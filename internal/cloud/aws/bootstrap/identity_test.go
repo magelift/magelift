@@ -235,6 +235,16 @@ func TestIdentityPlanIsRepoScopedAndLeastPrivilege(t *testing.T) {
 	if !strings.Contains(plan.CITrustPolicy, "repo:acourtiol/magelift:environment:production") {
 		t.Fatal("CI trust policy is not repository scoped")
 	}
+	boundary, err := ciPermissionsBoundaryPolicy()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(boundary) > 6144 {
+		t.Fatalf("CI permissions boundary exceeds the IAM managed-policy limit: %d", len(boundary))
+	}
+	if len(plan.CIPermissionsPolicy) > 10240 {
+		t.Fatalf("CI inline permissions exceed the IAM role-policy limit: %d", len(plan.CIPermissionsPolicy))
+	}
 }
 
 func TestIdentityEnsureIsIdempotent(t *testing.T) {

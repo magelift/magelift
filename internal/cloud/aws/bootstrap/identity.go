@@ -204,35 +204,45 @@ func (b *IdentityBootstrapper) Ensure(ctx context.Context, plan IdentityPlan) er
 		return errors.New("identity bootstrap clients are required")
 	}
 	if err := b.ensureProvider(ctx, plan); err != nil {
-		return redactAWS(ctx, ErrEnsureOIDCProvider)
+		return redactAWS(ctx, ErrEnsureOIDCProvider, err)
 	}
 	if err := b.ensureBoundary(ctx, plan); err != nil {
-		return redactAWS(ctx, ErrEnsureRoleBoundary)
+		return redactAWS(ctx, ErrEnsureRoleBoundary, err)
 	}
 	if err := b.ensureRole(ctx, plan); err != nil {
-		return redactAWS(ctx, ErrEnsureRole)
+		return redactAWS(ctx, ErrEnsureRole, err)
 	}
 	if err := b.ensureCIBoundary(ctx, plan); err != nil {
-		return redactAWS(ctx, ErrEnsureRoleBoundary)
+		return redactAWS(ctx, ErrEnsureRoleBoundary, err)
 	}
 	if err := b.ensureCIRole(ctx, plan); err != nil {
-		return redactAWS(ctx, ErrEnsureRole)
+		return redactAWS(ctx, ErrEnsureRole, err)
 	}
 	if err := b.ensureBuildBoundary(ctx, plan); err != nil {
-		return redactAWS(ctx, ErrEnsureRoleBoundary)
+		return redactAWS(ctx, ErrEnsureRoleBoundary, err)
 	}
 	if err := b.ensureBuildRole(ctx, plan); err != nil {
-		return redactAWS(ctx, ErrEnsureRole)
+		return redactAWS(ctx, ErrEnsureRole, err)
 	}
 	if err := b.writeMetadata(ctx, plan); err != nil {
-		return redactAWS(ctx, ErrWriteMetadata)
+		return redactAWS(ctx, ErrWriteMetadata, err)
 	}
 	return nil
 }
 
-func redactAWS(ctx context.Context, fallback error) error {
-	if cause := context.Cause(ctx); cause != nil {
-		return cause
+func redactAWS(ctx context.Context, fallback, cause error) error {
+	if ctxCause := context.Cause(ctx); ctxCause != nil {
+		return ctxCause
+	}
+	if cause == nil {
+		return fallback
+	}
+	var apiErr smithy.APIError
+	if errors.As(cause, &apiErr) {
+		code := strings.TrimSpace(apiErr.ErrorCode())
+		if code != "" {
+			return fmt.Errorf("%w: %s", fallback, code)
+		}
 	}
 	return fallback
 }
@@ -265,7 +275,11 @@ func (b *IdentityBootstrapper) ensureRole(ctx context.Context, plan IdentityPlan
 }
 
 func (b *IdentityBootstrapper) ensureCIBoundary(ctx context.Context, plan IdentityPlan) error {
-	return b.ensureBoundarySpec(ctx, plan.CIBoundaryName, plan.CIBoundaryARN, plan.CIPermissionsPolicy, plan.Tags)
+	boundary, err := ciPermissionsBoundaryPolicy()
+	if err != nil {
+		return err
+	}
+	return b.ensureBoundarySpec(ctx, plan.CIBoundaryName, plan.CIBoundaryARN, boundary, plan.Tags)
 }
 
 func (b *IdentityBootstrapper) ensureCIRole(ctx context.Context, plan IdentityPlan) error {

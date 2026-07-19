@@ -56,6 +56,23 @@ func awsServiceSuffix(partition string) string {
 	return "amazonaws.com"
 }
 
+// ciPermissionsBoundaryPolicy is the IAM permissions-boundary document for the
+// CI role. Managed policies are capped at 6144 bytes, so this boundary only
+// names the service families MageLift may use. The detailed inline role policy
+// from ciPermissionsPolicy still constrains effective permissions.
+func ciPermissionsBoundaryPolicy() (string, error) {
+	return policyJSON([]map[string]any{{
+		"Effect": "Allow",
+		"Action": []string{
+			"sts:GetCallerIdentity",
+			"acm:*", "aoss:*", "cloudfront:*", "cloudwatch:*", "ec2:*", "ecr:*", "ecs:*",
+			"elasticache:*", "elasticloadbalancing:*", "es:*", "iam:*", "kms:*", "logs:*",
+			"mq:*", "rds:*", "route53:*", "s3:*", "secretsmanager:*", "ssm:*", "synthetics:*", "wafv2:*",
+		},
+		"Resource": "*",
+	}})
+}
+
 // ciPermissionsPolicy is deliberately explicit about service actions. AWS
 // create and describe APIs generally require Resource "*"; IAM escalation is
 // constrained separately to MageLift-owned roles and policies.
