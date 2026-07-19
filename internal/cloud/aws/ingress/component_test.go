@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/acourtiol/magelift/internal/cloud/aws/naming"
 	awsprovider "github.com/pulumi/pulumi-aws/sdk/v7/go/aws"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -60,10 +61,16 @@ func TestCreatesSecureInternetFacingHTTPSIngress(t *testing.T) {
 	if loadBalancer["internal"].BoolValue() || loadBalancer["loadBalancerType"].StringValue() != "application" || !loadBalancer["dropInvalidHeaderFields"].BoolValue() {
 		t.Fatalf("load balancer inputs = %#v", loadBalancer.Mappable())
 	}
+	if loadBalancer["name"].StringValue() != "shop-alb" {
+		t.Fatalf("load balancer name = %q", loadBalancer["name"].StringValue())
+	}
 	if len(loadBalancer["subnets"].ArrayValue()) != 2 || len(loadBalancer["securityGroups"].ArrayValue()) != 1 {
 		t.Fatal("load balancer placement is incomplete")
 	}
 	target := m.one(t, "aws:lb/targetGroup:TargetGroup").inputs
+	if target["name"].StringValue() != "shop-web" {
+		t.Fatalf("target group name = %q", target["name"].StringValue())
+	}
 	if target["targetType"].StringValue() != "ip" || target["protocol"].StringValue() != "HTTP" || target["port"].NumberValue() != 8080 {
 		t.Fatalf("target group inputs = %#v", target.Mappable())
 	}
@@ -197,4 +204,20 @@ func (m *mocks) countWithoutProvider() int {
 		}
 	}
 	return count
+}
+
+func TestAWSResourceNameRespectsLimit(t *testing.T) {
+	t.Parallel()
+	exact := "acceptance-preview-ingress-alb" // 32 characters
+	if got := naming.AWSName(exact, 32); got != exact {
+		t.Fatalf("exact-limit name changed: %q", got)
+	}
+	long := exact + "-extra"
+	got := naming.AWSName(long, 32)
+	if len(got) > 32 {
+		t.Fatalf("name too long: %q (%d)", got, len(got))
+	}
+	if got == long {
+		t.Fatal("expected truncation for over-limit name")
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/acourtiol/magelift/internal/cloud/aws/naming"
 	sdk "github.com/acourtiol/magelift/sdk/v1"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/opensearch"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -100,8 +101,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 func createServerless(ctx *pulumi.Context, name string, args Args, component *Component) error {
 	child := pulumi.Parent(component)
 	capacity := args.Serverless.Capacity
+	collectionName := naming.AWSName(name, 26)
 	group, err := opensearch.NewServerlessCollectionGroup(ctx, name+"-group", &opensearch.ServerlessCollectionGroupArgs{
-		Name: pulumi.String(name + "-group"), Region: pulumi.String(args.Region), Generation: pulumi.String(serverlessClassic),
+		Name: pulumi.String(naming.AWSName(name+"-group", 26)), Region: pulumi.String(args.Region), Generation: pulumi.String(serverlessClassic),
 		StandbyReplicas: pulumi.String("DISABLED"), Tags: tags(args.Tags, name, "collection-group"),
 		CapacityLimits: opensearch.ServerlessCollectionGroupCapacityLimitArray{
 			&opensearch.ServerlessCollectionGroupCapacityLimitArgs{
@@ -114,7 +116,7 @@ func createServerless(ctx *pulumi.Context, name string, args Args, component *Co
 		return err
 	}
 	endpoint, err := opensearch.NewServerlessVpcEndpoint(ctx, name+"-endpoint", &opensearch.ServerlessVpcEndpointArgs{
-		Name: pulumi.String(name + "-endpoint"), Region: pulumi.String(args.Region), VpcId: args.VPCID,
+		Name: pulumi.String(naming.AWSName(name+"-endpoint", 32)), Region: pulumi.String(args.Region), VpcId: args.VPCID,
 		SubnetIds: args.SubnetIDs, SecurityGroupIds: args.SecurityGroupIDs,
 	}, child)
 	if err != nil {
@@ -124,13 +126,13 @@ func createServerless(ctx *pulumi.Context, name string, args Args, component *Co
 		return marshalPolicy([]networkPolicyDocument{{
 			Description: "Private collection access", AllowFromPublic: false, SourceVPCEs: []string{string(endpointID)},
 			Rules: []networkRule{
-				{ResourceType: "collection", Resource: []string{"collection/" + name}},
-				{ResourceType: "dashboard", Resource: []string{"collection/" + name}},
+				{ResourceType: "collection", Resource: []string{"collection/" + collectionName}},
+				{ResourceType: "dashboard", Resource: []string{"collection/" + collectionName}},
 			},
 		}})
 	}).(pulumi.StringOutput)
 	network, err := opensearch.NewServerlessSecurityPolicy(ctx, name+"-network", &opensearch.ServerlessSecurityPolicyArgs{
-		Name: pulumi.String(name + "-network"), Region: pulumi.String(args.Region), Type: pulumi.String("network"), Policy: networkPolicy,
+		Name: pulumi.String(naming.AWSName(name+"-network", 32)), Region: pulumi.String(args.Region), Type: pulumi.String("network"), Policy: networkPolicy,
 	}, child)
 	if err != nil {
 		return err
@@ -139,19 +141,19 @@ func createServerless(ctx *pulumi.Context, name string, args Args, component *Co
 		return marshalPolicy([]accessPolicyDocument{{
 			Description: "Magento search access", Principal: []string{identity},
 			Rules: []accessRule{
-				{ResourceType: "collection", Resource: []string{"collection/" + name}, Permission: []string{"aoss:DescribeCollectionItems"}},
-				{ResourceType: "index", Resource: []string{"index/" + name + "/*"}, Permission: []string{"aoss:CreateIndex", "aoss:DeleteIndex", "aoss:UpdateIndex", "aoss:DescribeIndex", "aoss:ReadDocument", "aoss:WriteDocument"}},
+				{ResourceType: "collection", Resource: []string{"collection/" + collectionName}, Permission: []string{"aoss:DescribeCollectionItems"}},
+				{ResourceType: "index", Resource: []string{"index/" + collectionName + "/*"}, Permission: []string{"aoss:CreateIndex", "aoss:DeleteIndex", "aoss:UpdateIndex", "aoss:DescribeIndex", "aoss:ReadDocument", "aoss:WriteDocument"}},
 			},
 		}})
 	}).(pulumi.StringOutput)
 	access, err := opensearch.NewServerlessAccessPolicy(ctx, name+"-access", &opensearch.ServerlessAccessPolicyArgs{
-		Name: pulumi.String(name + "-access"), Region: pulumi.String(args.Region), Type: pulumi.String("data"), Policy: accessJSON,
+		Name: pulumi.String(naming.AWSName(name+"-access", 32)), Region: pulumi.String(args.Region), Type: pulumi.String("data"), Policy: accessJSON,
 	}, child)
 	if err != nil {
 		return err
 	}
 	collection, err := opensearch.NewServerlessCollection(ctx, name, &opensearch.ServerlessCollectionArgs{
-		Name: pulumi.String(name), Region: pulumi.String(args.Region), Type: pulumi.String("SEARCH"),
+		Name: pulumi.String(collectionName), Region: pulumi.String(args.Region), Type: pulumi.String("SEARCH"),
 		CollectionGroupName: group.Name, StandbyReplicas: pulumi.String("DISABLED"), Tags: tags(args.Tags, name, "collection"),
 		EncryptionConfigs: opensearch.ServerlessCollectionEncryptionConfigArray{
 			&opensearch.ServerlessCollectionEncryptionConfigArgs{KmsKeyArn: pulumi.String(args.KMSKeyARN)},

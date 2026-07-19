@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/acourtiol/magelift/internal/cloud/aws/naming"
 	awsprovider "github.com/pulumi/pulumi-aws/sdk/v7/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/lb"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -54,6 +55,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	child := []pulumi.ResourceOption{pulumi.Parent(component), pulumi.Provider(args.Provider)}
 	loadBalancer, err := lb.NewLoadBalancer(ctx, name+"-alb", &lb.LoadBalancerArgs{
+		Name:                    pulumi.String(naming.AWSName(name+"-alb", 32)),
 		Internal:                pulumi.Bool(false),
 		LoadBalancerType:        pulumi.String("application"),
 		IpAddressType:           pulumi.String("ipv4"),
@@ -68,6 +70,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 	targetGroup, err := lb.NewTargetGroup(ctx, name+"-web", &lb.TargetGroupArgs{
+		Name:        pulumi.String(naming.AWSName(name+"-web", 32)),
 		VpcId:       args.VPCID,
 		Port:        pulumi.Int(args.TargetPort),
 		Protocol:    pulumi.String("HTTP"),
