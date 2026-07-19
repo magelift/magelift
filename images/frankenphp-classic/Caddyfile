@@ -1,0 +1,25 @@
+{
+	storage file_system /tmp/magelift-caddy
+	skip_install_trust
+}
+
+:8080 {
+	root * /app/pub
+	encode gzip
+	php_server
+	log {
+		output stdout
+		format json
+	}
+}
+
+https://localhost:8443 {
+	tls internal
+	root * /app/pub
+	encode gzip
+	php_server
+	log {
+		output stdout
+		format json
+	}
+}

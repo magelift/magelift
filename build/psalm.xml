@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<psalm
+    errorLevel="6"
+    resolveFromConfigFile="true"
+    findUnusedBaselineEntry="true"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://getpsalm.org/schema/config"
+    xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
+>
+    <projectFiles>
+        <directory name="src" />
+    </projectFiles>
+    <issueHandlers>
+        <MissingFile errorLevel="error" />
+        <!-- Public package classes and interface methods are consumed by the Go runner and by callers outside this tree. -->
+        <UnusedClass errorLevel="suppress" />
+        <PossiblyUnusedMethod errorLevel="suppress" />
+        <PossiblyUnusedProperty errorLevel="suppress" />
+        <!-- #[Override] is unavailable on the package's PHP 8.2 floor. -->
+        <MissingOverrideAttribute errorLevel="suppress" />
+        <!-- Runtime protocol guards intentionally repeat checks after JSON decoding. -->
+        <UnusedFunctionCall errorLevel="suppress" />
+        <UndefinedMethod errorLevel="suppress" />
+    </issueHandlers>
+</psalm>
