@@ -1,0 +1,35 @@
+site_name: MageLift
+site_description: Open-source Magento application platform for AWS
+repo_url: https://github.com/acourtiol/magelift
+repo_name: acourtiol/magelift
+docs_dir: docs
+strict: true
+theme:
+  name: mkdocs
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Configuration: configuration.md
+  - Compatibility: compatibility.md
+  - Application builds: builds.md
+  - Benchmarking: benchmarks.md
+  - AWS bootstrap: bootstrap.md
+  - Deployment operations: operations.md
+  - CLI reference: cli-reference.md
+  - Secret references: secrets.md
+  - Dependency policy: dependency-policy.md
+  - Decisions:
+      - ADR process: adr/README.md
+      - "0001: AWS ECS Fargate v1": adr/0001-aws-ecs-fargate-v1.md
+      - "0002: Provider and runtime extensions": adr/0002-provider-runtime-extension-boundary.md
+      - "0003: External artifact manifest": adr/0003-external-final-artifact-manifest.md
+      - "0004: Provider package layout": adr/0004-provider-package-layout.md
+      - "0005: Local development Compose": adr/0005-local-development-compose.md
+      - "0006: GitHub OIDC role separation": adr/0006-github-oidc-role-separation.md
+  - Clean-room provenance: provenance.md
+  - Release readiness: release-readiness.md
+markdown_extensions:
+  - admonition
+  - attr_list
+  - toc:
+      permalink: true

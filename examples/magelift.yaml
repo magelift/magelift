@@ -1,0 +1,31 @@
+schemaVersion: 1
+project:
+  name: example-shop
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+build:
+  php: "8.5"
+  composer:
+    credentials: aws-secrets-manager://magelift/composer
+target:
+  provider: aws
+  runtime: ecs-fargate
+  aws: {}
+defaults:
+  region: eu-west-3
+  preset: preview
+environments:
+  staging:
+    account: "123456789012"
+    branches: [main]
+    domain: staging.example.com
+  production:
+    inherits: staging
+    account: "210987654321"
+    class: production
+    preset: high-availability
+    domain: example.com
+    protection: true
+extensions: {}

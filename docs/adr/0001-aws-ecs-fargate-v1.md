@@ -1,0 +1,32 @@
+# ADR 0001: AWS ECS Fargate is the only certified v1 runtime
+
+- Status: Accepted
+- Date: 2026-07-17
+
+## Context
+
+Magento operations already span application build, networking, data services,
+deployment safety, recovery, security, and cost. Implementing several providers before
+one complete path is proven would dilute testing and leak lowest-common-denominator
+abstractions into the user contract.
+
+## Decision
+
+MageLift v1 targets AWS and certifies ECS Fargate. Stable application lifecycle,
+capability, build, and target interfaces preserve future extension points, but neither
+documentation nor marketing will claim multi-cloud support until a second provider
+passes the same application-level acceptance suite.
+
+Pulumi owns durable AWS resources. The CLI uses AWS APIs directly only where Pulumi's
+backend cannot bootstrap itself and for bounded deployment orchestration.
+
+## Consequences
+
+The project can test deeper AWS failure and recovery behavior and publish realistic
+presets. Users needing Kubernetes or another cloud must wait or maintain an unsupported
+extension. Provider differences remain explicit rather than entering the core YAML.
+
+## Provenance
+
+This is an original project decision informed by public Pulumi Automation API and AWS
+ECS documentation. No third-party source code was used.
