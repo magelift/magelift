@@ -143,7 +143,8 @@ func validateAWSServiceCompatibility(cfg config.Config) error {
 	if !strings.HasPrefix(versions.RabbitMQ, "3.13") && !strings.HasPrefix(versions.RabbitMQ, "4.2") {
 		return fmt.Errorf("Magento %s requires AWS MQ RabbitMQ 3.13 or 4.2 for the v1 target", versionLine)
 	}
-	if strings.HasPrefix(versions.RabbitMQ, "4.2") && !strings.HasPrefix(cfg.Target.AWS.Catalog.RabbitMQ.InstanceType, "mq.m7g.") {
+	// Preview uses Magento database queues, so the RabbitMQ instance type may be unset.
+	if instanceType := strings.TrimSpace(cfg.Target.AWS.Catalog.RabbitMQ.InstanceType); strings.HasPrefix(versions.RabbitMQ, "4.2") && instanceType != "" && !strings.HasPrefix(instanceType, "mq.m7g.") {
 		return errors.New("AWS MQ RabbitMQ 4.2 requires an mq.m7g instance type")
 	}
 	if !strings.Contains(versions.AuroraMySQL, ".3.12") && !strings.Contains(versions.AuroraMySQL, ".3.11") {

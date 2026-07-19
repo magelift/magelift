@@ -162,6 +162,11 @@ func TestPlanFromConfigAcceptsCurrentAWSServiceVersions(t *testing.T) {
 	if _, err := PlanFromConfig(cfg, "staging"); err == nil || !strings.Contains(err.Error(), "mq.m7g") {
 		t.Fatalf("RabbitMQ 4.2 instance constraint was not enforced: %v", err)
 	}
+
+	cfg.Target.AWS.Catalog.RabbitMQ.InstanceType = ""
+	if err := validateAWSServiceCompatibility(cfg); err != nil {
+		t.Fatalf("empty RabbitMQ instance type should skip the mq.m7g gate: %v", err)
+	}
 }
 
 func deploymentConfig() config.Config {
