@@ -57,14 +57,20 @@ const (
 )
 
 const (
-	CapabilityDatabaseMySQL           CapabilityID = "database.mysql"
-	CapabilityCacheValkey             CapabilityID = "cache.valkey"
-	CapabilitySearchOpenSearch        CapabilityID = "search.opensearch"
-	CapabilityQueueDatabase           CapabilityID = "queue.database"
-	CapabilityQueueRabbitMQ           CapabilityID = "queue.rabbitmq"
-	CapabilityObjectStorageS3         CapabilityID = "object-storage.s3"
-	CapabilityEdgeCloudFront          CapabilityID = "edge.cloudfront"
-	CapabilityObservabilityCloudWatch CapabilityID = "observability.cloudwatch"
+	CapabilityDatabaseMySQL        CapabilityID = "database.mysql"
+	CapabilityCacheValkey          CapabilityID = "cache.valkey"
+	CapabilitySearchFullText       CapabilityID = "search.fulltext"
+	CapabilityQueueDatabase        CapabilityID = "queue.database"
+	CapabilityQueueRabbitMQ        CapabilityID = "queue.rabbitmq"
+	CapabilityObjectStorageBlob    CapabilityID = "object-storage.blob"
+	CapabilityEdgeCDN              CapabilityID = "edge.cdn"
+	CapabilityObservabilityLogs    CapabilityID = "observability.logs"
+
+	// Deprecated AWS-product aliases — prefer the Magento-shaped IDs above.
+	CapabilitySearchOpenSearch        = CapabilitySearchFullText
+	CapabilityObjectStorageS3         = CapabilityObjectStorageBlob
+	CapabilityEdgeCloudFront          = CapabilityEdgeCDN
+	CapabilityObservabilityCloudWatch = CapabilityObservabilityLogs
 )
 
 type CapabilityRequest struct {
