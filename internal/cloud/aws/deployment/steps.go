@@ -77,6 +77,17 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 	if err != nil {
 		return fmt.Errorf("read ECS deployment outputs: %w", err)
 	}
+	// Greenfield stacks have no ECS outputs yet. Create infrastructure first so
+	// the candidate task definition and cluster exist, then continue.
+	if _, err := requiredString(outputs, "clusterName"); err != nil {
+		if _, updateErr := s.UpdateServices(ctx, request); updateErr != nil {
+			return fmt.Errorf("create initial infrastructure: %w", updateErr)
+		}
+		outputs, err = s.backend.Outputs(ctx)
+		if err != nil {
+			return fmt.Errorf("read ECS deployment outputs after initial create: %w", err)
+		}
+	}
 	cluster, err := requiredString(outputs, "clusterName")
 	if err != nil {
 		return err
