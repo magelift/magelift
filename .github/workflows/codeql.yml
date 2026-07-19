@@ -19,15 +19,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [go, php]
+        # CodeQL does not treat PHP as a first-class language here; Go needs a real build.
+        include:
+          - language: go
+            build-mode: autobuild
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+        if: matrix.language == 'go'
       - uses: github/codeql-action/init@bb16b9baa2ec4010b29f5c606d57d01190139edd # v4.37.1
         with:
           languages: ${{ matrix.language }}
-          build-mode: none
+          build-mode: ${{ matrix.build-mode }}
       - uses: github/codeql-action/analyze@bb16b9baa2ec4010b29f5c606d57d01190139edd # v4.37.1
         with:
           category: /language:${{ matrix.language }}

@@ -18,9 +18,12 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - run: gofmt -w $(git ls-files '*.go') && git diff --exit-code
-      - run: go run ./cmd/genconfig --check
-      - run: go run ./cmd/gendocs --check
+      - run: |
+          mapfile -t go_files < <(git ls-files '*.go')
+          gofmt -w "${go_files[@]}"
+          git diff --exit-code
+      - run: go build -o /tmp/genconfig ./cmd/genconfig && /tmp/genconfig --check
+      - run: go build -o /tmp/gendocs ./cmd/gendocs && /tmp/gendocs --check
       - run: go vet ./...
       - run: go test -race ./...
       - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
@@ -73,6 +76,8 @@ jobs:
           php-runtime-${{ matrix.php.target }}
           php-builder-${{ matrix.php.target }}
           --load
+          --provenance=false
+          --sbom=false
           --set '*.platform=linux/amd64'
       - name: Inspect runtime
         env:
@@ -120,7 +125,7 @@ jobs:
         run: |
           target="frankenphp-classic-${{ matrix.php.target }}"
           image="magelift/frankenphp-classic:${PHP_BRANCH}-local"
-          docker buildx bake "$target" --load --set "$target.platform=linux/amd64"
+          docker buildx bake "$target" --load --provenance=false --sbom=false --set "$target.platform=linux/amd64"
           test "$(docker run --rm --entrypoint id "$image" -u)" = 10001
           docker run --rm --entrypoint frankenphp "$image" version
           MAGELIFT_FRANKENPHP_IMAGE="$image" ./scripts/frankenphp-tls-test.sh
@@ -222,7 +227,7 @@ jobs:
       - name: Build image for scanning
         env:
           TARGET: ${{ matrix.target }}
-        run: docker buildx bake "$TARGET" --load --set "$TARGET.platform=linux/amd64"
+        run: docker buildx bake "$TARGET" --load --provenance=false --sbom=false --set "$TARGET.platform=linux/amd64"
       - uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           image-ref: ${{ matrix.image }}
