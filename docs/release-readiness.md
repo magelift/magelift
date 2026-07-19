@@ -33,3 +33,26 @@ fine-grained token so release tags can trigger the artifact workflow; the defaul
 `GITHUB_TOKEN` does not start a second workflow.
 
 If clearance fails, rename every identifier before the first public tag.
+
+## Packaging status (2026-07-19)
+
+GoReleaser config is valid (`goreleaser check`). Builds target linux/darwin/windows
+× amd64/arm64 with CGO disabled. Release workflow can publish a Homebrew cask to
+`acourtiol/homebrew-tap` when `HOMEBREW_TAP_GITHUB_TOKEN` is set. There is no
+Scoop/winget/Chocolatey formula yet.
+
+**Not ready to publish.** Blockers before any public `v*` tag or brew tap push:
+
+| Gate | Status |
+| --- | --- |
+| Trademark / package-name clearance | Open |
+| Pre-alpha → stable contract freeze | Open |
+| Real AWS acceptance (incl. OpenSearch path) | Maintainer-local; not green for release |
+| GCP Magento deploy Ops | Experimental / incomplete |
+| NOTICE + license review for release scope | Documented process; confirm before tag |
+| Homebrew tap repo + token in release env | Config present; tap contents unverified here |
+| Windows/macOS smoke of released archives | Not run in this pass |
+
+Ship GitHub Release archives first after clearance. Add brew only when the cask
+install path is tested on macOS. Treat Windows as archive download until a
+maintainer owns winget/Scoop if demand appears.
