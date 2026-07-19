@@ -1,0 +1,1672 @@
+{
+  "$defs": {
+    "aWSCatalog": {
+      "additionalProperties": false,
+      "properties": {
+        "aurora": {
+          "$ref": "#/$defs/aWSCatalogAurora",
+          "description": "Aurora capacity"
+        },
+        "fargate": {
+          "$ref": "#/$defs/aWSCatalogFargate",
+          "description": "Fargate capacity"
+        },
+        "rabbitMq": {
+          "$ref": "#/$defs/aWSCatalogRabbitMQ",
+          "description": "RabbitMQ capacity"
+        },
+        "retention": {
+          "$ref": "#/$defs/aWSCatalogRetention",
+          "description": "Retention policy"
+        },
+        "search": {
+          "$ref": "#/$defs/aWSCatalogSearch",
+          "description": "OpenSearch capacity"
+        },
+        "valkey": {
+          "$ref": "#/$defs/aWSCatalogValkey",
+          "description": "Valkey capacity"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "description": "Benchmark catalog version",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "versions": {
+          "$ref": "#/$defs/aWSCatalogVersions",
+          "description": "Managed service versions"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogAurora": {
+      "additionalProperties": false,
+      "properties": {
+        "autoPauseSeconds": {
+          "description": "Aurora auto-pause duration",
+          "type": "integer"
+        },
+        "engineSupportsAutoPause": {
+          "description": "Whether the selected engine supports auto-pause",
+          "type": "boolean"
+        },
+        "instanceClass": {
+          "description": "Provisioned Aurora instance class",
+          "type": "string"
+        },
+        "instanceCount": {
+          "description": "Provisioned Aurora instance count",
+          "type": "integer"
+        },
+        "maximumAcu": {
+          "description": "Maximum Aurora Serverless v2 capacity",
+          "type": "number"
+        },
+        "minimumAcu": {
+          "description": "Minimum Aurora Serverless v2 capacity",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogAuroraOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "autoPauseSeconds": {
+          "description": "Aurora auto-pause duration",
+          "type": "integer"
+        },
+        "engineSupportsAutoPause": {
+          "description": "Whether the selected engine supports auto-pause",
+          "type": "boolean"
+        },
+        "instanceClass": {
+          "description": "Provisioned Aurora instance class",
+          "type": "string"
+        },
+        "instanceCount": {
+          "description": "Provisioned Aurora instance count",
+          "type": "integer"
+        },
+        "maximumAcu": {
+          "description": "Maximum Aurora Serverless v2 capacity",
+          "type": "number"
+        },
+        "minimumAcu": {
+          "description": "Minimum Aurora Serverless v2 capacity",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogFargate": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "description": "Fargate task CPU",
+          "type": "integer"
+        },
+        "desiredCount": {
+          "description": "Fargate desired task count",
+          "type": "integer"
+        },
+        "memoryMiB": {
+          "description": "Fargate task memory",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogFargateOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "description": "Fargate task CPU",
+          "type": "integer"
+        },
+        "desiredCount": {
+          "description": "Fargate desired task count",
+          "type": "integer"
+        },
+        "memoryMiB": {
+          "description": "Fargate task memory",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "aurora": {
+          "$ref": "#/$defs/aWSCatalogAuroraOverlay",
+          "description": "Aurora capacity"
+        },
+        "fargate": {
+          "$ref": "#/$defs/aWSCatalogFargateOverlay",
+          "description": "Fargate capacity"
+        },
+        "rabbitMq": {
+          "$ref": "#/$defs/aWSCatalogRabbitMQOverlay",
+          "description": "RabbitMQ capacity"
+        },
+        "retention": {
+          "$ref": "#/$defs/aWSCatalogRetentionOverlay",
+          "description": "Retention policy"
+        },
+        "search": {
+          "$ref": "#/$defs/aWSCatalogSearchOverlay",
+          "description": "OpenSearch capacity"
+        },
+        "valkey": {
+          "$ref": "#/$defs/aWSCatalogValkeyOverlay",
+          "description": "Valkey capacity"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "description": "Benchmark catalog version",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "versions": {
+          "$ref": "#/$defs/aWSCatalogVersionsOverlay",
+          "description": "Managed service versions"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogRabbitMQ": {
+      "additionalProperties": false,
+      "properties": {
+        "instanceType": {
+          "description": "RabbitMQ broker instance type",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogRabbitMQOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "instanceType": {
+          "description": "RabbitMQ broker instance type",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogRetention": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactDays": {
+          "description": "Artifact retention days",
+          "type": "integer"
+        },
+        "backupDays": {
+          "description": "Database backup retention days",
+          "type": "integer"
+        },
+        "logDays": {
+          "description": "CloudWatch log retention days",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogRetentionOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactDays": {
+          "description": "Artifact retention days",
+          "type": "integer"
+        },
+        "backupDays": {
+          "description": "Database backup retention days",
+          "type": "integer"
+        },
+        "logDays": {
+          "description": "CloudWatch log retention days",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogSearch": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptColdStarts": {
+          "description": "Accept OpenSearch Serverless cold starts",
+          "type": "boolean"
+        },
+        "dedicatedMasterCount": {
+          "description": "OpenSearch dedicated master count",
+          "type": "integer"
+        },
+        "dedicatedMasterType": {
+          "description": "OpenSearch dedicated master type",
+          "type": "string"
+        },
+        "ebsVolumeSizeGiB": {
+          "description": "OpenSearch EBS volume size",
+          "type": "integer"
+        },
+        "ebsVolumeType": {
+          "description": "OpenSearch EBS volume type",
+          "type": "string"
+        },
+        "instanceCount": {
+          "description": "Provisioned OpenSearch data node count",
+          "type": "integer"
+        },
+        "instanceType": {
+          "description": "Provisioned OpenSearch instance type",
+          "type": "string"
+        },
+        "maximumIndexingOcu": {
+          "description": "OpenSearch Serverless indexing limit",
+          "type": "number"
+        },
+        "maximumSearchOcu": {
+          "description": "OpenSearch Serverless search limit",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogSearchOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptColdStarts": {
+          "description": "Accept OpenSearch Serverless cold starts",
+          "type": "boolean"
+        },
+        "dedicatedMasterCount": {
+          "description": "OpenSearch dedicated master count",
+          "type": "integer"
+        },
+        "dedicatedMasterType": {
+          "description": "OpenSearch dedicated master type",
+          "type": "string"
+        },
+        "ebsVolumeSizeGiB": {
+          "description": "OpenSearch EBS volume size",
+          "type": "integer"
+        },
+        "ebsVolumeType": {
+          "description": "OpenSearch EBS volume type",
+          "type": "string"
+        },
+        "instanceCount": {
+          "description": "Provisioned OpenSearch data node count",
+          "type": "integer"
+        },
+        "instanceType": {
+          "description": "Provisioned OpenSearch instance type",
+          "type": "string"
+        },
+        "maximumIndexingOcu": {
+          "description": "OpenSearch Serverless indexing limit",
+          "type": "number"
+        },
+        "maximumSearchOcu": {
+          "description": "OpenSearch Serverless search limit",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogValkey": {
+      "additionalProperties": false,
+      "properties": {
+        "nodeType": {
+          "description": "Valkey node type",
+          "type": "string"
+        },
+        "replicaCount": {
+          "description": "Valkey replica count",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogValkeyOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "nodeType": {
+          "description": "Valkey node type",
+          "type": "string"
+        },
+        "replicaCount": {
+          "description": "Valkey replica count",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogVersions": {
+      "additionalProperties": false,
+      "properties": {
+        "auroraMysql": {
+          "description": "Aurora MySQL engine version",
+          "type": "string"
+        },
+        "openSearch": {
+          "description": "OpenSearch engine version",
+          "type": "string"
+        },
+        "rabbitMq": {
+          "description": "RabbitMQ engine version",
+          "type": "string"
+        },
+        "valkey": {
+          "description": "Valkey engine version",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogVersionsOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "auroraMysql": {
+          "description": "Aurora MySQL engine version",
+          "type": "string"
+        },
+        "openSearch": {
+          "description": "OpenSearch engine version",
+          "type": "string"
+        },
+        "rabbitMq": {
+          "description": "RabbitMQ engine version",
+          "type": "string"
+        },
+        "valkey": {
+          "description": "Valkey engine version",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "aWSExistingResource": {
+      "additionalProperties": false,
+      "properties": {
+        "externalId": {
+          "description": "Provider resource identifier",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Resource kind",
+          "type": "string"
+        },
+        "provider": {
+          "const": "aws",
+          "description": "Resource provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "kind",
+        "externalId"
+      ],
+      "type": "object"
+    },
+    "aWSExistingResourceOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "externalId": {
+          "description": "Provider resource identifier",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Resource kind",
+          "type": "string"
+        },
+        "provider": {
+          "const": "aws",
+          "description": "Resource provider",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "aWSExistingResources": {
+      "additionalProperties": false,
+      "properties": {
+        "dataSubnetIds": {
+          "anyOf": [
+            {
+              "description": "Existing data subnet IDs",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "network": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSExistingResource",
+              "description": "Existing VPC reference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "privateSubnetIds": {
+          "anyOf": [
+            {
+              "description": "Existing private subnet IDs",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publicSubnetIds": {
+          "anyOf": [
+            {
+              "description": "Existing public subnet IDs",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "aWSExistingResourcesOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "dataSubnetIds": {
+          "anyOf": [
+            {
+              "description": "Existing data subnet IDs",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "network": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSExistingResourceOverlay",
+              "description": "Existing VPC reference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "privateSubnetIds": {
+          "anyOf": [
+            {
+              "description": "Existing private subnet IDs",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publicSubnetIds": {
+          "anyOf": [
+            {
+              "description": "Existing public subnet IDs",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "aWSTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "albCertificateArn": {
+          "anyOf": [
+            {
+              "description": "Regional ACM certificate ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "availabilityZones": {
+          "anyOf": [
+            {
+              "description": "AWS availability zones",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cacheSecretArn": {
+          "anyOf": [
+            {
+              "description": "Valkey auth token secret ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "catalog": {
+          "$ref": "#/$defs/aWSCatalog",
+          "description": "Benchmark-selected service catalog"
+        },
+        "cloudFrontCertificateArn": {
+          "anyOf": [
+            {
+              "description": "us-east-1 ACM certificate ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseName": {
+          "anyOf": [
+            {
+              "description": "Magento database name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encryptionKeySecretArn": {
+          "anyOf": [
+            {
+              "description": "Magento encryption key secret ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "existing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSExistingResources",
+              "description": "Existing AWS resources"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hostedZoneId": {
+          "anyOf": [
+            {
+              "description": "Route 53 hosted zone ID",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "imageDigest": {
+          "anyOf": [
+            {
+              "description": "Signed immutable OCI image digest",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kmsKeyArn": {
+          "anyOf": [
+            {
+              "description": "Customer-managed KMS key ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "masterUsername": {
+          "anyOf": [
+            {
+              "description": "Database master username",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mediaDomain": {
+          "anyOf": [
+            {
+              "description": "Media delivery domain",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueSecretArn": {
+          "anyOf": [
+            {
+              "description": "RabbitMQ password secret ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionSecretArn": {
+          "anyOf": [
+            {
+              "description": "Session auth token secret ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "snsTopicArn": {
+          "anyOf": [
+            {
+              "description": "SNS notification topic ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vpcCidr": {
+          "anyOf": [
+            {
+              "description": "Canonical VPC IPv4 CIDR",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "aWSTargetOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "albCertificateArn": {
+          "anyOf": [
+            {
+              "description": "Regional ACM certificate ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "availabilityZones": {
+          "anyOf": [
+            {
+              "description": "AWS availability zones",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cacheSecretArn": {
+          "anyOf": [
+            {
+              "description": "Valkey auth token secret ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "catalog": {
+          "$ref": "#/$defs/aWSCatalogOverlay",
+          "description": "Benchmark-selected service catalog"
+        },
+        "cloudFrontCertificateArn": {
+          "anyOf": [
+            {
+              "description": "us-east-1 ACM certificate ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseName": {
+          "anyOf": [
+            {
+              "description": "Magento database name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encryptionKeySecretArn": {
+          "anyOf": [
+            {
+              "description": "Magento encryption key secret ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "existing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSExistingResourcesOverlay",
+              "description": "Existing AWS resources"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hostedZoneId": {
+          "anyOf": [
+            {
+              "description": "Route 53 hosted zone ID",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "imageDigest": {
+          "anyOf": [
+            {
+              "description": "Signed immutable OCI image digest",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kmsKeyArn": {
+          "anyOf": [
+            {
+              "description": "Customer-managed KMS key ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "masterUsername": {
+          "anyOf": [
+            {
+              "description": "Database master username",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mediaDomain": {
+          "anyOf": [
+            {
+              "description": "Media delivery domain",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueSecretArn": {
+          "anyOf": [
+            {
+              "description": "RabbitMQ password secret ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessionSecretArn": {
+          "anyOf": [
+            {
+              "description": "Session auth token secret ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "snsTopicArn": {
+          "anyOf": [
+            {
+              "description": "SNS notification topic ARN",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vpcCidr": {
+          "anyOf": [
+            {
+              "description": "Canonical VPC IPv4 CIDR",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "application": {
+      "additionalProperties": false,
+      "properties": {
+        "edition": {
+          "description": "Magento edition",
+          "enum": [
+            "open-source",
+            "commerce"
+          ],
+          "type": "string"
+        },
+        "mode": {
+          "description": "Application mode",
+          "enum": [
+            "integrated",
+            "headless"
+          ],
+          "type": "string"
+        },
+        "version": {
+          "description": "Exact Magento release",
+          "type": "string"
+        },
+        "webRuntime": {
+          "description": "HTTP application runtime",
+          "enum": [
+            "nginx-fpm",
+            "frankenphp-classic"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "edition",
+        "version",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "applicationOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "edition": {
+          "description": "Magento edition",
+          "enum": [
+            "open-source",
+            "commerce"
+          ],
+          "type": "string"
+        },
+        "mode": {
+          "description": "Application mode",
+          "enum": [
+            "integrated",
+            "headless"
+          ],
+          "type": "string"
+        },
+        "version": {
+          "description": "Exact Magento release",
+          "type": "string"
+        },
+        "webRuntime": {
+          "description": "HTTP application runtime",
+          "enum": [
+            "nginx-fpm",
+            "frankenphp-classic"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "build": {
+      "additionalProperties": false,
+      "properties": {
+        "composer": {
+          "$ref": "#/$defs/composer",
+          "description": "Composer settings"
+        },
+        "hooks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/buildHook"
+          },
+          "description": "Build lifecycle hooks",
+          "type": "object"
+        },
+        "php": {
+          "description": "Exact PHP branch or patch version",
+          "type": "string"
+        },
+        "staticContent": {
+          "additionalProperties": true,
+          "description": "Static content deployment settings",
+          "type": "object"
+        }
+      },
+      "required": [
+        "php"
+      ],
+      "type": "object"
+    },
+    "buildHook": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/buildHookCommand",
+              "description": "Validated command vector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dependencies": {
+          "description": "Additional stable step dependencies",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "failure": {
+          "description": "Failure action",
+          "enum": [
+            "abort",
+            "continue"
+          ],
+          "type": "string"
+        },
+        "phase": {
+          "description": "Preparation lifecycle phase",
+          "enum": [
+            "validate",
+            "build",
+            "package"
+          ],
+          "type": "string"
+        },
+        "relationship": {
+          "description": "Relationship to the target step",
+          "enum": [
+            "before",
+            "after",
+            "replace",
+            "disable"
+          ],
+          "type": "string"
+        },
+        "retries": {
+          "$ref": "#/$defs/buildHookRetries",
+          "description": "Retry policy"
+        },
+        "target": {
+          "description": "Stable target step ID",
+          "type": "string"
+        },
+        "timeoutSeconds": {
+          "description": "Step timeout in seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "phase",
+        "relationship",
+        "target"
+      ],
+      "type": "object"
+    },
+    "buildHookCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "description": "Argument vector",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "executable": {
+          "description": "Allowed executable",
+          "enum": [
+            "composer",
+            "magento"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "executable"
+      ],
+      "type": "object"
+    },
+    "buildHookCommandOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "description": "Argument vector",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "executable": {
+          "description": "Allowed executable",
+          "enum": [
+            "composer",
+            "magento"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "buildHookOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/buildHookCommandOverlay",
+              "description": "Validated command vector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dependencies": {
+          "description": "Additional stable step dependencies",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "failure": {
+          "description": "Failure action",
+          "enum": [
+            "abort",
+            "continue"
+          ],
+          "type": "string"
+        },
+        "phase": {
+          "description": "Preparation lifecycle phase",
+          "enum": [
+            "validate",
+            "build",
+            "package"
+          ],
+          "type": "string"
+        },
+        "relationship": {
+          "description": "Relationship to the target step",
+          "enum": [
+            "before",
+            "after",
+            "replace",
+            "disable"
+          ],
+          "type": "string"
+        },
+        "retries": {
+          "$ref": "#/$defs/buildHookRetriesOverlay",
+          "description": "Retry policy"
+        },
+        "target": {
+          "description": "Stable target step ID",
+          "type": "string"
+        },
+        "timeoutSeconds": {
+          "description": "Step timeout in seconds",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "buildHookRetries": {
+      "additionalProperties": false,
+      "properties": {
+        "delaySeconds": {
+          "description": "Retry delay in seconds",
+          "type": "integer"
+        },
+        "idempotent": {
+          "description": "Whether retrying is safe",
+          "type": "boolean"
+        },
+        "maxAttempts": {
+          "description": "Maximum attempts",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "buildHookRetriesOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "delaySeconds": {
+          "description": "Retry delay in seconds",
+          "type": "integer"
+        },
+        "idempotent": {
+          "description": "Whether retrying is safe",
+          "type": "boolean"
+        },
+        "maxAttempts": {
+          "description": "Maximum attempts",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "buildOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "composer": {
+          "$ref": "#/$defs/composerOverlay",
+          "description": "Composer settings"
+        },
+        "hooks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/buildHookOverlay"
+          },
+          "description": "Build lifecycle hooks",
+          "type": "object"
+        },
+        "php": {
+          "description": "Exact PHP branch or patch version",
+          "type": "string"
+        },
+        "staticContent": {
+          "additionalProperties": true,
+          "description": "Static content deployment settings",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "compatibility": {
+      "additionalProperties": false,
+      "properties": {
+        "allowUnsupported": {
+          "description": "Allow an unsupported service combination",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "compatibilityOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "allowUnsupported": {
+          "description": "Allow an unsupported service combination",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "composer": {
+      "additionalProperties": false,
+      "properties": {
+        "credentials": {
+          "description": "Composer credentials secret reference",
+          "pattern": "^(aws-secrets-manager|ssm)://\\S+$",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "composerOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "credentials": {
+          "description": "Composer credentials secret reference",
+          "pattern": "^(aws-secrets-manager|ssm)://\\S+$",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "defaults": {
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "description": "Default infrastructure preset",
+          "enum": [
+            "preview",
+            "standard",
+            "high-availability"
+          ],
+          "type": "string"
+        },
+        "region": {
+          "description": "Default AWS region",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "defaultsOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "description": "Default infrastructure preset",
+          "enum": [
+            "preview",
+            "standard",
+            "high-availability"
+          ],
+          "type": "string"
+        },
+        "region": {
+          "description": "Default AWS region",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "environment": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "anyOf": [
+            {
+              "description": "AWS account ID",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "application": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/applicationOverlay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "branches": {
+          "anyOf": [
+            {
+              "description": "Git branches mapped to this environment",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "build": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/buildOverlay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "class": {
+          "anyOf": [
+            {
+              "description": "Environment class",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compatibility": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/compatibilityOverlay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "defaults": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/defaultsOverlay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "domain": {
+          "anyOf": [
+            {
+              "description": "Environment domain",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expiresAt": {
+          "anyOf": [
+            {
+              "description": "Preview expiration as RFC3339",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "extensions": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "inherits": {
+          "description": "Parent environment",
+          "type": "string"
+        },
+        "monthlyBudgetCents": {
+          "anyOf": [
+            {
+              "description": "Maximum monthly AWS budget in cents",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "preset": {
+          "anyOf": [
+            {
+              "description": "Infrastructure preset",
+              "enum": [
+                "preview",
+                "standard",
+                "high-availability"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/projectOverlay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "protection": {
+          "anyOf": [
+            {
+              "description": "Protect against destructive commands",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/targetOverlay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "project": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Project name",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "projectOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Project name",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "target": {
+      "additionalProperties": false,
+      "properties": {
+        "aws": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSTarget",
+              "description": "AWS deployment inputs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider": {
+          "const": "aws",
+          "description": "Infrastructure provider",
+          "type": "string"
+        },
+        "runtime": {
+          "const": "ecs-fargate",
+          "description": "Application runtime",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "runtime"
+      ],
+      "type": "object"
+    },
+    "targetOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "aws": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSTargetOverlay",
+              "description": "AWS deployment inputs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider": {
+          "const": "aws",
+          "description": "Infrastructure provider",
+          "type": "string"
+        },
+        "runtime": {
+          "const": "ecs-fargate",
+          "description": "Application runtime",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://magelift.dev/schema/v1/magelift.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "application": {
+      "$ref": "#/$defs/application",
+      "description": "Magento application settings"
+    },
+    "build": {
+      "$ref": "#/$defs/build",
+      "description": "Application build settings"
+    },
+    "compatibility": {
+      "$ref": "#/$defs/compatibility",
+      "description": "Compatibility policy"
+    },
+    "defaults": {
+      "$ref": "#/$defs/defaults",
+      "description": "Project defaults"
+    },
+    "environments": {
+      "additionalProperties": {
+        "$ref": "#/$defs/environment"
+      },
+      "description": "Named deployment environments",
+      "minProperties": 1,
+      "type": "object"
+    },
+    "extensions": {
+      "additionalProperties": true,
+      "description": "Namespaced extension settings",
+      "type": "object"
+    },
+    "project": {
+      "$ref": "#/$defs/project",
+      "description": "Project identity"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "description": "MageLift configuration schema version",
+      "type": "integer"
+    },
+    "target": {
+      "$ref": "#/$defs/target",
+      "description": "Deployment target"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "project",
+    "application",
+    "build",
+    "target",
+    "defaults",
+    "environments"
+  ],
+  "title": "MageLift configuration",
+  "type": "object"
+}
