@@ -28,7 +28,7 @@ func NewAWSStackWithBackend(ctx context.Context, stackName string, spec awsstack
 	if backendURL != "" {
 		options = append(options, auto.EnvVars(map[string]string{"PULUMI_BACKEND_URL": backendURL}))
 	}
-	stack, err := auto.NewStackInlineSource(ctx, stackName, "magelift", awsstack.Program(spec), options...)
+	stack, err := auto.UpsertStackInlineSource(ctx, stackName, "magelift", awsstack.Program(spec), options...)
 	if err != nil {
 		return nil, err
 	}
