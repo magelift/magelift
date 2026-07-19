@@ -100,6 +100,16 @@ func (f *fakeKMS) TagResource(_ context.Context, input *kms.TagResourceInput, _ 
 	return &kms.TagResourceOutput{}, nil
 }
 
+func (f *fakeKMS) PutKeyPolicy(_ context.Context, input *kms.PutKeyPolicyInput, _ ...func(*kms.Options)) (*kms.PutKeyPolicyOutput, error) {
+	if input == nil || input.Policy == nil || strings.TrimSpace(*input.Policy) == "" {
+		return nil, errors.New("kms policy required")
+	}
+	if !strings.Contains(*input.Policy, "logs.") {
+		return nil, errors.New("kms policy must allow CloudWatch Logs")
+	}
+	return &kms.PutKeyPolicyOutput{}, nil
+}
+
 type fakeS3 struct {
 	mu                 sync.Mutex
 	exists             bool

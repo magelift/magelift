@@ -88,6 +88,7 @@ func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
 	t.Parallel()
 	m := &stackMocks{}
 	var outputs []string
+	var exported pulumi.Map
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		providers, err := NewProviders(ctx, "shop", "eu-west-3")
 		if err != nil {
@@ -96,6 +97,10 @@ func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
 		component, err := New(ctx, "shop-preview-1", validSpec(), providers)
 		if err != nil {
 			return err
+		}
+		exported = component.Outputs()
+		for key, value := range exported {
+			ctx.Export(key, value)
 		}
 		pulumi.All(component.Edge.DistributionDomainName, component.Ingress.TargetGroupARN, component.Runtime.TaskRoleARN, component.Database.WriterEndpoint).ApplyT(func(values []interface{}) string {
 			for _, value := range values {
@@ -116,6 +121,11 @@ func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
 	}
 	if len(outputs) != 4 {
 		t.Fatalf("stack outputs did not resolve through Pulumi graph: %#v", outputs)
+	}
+	for _, key := range []string{"clusterName", "serviceName", "deployTaskDefinitionArn", "securityGroupId", "applicationURL", "mediaURL", "privateSubnetIds"} {
+		if _, ok := exported[key]; !ok {
+			t.Fatalf("Component.Outputs missing %q", key)
+		}
 	}
 	policy := resourceInput(m, "aws:iam/rolePolicy:RolePolicy", "shop-preview-1-task-policy")
 	policyText := policy["policy"].StringValue()
@@ -168,6 +178,7 @@ func TestNewComposesStandardThreeZoneStack(t *testing.T) {
 	spec.Dependencies.QueueSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-queue-token"
 	spec.Catalog.Valkey.ReplicaCount = 1
 	spec.Catalog.Fargate.DesiredCount = 2
+	spec.Catalog.SearchMode = SearchModeProvisioned
 	spec.Catalog.AuroraProvisioned = AuroraProvisionedProfile{InstanceClass: "db.r8g.large", InstanceCount: 2}
 	spec.Catalog.SearchProvisioned = SearchProvisionedProfile{InstanceType: "m7g.large.search", InstanceCount: 2, EBSVolumeType: "gp3", EBSVolumeSizeGiB: 200}
 	spec.Catalog.RabbitMQ = RabbitMQProfile{InstanceType: "mq.m7g.large"}
@@ -200,6 +211,7 @@ func TestNewComposesHighAvailabilityStack(t *testing.T) {
 	spec.Dependencies.QueueSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-queue-token"
 	spec.Catalog.Valkey.ReplicaCount = 2
 	spec.Catalog.Fargate.DesiredCount = 3
+	spec.Catalog.SearchMode = SearchModeProvisioned
 	spec.Catalog.AuroraProvisioned = AuroraProvisionedProfile{InstanceClass: "db.r8g.large", InstanceCount: 3}
 	spec.Catalog.SearchProvisioned = SearchProvisionedProfile{InstanceType: "m7g.large.search", InstanceCount: 3, DedicatedMasterType: "m7g.large.search", DedicatedMasterCount: 3, EBSVolumeType: "gp3", EBSVolumeSizeGiB: 400}
 	spec.Catalog.RabbitMQ = RabbitMQProfile{InstanceType: "mq.m7g.large"}

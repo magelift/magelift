@@ -16,6 +16,17 @@ import (
 
 const TypeToken = "magelift:aws:Network"
 
+// NAT egress modes. nat-gateway is the certified managed path; fck-nat is an
+// explicit low-cost alternative that runs a small EC2 instance as a NAT.
+const (
+	NatModeGateway = "nat-gateway"
+	NatModeFckNat  = "fck-nat"
+
+	fckNatAMIOwner      = "568608671756"
+	fckNatAMINamePrefix = "fck-nat-al2023-*-arm64-ebs"
+	fckNatInstanceType  = "t4g.micro"
+)
+
 var existingVPCID = regexp.MustCompile(`^vpc-[A-Za-z0-9-]+$`)
 var existingSubnetID = regexp.MustCompile(`^subnet-[A-Za-z0-9-]+$`)
 
@@ -50,6 +61,7 @@ type Args struct {
 	Region             string
 	VPCCIDR            string
 	AvailabilityZones  []string
+	NatMode            string
 	Existing           *ExistingNetwork
 	GatewayEndpoints   []GatewayEndpoint
 	InterfaceEndpoints []InterfaceEndpoint
@@ -176,35 +188,111 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if args.Preset != sdk.PresetPreview {
 		natCount = len(args.AvailabilityZones)
 	}
-	nats := make([]*ec2.NatGateway, natCount)
-	for index := 0; index < natCount; index++ {
-		suffix := fmt.Sprintf("%02d", index+1)
-		eip, err := ec2.NewEip(ctx, name+"-nat-eip-"+suffix, &ec2.EipArgs{
-			Domain: pulumi.String("vpc"), Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "nat-eip", suffix, args.AvailabilityZones[index]),
-		}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
-		if err != nil {
-			return nil, err
-		}
-		nats[index], err = ec2.NewNatGateway(ctx, name+"-nat-"+suffix, &ec2.NatGatewayArgs{
-			AllocationId: eip.ID(), SubnetId: component.PublicSubnetIDs[index], ConnectivityType: pulumi.String("public"), AvailabilityMode: pulumi.String("zonal"),
-			Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "nat-gateway", suffix, args.AvailabilityZones[index]),
-		}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
-		if err != nil {
-			return nil, err
-		}
-		component.NATGatewayIDs = append(component.NATGatewayIDs, nats[index].ID())
+	natMode := args.NatMode
+	if strings.TrimSpace(natMode) == "" {
+		natMode = NatModeGateway
 	}
-	for index := range privateTables {
-		natIndex := index
-		if args.Preset == sdk.PresetPreview {
-			natIndex = 0
+	var privateDefaultRouteTargets []pulumi.StringOutput
+	switch natMode {
+	case NatModeGateway:
+		nats := make([]*ec2.NatGateway, natCount)
+		for index := 0; index < natCount; index++ {
+			suffix := fmt.Sprintf("%02d", index+1)
+			eip, err := ec2.NewEip(ctx, name+"-nat-eip-"+suffix, &ec2.EipArgs{
+				Domain: pulumi.String("vpc"), Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "nat-eip", suffix, args.AvailabilityZones[index]),
+			}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
+			if err != nil {
+				return nil, err
+			}
+			nats[index], err = ec2.NewNatGateway(ctx, name+"-nat-"+suffix, &ec2.NatGatewayArgs{
+				AllocationId: eip.ID(), SubnetId: component.PublicSubnetIDs[index], ConnectivityType: pulumi.String("public"), AvailabilityMode: pulumi.String("zonal"),
+				Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "nat-gateway", suffix, args.AvailabilityZones[index]),
+			}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
+			if err != nil {
+				return nil, err
+			}
+			component.NATGatewayIDs = append(component.NATGatewayIDs, nats[index].ID())
+			privateDefaultRouteTargets = append(privateDefaultRouteTargets, nats[index].ID().ToStringOutput())
 		}
-		_, err := ec2.NewRoute(ctx, name+"-private-default-"+fmt.Sprintf("%02d", index+1), &ec2.RouteArgs{
-			RouteTableId: privateTables[index].ID(), DestinationCidrBlock: pulumi.String("0.0.0.0/0"), NatGatewayId: nats[natIndex].ID(), Region: pulumi.String(args.Region),
+		for index := range privateTables {
+			natIndex := index
+			if args.Preset == sdk.PresetPreview {
+				natIndex = 0
+			}
+			_, err := ec2.NewRoute(ctx, name+"-private-default-"+fmt.Sprintf("%02d", index+1), &ec2.RouteArgs{
+				RouteTableId: privateTables[index].ID(), DestinationCidrBlock: pulumi.String("0.0.0.0/0"), NatGatewayId: privateDefaultRouteTargets[natIndex], Region: pulumi.String(args.Region),
+			}, child)
+			if err != nil {
+				return nil, err
+			}
+		}
+	case NatModeFckNat:
+		ami, err := ec2.LookupAmi(ctx, &ec2.LookupAmiArgs{
+			Owners:     []string{fckNatAMIOwner},
+			MostRecent: pulumi.BoolRef(true),
+			Filters: []ec2.GetAmiFilter{
+				{Name: "name", Values: []string{fckNatAMINamePrefix}},
+				{Name: "state", Values: []string{"available"}},
+				{Name: "architecture", Values: []string{"arm64"}},
+			},
+		}, nil)
+		if err != nil {
+			return nil, fmt.Errorf("lookup fck-nat AMI: %w", err)
+		}
+		securityGroup, err := ec2.NewSecurityGroup(ctx, name+"-fck-nat-sg", &ec2.SecurityGroupArgs{
+			VpcId:       vpc.ID(),
+			Description: pulumi.String("MageLift fck-nat egress instance"),
+			Ingress: ec2.SecurityGroupIngressArray{
+				ec2.SecurityGroupIngressArgs{Protocol: pulumi.String("-1"), FromPort: pulumi.Int(0), ToPort: pulumi.Int(0), CidrBlocks: pulumi.StringArray{pulumi.String(args.VPCCIDR)}},
+			},
+			Egress: ec2.SecurityGroupEgressArray{
+				ec2.SecurityGroupEgressArgs{Protocol: pulumi.String("-1"), FromPort: pulumi.Int(0), ToPort: pulumi.Int(0), CidrBlocks: pulumi.StringArray{pulumi.String("0.0.0.0/0")}},
+			},
+			Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "fck-nat-security-group", "", ""),
 		}, child)
 		if err != nil {
 			return nil, err
 		}
+		eniIDs := make([]pulumi.StringOutput, natCount)
+		for index := 0; index < natCount; index++ {
+			suffix := fmt.Sprintf("%02d", index+1)
+			eip, err := ec2.NewEip(ctx, name+"-fck-nat-eip-"+suffix, &ec2.EipArgs{
+				Domain: pulumi.String("vpc"), Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "fck-nat-eip", suffix, args.AvailabilityZones[index]),
+			}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
+			if err != nil {
+				return nil, err
+			}
+			instance, err := ec2.NewInstance(ctx, name+"-fck-nat-"+suffix, &ec2.InstanceArgs{
+				Ami: pulumi.String(ami.Id), InstanceType: pulumi.String(fckNatInstanceType), SubnetId: component.PublicSubnetIDs[index],
+				VpcSecurityGroupIds: pulumi.StringArray{securityGroup.ID()}, SourceDestCheck: pulumi.Bool(false),
+				AssociatePublicIpAddress: pulumi.Bool(true), Region: pulumi.String(args.Region),
+				Tags: tags(args.Tags, name, "fck-nat", suffix, args.AvailabilityZones[index]),
+			}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
+			if err != nil {
+				return nil, err
+			}
+			_, err = ec2.NewEipAssociation(ctx, name+"-fck-nat-eip-assoc-"+suffix, &ec2.EipAssociationArgs{
+				AllocationId: eip.ID(), InstanceId: instance.ID(), Region: pulumi.String(args.Region),
+			}, child)
+			if err != nil {
+				return nil, err
+			}
+			eniIDs[index] = instance.PrimaryNetworkInterfaceId
+		}
+		for index := range privateTables {
+			natIndex := index
+			if args.Preset == sdk.PresetPreview {
+				natIndex = 0
+			}
+			_, err := ec2.NewRoute(ctx, name+"-private-default-"+fmt.Sprintf("%02d", index+1), &ec2.RouteArgs{
+				RouteTableId: privateTables[index].ID(), DestinationCidrBlock: pulumi.String("0.0.0.0/0"), NetworkInterfaceId: eniIDs[natIndex], Region: pulumi.String(args.Region),
+			}, child)
+			if err != nil {
+				return nil, err
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unsupported natMode %q", natMode)
 	}
 
 	for _, endpoint := range args.GatewayEndpoints {
@@ -269,6 +357,13 @@ func validate(args Args) ([]string, error) {
 	}
 	if strings.TrimSpace(args.Region) == "" {
 		return nil, errors.New("AWS region is required")
+	}
+	natMode := args.NatMode
+	if strings.TrimSpace(natMode) == "" {
+		natMode = NatModeGateway
+	}
+	if natMode != NatModeGateway && natMode != NatModeFckNat {
+		return nil, errors.New("natMode must be nat-gateway or fck-nat")
 	}
 	seen := map[string]bool{}
 	for _, zone := range args.AvailabilityZones {

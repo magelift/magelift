@@ -61,20 +61,10 @@ func New(ctx *pulumi.Context, name string, args Args, options ...pulumi.Resource
 	}
 	childOptions := []pulumi.ResourceOption{pulumi.Parent(component), pulumi.Provider(args.GlobalAWS)}
 
-	cachePolicy, err := cloudfront.NewCachePolicy(ctx, name+"-dynamic", &cloudfront.CachePolicyArgs{
-		Name:       pulumi.String(name + "-dynamic"),
-		Comment:    pulumi.String("Magento dynamic requests are not cached at the edge"),
-		DefaultTtl: pulumi.Int(0), MaxTtl: pulumi.Int(0), MinTtl: pulumi.Int(0),
-		ParametersInCacheKeyAndForwardedToOrigin: &cloudfront.CachePolicyParametersInCacheKeyAndForwardedToOriginArgs{
-			CookiesConfig:              &cloudfront.CachePolicyParametersInCacheKeyAndForwardedToOriginCookiesConfigArgs{CookieBehavior: pulumi.String("all")},
-			HeadersConfig:              &cloudfront.CachePolicyParametersInCacheKeyAndForwardedToOriginHeadersConfigArgs{HeaderBehavior: pulumi.String("none")},
-			QueryStringsConfig:         &cloudfront.CachePolicyParametersInCacheKeyAndForwardedToOriginQueryStringsConfigArgs{QueryStringBehavior: pulumi.String("all")},
-			EnableAcceptEncodingBrotli: pulumi.Bool(true), EnableAcceptEncodingGzip: pulumi.Bool(true),
-		},
-	}, childOptions...)
-	if err != nil {
-		return nil, fmt.Errorf("create CloudFront cache policy: %w", err)
-	}
+	// Managed CachingDisabled (TTL 0). Custom cache policies with caching disabled
+	// reject cookie/query cache-key behaviors and Accept-Encoding toggles; viewer
+	// cookies and query strings are still forwarded via OriginRequestPolicy.
+	const cachingDisabledPolicyID = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
 	originRequestPolicy, err := cloudfront.NewOriginRequestPolicy(ctx, name+"-origin", &cloudfront.OriginRequestPolicyArgs{
 		Name: pulumi.String(name + "-origin"), Comment: pulumi.String("Forward Magento request context to the ALB origin"),
 		CookiesConfig:      &cloudfront.OriginRequestPolicyCookiesConfigArgs{CookieBehavior: pulumi.String("all")},
@@ -109,7 +99,7 @@ func New(ctx *pulumi.Context, name string, args Args, options ...pulumi.Resource
 		}},
 		DefaultCacheBehavior: &cloudfront.DistributionDefaultCacheBehaviorArgs{
 			AllowedMethods: pulumi.ToStringArray([]string{"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"}), CachedMethods: pulumi.ToStringArray([]string{"GET", "HEAD", "OPTIONS"}),
-			TargetOriginId: pulumi.String("alb"), ViewerProtocolPolicy: pulumi.String("redirect-to-https"), Compress: pulumi.Bool(true), CachePolicyId: cachePolicy.ID(), OriginRequestPolicyId: originRequestPolicy.ID(),
+			TargetOriginId: pulumi.String("alb"), ViewerProtocolPolicy: pulumi.String("redirect-to-https"), Compress: pulumi.Bool(true), CachePolicyId: pulumi.String(cachingDisabledPolicyID), OriginRequestPolicyId: originRequestPolicy.ID(),
 		},
 		Restrictions:      &cloudfront.DistributionRestrictionsArgs{GeoRestriction: &cloudfront.DistributionRestrictionsGeoRestrictionArgs{RestrictionType: pulumi.String("none")}},
 		ViewerCertificate: &cloudfront.DistributionViewerCertificateArgs{AcmCertificateArn: pulumi.String(args.Certificate.ExternalID), MinimumProtocolVersion: pulumi.String(args.Security.MinimumTLSVersion), SslSupportMethod: pulumi.String("sni-only")},

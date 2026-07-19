@@ -45,6 +45,7 @@ func (s SecretReference) ValueFrom() string {
 
 type CapabilityConfig struct {
 	DatabaseWriterEndpoint pulumi.StringInput
+	DatabaseName           string
 	DatabaseSecretARN      pulumi.StringInput
 	CacheEndpoint          pulumi.StringInput
 	SessionEndpoint        pulumi.StringInput
@@ -240,7 +241,6 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		Family: pulumi.String(name + "-web"), ContainerDefinitions: definitions, Cpu: pulumi.String(args.TaskCPU), Memory: pulumi.String(args.TaskMemory),
 		ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.TaskRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
 		RuntimePlatform: &ecs.TaskDefinitionRuntimePlatformArgs{CpuArchitecture: pulumi.String("X86_64"), OperatingSystemFamily: pulumi.String("LINUX")},
-		Volumes:         ecs.TaskDefinitionVolumeArray{ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("tmp")}, ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("var")}},
 		Region:          pulumi.String(args.Region), Tags: tags(args.Tags, name, "web-task"),
 	}, child)
 	if err != nil {
@@ -256,7 +256,6 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		Family: pulumi.String(name + "-deploy"), ContainerDefinitions: deployDefinitions, Cpu: pulumi.String(args.TaskCPU), Memory: pulumi.String(args.TaskMemory),
 		ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.DeploymentRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
 		RuntimePlatform: &ecs.TaskDefinitionRuntimePlatformArgs{CpuArchitecture: pulumi.String("X86_64"), OperatingSystemFamily: pulumi.String("LINUX")},
-		Volumes:         ecs.TaskDefinitionVolumeArray{ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("tmp")}, ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("var")}},
 		Region:          pulumi.String(args.Region), Tags: tags(args.Tags, name, "deploy-task"),
 	}, child)
 	if err != nil {
@@ -272,7 +271,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		PropagateTags:            pulumi.String("TASK_DEFINITION"), Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "web-service"),
 	}
 	if args.TargetGroupARN != nil {
-		serviceArgs.LoadBalancers = ecs.ServiceLoadBalancerArray{ecs.ServiceLoadBalancerArgs{ContainerName: pulumi.String("web"), ContainerPort: pulumi.Int(args.ContainerPort), TargetGroupArn: targetGroupInput(args.TargetGroupARN)}}
+		loadBalancerContainer := "web"
+		if args.ApplicationMode == "integrated" {
+			// Integrated traffic enters Varnish; nginx/frankenphp stay internal.
+			loadBalancerContainer = "varnish"
+		}
+		serviceArgs.LoadBalancers = ecs.ServiceLoadBalancerArray{ecs.ServiceLoadBalancerArgs{ContainerName: pulumi.String(loadBalancerContainer), ContainerPort: pulumi.Int(args.ContainerPort), TargetGroupArn: targetGroupInput(args.TargetGroupARN)}}
 	}
 	service, err := ecs.NewService(ctx, name+"-web-service", serviceArgs, child)
 	if err != nil {
@@ -289,7 +293,6 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		Family: pulumi.String(name + "-cron"), ContainerDefinitions: cronDefinitions, Cpu: pulumi.String(args.TaskCPU), Memory: pulumi.String(args.TaskMemory),
 		ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.TaskRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
 		RuntimePlatform: &ecs.TaskDefinitionRuntimePlatformArgs{CpuArchitecture: pulumi.String("X86_64"), OperatingSystemFamily: pulumi.String("LINUX")},
-		Volumes:         ecs.TaskDefinitionVolumeArray{ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("tmp")}, ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("var")}},
 		Region:          pulumi.String(args.Region), Tags: tags(args.Tags, name, "cron-task"),
 	}, child)
 	if err != nil {
@@ -317,7 +320,6 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 			Family: pulumi.String(name + "-queue"), ContainerDefinitions: queueDefinitions, Cpu: pulumi.String(args.TaskCPU), Memory: pulumi.String(args.TaskMemory),
 			ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.TaskRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
 			RuntimePlatform: &ecs.TaskDefinitionRuntimePlatformArgs{CpuArchitecture: pulumi.String("X86_64"), OperatingSystemFamily: pulumi.String("LINUX")},
-			Volumes:         ecs.TaskDefinitionVolumeArray{ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("tmp")}, ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("var")}},
 			Region:          pulumi.String(args.Region), Tags: tags(args.Tags, name, "queue-task"),
 		}, child)
 		if err != nil {
@@ -557,6 +559,7 @@ func containerDefinitions(args Args, secrets []SecretReference, environment []co
 	if args.WebRuntime == "nginx-fpm" {
 		php := baseContainer(args, appendDatabaseSecret(secrets, databaseARN), environment, "php-fpm", nil, false)
 		web := baseContainer(args, nil, nil, "web", []string{"nginx", "-g", "daemon off;"}, args.ApplicationMode != "integrated")
+		web.HealthCheck = nginxHealthCheck()
 		containers, err := appendSearchProxy(args, []containerDefinition{php, web}, searchEndpoint)
 		if err != nil {
 			return "", err
@@ -608,6 +611,14 @@ type containerEnvironment struct {
 	Value string `json:"value"`
 }
 
+type containerHealthCheck struct {
+	Command     []string `json:"command"`
+	Interval    int      `json:"interval"`
+	Timeout     int      `json:"timeout"`
+	Retries     int      `json:"retries"`
+	StartPeriod int      `json:"startPeriod"`
+}
+
 type containerDefinition struct {
 	Name                   string                 `json:"name"`
 	Image                  string                 `json:"image"`
@@ -617,8 +628,9 @@ type containerDefinition struct {
 	ReadonlyRootFilesystem bool                   `json:"readonlyRootFilesystem"`
 	LinuxParameters        containerLinux         `json:"linuxParameters"`
 	PortMappings           []containerPort        `json:"portMappings"`
-	MountPoints            []containerMount       `json:"mountPoints"`
+	MountPoints            []containerMount       `json:"mountPoints,omitempty"`
 	DependsOn              []containerDependency  `json:"dependsOn,omitempty"`
+	HealthCheck            *containerHealthCheck  `json:"healthCheck,omitempty"`
 	Secrets                []containerSecret      `json:"secrets,omitempty"`
 	Environment            []containerEnvironment `json:"environment,omitempty"`
 }
@@ -691,30 +703,34 @@ func appendVarnish(args Args, containers []containerDefinition) ([]containerDefi
 	if !imageDigest.MatchString(args.VarnishImage) {
 		return nil, errors.New("integrated runtime requires a Varnish image pinned by a lowercase SHA-256 digest")
 	}
+	memory, _ := strconv.Atoi(args.TaskMemory)
+	// Keep malloc well under task memory. References (magento-aws-stack) run
+	// Varnish in a dedicated task; colocated preview tasks must stay lean.
+	varnishMallocMiB := 64
+	if memory >= 2048 {
+		varnishMallocMiB = 256
+	} else if memory >= 1024 {
+		varnishMallocMiB = 128
+	}
 	return append(containers, containerDefinition{
 		Name:      "varnish",
 		Image:     args.VarnishImage,
 		Essential: true,
 		User:      "varnish",
-		// Varnish creates its VSM working directory under /var/lib/varnish.
-		// Keep the image root read-only and provide only an executable,
-		// task-scoped cache filesystem for VSM and the transient cache.
-		ReadonlyRootFilesystem: true,
-		LinuxParameters: containerLinux{
-			InitProcessEnabled: false,
-			Tmpfs: []containerTmpfs{{
-				ContainerPath: "/var/lib/varnish",
-				MountOptions:  []string{"rw", "exec", "uid=1000", "gid=1000", "mode=0750"},
-				Size:          384,
-			}},
-		},
-		PortMappings: []containerPort{{ContainerPort: VarnishPort, Protocol: "tcp"}},
-		DependsOn:    []containerDependency{{ContainerName: "web", Condition: "START"}},
+		// Official image entrypoint appends hyphen flags to varnishd. -n must
+		// point at writable storage: Fargate /dev/shm is only 64 MiB and is
+		// where Varnish places VSM when -n is unset. Use the image /tmp (1777),
+		// not a Fargate empty volume — those mount as root:root and break -n.
+		Command:                []string{"-n", "/tmp/varnish", "-p", "vsl_space=4m"},
+		ReadonlyRootFilesystem: false,
+		LinuxParameters:        containerLinux{InitProcessEnabled: false},
+		PortMappings:           []containerPort{{ContainerPort: VarnishPort, Protocol: "tcp"}},
+		DependsOn:              []containerDependency{{ContainerName: "web", Condition: "HEALTHY"}},
 		Environment: []containerEnvironment{
 			{Name: "VARNISH_BACKEND_HOST", Value: "127.0.0.1"},
 			{Name: "VARNISH_BACKEND_PORT", Value: strconv.Itoa(ApplicationPort)},
 			{Name: "VARNISH_HTTP_PORT", Value: strconv.Itoa(VarnishPort)},
-			{Name: "VARNISH_SIZE", Value: "256M"},
+			{Name: "VARNISH_SIZE", Value: strconv.Itoa(varnishMallocMiB) + "m"},
 		},
 	}), nil
 }
@@ -739,13 +755,12 @@ func appendDatabaseSecret(secrets []SecretReference, databaseARN string) []Secre
 	}
 	result := append([]SecretReference(nil), secrets...)
 	result = append(result, SecretReference{Name: "MAGELIFT_DATABASE_CREDENTIALS", ARN: databaseARN})
+	// RDS/Aurora ManageMasterUserPassword secrets only contain username and
+	// password. Host, port, and dbname come from capability environment vars.
 	for _, field := range []struct {
 		name string
 		key  string
 	}{
-		{"MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST", "host"},
-		{"MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT", "port"},
-		{"MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME", "dbname"},
 		{"MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME", "username"},
 		{"MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD", "password"},
 	} {
@@ -768,12 +783,27 @@ func deploymentCommand() []string {
 	return []string{"/bin/sh", "-ec", "bin/magento app:config:import --no-interaction && bin/magento setup:upgrade --keep-generated --no-interaction && bin/magento cache:clean && bin/magento cache:flush"}
 }
 
+// nginxHealthCheck probes the ALB-facing /health location without booting Magento.
+func nginxHealthCheck() *containerHealthCheck {
+	return &containerHealthCheck{
+		Command:     []string{"CMD-SHELL", "curl -sf http://127.0.0.1:8080/health"},
+		Interval:    10,
+		Timeout:     5,
+		Retries:     3,
+		StartPeriod: 30,
+	}
+}
+
 func baseContainer(args Args, secrets []SecretReference, environment []containerEnvironment, name string, command []string, exposePort bool) containerDefinition {
 	selected := make([]containerSecret, len(secrets))
 	for index, value := range secrets {
 		selected[index] = containerSecret{Name: value.Name, ValueFrom: value.ValueFrom()}
 	}
-	container := containerDefinition{Name: name, Image: args.Image, Command: command, Essential: true, User: "10001:10001", ReadonlyRootFilesystem: true, LinuxParameters: containerLinux{InitProcessEnabled: true}, MountPoints: []containerMount{{SourceVolume: "tmp", ContainerPath: "/tmp"}, {SourceVolume: "var", ContainerPath: "/app/var"}}, Secrets: selected, Environment: environment}
+	// Magento needs a writable root (env.php, generated files, nginx pid under
+	// /tmp). Fargate empty volumes mount as root:root, so overlaying /tmp or
+	// /app/var breaks non-root nginx/php — match magento-aws-stack (writable root,
+	// no bind-mount overlays) until EFS access points own the paths.
+	container := containerDefinition{Name: name, Image: args.Image, Command: command, Essential: true, User: "10001:10001", ReadonlyRootFilesystem: false, LinuxParameters: containerLinux{InitProcessEnabled: true}, Secrets: selected, Environment: environment}
 	if exposePort {
 		container.PortMappings = []containerPort{{ContainerPort: args.ContainerPort, Protocol: "tcp"}}
 	}
@@ -811,6 +841,9 @@ func capabilityEnvironment(args Args) pulumi.Output {
 			{Name: "MAGELIFT_QUEUE_MODE", Value: queueMode},
 			{Name: "MAGELIFT_QUEUE_ENDPOINT", Value: queueEndpoint},
 			{Name: "MAGELIFT_MEDIA_BUCKET", Value: values[8].(string)},
+			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST", Value: values[0].(string)},
+			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT", Value: "3306"},
+			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME", Value: capabilities.DatabaseName},
 			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__MODEL", Value: "mysql4"},
 			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__ENGINE", Value: "innodb"},
 			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__INITSTATEMENTS", Value: "SET NAMES utf8;"},

@@ -39,6 +39,8 @@ type Plan struct {
 	AccessLogBucket string            `json:"accessLogBucket" yaml:"accessLogBucket"`
 	AccessLogPrefix string            `json:"accessLogPrefix" yaml:"accessLogPrefix"`
 	KMSAlias        string            `json:"kmsAlias" yaml:"kmsAlias"`
+	AccountID       string            `json:"accountId,omitempty" yaml:"accountId,omitempty"`
+	Region          string            `json:"region,omitempty" yaml:"region,omitempty"`
 	Tags            map[string]string `json:"tags" yaml:"tags"`
 }
 
@@ -73,6 +75,8 @@ func BuildPlan(spec Spec) (Plan, error) {
 		AccessLogBucket: spec.AccessLogBucket,
 		AccessLogPrefix: "pulumi-state/" + bucket + "/",
 		KMSAlias:        "alias/magelift/" + spec.Project + "/" + spec.Environment + "/state",
+		AccountID:       spec.AccountID,
+		Region:          spec.Region,
 		Tags: map[string]string{
 			"magelift:bootstrap-id": bootstrapID,
 			"magelift:environment":  spec.Environment,
@@ -101,6 +105,7 @@ type KMSAPI interface {
 	CreateAlias(context.Context, *kms.CreateAliasInput, ...func(*kms.Options)) (*kms.CreateAliasOutput, error)
 	EnableKeyRotation(context.Context, *kms.EnableKeyRotationInput, ...func(*kms.Options)) (*kms.EnableKeyRotationOutput, error)
 	TagResource(context.Context, *kms.TagResourceInput, ...func(*kms.Options)) (*kms.TagResourceOutput, error)
+	PutKeyPolicy(context.Context, *kms.PutKeyPolicyInput, ...func(*kms.Options)) (*kms.PutKeyPolicyOutput, error)
 	ListKeys(context.Context, *kms.ListKeysInput, ...func(*kms.Options)) (*kms.ListKeysOutput, error)
 	ListResourceTags(context.Context, *kms.ListResourceTagsInput, ...func(*kms.Options)) (*kms.ListResourceTagsOutput, error)
 }
@@ -176,6 +181,7 @@ func (b *Bootstrapper) ensureKey(ctx context.Context, plan Plan) (string, error)
 				Description: awssdk.String("MageLift Pulumi state encryption"),
 				KeySpec:     kmstypes.KeySpecSymmetricDefault,
 				KeyUsage:    kmstypes.KeyUsageTypeEncryptDecrypt,
+				Policy:      awssdk.String(kmsKeyPolicy(plan.AccountID, plan.Region)),
 				Tags:        kmsTags(plan.Tags),
 			})
 			if createErr != nil {
@@ -201,7 +207,40 @@ func (b *Bootstrapper) ensureKey(ctx context.Context, plan Plan) (string, error)
 	if _, err := b.kms.EnableKeyRotation(ctx, &kms.EnableKeyRotationInput{KeyId: awssdk.String(keyID)}); err != nil {
 		return "", fmt.Errorf("enable bootstrap KMS key rotation: %w", err)
 	}
+	if _, err := b.kms.PutKeyPolicy(ctx, &kms.PutKeyPolicyInput{
+		KeyId: awssdk.String(keyID), PolicyName: awssdk.String("default"), Policy: awssdk.String(kmsKeyPolicy(plan.AccountID, plan.Region)),
+	}); err != nil {
+		return "", fmt.Errorf("set bootstrap KMS key policy: %w", err)
+	}
 	return keyARN, nil
+}
+
+func kmsKeyPolicy(accountID, region string) string {
+	return `{
+  "Version": "2012-10-17",
+  "Id": "magelift-bootstrap-key",
+  "Statement": [
+    {
+      "Sid": "EnableIAMUserPermissions",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::` + accountID + `:root"},
+      "Action": "kms:*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowCloudWatchLogs",
+      "Effect": "Allow",
+      "Principal": {"Service": "logs.` + region + `.amazonaws.com"},
+      "Action": ["kms:Encrypt","kms:Decrypt","kms:ReEncrypt*","kms:GenerateDataKey*","kms:DescribeKey"],
+      "Resource": "*",
+      "Condition": {
+        "ArnLike": {
+          "kms:EncryptionContext:aws:logs:arn": "arn:aws:logs:` + region + `:` + accountID + `:*"
+        }
+      }
+    }
+  ]
+}`
 }
 
 func (b *Bootstrapper) findUnaliasedKey(ctx context.Context, bootstrapID string) (string, string, error) {

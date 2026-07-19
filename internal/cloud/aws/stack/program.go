@@ -12,7 +12,15 @@ func Program(spec Spec) pulumi.RunFunc {
 		if err != nil {
 			return err
 		}
-		_, err = New(ctx, name, spec, providers)
-		return err
+		component, err := New(ctx, name, spec, providers)
+		if err != nil {
+			return err
+		}
+		// Component RegisterResourceOutputs are not stack outputs. Export the
+		// same map so automation.Outputs / magelift outputs / deploy can read them.
+		for key, value := range component.Outputs() {
+			ctx.Export(key, value)
+		}
+		return nil
 	}
 }

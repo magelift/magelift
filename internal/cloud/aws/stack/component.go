@@ -80,7 +80,8 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	}
 	networkArgs := network.Args{
 		Preset: spec.Identity.Preset, Region: spec.Identity.Region, VPCCIDR: spec.Policy.VPCCIDR.String(),
-		AvailabilityZones: spec.Policy.AvailabilityZones, GatewayEndpoints: []network.GatewayEndpoint{{Service: network.GatewayEndpointS3, Rationale: network.ReduceNATCostAndExposure}}, InterfaceEndpoints: interfaceEndpoints, Tags: tags,
+		AvailabilityZones: spec.Policy.AvailabilityZones, NatMode: spec.Policy.NatMode,
+		GatewayEndpoints: []network.GatewayEndpoint{{Service: network.GatewayEndpointS3, Rationale: network.ReduceNATCostAndExposure}}, InterfaceEndpoints: interfaceEndpoints, Tags: tags,
 	}
 	if spec.Existing.Network != nil {
 		networkArgs.Existing = &network.ExistingNetwork{VPCID: spec.Existing.Network.ExternalID, PublicSubnetIDs: spec.Existing.PublicSubnetIDs, PrivateSubnetIDs: spec.Existing.PrivateSubnetIDs, DataSubnetIDs: spec.Existing.DataSubnetIDs}
@@ -122,9 +123,13 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		return nil, fmt.Errorf("create AWS ECS runtime identity: %w", err)
 	}
 
+	engineVersion := spec.Catalog.Versions.AuroraMySQL
+	if spec.Catalog.DatabaseEngine == DatabaseEngineRDSMySQL {
+		engineVersion = spec.Catalog.Versions.MySQL
+	}
 	component.Database, err = database.New(ctx, name+"-database", database.Args{
 		Preset: spec.Identity.Preset, EnvironmentClass: spec.Identity.EnvironmentClass, Region: spec.Identity.Region, AvailabilityZones: databaseZones, DataSubnetIDs: databaseSubnets,
-		VpcSecurityGroupIDs: pulumi.StringArray{component.Security.DataSecurityGroupID}, EngineVersion: spec.Catalog.Versions.AuroraMySQL, DatabaseName: spec.Dependencies.DatabaseName, MasterUsername: spec.Dependencies.MasterUsername,
+		VpcSecurityGroupIDs: pulumi.StringArray{component.Security.DataSecurityGroupID}, Engine: spec.Catalog.DatabaseEngine, EngineVersion: engineVersion, DatabaseName: spec.Dependencies.DatabaseName, MasterUsername: spec.Dependencies.MasterUsername,
 		KMSKeyARN: spec.Dependencies.KMSKeyARN, BackupRetentionDays: spec.Catalog.Retention.BackupDays, FinalSnapshotIdentifier: name + "-final", ProvisionedInstanceClass: spec.Catalog.AuroraProvisioned.InstanceClass, InstanceCount: spec.Catalog.AuroraProvisioned.InstanceCount,
 		ServerlessV2: serverlessDatabase(spec), Tags: tags,
 	}, regional...)
@@ -147,13 +152,19 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		return nil, fmt.Errorf("create AWS Valkey cache: %w", err)
 	}
 
-	component.Search, err = search.New(ctx, name+"-search", search.Args{
-		Preset: spec.Identity.Preset, Region: spec.Identity.Region, VPCID: component.Network.VpcID.ToStringOutput(), SubnetIDs: searchSubnets,
-		SecurityGroupIDs: pulumi.StringArray{component.Security.SearchSecurityGroupID}, KMSKeyARN: spec.Dependencies.KMSKeyARN, AccessIdentityInput: component.RuntimeIdentity.TaskRoleARN,
-		Serverless: serverlessSearch(spec), Provisioned: provisionedSearch(spec), Tags: tags,
-	}, regional...)
-	if err != nil {
-		return nil, fmt.Errorf("create AWS OpenSearch: %w", err)
+	searchEndpoint := pulumi.String("").ToStringOutput()
+	searchARN := pulumi.String("").ToStringOutput()
+	if spec.Catalog.SearchMode != SearchModeDisabled {
+		component.Search, err = search.New(ctx, name+"-search", search.Args{
+			Preset: spec.Identity.Preset, Region: spec.Identity.Region, VPCID: component.Network.VpcID.ToStringOutput(), SubnetIDs: searchSubnets,
+			SecurityGroupIDs: pulumi.StringArray{component.Security.SearchSecurityGroupID}, KMSKeyARN: spec.Dependencies.KMSKeyARN, AccessIdentityInput: component.RuntimeIdentity.TaskRoleARN,
+			Serverless: serverlessSearch(spec), Provisioned: provisionedSearch(spec), Tags: tags,
+		}, regional...)
+		if err != nil {
+			return nil, fmt.Errorf("create AWS OpenSearch: %w", err)
+		}
+		searchEndpoint = component.Search.Endpoint
+		searchARN = component.Search.ARN
 	}
 
 	component.Queue, err = queue.New(ctx, name+"-queue", queue.Args{
@@ -172,19 +183,24 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	if err != nil {
 		return nil, fmt.Errorf("create AWS media storage: %w", err)
 	}
+	searchProxyImage := ""
+	if spec.Catalog.SearchMode != SearchModeDisabled {
+		searchProxyImage = sigV4ProxyImage
+	}
+	capabilityConfig := &runtime.CapabilityConfig{
+		DatabaseWriterEndpoint: component.Database.WriterEndpoint, DatabaseName: spec.Dependencies.DatabaseName, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN),
+		CacheEndpoint: component.Cache.CachePrimaryEndpoint, SessionEndpoint: component.Cache.SessionPrimaryEndpoint,
+		SearchEndpoint: searchEndpoint, QueueMode: component.Queue.QueueMode, QueueEndpoint: component.Queue.AMQPEndpoint,
+		QueueUsername: pulumi.String(spec.Dependencies.MasterUsername),
+		MediaBucket:   component.Storage.BucketName,
+	}
 	component.Runtime, err = runtime.New(ctx, name+"-runtime", runtime.Args{
 		ApplicationMode: spec.Application.Mode, WebRuntime: spec.Application.WebRuntime,
 		Region: spec.Identity.Region, VpcID: component.Network.VpcID.ToStringOutput(), PrivateSubnetIDs: privateSubnets,
-		Image: spec.Artifact.ImageDigest, SearchProxyImage: sigV4ProxyImage, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN), ContainerPort: frontendPort, VarnishImage: varnishImageFor(spec.Application.Mode), TaskCPU: strconv.Itoa(spec.Catalog.Fargate.CPU), TaskMemory: strconv.Itoa(spec.Catalog.Fargate.MemoryMiB), DesiredCount: spec.Catalog.Fargate.DesiredCount, QueueConsumerCount: queueConsumerCount(spec),
+		Image: spec.Artifact.ImageDigest, SearchProxyImage: searchProxyImage, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN), ContainerPort: frontendPort, VarnishImage: varnishImageFor(spec.Application.Mode), TaskCPU: strconv.Itoa(spec.Catalog.Fargate.CPU), TaskMemory: strconv.Itoa(spec.Catalog.Fargate.MemoryMiB), DesiredCount: spec.Catalog.Fargate.DesiredCount, QueueConsumerCount: queueConsumerCount(spec),
 		WebSecurityGroupID: component.Security.WebSecurityGroupID, TargetGroupARN: component.Ingress.TargetGroupARN,
 		Secrets: runtimeSecrets(spec), Identity: component.RuntimeIdentity,
-		Capabilities: &runtime.CapabilityConfig{
-			DatabaseWriterEndpoint: component.Database.WriterEndpoint, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN),
-			CacheEndpoint: component.Cache.CachePrimaryEndpoint, SessionEndpoint: component.Cache.SessionPrimaryEndpoint,
-			SearchEndpoint: component.Search.Endpoint, QueueMode: component.Queue.QueueMode, QueueEndpoint: component.Queue.AMQPEndpoint,
-			QueueUsername: pulumi.String(spec.Dependencies.MasterUsername),
-			MediaBucket:   component.Storage.BucketName,
-		},
+		Capabilities:     capabilityConfig,
 		EncryptionKeyARN: pulumi.String(spec.Dependencies.EncryptionKeyARN),
 		Tags:             tags,
 	}, regional...)
@@ -207,7 +223,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	if err != nil {
 		return nil, fmt.Errorf("create AWS observability: %w", err)
 	}
-	capabilityPolicy := taskPolicy(spec, component)
+	capabilityPolicy := taskPolicy(spec, component, searchARN)
 	if _, err := iam.NewRolePolicy(ctx, name+"-task-policy", &iam.RolePolicyArgs{
 		Role: component.Runtime.TaskRoleName, Policy: capabilityPolicy,
 	}, regional...); err != nil {
@@ -219,19 +235,30 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		return nil, fmt.Errorf("grant Magento deployment capabilities: %w", err)
 	}
 
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"networkVpcId": component.Network.VpcID, "edgeDistributionId": component.Edge.DistributionID,
-		"applicationURL": pulumi.Sprintf("https://%s", component.Edge.DistributionDomainName), "mediaURL": component.Storage.DistributionURL,
-		"databaseWriter": component.Database.WriterEndpoint, "cacheEndpoint": component.Cache.CachePrimaryEndpoint, "searchEndpoint": component.Search.Endpoint, "queueMode": component.Queue.QueueMode,
-		"clusterName": component.Runtime.ClusterName, "clusterArn": component.Runtime.ClusterARN, "serviceName": component.Runtime.ServiceName,
-		"taskDefinitionArn": component.Runtime.TaskDefinitionARN, "deployTaskDefinitionArn": component.Runtime.DeployTaskDefinitionARN,
-		"cronServiceName": component.Runtime.CronServiceName, "cronTaskDefinitionArn": component.Runtime.CronTaskDefinitionARN,
-		"queueServiceName": component.Runtime.QueueServiceName, "queueTaskDefinitionArn": component.Runtime.QueueTaskDefinitionARN,
-		"taskRoleArn": component.Runtime.TaskRoleARN, "deploymentRoleArn": component.Runtime.DeploymentRoleARN, "securityGroupId": component.Runtime.SecurityGroupID, "privateSubnetIds": stringInputs(component.Network.PrivateSubnetIDs),
-	}); err != nil {
+	if err := ctx.RegisterResourceOutputs(component, component.Outputs()); err != nil {
 		return nil, err
 	}
 	return component, nil
+}
+
+// Outputs returns the stack-level values deploy, health, exec, and outputs
+// commands read via Pulumi Automation API. Keep this map and Program exports
+// in sync — RegisterResourceOutputs alone does not surface stack outputs.
+func (c *Component) Outputs() pulumi.Map {
+	searchEndpoint := pulumi.String("").ToStringOutput()
+	if c.Search != nil {
+		searchEndpoint = c.Search.Endpoint
+	}
+	return pulumi.Map{
+		"networkVpcId": c.Network.VpcID, "edgeDistributionId": c.Edge.DistributionID,
+		"applicationURL": pulumi.Sprintf("https://%s", c.Edge.DistributionDomainName), "mediaURL": c.Storage.DistributionURL,
+		"databaseWriter": c.Database.WriterEndpoint, "cacheEndpoint": c.Cache.CachePrimaryEndpoint, "searchEndpoint": searchEndpoint, "queueMode": c.Queue.QueueMode,
+		"clusterName": c.Runtime.ClusterName, "clusterArn": c.Runtime.ClusterARN, "serviceName": c.Runtime.ServiceName,
+		"taskDefinitionArn": c.Runtime.TaskDefinitionARN, "deployTaskDefinitionArn": c.Runtime.DeployTaskDefinitionARN,
+		"cronServiceName": c.Runtime.CronServiceName, "cronTaskDefinitionArn": c.Runtime.CronTaskDefinitionARN,
+		"queueServiceName": c.Runtime.QueueServiceName, "queueTaskDefinitionArn": c.Runtime.QueueTaskDefinitionARN,
+		"taskRoleArn": c.Runtime.TaskRoleARN, "deploymentRoleArn": c.Runtime.DeploymentRoleARN, "securityGroupId": c.Runtime.SecurityGroupID, "privateSubnetIds": stringInputs(c.Network.PrivateSubnetIDs),
+	}
 }
 
 func databaseSecretARN(input pulumi.StringPtrOutput) pulumi.StringOutput {
@@ -243,10 +270,10 @@ func databaseSecretARN(input pulumi.StringPtrOutput) pulumi.StringOutput {
 	}).(pulumi.StringOutput)
 }
 
-func taskPolicy(spec Spec, component *Component) pulumi.StringOutput {
-	return pulumi.All(component.Storage.BucketARN, component.Search.ARN, component.Database.MasterSecretARN).ApplyT(func(values []interface{}) (string, error) {
+func taskPolicy(spec Spec, component *Component, searchARN pulumi.StringOutput) pulumi.StringOutput {
+	return pulumi.All(component.Storage.BucketARN, searchARN, component.Database.MasterSecretARN).ApplyT(func(values []interface{}) (string, error) {
 		bucketARN, _ := values[0].(string)
-		searchARN, _ := values[1].(string)
+		searchARNValue, _ := values[1].(string)
 		databaseSecretARN := ""
 		switch value := values[2].(type) {
 		case *string:
@@ -263,22 +290,25 @@ func taskPolicy(spec Spec, component *Component) pulumi.StringOutput {
 		if databaseSecretARN != "" {
 			secrets = append(secrets, databaseSecretARN)
 		}
-		searchAction, searchResource := "aoss:APIAccessAll", searchARN
-		if spec.Identity.Preset != sdk.PresetPreview {
-			searchAction = "es:ESHttp*"
-			searchResource = searchARN + "/*"
-		}
-		document := struct {
-			Version   string                   `json:"Version"`
-			Statement []map[string]interface{} `json:"Statement"`
-		}{Version: "2012-10-17", Statement: []map[string]interface{}{
+		statements := []map[string]interface{}{
 			{"Effect": "Allow", "Action": []string{"s3:ListBucket"}, "Resource": bucketARN},
 			{"Effect": "Allow", "Action": []string{"s3:GetObject", "s3:PutObject", "s3:DeleteObject"}, "Resource": bucketARN + "/*"},
 			{"Effect": "Allow", "Action": []string{"kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"}, "Resource": spec.Dependencies.KMSKeyARN},
 			{"Effect": "Allow", "Action": []string{"ssmmessages:CreateControlChannel", "ssmmessages:CreateDataChannel", "ssmmessages:OpenControlChannel", "ssmmessages:OpenDataChannel"}, "Resource": "*"},
-			{"Effect": "Allow", "Action": []string{searchAction}, "Resource": searchResource},
 			{"Effect": "Allow", "Action": []string{"secretsmanager:GetSecretValue"}, "Resource": secrets},
-		}}
+		}
+		if searchARNValue != "" {
+			searchAction, searchResource := "aoss:APIAccessAll", searchARNValue
+			if spec.Identity.Preset != sdk.PresetPreview {
+				searchAction = "es:ESHttp*"
+				searchResource = searchARNValue + "/*"
+			}
+			statements = append(statements, map[string]interface{}{"Effect": "Allow", "Action": []string{searchAction}, "Resource": searchResource})
+		}
+		document := struct {
+			Version   string                   `json:"Version"`
+			Statement []map[string]interface{} `json:"Statement"`
+		}{Version: "2012-10-17", Statement: statements}
 		encoded, err := json.Marshal(document)
 		return string(encoded), err
 	}).(pulumi.StringOutput)
@@ -327,7 +357,7 @@ func firstN(subnets pulumi.StringArray, zones []string, count int) (pulumi.Strin
 }
 
 func serverlessDatabase(spec Spec) *database.ServerlessV2 {
-	if spec.Identity.Preset != sdk.PresetPreview {
+	if spec.Identity.Preset != sdk.PresetPreview || spec.Catalog.DatabaseEngine != DatabaseEngineAuroraMySQL {
 		return nil
 	}
 	profile := spec.Catalog.Aurora
@@ -349,7 +379,7 @@ func varnishImageFor(applicationMode string) string {
 }
 
 func serverlessSearch(spec Spec) *search.Serverless {
-	if spec.Identity.Preset != sdk.PresetPreview {
+	if spec.Catalog.SearchMode != SearchModeServerless {
 		return nil
 	}
 	profile := spec.Catalog.Search
@@ -357,7 +387,7 @@ func serverlessSearch(spec Spec) *search.Serverless {
 }
 
 func provisionedSearch(spec Spec) *search.Provisioned {
-	if spec.Identity.Preset == sdk.PresetPreview {
+	if spec.Catalog.SearchMode != SearchModeProvisioned {
 		return nil
 	}
 	profile := spec.Catalog.SearchProvisioned

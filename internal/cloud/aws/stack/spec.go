@@ -89,15 +89,30 @@ type Dependencies struct {
 	MasterUsername   string
 }
 
+const (
+	NatModeGateway = "nat-gateway"
+	NatModeFckNat  = "fck-nat"
+
+	DatabaseEngineAuroraMySQL = "aurora-mysql"
+	DatabaseEngineRDSMySQL    = "rds-mysql"
+
+	SearchModeServerless  = "serverless"
+	SearchModeProvisioned = "provisioned"
+	SearchModeDisabled    = "disabled"
+)
+
 type NetworkPolicy struct {
 	VPCCIDR           netip.Prefix
 	AvailabilityZones []string
 	MediaDomain       string
 	ApplicationDomain string
+	NatMode           string
 }
 
 type CatalogSelection struct {
 	Version           string
+	DatabaseEngine    string
+	SearchMode        string
 	Aurora            AuroraPreviewProfile
 	Valkey            ValkeyPreviewProfile
 	Search            SearchPreviewProfile
@@ -159,6 +174,7 @@ type RetentionProfile struct {
 
 type ServiceVersions struct {
 	AuroraMySQL string
+	MySQL       string
 	Valkey      string
 	OpenSearch  string
 	RabbitMQ    string
@@ -374,6 +390,9 @@ func (p NetworkPolicy) validate(preset sdk.PresetID) error {
 	if !domain.MatchString(p.ApplicationDomain) || !domain.MatchString(p.MediaDomain) {
 		problems = append(problems, errors.New("application and media domains are required"))
 	}
+	if p.NatMode != NatModeGateway && p.NatMode != NatModeFckNat {
+		problems = append(problems, errors.New("natMode must be nat-gateway or fck-nat"))
+	}
 	return errors.Join(problems...)
 }
 
@@ -381,6 +400,24 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 	var problems []error
 	if strings.TrimSpace(c.Version) == "" {
 		problems = append(problems, errors.New("benchmark catalog version is required"))
+	}
+	if c.DatabaseEngine != DatabaseEngineAuroraMySQL && c.DatabaseEngine != DatabaseEngineRDSMySQL {
+		problems = append(problems, errors.New("databaseEngine must be aurora-mysql or rds-mysql"))
+	}
+	if c.SearchMode != SearchModeServerless && c.SearchMode != SearchModeProvisioned && c.SearchMode != SearchModeDisabled {
+		problems = append(problems, errors.New("searchMode must be serverless, provisioned, or disabled"))
+	}
+	if c.DatabaseEngine == DatabaseEngineRDSMySQL && preset != sdk.PresetPreview {
+		problems = append(problems, errors.New("rds-mysql is only supported for the preview preset"))
+	}
+	if c.SearchMode == SearchModeDisabled && preset != sdk.PresetPreview {
+		problems = append(problems, errors.New("searchMode disabled is only supported for the preview preset"))
+	}
+	if c.SearchMode == SearchModeServerless && preset != sdk.PresetPreview {
+		problems = append(problems, errors.New("searchMode serverless is only supported for the preview preset"))
+	}
+	if c.SearchMode == SearchModeProvisioned && preset == sdk.PresetPreview {
+		problems = append(problems, errors.New("searchMode provisioned is not supported for the preview preset"))
 	}
 	if strings.TrimSpace(c.Valkey.NodeType) == "" || c.Valkey.ReplicaCount < 0 {
 		problems = append(problems, errors.New("Valkey capacity is incomplete"))
@@ -395,15 +432,32 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 	if !retentionSet[c.Retention.LogDays] || c.Retention.BackupDays < 1 || c.Retention.ArtifactDays < 1 {
 		problems = append(problems, errors.New("retention profile is invalid"))
 	}
-	if !auroraVersion.MatchString(c.Versions.AuroraMySQL) || !version.MatchString(c.Versions.Valkey) || !openSearchVersion.MatchString(c.Versions.OpenSearch) || !version.MatchString(c.Versions.RabbitMQ) {
-		problems = append(problems, errors.New("all managed service versions must use their explicit AWS version format"))
+	if !version.MatchString(c.Versions.Valkey) || !version.MatchString(c.Versions.RabbitMQ) {
+		problems = append(problems, errors.New("Valkey and RabbitMQ versions must use their explicit AWS version format"))
+	}
+	if c.DatabaseEngine == DatabaseEngineRDSMySQL {
+		if !version.MatchString(c.Versions.MySQL) {
+			problems = append(problems, errors.New("rds-mysql requires an explicit MySQL engine version"))
+		}
+		if strings.TrimSpace(c.AuroraProvisioned.InstanceClass) == "" {
+			problems = append(problems, errors.New("rds-mysql requires an explicit instance class"))
+		}
+	} else if !auroraVersion.MatchString(c.Versions.AuroraMySQL) {
+		problems = append(problems, errors.New("aurora-mysql requires an explicit Aurora MySQL engine version"))
+	}
+	if c.SearchMode != SearchModeDisabled && !openSearchVersion.MatchString(c.Versions.OpenSearch) {
+		problems = append(problems, errors.New("OpenSearch version must use its explicit AWS version format"))
 	}
 	if preset == sdk.PresetPreview {
-		if c.Aurora.MinimumACU < 0 || c.Aurora.MaximumACU <= 0 || c.Aurora.MaximumACU < c.Aurora.MinimumACU || !halfStep(c.Aurora.MinimumACU) || !halfStep(c.Aurora.MaximumACU) {
-			problems = append(problems, errors.New("Aurora preview capacity bounds are invalid"))
+		if c.DatabaseEngine == DatabaseEngineAuroraMySQL {
+			if c.Aurora.MinimumACU < 0 || c.Aurora.MaximumACU <= 0 || c.Aurora.MaximumACU < c.Aurora.MinimumACU || !halfStep(c.Aurora.MinimumACU) || !halfStep(c.Aurora.MaximumACU) {
+				problems = append(problems, errors.New("Aurora preview capacity bounds are invalid"))
+			}
 		}
-		if c.Search.MaximumIndexingOCU <= 0 || c.Search.MaximumSearchOCU <= 0 || !c.Search.AcceptColdStarts {
-			problems = append(problems, errors.New("OpenSearch preview capacity must be bounded and accept cold starts explicitly"))
+		if c.SearchMode == SearchModeServerless {
+			if c.Search.MaximumIndexingOCU <= 0 || c.Search.MaximumSearchOCU <= 0 || !c.Search.AcceptColdStarts {
+				problems = append(problems, errors.New("OpenSearch preview capacity must be bounded and accept cold starts explicitly"))
+			}
 		}
 		if c.Valkey.ReplicaCount > 1 {
 			problems = append(problems, errors.New("preview Valkey catalog profile cannot exceed one replica"))
@@ -416,8 +470,10 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 		if strings.TrimSpace(c.AuroraProvisioned.InstanceClass) == "" || c.AuroraProvisioned.InstanceCount < minimumInstances {
 			problems = append(problems, fmt.Errorf("preset %q requires at least %d Aurora instances", preset, minimumInstances))
 		}
-		if strings.TrimSpace(c.SearchProvisioned.InstanceType) == "" || c.SearchProvisioned.InstanceCount < 2 || strings.TrimSpace(c.SearchProvisioned.EBSVolumeType) == "" || c.SearchProvisioned.EBSVolumeSizeGiB <= 0 {
-			problems = append(problems, errors.New("non-preview catalog requires explicit OpenSearch capacity"))
+		if c.SearchMode == SearchModeProvisioned {
+			if strings.TrimSpace(c.SearchProvisioned.InstanceType) == "" || c.SearchProvisioned.InstanceCount < 2 || strings.TrimSpace(c.SearchProvisioned.EBSVolumeType) == "" || c.SearchProvisioned.EBSVolumeSizeGiB <= 0 {
+				problems = append(problems, errors.New("non-preview catalog requires explicit OpenSearch capacity"))
+			}
 		}
 		if strings.TrimSpace(c.RabbitMQ.InstanceType) == "" {
 			problems = append(problems, errors.New("non-preview catalog requires an explicit RabbitMQ instance type"))

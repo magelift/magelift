@@ -19,8 +19,8 @@ func validSpec() Spec {
 		Lifecycle:    Lifecycle{ExpiresAt: time.Date(2026, time.December, 31, 0, 0, 0, 0, time.UTC), MonthlyBudgetCents: 25000},
 		Existing:     ExistingResources{HostedZone: &hostedZone, Certificate: &certificate, ALBCertificate: &albCertificate},
 		Dependencies: Dependencies{KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/11111111-2222-3333-4444-555555555555", CacheSecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-cache-token", EncryptionKeyARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-encryption-key", DatabaseName: "magento", MasterUsername: "magento"},
-		Policy:       NetworkPolicy{VPCCIDR: netip.MustParsePrefix("10.42.0.0/16"), AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, ApplicationDomain: "preview.example.com", MediaDomain: "media.preview.example.com"},
-		Catalog:      CatalogSelection{Version: "2026.07-preview.1", Aurora: AuroraPreviewProfile{MinimumACU: 0, MaximumACU: 4, AutoPauseSeconds: 900, EngineSupportsAutoPause: true}, Valkey: ValkeyPreviewProfile{NodeType: "cache.t4g.micro"}, Search: SearchPreviewProfile{MaximumIndexingOCU: 2, MaximumSearchOCU: 2, AcceptColdStarts: true}, Fargate: FargatePreviewProfile{CPU: 512, MemoryMiB: 1024, DesiredCount: 1}, Retention: RetentionProfile{LogDays: 7, BackupDays: 1, ArtifactDays: 7}, Versions: ServiceVersions{AuroraMySQL: "8.0.mysql_aurora.3.12", Valkey: "8.1", OpenSearch: "OpenSearch_3.1", RabbitMQ: "3.13"}},
+		Policy:       NetworkPolicy{VPCCIDR: netip.MustParsePrefix("10.42.0.0/16"), AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, ApplicationDomain: "preview.example.com", MediaDomain: "media.preview.example.com", NatMode: NatModeGateway},
+		Catalog:      CatalogSelection{Version: "2026.07-preview.1", DatabaseEngine: DatabaseEngineAuroraMySQL, SearchMode: SearchModeServerless, Aurora: AuroraPreviewProfile{MinimumACU: 0, MaximumACU: 4, AutoPauseSeconds: 900, EngineSupportsAutoPause: true}, Valkey: ValkeyPreviewProfile{NodeType: "cache.t4g.micro"}, Search: SearchPreviewProfile{MaximumIndexingOCU: 2, MaximumSearchOCU: 2, AcceptColdStarts: true}, Fargate: FargatePreviewProfile{CPU: 512, MemoryMiB: 1024, DesiredCount: 1}, Retention: RetentionProfile{LogDays: 7, BackupDays: 1, ArtifactDays: 7}, Versions: ServiceVersions{AuroraMySQL: "8.0.mysql_aurora.3.12", Valkey: "8.1", OpenSearch: "OpenSearch_3.1", RabbitMQ: "3.13"}},
 	}
 }
 
@@ -64,6 +64,7 @@ func TestSpecValidateAllowsThreeZoneStandardQueueLayout(t *testing.T) {
 	spec.Policy.AvailabilityZones = []string{"eu-west-3a", "eu-west-3b", "eu-west-3c"}
 	spec.Catalog.Valkey.ReplicaCount = 1
 	spec.Catalog.Fargate.DesiredCount = 2
+	spec.Catalog.SearchMode = SearchModeProvisioned
 	spec.Dependencies.SessionSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-session-token"
 	spec.Dependencies.QueueSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-queue-token"
 	spec.Catalog.AuroraProvisioned = AuroraProvisionedProfile{InstanceClass: "db.r8g.large", InstanceCount: 2}

@@ -114,7 +114,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		Origins: cloudfront.DistributionOriginArray{cloudfront.DistributionOriginArgs{DomainName: bucket.BucketRegionalDomainName, OriginId: pulumi.String("media-s3"), OriginAccessControlId: oac.ID()}},
 		DefaultCacheBehavior: &cloudfront.DistributionDefaultCacheBehaviorArgs{
 			AllowedMethods: pulumi.StringArray{pulumi.String("GET"), pulumi.String("HEAD")}, CachedMethods: pulumi.StringArray{pulumi.String("GET"), pulumi.String("HEAD")},
-			CachePolicyId: pulumi.String("658327ea-f89d-4fab-a63d-7e88639e58f"), Compress: pulumi.Bool(true), TargetOriginId: pulumi.String("media-s3"), ViewerProtocolPolicy: pulumi.String("redirect-to-https"),
+			CachePolicyId: pulumi.String("658327ea-f89d-4fab-a63d-7e88639e58f6"), Compress: pulumi.Bool(true), TargetOriginId: pulumi.String("media-s3"), ViewerProtocolPolicy: pulumi.String("redirect-to-https"),
 		},
 		Restrictions:      &cloudfront.DistributionRestrictionsArgs{GeoRestriction: &cloudfront.DistributionRestrictionsGeoRestrictionArgs{RestrictionType: pulumi.String("none")}},
 		ViewerCertificate: viewerCertificate, WaitForDeployment: pulumi.Bool(false), Tags: tags,

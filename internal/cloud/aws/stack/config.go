@@ -102,8 +102,8 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		Lifecycle:    Lifecycle{ExpiresAt: expiresAt, MonthlyBudgetCents: cfg.MonthlyBudgetCents, Protection: cfg.Protection},
 		Existing:     ExistingResources{Network: existingNetwork, PublicSubnetIDs: existingPublicSubnets, PrivateSubnetIDs: existingPrivateSubnets, DataSubnetIDs: existingDataSubnets, HostedZone: &hostedZone, Certificate: &cloudFrontCertificate, ALBCertificate: &albCertificate, SNSTopicARN: aws.SNSTopicARN},
 		Dependencies: Dependencies{KMSKeyARN: aws.KMSKeyARN, CacheSecretARN: aws.CacheSecretARN, SessionSecretARN: aws.SessionSecretARN, QueueSecretARN: aws.QueueSecretARN, EncryptionKeyARN: aws.EncryptionKeySecretARN, DatabaseName: aws.DatabaseName, MasterUsername: aws.MasterUsername},
-		Policy:       NetworkPolicy{VPCCIDR: cidr, AvailabilityZones: append([]string(nil), aws.AvailabilityZones...), MediaDomain: aws.MediaDomain, ApplicationDomain: cfg.Domain},
-		Catalog:      catalogFromConfig(aws.Catalog),
+		Policy:       NetworkPolicy{VPCCIDR: cidr, AvailabilityZones: append([]string(nil), aws.AvailabilityZones...), MediaDomain: aws.MediaDomain, ApplicationDomain: cfg.Domain, NatMode: resolveNatMode(aws.NatMode)},
+		Catalog:      catalogFromConfig(aws.Catalog, preset),
 	}
 	validate := spec.Validate
 	if options.AllowExpiredPreview && preset == sdk.PresetPreview && !expiresAt.IsZero() && expiresAt.Before(time.Now().UTC()) {
@@ -130,12 +130,20 @@ func validateAWSServiceCompatibility(cfg config.Config) error {
 		return fmt.Errorf("AWS service compatibility is not cataloged for Magento %s", versionLine)
 	}
 	versions := cfg.Target.AWS.Catalog.Versions
-	searchCompatible := strings.HasPrefix(versions.OpenSearch, policy.openSearchPrefix)
-	if versionLine == "2.4.7" || versionLine == "2.4.6" {
-		searchCompatible = strings.HasPrefix(versions.OpenSearch, "OpenSearch_2") || strings.HasPrefix(versions.OpenSearch, "OpenSearch_3")
+	engine := resolveDatabaseEngine(cfg.Target.AWS.Catalog.DatabaseEngine)
+	presetName := cfg.Preset
+	if strings.TrimSpace(presetName) == "" {
+		presetName = cfg.Defaults.Preset
 	}
-	if !searchCompatible {
-		return fmt.Errorf("Magento %s requires an Adobe-listed AWS OpenSearch 2 or 3 version", versionLine)
+	searchMode := resolveSearchMode(cfg.Target.AWS.Catalog.SearchMode, sdk.PresetID(presetName))
+	if searchMode != SearchModeDisabled {
+		searchCompatible := strings.HasPrefix(versions.OpenSearch, policy.openSearchPrefix)
+		if versionLine == "2.4.7" || versionLine == "2.4.6" {
+			searchCompatible = strings.HasPrefix(versions.OpenSearch, "OpenSearch_2") || strings.HasPrefix(versions.OpenSearch, "OpenSearch_3")
+		}
+		if !searchCompatible {
+			return fmt.Errorf("Magento %s requires an Adobe-listed AWS OpenSearch 2 or 3 version", versionLine)
+		}
 	}
 	if !hasPrefix(versions.Valkey, policy.valkeyPrefixes) {
 		return fmt.Errorf("Magento %s requires an Adobe-listed AWS Valkey version", versionLine)
@@ -146,6 +154,12 @@ func validateAWSServiceCompatibility(cfg config.Config) error {
 	// Preview uses Magento database queues, so the RabbitMQ instance type may be unset.
 	if instanceType := strings.TrimSpace(cfg.Target.AWS.Catalog.RabbitMQ.InstanceType); strings.HasPrefix(versions.RabbitMQ, "4.2") && instanceType != "" && !strings.HasPrefix(instanceType, "mq.m7g.") {
 		return errors.New("AWS MQ RabbitMQ 4.2 requires an mq.m7g instance type")
+	}
+	if engine == DatabaseEngineRDSMySQL {
+		if strings.TrimSpace(versions.MySQL) == "" || (!strings.HasPrefix(versions.MySQL, "8.0.") && !strings.HasPrefix(versions.MySQL, "8.4.")) {
+			return fmt.Errorf("Magento %s requires an AWS RDS MySQL 8.0 or 8.4 engine", versionLine)
+		}
+		return nil
 	}
 	if !strings.Contains(versions.AuroraMySQL, ".3.12") && !strings.Contains(versions.AuroraMySQL, ".3.11") {
 		return fmt.Errorf("Magento %s requires an AWS Aurora MySQL 3.11 or 3.12 engine", versionLine)
@@ -173,17 +187,43 @@ func parseExpiration(value string) (time.Time, error) {
 	return parsed.UTC(), nil
 }
 
-func catalogFromConfig(input config.AWSCatalog) CatalogSelection {
+func catalogFromConfig(input config.AWSCatalog, preset sdk.PresetID) CatalogSelection {
 	return CatalogSelection{
 		Version:           input.Version,
+		DatabaseEngine:    resolveDatabaseEngine(input.DatabaseEngine),
+		SearchMode:        resolveSearchMode(input.SearchMode, preset),
 		Aurora:            AuroraPreviewProfile{MinimumACU: input.Aurora.MinimumACU, MaximumACU: input.Aurora.MaximumACU, AutoPauseSeconds: input.Aurora.AutoPauseSeconds, EngineSupportsAutoPause: input.Aurora.EngineSupportsAutoPause},
 		Valkey:            ValkeyPreviewProfile{NodeType: input.Valkey.NodeType, ReplicaCount: input.Valkey.ReplicaCount},
 		Search:            SearchPreviewProfile{MaximumIndexingOCU: input.Search.MaximumIndexingOCU, MaximumSearchOCU: input.Search.MaximumSearchOCU, AcceptColdStarts: input.Search.AcceptColdStarts},
 		Fargate:           FargatePreviewProfile{CPU: input.Fargate.CPU, MemoryMiB: input.Fargate.MemoryMiB, DesiredCount: input.Fargate.DesiredCount},
 		Retention:         RetentionProfile{LogDays: input.Retention.LogDays, BackupDays: input.Retention.BackupDays, ArtifactDays: input.Retention.ArtifactDays},
-		Versions:          ServiceVersions{AuroraMySQL: input.Versions.AuroraMySQL, Valkey: input.Versions.Valkey, OpenSearch: input.Versions.OpenSearch, RabbitMQ: input.Versions.RabbitMQ},
+		Versions:          ServiceVersions{AuroraMySQL: input.Versions.AuroraMySQL, MySQL: input.Versions.MySQL, Valkey: input.Versions.Valkey, OpenSearch: input.Versions.OpenSearch, RabbitMQ: input.Versions.RabbitMQ},
 		AuroraProvisioned: AuroraProvisionedProfile{InstanceClass: input.Aurora.InstanceClass, InstanceCount: input.Aurora.InstanceCount},
 		SearchProvisioned: SearchProvisionedProfile{InstanceType: input.Search.InstanceType, InstanceCount: input.Search.InstanceCount, DedicatedMasterType: input.Search.DedicatedMasterType, DedicatedMasterCount: input.Search.DedicatedMasterCount, EBSVolumeType: input.Search.EBSVolumeType, EBSVolumeSizeGiB: input.Search.EBSVolumeSizeGiB},
 		RabbitMQ:          RabbitMQProfile{InstanceType: input.RabbitMQ.InstanceType},
 	}
+}
+
+func resolveNatMode(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return NatModeGateway
+	}
+	return strings.TrimSpace(value)
+}
+
+func resolveDatabaseEngine(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return DatabaseEngineAuroraMySQL
+	}
+	return strings.TrimSpace(value)
+}
+
+func resolveSearchMode(value string, preset sdk.PresetID) string {
+	if strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	if preset == sdk.PresetPreview {
+		return SearchModeServerless
+	}
+	return SearchModeProvisioned
 }

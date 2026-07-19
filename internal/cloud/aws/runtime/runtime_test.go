@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -61,29 +62,58 @@ func TestRuntimeResourceGraphAndSecurityContract(t *testing.T) {
 	php := containers["php-fpm"]
 	web := containers["web"]
 	varnish := containers["varnish"]
-	if php["image"] != testImage || php["user"] != "10001:10001" || php["readonlyRootFilesystem"] != true {
+	if php["image"] != testImage || php["user"] != "10001:10001" || php["readonlyRootFilesystem"] != false {
 		t.Fatalf("php-fpm container definition = %#v", php)
 	}
 	if web["image"] != testImage || web["command"].([]any)[0] != "nginx" || web["portMappings"] != nil {
 		t.Fatalf("nginx container definition = %#v", web)
 	}
-	if varnish["image"] != testVarnishImage || varnish["user"] != "varnish" || varnish["readonlyRootFilesystem"] != true || varnish["portMappings"].([]any)[0].(map[string]any)["containerPort"] != float64(VarnishPort) {
+	if web["readonlyRootFilesystem"] != false {
+		t.Fatalf("web must use a writable root on Fargate: %#v", web)
+	}
+	if _, hasMounts := web["mountPoints"]; hasMounts {
+		t.Fatalf("web must not overlay Fargate empty volumes on /tmp: %#v", web["mountPoints"])
+	}
+	healthCheck, ok := web["healthCheck"].(map[string]any)
+	if !ok {
+		t.Fatalf("web must define an ECS health check for /health: %#v", web)
+	}
+	hcCommand, _ := healthCheck["command"].([]any)
+	if len(hcCommand) < 2 || hcCommand[0] != "CMD-SHELL" || !strings.Contains(fmt.Sprint(hcCommand[1]), "127.0.0.1:8080/health") {
+		t.Fatalf("web health check = %#v", healthCheck)
+	}
+	if varnish["image"] != testVarnishImage || varnish["user"] != "varnish" || varnish["readonlyRootFilesystem"] != false || varnish["portMappings"].([]any)[0].(map[string]any)["containerPort"] != float64(VarnishPort) {
 		t.Fatalf("varnish container definition = %#v", varnish)
+	}
+	depends, _ := varnish["dependsOn"].([]any)
+	if len(depends) != 1 {
+		t.Fatalf("varnish dependsOn = %#v", varnish["dependsOn"])
+	}
+	dep, _ := depends[0].(map[string]any)
+	if dep["containerName"] != "web" || dep["condition"] != "HEALTHY" {
+		t.Fatalf("varnish must wait for healthy nginx: %#v", dep)
 	}
 	linuxParameters, ok := varnish["linuxParameters"].(map[string]any)
 	if !ok {
 		t.Fatalf("varnish Linux parameters are missing: %#v", varnish)
 	}
-	tmpfs, ok := linuxParameters["tmpfs"].([]any)
-	if !ok || len(tmpfs) != 1 {
-		t.Fatalf("varnish must use one task-scoped tmpfs: %#v", linuxParameters)
+	if _, hasTmpfs := linuxParameters["tmpfs"]; hasTmpfs {
+		t.Fatalf("varnish must not use tmpfs for VSM: %#v", linuxParameters)
 	}
-	varnishTmpfs, ok := tmpfs[0].(map[string]any)
-	if !ok || varnishTmpfs["containerPath"] != "/var/lib/varnish" || varnishTmpfs["size"] != float64(384) {
-		t.Fatalf("varnish VSM tmpfs = %#v", varnishTmpfs)
+	if _, hasMounts := varnish["mountPoints"]; hasMounts {
+		t.Fatalf("varnish must use image /tmp, not a Fargate empty volume: %#v", varnish["mountPoints"])
 	}
-	if !reflect.DeepEqual(varnishTmpfs["mountOptions"], []any{"rw", "exec", "uid=1000", "gid=1000", "mode=0750"}) {
-		t.Fatalf("varnish VSM tmpfs options = %#v", varnishTmpfs["mountOptions"])
+	command, _ := varnish["command"].([]any)
+	if len(command) < 2 || command[0] != "-n" || command[1] != "/tmp/varnish" {
+		t.Fatalf("varnish must set -n /tmp/varnish for Fargate VSM: %#v", command)
+	}
+	if env := environmentByName(varnish); env["VARNISH_SIZE"] != "64m" {
+		t.Fatalf("varnish malloc for 512MiB task = %q, want 64m", env["VARNISH_SIZE"])
+	}
+	if webLinux, ok := web["linuxParameters"].(map[string]any); ok {
+		if _, hasTmpfs := webLinux["tmpfs"]; hasTmpfs {
+			t.Fatalf("web must not rely on Fargate tmpfs uid/gid options: %#v", webLinux)
+		}
 	}
 	if _, hasSecrets := web["secrets"]; hasSecrets {
 		t.Fatal("nginx sidecar received application secrets")
@@ -96,6 +126,9 @@ func TestRuntimeResourceGraphAndSecurityContract(t *testing.T) {
 	}
 	if !strings.Contains(task.inputs["containerDefinitions"].StringValue(), "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD") || !strings.Contains(task.inputs["containerDefinitions"].StringValue(), "database:password::") {
 		t.Fatalf("container definitions do not select database JSON credentials: %s", task.inputs["containerDefinitions"].StringValue())
+	}
+	if strings.Contains(task.inputs["containerDefinitions"].StringValue(), "database:host::") || strings.Contains(task.inputs["containerDefinitions"].StringValue(), "database:port::") || strings.Contains(task.inputs["containerDefinitions"].StringValue(), "database:dbname::") {
+		t.Fatalf("managed database secret must not select host/port/dbname JSON keys: %s", task.inputs["containerDefinitions"].StringValue())
 	}
 	if !strings.Contains(task.inputs["containerDefinitions"].StringValue(), "MAGENTO_DC_CRYPT__KEY") || !strings.Contains(task.inputs["containerDefinitions"].StringValue(), "encryption-key") {
 		t.Fatalf("container definitions do not inject the Magento encryption key reference: %s", task.inputs["containerDefinitions"].StringValue())
@@ -245,6 +278,9 @@ func TestRuntimeInjectsNonSecretCapabilityReferences(t *testing.T) {
 				}
 			}
 			for name, value := range map[string]string{
+				"MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST":                     "shop.writer",
+				"MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT":                     "3306",
+				"MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME":                   "magento",
 				"MAGENTO_DC_DB__CONNECTION__DEFAULT__MODEL":                    "mysql4",
 				"MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__SERVER": "shop.cache",
 				"MAGENTO_DC_SESSION__REDIS_HOST":                               "shop.sessions",
@@ -289,8 +325,15 @@ func TestRuntimeAttachesExistingSecurityGroupAndTargetGroup(t *testing.T) {
 	}
 	service := m.named(t, "aws:ecs/service:Service", "shop-web-service")
 	loadBalancers := service.inputs["loadBalancers"].ArrayValue()
-	if len(loadBalancers) != 1 || loadBalancers[0].ObjectValue()["targetGroupArn"].StringValue() != string(args.TargetGroupARN.(pulumi.String)) {
+	if len(loadBalancers) != 1 {
 		t.Fatalf("service load balancer attachment = %#v", loadBalancers)
+	}
+	lb := loadBalancers[0].ObjectValue()
+	if lb["targetGroupArn"].StringValue() != string(args.TargetGroupARN.(pulumi.String)) {
+		t.Fatalf("service load balancer attachment = %#v", loadBalancers)
+	}
+	if lb["containerName"].StringValue() != "varnish" || lb["containerPort"].NumberValue() != float64(VarnishPort) {
+		t.Fatalf("integrated load balancer must target varnish:%d, got %#v", VarnishPort, lb)
 	}
 }
 
@@ -363,7 +406,7 @@ func TestFrontendPortSelectsIntegratedVarnishBoundary(t *testing.T) {
 
 func testCapabilities() *CapabilityConfig {
 	return &CapabilityConfig{
-		DatabaseWriterEndpoint: pulumi.String("shop.writer"), DatabaseSecretARN: pulumi.String("arn:aws:secretsmanager:eu-west-3:123456789012:secret:database"),
+		DatabaseWriterEndpoint: pulumi.String("shop.writer"), DatabaseName: "magento", DatabaseSecretARN: pulumi.String("arn:aws:secretsmanager:eu-west-3:123456789012:secret:database"),
 		CacheEndpoint: pulumi.String("shop.cache"), SessionEndpoint: pulumi.String("shop.sessions"), SearchEndpoint: pulumi.String("https://shop.search"),
 		QueueMode: pulumi.String("rabbitmq"), QueueEndpoint: pulumi.String("amqps://shop.queue:5671"), QueueUsername: pulumi.String("magento_admin"), MediaBucket: pulumi.String("shop-media"),
 	}
