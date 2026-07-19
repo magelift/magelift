@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help generate generate-check cli-docs cli-docs-check fmt fmt-check test lint license-check php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test floci-test aws-acceptance-local docs workflow-check verify
+.PHONY: help generate generate-check cli-docs cli-docs-check fmt fmt-check test lint license-check php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test floci-test aws-acceptance-local gcp-acceptance-local docs workflow-check verify
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -15,7 +15,7 @@ test: ## Run Go tests with the race detector
 	go test -race ./...
 
 lint: ## Run static Go checks
-	go vet ./...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0 run ./...
 
 license-check: ## Check Go dependency licenses
 	go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown
@@ -59,6 +59,9 @@ floci-test: ## Run account-free AWS state and lock integration tests through Flo
 
 aws-acceptance-local: ## Run a local real-AWS acceptance pass (preview; destroys on exit)
 	./scripts/aws-acceptance-local.sh
+
+gcp-acceptance-local: ## Run a local real-GCP acceptance pass (experimental; destroys on exit)
+	./scripts/gcp-acceptance-local.sh
 
 docs: ## Build documentation with strict link and navigation checks
 	mkdocs build --strict
