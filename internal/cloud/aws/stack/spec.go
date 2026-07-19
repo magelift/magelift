@@ -264,10 +264,10 @@ func awsCapabilities(preset sdk.PresetID) []sdk.CapabilityID {
 	capabilities := []sdk.CapabilityID{
 		sdk.CapabilityDatabaseMySQL,
 		sdk.CapabilityCacheValkey,
-		sdk.CapabilitySearchOpenSearch,
-		sdk.CapabilityObjectStorageS3,
-		sdk.CapabilityEdgeCloudFront,
-		sdk.CapabilityObservabilityCloudWatch,
+		sdk.CapabilitySearchFullText,
+		sdk.CapabilityObjectStorageBlob,
+		sdk.CapabilityEdgeCDN,
+		sdk.CapabilityObservabilityLogs,
 	}
 	if preset == sdk.PresetPreview {
 		return append(capabilities, sdk.CapabilityQueueDatabase)
