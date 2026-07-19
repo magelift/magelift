@@ -7,59 +7,66 @@ import (
 	"strings"
 	"testing"
 
-	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
+	"github.com/acourtiol/magelift/internal/platform"
 )
 
-type fakeStateManager struct {
-	info   awsstate.Info
-	err    error
-	called bool
-	unlock bool
-	locked bool
-}
-
-type fakeStateArchive struct {
-	backup   awsstate.BackupResult
-	restore  awsstate.RestoreResult
+type fakePlatformState struct {
+	info     platform.LockInfo
+	err      error
+	called   bool
+	unlock   bool
+	locked   bool
+	backup   platform.BackupResult
+	restore  platform.RestoreResult
 	backups  int
 	restores []string
+	backend  string
 }
 
-func (a *fakeStateArchive) Backup(context.Context) (awsstate.BackupResult, error) {
-	a.backups++
-	return a.backup, nil
-}
-
-func (a *fakeStateArchive) Restore(_ context.Context, id string) (awsstate.RestoreResult, error) {
-	a.restores = append(a.restores, id)
-	return a.restore, nil
-}
-
-func (m *fakeStateManager) Status(context.Context) (awsstate.Info, error) {
+func (m *fakePlatformState) Status(context.Context, platform.PlannedStack) (bool, *platform.LockInfo, string, error) {
 	m.called = true
-	return m.info, m.err
+	if m.err != nil {
+		return false, nil, m.backend, m.err
+	}
+	if m.info.Owner == "" {
+		return false, nil, m.backend, nil
+	}
+	info := m.info
+	return true, &info, m.backend, nil
 }
 
-func (m *fakeStateManager) Unlock(context.Context) (awsstate.Info, error) {
-	m.unlock = true
-	return m.info, m.err
-}
-
-func (m *fakeStateManager) Lock(context.Context, string, string, string) (func() error, error) {
+func (m *fakePlatformState) Lock(context.Context, platform.PlannedStack, string) (func(context.Context) error, error) {
 	m.locked = true
-	return func() error { return nil }, nil
+	return func(context.Context) error { return nil }, nil
+}
+
+func (m *fakePlatformState) Unlock(context.Context, platform.PlannedStack) (*platform.LockInfo, error) {
+	m.unlock = true
+	if m.err != nil {
+		return nil, m.err
+	}
+	info := m.info
+	return &info, nil
+}
+
+func (m *fakePlatformState) Backup(context.Context, platform.PlannedStack) (platform.BackupResult, error) {
+	m.backups++
+	return m.backup, nil
+}
+
+func (m *fakePlatformState) Restore(_ context.Context, _ platform.PlannedStack, id string) (platform.RestoreResult, error) {
+	m.restores = append(m.restores, id)
+	return m.restore, nil
 }
 
 func TestStateStatusReportsUnlockedEnvironment(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
-	manager := &fakeStateManager{err: awsstate.ErrNotLocked}
+	manager := &fakePlatformState{backend: "s3://state"}
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newState = func(context.Context, string, string, string, string, string) (stateManager, error) {
-		return manager, nil
-	}
+	o.testState = manager
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "state", "status"})
 	if err := cmd.Execute(); err != nil {
@@ -72,13 +79,11 @@ func TestStateStatusReportsUnlockedEnvironment(t *testing.T) {
 
 func TestStateStatusPropagatesInspectionFailure(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
-	manager := &fakeStateManager{err: errors.New("backend unavailable")}
+	manager := &fakePlatformState{err: errors.New("backend unavailable")}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newState = func(context.Context, string, string, string, string, string) (stateManager, error) {
-		return manager, nil
-	}
+	o.testState = manager
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--env", "staging", "state", "status"})
 	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "inspect deployment lock") {
@@ -88,14 +93,12 @@ func TestStateStatusPropagatesInspectionFailure(t *testing.T) {
 
 func TestStateUnlockRequiresConfirmation(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
-	manager := &fakeStateManager{info: awsstate.Info{Project: "shop", Environment: "staging", Owner: "ci"}}
+	manager := &fakePlatformState{info: platform.LockInfo{Project: "shop", Environment: "staging", Owner: "ci"}}
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newState = func(context.Context, string, string, string, string, string) (stateManager, error) {
-		return manager, nil
-	}
+	o.testState = manager
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--env", "staging", "state", "unlock"})
 	err := cmd.Execute()
@@ -119,24 +122,23 @@ func TestStateUnlockRequiresConfirmation(t *testing.T) {
 
 func TestStateBackupAndRestoreUseADeploymentLock(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
-	manager := &fakeStateManager{}
-	archive := &fakeStateArchive{backup: awsstate.BackupResult{ID: "backup-1", Objects: 2}, restore: awsstate.RestoreResult{ID: "backup-1", Objects: 2}}
+	manager := &fakePlatformState{
+		backup:  platform.BackupResult{ID: "backup-1", Location: "backups/backup-1"},
+		restore: platform.RestoreResult{ID: "backup-1", Location: "backups/backup-1"},
+	}
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newState = func(context.Context, string, string, string, string, string) (stateManager, error) {
-		return manager, nil
-	}
-	o.newArchive = func(context.Context, string, string, string) (stateArchive, error) { return archive, nil }
+	o.testState = manager
 
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "state", "backup"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !manager.locked || archive.backups != 1 || !strings.Contains(out.String(), `"id": "backup-1"`) {
-		t.Fatalf("backup calls: locked=%v backups=%d output=%s", manager.locked, archive.backups, out.String())
+	if !manager.locked || manager.backups != 1 || !strings.Contains(out.String(), `"id": "backup-1"`) {
+		t.Fatalf("backup calls: locked=%v backups=%d output=%s", manager.locked, manager.backups, out.String())
 	}
 
 	out.Reset()
@@ -145,7 +147,7 @@ func TestStateBackupAndRestoreUseADeploymentLock(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if len(archive.restores) != 1 || archive.restores[0] != "backup-1" || !strings.Contains(out.String(), `"id": "backup-1"`) {
-		t.Fatalf("restore calls: %+v output=%s", archive.restores, out.String())
+	if len(manager.restores) != 1 || manager.restores[0] != "backup-1" || !strings.Contains(out.String(), `"id": "backup-1"`) {
+		t.Fatalf("restore calls: %+v output=%s", manager.restores, out.String())
 	}
 }

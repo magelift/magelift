@@ -9,22 +9,19 @@ import (
 	osExec "os/exec"
 	"strings"
 
-	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
+	"github.com/acourtiol/magelift/internal/platform"
+	sdk "github.com/acourtiol/magelift/sdk/v1"
 	"github.com/spf13/cobra"
 )
 
-type execStore interface {
-	SelectTask(context.Context, string, string) (awsoperations.Task, error)
-}
-
 type remoteCommandResult struct {
 	Environment string `json:"environment" yaml:"environment"`
-	Cluster     string `json:"cluster" yaml:"cluster"`
-	Service     string `json:"service" yaml:"service"`
-	Task        string `json:"task" yaml:"task"`
-	Container   string `json:"container" yaml:"container"`
+	Cluster     string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
+	Service     string `json:"service,omitempty" yaml:"service,omitempty"`
+	Task        string `json:"task,omitempty" yaml:"task,omitempty"`
+	Container   string `json:"container,omitempty" yaml:"container,omitempty"`
 	Command     string `json:"command" yaml:"command"`
+	Launcher    string `json:"launcher,omitempty" yaml:"launcher,omitempty"`
 }
 
 func execCommand(o *options) *cobra.Command {
@@ -32,23 +29,17 @@ func execCommand(o *options) *cobra.Command {
 	var sessionOnly bool
 	command := &cobra.Command{
 		Use:   "exec --service web --container web -- <command>",
-		Short: "Run a command through ECS Exec",
+		Short: "Run a command on a Magento workload",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			result, argv, err := o.prepareRemoteCommand(cmd.Context(), service, container, args)
+			result, target, err := o.prepareRemoteCommand(cmd.Context(), service, container, args)
 			if err != nil {
 				return err
 			}
 			if sessionOnly {
 				return o.write(result)
 			}
-			if o.runCommand == nil {
-				return &exitError{code: 3, err: errors.New("AWS CLI command runner is unavailable")}
-			}
-			if err := o.runCommand(cmd.Context(), "", argv, o.stdout, o.stderr); err != nil {
-				return &exitError{code: 3, err: fmt.Errorf("run ECS Exec command: %w", err)}
-			}
-			return nil
+			return o.runExecTarget(cmd.Context(), target)
 		},
 	}
 	command.Flags().StringVar(&service, "service", "web", "logical service: web, deploy, or cron")
@@ -66,23 +57,15 @@ func magentoOperationCommand(o *options, name string) *cobra.Command {
 	}
 	return &cobra.Command{
 		Use:   name,
-		Short: "Run the Magento " + name + " operation through ECS Exec",
+		Short: "Run the Magento " + name + " operation on the web workload",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// An nginx-fpm task keeps PHP in the php-fpm sidecar. FrankenPHP
-			// serves the application and runs PHP in the web container.
-			result, argv, err := o.prepareRemoteCommand(cmd.Context(), "web", "", strings.Fields(commands[name]))
+			// Empty container lets the adapter pick php-fpm vs web from WebRuntime.
+			_, target, err := o.prepareRemoteCommand(cmd.Context(), "web", "", strings.Fields(commands[name]))
 			if err != nil {
 				return err
 			}
-			if o.runCommand == nil {
-				return &exitError{code: 3, err: errors.New("AWS CLI command runner is unavailable")}
-			}
-			if err := o.runCommand(cmd.Context(), "", argv, o.stdout, o.stderr); err != nil {
-				return &exitError{code: 3, err: fmt.Errorf("run Magento operation: %w", err)}
-			}
-			_ = result
-			return nil
+			return o.runExecTarget(cmd.Context(), target)
 		},
 	}
 }
@@ -92,23 +75,17 @@ func sshCommand(o *options) *cobra.Command {
 	var sessionOnly bool
 	command := &cobra.Command{
 		Use:   "ssh",
-		Short: "Open an SSH-compatible shell through ECS Exec",
+		Short: "Open a shell on a Magento workload",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, argv, err := o.prepareRemoteCommand(cmd.Context(), service, container, []string{commandText})
+			result, target, err := o.prepareRemoteCommand(cmd.Context(), service, container, []string{commandText})
 			if err != nil {
 				return err
 			}
 			if sessionOnly {
 				return o.write(result)
 			}
-			if o.runCommand == nil {
-				return &exitError{code: 3, err: errors.New("AWS CLI command runner is unavailable")}
-			}
-			if err := o.runCommand(cmd.Context(), "", argv, o.stdout, o.stderr); err != nil {
-				return &exitError{code: 3, err: fmt.Errorf("open ECS Exec shell: %w", err)}
-			}
-			return nil
+			return o.runExecTarget(cmd.Context(), target)
 		},
 	}
 	command.Flags().StringVar(&service, "service", "web", "logical service: web, deploy, or cron")
@@ -124,102 +101,83 @@ func tunnelCommand() *cobra.Command {
 	}}
 }
 
-func (o *options) prepareRemoteCommand(ctx context.Context, service, container string, command []string) (remoteCommandResult, []string, error) {
-	environment, spec, outputs, err := o.runtimeOutputs(ctx)
+func (o *options) runExecTarget(ctx context.Context, target platform.ExecTarget) error {
+	if o.runCommand == nil {
+		return &exitError{code: 3, err: errors.New("remote command runner is unavailable")}
+	}
+	launcher := target.Launcher
+	if launcher == "" {
+		launcher = "aws"
+	}
+	args := append([]string{}, target.Args...)
+	// runCommand historically received argv without the launcher binary name.
+	if err := o.runCommand(ctx, "", args, o.stdout, o.stderr); err != nil {
+		return &exitError{code: 3, err: fmt.Errorf("run remote command (%s): %w", launcher, err)}
+	}
+	return nil
+}
+
+func (o *options) prepareRemoteCommand(ctx context.Context, service, container string, command []string) (remoteCommandResult, platform.ExecTarget, error) {
+	environment, planned, outputs, err := o.plannedOutputs(ctx)
 	if err != nil {
-		return remoteCommandResult{}, nil, err
+		return remoteCommandResult{}, platform.ExecTarget{}, err
 	}
 	service = strings.TrimSpace(service)
 	container = strings.TrimSpace(container)
-	if container == "" && service == "web" {
-		if spec.Application.WebRuntime == "nginx-fpm" {
-			container = "php-fpm"
-		} else {
-			container = "web"
-		}
-	}
 	if service != "web" && service != "deploy" && service != "cron" {
-		return remoteCommandResult{}, nil, invalid(fmt.Errorf("unsupported service %q", service))
-	}
-	if container == "" {
-		return remoteCommandResult{}, nil, invalid(errors.New("container is required"))
+		return remoteCommandResult{}, platform.ExecTarget{}, invalid(fmt.Errorf("unsupported service %q", service))
 	}
 	if len(command) == 0 {
-		return remoteCommandResult{}, nil, invalid(errors.New("a command is required"))
+		return remoteCommandResult{}, platform.ExecTarget{}, invalid(errors.New("a command is required"))
 	}
 	for _, part := range command {
 		if strings.ContainsRune(part, '\x00') || strings.ContainsAny(part, "\r\n") {
-			return remoteCommandResult{}, nil, invalid(errors.New("command arguments must not contain NUL or newline characters"))
+			return remoteCommandResult{}, platform.ExecTarget{}, invalid(errors.New("command arguments must not contain NUL or newline characters"))
 		}
 	}
-	cluster := outputString(outputs, "clusterName")
-	serviceName := outputString(outputs, serviceNameOutput(service))
-	if cluster == "" || serviceName == "" {
-		return remoteCommandResult{}, nil, &exitError{code: 3, err: fmt.Errorf("stack outputs do not contain ECS %s runtime identifiers", service)}
-	}
-	if o.newExec == nil {
-		return remoteCommandResult{}, nil, errors.New("AWS ECS operation factory is required")
-	}
-	store, err := o.newExec(ctx, spec.Identity.Region)
+	observe, err := o.runtimeObserve()
 	if err != nil {
-		return remoteCommandResult{}, nil, fmt.Errorf("create AWS ECS operation client: %w", err)
+		return remoteCommandResult{}, platform.ExecTarget{}, err
 	}
-	task, err := store.SelectTask(ctx, cluster, serviceName)
+	target, err := observe.PrepareExec(ctx, planned, outputs, platform.ExecQuery{
+		Workload:  sdk.WorkloadID(service),
+		Container: container,
+		Command:   command,
+	})
 	if err != nil {
-		return remoteCommandResult{}, nil, &exitError{code: 3, err: err}
+		if mapped := notSupported(err, planned, "exec"); mapped != err {
+			return remoteCommandResult{}, platform.ExecTarget{}, mapped
+		}
+		return remoteCommandResult{}, platform.ExecTarget{}, &exitError{code: 3, err: err}
 	}
-	commandText := strings.Join(command, " ")
-	result := remoteCommandResult{Environment: environment, Cluster: cluster, Service: serviceName, Task: task.ARN, Container: container, Command: commandText}
-	argv := []string{"ecs", "execute-command", "--cluster", cluster, "--task", task.ARN, "--container", container, "--command", commandText, "--interactive"}
-	return result, argv, nil
+	result := remoteCommandResult{
+		Environment: environment,
+		Cluster:     target.Cluster,
+		Task:        target.Task,
+		Container:   target.Container,
+		Command:     strings.Join(command, " "),
+		Launcher:    target.Launcher,
+	}
+	return result, target, nil
 }
 
-func (o *options) runtimeOutputs(ctx context.Context) (string, awsstack.Spec, map[string]any, error) {
-	environment, spec, err := o.infrastructureSpec()
+func (o *options) plannedOutputs(ctx context.Context) (string, platform.PlannedStack, map[string]any, error) {
+	environment, planned, err := o.planStack(false)
 	if err != nil {
-		return "", awsstack.Spec{}, nil, invalid(err)
+		return "", nil, nil, invalid(err)
 	}
 	if o.newBackend == nil {
-		return "", awsstack.Spec{}, nil, errors.New("infrastructure backend factory is required")
+		return "", nil, nil, errors.New("infrastructure backend factory is required")
 	}
-	planned := awsstack.Planned{Spec: spec}
 	backend, err := o.newBackend(ctx, planned, strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL")))
 	if err != nil {
-		return "", awsstack.Spec{}, nil, fmt.Errorf("create infrastructure backend: %w", err)
+		return "", nil, nil, fmt.Errorf("create infrastructure backend: %w", err)
 	}
 	outputs, err := backend.Outputs(ctx)
 	if err != nil {
-		return "", awsstack.Spec{}, nil, fmt.Errorf("read infrastructure outputs: %w", err)
+		return "", nil, nil, fmt.Errorf("read infrastructure outputs: %w", err)
 	}
-	return environment, spec, outputs, nil
-}
-
-func serviceNameOutput(service string) string {
-	switch service {
-	case "web":
-		return "serviceName"
-	case "deploy":
-		return "deployServiceName"
-	case "cron":
-		return "cronServiceName"
-	default:
-		return ""
-	}
-}
-
-func outputString(outputs map[string]any, key string) string {
-	value, ok := outputs[key]
-	if !ok {
-		return ""
-	}
-	switch value := value.(type) {
-	case string:
-		return strings.TrimSpace(value)
-	case fmt.Stringer:
-		return strings.TrimSpace(value.String())
-	default:
-		return strings.TrimSpace(fmt.Sprint(value))
-	}
+	return environment, planned, outputs, nil
 }
 
 func runAWSCommand(ctx context.Context, directory string, args []string, stdout, stderr io.Writer) error {

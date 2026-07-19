@@ -3,22 +3,52 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 
-	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
 	"github.com/acourtiol/magelift/internal/platform"
+	sdk "github.com/acourtiol/magelift/sdk/v1"
 )
 
-type fakeExecStore struct {
-	task awsoperations.Task
+type recordingExecObserve struct {
+	query  platform.ExecQuery
+	target platform.ExecTarget
 }
 
-func (f fakeExecStore) SelectTask(context.Context, string, string) (awsoperations.Task, error) {
-	return f.task, nil
+func (r *recordingExecObserve) TailLogs(context.Context, platform.PlannedStack, platform.LogQuery) ([]platform.LogEvent, error) {
+	return nil, platform.ErrNotSupported
+}
+func (r *recordingExecObserve) CheckRuntime(context.Context, platform.PlannedStack, map[string]any) ([]platform.RuntimeHealth, error) {
+	return nil, platform.ErrNotSupported
+}
+func (r *recordingExecObserve) PrepareExec(_ context.Context, _ platform.PlannedStack, outputs map[string]any, query platform.ExecQuery) (platform.ExecTarget, error) {
+	r.query = query
+	if _, ok := outputs["serviceName"]; !ok && (query.Workload == "" || query.Workload == "web") {
+		return platform.ExecTarget{}, errors.New("stack outputs do not contain ECS web runtime identifiers")
+	}
+	if r.target.Launcher != "" {
+		return r.target, nil
+	}
+	container := query.Container
+	if container == "" {
+		container = "php-fpm"
+	}
+	return platform.ExecTarget{
+		Launcher: "aws",
+		Args: []string{
+			"ecs", "execute-command",
+			"--cluster", "shop-cluster",
+			"--task", "task-a",
+			"--container", container,
+			"--command", strings.Join(query.Command, " "),
+			"--interactive",
+		},
+		Cluster: "shop-cluster", Task: "task-a", Container: container,
+	}, nil
 }
 
 func TestExecBuildsPinnedAWSCLICommandFromStackOutputs(t *testing.T) {
@@ -26,14 +56,17 @@ func TestExecBuildsPinnedAWSCLICommandFromStackOutputs(t *testing.T) {
 	backend := &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster", "serviceName": "shop-web-service"}}
 	var output bytes.Buffer
 	var captured []string
+	observe := &recordingExecObserve{target: platform.ExecTarget{
+		Launcher: "aws",
+		Args:     []string{"ecs", "execute-command", "--cluster", "shop-cluster", "--task", "arn:aws:ecs:eu-west-3:123456789012:task/shop/task-a", "--container", "web", "--command", "bin/magento cache:flush", "--interactive"},
+		Cluster:  "shop-cluster", Task: "arn:aws:ecs:eu-west-3:123456789012:task/shop/task-a", Container: "web",
+	}}
 	o := testOptions(&output, &fakeTerminal{interactive: false})
 	o.configPath, o.environment, o.output = path, "staging", "json"
 	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newExec = func(context.Context, string) (execStore, error) {
-		return fakeExecStore{task: awsoperations.Task{ARN: "arn:aws:ecs:eu-west-3:123456789012:task/shop/task-a"}}, nil
-	}
+	o.testRuntimeObserve = observe
 	o.runCommand = func(_ context.Context, _ string, args []string, _, _ io.Writer) error {
 		captured = append([]string(nil), args...)
 		return nil
@@ -47,6 +80,9 @@ func TestExecBuildsPinnedAWSCLICommandFromStackOutputs(t *testing.T) {
 	if !reflect.DeepEqual(captured, want) {
 		t.Fatalf("args = %#v, want %#v", captured, want)
 	}
+	if observe.query.Workload != sdk.WorkloadID("web") {
+		t.Fatalf("workload = %q", observe.query.Workload)
+	}
 }
 
 func TestExecRejectsMissingRuntimeOutputAndUnsafeCommand(t *testing.T) {
@@ -57,9 +93,7 @@ func TestExecRejectsMissingRuntimeOutputAndUnsafeCommand(t *testing.T) {
 	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newExec = func(context.Context, string) (execStore, error) {
-		return fakeExecStore{task: awsoperations.Task{ARN: "task"}}, nil
-	}
+	o.testRuntimeObserve = &recordingExecObserve{}
 	command := newCommandWithOptions(o)
 	command.SetArgs([]string{"--config", path, "--env", "staging", "exec", "--", "echo", "ok"})
 	err := command.Execute()
@@ -72,9 +106,7 @@ func TestExecRejectsMissingRuntimeOutputAndUnsafeCommand(t *testing.T) {
 	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster", "serviceName": "shop-web-service"}}, nil
 	}
-	o.newExec = func(context.Context, string) (execStore, error) {
-		return fakeExecStore{task: awsoperations.Task{ARN: "task"}}, nil
-	}
+	o.testRuntimeObserve = &recordingExecObserve{}
 	command = newCommandWithOptions(o)
 	command.SetArgs([]string{"--config", path, "--env", "staging", "exec", "--", "echo\nno"})
 	err = command.Execute()
@@ -92,9 +124,7 @@ func TestMagentoOperationTargetsPHPContainer(t *testing.T) {
 	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newExec = func(context.Context, string) (execStore, error) {
-		return fakeExecStore{task: awsoperations.Task{ARN: "task-a"}}, nil
-	}
+	o.testRuntimeObserve = &recordingExecObserve{}
 	o.runCommand = func(_ context.Context, _ string, args []string, _, _ io.Writer) error {
 		captured = append([]string(nil), args...)
 		return nil
@@ -127,9 +157,7 @@ func TestMagentoOperationTargetsFrankenPHPWebContainer(t *testing.T) {
 	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newExec = func(context.Context, string) (execStore, error) {
-		return fakeExecStore{task: awsoperations.Task{ARN: "task-a"}}, nil
-	}
+	o.testRuntimeObserve = frankenObserve{}
 	o.runCommand = func(_ context.Context, _ string, args []string, _, _ io.Writer) error {
 		captured = append([]string(nil), args...)
 		return nil
@@ -144,6 +172,26 @@ func TestMagentoOperationTargetsFrankenPHPWebContainer(t *testing.T) {
 	}
 }
 
+type frankenObserve struct{}
+
+func (frankenObserve) TailLogs(context.Context, platform.PlannedStack, platform.LogQuery) ([]platform.LogEvent, error) {
+	return nil, platform.ErrNotSupported
+}
+func (frankenObserve) CheckRuntime(context.Context, platform.PlannedStack, map[string]any) ([]platform.RuntimeHealth, error) {
+	return nil, platform.ErrNotSupported
+}
+func (frankenObserve) PrepareExec(_ context.Context, _ platform.PlannedStack, _ map[string]any, query platform.ExecQuery) (platform.ExecTarget, error) {
+	container := query.Container
+	if container == "" {
+		container = "web"
+	}
+	return platform.ExecTarget{
+		Launcher: "aws",
+		Args:     []string{"ecs", "execute-command", "--cluster", "shop-cluster", "--task", "task-a", "--container", container, "--command", strings.Join(query.Command, " "), "--interactive"},
+		Cluster:  "shop-cluster", Task: "task-a", Container: container,
+	}, nil
+}
+
 func TestSSHUsesECSExecAsTheSupportedPath(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
 	backend := &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster", "serviceName": "shop-web-service"}}
@@ -154,9 +202,11 @@ func TestSSHUsesECSExecAsTheSupportedPath(t *testing.T) {
 	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newExec = func(context.Context, string) (execStore, error) {
-		return fakeExecStore{task: awsoperations.Task{ARN: "task-a"}}, nil
-	}
+	o.testRuntimeObserve = &recordingExecObserve{target: platform.ExecTarget{
+		Launcher: "aws",
+		Args:     []string{"ecs", "execute-command", "--cluster", "shop-cluster", "--task", "task-a", "--container", "web", "--command", "/bin/bash", "--interactive"},
+		Cluster:  "shop-cluster", Task: "task-a", Container: "web",
+	}}
 	o.runCommand = func(_ context.Context, _ string, args []string, _, _ io.Writer) error { captured = args; return nil }
 	command := newCommandWithOptions(o)
 	command.SetArgs([]string{"--config", path, "--env", "staging", "ssh", "--command", "/bin/bash"})

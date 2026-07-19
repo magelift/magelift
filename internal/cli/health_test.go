@@ -8,17 +8,26 @@ import (
 	"strings"
 	"testing"
 
-	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
 	"github.com/acourtiol/magelift/internal/health"
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
-type fakeRuntimeStore struct {
-	result awsoperations.ServiceHealth
+type fakeRuntimeObserve struct {
+	items []platform.RuntimeHealth
+	err   error
 }
 
-func (f fakeRuntimeStore) Check(context.Context, string, string) (awsoperations.ServiceHealth, error) {
-	return f.result, nil
+func (f fakeRuntimeObserve) TailLogs(context.Context, platform.PlannedStack, platform.LogQuery) ([]platform.LogEvent, error) {
+	return nil, platform.ErrNotSupported
+}
+func (f fakeRuntimeObserve) CheckRuntime(context.Context, platform.PlannedStack, map[string]any) ([]platform.RuntimeHealth, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.items, nil
+}
+func (f fakeRuntimeObserve) PrepareExec(context.Context, platform.PlannedStack, map[string]any, platform.ExecQuery) (platform.ExecTarget, error) {
+	return platform.ExecTarget{}, platform.ErrNotSupported
 }
 
 func TestHealthConfigModeProducesJSON(t *testing.T) {
@@ -53,7 +62,7 @@ func TestHealthRuntimeModeDoesNotFabricateSuccess(t *testing.T) {
 	if err == nil || ExitCode(err) != healthExitUnavailable {
 		t.Fatalf("runtime health error/code = %v/%d", err, ExitCode(err))
 	}
-	if !strings.Contains(out.String(), `"status": "unavailable"`) || !strings.Contains(out.String(), `"id": "runtime.ecs"`) {
+	if !strings.Contains(out.String(), `"status": "unavailable"`) || !strings.Contains(out.String(), `"id": "runtime.observe"`) {
 		t.Fatalf("unexpected health report: %s", out.String())
 	}
 }
@@ -80,9 +89,11 @@ func TestHealthRuntimeModeUsesECSServiceAndTaskEvidence(t *testing.T) {
 	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster", "serviceName": "shop-web-service"}}, nil
 	}
-	o.newRuntime = func(context.Context, string) (runtimeStore, error) {
-		return fakeRuntimeStore{result: awsoperations.ServiceHealth{DesiredCount: 2, RunningCount: 2, PrimaryRollout: "COMPLETED", Tasks: []awsoperations.TaskHealth{{ARN: "task-a", LastStatus: "RUNNING", HealthStatus: "HEALTHY"}}}}, nil
-	}
+	o.testRuntimeObserve = fakeRuntimeObserve{items: []platform.RuntimeHealth{
+		{ID: "runtime.ecs.service", Service: "shop-web-service", Status: "healthy", Detail: "ECS service has 2 running of 2 desired tasks"},
+		{ID: "runtime.ecs.rollout", Service: "shop-web-service", Status: "healthy", Detail: "the primary ECS deployment rollout completed"},
+		{ID: "runtime.ecs.task.task-a", Service: "shop-web-service", Status: "healthy", Detail: "ECS task is running and healthy"},
+	}}
 	command := newCommandWithOptions(o)
 	command.SetArgs([]string{"--config", path, "--env", "staging", "health", "--mode", "runtime"})
 	if err := command.Execute(); err != nil {
@@ -94,16 +105,21 @@ func TestHealthRuntimeModeUsesECSServiceAndTaskEvidence(t *testing.T) {
 }
 
 func TestRuntimeHealthChecksMarkUnhealthyRollouts(t *testing.T) {
-	checks := runtimeHealthChecks(awsoperations.ServiceHealth{DesiredCount: 2, RunningCount: 1, PrimaryRollout: "IN_PROGRESS", Tasks: []awsoperations.TaskHealth{{ARN: "task-a", LastStatus: "STOPPED"}}})
+	checks := runtimeHealthChecks([]platform.RuntimeHealth{
+		{ID: "runtime.ecs.service", Status: "unhealthy", Detail: "ECS service has 1 running of 2 desired tasks"},
+		{ID: "runtime.ecs.rollout", Status: "unhealthy", Detail: "the primary ECS deployment rollout has not completed"},
+		{ID: "runtime.ecs.task.task-a", Status: "unhealthy", Detail: "ECS task status is STOPPED/"},
+	})
 	if health.Summarize(checks) != health.StatusUnhealthy {
 		t.Fatalf("unhealthy runtime evidence was accepted: %#v", checks)
 	}
 }
 
 func TestRuntimeHealthChecksAcceptUnknownWhenRunning(t *testing.T) {
-	checks := runtimeHealthChecks(awsoperations.ServiceHealth{
-		DesiredCount: 1, RunningCount: 1, PrimaryRollout: "COMPLETED",
-		Tasks: []awsoperations.TaskHealth{{ARN: "task-a", LastStatus: "RUNNING", HealthStatus: "UNKNOWN"}},
+	checks := runtimeHealthChecks([]platform.RuntimeHealth{
+		{ID: "runtime.ecs.service", Status: "healthy"},
+		{ID: "runtime.ecs.rollout", Status: "healthy"},
+		{ID: "runtime.ecs.task.task-a", Status: "healthy", Detail: "ECS task is running (no container health check configured)"},
 	})
 	if health.Summarize(checks) != health.StatusHealthy {
 		t.Fatalf("RUNNING/UNKNOWN must be healthy when no container health check is set: %#v", checks)
@@ -111,9 +127,10 @@ func TestRuntimeHealthChecksAcceptUnknownWhenRunning(t *testing.T) {
 }
 
 func TestRuntimeHealthChecksRejectUnhealthyTask(t *testing.T) {
-	checks := runtimeHealthChecks(awsoperations.ServiceHealth{
-		DesiredCount: 1, RunningCount: 1, PrimaryRollout: "COMPLETED",
-		Tasks: []awsoperations.TaskHealth{{ARN: "task-a", LastStatus: "RUNNING", HealthStatus: "UNHEALTHY"}},
+	checks := runtimeHealthChecks([]platform.RuntimeHealth{
+		{ID: "runtime.ecs.service", Status: "healthy"},
+		{ID: "runtime.ecs.rollout", Status: "healthy"},
+		{ID: "runtime.ecs.task.task-a", Status: "unhealthy", Detail: "ECS task status is RUNNING/UNHEALTHY"},
 	})
 	if health.Summarize(checks) != health.StatusUnhealthy {
 		t.Fatalf("RUNNING/UNHEALTHY must fail: %#v", checks)

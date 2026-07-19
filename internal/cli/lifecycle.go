@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/acourtiol/magelift/internal/automation"
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/platform"
@@ -186,7 +185,15 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			return infrastructureResult{}, previewErr
 		}
 		update, updateErr := automation.NewRunner(backend, o.stderr).Update(ctx, automation.Request{Target: requestTarget})
-		return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update}, updateErr
+		if updateErr != nil {
+			return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview}, updateErr
+		}
+		if outputs, outErr := backend.Outputs(ctx); outErr == nil && len(outputs) > 0 {
+			if reqErr := platform.RequireOutputs(outputs, platform.RequiredOutputKeys()); reqErr != nil {
+				return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update}, reqErr
+			}
+		}
+		return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update}, nil
 	}()
 	if releaseErr := release(ctx); releaseErr != nil {
 		if err != nil {
@@ -266,24 +273,6 @@ func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedS
 		return "", nil, err
 	}
 	return environment, planned, nil
-}
-
-// infrastructureSpec remains for AWS-only callers (exec/health/releases) that
-// still need the concrete Spec. Non-AWS targets fail explicitly.
-func (o *options) infrastructureSpec() (string, awsstack.Spec, error) {
-	return o.infrastructureSpecFor(false)
-}
-
-func (o *options) infrastructureSpecFor(allowExpiredPreview bool) (string, awsstack.Spec, error) {
-	environment, planned, err := o.planStack(allowExpiredPreview)
-	if err != nil {
-		return "", awsstack.Spec{}, err
-	}
-	awsPlanned, ok := awsstack.AsAWSPlanned(planned)
-	if !ok {
-		return "", awsstack.Spec{}, fmt.Errorf("operation requires the certified AWS target; selected %q/%q is experimental", planned.Provider(), planned.Runtime())
-	}
-	return environment, awsPlanned.AWSSpec(), nil
 }
 
 func (o *options) acquireProviderLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {

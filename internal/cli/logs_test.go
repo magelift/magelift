@@ -3,45 +3,44 @@ package cli
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
-	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
+	"github.com/acourtiol/magelift/internal/platform"
+	sdk "github.com/acourtiol/magelift/sdk/v1"
 )
 
-type recordingLogsStore struct {
-	group  string
-	start  time.Time
-	filter string
-	limit  int
+type recordingObserve struct {
+	query platform.LogQuery
 }
 
-func (s *recordingLogsStore) Tail(_ context.Context, group string, start time.Time, _ *time.Time, filter string, limit int) ([]awsoperations.Event, error) {
-	s.group, s.start, s.filter, s.limit = group, start, filter, limit
-	return []awsoperations.Event{{Timestamp: time.Date(2026, time.July, 18, 2, 0, 0, 0, time.UTC), Message: "healthy"}}, nil
+func (r *recordingObserve) TailLogs(_ context.Context, planned platform.PlannedStack, query platform.LogQuery) ([]platform.LogEvent, error) {
+	r.query = query
+	_ = planned
+	return []platform.LogEvent{{Timestamp: time.Date(2026, time.July, 18, 2, 0, 0, 0, time.UTC), Message: "healthy"}}, nil
+}
+func (r *recordingObserve) CheckRuntime(context.Context, platform.PlannedStack, map[string]any) ([]platform.RuntimeHealth, error) {
+	return nil, platform.ErrNotSupported
+}
+func (r *recordingObserve) PrepareExec(context.Context, platform.PlannedStack, map[string]any, platform.ExecQuery) (platform.ExecTarget, error) {
+	return platform.ExecTarget{}, platform.ErrNotSupported
 }
 
 func TestLogsCommandUsesResolvedEnvironmentAndStructuredOutput(t *testing.T) {
-	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	configPath := writeLifecycleConfig(t, "staging", false)
 	var output bytes.Buffer
-	store := &recordingLogsStore{}
+	observe := &recordingObserve{}
 	o := testOptions(&output, &fakeTerminal{interactive: false})
-	o.newLogs = func(context.Context, string) (logsStore, error) { return store, nil }
+	o.testRuntimeObserve = observe
 	command := newCommandWithOptions(o)
 	command.SetArgs([]string{"--config", configPath, "--env", "staging", "--output", "json", "logs", "--service", "deploy", "--since", "30m", "--filter", "ERROR", "--limit", "7"})
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if store.group != "/magelift/example-shop/staging/deploy" || store.filter != "ERROR" || store.limit != 7 || store.start.IsZero() {
-		t.Fatalf("request = %#v", store)
+	if observe.query.Workload != sdk.WorkloadID("deploy") || observe.query.Filter != "ERROR" || observe.query.Limit != 7 || observe.query.Since.IsZero() {
+		t.Fatalf("query = %#v", observe.query)
 	}
-	if !bytes.Contains(output.Bytes(), []byte(`"message": "healthy"`)) || !bytes.Contains(output.Bytes(), []byte(`"group": "/magelift/example-shop/staging/deploy"`)) {
+	if !bytes.Contains(output.Bytes(), []byte(`"message": "healthy"`)) || !bytes.Contains(output.Bytes(), []byte(`"group": "/magelift/shop/staging/deploy"`)) {
 		t.Fatalf("output = %s", output.Bytes())
 	}
 }

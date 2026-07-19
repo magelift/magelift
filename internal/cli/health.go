@@ -7,15 +7,12 @@ import (
 	"net/url"
 	"strings"
 
-	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/health"
+	"github.com/acourtiol/magelift/internal/platform"
+	sdk "github.com/acourtiol/magelift/sdk/v1"
 	"github.com/spf13/cobra"
 )
-
-type runtimeStore interface {
-	Check(context.Context, string, string) (awsoperations.ServiceHealth, error)
-}
 
 const (
 	healthExitUnhealthy   = 4
@@ -59,7 +56,7 @@ func (o *options) runHealth(ctx context.Context, mode string) (health.Report, er
 	report := health.Report{Environment: environment, Target: target, Mode: mode, Checks: []health.Check{}}
 	switch mode {
 	case "config":
-		report.Checks = configHealthChecks(effective.Config)
+		report.Checks = o.configHealthChecks(effective.Config)
 	case "outputs":
 		_, planned, err := o.planStack(false)
 		if err != nil {
@@ -78,29 +75,7 @@ func (o *options) runHealth(ctx context.Context, mode string) (health.Report, er
 		}
 		report.Checks = outputHealthChecks(outputs)
 	case "runtime":
-		if o.newRuntime == nil {
-			report.Checks = []health.Check{{ID: "runtime.ecs", Status: health.StatusUnavailable, Message: "ECS runtime health adapter is not configured"}}
-			break
-		}
-		_, spec, outputs, err := o.runtimeOutputs(ctx)
-		if err != nil {
-			return health.Report{}, err
-		}
-		cluster := outputString(outputs, "clusterName")
-		service := outputString(outputs, "serviceName")
-		if cluster == "" || service == "" {
-			report.Checks = []health.Check{{ID: "runtime.ecs", Status: health.StatusUnavailable, Message: "stack outputs do not contain ECS cluster and service identifiers"}}
-			break
-		}
-		store, err := o.newRuntime(ctx, spec.Identity.Region)
-		if err != nil {
-			return health.Report{}, &exitError{code: healthExitUnavailable, err: fmt.Errorf("create ECS runtime health client: %w", err)}
-		}
-		healthResult, err := store.Check(ctx, cluster, service)
-		if err != nil {
-			return health.Report{}, &exitError{code: healthExitUnavailable, err: err}
-		}
-		report.Checks = runtimeHealthChecks(healthResult)
+		report.Checks = o.runtimeHealthEvidence(ctx)
 	default:
 		return health.Report{}, invalid(fmt.Errorf("unsupported health mode %q", mode))
 	}
@@ -108,43 +83,63 @@ func (o *options) runHealth(ctx context.Context, mode string) (health.Report, er
 	return report, nil
 }
 
-func runtimeHealthChecks(result awsoperations.ServiceHealth) []health.Check {
-	checks := make([]health.Check, 0, 3+len(result.Tasks))
-	serviceStatus := health.StatusHealthy
-	serviceMessage := fmt.Sprintf("ECS service has %d running of %d desired tasks", result.RunningCount, result.DesiredCount)
-	if result.DesiredCount <= 0 || result.RunningCount < result.DesiredCount {
-		serviceStatus = health.StatusUnhealthy
-		serviceMessage = fmt.Sprintf("ECS service has %d running of %d desired tasks", result.RunningCount, result.DesiredCount)
+func (o *options) runtimeHealthEvidence(ctx context.Context) []health.Check {
+	unavailable := []health.Check{{ID: "runtime.observe", Status: health.StatusUnavailable, Message: "runtime health evidence is unavailable"}}
+	observe, err := o.runtimeObserve()
+	if err != nil {
+		return unavailable
 	}
-	checks = append(checks, health.Check{ID: "runtime.ecs.service", Status: serviceStatus, Message: serviceMessage})
-	rolloutStatus := health.StatusHealthy
-	rolloutMessage := "the primary ECS deployment rollout completed"
-	if result.PrimaryRollout != "COMPLETED" {
-		rolloutStatus = health.StatusUnhealthy
-		rolloutMessage = "the primary ECS deployment rollout has not completed"
+	if o.newBackend == nil {
+		return unavailable
 	}
-	checks = append(checks, health.Check{ID: "runtime.ecs.rollout", Status: rolloutStatus, Message: rolloutMessage})
-	for _, task := range result.Tasks {
-		status := health.StatusHealthy
-		message := "ECS task is running and healthy"
-		// ECS reports UNKNOWN when the task definition has no container health
-		// check; that is not a failure. Only UNHEALTHY (or non-RUNNING) is.
-		switch {
-		case task.LastStatus != "RUNNING" || task.HealthStatus == "UNHEALTHY":
-			status = health.StatusUnhealthy
-			message = fmt.Sprintf("ECS task status is %s/%s", task.LastStatus, task.HealthStatus)
-		case task.HealthStatus == "" || task.HealthStatus == "UNKNOWN":
-			message = "ECS task is running (no container health check configured)"
+	_, planned, outputs, err := o.plannedOutputs(ctx)
+	if err != nil {
+		return unavailable
+	}
+	items, err := observe.CheckRuntime(ctx, planned, outputs)
+	if err != nil {
+		if errors.Is(err, platform.ErrNotSupported) {
+			return []health.Check{{ID: "runtime.observe", Status: health.StatusUnavailable, Message: fmt.Sprintf("runtime health is not supported for target %s/%s yet", planned.Provider(), planned.Runtime())}}
 		}
-		checks = append(checks, health.Check{ID: "runtime.ecs.task." + task.ARN, Status: status, Message: message})
+		return unavailable
+	}
+	return runtimeHealthChecks(items)
+}
+
+func runtimeHealthChecks(items []platform.RuntimeHealth) []health.Check {
+	checks := make([]health.Check, 0, len(items))
+	for _, item := range items {
+		id := item.ID
+		if id == "" {
+			id = "runtime." + item.Service
+		}
+		status := health.StatusUnavailable
+		switch strings.ToLower(item.Status) {
+		case "healthy":
+			status = health.StatusHealthy
+		case "unhealthy":
+			status = health.StatusUnhealthy
+		}
+		message := item.Detail
+		if message == "" {
+			message = item.Service + " is " + item.Status
+		}
+		checks = append(checks, health.Check{ID: id, Status: status, Message: message})
+	}
+	if len(checks) == 0 {
+		return []health.Check{{ID: "runtime.observe", Status: health.StatusUnavailable, Message: "runtime health returned no probes"}}
 	}
 	return checks
 }
 
-func configHealthChecks(cfg config.Config) []health.Check {
+func (o *options) configHealthChecks(cfg config.Config) []health.Check {
 	checks := []health.Check{{ID: "config.resolved", Status: health.StatusHealthy, Message: "configuration resolved and passed schema and compatibility validation"}}
-	status, message := health.StatusHealthy, "AWS ECS Fargate target is selected"
-	if cfg.Target.Provider != "aws" || cfg.Target.Runtime != "ecs-fargate" {
+	status, message := health.StatusHealthy, "registered Magento target is selected"
+	if o.modules != nil {
+		if _, found := o.modules.Module(sdk.ProviderID(cfg.Target.Provider), sdk.RuntimeID(cfg.Target.Runtime)); !found {
+			status, message = health.StatusUnhealthy, "the selected target is not registered in this binary"
+		}
+	} else if cfg.Target.Provider != "aws" || cfg.Target.Runtime != "ecs-fargate" {
 		status, message = health.StatusUnhealthy, "the selected target is not supported by this release"
 	}
 	return append(checks, health.Check{ID: "target.supported", Status: status, Message: message})

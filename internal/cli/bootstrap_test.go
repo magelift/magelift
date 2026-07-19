@@ -3,51 +3,51 @@ package cli
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	awsbootstrap "github.com/acourtiol/magelift/internal/cloud/aws/bootstrap"
+	"github.com/acourtiol/magelift/internal/platform"
 )
 
-type fakeBootstrap struct {
-	plan   awsbootstrap.Plan
-	region string
-	result awsbootstrap.Result
+type recordingBootstrap struct {
+	req    platform.BootstrapRequest
+	result platform.BootstrapResult
 	err    error
 }
 
-type fakeIdentity struct {
-	plan awsbootstrap.IdentityPlan
-	err  error
+func (r *recordingBootstrap) VerifyAccount(context.Context, platform.PlannedStack) error {
+	return nil
 }
 
-func (f *fakeIdentity) Ensure(_ context.Context, plan awsbootstrap.IdentityPlan) error {
-	f.plan = plan
-	return f.err
-}
-
-func (f *fakeBootstrap) Ensure(_ context.Context, plan awsbootstrap.Plan, region string) (awsbootstrap.Result, error) {
-	f.plan = plan
-	f.region = region
-	if f.result.Plan.StateBucket == "" {
-		f.result.Plan = plan
+func (r *recordingBootstrap) Ensure(_ context.Context, _ platform.PlannedStack, req platform.BootstrapRequest) (platform.BootstrapResult, error) {
+	r.req = req
+	if r.err != nil {
+		return platform.BootstrapResult{}, r.err
 	}
-	return f.result, f.err
+	if r.result.BackendURL == "" {
+		r.result = platform.BootstrapResult{
+			BackendURL: "s3://magelift-123456789012-eu-west-3-example-shop-staging-state",
+			KeyRef:     "arn:aws:kms:eu-west-3:123456789012:key/test",
+			Details: map[string]any{
+				"identity": map[string]string{
+					"ciRoleArn":    "arn:aws:iam::123456789012:role/ci",
+					"stateRoleArn": "arn:aws:iam::123456789012:role/state",
+					"buildRoleArn": "arn:aws:iam::123456789012:role/build",
+				},
+			},
+		}
+	}
+	return r.result, nil
 }
 
 func TestBootstrapCommandReconcilesSelectedEnvironment(t *testing.T) {
-	configPath := bootstrapConfig(t)
-	fake := &fakeBootstrap{result: awsbootstrap.Result{KeyARN: "arn:aws:kms:eu-west-3:123456789012:key/test"}}
-	identity := &fakeIdentity{}
+	configPath := writeLifecycleConfig(t, "staging", false)
+	fake := &recordingBootstrap{}
 	var output strings.Builder
 	o := testOptions(nil, &fakeTerminal{interactive: false})
 	o.stdout = &output
 	o.stderr = &output
-	o.newBootstrap = func(context.Context, string) (awsbootstrap.Ensurer, error) { return fake, nil }
-	o.newIdentity = func(context.Context, string) (awsbootstrap.IdentityEnsurer, error) { return identity, nil }
-	o.verifyAccount = func(context.Context, string, string) error { return nil }
+	o.testBootstrap = fake
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{
 		"--config", configPath,
@@ -61,47 +61,36 @@ func TestBootstrapCommandReconcilesSelectedEnvironment(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if fake.region != "eu-west-3" || fake.plan.StateBucket != "magelift-123456789012-eu-west-3-example-shop-staging-state" {
-		t.Fatalf("unexpected bootstrap request: %#v region=%q", fake.plan, fake.region)
+	if fake.req.AccessLogBucket != "existing-log-bucket" || fake.req.GitHubOwner != "acourtiol" || fake.req.GitHubRepo != "magelift" {
+		t.Fatalf("unexpected bootstrap request: %#v", fake.req)
 	}
-	if identity.plan.CIRoleARN == "" || identity.plan.StateRoleARN == "" || identity.plan.BuildRoleARN == "" || identity.plan.CIRoleARN == identity.plan.StateRoleARN || identity.plan.BuildRoleARN == identity.plan.CIRoleARN || !strings.Contains(output.String(), "ciRoleArn") || !strings.Contains(output.String(), "buildRoleArn") {
+	if !strings.Contains(output.String(), "backendURL") || !strings.Contains(output.String(), "ciRoleArn") {
 		t.Fatalf("unexpected output: %s", output.String())
 	}
 }
 
 func TestBootstrapCommandRequiresAccessLogBucket(t *testing.T) {
+	configPath := writeLifecycleConfig(t, "staging", false)
+	fake := &recordingBootstrap{err: errors.New("--access-log-bucket is required")}
 	o := testOptions(nil, &fakeTerminal{interactive: false})
+	o.testBootstrap = fake
 	cmd := newCommandWithOptions(o)
-	cmd.SetArgs([]string{"bootstrap"})
+	cmd.SetArgs([]string{"--config", configPath, "--env", "staging", "bootstrap"})
 	err := cmd.Execute()
-	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "access-log-bucket") {
+	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "access-log-bucket") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestBootstrapCommandRedactsBackendFailure(t *testing.T) {
-	configPath := bootstrapConfig(t)
+	configPath := writeLifecycleConfig(t, "staging", false)
 	secret := "secret-provider-detail"
 	o := testOptions(nil, &fakeTerminal{interactive: false})
-	o.newBootstrap = func(context.Context, string) (awsbootstrap.Ensurer, error) {
-		return &fakeBootstrap{err: errors.New(secret)}, nil
-	}
-	o.newIdentity = func(context.Context, string) (awsbootstrap.IdentityEnsurer, error) { return &fakeIdentity{}, nil }
-	o.verifyAccount = func(context.Context, string, string) error { return nil }
+	o.testBootstrap = &recordingBootstrap{err: errors.New(secret)}
 	cmd := newCommandWithOptions(o)
-	o.verifyAccount = func(context.Context, string, string) error { return nil }
 	cmd.SetArgs([]string{"--config", configPath, "--env", "staging", "bootstrap", "--access-log-bucket", "logs", "--github-owner", "acourtiol", "--github-repo", "magelift"})
 	err := cmd.Execute()
 	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), secret) {
 		t.Fatalf("unexpected error: %v", err)
 	}
-}
-
-func bootstrapConfig(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
 }

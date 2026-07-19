@@ -3,16 +3,14 @@ package cli
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
+	"github.com/acourtiol/magelift/internal/platform"
 )
 
-type fakeSecretStore struct {
-	items       []awssecrets.Secret
+type fakePlatformSecrets struct {
+	items       []platform.SecretMeta
 	setName     string
 	setValue    []byte
 	removed     string
@@ -21,42 +19,34 @@ type fakeSecretStore struct {
 	removeCalls int
 }
 
-func (s *fakeSecretStore) List(context.Context) ([]awssecrets.Secret, error) {
+func (s *fakePlatformSecrets) List(context.Context, platform.PlannedStack) ([]platform.SecretMeta, error) {
 	s.listCalls++
-	return append([]awssecrets.Secret(nil), s.items...), nil
+	return append([]platform.SecretMeta(nil), s.items...), nil
 }
 
-func (s *fakeSecretStore) Set(_ context.Context, name string, value []byte) error {
+func (s *fakePlatformSecrets) Set(_ context.Context, _ platform.PlannedStack, name string, value []byte) error {
 	s.setCalls++
 	s.setName = name
 	s.setValue = append([]byte(nil), value...)
 	return nil
 }
 
-func (s *fakeSecretStore) Remove(_ context.Context, name string) error {
+func (s *fakePlatformSecrets) Remove(_ context.Context, _ platform.PlannedStack, name string) error {
 	s.removeCalls++
 	s.removed = name
 	return nil
 }
 
-func secretTestOptions(out *bytes.Buffer, store *fakeSecretStore, configPath string) *options {
+func secretTestOptions(out *bytes.Buffer, store *fakePlatformSecrets, configPath string) *options {
 	o := testOptions(out, &fakeTerminal{interactive: false})
 	o.configPath = configPath
-	o.newSecrets = func(context.Context, string) (secretStore, error) { return store, nil }
+	o.testSecrets = store
 	return o
 }
 
-func writeTestConfig(t *testing.T, path string) {
-	t.Helper()
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestSecretSetReadsOnlyFromExplicitStdin(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	writeTestConfig(t, path)
-	store := &fakeSecretStore{}
+	path := writeLifecycleConfig(t, "staging", false)
+	store := &fakePlatformSecrets{}
 	var out bytes.Buffer
 	o := secretTestOptions(&out, store, path)
 	cmd := newCommandWithOptions(o)
@@ -77,9 +67,8 @@ func TestSecretSetReadsOnlyFromExplicitStdin(t *testing.T) {
 }
 
 func TestSecretSetRequiresValueStdin(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	writeTestConfig(t, path)
-	store := &fakeSecretStore{}
+	path := writeLifecycleConfig(t, "staging", false)
+	store := &fakePlatformSecrets{}
 	var out bytes.Buffer
 	o := secretTestOptions(&out, store, path)
 	cmd := newCommandWithOptions(o)
@@ -94,9 +83,8 @@ func TestSecretSetRequiresValueStdin(t *testing.T) {
 }
 
 func TestSecretListUsesStructuredMetadataOnly(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	writeTestConfig(t, path)
-	store := &fakeSecretStore{items: []awssecrets.Secret{{Name: "shop/api", ARN: "arn:secret"}}}
+	path := writeLifecycleConfig(t, "staging", false)
+	store := &fakePlatformSecrets{items: []platform.SecretMeta{{Name: "shop/api"}}}
 	var out bytes.Buffer
 	o := secretTestOptions(&out, store, path)
 	cmd := newCommandWithOptions(o)
@@ -104,15 +92,14 @@ func TestSecretListUsesStructuredMetadataOnly(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), `"name": "shop/api"`) || !strings.Contains(out.String(), `"arn": "arn:secret"`) {
+	if !strings.Contains(out.String(), `"name": "shop/api"`) {
 		t.Fatalf("unexpected output: %s", out.String())
 	}
 }
 
 func TestSecretRemoveRequiresConfirmation(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	writeTestConfig(t, path)
-	store := &fakeSecretStore{}
+	path := writeLifecycleConfig(t, "staging", false)
+	store := &fakePlatformSecrets{}
 	var out bytes.Buffer
 	o := secretTestOptions(&out, store, path)
 	cmd := newCommandWithOptions(o)
@@ -128,7 +115,7 @@ func TestSecretRemoveRequiresConfirmation(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if store.removeCalls != 1 || store.removed != "shop/api" || !strings.Contains(out.String(), `"recoveryWindowDays": 30`) {
+	if store.removeCalls != 1 || store.removed != "shop/api" || !strings.Contains(out.String(), `"scheduled": true`) {
 		t.Fatalf("unexpected removal: calls=%d name=%q output=%s", store.removeCalls, store.removed, out.String())
 	}
 }

@@ -14,12 +14,8 @@ import (
 	"strings"
 
 	"github.com/acourtiol/magelift/internal/automation"
-	awsbootstrap "github.com/acourtiol/magelift/internal/cloud/aws/bootstrap"
-	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
 	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
 	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
-	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
-	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
 	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
@@ -62,18 +58,9 @@ type options struct {
 	currentBranch   func(string) (string, error)
 	terminal        environmentTerminal
 	modules         *platform.ModuleRegistry
-	newBootstrap    func(context.Context, string) (awsbootstrap.Ensurer, error)
-	verifyAccount   func(context.Context, string, string) error
-	newIdentity     func(context.Context, string) (awsbootstrap.IdentityEnsurer, error)
 	newBackend      func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error)
 	newDeploySteps  func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error)
 	newLock         func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
-	newState        func(context.Context, string, string, string, string, string) (stateManager, error)
-	newSecrets      func(context.Context, string) (secretStore, error)
-	newArchive      func(context.Context, string, string, string) (stateArchive, error)
-	newLogs         func(context.Context, string) (logsStore, error)
-	newExec         func(context.Context, string) (execStore, error)
-	newRuntime      func(context.Context, string) (runtimeStore, error)
 	runCommand      func(context.Context, string, []string, io.Writer, io.Writer) error
 	runCompose      func(context.Context, string, []string, []string, io.Writer, io.Writer) error
 	newReleaseStore func(string, string) (releaseStore, error)
@@ -81,6 +68,11 @@ type options struct {
 	newPricing      func(context.Context, string) (costEstimator, error)
 	newUpgrade      func() upgradeClient
 	executable      func() (string, error)
+	// Test doubles for day-2 ports (override Module* resolution).
+	testBootstrap      platform.Bootstrap
+	testState          platform.State
+	testSecrets        platform.Secrets
+	testRuntimeObserve platform.RuntimeObserve
 }
 
 type environmentTerminal interface {
@@ -137,13 +129,6 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 		currentBranch: gitCurrentBranch,
 		terminal:      consoleTerminal{in: os.Stdin, out: stderr},
 		modules:       modules,
-		newBootstrap: func(ctx context.Context, region string) (awsbootstrap.Ensurer, error) {
-			return awsbootstrap.NewAWS(ctx, region)
-		},
-		verifyAccount: awsbootstrap.VerifyAccount,
-		newIdentity: func(ctx context.Context, region string) (awsbootstrap.IdentityEnsurer, error) {
-			return awsbootstrap.NewAWSIdentity(ctx, region)
-		},
 		newBackend: func(ctx context.Context, planned platform.PlannedStack, backendURL string) (infrastructureBackend, error) {
 			module, found := modules.Module(planned.Provider(), planned.Runtime())
 			if !found {
@@ -170,24 +155,6 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 				return func(context.Context) error { return nil }, nil
 			}
 			return ops.AcquireLock(ctx, planned)
-		},
-		newState: func(ctx context.Context, region, bucket, project, environment, kmsARN string) (stateManager, error) {
-			return awsstate.NewAWS(ctx, region, bucket, project, environment, kmsARN)
-		},
-		newSecrets: func(ctx context.Context, region string) (secretStore, error) {
-			return awssecrets.NewStore(ctx, region)
-		},
-		newArchive: func(ctx context.Context, region, bucket, kmsARN string) (stateArchive, error) {
-			return awsstate.NewAWSArchive(ctx, region, bucket, kmsARN)
-		},
-		newLogs: func(ctx context.Context, region string) (logsStore, error) {
-			return awsoperations.New(ctx, region)
-		},
-		newExec: func(ctx context.Context, region string) (execStore, error) {
-			return awsoperations.NewExec(ctx, region)
-		},
-		newRuntime: func(ctx context.Context, region string) (runtimeStore, error) {
-			return awsoperations.NewRuntime(ctx, region)
 		},
 		runCommand: runAWSCommand,
 		runCompose: runDockerCompose,

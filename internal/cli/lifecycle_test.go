@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/acourtiol/magelift/internal/automation"
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
@@ -174,7 +173,7 @@ func writeFile(path string, data []byte) error {
 
 func TestDeployRunsPreviewAndUpdateThroughBackendBoundary(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
-	backend := &fakeInfrastructureBackend{outputs: map[string]any{"url": "https://shop.example"}}
+	backend := &fakeInfrastructureBackend{}
 	var out bytes.Buffer
 	var plannedDigest string
 	o := testOptions(&out, &fakeTerminal{interactive: false})
@@ -192,7 +191,7 @@ func TestDeployRunsPreviewAndUpdateThroughBackendBoundary(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(backend.calls, []string{"preview", "update"}) {
+	if !reflect.DeepEqual(backend.calls, []string{"preview", "update", "outputs"}) {
 		t.Fatalf("backend calls = %v", backend.calls)
 	}
 	if !bytes.Contains(out.Bytes(), []byte(`"update"`)) {
@@ -251,11 +250,11 @@ func TestRollbackDeploymentPassesForwardOnlyFlagsToWorkflow(t *testing.T) {
 	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
 		return func(context.Context) error { return nil }, nil
 	}
-	_, spec, err := o.infrastructureSpec()
+	_, planned, err := o.planStack(false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := o.runDeploymentWithOptions(context.Background(), "staging", awsstack.Planned{Spec: spec}, spec.Artifact.ImageDigest, deploymentOptions{rollback: true, acknowledgeForwardOnlyDB: true}); err != nil {
+	if _, err := o.runDeploymentWithOptions(context.Background(), "staging", planned, planned.ImageDigest(), deploymentOptions{rollback: true, acknowledgeForwardOnlyDB: true}); err != nil {
 		t.Fatal(err)
 	}
 	if !request.Rollback || !request.AcknowledgeForwardOnlyDB {

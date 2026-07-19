@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
 	"github.com/acourtiol/magelift/internal/cosign"
 	"github.com/acourtiol/magelift/internal/releasejournal"
 	"github.com/spf13/cobra"
@@ -103,12 +102,14 @@ func rollbackCommand(o *options) *cobra.Command {
 			if err := o.verifyRelease(cmd.Context(), source.DigestReference, cosign.VerifyOptions{CertificateIdentity: source.SignatureIdentity, OIDCIssuer: source.SignatureIssuer}); err != nil {
 				return &exitError{code: 3, err: errors.New("signed rollback verification failed")}
 			}
-			_, spec, err := o.infrastructureSpec()
+			_, planned, err := o.planStack(false)
 			if err != nil {
 				return invalid(err)
 			}
-			planned := awsstack.Planned{Spec: spec}
-			planned.Spec.Artifact.ImageDigest = source.DigestReference
+			planned, err = planned.WithImageDigest(source.DigestReference)
+			if err != nil {
+				return invalid(err)
+			}
 			if _, err := o.runDeploymentWithOptions(cmd.Context(), environment, planned, source.DigestReference, deploymentOptions{rollback: true, acknowledgeForwardOnlyDB: acknowledgeForwardOnlyDB}); err != nil {
 				return err
 			}
