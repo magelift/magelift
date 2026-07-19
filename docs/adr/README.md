@@ -16,3 +16,4 @@ decision and explains migration implications.
 - [ADR 0005](0005-local-development-compose.md): Local development uses a generated Docker Compose execution context.
 - [ADR 0006](0006-github-oidc-role-separation.md): GitHub CI and state recovery use separate trusted roles.
 - [ADR 0007](0007-multi-provider-community-targets.md): Multi-provider roadmap and community targets.
+- [ADR 0008](0008-ports-and-adapters-multi-provider.md): Ports and adapters for multi-provider stacks.

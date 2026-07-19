@@ -1,10 +1,19 @@
 # MageLift documentation
 
-MageLift is a pre-alpha, open-source application platform intended to deploy Magento
-Open Source and Adobe Commerce workloads to infrastructure owned by the user in AWS.
+Pre-alpha Magento deploy tooling: you own the cloud account; YAML and the CLI
+drive builds, Pulumi, and day-2 ops.
 
-Start with the [architecture charter](architecture.md). Contributors must also review
-the [clean-room provenance ledger](provenance.md) and record material design inputs.
+| Topic | Doc |
+| --- | --- |
+| Product shape | [Architecture](architecture.md) |
+| Contribute | [CONTRIBUTING](https://github.com/acourtiol/magelift/blob/main/CONTRIBUTING.md) |
+| New cloud adapter | [Adding a provider](adding-a-provider.md) |
+| CLI | [CLI reference](cli-reference.md) |
+| AWS acceptance | [Local AWS acceptance](aws-acceptance.md) |
+| GCP (experimental) | [GCP experimental](gcp-experimental.md) |
+| Clean-room rules | [Provenance](provenance.md) |
 
-MageLift is independent of and not affiliated with Adobe Inc. Product names are used
-only to describe compatibility.
+Certified target: AWS ECS Fargate. Experimental: GCP GKE Autopilot. Multi-cloud
+is not claimed until two targets are certified (ADR 0007).
+
+Independent of Adobe Inc. Product names are descriptive only.

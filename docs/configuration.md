@@ -8,6 +8,10 @@ Project and environment values override them. The defaults do not create secrets
 certificates, existing-resource references, or benchmark-selected instance sizes.
 Use `config effective` to inspect the values and their provenance.
 
+`target.provider: gcp` with `runtime: gke-autopilot` is an **experimental** first-party
+target (ADR 0007 / 0008). It requires `target.gcp.project` and keeps GCP topology under
+`target.gcp` only. Do not reuse `target.aws` fields for GCP.
+
 Deployments require `target.aws.encryptionKeySecretArn` to reference a stable
 Secrets Manager value. MageLift injects it at task start as the Magento encryption
 key. The key must remain stable for the lifetime of encrypted Magento data.
@@ -48,8 +52,8 @@ access. The VPC CIDR is still required for security-group rules.
 | `build.hooks.*.retries.idempotent` | boolean | no |  | Whether retrying is safe |
 | `build.hooks.*.failure` | string | no | abort, continue | Failure action |
 | `target` | object | yes |  | Deployment target |
-| `target.provider` | string | yes | aws | Infrastructure provider |
-| `target.runtime` | string | yes | ecs-fargate | Application runtime |
+| `target.provider` | string | yes | aws, gcp | Infrastructure provider |
+| `target.runtime` | string | yes | ecs-fargate, gke-autopilot | Application runtime |
 | `target.aws` | object or null | no |  | AWS deployment inputs |
 | `target.aws.kmsKeyArn` | string or null | no |  | Customer-managed KMS key ARN |
 | `target.aws.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID |
@@ -66,6 +70,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `target.aws.vpcCidr` | string or null | no |  | Canonical VPC IPv4 CIDR |
 | `target.aws.availabilityZones` | array or null | no |  | AWS availability zones |
 | `target.aws.mediaDomain` | string or null | no |  | Media delivery domain |
+| `target.aws.natMode` | string or null | no | nat-gateway, fck-nat | Private subnet egress mode |
 | `target.aws.existing` | object or null | no |  | Existing AWS resources |
 | `target.aws.existing.network` | object or null | no |  | Existing VPC reference |
 | `target.aws.existing.network.provider` | string | yes | aws | Resource provider |
@@ -76,12 +81,14 @@ access. The VPC CIDR is still required for security-group rules.
 | `target.aws.existing.dataSubnetIds` | array or null | no |  | Existing data subnet IDs |
 | `target.aws.catalog` | object | no |  | Benchmark-selected service catalog |
 | `target.aws.catalog.version` | string or null | no |  | Benchmark catalog version |
-| `target.aws.catalog.aurora` | object | no |  | Aurora capacity |
+| `target.aws.catalog.databaseEngine` | string or null | no | aurora-mysql, rds-mysql | MySQL engine shape |
+| `target.aws.catalog.searchMode` | string or null | no | serverless, provisioned, disabled | OpenSearch provisioning mode |
+| `target.aws.catalog.aurora` | object | no |  | Aurora or RDS MySQL capacity |
 | `target.aws.catalog.aurora.minimumAcu` | number | no |  | Minimum Aurora Serverless v2 capacity |
 | `target.aws.catalog.aurora.maximumAcu` | number | no |  | Maximum Aurora Serverless v2 capacity |
 | `target.aws.catalog.aurora.autoPauseSeconds` | integer | no |  | Aurora auto-pause duration |
 | `target.aws.catalog.aurora.engineSupportsAutoPause` | boolean | no |  | Whether the selected engine supports auto-pause |
-| `target.aws.catalog.aurora.instanceClass` | string | no |  | Provisioned Aurora instance class |
+| `target.aws.catalog.aurora.instanceClass` | string | no |  | Provisioned Aurora or RDS MySQL instance class |
 | `target.aws.catalog.aurora.instanceCount` | integer | no |  | Provisioned Aurora instance count |
 | `target.aws.catalog.valkey` | object | no |  | Valkey capacity |
 | `target.aws.catalog.valkey.nodeType` | string | no |  | Valkey node type |
@@ -108,9 +115,26 @@ access. The VPC CIDR is still required for security-group rules.
 | `target.aws.catalog.retention.artifactDays` | integer | no |  | Artifact retention days |
 | `target.aws.catalog.versions` | object | no |  | Managed service versions |
 | `target.aws.catalog.versions.auroraMysql` | string | no |  | Aurora MySQL engine version |
+| `target.aws.catalog.versions.mysql` | string | no |  | RDS MySQL engine version |
 | `target.aws.catalog.versions.valkey` | string | no |  | Valkey engine version |
 | `target.aws.catalog.versions.openSearch` | string | no |  | OpenSearch engine version |
 | `target.aws.catalog.versions.rabbitMq` | string | no |  | RabbitMQ engine version |
+| `target.gcp` | object or null | no |  | GCP deployment inputs (experimental) |
+| `target.gcp.project` | string | yes |  | GCP project ID |
+| `target.gcp.region` | string or null | no |  | GCP region |
+| `target.gcp.networkCidr` | string or null | no |  | VPC IPv4 CIDR |
+| `target.gcp.zones` | array or null | no |  | GCP zones |
+| `target.gcp.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
+| `target.gcp.databaseName` | string or null | no |  | Magento database name |
+| `target.gcp.masterUsername` | string or null | no |  | Cloud SQL master username |
+| `target.gcp.encryptionKeySecret` | string or null | no |  | Secret Manager secret ID for Magento encryption key |
+| `target.gcp.cloudSqlTier` | string or null | no |  | Cloud SQL machine tier |
+| `target.gcp.memorystoreNodeType` | string or null | no |  | Memorystore for Valkey node type |
+| `target.gcp.autopilotCpuRequest` | string or null | no |  | GKE Autopilot CPU request |
+| `target.gcp.autopilotMemoryRequest` | string or null | no |  | GKE Autopilot memory request |
+| `target.gcp.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
+| `target.gcp.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
+| `target.gcp.labels` | object or null | no |  | Resource labels |
 | `defaults` | object | yes |  | Project defaults |
 | `defaults.region` | string | no |  | Default AWS region |
 | `defaults.preset` | string | no | preview, standard, high-availability | Default infrastructure preset |
@@ -153,8 +177,8 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.build.hooks.*.retries.idempotent` | boolean | no |  | Whether retrying is safe |
 | `environments.*.build.hooks.*.failure` | string | no | abort, continue | Failure action |
 | `environments.*.target` | object or null | no |  |  |
-| `environments.*.target.provider` | string | no | aws | Infrastructure provider |
-| `environments.*.target.runtime` | string | no | ecs-fargate | Application runtime |
+| `environments.*.target.provider` | string | no | aws, gcp | Infrastructure provider |
+| `environments.*.target.runtime` | string | no | ecs-fargate, gke-autopilot | Application runtime |
 | `environments.*.target.aws` | object or null | no |  | AWS deployment inputs |
 | `environments.*.target.aws.kmsKeyArn` | string or null | no |  | Customer-managed KMS key ARN |
 | `environments.*.target.aws.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID |
@@ -171,6 +195,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.target.aws.vpcCidr` | string or null | no |  | Canonical VPC IPv4 CIDR |
 | `environments.*.target.aws.availabilityZones` | array or null | no |  | AWS availability zones |
 | `environments.*.target.aws.mediaDomain` | string or null | no |  | Media delivery domain |
+| `environments.*.target.aws.natMode` | string or null | no | nat-gateway, fck-nat | Private subnet egress mode |
 | `environments.*.target.aws.existing` | object or null | no |  | Existing AWS resources |
 | `environments.*.target.aws.existing.network` | object or null | no |  | Existing VPC reference |
 | `environments.*.target.aws.existing.network.provider` | string | no | aws | Resource provider |
@@ -181,12 +206,14 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.target.aws.existing.dataSubnetIds` | array or null | no |  | Existing data subnet IDs |
 | `environments.*.target.aws.catalog` | object | no |  | Benchmark-selected service catalog |
 | `environments.*.target.aws.catalog.version` | string or null | no |  | Benchmark catalog version |
-| `environments.*.target.aws.catalog.aurora` | object | no |  | Aurora capacity |
+| `environments.*.target.aws.catalog.databaseEngine` | string or null | no | aurora-mysql, rds-mysql | MySQL engine shape |
+| `environments.*.target.aws.catalog.searchMode` | string or null | no | serverless, provisioned, disabled | OpenSearch provisioning mode |
+| `environments.*.target.aws.catalog.aurora` | object | no |  | Aurora or RDS MySQL capacity |
 | `environments.*.target.aws.catalog.aurora.minimumAcu` | number | no |  | Minimum Aurora Serverless v2 capacity |
 | `environments.*.target.aws.catalog.aurora.maximumAcu` | number | no |  | Maximum Aurora Serverless v2 capacity |
 | `environments.*.target.aws.catalog.aurora.autoPauseSeconds` | integer | no |  | Aurora auto-pause duration |
 | `environments.*.target.aws.catalog.aurora.engineSupportsAutoPause` | boolean | no |  | Whether the selected engine supports auto-pause |
-| `environments.*.target.aws.catalog.aurora.instanceClass` | string | no |  | Provisioned Aurora instance class |
+| `environments.*.target.aws.catalog.aurora.instanceClass` | string | no |  | Provisioned Aurora or RDS MySQL instance class |
 | `environments.*.target.aws.catalog.aurora.instanceCount` | integer | no |  | Provisioned Aurora instance count |
 | `environments.*.target.aws.catalog.valkey` | object | no |  | Valkey capacity |
 | `environments.*.target.aws.catalog.valkey.nodeType` | string | no |  | Valkey node type |
@@ -213,9 +240,26 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.target.aws.catalog.retention.artifactDays` | integer | no |  | Artifact retention days |
 | `environments.*.target.aws.catalog.versions` | object | no |  | Managed service versions |
 | `environments.*.target.aws.catalog.versions.auroraMysql` | string | no |  | Aurora MySQL engine version |
+| `environments.*.target.aws.catalog.versions.mysql` | string | no |  | RDS MySQL engine version |
 | `environments.*.target.aws.catalog.versions.valkey` | string | no |  | Valkey engine version |
 | `environments.*.target.aws.catalog.versions.openSearch` | string | no |  | OpenSearch engine version |
 | `environments.*.target.aws.catalog.versions.rabbitMq` | string | no |  | RabbitMQ engine version |
+| `environments.*.target.gcp` | object or null | no |  | GCP deployment inputs (experimental) |
+| `environments.*.target.gcp.project` | string | no |  | GCP project ID |
+| `environments.*.target.gcp.region` | string or null | no |  | GCP region |
+| `environments.*.target.gcp.networkCidr` | string or null | no |  | VPC IPv4 CIDR |
+| `environments.*.target.gcp.zones` | array or null | no |  | GCP zones |
+| `environments.*.target.gcp.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
+| `environments.*.target.gcp.databaseName` | string or null | no |  | Magento database name |
+| `environments.*.target.gcp.masterUsername` | string or null | no |  | Cloud SQL master username |
+| `environments.*.target.gcp.encryptionKeySecret` | string or null | no |  | Secret Manager secret ID for Magento encryption key |
+| `environments.*.target.gcp.cloudSqlTier` | string or null | no |  | Cloud SQL machine tier |
+| `environments.*.target.gcp.memorystoreNodeType` | string or null | no |  | Memorystore for Valkey node type |
+| `environments.*.target.gcp.autopilotCpuRequest` | string or null | no |  | GKE Autopilot CPU request |
+| `environments.*.target.gcp.autopilotMemoryRequest` | string or null | no |  | GKE Autopilot memory request |
+| `environments.*.target.gcp.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
+| `environments.*.target.gcp.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
+| `environments.*.target.gcp.labels` | object or null | no |  | Resource labels |
 | `environments.*.defaults` | object or null | no |  |  |
 | `environments.*.defaults.region` | string | no |  | Default AWS region |
 | `environments.*.defaults.preset` | string | no | preview, standard, high-availability | Default infrastructure preset |

@@ -1,5 +1,5 @@
 site_name: MageLift
-site_description: Open-source Magento application platform for AWS
+site_description: Open-source Magento application platform (AWS certified, multi-provider ports)
 repo_url: https://github.com/acourtiol/magelift
 repo_name: acourtiol/magelift
 docs_dir: docs
@@ -9,16 +9,20 @@ theme:
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Adding a provider: adding-a-provider.md
   - Configuration: configuration.md
   - Compatibility: compatibility.md
   - Application builds: builds.md
   - Benchmarking: benchmarks.md
   - AWS bootstrap: bootstrap.md
   - Local AWS acceptance: aws-acceptance.md
+  - GCP experimental: gcp-experimental.md
+  - Local GCP acceptance: gcp-acceptance.md
   - Deployment operations: operations.md
   - CLI reference: cli-reference.md
   - Secret references: secrets.md
   - Dependency policy: dependency-policy.md
+  - GitHub labels: github-labels.md
   - Decisions:
       - ADR process: adr/README.md
       - "0001: AWS ECS Fargate v1": adr/0001-aws-ecs-fargate-v1.md
@@ -28,6 +32,7 @@ nav:
       - "0005: Local development Compose": adr/0005-local-development-compose.md
       - "0006: GitHub OIDC role separation": adr/0006-github-oidc-role-separation.md
       - "0007: Multi-provider and community targets": adr/0007-multi-provider-community-targets.md
+      - "0008: Ports and adapters": adr/0008-ports-and-adapters-multi-provider.md
   - Clean-room provenance: provenance.md
   - Release readiness: release-readiness.md
 markdown_extensions:

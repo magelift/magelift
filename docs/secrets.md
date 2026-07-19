@@ -1,7 +1,9 @@
 # Secret references
 
-MageLift does not accept Composer credentials as plaintext YAML. Set
-`build.composer.credentials` to one of these references:
+Composer credentials must not appear as plaintext in YAML. Use a scheme that
+matches `target.provider`.
+
+## AWS (`target.provider: aws`)
 
 ```yaml
 build:
@@ -15,13 +17,11 @@ build:
     credentials: ssm:///magelift/composer
 ```
 
-The resolved value must be a non-empty Composer `auth.json` object. MageLift requests
-encrypted SSM parameters with decryption enabled. It uses `defaults.region` for names
-and parameter paths. A Secrets Manager or SSM ARN uses the region from the ARN.
+The value must be a non-empty Composer `auth.json` object. SSM parameters are
+fetched with decryption. Names and paths use `defaults.region`; an ARN supplies
+its own region.
 
-Secrets Manager references may select a string field from a JSON secret with the
-`jsonField` query parameter. The selected string must contain the complete Composer
-authentication object:
+To pick one string field from a JSON Secrets Manager secret:
 
 ```yaml
 build:
@@ -29,11 +29,25 @@ build:
     credentials: aws-secrets-manager://magelift/shared?jsonField=composer
 ```
 
-The CLI sends the value to the isolated prepare container through a private temporary
-file. It does not place the value in process arguments, build metadata, the application
-image, the artifact manifest, or Pulumi state. The temporary file is removed after the
-runner exits.
+That field must hold the full Composer auth object.
 
-Only AWS Secrets Manager and SSM Parameter Store are supported in v1. Unknown schemes,
-fragments, user information, and provider-specific query options fail configuration
-validation.
+## GCP (`target.provider: gcp`, experimental)
+
+```yaml
+build:
+  composer:
+    credentials: gcp-secret-manager://projects/PROJECT/secrets/NAME/versions/latest
+```
+
+Config accepts the scheme so GCP YAML validates. `magelift build` does not yet
+resolve GCP Secret Manager; implement `secretref.GCPSecretManagerProvider` to
+wire it.
+
+## How resolution works
+
+The CLI writes the secret to a private temp file for the prepare container, then
+deletes it. It never puts the value in process args, build metadata, the app
+image, the artifact manifest, or Pulumi state.
+
+Unknown schemes, fragments, userinfo, and stray query keys fail validation.
+Cross-provider schemes (e.g. `gcp-secret-manager://` on an AWS target) fail too.

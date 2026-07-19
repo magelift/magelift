@@ -441,7 +441,7 @@ magelift outputs
 ```
 ## magelift preview
 
-Preview AWS infrastructure changes
+Preview infrastructure changes
 
 ```text
 magelift preview

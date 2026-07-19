@@ -3,34 +3,36 @@
 ## Product promise
 
 A Magento developer adds `magelift.yaml` to an existing repository and uses one native
-CLI to deploy and operate a production-grade environment in their own AWS account,
+CLI to deploy and operate a production-grade environment in their own cloud account,
 without editing Pulumi or Go for the supported path.
 
 ## Boundaries
 
-- V1 is AWS-only and certifies ECS Fargate.
-- Configuration, application lifecycle, capabilities, and target APIs may be stable
-  interfaces, but must not imply unimplemented multi-cloud support.
+- V1 certifies AWS ECS Fargate. GCP (`gcp` / `gke-autopilot`) is experimental
+  (ADR 0007 / 0008). Multi-cloud is not claimed until two targets are certified.
+- Stable interfaces may exist for config, lifecycle, and capabilities;
+  experimental targets must be labeled in docs and CLI output.
 - The CLI orchestrates; Pulumi owns durable infrastructure.
 - Artifacts are immutable, signed, built once, and promoted by digest.
-- Secrets are references resolved at runtime and never plaintext configuration.
-- Unsupported Magento/service combinations fail before infrastructure mutation unless
-  a committed, auditable override explicitly accepts the risk.
+- Secrets are references resolved at runtime, never plaintext config.
+- Unsupported Magento/service combinations fail before mutate unless an auditable
+  override accepts the risk.
+- No shared Pulumi components that switch on provider. Each cloud owns topology
+  under `internal/cloud/<provider>/`.
 
 ## System shape
 
-The public control plane is the native `magelift` CLI. It loads strict typed YAML,
-resolves an environment, validates compatibility, and drives build, Pulumi, AWS, and
-operational workflows. The initial production request path is Route 53, CloudFront,
-WAF, ALB, and private ECS Fargate tasks. Managed AWS services supply stateful
-capabilities; S3 remote storage is the media golden path.
+The control plane is the `magelift` CLI: load typed YAML, resolve an environment,
+validate compatibility, then drive build, Pulumi, and ops. On certified AWS the
+request path is Route 53, CloudFront, WAF, ALB, and private ECS Fargate. Managed
+AWS services hold state; S3 is the media path. Experimental GCP maps Magento onto
+GKE Autopilot, Cloud SQL, and Memorystore — see [gcp-experimental.md](gcp-experimental.md).
 
-The PHP build package exposes a typed lifecycle DAG: validate, build, package, deploy,
-and post-deploy. The build runner executes the first three nodes without runtime
-credentials. The deployment workflow consumes the deploy and post-deploy nodes after
-it has established connectivity and injected runtime configuration. Extension
-interfaces use stable logical IDs rather than raw provider schemas. Normal projects
-remain YAML-only.
+The PHP package exposes a lifecycle DAG: validate, build, package, deploy,
+post-deploy. The build runner runs the first three without runtime credentials.
+Deploy and post-deploy run after connectivity and runtime config injection.
+Extensions use stable logical IDs, not raw provider schemas. Normal projects stay
+YAML-only.
 
 Artifact manifest creation has a pre-digest prepare step and a post-build finalize
 step. The finalized manifest stays outside the image and binds the prepared metadata
@@ -57,40 +59,46 @@ boundary.
 FrankenPHP worker mode is reserved and does not appear in configuration because
 Magento compatibility has not been proven.
 
-AWS ECS Fargate is the only certified v1 target. Future AWS EKS, Kubernetes, or other
-cloud targets must implement versioned `Target` and `CapabilityProvider` interfaces.
-Each provider keeps its capabilities explicit and must pass the shared
-application-level acceptance suite. MageLift does not flatten provider features into a
-lowest-common-denominator YAML schema and does not claim multi-cloud support today.
+AWS ECS Fargate is the only certified v1 target. Other runtimes and clouds
+implement `sdk/v1` Target contracts and register a `platform.StackModule`. Each
+provider keeps capabilities explicit and must pass the shared Magento acceptance
+suite before certification. Portable YAML is not a lowest-common-denominator cloud
+catalog.
 
-See [ADR 0002](adr/0002-provider-runtime-extension-boundary.md) for the extension
-boundary and certification rule.
+See [ADR 0002](adr/0002-provider-runtime-extension-boundary.md) and
+[ADR 0008](adr/0008-ports-and-adapters-multi-provider.md). Contributor checklist:
+[adding-a-provider.md](adding-a-provider.md).
 
 ## Repository layout
 
-Provider-neutral Go code lives in `internal/infra`, `internal/topology`,
-`internal/automation`, `internal/deploy`, and `sdk/v1`. Provider implementations live below
-`internal/cloud/<provider>` so adding another cloud does not scatter provider code
-through shared packages. The AWS implementation currently has `bootstrap`,
-`secrets`, `target`, `network`, `security`, `ingress`, `runtime`, `edge`, `database`,
-`cache`, `search`, `queue`, `storage`, `observability`, `operations`, `deployment`,
-`stack`, and `state` packages.
-The extension registry SDK validates and indexes targets, capabilities, typed
-transforms, and lifecycle hooks by stable IDs. Transform registration keeps the options type
-checked at the extension boundary; lookup cannot apply a transform to a component
-outside its descriptor. Hook discovery is deterministic by phase and ID. The v1 CLI
-ships only the built-in AWS target; loading compiled third-party extensions remains an
-advanced integration boundary rather than an implicit project feature.
-The stack package is a thin AWS composition boundary. It receives a validated plan,
-selects only catalog values supplied by the caller, and wires Pulumi outputs between
-capability components. Regional resources and CloudFront/WAF resources use separate
-provider instances. Each capability validates its typed inputs before registering
-resources. The planner also checks the selected Magento release against the AWS
-service versions listed in the Adobe compatibility tables. `allowUnsupported` is the
-only way to record an exception, and the resulting artifact metadata marks it.
-An explicit existing-network reference can provide a VPC and its public, private, and
-data subnets; in that mode MageLift does not create routing, NAT, or VPC endpoint
-resources for the imported network.
+Provider-neutral code: `internal/platform` (stack modules, Magento output keys,
+env bindings), `internal/automation`, `internal/deploy`, `internal/infra` (SDK
+extension index), `internal/topology`, and `sdk/v1`. Providers live under
+`internal/cloud/<provider>/`.
+
+AWS packages today include `bootstrap`, `secrets`, `target`, `network`,
+`security`, `ingress`, `runtime`, `edge`, `database`, `cache`, `search`, `queue`,
+`storage`, `observability`, `operations`, `deployment`, `stack`, and `state`.
+GCP experimental code mirrors the stack composition boundary under
+`internal/cloud/gcp/`.
+
+**CLI deploy path:** `platform.ModuleRegistry` selects a `StackModule` by
+provider + runtime. Magento lock and candidate steps are optional via
+`platform.HasOps`. `internal/infra.Registry` is for Target/Capability/Hook
+discovery tests; it does not replace module registration.
+
+The SDK registry indexes targets, capabilities, typed transforms, and lifecycle
+hooks by stable IDs. Transforms stay type-checked at the boundary. Hook discovery
+is deterministic by phase and ID. The default CLI ships AWS plus experimental GCP;
+third-party modules use a custom binary that calls `RegisterModule` (ADR 0007).
+
+The AWS stack package composes a validated plan: catalog values from the caller,
+Pulumi outputs between capabilities, separate providers for regional vs
+CloudFront/WAF resources. Each capability validates typed inputs before register.
+The planner checks Magento release against Adobe’s AWS service versions.
+`allowUnsupported` is the only recorded exception path. An existing-network
+reference can supply VPC and subnets; MageLift then skips routing, NAT, and VPC
+endpoints for that network.
 
 Standard and high-availability networks create private interface endpoints for ECR,
 CloudWatch Logs, Secrets Manager, SSM, and ECS Exec, alongside the S3 gateway endpoint.
@@ -110,12 +118,11 @@ The Go build system follows the same rule. Its packages are grouped below
 `internal/build/runner`. The repository-level `build/` directory remains the
 Magento Composer package and is separate from these Go internals.
 
-The current infrastructure commands keep the seams narrow: configuration produces
-an AWS `stack.Spec`, the Automation API owns the Pulumi workspace, and the CLI owns
-environment selection, approval checks, the deployment lock, the candidate migration
-task, and post-update health evidence. A stack backend can be replaced in tests, so
-the command path does not need AWS credentials to exercise validation and failure
-handling.
+Infrastructure commands keep seams narrow: config yields a `platform.PlannedStack`
+from the selected module; Automation API owns the Pulumi workspace; the CLI owns
+environment selection, approvals, provider Ops (lock / Magento steps when present),
+and post-update health. Stack backends are swappable in tests so commands can run
+without cloud credentials.
 
 ECS web, cron, and queue tasks use the application task role. The one-off migration
 candidate uses a separate ECS deployment role, which can be tightened independently
@@ -182,7 +189,10 @@ Public contracts are independently versioned. Current and previous major configu
 schemas receive deterministic migrations. Released infrastructure component names use
 aliases or migration logic before renaming. Material decisions are recorded as ADRs.
 
-Provider growth follows [ADR 0007](adr/0007-multi-provider-community-targets.md): AWS
-is the certified v1 target, GCP is the planned v1.1 first-party candidate, and later
-clouds arrive as first-party or community `sdk/v1` modules without expanding portable
-YAML into a lowest-common-denominator cloud schema.
+Provider growth follows [ADR 0007](adr/0007-multi-provider-community-targets.md) and
+[ADR 0008](adr/0008-ports-and-adapters-multi-provider.md): AWS is the certified v1
+target; Magento-shaped ports live in `internal/platform`; cloud adapters live under
+`internal/cloud/<provider>`. GCP (`gcp` / `gke-autopilot`) is the experimental v1.1
+first-party candidate — see [gcp-experimental.md](gcp-experimental.md). Later clouds
+register another adapter without expanding portable YAML into a lowest-common-denominator
+cloud schema.

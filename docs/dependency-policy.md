@@ -13,10 +13,10 @@ MageLift uses the newest production-suitable dependency compatible with its supp
 - PHPStan and Psalm run on every verification job. Their dynamic JSON and process
   boundary checks are kept in source rather than hidden in a generated baseline.
 - Docker base images are pinned by multi-platform digest. The FrankenPHP classic adapter currently uses the Debian Trixie PHP 8.5 image from the 1.12.4 release; Dependabot tracks Docker digest updates.
-- Pulumi Automation API and the AWS provider are direct Go dependencies. Their versions
-  are pinned in `go.mod`, checked with `go list -m -u all`, and exercised by Pulumi mock
-  graph tests. Provider SDKs for other clouds remain out of the module until a target is
-  implemented.
+- Pulumi Automation API and cloud provider SDKs that MageLift implements are direct
+  Go dependencies. Their versions are pinned in `go.mod`, checked with
+  `go list -m -u all`, and exercised by Pulumi mock graph tests. Additional cloud
+  SDKs enter the module only when that target is implemented.
 - Magento and PHP support data is date-stamped in the compatibility catalog. The AWS
   stack planner applies the service-version combinations from [Adobe's system
   requirements](https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements)
@@ -25,7 +25,7 @@ MageLift uses the newest production-suitable dependency compatible with its supp
 
 Dependabot opens the dependency update pull requests. Go modules, Composer packages, and GitHub Actions use separate update groups so their tests and release risks stay visible.
 
-CI also runs Go vulnerability and license checks, CodeQL for Go and PHP, and Trivy
+CI also runs Go vulnerability and license checks, CodeQL for Go, and Trivy
 against every published Debian PHP runtime, builder, and FrankenPHP classic image
 for each supported PHP branch. Shellcheck validates repository shell scripts, and
 actionlint validates workflow syntax and expressions;

@@ -15,8 +15,11 @@ Provider implementations live under `internal/cloud/<provider>`. AWS capabilitie
 use separate packages such as `bootstrap`, `network`, `security`, `ingress`, `runtime`,
 `database`, `cache`, `search`, `queue`, `storage`, `observability`, and `stack`.
 Provider-neutral orchestration and
-contracts stay in `internal/automation`, `internal/deploy`, `internal/infra`,
-`internal/topology`, and `sdk/v1`.
+contracts stay in `internal/platform` (stack modules and Magento-shaped ports),
+`internal/automation`, `internal/deploy`, `internal/infra` (SDK extension index),
+`internal/topology`, and `sdk/v1`. Magento-shaped stack registration for the CLI
+uses `platform.ModuleRegistry` (ADR 0008); `infra.Registry` alone does not wire
+deploy.
 
 The Go build system uses `internal/build/kit`, `internal/build/pipeline`,
 `internal/build/plan`, and `internal/build/runner`. The repository-level `build/`
