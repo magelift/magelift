@@ -84,8 +84,12 @@ GCP experimental code mirrors the stack composition boundary under
 
 **CLI deploy path:** `platform.ModuleRegistry` selects a `StackModule` by
 provider + runtime. Magento lock and candidate steps are optional via
-`platform.HasOps`. `internal/infra.Registry` is for Target/Capability/Hook
-discovery tests; it does not replace module registration.
+`platform.HasOps`. Day-2 surfaces (bootstrap, state, secrets, logs, exec, runtime
+health) resolve the same way through `HasBootstrap` / `HasState` / `HasSecrets` /
+`HasRuntimeObserve` ([ADR 0009](adr/0009-day2-magento-ports.md)). DIY stack names
+include provider and runtime so targets do not collide.
+`internal/infra.Registry` is for Target/Capability/Hook discovery tests; it does
+not replace module registration.
 
 The SDK registry indexes targets, capabilities, typed transforms, and lifecycle
 hooks by stable IDs. Transforms stay type-checked at the boundary. Hook discovery

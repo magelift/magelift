@@ -19,11 +19,13 @@ A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`
 1. `internal/cloud/<p>/target/` — IDs, `Validate`, optional `Register(*infra.Registry)` for tests.
 2. `internal/cloud/<p>/stack/` — `Spec`, `PlanFromConfig*`, Pulumi `Program` (`ctx.Export` must match `Component.Outputs()`), `component`, and a `StackModule`. If Magento Ops would cycle imports with other packages, put `HasOps` on a thin wrapper (AWS: `internal/cloud/aws/ops`).
 3. Capability packages (`network`, `database`, …) as needed; keep them typed and small.
-4. Optional `platform.HasOps` for lock + Magento candidate steps. Without it (or if `NewDeploySteps` returns `ErrNotSupported`), the CLI only updates the stack graph and the target stays experimental.
+4. Optional day-2 ports on the module (`HasOps`, `HasBootstrap`, `HasState`,
+   `HasSecrets`, `HasRuntimeObserve`). Return `ErrNotSupported` until ready.
+   See [ADR 0009](adr/0009-day2-magento-ports.md).
 5. `internal/config` — provider block, enums, validation, then `make generate` for schema.
 6. `internal/cli/root.go` — `RegisterModule(...)`.
 7. Mock Pulumi graph tests; docs for experimental vs acceptance.
-8. Later for certification: DIY lock, bootstrap, secrets/logs/exec (ADR 0007).
+8. Later for certification: implement the day-2 ports end-to-end (ADR 0007).
 
 ## Required stack outputs
 

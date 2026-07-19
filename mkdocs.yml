@@ -33,6 +33,7 @@ nav:
       - "0006: GitHub OIDC role separation": adr/0006-github-oidc-role-separation.md
       - "0007: Multi-provider and community targets": adr/0007-multi-provider-community-targets.md
       - "0008: Ports and adapters": adr/0008-ports-and-adapters-multi-provider.md
+      - "0009: Day-2 Magento ports": adr/0009-day2-magento-ports.md
   - Clean-room provenance: provenance.md
   - Release readiness: release-readiness.md
 markdown_extensions:
