@@ -193,7 +193,9 @@ behavior. Floci and Pulumi mocks do not prove this managed data-plane behavior.
 
 Use `make floci-test` for account-free bootstrap, state, lock, versioned-media
 restore, ECS runtime health, ephemeral candidate registration, Secrets Manager, and
-CloudWatch Logs tests. It covers the AWS SDK paths that Floci implements. It does not replace a
-real-AWS test: the GitHub OIDC provider operations and final managed-service behavior
-still need the scheduled AWS matrix. The composed Pulumi target is tested separately with
-provider mocks, including preview, standard, and high-availability resource graphs.
+CloudWatch Logs tests. It covers the AWS SDK paths that Floci implements. It does not
+replace a real-AWS pass: GitHub OIDC provider operations and final managed-service
+behavior still need a sparse local acceptance run when credits allow. See
+[Local AWS acceptance](aws-acceptance.md). The composed Pulumi target is tested
+separately with provider mocks, including preview, standard, and high-availability
+resource graphs.

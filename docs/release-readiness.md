@@ -11,16 +11,14 @@ No public tag may be created until maintainers have documented:
 
 The AWS OpenSearch path is an explicit release gate. ECS tasks now include a
 pinned AWS SigV4 proxy sidecar and route Magento search traffic through it. Do
-not call the managed search path production-ready until a real AWS matrix proves
-index creation, catalog indexing, queries, reconnects, and least-privilege
-behavior.
+not call the managed search path production-ready until a real AWS acceptance
+pass proves index creation, catalog indexing, queries, reconnects, and
+least-privilege behavior.
 
-`.github/workflows/aws-integration.yml` is the spend-gated acceptance matrix for
-preview, standard, and high-availability profiles. It uses GitHub OIDC and a
-repository-scoped role, consumes a reviewable configuration supplied through the
-integration environment, and destroys disposable resources in an exit trap. Set
-`MAGELIFT_AWS_INTEGRATION_ENABLED` only after the role, environment approvals,
-signed image digest, and configuration have been reviewed.
+Real AWS acceptance is a local maintainer activity. Use
+[Local AWS acceptance](aws-acceptance.md) with the `preview` preset, destroy on
+exit, and free credits carefully. There is no GitHub Actions cloud spend matrix;
+Floci and mocks remain the default automated verification.
 
 The release workflows use Release Please for Conventional Commit versioning and
 GoReleaser for reproducible multi-platform archives, SHA-256 checksums, SBOMs, and

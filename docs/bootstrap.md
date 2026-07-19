@@ -41,9 +41,9 @@ Manager version updates, and CloudWatch Logs ingestion without an AWS account.
 
 Floci is an emulator, not an AWS certification environment. Its current IAM
 surface does not implement GitHub OIDC-provider operations, and managed-service
-behavior is not proof of AWS behavior. Identity bootstrap and Pulumi resource
-graphs still require the scheduled real-AWS matrix described in the operations
-runbook.
+behavior is not proof of AWS behavior. Identity bootstrap and managed-service
+behavior still need a sparse local real-AWS acceptance pass when credits allow;
+see [Local AWS acceptance](aws-acceptance.md).
 
 For local AWS-compatible testing, set `MAGELIFT_AWS_ENDPOINT_URL` to the emulator
 endpoint, for example `http://127.0.0.1:4566`. The endpoint must use HTTP or HTTPS

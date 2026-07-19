@@ -181,3 +181,8 @@ Protected and retained resources must be explicit during destruction.
 Public contracts are independently versioned. Current and previous major configuration
 schemas receive deterministic migrations. Released infrastructure component names use
 aliases or migration logic before renaming. Material decisions are recorded as ADRs.
+
+Provider growth follows [ADR 0007](adr/0007-multi-provider-community-targets.md): AWS
+is the certified v1 target, GCP is the planned v1.1 first-party candidate, and later
+clouds arrive as first-party or community `sdk/v1` modules without expanding portable
+YAML into a lowest-common-denominator cloud schema.

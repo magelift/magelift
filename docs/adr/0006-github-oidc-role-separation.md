@@ -29,8 +29,8 @@ Bootstrap output contains all three ARNs. Generated workflows use
 environment role variables. The state role remains available for audited recovery
 procedures and cannot mutate application infrastructure.
 
-Floci cannot certify IAM or GitHub OIDC behavior. Pulumi mocks and the scheduled AWS
-matrix must verify the final policy and trust behavior.
+Floci cannot certify IAM or GitHub OIDC behavior. Pulumi mocks and sparse local
+AWS acceptance runs must verify the final policy and trust behavior.
 
 ## Alternatives
 

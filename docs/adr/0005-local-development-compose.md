@@ -40,4 +40,4 @@ variables, while deployed resources continue to come from the provider target.
 
 This gives contributors a native CLI workflow and keeps service state local. It
 does not reproduce AWS-managed failover, IAM, or network behavior; those checks stay
-in Floci tests, Pulumi mocks, and the scheduled AWS matrix.
+in Floci tests, Pulumi mocks, and sparse local AWS acceptance runs.
