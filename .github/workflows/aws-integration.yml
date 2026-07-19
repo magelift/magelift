@@ -1,0 +1,83 @@
+name: AWS Integration Matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Profile to exercise
+        required: true
+        default: all
+        type: choice
+        options: [all, preview, standard, high-availability]
+      keep:
+        description: Keep resources for investigation after the run
+        required: true
+        default: false
+        type: boolean
+  schedule:
+    - cron: '37 2 * * 6'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  integration:
+    if: vars.MAGELIFT_AWS_INTEGRATION_ENABLED == 'true'
+    name: ${{ matrix.profile }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: magelift-aws-${{ matrix.profile }}
+    concurrency:
+      group: magelift-aws-integration-${{ matrix.profile }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [preview, standard, high-availability]
+    env:
+      MAGELIFT_AWS_INTEGRATION_CONFIG_B64: ${{ secrets.MAGELIFT_AWS_INTEGRATION_CONFIG_B64 }}
+      MAGELIFT_AWS_INTEGRATION_DIGEST: ${{ secrets.MAGELIFT_AWS_INTEGRATION_DIGEST }}
+      MAGELIFT_AWS_CERTIFICATE_IDENTITY: ${{ vars.MAGELIFT_AWS_CERTIFICATE_IDENTITY }}
+      MAGELIFT_AWS_CERTIFICATE_OIDC_ISSUER: https://token.actions.githubusercontent.com
+      AWS_REGION: ${{ vars.MAGELIFT_AWS_INTEGRATION_REGION }}
+      MAGELIFT_AWS_INTEGRATION_PROFILE: ${{ matrix.profile }}
+
+    steps:
+      - name: Skip unselected manual profile
+        if: github.event_name == 'workflow_dispatch' && inputs.profile != 'all' && inputs.profile != matrix.profile
+        run: echo "profile ${{ matrix.profile }} was not selected"
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        if: github.event_name != 'workflow_dispatch' || inputs.profile == 'all' || inputs.profile == matrix.profile
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: github.event_name != 'workflow_dispatch' || inputs.profile == 'all' || inputs.profile == matrix.profile
+        with:
+          go-version-file: go.mod
+      - uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5.0.0
+        if: github.event_name != 'workflow_dispatch' || inputs.profile == 'all' || inputs.profile == matrix.profile
+        with:
+          role-to-assume: ${{ secrets.MAGELIFT_AWS_INTEGRATION_ROLE_ARN }}
+          aws-region: ${{ vars.MAGELIFT_AWS_INTEGRATION_REGION }}
+          role-session-name: magelift-${{ matrix.profile }}-${{ github.run_id }}
+          mask-aws-account-id: true
+      - name: Materialize integration configuration
+        if: github.event_name != 'workflow_dispatch' || inputs.profile == 'all' || inputs.profile == matrix.profile
+        env:
+          CONFIG_PATH: ${{ runner.temp }}/magelift-integration.yaml
+        run: |
+          test -n "$MAGELIFT_AWS_INTEGRATION_CONFIG_B64"
+          printf '%s' "$MAGELIFT_AWS_INTEGRATION_CONFIG_B64" | base64 --decode > "$CONFIG_PATH"
+          chmod 600 "$CONFIG_PATH"
+          echo "MAGELIFT_CONFIG=$CONFIG_PATH" >> "$GITHUB_ENV"
+      - name: Build CLI
+        if: github.event_name != 'workflow_dispatch' || inputs.profile == 'all' || inputs.profile == matrix.profile
+        run: go build -trimpath -ldflags='-s -w' -o "$RUNNER_TEMP/magelift" ./cmd/magelift
+      - name: Run acceptance workflow
+        if: github.event_name != 'workflow_dispatch' || inputs.profile == 'all' || inputs.profile == matrix.profile
+        env:
+          MAGELIFT_BIN: ${{ runner.temp }}/magelift
+          MAGELIFT_AWS_INTEGRATION_KEEP: ${{ github.event_name == 'workflow_dispatch' && inputs.keep || 'false' }}
+        run: ./scripts/aws-integration.sh

@@ -1,0 +1,10 @@
+services:
+  floci:
+    image: floci/floci:1.5.33@sha256:d2ecc8035822b23b8587a56eab15edd825f41d3fb80d93e8e66680410beddc08
+    ports:
+      - "4566:4566"
+    environment:
+      FLOCI_DEFAULT_REGION: us-east-1
+      FLOCI_DEFAULT_ACCOUNT_ID: "000000000000"
+      FLOCI_STORAGE_MODE: memory
+      FLOCI_AUTH_VALIDATE_SIGNATURES: "true"

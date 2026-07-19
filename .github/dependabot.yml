@@ -1,0 +1,61 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels: [dependencies, go]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+  - package-ecosystem: composer
+    directory: /build
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels: [dependencies, php]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      composer-dependencies:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      github-actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /images/php-runtime
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      docker-base-images:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /images/frankenphp-classic
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      frankenphp-base-image:
+        patterns: ["*"]
