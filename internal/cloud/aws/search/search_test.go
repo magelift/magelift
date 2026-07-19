@@ -65,10 +65,10 @@ func TestPreviewCreatesPrivateBoundedServerlessSearch(t *testing.T) {
 		t.Fatalf("collection group policy = %v", group)
 	}
 	limits := group["capacityLimits"].ArrayValue()[0].ObjectValue()
-	assertNumber(t, limits, "minIndexingCapacityInOcu", 0)
+	assertNumber(t, limits, "minIndexingCapacityInOcu", 1)
 	assertNumber(t, limits, "maxIndexingCapacityInOcu", 4)
-	assertNumber(t, limits, "minSearchCapacityInOcu", 0)
-	assertNumber(t, limits, "maxSearchCapacityInOcu", 6)
+	assertNumber(t, limits, "minSearchCapacityInOcu", 1)
+	assertNumber(t, limits, "maxSearchCapacityInOcu", 4)
 
 	collection := m.one(t, "aws:opensearch/serverlessCollection:ServerlessCollection").inputs
 	if collection["type"].StringValue() != "SEARCH" || collection["standbyReplicas"].StringValue() != "DISABLED" {
@@ -160,9 +160,11 @@ func TestSearchRejectsUnsafeOrGuessedInputsBeforeRegistration(t *testing.T) {
 		func(args *Args) { args.KMSKeyARN = "alias/aws/aoss" },
 		func(args *Args) { args.AccessIdentityARN = "magelift-admin" },
 		func(args *Args) { args.Serverless.AcceptColdStarts = false },
-		func(args *Args) { args.Serverless.Capacity.MinimumSearchOCU = 1 },
+		func(args *Args) { args.Serverless.Capacity.MinimumSearchOCU = 0 },
+		func(args *Args) { args.Serverless.Capacity.MinimumIndexingOCU = 3 },
 		func(args *Args) { args.Serverless.Capacity.MaximumIndexingOCU = 0 },
 		func(args *Args) { args.Serverless.Capacity.MaximumSearchOCU = math.Inf(1) },
+		func(args *Args) { args.Serverless.Capacity.MaximumIndexingOCU = 3 },
 		func(args *Args) { args.Provisioned = &Provisioned{} },
 	}
 	for index, mutate := range previewCases {
@@ -199,7 +201,7 @@ func previewArgs() Args {
 		Preset: sdk.PresetPreview, Region: "eu-west-3", VPCID: pulumi.String("vpc-123"),
 		SubnetIDs: stringsInput("data-a", "data-b"), SecurityGroupIDs: stringsInput("sg-search"),
 		KMSKeyARN: testKMSKeyARN, AccessIdentityARN: testIdentityARN,
-		Serverless: &Serverless{AcceptColdStarts: true, Capacity: ServerlessCapacity{MaximumIndexingOCU: 4, MaximumSearchOCU: 6}},
+		Serverless: &Serverless{AcceptColdStarts: true, Capacity: ServerlessCapacity{MinimumIndexingOCU: 1, MaximumIndexingOCU: 4, MinimumSearchOCU: 1, MaximumSearchOCU: 4}},
 	}
 }
 

@@ -353,7 +353,7 @@ func serverlessSearch(spec Spec) *search.Serverless {
 		return nil
 	}
 	profile := spec.Catalog.Search
-	return &search.Serverless{AcceptColdStarts: profile.AcceptColdStarts, Capacity: search.ServerlessCapacity{MaximumIndexingOCU: profile.MaximumIndexingOCU, MaximumSearchOCU: profile.MaximumSearchOCU}}
+	return &search.Serverless{AcceptColdStarts: profile.AcceptColdStarts, Capacity: search.ServerlessCapacity{MinimumIndexingOCU: 1, MaximumIndexingOCU: profile.MaximumIndexingOCU, MinimumSearchOCU: 1, MaximumSearchOCU: profile.MaximumSearchOCU}}
 }
 
 func provisionedSearch(spec Spec) *search.Provisioned {

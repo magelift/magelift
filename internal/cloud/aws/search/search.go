@@ -224,11 +224,15 @@ func validate(name string, args Args) error {
 			return errors.New("preview search must explicitly accept Serverless cold starts")
 		}
 		capacity := args.Serverless.Capacity
-		if capacity.MinimumIndexingOCU != 0 || capacity.MinimumSearchOCU != 0 {
-			return errors.New("preview search must use zero minimum indexing and search capacity")
+		// AOSS collection-group capacity no longer allows 0; AWS accepts 1, 2, 4, 8, 16, or multiples of 16.
+		if !validServerlessOCU(capacity.MinimumIndexingOCU) || !validServerlessOCU(capacity.MinimumSearchOCU) {
+			return errors.New("Serverless minimum indexing and search capacity must be 1, 2, 4, 8, 16, or a multiple of 16")
 		}
 		if !validCapacityRange(capacity.MinimumIndexingOCU, capacity.MaximumIndexingOCU) || !validCapacityRange(capacity.MinimumSearchOCU, capacity.MaximumSearchOCU) {
 			return errors.New("Serverless indexing and search capacity must have finite positive maxima at least as large as their minima")
+		}
+		if !validServerlessOCU(capacity.MaximumIndexingOCU) || !validServerlessOCU(capacity.MaximumSearchOCU) {
+			return errors.New("Serverless maximum indexing and search capacity must be 1, 2, 4, 8, 16, or a multiple of 16")
 		}
 		if len(args.SubnetIDs) > 6 {
 			return errors.New("Serverless VPC endpoints support at most six subnets")
@@ -269,7 +273,15 @@ func validate(name string, args Args) error {
 }
 
 func validCapacityRange(minimum, maximum float64) bool {
-	return !math.IsNaN(minimum) && !math.IsInf(minimum, 0) && !math.IsNaN(maximum) && !math.IsInf(maximum, 0) && minimum >= 0 && maximum > 0 && maximum >= minimum
+	return !math.IsNaN(minimum) && !math.IsInf(minimum, 0) && !math.IsNaN(maximum) && !math.IsInf(maximum, 0) && minimum > 0 && maximum > 0 && maximum >= minimum
+}
+
+func validServerlessOCU(value float64) bool {
+	switch value {
+	case 1, 2, 4, 8, 16:
+		return true
+	}
+	return value >= 32 && math.Mod(value, 16) == 0
 }
 
 func tags(input map[string]string, component, role string) pulumi.StringMap {
