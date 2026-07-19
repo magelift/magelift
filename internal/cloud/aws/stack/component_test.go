@@ -1,0 +1,260 @@
+package stack
+
+import (
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+)
+
+type stackMocks struct {
+	mu        sync.Mutex
+	resources []pulumi.MockResourceArgs
+	invokes   []pulumi.MockCallArgs
+}
+
+func (m *stackMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+	m.mu.Lock()
+	m.resources = append(m.resources, args)
+	m.mu.Unlock()
+	state := args.Inputs.Copy()
+	switch args.TypeToken {
+	case "aws:lb/loadBalancer:LoadBalancer":
+		state["arn"] = resource.NewStringProperty("arn:aws:elasticloadbalancing:eu-west-3:123456789012:loadbalancer/app/shop/abc")
+		state["arnSuffix"] = resource.NewStringProperty("app/shop/abc")
+		state["dnsName"] = resource.NewStringProperty("shop.eu-west-3.elb.amazonaws.com")
+	case "aws:lb/targetGroup:TargetGroup":
+		state["arn"] = resource.NewStringProperty("arn:aws:elasticloadbalancing:eu-west-3:123456789012:targetgroup/shop/def")
+	case "aws:lb/listener:Listener":
+		state["arn"] = resource.NewStringProperty("arn:aws:elasticloadbalancing:eu-west-3:123456789012:listener/app/shop/abc/ghi")
+	case "aws:ecs/cluster:Cluster":
+		state["arn"] = resource.NewStringProperty("arn:aws:ecs:eu-west-3:123456789012:cluster/shop")
+		state["name"] = resource.NewStringProperty("shop-cluster")
+	case "aws:ecs/service:Service":
+		state["name"] = resource.NewStringProperty("shop-web-service")
+	case "aws:ecs/taskDefinition:TaskDefinition":
+		state["arn"] = resource.NewStringProperty("arn:aws:ecs:eu-west-3:123456789012:task-definition/shop-web:1")
+	case "aws:iam/role:Role":
+		state["arn"] = resource.NewStringProperty("arn:aws:iam::123456789012:role/" + args.Name)
+		state["name"] = resource.NewStringProperty(args.Name)
+	case "aws:rds/cluster:Cluster":
+		state["arn"] = resource.NewStringProperty("arn:aws:rds:eu-west-3:123456789012:cluster/shop")
+		state["endpoint"] = resource.NewStringProperty("shop.writer")
+		state["readerEndpoint"] = resource.NewStringProperty("shop.reader")
+		state["masterUserSecrets"] = resource.NewArrayProperty([]resource.PropertyValue{resource.NewObjectProperty(resource.PropertyMap{"secretArn": resource.NewStringProperty("arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed")})})
+	case "aws:elasticache/replicationGroup:ReplicationGroup":
+		state["primaryEndpointAddress"] = resource.NewStringProperty(args.Name + ".cache.amazonaws.com")
+	case "aws:mq/broker:Broker":
+		state["arn"] = resource.NewStringProperty("arn:aws:mq:eu-west-3:123456789012:broker:shop")
+		state["instances"] = resource.NewArrayProperty([]resource.PropertyValue{resource.NewObjectProperty(resource.PropertyMap{
+			"endpoints":  resource.NewArrayProperty([]resource.PropertyValue{resource.NewStringProperty("amqps://shop.mq.eu-west-3.amazonaws.com:5671")}),
+			"consoleUrl": resource.NewStringProperty("https://shop.mq.eu-west-3.amazonaws.com:15671"),
+		})})
+	case "aws:opensearch/serverlessCollection:ServerlessCollection":
+		state["arn"] = resource.NewStringProperty("arn:aws:aoss:eu-west-3:123456789012:collection/shop")
+		state["collectionEndpoint"] = resource.NewStringProperty("https://shop.eu-west-3.aoss.amazonaws.com")
+		state["dashboardEndpoint"] = resource.NewStringProperty("https://shop.eu-west-3.aoss.amazonaws.com/_dashboards")
+	case "aws:opensearch/domain:Domain":
+		state["arn"] = resource.NewStringProperty("arn:aws:es:eu-west-3:123456789012:domain/shop")
+		state["endpoint"] = resource.NewStringProperty("shop.eu-west-3.es.amazonaws.com")
+		state["dashboardEndpoint"] = resource.NewStringProperty("shop.eu-west-3.es.amazonaws.com/_dashboards")
+	case "aws:s3/bucket:Bucket":
+		state["arn"] = resource.NewStringProperty("arn:aws:s3:::shop-media")
+		state["bucket"] = resource.NewStringProperty("shop-media")
+		state["bucketRegionalDomainName"] = resource.NewStringProperty("shop-media.s3.eu-west-3.amazonaws.com")
+	case "aws:cloudfront/distribution:Distribution":
+		state["arn"] = resource.NewStringProperty("arn:aws:cloudfront::123456789012:distribution/EDFDVBD6EXAMPLE")
+		state["domainName"] = resource.NewStringProperty("d111111abcdef8.cloudfront.net")
+		state["hostedZoneId"] = resource.NewStringProperty("Z2FDTNDATAQYW2")
+	case "aws:wafv2/webAcl:WebAcl":
+		state["arn"] = resource.NewStringProperty("arn:aws:wafv2:us-east-1:123456789012:global/webacl/shop/abc")
+	case "aws:cloudwatch/metricAlarm:MetricAlarm":
+		state["arn"] = resource.NewStringProperty("arn:aws:cloudwatch:eu-west-3:123456789012:alarm:" + args.Name)
+	}
+	return args.Name + "-id", state, nil
+}
+
+func (m *stackMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
+	m.mu.Lock()
+	m.invokes = append(m.invokes, args)
+	m.mu.Unlock()
+	return resource.PropertyMap{"secretString": resource.MakeSecret(resource.NewStringProperty("mock-secret"))}, nil
+}
+
+func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
+	t.Parallel()
+	m := &stackMocks{}
+	var outputs []string
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		providers, err := NewProviders(ctx, "shop", "eu-west-3")
+		if err != nil {
+			return err
+		}
+		component, err := New(ctx, "shop-preview-1", validSpec(), providers)
+		if err != nil {
+			return err
+		}
+		pulumi.All(component.Edge.DistributionDomainName, component.Ingress.TargetGroupARN, component.Runtime.TaskRoleARN, component.Database.WriterEndpoint).ApplyT(func(values []interface{}) string {
+			for _, value := range values {
+				outputs = append(outputs, value.(string))
+			}
+			return strings.Join(outputs, ",")
+		})
+		return nil
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if componentCount(m, "magelift:aws:Network") != 1 || componentCount(m, "magelift:aws:Ingress") != 1 || componentCount(m, "magelift:aws:EcsRuntime") != 1 || componentCount(m, "magelift:aws:AuroraMysql") != 1 || componentCount(m, "magelift:aws:Valkey") != 1 || componentCount(m, "magelift:aws:OpenSearch") != 1 || componentCount(m, "magelift:aws:MediaStorage") != 1 || componentCount(m, "magelift:aws:Edge") != 1 {
+		t.Fatalf("stack did not compose expected components")
+	}
+	if componentCount(m, "magelift:aws:EcsRuntimeIdentity") != 1 {
+		t.Fatal("stack did not split runtime identity from task definitions")
+	}
+	if len(outputs) != 4 {
+		t.Fatalf("stack outputs did not resolve through Pulumi graph: %#v", outputs)
+	}
+	policy := resourceInput(m, "aws:iam/rolePolicy:RolePolicy", "shop-preview-1-task-policy")
+	policyText := policy["policy"].StringValue()
+	for _, required := range []string{"s3:GetObject", "aoss:APIAccessAll", "secretsmanager:GetSecretValue", "kms:Decrypt", "ssmmessages:OpenDataChannel"} {
+		if !strings.Contains(policyText, required) {
+			t.Fatalf("task policy is missing %q: %s", required, policyText)
+		}
+	}
+	deploymentPolicy := resourceInput(m, "aws:iam/rolePolicy:RolePolicy", "shop-preview-1-deployment-policy")
+	if deploymentPolicy == nil || !strings.Contains(deploymentPolicy["policy"].StringValue(), "s3:GetObject") {
+		t.Fatal("deployment task capability policy was not registered")
+	}
+	executionDatabasePolicy := resourceInput(m, "aws:iam/rolePolicy:RolePolicy", "shop-preview-1-execution-database-policy")
+	if executionDatabasePolicy == nil || !strings.Contains(executionDatabasePolicy["policy"].StringValue(), "secretsmanager:GetSecretValue") || !strings.Contains(executionDatabasePolicy["policy"].StringValue(), "arn:aws:kms:eu-west-3:123456789012:key/11111111-2222-3333-4444-555555555555") {
+		t.Fatalf("ECS execution role cannot read the managed database secret: %#v", executionDatabasePolicy)
+	}
+	webTask := resourceInput(m, "aws:ecs/taskDefinition:TaskDefinition", "shop-preview-1-runtime-web-task")
+	definitions := webTask["containerDefinitions"].StringValue()
+	for _, required := range []string{"MAGELIFT_DATABASE_WRITER", "shop.writer", "MAGELIFT_DATABASE_SECRET_ARN", "arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed", "MAGELIFT_CACHE_ENDPOINT", "MAGELIFT_SEARCH_ENDPOINT", "MAGELIFT_MEDIA_BUCKET", "shop-media", "aws-observability/aws-sigv4-proxy:1.11.1", "docker.io/library/varnish:8.0.2", "VARNISH_HTTP_PORT", "6081", "MAGENTO_DC_CATALOG__SEARCH__ENGINE", "127.0.0.1"} {
+		if !strings.Contains(definitions, required) {
+			t.Fatalf("runtime capability configuration is missing %q: %s", required, definitions)
+		}
+	}
+	targetGroup := resourceInput(m, "aws:lb/targetGroup:TargetGroup", "shop-preview-1-ingress-web")
+	if targetGroup["port"].NumberValue() != 6081 {
+		t.Fatalf("integrated target group port = %v, want 6081", targetGroup["port"])
+	}
+	if !strings.Contains(definitions, "MAGELIFT_DATABASE_CREDENTIALS") {
+		t.Fatal("runtime task does not receive the managed database secret reference")
+	}
+	if strings.Contains(definitions, "mock-secret") {
+		t.Fatal("runtime capability configuration contains a resolved secret value")
+	}
+	deployTask := resourceInput(m, "aws:ecs/taskDefinition:TaskDefinition", "shop-preview-1-runtime-deploy-task")
+	if !strings.Contains(deployTask["taskRoleArn"].StringValue(), "deployment-role") {
+		t.Fatalf("deploy task does not use the deployment identity: %v", deployTask)
+	}
+}
+
+func TestNewComposesStandardThreeZoneStack(t *testing.T) {
+	t.Parallel()
+	m := &stackMocks{}
+	spec := validSpec()
+	spec.Identity.Environment = "staging-1"
+	spec.Identity.EnvironmentClass = "staging"
+	spec.Identity.Preset = "standard"
+	spec.Lifecycle.ExpiresAt = time.Time{}
+	spec.Policy.AvailabilityZones = []string{"eu-west-3a", "eu-west-3b", "eu-west-3c"}
+	spec.Dependencies.SessionSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-session-token"
+	spec.Dependencies.QueueSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-queue-token"
+	spec.Catalog.Valkey.ReplicaCount = 1
+	spec.Catalog.Fargate.DesiredCount = 2
+	spec.Catalog.AuroraProvisioned = AuroraProvisionedProfile{InstanceClass: "db.r8g.large", InstanceCount: 2}
+	spec.Catalog.SearchProvisioned = SearchProvisionedProfile{InstanceType: "m7g.large.search", InstanceCount: 2, EBSVolumeType: "gp3", EBSVolumeSizeGiB: 200}
+	spec.Catalog.RabbitMQ = RabbitMQProfile{InstanceType: "mq.m7g.large"}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		providers, err := NewProviders(ctx, "shop", "eu-west-3")
+		if err != nil {
+			return err
+		}
+		_, err = New(ctx, "shop-staging-1", spec, providers)
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if componentCount(m, "magelift:aws:RabbitMqQueue") != 1 || componentCount(m, "aws:mq/broker:Broker") != 1 || componentCount(m, "aws:rds/clusterInstance:ClusterInstance") != 2 {
+		t.Fatalf("standard stack did not create managed production capabilities")
+	}
+}
+
+func TestNewComposesHighAvailabilityStack(t *testing.T) {
+	t.Parallel()
+	m := &stackMocks{}
+	spec := validSpec()
+	spec.Identity.Environment = "production"
+	spec.Identity.EnvironmentClass = "production"
+	spec.Identity.Preset = "high-availability"
+	spec.Lifecycle.ExpiresAt = time.Time{}
+	spec.Policy.AvailabilityZones = []string{"eu-west-3a", "eu-west-3b", "eu-west-3c"}
+	spec.Dependencies.SessionSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-session-token"
+	spec.Dependencies.QueueSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-queue-token"
+	spec.Catalog.Valkey.ReplicaCount = 2
+	spec.Catalog.Fargate.DesiredCount = 3
+	spec.Catalog.AuroraProvisioned = AuroraProvisionedProfile{InstanceClass: "db.r8g.large", InstanceCount: 3}
+	spec.Catalog.SearchProvisioned = SearchProvisionedProfile{InstanceType: "m7g.large.search", InstanceCount: 3, DedicatedMasterType: "m7g.large.search", DedicatedMasterCount: 3, EBSVolumeType: "gp3", EBSVolumeSizeGiB: 400}
+	spec.Catalog.RabbitMQ = RabbitMQProfile{InstanceType: "mq.m7g.large"}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		providers, err := NewProviders(ctx, "shop", "eu-west-3")
+		if err != nil {
+			return err
+		}
+		_, err = New(ctx, "shop-production", spec, providers)
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if componentCount(m, "magelift:aws:RabbitMqQueue") != 1 || componentCount(m, "aws:rds/clusterInstance:ClusterInstance") != 3 || componentCount(m, "aws:opensearch/domain:Domain") != 1 {
+		t.Fatalf("high-availability stack did not create the selected topology")
+	}
+}
+
+func TestNewRejectsInvalidPlanBeforePulumiRegistration(t *testing.T) {
+	m := &stackMocks{}
+	spec := validSpec()
+	spec.Artifact.ImageDigest = "latest"
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		providers, err := NewProviders(ctx, "shop", "eu-west-3")
+		if err != nil {
+			return err
+		}
+		_, err = New(ctx, "shop-preview-1", spec, providers)
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err == nil || len(m.resources) != 2 {
+		t.Fatalf("invalid plan registration = %d resources, error = %v", len(m.resources), err)
+	}
+}
+
+func componentCount(m *stackMocks, token string) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	count := 0
+	for _, resource := range m.resources {
+		if resource.TypeToken == token {
+			count++
+		}
+	}
+	return count
+}
+
+func resourceInput(m *stackMocks, token, name string) resource.PropertyMap {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, item := range m.resources {
+		if item.TypeToken == token && item.Name == name {
+			return item.Inputs
+		}
+	}
+	return nil
+}
