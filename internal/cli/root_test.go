@@ -7,7 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
+	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
 	"github.com/acourtiol/magelift/internal/config"
+	"github.com/acourtiol/magelift/internal/platform"
 )
 
 type fakeTerminal struct {
@@ -23,12 +26,16 @@ func (t *fakeTerminal) SelectEnvironment([]string) (string, error) {
 }
 
 func testOptions(out *bytes.Buffer, terminal environmentTerminal) *options {
+	modules := platform.NewModuleRegistry()
+	_ = modules.RegisterModule(awsops.Module{})
+	_ = modules.RegisterModule(gcpstack.Module{})
 	return &options{
 		stdout:        out,
 		stderr:        out,
 		getenv:        func(string) string { return "" },
 		currentBranch: func(string) (string, error) { return "", nil },
 		terminal:      terminal,
+		modules:       modules,
 	}
 }
 

@@ -298,11 +298,26 @@ func validate(c Config) (CompatibilityAssessment, error) {
 	if c.Application.WebRuntime != "nginx-fpm" && c.Application.WebRuntime != "frankenphp-classic" {
 		problems = append(problems, "application.webRuntime must be nginx-fpm or frankenphp-classic")
 	}
-	if c.Target.Provider != "aws" {
-		problems = append(problems, "target.provider must be aws")
-	}
-	if c.Target.Runtime != "ecs-fargate" {
-		problems = append(problems, "target.runtime must be ecs-fargate")
+	switch c.Target.Provider {
+	case "aws":
+		if c.Target.Runtime != "ecs-fargate" {
+			problems = append(problems, "target.runtime must be ecs-fargate when provider is aws")
+		}
+		if c.Target.GCP != nil {
+			problems = append(problems, "target.gcp is not valid when provider is aws")
+		}
+	case "gcp":
+		if c.Target.Runtime != "gke-autopilot" {
+			problems = append(problems, "target.runtime must be gke-autopilot when provider is gcp")
+		}
+		if c.Target.AWS != nil {
+			problems = append(problems, "target.aws is not valid when provider is gcp")
+		}
+		if c.Target.GCP == nil || c.Target.GCP.Project == "" {
+			problems = append(problems, "target.gcp.project is required when provider is gcp")
+		}
+	default:
+		problems = append(problems, "target.provider must be aws or gcp")
 	}
 	if c.Defaults.Preset != "preview" && c.Defaults.Preset != "standard" && c.Defaults.Preset != "high-availability" {
 		problems = append(problems, "defaults.preset must be preview, standard, or high-availability")
@@ -311,8 +326,22 @@ func validate(c Config) (CompatibilityAssessment, error) {
 		problems = append(problems, "environment preset must be preview, standard, or high-availability")
 	}
 	if credential := c.Build.Composer.Credentials; credential != "" {
-		if _, err := secretref.Parse(credential); err != nil {
-			problems = append(problems, "build.composer.credentials must be a valid AWS Secrets Manager or SSM reference, not plaintext")
+		ref, err := secretref.Parse(credential)
+		if err != nil {
+			problems = append(problems, "build.composer.credentials must be a valid secret reference, not plaintext")
+		} else {
+			switch c.Target.Provider {
+			case "aws":
+				if ref.Kind != secretref.SecretsManager && ref.Kind != secretref.ParameterStore {
+					problems = append(problems, "build.composer.credentials for aws must use aws-secrets-manager:// or ssm://")
+				}
+			case "gcp":
+				if ref.Kind != secretref.GCPSecretManager {
+					// Accepted at config time; build resolution wires the GCP provider later.
+				} else {
+					problems = append(problems, "build.composer.credentials for gcp must use gcp-secret-manager://")
+				}
+			}
 		}
 	}
 	problems = append(problems, validateBuildHooks(c.Build.Hooks)...)

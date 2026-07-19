@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
 	"github.com/acourtiol/magelift/internal/health"
+	"github.com/acourtiol/magelift/internal/platform"
 )
 
 type fakeRuntimeStore struct {
@@ -77,7 +77,7 @@ func TestHealthRuntimeModeUsesECSServiceAndTaskEvidence(t *testing.T) {
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.configPath, o.environment, o.output = path, "staging", "json"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster", "serviceName": "shop-web-service"}}, nil
 	}
 	o.newRuntime = func(context.Context, string) (runtimeStore, error) {
@@ -97,5 +97,25 @@ func TestRuntimeHealthChecksMarkUnhealthyRollouts(t *testing.T) {
 	checks := runtimeHealthChecks(awsoperations.ServiceHealth{DesiredCount: 2, RunningCount: 1, PrimaryRollout: "IN_PROGRESS", Tasks: []awsoperations.TaskHealth{{ARN: "task-a", LastStatus: "STOPPED"}}})
 	if health.Summarize(checks) != health.StatusUnhealthy {
 		t.Fatalf("unhealthy runtime evidence was accepted: %#v", checks)
+	}
+}
+
+func TestRuntimeHealthChecksAcceptUnknownWhenRunning(t *testing.T) {
+	checks := runtimeHealthChecks(awsoperations.ServiceHealth{
+		DesiredCount: 1, RunningCount: 1, PrimaryRollout: "COMPLETED",
+		Tasks: []awsoperations.TaskHealth{{ARN: "task-a", LastStatus: "RUNNING", HealthStatus: "UNKNOWN"}},
+	})
+	if health.Summarize(checks) != health.StatusHealthy {
+		t.Fatalf("RUNNING/UNKNOWN must be healthy when no container health check is set: %#v", checks)
+	}
+}
+
+func TestRuntimeHealthChecksRejectUnhealthyTask(t *testing.T) {
+	checks := runtimeHealthChecks(awsoperations.ServiceHealth{
+		DesiredCount: 1, RunningCount: 1, PrimaryRollout: "COMPLETED",
+		Tasks: []awsoperations.TaskHealth{{ARN: "task-a", LastStatus: "RUNNING", HealthStatus: "UNHEALTHY"}},
+	})
+	if health.Summarize(checks) != health.StatusUnhealthy {
+		t.Fatalf("RUNNING/UNHEALTHY must fail: %#v", checks)
 	}
 }

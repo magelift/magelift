@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
+	"github.com/acourtiol/magelift/internal/platform"
 )
 
 type fakeExecStore struct {
@@ -28,7 +28,7 @@ func TestExecBuildsPinnedAWSCLICommandFromStackOutputs(t *testing.T) {
 	var captured []string
 	o := testOptions(&output, &fakeTerminal{interactive: false})
 	o.configPath, o.environment, o.output = path, "staging", "json"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
 	o.newExec = func(context.Context, string) (execStore, error) {
@@ -54,7 +54,7 @@ func TestExecRejectsMissingRuntimeOutputAndUnsafeCommand(t *testing.T) {
 	backend := &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster"}}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath, o.environment = path, "staging"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
 	o.newExec = func(context.Context, string) (execStore, error) {
@@ -69,7 +69,7 @@ func TestExecRejectsMissingRuntimeOutputAndUnsafeCommand(t *testing.T) {
 
 	o = testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath, o.environment = path, "staging"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster", "serviceName": "shop-web-service"}}, nil
 	}
 	o.newExec = func(context.Context, string) (execStore, error) {
@@ -89,7 +89,7 @@ func TestMagentoOperationTargetsPHPContainer(t *testing.T) {
 	var captured []string
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath, o.environment = path, "staging"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
 	o.newExec = func(context.Context, string) (execStore, error) {
@@ -124,7 +124,7 @@ func TestMagentoOperationTargetsFrankenPHPWebContainer(t *testing.T) {
 	var captured []string
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath, o.environment = path, "staging"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
 	o.newExec = func(context.Context, string) (execStore, error) {
@@ -151,7 +151,7 @@ func TestSSHUsesECSExecAsTheSupportedPath(t *testing.T) {
 	var captured []string
 	o := testOptions(&output, &fakeTerminal{interactive: false})
 	o.configPath, o.environment, o.output = path, "staging", "json"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
 	o.newExec = func(context.Context, string) (execStore, error) {

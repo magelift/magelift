@@ -3,7 +3,6 @@ package state
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -186,14 +185,6 @@ func (m *Manager) inspect(ctx context.Context) (Info, error) {
 		info.ETag = strings.Trim(awssdk.ToString(object.ETag), "\"")
 	}
 	return info, nil
-}
-
-func randomOwner() (string, error) {
-	value := make([]byte, 16)
-	if _, err := rand.Read(value); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", value), nil
 }
 
 func isPreconditionFailed(err error) bool {

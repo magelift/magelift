@@ -61,14 +61,14 @@ func (o *options) runHealth(ctx context.Context, mode string) (health.Report, er
 	case "config":
 		report.Checks = configHealthChecks(effective.Config)
 	case "outputs":
-		_, spec, err := o.infrastructureSpec()
+		_, planned, err := o.planStack(false)
 		if err != nil {
 			return health.Report{}, invalid(err)
 		}
 		if o.newBackend == nil {
 			return health.Report{}, errors.New("infrastructure backend factory is required")
 		}
-		backend, err := o.newBackend(ctx, stackName(spec), spec, strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL")))
+		backend, err := o.newBackend(ctx, planned, strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL")))
 		if err != nil {
 			return health.Report{}, fmt.Errorf("create infrastructure backend: %w", err)
 		}
@@ -127,9 +127,14 @@ func runtimeHealthChecks(result awsoperations.ServiceHealth) []health.Check {
 	for _, task := range result.Tasks {
 		status := health.StatusHealthy
 		message := "ECS task is running and healthy"
-		if task.LastStatus != "RUNNING" || (task.HealthStatus != "" && task.HealthStatus != "HEALTHY") {
+		// ECS reports UNKNOWN when the task definition has no container health
+		// check; that is not a failure. Only UNHEALTHY (or non-RUNNING) is.
+		switch {
+		case task.LastStatus != "RUNNING" || task.HealthStatus == "UNHEALTHY":
 			status = health.StatusUnhealthy
 			message = fmt.Sprintf("ECS task status is %s/%s", task.LastStatus, task.HealthStatus)
+		case task.HealthStatus == "" || task.HealthStatus == "UNKNOWN":
+			message = "ECS task is running (no container health check configured)"
 		}
 		checks = append(checks, health.Check{ID: "runtime.ecs.task." + task.ARN, Status: status, Message: message})
 	}

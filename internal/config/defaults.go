@@ -3,7 +3,8 @@ package config
 // DefaultResolveOptions returns the resolver defaults used by the CLI and
 // library callers. The values describe topology decisions only. Credentials,
 // existing-resource references, and benchmark-selected instance sizes remain
-// project inputs.
+// project inputs. GCP sizing defaults live in the GCP PlanFromConfig path so
+// AWS resolves never materialize a target.gcp block.
 func DefaultResolveOptions() ResolveOptions {
 	return ResolveOptions{Presets: map[string]map[string]any{
 		"preview": {
@@ -42,10 +43,10 @@ func compatibilityDefaults(version string) map[string]any {
 		}
 	}
 	versions := map[string]map[string]any{
-		"2.4.9": {"auroraMysql": "8.0.mysql_aurora.3.12", "valkey": "9.0", "openSearch": "OpenSearch_3.1", "rabbitMq": "4.2"},
-		"2.4.8": {"auroraMysql": "8.0.mysql_aurora.3.12", "valkey": "8.1", "openSearch": "OpenSearch_3.1", "rabbitMq": "4.2"},
-		"2.4.7": {"auroraMysql": "8.0.mysql_aurora.3.12", "valkey": "8.1", "openSearch": "OpenSearch_2.19", "rabbitMq": "4.2"},
-		"2.4.6": {"auroraMysql": "8.0.mysql_aurora.3.12", "valkey": "8.1", "openSearch": "OpenSearch_2.19", "rabbitMq": "4.2"},
+		"2.4.9": {"auroraMysql": "8.0.mysql_aurora.3.12", "mysql": "8.4.10", "valkey": "9.0", "openSearch": "OpenSearch_3.1", "rabbitMq": "4.2"},
+		"2.4.8": {"auroraMysql": "8.0.mysql_aurora.3.12", "mysql": "8.4.10", "valkey": "8.1", "openSearch": "OpenSearch_3.1", "rabbitMq": "4.2"},
+		"2.4.7": {"auroraMysql": "8.0.mysql_aurora.3.12", "mysql": "8.4.10", "valkey": "8.1", "openSearch": "OpenSearch_2.19", "rabbitMq": "4.2"},
+		"2.4.6": {"auroraMysql": "8.0.mysql_aurora.3.12", "mysql": "8.4.10", "valkey": "8.1", "openSearch": "OpenSearch_2.19", "rabbitMq": "4.2"},
 	}[line]
 	if versions == nil {
 		return nil

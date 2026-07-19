@@ -5,7 +5,22 @@
       "properties": {
         "aurora": {
           "$ref": "#/$defs/aWSCatalogAurora",
-          "description": "Aurora capacity"
+          "description": "Aurora or RDS MySQL capacity"
+        },
+        "databaseEngine": {
+          "anyOf": [
+            {
+              "description": "MySQL engine shape",
+              "enum": [
+                "aurora-mysql",
+                "rds-mysql"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "fargate": {
           "$ref": "#/$defs/aWSCatalogFargate",
@@ -22,6 +37,22 @@
         "search": {
           "$ref": "#/$defs/aWSCatalogSearch",
           "description": "OpenSearch capacity"
+        },
+        "searchMode": {
+          "anyOf": [
+            {
+              "description": "OpenSearch provisioning mode",
+              "enum": [
+                "serverless",
+                "provisioned",
+                "disabled"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "valkey": {
           "$ref": "#/$defs/aWSCatalogValkey",
@@ -57,7 +88,7 @@
           "type": "boolean"
         },
         "instanceClass": {
-          "description": "Provisioned Aurora instance class",
+          "description": "Provisioned Aurora or RDS MySQL instance class",
           "type": "string"
         },
         "instanceCount": {
@@ -87,7 +118,7 @@
           "type": "boolean"
         },
         "instanceClass": {
-          "description": "Provisioned Aurora instance class",
+          "description": "Provisioned Aurora or RDS MySQL instance class",
           "type": "string"
         },
         "instanceCount": {
@@ -146,7 +177,22 @@
       "properties": {
         "aurora": {
           "$ref": "#/$defs/aWSCatalogAuroraOverlay",
-          "description": "Aurora capacity"
+          "description": "Aurora or RDS MySQL capacity"
+        },
+        "databaseEngine": {
+          "anyOf": [
+            {
+              "description": "MySQL engine shape",
+              "enum": [
+                "aurora-mysql",
+                "rds-mysql"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "fargate": {
           "$ref": "#/$defs/aWSCatalogFargateOverlay",
@@ -163,6 +209,22 @@
         "search": {
           "$ref": "#/$defs/aWSCatalogSearchOverlay",
           "description": "OpenSearch capacity"
+        },
+        "searchMode": {
+          "anyOf": [
+            {
+              "description": "OpenSearch provisioning mode",
+              "enum": [
+                "serverless",
+                "provisioned",
+                "disabled"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "valkey": {
           "$ref": "#/$defs/aWSCatalogValkeyOverlay",
@@ -361,6 +423,10 @@
           "description": "Aurora MySQL engine version",
           "type": "string"
         },
+        "mysql": {
+          "description": "RDS MySQL engine version",
+          "type": "string"
+        },
         "openSearch": {
           "description": "OpenSearch engine version",
           "type": "string"
@@ -381,6 +447,10 @@
       "properties": {
         "auroraMysql": {
           "description": "Aurora MySQL engine version",
+          "type": "string"
+        },
+        "mysql": {
+          "description": "RDS MySQL engine version",
           "type": "string"
         },
         "openSearch": {
@@ -701,6 +771,21 @@
             }
           ]
         },
+        "natMode": {
+          "anyOf": [
+            {
+              "description": "Private subnet egress mode",
+              "enum": [
+                "nat-gateway",
+                "fck-nat"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "queueSecretArn": {
           "anyOf": [
             {
@@ -883,6 +968,21 @@
           "anyOf": [
             {
               "description": "Media delivery domain",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "natMode": {
+          "anyOf": [
+            {
+              "description": "Private subnet egress mode",
+              "enum": [
+                "nat-gateway",
+                "fck-nat"
+              ],
               "type": "string"
             },
             {
@@ -1302,7 +1402,7 @@
       "properties": {
         "credentials": {
           "description": "Composer credentials secret reference",
-          "pattern": "^(aws-secrets-manager|ssm)://\\S+$",
+          "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
           "type": "string"
         }
       },
@@ -1313,7 +1413,7 @@
       "properties": {
         "credentials": {
           "description": "Composer credentials secret reference",
-          "pattern": "^(aws-secrets-manager|ssm)://\\S+$",
+          "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
           "type": "string"
         }
       },
@@ -1527,6 +1627,351 @@
       },
       "type": "object"
     },
+    "gCPTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "autopilotCpuRequest": {
+          "anyOf": [
+            {
+              "description": "GKE Autopilot CPU request",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "autopilotMemoryRequest": {
+          "anyOf": [
+            {
+              "description": "GKE Autopilot memory request",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlTier": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL machine tier",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseName": {
+          "anyOf": [
+            {
+              "description": "Magento database name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "desiredWebReplicas": {
+          "anyOf": [
+            {
+              "description": "Desired web Deployment replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encryptionKeySecret": {
+          "anyOf": [
+            {
+              "description": "Secret Manager secret ID for Magento encryption key",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "imageDigest": {
+          "anyOf": [
+            {
+              "description": "Signed immutable OCI image digest",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Resource labels",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "masterUsername": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL master username",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreNodeType": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey node type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "networkCidr": {
+          "anyOf": [
+            {
+              "description": "VPC IPv4 CIDR",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project": {
+          "description": "GCP project ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "queueConsumerCount": {
+          "anyOf": [
+            {
+              "description": "Queue consumer Deployment replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "region": {
+          "anyOf": [
+            {
+              "description": "GCP region",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zones": {
+          "anyOf": [
+            {
+              "description": "GCP zones",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "project"
+      ],
+      "type": "object"
+    },
+    "gCPTargetOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "autopilotCpuRequest": {
+          "anyOf": [
+            {
+              "description": "GKE Autopilot CPU request",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "autopilotMemoryRequest": {
+          "anyOf": [
+            {
+              "description": "GKE Autopilot memory request",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlTier": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL machine tier",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseName": {
+          "anyOf": [
+            {
+              "description": "Magento database name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "desiredWebReplicas": {
+          "anyOf": [
+            {
+              "description": "Desired web Deployment replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encryptionKeySecret": {
+          "anyOf": [
+            {
+              "description": "Secret Manager secret ID for Magento encryption key",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "imageDigest": {
+          "anyOf": [
+            {
+              "description": "Signed immutable OCI image digest",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Resource labels",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "masterUsername": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL master username",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreNodeType": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey node type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "networkCidr": {
+          "anyOf": [
+            {
+              "description": "VPC IPv4 CIDR",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project": {
+          "description": "GCP project ID",
+          "minLength": 1,
+          "type": "string"
+        },
+        "queueConsumerCount": {
+          "anyOf": [
+            {
+              "description": "Queue consumer Deployment replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "region": {
+          "anyOf": [
+            {
+              "description": "GCP region",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "zones": {
+          "anyOf": [
+            {
+              "description": "GCP zones",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
     "project": {
       "additionalProperties": false,
       "properties": {
@@ -1566,14 +2011,31 @@
             }
           ]
         },
+        "gcp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/gCPTarget",
+              "description": "GCP deployment inputs (experimental)"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "provider": {
-          "const": "aws",
           "description": "Infrastructure provider",
+          "enum": [
+            "aws",
+            "gcp"
+          ],
           "type": "string"
         },
         "runtime": {
-          "const": "ecs-fargate",
           "description": "Application runtime",
+          "enum": [
+            "ecs-fargate",
+            "gke-autopilot"
+          ],
           "type": "string"
         }
       },
@@ -1597,14 +2059,31 @@
             }
           ]
         },
+        "gcp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/gCPTargetOverlay",
+              "description": "GCP deployment inputs (experimental)"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "provider": {
-          "const": "aws",
           "description": "Infrastructure provider",
+          "enum": [
+            "aws",
+            "gcp"
+          ],
           "type": "string"
         },
         "runtime": {
-          "const": "ecs-fargate",
           "description": "Application runtime",
+          "enum": [
+            "ecs-fargate",
+            "gke-autopilot"
+          ],
           "type": "string"
         }
       },

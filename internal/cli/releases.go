@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
 	"github.com/acourtiol/magelift/internal/cosign"
 	"github.com/acourtiol/magelift/internal/releasejournal"
 	"github.com/spf13/cobra"
@@ -106,8 +107,9 @@ func rollbackCommand(o *options) *cobra.Command {
 			if err != nil {
 				return invalid(err)
 			}
-			spec.Artifact.ImageDigest = source.DigestReference
-			if _, err := o.runDeploymentWithOptions(cmd.Context(), environment, spec, source.DigestReference, deploymentOptions{rollback: true, acknowledgeForwardOnlyDB: acknowledgeForwardOnlyDB}); err != nil {
+			planned := awsstack.Planned{Spec: spec}
+			planned.Spec.Artifact.ImageDigest = source.DigestReference
+			if _, err := o.runDeploymentWithOptions(cmd.Context(), environment, planned, source.DigestReference, deploymentOptions{rollback: true, acknowledgeForwardOnlyDB: acknowledgeForwardOnlyDB}); err != nil {
 				return err
 			}
 		}

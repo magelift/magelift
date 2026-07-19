@@ -14,8 +14,9 @@ const MaxValueSize = 1 << 20
 type Kind string
 
 const (
-	SecretsManager Kind = "aws-secrets-manager"
-	ParameterStore Kind = "ssm"
+	SecretsManager   Kind = "aws-secrets-manager"
+	ParameterStore   Kind = "ssm"
+	GCPSecretManager Kind = "gcp-secret-manager"
 )
 
 var (
@@ -37,7 +38,9 @@ func Parse(value string) (Reference, error) {
 	}
 
 	kind := Kind(scheme)
-	if kind != SecretsManager && kind != ParameterStore {
+	switch kind {
+	case SecretsManager, ParameterStore, GCPSecretManager:
+	default:
 		return Reference{}, invalid("unsupported scheme")
 	}
 	if strings.Contains(remainder, "#") {
@@ -64,13 +67,14 @@ func Parse(value string) (Reference, error) {
 		if len(values) != 1 {
 			return Reference{}, invalid("query keys may appear once")
 		}
-		if kind != SecretsManager || key != "jsonField" {
+		allowsJSONField := kind == SecretsManager || kind == GCPSecretManager
+		if !allowsJSONField || key != "jsonField" {
 			return Reference{}, invalid("unknown query key")
 		}
 	}
 
 	reference := Reference{Kind: kind, ID: id}
-	if kind == SecretsManager {
+	if kind == SecretsManager || kind == GCPSecretManager {
 		reference.JSONField = query.Get("jsonField")
 		if _, present := query["jsonField"]; present && reference.JSONField == "" {
 			return Reference{}, invalid("jsonField cannot be empty")
@@ -91,9 +95,16 @@ type ParameterStoreProvider interface {
 	GetParameter(context.Context, string) ([]byte, error)
 }
 
+// GCPSecretManagerProvider resolves Secret Manager resource names
+// (projects/*/secrets/*/versions/* or shorter project-local forms accepted by the adapter).
+type GCPSecretManagerProvider interface {
+	GetSecretValue(context.Context, string) ([]byte, error)
+}
+
 type Resolver struct {
-	SecretsManager SecretsManagerProvider
-	ParameterStore ParameterStoreProvider
+	SecretsManager   SecretsManagerProvider
+	ParameterStore   ParameterStoreProvider
+	GCPSecretManager GCPSecretManagerProvider
 }
 
 func (resolver Resolver) Resolve(ctx context.Context, reference Reference) ([]byte, error) {
@@ -101,7 +112,7 @@ func (resolver Resolver) Resolve(ctx context.Context, reference Reference) ([]by
 		return nil, invalid("secret identifier is required")
 	}
 	if reference.Kind == ParameterStore && reference.JSONField != "" {
-		return nil, invalid("jsonField is only valid for Secrets Manager")
+		return nil, invalid("jsonField is only valid for Secrets Manager schemes")
 	}
 
 	var value []byte
@@ -118,6 +129,11 @@ func (resolver Resolver) Resolve(ctx context.Context, reference Reference) ([]by
 			return nil, ErrProvider
 		}
 		value, err = resolver.ParameterStore.GetParameter(ctx, reference.ID)
+	case GCPSecretManager:
+		if resolver.GCPSecretManager == nil {
+			return nil, ErrProvider
+		}
+		value, err = resolver.GCPSecretManager.GetSecretValue(ctx, reference.ID)
 	default:
 		return nil, ErrInvalidReference
 	}
@@ -131,7 +147,7 @@ func (resolver Resolver) Resolve(ctx context.Context, reference Reference) ([]by
 		return nil, ErrValueTooLarge
 	}
 
-	if reference.Kind == SecretsManager && reference.JSONField != "" {
+	if (reference.Kind == SecretsManager || reference.Kind == GCPSecretManager) && reference.JSONField != "" {
 		var object map[string]json.RawMessage
 		if json.Unmarshal(value, &object) != nil || object == nil {
 			return nil, invalid("secret value is not a JSON object")

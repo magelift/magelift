@@ -15,15 +15,16 @@ import (
 
 	"github.com/acourtiol/magelift/internal/automation"
 	awsbootstrap "github.com/acourtiol/magelift/internal/cloud/aws/bootstrap"
-	awsdeployment "github.com/acourtiol/magelift/internal/cloud/aws/deployment"
 	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
+	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
 	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
 	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
+	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
+	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/acourtiol/magelift/internal/releasejournal"
 	mageliftupgrade "github.com/acourtiol/magelift/internal/upgrade"
 	"github.com/spf13/cobra"
@@ -60,12 +61,13 @@ type options struct {
 	getenv          func(string) string
 	currentBranch   func(string) (string, error)
 	terminal        environmentTerminal
+	modules         *platform.ModuleRegistry
 	newBootstrap    func(context.Context, string) (awsbootstrap.Ensurer, error)
 	verifyAccount   func(context.Context, string, string) error
 	newIdentity     func(context.Context, string) (awsbootstrap.IdentityEnsurer, error)
-	newBackend      func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error)
-	newDeploySteps  func(context.Context, infrastructureBackend, awsstack.Spec, io.Writer) (deployflow.Steps, error)
-	newLock         func(context.Context, awsstack.Spec) (func(context.Context) error, error)
+	newBackend      func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error)
+	newDeploySteps  func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error)
+	newLock         func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
 	newState        func(context.Context, string, string, string, string, string) (stateManager, error)
 	newSecrets      func(context.Context, string) (secretStore, error)
 	newArchive      func(context.Context, string, string, string) (stateArchive, error)
@@ -121,12 +123,20 @@ func New() *cobra.Command {
 }
 
 func newCommand(stdout, stderr io.Writer) *cobra.Command {
+	modules := platform.NewModuleRegistry()
+	if err := modules.RegisterModule(awsops.Module{}); err != nil {
+		panic(err)
+	}
+	if err := modules.RegisterModule(gcpstack.Module{}); err != nil {
+		panic(err)
+	}
 	o := &options{
 		stdout:        stdout,
 		stderr:        stderr,
 		getenv:        os.Getenv,
 		currentBranch: gitCurrentBranch,
 		terminal:      consoleTerminal{in: os.Stdin, out: stderr},
+		modules:       modules,
 		newBootstrap: func(ctx context.Context, region string) (awsbootstrap.Ensurer, error) {
 			return awsbootstrap.NewAWS(ctx, region)
 		},
@@ -134,15 +144,33 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 		newIdentity: func(ctx context.Context, region string) (awsbootstrap.IdentityEnsurer, error) {
 			return awsbootstrap.NewAWSIdentity(ctx, region)
 		},
-		newBackend: func(ctx context.Context, stackName string, spec awsstack.Spec, backendURL string) (infrastructureBackend, error) {
-			pulumiStack, err := automation.NewAWSStackWithBackend(ctx, stackName, spec, backendURL)
+		newBackend: func(ctx context.Context, planned platform.PlannedStack, backendURL string) (infrastructureBackend, error) {
+			module, found := modules.Module(planned.Provider(), planned.Runtime())
+			if !found {
+				return nil, fmt.Errorf("no stack module for %q/%q", planned.Provider(), planned.Runtime())
+			}
+			program, err := module.Program(planned)
+			if err != nil {
+				return nil, err
+			}
+			pulumiStack, err := automation.NewInlineStackWithBackend(ctx, planned.StackName(), program, backendURL)
 			if err != nil {
 				return nil, err
 			}
 			return automation.NewPulumiBackend(pulumiStack), nil
 		},
 		newDeploySteps: nil,
-		newLock:        newAWSDeploymentLock,
+		newLock: func(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
+			module, found := modules.Module(planned.Provider(), planned.Runtime())
+			if !found {
+				return nil, fmt.Errorf("no stack module for %q/%q", planned.Provider(), planned.Runtime())
+			}
+			ops := platform.ModuleOps(module)
+			if ops == nil {
+				return func(context.Context) error { return nil }, nil
+			}
+			return ops.AcquireLock(ctx, planned)
+		},
 		newState: func(ctx context.Context, region, bucket, project, environment, kmsARN string) (stateManager, error) {
 			return awsstate.NewAWS(ctx, region, bucket, project, environment, kmsARN)
 		},
@@ -173,24 +201,31 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 		newUpgrade: func() upgradeClient { return mageliftupgrade.New(nil) },
 		executable: os.Executable,
 	}
-	o.newDeploySteps = func(ctx context.Context, backend infrastructureBackend, spec awsstack.Spec, diagnostics io.Writer) (deployflow.Steps, error) {
-		candidate, err := awsoperations.NewDeployment(ctx, spec.Identity.Region)
-		if err != nil {
-			return nil, err
+	o.newDeploySteps = func(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
+		module, found := modules.Module(planned.Provider(), planned.Runtime())
+		if !found {
+			return nil, fmt.Errorf("no stack module for %q/%q", planned.Provider(), planned.Runtime())
 		}
-		runtime, err := awsoperations.NewRuntime(ctx, spec.Identity.Region)
-		if err != nil {
-			return nil, err
+		ops := platform.ModuleOps(module)
+		if ops == nil {
+			return nil, platform.ErrNotSupported
 		}
-		record := func(ctx context.Context, request deployflow.Request, _ deployflow.Result) error {
-			store, err := o.releaseStore(spec.Identity.Environment)
-			if err != nil {
+		awsOps, ok := ops.(awsops.Ops)
+		if ok {
+			awsOps.RecordRelease = func(ctx context.Context, request deployflow.Request, _ deployflow.Result) error {
+				store, err := o.releaseStore(planned.Environment())
+				if err != nil {
+					return err
+				}
+				_, err = store.Append(ctx, releasejournal.Entry{
+					Action: releasejournal.ActionDeploy, Environment: planned.Environment(),
+					DigestReference: request.ImageDigest, ForwardOnly: true,
+				})
 				return err
 			}
-			_, err = store.Append(ctx, releasejournal.Entry{Action: releasejournal.ActionDeploy, Environment: spec.Identity.Environment, DigestReference: request.ImageDigest, ForwardOnly: true})
-			return err
+			ops = awsOps
 		}
-		return awsdeployment.New(backend, spec, candidate, runtime, diagnostics, record)
+		return ops.NewDeploySteps(ctx, backend, planned, diagnostics)
 	}
 	return newCommandWithOptions(o)
 }
@@ -198,7 +233,7 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 func newCommandWithOptions(o *options) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "magelift",
-		Short:         "Deploy Magento applications to your AWS account",
+		Short:         "Deploy Magento applications to certified and experimental cloud targets",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

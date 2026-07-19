@@ -4,16 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/acourtiol/magelift/internal/automation"
-	awsbootstrap "github.com/acourtiol/magelift/internal/cloud/aws/bootstrap"
 	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
-	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +30,7 @@ type infrastructureResult struct {
 
 func infrastructureCommands(o *options) []*cobra.Command {
 	return []*cobra.Command{
-		infrastructureCommand(o, "preview", "Preview AWS infrastructure changes", func(ctx context.Context, backend infrastructureBackend, request automation.Request) (infrastructureResult, error) {
+		infrastructureCommand(o, "preview", "Preview infrastructure changes", func(ctx context.Context, backend infrastructureBackend, request automation.Request) (infrastructureResult, error) {
 			summary, err := automation.NewRunner(backend, o.stderr).Preview(ctx, request)
 			return infrastructureResult{Preview: summary}, err
 		}),
@@ -77,42 +74,39 @@ func (o *options) destroyOperation(ctx context.Context, backend infrastructureBa
 }
 
 func (o *options) executeInfrastructure(ctx context.Context, name string, operation func(context.Context, infrastructureBackend, automation.Request) (infrastructureResult, error), digestOverride string) (infrastructureResult, error) {
-	environment, spec, err := o.infrastructureSpecFor(name == "destroy")
+	environment, planned, err := o.planStack(name == "destroy")
 	if err != nil {
 		return infrastructureResult{}, invalid(err)
 	}
 	if digestOverride != "" {
-		spec.Artifact.ImageDigest = digestOverride
-		if err := spec.Validate(); err != nil {
+		planned, err = planned.WithImageDigest(digestOverride)
+		if err != nil {
 			return infrastructureResult{}, invalid(fmt.Errorf("deployment digest is invalid: %w", err))
 		}
 	}
-	if (name == "deploy" || name == "destroy") && spec.Identity.EnvironmentClass == "production" && !o.yes {
+	if (name == "deploy" || name == "destroy") && planned.EnvironmentClass() == "production" && !o.yes {
 		return infrastructureResult{}, invalid(errors.New("production changes require explicit --yes approval"))
 	}
-	if name == "destroy" && spec.Lifecycle.Protection {
+	if name == "destroy" && planned.Protected() {
 		return infrastructureResult{}, invalid(errors.New("protected environments must be unprotected before destroy"))
 	}
 	if name == "deploy" {
-		return o.runDeployment(ctx, environment, spec, spec.Artifact.ImageDigest)
+		return o.runDeployment(ctx, environment, planned, planned.ImageDigest())
 	}
 	if o.newBackend == nil {
 		return infrastructureResult{}, errors.New("infrastructure backend factory is required")
 	}
 	backendURL := strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL"))
-	backend, err := o.newBackend(ctx, stackName(spec), spec, backendURL)
+	backend, err := o.newBackend(ctx, planned, backendURL)
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
-	requestTarget := sdk.TargetDescriptor{ID: sdk.TargetID("aws.ecs-fargate"), Provider: "aws", Runtime: "ecs-fargate"}
+	requestTarget := planned.TargetDescriptor()
 	var release func(context.Context) error
 	if name == "destroy" {
-		if o.newLock == nil {
-			return infrastructureResult{}, errors.New("deployment lock factory is required")
-		}
-		release, err = o.newLock(ctx, spec)
+		release, err = o.acquireProviderLock(ctx, planned)
 		if err != nil {
-			return infrastructureResult{}, fmt.Errorf("acquire deployment lock: %w", err)
+			return infrastructureResult{}, err
 		}
 	}
 	request := automation.Request{Target: requestTarget}
@@ -131,7 +125,7 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 		return infrastructureResult{}, err
 	}
 	result.Environment = environment
-	result.Stack = stackName(spec)
+	result.Stack = planned.StackName()
 	return result, nil
 }
 
@@ -140,46 +134,49 @@ type deploymentOptions struct {
 	acknowledgeForwardOnlyDB bool
 }
 
-func (o *options) runDeployment(ctx context.Context, environment string, spec awsstack.Spec, digest string) (infrastructureResult, error) {
-	return o.runDeploymentWithOptions(ctx, environment, spec, digest, deploymentOptions{})
+func (o *options) runDeployment(ctx context.Context, environment string, planned platform.PlannedStack, digest string) (infrastructureResult, error) {
+	return o.runDeploymentWithOptions(ctx, environment, planned, digest, deploymentOptions{})
 }
 
-func (o *options) runDeploymentWithOptions(ctx context.Context, environment string, spec awsstack.Spec, digest string, deployOptions deploymentOptions) (infrastructureResult, error) {
+func (o *options) runDeploymentWithOptions(ctx context.Context, environment string, planned platform.PlannedStack, digest string, deployOptions deploymentOptions) (infrastructureResult, error) {
 	if o.newBackend == nil {
 		return infrastructureResult{}, errors.New("infrastructure backend factory is required")
 	}
-	if o.newDeploySteps != nil && spec.Identity.EnvironmentClass == "production" {
-		if err := o.requireSignedRelease(ctx, environment, digest); err != nil {
-			return infrastructureResult{}, err
-		}
-	}
 	backendURL := strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL"))
-	backend, err := o.newBackend(ctx, stackName(spec), spec, backendURL)
+	backend, err := o.newBackend(ctx, planned, backendURL)
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
-	requestTarget := sdk.TargetDescriptor{ID: sdk.TargetID("aws.ecs-fargate"), Provider: "aws", Runtime: "ecs-fargate"}
+	requestTarget := planned.TargetDescriptor()
 	if o.newDeploySteps != nil {
-		if o.newLock == nil {
-			return infrastructureResult{}, errors.New("deployment lock factory is required")
+		steps, stepsErr := o.newDeploySteps(ctx, backend, planned, o.stderr)
+		if stepsErr == nil && steps != nil {
+			if planned.EnvironmentClass() == "production" {
+				if err := o.requireSignedRelease(ctx, environment, digest); err != nil {
+					return infrastructureResult{}, err
+				}
+			}
+			if o.newLock == nil {
+				return infrastructureResult{}, errors.New("deployment lock factory is required")
+			}
+			result, runErr := deployflow.New(cliDeploymentLock{factory: o.newLock, planned: planned}, steps).Run(ctx, deployflow.Request{
+				Target: requestTarget, ImageDigest: digest, Production: planned.EnvironmentClass() == "production", Approved: o.yes,
+				Rollback: deployOptions.rollback, AcknowledgeForwardOnlyDB: deployOptions.acknowledgeForwardOnlyDB,
+			})
+			if runErr != nil {
+				return infrastructureResult{}, runErr
+			}
+			return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: result.Preview, Update: result.Update}, nil
 		}
-		steps, stepsErr := o.newDeploySteps(ctx, backend, spec, o.stderr)
-		if stepsErr != nil {
+		if stepsErr != nil && !errors.Is(stepsErr, platform.ErrNotSupported) {
 			return infrastructureResult{}, fmt.Errorf("create deployment workflow: %w", stepsErr)
 		}
-		result, runErr := deployflow.New(cliDeploymentLock{factory: o.newLock, spec: spec}, steps).Run(ctx, deployflow.Request{
-			Target: requestTarget, ImageDigest: digest, Production: spec.Identity.EnvironmentClass == "production", Approved: o.yes,
-			Rollback: deployOptions.rollback, AcknowledgeForwardOnlyDB: deployOptions.acknowledgeForwardOnlyDB,
-		})
-		if runErr != nil {
-			return infrastructureResult{}, runErr
-		}
-		return infrastructureResult{Environment: environment, Stack: stackName(spec), Preview: result.Preview, Update: result.Update}, nil
+		// ErrNotSupported or nil steps: infrastructure graph update only.
 	}
 	if o.newLock == nil {
 		return infrastructureResult{}, errors.New("deployment lock factory is required")
 	}
-	release, err := o.newLock(ctx, spec)
+	release, err := o.newLock(ctx, planned)
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("acquire deployment lock: %w", err)
 	}
@@ -189,7 +186,7 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			return infrastructureResult{}, previewErr
 		}
 		update, updateErr := automation.NewRunner(backend, o.stderr).Update(ctx, automation.Request{Target: requestTarget})
-		return infrastructureResult{Environment: environment, Stack: stackName(spec), Preview: preview, Update: update}, updateErr
+		return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update}, updateErr
 	}()
 	if releaseErr := release(ctx); releaseErr != nil {
 		if err != nil {
@@ -226,17 +223,17 @@ func (o *options) requireSignedRelease(ctx context.Context, environment, digest 
 }
 
 type cliDeploymentLock struct {
-	factory func(context.Context, awsstack.Spec) (func(context.Context) error, error)
-	spec    awsstack.Spec
+	factory func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
+	planned platform.PlannedStack
 }
 
 func (l cliDeploymentLock) Acquire(ctx context.Context, _ deployflow.Request) (func(context.Context) error, error) {
-	return l.factory(ctx, l.spec)
+	return l.factory(ctx, l.planned)
 }
 
 func outputsCommand(o *options) *cobra.Command {
 	return &cobra.Command{Use: "outputs", Short: "Read outputs from the selected environment", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		environment, spec, err := o.infrastructureSpec()
+		environment, planned, err := o.planStack(false)
 		if err != nil {
 			return invalid(err)
 		}
@@ -244,7 +241,7 @@ func outputsCommand(o *options) *cobra.Command {
 			return errors.New("infrastructure backend factory is required")
 		}
 		backendURL := strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL"))
-		backend, err := o.newBackend(cmd.Context(), stackName(spec), spec, backendURL)
+		backend, err := o.newBackend(cmd.Context(), planned, backendURL)
 		if err != nil {
 			return fmt.Errorf("create infrastructure backend: %w", err)
 		}
@@ -252,51 +249,50 @@ func outputsCommand(o *options) *cobra.Command {
 		if err != nil {
 			return fmt.Errorf("read infrastructure outputs: %w", err)
 		}
-		return o.write(map[string]any{"environment": environment, "stack": stackName(spec), "outputs": outputs})
+		return o.write(map[string]any{"environment": environment, "stack": planned.StackName(), "outputs": outputs})
 	}}
 }
 
+func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedStack, error) {
+	if o.modules == nil {
+		return "", nil, errors.New("stack module registry is required")
+	}
+	effective, environment, err := o.resolveWithEnvironment()
+	if err != nil {
+		return "", nil, err
+	}
+	_, planned, err := o.modules.Plan(effective.Config, environment, platform.PlanOptions{AllowExpiredPreview: allowExpiredPreview})
+	if err != nil {
+		return "", nil, err
+	}
+	return environment, planned, nil
+}
+
+// infrastructureSpec remains for AWS-only callers (exec/health/releases) that
+// still need the concrete Spec. Non-AWS targets fail explicitly.
 func (o *options) infrastructureSpec() (string, awsstack.Spec, error) {
 	return o.infrastructureSpecFor(false)
 }
 
 func (o *options) infrastructureSpecFor(allowExpiredPreview bool) (string, awsstack.Spec, error) {
-	effective, environment, err := o.resolveWithEnvironment()
+	environment, planned, err := o.planStack(allowExpiredPreview)
 	if err != nil {
 		return "", awsstack.Spec{}, err
 	}
-	spec, err := awsstack.PlanFromConfigWithOptions(effective.Config, environment, awsstack.PlanOptions{AllowExpiredPreview: allowExpiredPreview})
-	if err != nil {
-		return "", awsstack.Spec{}, err
+	awsPlanned, ok := awsstack.AsAWSPlanned(planned)
+	if !ok {
+		return "", awsstack.Spec{}, fmt.Errorf("operation requires the certified AWS target; selected %q/%q is experimental", planned.Provider(), planned.Runtime())
 	}
-	if err := spec.Validate(); err != nil {
-		return "", awsstack.Spec{}, fmt.Errorf("deployment configuration is invalid: %w", err)
-	}
-	return environment, spec, nil
+	return environment, awsPlanned.AWSSpec(), nil
 }
 
-func stackName(spec awsstack.Spec) string {
-	return spec.Identity.Project + "-" + spec.Identity.Environment
-}
-
-func newAWSDeploymentLock(ctx context.Context, spec awsstack.Spec) (func(context.Context) error, error) {
-	plan, err := awsbootstrap.BuildPlan(awsbootstrap.Spec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
-		AccountID: spec.Identity.AccountID, Region: spec.Identity.Region,
-		AccessLogBucket: "magelift-access-logs",
-	})
-	if err != nil {
-		return nil, err
+func (o *options) acquireProviderLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
+	if o.newLock == nil {
+		return nil, errors.New("deployment lock factory is required")
 	}
-	manager, err := awsstate.NewAWS(ctx, spec.Identity.Region, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment, spec.Dependencies.KMSKeyARN)
+	release, err := o.newLock(ctx, planned)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("acquire deployment lock: %w", err)
 	}
-	host, _ := os.Hostname()
-	owner := fmt.Sprintf("magelift-cli-%s-%d", host, os.Getpid())
-	handle, err := manager.Acquire(ctx, spec.Identity.Project, spec.Identity.Environment, owner)
-	if err != nil {
-		return nil, err
-	}
-	return handle.Release, nil
+	return release, nil
 }

@@ -19,6 +19,8 @@ func TestParse(t *testing.T) {
 		{"JSON field", "aws-secrets-manager://composer?jsonField=http-basic%2Erepo%2Emagento%2Ecom", Reference{Kind: SecretsManager, ID: "composer", JSONField: "http-basic.repo.magento.com"}},
 		{"parameter path", "ssm:///magelift/composer/auth", Reference{Kind: ParameterStore, ID: "/magelift/composer/auth"}},
 		{"escaped identifier", "ssm://folder%2Fname%40example", Reference{Kind: ParameterStore, ID: "folder/name@example"}},
+		{"GCP secret", "gcp-secret-manager://projects/p/secrets/composer/versions/latest", Reference{Kind: GCPSecretManager, ID: "projects/p/secrets/composer/versions/latest"}},
+		{"GCP JSON field", "gcp-secret-manager://projects/p/secrets/shared/versions/1?jsonField=composer", Reference{Kind: GCPSecretManager, ID: "projects/p/secrets/shared/versions/1", JSONField: "composer"}},
 	}
 	for _, test := range tests {
 		test := test

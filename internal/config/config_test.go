@@ -205,9 +205,20 @@ func TestRejectsUnsupportedOrMalformedSecretReference(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, err = f.Resolve("staging", ResolveOptions{})
-		if err == nil || !strings.Contains(err.Error(), "valid AWS Secrets Manager or SSM reference") {
+		if err == nil || !strings.Contains(err.Error(), "valid secret reference") {
 			t.Fatalf("reference %q returned %v", reference, err)
 		}
+	}
+}
+
+func TestRejectsGCPSecretSchemeOnAWSTarget(t *testing.T) {
+	f, err := Load([]byte(strings.Replace(base, "aws-secrets-manager://composer/auth", "gcp-secret-manager://projects/p/secrets/s/versions/latest", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "aws-secrets-manager:// or ssm://") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

@@ -182,7 +182,8 @@ func (o *options) runtimeOutputs(ctx context.Context) (string, awsstack.Spec, ma
 	if o.newBackend == nil {
 		return "", awsstack.Spec{}, nil, errors.New("infrastructure backend factory is required")
 	}
-	backend, err := o.newBackend(ctx, stackName(spec), spec, strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL")))
+	planned := awsstack.Planned{Spec: spec}
+	backend, err := o.newBackend(ctx, planned, strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL")))
 	if err != nil {
 		return "", awsstack.Spec{}, nil, fmt.Errorf("create infrastructure backend: %w", err)
 	}

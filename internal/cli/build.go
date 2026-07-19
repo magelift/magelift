@@ -228,15 +228,22 @@ func loadComposerCredentials(ctx context.Context, rawReference, region string) (
 	if err != nil {
 		return nil, fmt.Errorf("parse Composer credentials reference: %w", err)
 	}
-	region, err = secretRegion(reference, region)
-	if err != nil {
-		return nil, err
+	switch reference.Kind {
+	case secretref.SecretsManager, secretref.ParameterStore:
+		region, err = secretRegion(reference, region)
+		if err != nil {
+			return nil, err
+		}
+		provider, err := awssecrets.New(ctx, region)
+		if err != nil {
+			return nil, fmt.Errorf("initialize AWS secret provider: %w", err)
+		}
+		return resolveComposerCredentials(ctx, reference, provider)
+	case secretref.GCPSecretManager:
+		return nil, errors.New("gcp-secret-manager Composer credentials resolution is not implemented yet; use a custom build path or contribute the GCP Secret Manager adapter")
+	default:
+		return nil, fmt.Errorf("unsupported Composer credentials scheme %q", reference.Kind)
 	}
-	provider, err := awssecrets.New(ctx, region)
-	if err != nil {
-		return nil, fmt.Errorf("initialize AWS secret provider: %w", err)
-	}
-	return resolveComposerCredentials(ctx, reference, provider)
 }
 
 func secretRegion(reference secretref.Reference, defaultRegion string) (string, error) {

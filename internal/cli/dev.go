@@ -15,8 +15,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type composeRunner func(context.Context, string, []string, []string, io.Writer, io.Writer) error
-
 func devCommand(o *options) *cobra.Command {
 	command := &cobra.Command{Use: "dev", Short: "Run the local Magento development environment"}
 	command.AddCommand(devInitCommand(o), devSeedCommand(o), devComposeCommand(o, "up"), devComposeCommand(o, "down"), devComposeCommand(o, "reset"), devComposeCommand(o, "status"), devComposeCommand(o, "logs"), devExecCommand(o))

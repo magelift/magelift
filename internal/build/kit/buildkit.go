@@ -26,7 +26,7 @@ var secretIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]*$`)
 var buildArgName = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 var builderName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 var forbiddenBuildArg = regexp.MustCompile(`(?i)(secret|token|password|credential|authorization|private.?key)`)
-var forbiddenBuildArgValue = regexp.MustCompile(`(?i)^(?:aws-secrets-manager|ssm|vault)://|-----BEGIN PRIVATE KEY-----`)
+var forbiddenBuildArgValue = regexp.MustCompile(`(?i)^(?:aws-secrets-manager|ssm|gcp-secret-manager|vault)://|-----BEGIN PRIVATE KEY-----`)
 
 type OutputMode string
 

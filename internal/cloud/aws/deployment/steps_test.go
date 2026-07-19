@@ -16,10 +16,9 @@ import (
 )
 
 type stepsBackend struct {
-	outputs      map[string]any
-	updateCalls  int
-	afterUpdate  map[string]any
-	candidateErr error
+	outputs     map[string]any
+	updateCalls int
+	afterUpdate map[string]any
 }
 
 func (b *stepsBackend) Outputs(context.Context) (map[string]any, error) { return b.outputs, nil }
@@ -113,8 +112,8 @@ func testSpec(t *testing.T) awsstack.Spec {
 		Lifecycle:    awsstack.Lifecycle{ExpiresAt: time.Date(2026, time.December, 31, 0, 0, 0, 0, time.UTC), MonthlyBudgetCents: 25000},
 		Existing:     awsstack.ExistingResources{HostedZone: &hostedZone, Certificate: &certificate, ALBCertificate: &albCertificate},
 		Dependencies: awsstack.Dependencies{KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/11111111-2222-3333-4444-555555555555", CacheSecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-cache-token", EncryptionKeyARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-encryption-key", DatabaseName: "magento", MasterUsername: "magento"},
-		Policy:       awsstack.NetworkPolicy{VPCCIDR: netip.MustParsePrefix("10.42.0.0/16"), AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, ApplicationDomain: "preview.example.com", MediaDomain: "media.preview.example.com"},
-		Catalog:      awsstack.CatalogSelection{Version: "2026.07-preview.1", Aurora: awsstack.AuroraPreviewProfile{MinimumACU: 0, MaximumACU: 4, AutoPauseSeconds: 900, EngineSupportsAutoPause: true}, Valkey: awsstack.ValkeyPreviewProfile{NodeType: "cache.t4g.micro"}, Search: awsstack.SearchPreviewProfile{MaximumIndexingOCU: 2, MaximumSearchOCU: 2, AcceptColdStarts: true}, Fargate: awsstack.FargatePreviewProfile{CPU: 512, MemoryMiB: 1024, DesiredCount: 1}, Retention: awsstack.RetentionProfile{LogDays: 7, BackupDays: 1, ArtifactDays: 7}, Versions: awsstack.ServiceVersions{AuroraMySQL: "8.0.mysql_aurora.3.12", Valkey: "8.1", OpenSearch: "OpenSearch_3.1", RabbitMQ: "3.13"}},
+		Policy:       awsstack.NetworkPolicy{VPCCIDR: netip.MustParsePrefix("10.42.0.0/16"), AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, ApplicationDomain: "preview.example.com", MediaDomain: "media.preview.example.com", NatMode: awsstack.NatModeGateway},
+		Catalog:      awsstack.CatalogSelection{Version: "2026.07-preview.1", DatabaseEngine: awsstack.DatabaseEngineAuroraMySQL, SearchMode: awsstack.SearchModeServerless, Aurora: awsstack.AuroraPreviewProfile{MinimumACU: 0, MaximumACU: 4, AutoPauseSeconds: 900, EngineSupportsAutoPause: true}, Valkey: awsstack.ValkeyPreviewProfile{NodeType: "cache.t4g.micro"}, Search: awsstack.SearchPreviewProfile{MaximumIndexingOCU: 2, MaximumSearchOCU: 2, AcceptColdStarts: true}, Fargate: awsstack.FargatePreviewProfile{CPU: 512, MemoryMiB: 1024, DesiredCount: 1}, Retention: awsstack.RetentionProfile{LogDays: 7, BackupDays: 1, ArtifactDays: 7}, Versions: awsstack.ServiceVersions{AuroraMySQL: "8.0.mysql_aurora.3.12", Valkey: "8.1", OpenSearch: "OpenSearch_3.1", RabbitMQ: "3.13"}},
 	}
 }
 

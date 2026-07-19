@@ -16,6 +16,7 @@ import (
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
+	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/acourtiol/magelift/internal/releasejournal"
 	"go.yaml.in/yaml/v4"
 )
@@ -179,11 +180,11 @@ func TestDeployRunsPreviewAndUpdateThroughBackendBoundary(t *testing.T) {
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newBackend = func(_ context.Context, _ string, spec awsstack.Spec, _ string) (infrastructureBackend, error) {
-		plannedDigest = spec.Artifact.ImageDigest
+	o.newBackend = func(_ context.Context, planned platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		plannedDigest = planned.ImageDigest()
 		return backend, nil
 	}
-	o.newLock = func(context.Context, awsstack.Spec) (func(context.Context) error, error) {
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
 		return func(context.Context) error { return nil }, nil
 	}
 	cmd := newCommandWithOptions(o)
@@ -209,13 +210,13 @@ func TestDeployUsesPreTrafficWorkflowWhenConfigured(t *testing.T) {
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newDeploySteps = func(context.Context, infrastructureBackend, awsstack.Spec, io.Writer) (deployflow.Steps, error) {
+	o.newDeploySteps = func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error) {
 		return fakeDeploymentSteps{order: &order}, nil
 	}
-	o.newLock = func(context.Context, awsstack.Spec) (func(context.Context) error, error) {
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
 		order = append(order, "lock.acquire")
 		return func(context.Context) error { order = append(order, "lock.release"); return nil }, nil
 	}
@@ -241,20 +242,20 @@ func TestRollbackDeploymentPassesForwardOnlyFlagsToWorkflow(t *testing.T) {
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newDeploySteps = func(context.Context, infrastructureBackend, awsstack.Spec, io.Writer) (deployflow.Steps, error) {
+	o.newDeploySteps = func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error) {
 		return fakeDeploymentSteps{order: &order, request: &request}, nil
 	}
-	o.newLock = func(context.Context, awsstack.Spec) (func(context.Context) error, error) {
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
 		return func(context.Context) error { return nil }, nil
 	}
 	_, spec, err := o.infrastructureSpec()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := o.runDeploymentWithOptions(context.Background(), "staging", spec, spec.Artifact.ImageDigest, deploymentOptions{rollback: true, acknowledgeForwardOnlyDB: true}); err != nil {
+	if _, err := o.runDeploymentWithOptions(context.Background(), "staging", awsstack.Planned{Spec: spec}, spec.Artifact.ImageDigest, deploymentOptions{rollback: true, acknowledgeForwardOnlyDB: true}); err != nil {
 		t.Fatal(err)
 	}
 	if !request.Rollback || !request.AcknowledgeForwardOnlyDB {
@@ -321,10 +322,10 @@ func TestProductionAndProtectedDestroyRequireApproval(t *testing.T) {
 			o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 			o.configPath = path
 			o.environment = "staging"
-			o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+			o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 				return &fakeInfrastructureBackend{}, nil
 			}
-			o.newLock = func(context.Context, awsstack.Spec) (func(context.Context) error, error) {
+			o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
 				return func(context.Context) error { return nil }, nil
 			}
 			cmd := newCommandWithOptions(o)
@@ -342,7 +343,7 @@ func TestProtectedDestroyCannotBeBypassedWithYes(t *testing.T) {
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		t.Fatal("protected destroy reached the infrastructure backend")
 		return nil, nil
 	}
@@ -360,11 +361,11 @@ func TestDeployReleasesLockAfterBackendFailure(t *testing.T) {
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
 	released := false
-	o.newLock = func(context.Context, awsstack.Spec) (func(context.Context) error, error) {
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
 		return func(context.Context) error { released = true; return nil }, nil
 	}
 	cmd := newCommandWithOptions(o)
@@ -380,10 +381,10 @@ func TestDeployReportsLockReleaseFailure(t *testing.T) {
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath = path
 	o.environment = "staging"
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newLock = func(context.Context, awsstack.Spec) (func(context.Context) error, error) {
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
 		return func(context.Context) error { return errors.New("release failed") }, nil
 	}
 	cmd := newCommandWithOptions(o)

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
+	"github.com/acourtiol/magelift/internal/platform"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -104,10 +104,10 @@ func TestEnvDestroyDestroysInfrastructureBeforeRemovingOverlay(t *testing.T) {
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.configPath = path
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newLock = func(context.Context, awsstack.Spec) (func(context.Context) error, error) {
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
 		return func(context.Context) error { return nil }, nil
 	}
 	cmd := newCommandWithOptions(o)
@@ -157,10 +157,10 @@ func TestEnvSweepDestroysExpiredPreviewAndRemovesOverlay(t *testing.T) {
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.configPath = path
-	o.newBackend = func(context.Context, string, awsstack.Spec, string) (infrastructureBackend, error) {
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
 		return backend, nil
 	}
-	o.newLock = func(context.Context, awsstack.Spec) (func(context.Context) error, error) {
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
 		return func(context.Context) error { return nil }, nil
 	}
 	cmd := newCommandWithOptions(o)

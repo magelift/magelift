@@ -63,12 +63,32 @@ type BuildHookRetries struct {
 }
 
 type Composer struct {
-	Credentials string `yaml:"credentials,omitempty" json:"credentials,omitempty" config:"Composer credentials secret reference" schema:"pattern=^(aws-secrets-manager|ssm)://\\S+$"`
+	Credentials string `yaml:"credentials,omitempty" json:"credentials,omitempty" config:"Composer credentials secret reference" schema:"pattern=^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$"`
 }
 type Target struct {
-	Provider string     `yaml:"provider" json:"provider" config:"Infrastructure provider" schema:"const=aws"`
-	Runtime  string     `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"const=ecs-fargate"`
+	Provider string     `yaml:"provider" json:"provider" config:"Infrastructure provider" schema:"enum=aws|gcp"`
+	Runtime  string     `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"enum=ecs-fargate|gke-autopilot"`
 	AWS      *AWSTarget `yaml:"aws,omitempty" json:"aws,omitempty" config:"AWS deployment inputs"`
+	GCP      *GCPTarget `yaml:"gcp,omitempty" json:"gcp,omitempty" config:"GCP deployment inputs (experimental)"`
+}
+
+// GCPTarget holds provider-specific GCP inputs. Topology stays out of portable YAML.
+type GCPTarget struct {
+	Project                string            `yaml:"project" json:"project" config:"GCP project ID" schema:"minLength=1"`
+	Region                 string            `yaml:"region,omitempty" json:"region,omitempty" config:"GCP region" schema:"nullable"`
+	NetworkCIDR            string            `yaml:"networkCidr,omitempty" json:"networkCidr,omitempty" config:"VPC IPv4 CIDR" schema:"nullable"`
+	Zones                  []string          `yaml:"zones,omitempty" json:"zones,omitempty" config:"GCP zones" schema:"nullable"`
+	ImageDigest            string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Signed immutable OCI image digest" schema:"nullable"`
+	DatabaseName           string            `yaml:"databaseName,omitempty" json:"databaseName,omitempty" config:"Magento database name" schema:"nullable"`
+	MasterUsername         string            `yaml:"masterUsername,omitempty" json:"masterUsername,omitempty" config:"Cloud SQL master username" schema:"nullable"`
+	EncryptionKeySecret    string            `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Secret Manager secret ID for Magento encryption key" schema:"nullable"`
+	CloudSQLTier           string            `yaml:"cloudSqlTier,omitempty" json:"cloudSqlTier,omitempty" config:"Cloud SQL machine tier" schema:"nullable"`
+	MemorystoreNodeType    string            `yaml:"memorystoreNodeType,omitempty" json:"memorystoreNodeType,omitempty" config:"Memorystore for Valkey node type" schema:"nullable"`
+	AutopilotCPURequest    string            `yaml:"autopilotCpuRequest,omitempty" json:"autopilotCpuRequest,omitempty" config:"GKE Autopilot CPU request" schema:"nullable"`
+	AutopilotMemoryRequest string            `yaml:"autopilotMemoryRequest,omitempty" json:"autopilotMemoryRequest,omitempty" config:"GKE Autopilot memory request" schema:"nullable"`
+	DesiredWebReplicas     int               `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
+	QueueConsumerCount     int               `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
+	Labels                 map[string]string `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
 }
 
 type AWSTarget struct {
@@ -87,6 +107,7 @@ type AWSTarget struct {
 	VPCCIDR                  string               `yaml:"vpcCidr,omitempty" json:"vpcCidr,omitempty" config:"Canonical VPC IPv4 CIDR" schema:"nullable"`
 	AvailabilityZones        []string             `yaml:"availabilityZones,omitempty" json:"availabilityZones,omitempty" config:"AWS availability zones" schema:"nullable"`
 	MediaDomain              string               `yaml:"mediaDomain,omitempty" json:"mediaDomain,omitempty" config:"Media delivery domain" schema:"nullable"`
+	NatMode                  string               `yaml:"natMode,omitempty" json:"natMode,omitempty" config:"Private subnet egress mode" schema:"nullable,enum=nat-gateway|fck-nat"`
 	Existing                 AWSExistingResources `yaml:"existing,omitempty" json:"existing,omitempty" config:"Existing AWS resources" schema:"nullable"`
 	Catalog                  AWSCatalog           `yaml:"catalog,omitempty" json:"catalog,omitempty" config:"Benchmark-selected service catalog"`
 }
@@ -105,14 +126,16 @@ type AWSExistingResource struct {
 }
 
 type AWSCatalog struct {
-	Version   string              `yaml:"version,omitempty" json:"version,omitempty" config:"Benchmark catalog version" schema:"nullable"`
-	Aurora    AWSCatalogAurora    `yaml:"aurora,omitempty" json:"aurora,omitempty" config:"Aurora capacity"`
-	Valkey    AWSCatalogValkey    `yaml:"valkey,omitempty" json:"valkey,omitempty" config:"Valkey capacity"`
-	Search    AWSCatalogSearch    `yaml:"search,omitempty" json:"search,omitempty" config:"OpenSearch capacity"`
-	RabbitMQ  AWSCatalogRabbitMQ  `yaml:"rabbitMq,omitempty" json:"rabbitMq,omitempty" config:"RabbitMQ capacity"`
-	Fargate   AWSCatalogFargate   `yaml:"fargate,omitempty" json:"fargate,omitempty" config:"Fargate capacity"`
-	Retention AWSCatalogRetention `yaml:"retention,omitempty" json:"retention,omitempty" config:"Retention policy"`
-	Versions  AWSCatalogVersions  `yaml:"versions,omitempty" json:"versions,omitempty" config:"Managed service versions"`
+	Version        string              `yaml:"version,omitempty" json:"version,omitempty" config:"Benchmark catalog version" schema:"nullable"`
+	DatabaseEngine string              `yaml:"databaseEngine,omitempty" json:"databaseEngine,omitempty" config:"MySQL engine shape" schema:"nullable,enum=aurora-mysql|rds-mysql"`
+	SearchMode     string              `yaml:"searchMode,omitempty" json:"searchMode,omitempty" config:"OpenSearch provisioning mode" schema:"nullable,enum=serverless|provisioned|disabled"`
+	Aurora         AWSCatalogAurora    `yaml:"aurora,omitempty" json:"aurora,omitempty" config:"Aurora or RDS MySQL capacity"`
+	Valkey         AWSCatalogValkey    `yaml:"valkey,omitempty" json:"valkey,omitempty" config:"Valkey capacity"`
+	Search         AWSCatalogSearch    `yaml:"search,omitempty" json:"search,omitempty" config:"OpenSearch capacity"`
+	RabbitMQ       AWSCatalogRabbitMQ  `yaml:"rabbitMq,omitempty" json:"rabbitMq,omitempty" config:"RabbitMQ capacity"`
+	Fargate        AWSCatalogFargate   `yaml:"fargate,omitempty" json:"fargate,omitempty" config:"Fargate capacity"`
+	Retention      AWSCatalogRetention `yaml:"retention,omitempty" json:"retention,omitempty" config:"Retention policy"`
+	Versions       AWSCatalogVersions  `yaml:"versions,omitempty" json:"versions,omitempty" config:"Managed service versions"`
 }
 
 type AWSCatalogAurora struct {
@@ -120,7 +143,7 @@ type AWSCatalogAurora struct {
 	MaximumACU              float64 `yaml:"maximumAcu,omitempty" json:"maximumAcu,omitempty" config:"Maximum Aurora Serverless v2 capacity"`
 	AutoPauseSeconds        int     `yaml:"autoPauseSeconds,omitempty" json:"autoPauseSeconds,omitempty" config:"Aurora auto-pause duration"`
 	EngineSupportsAutoPause bool    `yaml:"engineSupportsAutoPause,omitempty" json:"engineSupportsAutoPause,omitempty" config:"Whether the selected engine supports auto-pause"`
-	InstanceClass           string  `yaml:"instanceClass,omitempty" json:"instanceClass,omitempty" config:"Provisioned Aurora instance class"`
+	InstanceClass           string  `yaml:"instanceClass,omitempty" json:"instanceClass,omitempty" config:"Provisioned Aurora or RDS MySQL instance class"`
 	InstanceCount           int     `yaml:"instanceCount,omitempty" json:"instanceCount,omitempty" config:"Provisioned Aurora instance count"`
 }
 
@@ -159,6 +182,7 @@ type AWSCatalogRetention struct {
 
 type AWSCatalogVersions struct {
 	AuroraMySQL string `yaml:"auroraMysql,omitempty" json:"auroraMysql,omitempty" config:"Aurora MySQL engine version"`
+	MySQL       string `yaml:"mysql,omitempty" json:"mysql,omitempty" config:"RDS MySQL engine version"`
 	Valkey      string `yaml:"valkey,omitempty" json:"valkey,omitempty" config:"Valkey engine version"`
 	OpenSearch  string `yaml:"openSearch,omitempty" json:"openSearch,omitempty" config:"OpenSearch engine version"`
 	RabbitMQ    string `yaml:"rabbitMq,omitempty" json:"rabbitMq,omitempty" config:"RabbitMQ engine version"`
