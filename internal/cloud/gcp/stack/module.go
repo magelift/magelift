@@ -16,7 +16,7 @@ type Planned struct {
 }
 
 func (p Planned) StackName() string {
-	return p.Spec.Identity.Project + "-" + p.Spec.Identity.Environment
+	return platform.FormatStackName(p.Spec.Identity.Project, p.Spec.Identity.Environment, p.Provider(), p.Runtime())
 }
 func (p Planned) Provider() sdk.ProviderID { return sdk.ProviderID("gcp") }
 func (p Planned) Runtime() sdk.RuntimeID   { return sdk.RuntimeID("gke-autopilot") }
