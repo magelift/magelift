@@ -92,25 +92,31 @@ func TestNewCreatesVpcAndPrivateNetworkWithSubnet(t *testing.T) {
 
 func TestNewRejectsInvalidInputsBeforeRegistration(t *testing.T) {
 	t.Parallel()
-	tests := []Args{
-		{ProjectID: "p", Region: "fr-par", NetworkCIDR: "172.16.0.0/22", Zones: nil},
-		{ProjectID: "", Region: "fr-par", NetworkCIDR: "172.16.0.0/22", Zones: []string{"fr-par-1"}},
-		{ProjectID: "p", Region: "", NetworkCIDR: "172.16.0.0/22", Zones: []string{"fr-par-1"}},
-		{ProjectID: "p", Region: "fr-par", NetworkCIDR: "not-a-cidr", Zones: []string{"fr-par-1"}},
-		{ProjectID: "p", Region: "fr-par", NetworkCIDR: "2001:db8::/32", Zones: []string{"fr-par-1"}},
+	tests := []struct {
+		name string
+		args Args
+	}{
+		{name: "missing zones", args: Args{ProjectID: "p", Region: "fr-par", NetworkCIDR: "172.16.0.0/22", Zones: nil}},
+		{name: "missing project id", args: Args{ProjectID: "", Region: "fr-par", NetworkCIDR: "172.16.0.0/22", Zones: []string{"fr-par-1"}}},
+		{name: "missing region", args: Args{ProjectID: "p", Region: "", NetworkCIDR: "172.16.0.0/22", Zones: []string{"fr-par-1"}}},
+		{name: "malformed cidr", args: Args{ProjectID: "p", Region: "fr-par", NetworkCIDR: "not-a-cidr", Zones: []string{"fr-par-1"}}},
+		{name: "ipv6 cidr", args: Args{ProjectID: "p", Region: "fr-par", NetworkCIDR: "2001:db8::/32", Zones: []string{"fr-par-1"}}},
 	}
-	for _, args := range tests {
-		mocks := &networkMocks{}
-		err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-			_, err := New(ctx, "shop-net", args)
-			return err
-		}, pulumi.WithMocks("magelift", "shop-preview", mocks))
-		if err == nil {
-			t.Fatalf("expected rejection for %+v", args)
-		}
-		if len(mocks.snapshot()) != 0 {
-			t.Fatalf("resources registered before input validation for %+v", args)
-		}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mocks := &networkMocks{}
+			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+				_, err := New(ctx, "shop-net", tc.args)
+				return err
+			}, pulumi.WithMocks("magelift", "shop-preview", mocks))
+			if err == nil {
+				t.Fatalf("expected rejection for %+v", tc.args)
+			}
+			if len(mocks.snapshot()) != 0 {
+				t.Fatalf("resources registered before input validation for %+v", tc.args)
+			}
+		})
 	}
 }
 
