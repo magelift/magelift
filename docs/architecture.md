@@ -8,8 +8,9 @@ without editing Pulumi or Go for the supported path.
 
 ## Boundaries
 
-- V1 certifies AWS ECS Fargate. GCP (`gcp` / `gke-autopilot`) is experimental
-  (ADR 0007 / 0008). Multi-cloud is not claimed until two targets are certified.
+- V1 certifies AWS ECS Fargate. GCP (`gcp` / `gke-autopilot`) and AWS EKS
+  (`aws` / `eks-autopilot`) are experimental (ADR 0007 / 0008). Multi-cloud is
+  not claimed until two targets are certified.
 - Stable interfaces may exist for config, lifecycle, and capabilities;
   experimental targets must be labeled in docs and CLI output.
 - The CLI orchestrates; Pulumi owns durable infrastructure.
@@ -64,6 +65,24 @@ implement `sdk/v1` Target contracts and register a `platform.StackModule`. Each
 provider keeps capabilities explicit and must pass the shared Magento acceptance
 suite before certification. Portable YAML is not a lowest-common-denominator cloud
 catalog.
+
+### AWS Magento product matrix
+
+“Full AWS Magento” means the Magento acceptance path on ECS Fargate with explicit
+escape hatches — not every AWS SKU.
+
+| Choice | Certified (ECS Fargate) | Experimental / deferred |
+| --- | --- | --- |
+| Runtime | `ecs-fargate` | `eks-autopilot` (EKS Auto Mode–shaped; infra-only) |
+| `natMode` | `nat-gateway` (default), `fck-nat` (cost/preview) | — |
+| `databaseEngine` | `aurora-mysql`, `rds-mysql` | — |
+| `searchMode` | `serverless`, `provisioned`, `disabled` | OpenSearch deferred on EKS |
+| Queue | Amazon MQ (non-preview) or DB-backed (preview) | deferred on EKS |
+| Edge | CloudFront + WAF | deferred on EKS |
+| Day-2 ops | deploy/logs/exec via AWS adapters | `ErrNotSupported` on EKS until phase 3 |
+
+See [aws-eks-experimental.md](aws-eks-experimental.md) for the EKS path and
+[gcp-experimental.md](gcp-experimental.md) for GCP.
 
 See [ADR 0002](adr/0002-provider-runtime-extension-boundary.md) and
 [ADR 0008](adr/0008-ports-and-adapters-multi-provider.md). Contributor checklist:

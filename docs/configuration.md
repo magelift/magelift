@@ -53,7 +53,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `build.hooks.*.failure` | string | no | abort, continue | Failure action |
 | `target` | object | yes |  | Deployment target |
 | `target.provider` | string | yes | aws, gcp | Infrastructure provider |
-| `target.runtime` | string | yes | ecs-fargate, gke-autopilot | Application runtime |
+| `target.runtime` | string | yes | ecs-fargate, eks-autopilot, gke-autopilot | Application runtime |
 | `target.aws` | object or null | no |  | AWS deployment inputs |
 | `target.aws.kmsKeyArn` | string or null | no |  | Customer-managed KMS key ARN |
 | `target.aws.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID |
@@ -105,10 +105,15 @@ access. The VPC CIDR is still required for security-group rules.
 | `target.aws.catalog.search.ebsVolumeSizeGiB` | integer | no |  | OpenSearch EBS volume size |
 | `target.aws.catalog.rabbitMq` | object | no |  | RabbitMQ capacity |
 | `target.aws.catalog.rabbitMq.instanceType` | string | no |  | RabbitMQ broker instance type |
-| `target.aws.catalog.fargate` | object | no |  | Fargate capacity |
+| `target.aws.catalog.fargate` | object | no |  | Fargate capacity (ecs-fargate) |
 | `target.aws.catalog.fargate.cpu` | integer | no |  | Fargate task CPU |
 | `target.aws.catalog.fargate.memoryMiB` | integer | no |  | Fargate task memory |
 | `target.aws.catalog.fargate.desiredCount` | integer | no |  | Fargate desired task count |
+| `target.aws.catalog.eks` | object or null | no |  | EKS Autopilot capacity (eks-autopilot) |
+| `target.aws.catalog.eks.cpuRequest` | string or null | no |  | Web/cron CPU request |
+| `target.aws.catalog.eks.memoryRequest` | string or null | no |  | Web/cron memory request |
+| `target.aws.catalog.eks.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
+| `target.aws.catalog.eks.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
 | `target.aws.catalog.retention` | object | no |  | Retention policy |
 | `target.aws.catalog.retention.logDays` | integer | no |  | CloudWatch log retention days |
 | `target.aws.catalog.retention.backupDays` | integer | no |  | Database backup retention days |
@@ -178,7 +183,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.build.hooks.*.failure` | string | no | abort, continue | Failure action |
 | `environments.*.target` | object or null | no |  |  |
 | `environments.*.target.provider` | string | no | aws, gcp | Infrastructure provider |
-| `environments.*.target.runtime` | string | no | ecs-fargate, gke-autopilot | Application runtime |
+| `environments.*.target.runtime` | string | no | ecs-fargate, eks-autopilot, gke-autopilot | Application runtime |
 | `environments.*.target.aws` | object or null | no |  | AWS deployment inputs |
 | `environments.*.target.aws.kmsKeyArn` | string or null | no |  | Customer-managed KMS key ARN |
 | `environments.*.target.aws.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID |
@@ -230,10 +235,15 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.target.aws.catalog.search.ebsVolumeSizeGiB` | integer | no |  | OpenSearch EBS volume size |
 | `environments.*.target.aws.catalog.rabbitMq` | object | no |  | RabbitMQ capacity |
 | `environments.*.target.aws.catalog.rabbitMq.instanceType` | string | no |  | RabbitMQ broker instance type |
-| `environments.*.target.aws.catalog.fargate` | object | no |  | Fargate capacity |
+| `environments.*.target.aws.catalog.fargate` | object | no |  | Fargate capacity (ecs-fargate) |
 | `environments.*.target.aws.catalog.fargate.cpu` | integer | no |  | Fargate task CPU |
 | `environments.*.target.aws.catalog.fargate.memoryMiB` | integer | no |  | Fargate task memory |
 | `environments.*.target.aws.catalog.fargate.desiredCount` | integer | no |  | Fargate desired task count |
+| `environments.*.target.aws.catalog.eks` | object or null | no |  | EKS Autopilot capacity (eks-autopilot) |
+| `environments.*.target.aws.catalog.eks.cpuRequest` | string or null | no |  | Web/cron CPU request |
+| `environments.*.target.aws.catalog.eks.memoryRequest` | string or null | no |  | Web/cron memory request |
+| `environments.*.target.aws.catalog.eks.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
+| `environments.*.target.aws.catalog.eks.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
 | `environments.*.target.aws.catalog.retention` | object | no |  | Retention policy |
 | `environments.*.target.aws.catalog.retention.logDays` | integer | no |  | CloudWatch log retention days |
 | `environments.*.target.aws.catalog.retention.backupDays` | integer | no |  | Database backup retention days |

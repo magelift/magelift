@@ -10,6 +10,7 @@ drive builds, Pulumi, and day-2 ops.
 | New cloud adapter | [Adding a provider](adding-a-provider.md) |
 | CLI | [CLI reference](cli-reference.md) |
 | AWS acceptance | [Local AWS acceptance](aws-acceptance.md) |
+| AWS EKS (experimental) | [AWS EKS experimental](aws-eks-experimental.md) |
 | GCP (experimental) | [GCP experimental](gcp-experimental.md) |
 | Clean-room rules | [Provenance](provenance.md) |
 

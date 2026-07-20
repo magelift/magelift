@@ -44,6 +44,10 @@ fine.
 Two certified first-party targets are required before a multi-cloud claim
 ([ADR 0007](adr/0007-multi-provider-community-targets.md)).
 
+For AWS product choices (runtime, natMode, databaseEngine, searchMode), see the
+matrix in [architecture.md](architecture.md#aws-magento-product-matrix). Full Magento
+on AWS is not every SKU.
+
 ## Community binary
 
 The released `magelift` binary includes first-party modules only. External
