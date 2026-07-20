@@ -24,7 +24,9 @@ A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`
    See [ADR 0009](adr/0009-day2-magento-ports.md). GCP’s experimental module
    implements these in `internal/cloud/gcp/ops` (GitHub WIF still deferred).
 5. `internal/config` — provider block, enums, validation, then `make generate` for schema.
-6. `internal/cli/root.go` — `RegisterModule(...)`.
+6. `cmd/magelift` — `RegisterModule(...)` in the production binary (keep
+   Pulumi SDKs out of `internal/cli` so `gendocs` and CLI unit tests stay
+   linkable on small CI runners).
 7. Mock Pulumi graph tests; docs for experimental vs acceptance.
 8. Later for certification: implement the day-2 ports end-to-end (ADR 0007).
 

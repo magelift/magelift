@@ -17,7 +17,7 @@ func TestCIGenerateIsDeterministicAndKeepsWorkflowOffStdout(t *testing.T) {
 	workflowPath := filepath.Join(directory, ".github", "workflows", "magelift.yml")
 	for run := range 2 {
 		var stdout, stderr bytes.Buffer
-		command := newCommand(&stdout, &stderr)
+		command := newCommand(&stdout, &stderr, nil)
 		command.SetArgs([]string{"--config", configPath, "--output", "json", "ci", "generate", "--magelift-version", "v1.2.3"})
 		if err := command.Execute(); err != nil {
 			t.Fatal(err)
@@ -86,7 +86,7 @@ func TestCIGenerateRejectsMutableToolVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
-	command := newCommand(&output, &output)
+	command := newCommand(&output, &output, nil)
 	command.SetArgs([]string{"--config", configPath, "ci", "generate", "--magelift-version", "latest"})
 	err := command.Execute()
 	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "immutable MageLift release") {
@@ -143,7 +143,7 @@ func executeCI(t *testing.T, configPath, action string) {
 
 func executeCIError(configPath, action string) error {
 	var stdout, stderr bytes.Buffer
-	command := newCommand(&stdout, &stderr)
+	command := newCommand(&stdout, &stderr, nil)
 	command.SetArgs([]string{"--config", configPath, "ci", action, "--magelift-version", "v1.2.3"})
 	return command.Execute()
 }

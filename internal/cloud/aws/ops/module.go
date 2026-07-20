@@ -43,6 +43,12 @@ type Ops struct {
 	RecordRelease func(context.Context, deployflow.Request, deployflow.Result) error
 }
 
+// WithRecordRelease implements platform.HasRecordRelease.
+func (o Ops) WithRecordRelease(fn func(context.Context, deployflow.Request, deployflow.Result) error) platform.Ops {
+	o.RecordRelease = fn
+	return o
+}
+
 func (o Ops) AcquireLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
 	awsPlanned, ok := awsstack.AsAWSPlanned(planned)
 	if !ok {

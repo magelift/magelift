@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
-	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
 )
@@ -27,8 +25,7 @@ func (t *fakeTerminal) SelectEnvironment([]string) (string, error) {
 
 func testOptions(out *bytes.Buffer, terminal environmentTerminal) *options {
 	modules := platform.NewModuleRegistry()
-	_ = modules.RegisterModule(awsops.Module{})
-	_ = modules.RegisterModule(gcpops.Module{})
+	registerTestModules(modules)
 	return &options{
 		stdout:        out,
 		stderr:        out,
@@ -45,7 +42,7 @@ func TestConfigEffectiveJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	cmd := newCommand(&out, &out)
+	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", filepath.Join(dir, "magelift.yaml"), "--env", "staging", "--output", "json", "config", "effective"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
@@ -80,7 +77,7 @@ func TestEnvironmentListUsesStructuredOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	cmd := newCommand(&out, &out)
+	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "env", "list"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
@@ -97,7 +94,7 @@ func TestStatusReportsSelectedConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	cmd := newCommand(&out, &out)
+	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "status"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
@@ -107,7 +104,7 @@ func TestStatusReportsSelectedConfiguration(t *testing.T) {
 	}
 }
 
-func TestDeployRequiresAValidDeploymentPlan(t *testing.T) {
+func TestDeployRequiresRegisteredStackModule(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "magelift.yaml")
 	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
@@ -116,7 +113,7 @@ func TestDeployRequiresAValidDeploymentPlan(t *testing.T) {
 	cmd := New()
 	cmd.SetArgs([]string{"--config", path, "--env", "staging", "deploy"})
 	err := cmd.Execute()
-	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "target.aws is required") {
+	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), `no stack module registered for target "aws"/"ecs-fargate"`) {
 		t.Fatalf("unexpected error/code: %v/%d", err, ExitCode(err))
 	}
 }
@@ -236,7 +233,7 @@ func TestConfigMigrateNormalizesCurrentSchema(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	cmd := newCommand(&out, &out)
+	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "config", "migrate"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
@@ -250,7 +247,7 @@ func TestConfigMigrateNormalizesCurrentSchema(t *testing.T) {
 	}
 
 	out.Reset()
-	cmd = newCommand(&out, &out)
+	cmd = newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "config", "migrate"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)

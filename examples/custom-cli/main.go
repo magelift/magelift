@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/acourtiol/magelift/internal/cli"
 	awseksops "github.com/acourtiol/magelift/internal/cloud/aws/eksops"
 	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
 	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
@@ -21,20 +22,22 @@ import (
 )
 
 func main() {
-	registry := platform.NewModuleRegistry()
-	if err := registry.RegisterModule(awsops.Module{}); err != nil {
-		fail(err)
+	modules := platform.NewModuleRegistry()
+	for _, module := range []platform.StackModule{
+		awsops.Module{},
+		awseksops.Module{},
+		gcpops.Module{},
+		// Community providers register the same way:
+		// community.Module{},
+	} {
+		if err := modules.RegisterModule(module); err != nil {
+			fail(err)
+		}
 	}
-	if err := registry.RegisterModule(awseksops.Module{}); err != nil {
-		fail(err)
+	if err := cli.NewWithModules(modules).Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(cli.ExitCode(err))
 	}
-	if err := registry.RegisterModule(gcpops.Module{}); err != nil {
-		fail(err)
-	}
-	// Community providers register the same way:
-	//   registry.RegisterModule(community.Module{})
-	fmt.Fprintln(os.Stdout, "registered stack modules: aws/ecs-fargate, aws/eks-autopilot, gcp/gke-autopilot")
-	fmt.Fprintln(os.Stdout, "wire this registry into your CLI main the same way cmd/magelift does")
 }
 
 func fail(err error) {

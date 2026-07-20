@@ -15,7 +15,7 @@ func TestDoctorChecksBuildAndEveryEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	cmd := newCommand(&out, &out)
+	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
@@ -35,7 +35,7 @@ func TestDoctorPrintsFailedChecksAndUsesStableExitCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	cmd := newCommand(&out, &out)
+	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
 	err := cmd.Execute()
 	if err == nil || ExitCode(err) != doctorExitUnhealthy {

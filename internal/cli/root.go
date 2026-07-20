@@ -14,13 +14,8 @@ import (
 	"strings"
 
 	"github.com/acourtiol/magelift/internal/automation"
-	awseksops "github.com/acourtiol/magelift/internal/cloud/aws/eksops"
-	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
 	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
-	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
-	ovhstack "github.com/acourtiol/magelift/internal/cloud/ovh/stack"
-	scwstack "github.com/acourtiol/magelift/internal/cloud/scaleway/stack"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
@@ -116,26 +111,22 @@ func (t consoleTerminal) SelectEnvironment(environments []string) (string, error
 	return environments[selection-1], nil
 }
 
+// New returns the CLI command tree with an empty module registry.
+// Production binaries must call NewWithModules after registering adapters
+// (see cmd/magelift). Keeping Pulumi SDKs out of this package lets tools like
+// gendocs link without OOM on GitHub-hosted runners.
 func New() *cobra.Command {
-	return newCommand(os.Stdout, os.Stderr)
+	return NewWithModules(platform.NewModuleRegistry())
 }
 
-func newCommand(stdout, stderr io.Writer) *cobra.Command {
-	modules := platform.NewModuleRegistry()
-	if err := modules.RegisterModule(awsops.Module{}); err != nil {
-		panic(err)
-	}
-	if err := modules.RegisterModule(awseksops.Module{}); err != nil {
-		panic(err)
-	}
-	if err := modules.RegisterModule(gcpops.Module{}); err != nil {
-		panic(err)
-	}
-	if err := modules.RegisterModule(ovhstack.Module{}); err != nil {
-		panic(err)
-	}
-	if err := modules.RegisterModule(scwstack.Module{}); err != nil {
-		panic(err)
+// NewWithModules returns the CLI wired to the given stack module registry.
+func NewWithModules(modules *platform.ModuleRegistry) *cobra.Command {
+	return newCommand(os.Stdout, os.Stderr, modules)
+}
+
+func newCommand(stdout, stderr io.Writer, modules *platform.ModuleRegistry) *cobra.Command {
+	if modules == nil {
+		modules = platform.NewModuleRegistry()
 	}
 	o := &options{
 		stdout:        stdout,
@@ -206,13 +197,8 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 			})
 			return err
 		}
-		if awsOps, ok := ops.(awsops.Ops); ok {
-			awsOps.RecordRelease = recordRelease
-			ops = awsOps
-		}
-		if gcpOps, ok := ops.(gcpops.Ops); ok {
-			gcpOps.RecordRelease = recordRelease
-			ops = gcpOps
+		if hook, ok := ops.(platform.HasRecordRelease); ok {
+			ops = hook.WithRecordRelease(recordRelease)
 		}
 		return ops.NewDeploySteps(ctx, backend, planned, diagnostics)
 	}
