@@ -427,8 +427,7 @@ force_clean_orphans() {
 	for subnet in private-0 private-1 public-0 public-1; do
 		gcloud compute networks subnets delete "${NAME}-${PROFILE}-net-${subnet}" --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
 	done
-	local i
-	for i in 1 2 3 4 5 6 7 8; do
+	for _ in 1 2 3 4 5 6 7 8; do
 		if gcloud services vpc-peerings delete --network="$net" --service=servicenetworking.googleapis.com --project="$PROJECT" --quiet 2>/dev/null; then
 			break
 		fi

@@ -57,14 +57,14 @@ const (
 )
 
 const (
-	CapabilityDatabaseMySQL        CapabilityID = "database.mysql"
-	CapabilityCacheValkey          CapabilityID = "cache.valkey"
-	CapabilitySearchFullText       CapabilityID = "search.fulltext"
-	CapabilityQueueDatabase        CapabilityID = "queue.database"
-	CapabilityQueueRabbitMQ        CapabilityID = "queue.rabbitmq"
-	CapabilityObjectStorageBlob    CapabilityID = "object-storage.blob"
-	CapabilityEdgeCDN              CapabilityID = "edge.cdn"
-	CapabilityObservabilityLogs    CapabilityID = "observability.logs"
+	CapabilityDatabaseMySQL     CapabilityID = "database.mysql"
+	CapabilityCacheValkey       CapabilityID = "cache.valkey"
+	CapabilitySearchFullText    CapabilityID = "search.fulltext"
+	CapabilityQueueDatabase     CapabilityID = "queue.database"
+	CapabilityQueueRabbitMQ     CapabilityID = "queue.rabbitmq"
+	CapabilityObjectStorageBlob CapabilityID = "object-storage.blob"
+	CapabilityEdgeCDN           CapabilityID = "edge.cdn"
+	CapabilityObservabilityLogs CapabilityID = "observability.logs"
 
 	// Deprecated AWS-product aliases — prefer the Magento-shaped IDs above.
 	CapabilitySearchOpenSearch        = CapabilitySearchFullText
