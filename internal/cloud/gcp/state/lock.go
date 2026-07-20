@@ -58,7 +58,7 @@ func NewManager(client ObjectAPI, bucket, project, environment string) (*Manager
 	}
 	return &Manager{
 		client: client, bucket: bucket,
-		key: "locks/" + project + "/" + environment + ".json",
+		key:     "locks/" + project + "/" + environment + ".json",
 		project: project, environment: environment, now: time.Now,
 	}, nil
 }

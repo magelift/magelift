@@ -63,6 +63,7 @@ func TestProgramBuildsMockGraph(t *testing.T) {
 		"ovh:CloudProject/kube:Kube",
 		"ovh:CloudProject/kubeNodePool:KubeNodePool",
 		"kubernetes:apps/v1:Deployment",
+		"kubernetes:batch/v1:Job",
 		"kubernetes:core/v1:Service",
 		"random:index/randomPassword:RandomPassword",
 	}

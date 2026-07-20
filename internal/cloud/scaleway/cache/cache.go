@@ -83,11 +83,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	component.PrimaryEndpoint = cluster.ConnectionString.ApplyT(func(connection string) string {
-		parsed, err := url.Parse(connection)
-		if err != nil {
-			return ""
-		}
-		return parsed.Hostname()
+		return redisEndpointHost(connection)
 	}).(pulumi.StringOutput)
 	component.ClusterName = cluster.Name
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
@@ -96,4 +92,23 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 	return component, nil
+}
+
+// redisEndpointHost extracts the host from Scaleway Redis ConnectionString.
+// Accepts URL forms (redis://host:6379) and bare host:port (common for PN-only).
+func redisEndpointHost(connection string) string {
+	connection = strings.TrimSpace(connection)
+	if connection == "" {
+		return ""
+	}
+	if parsed, err := url.Parse(connection); err == nil {
+		if host := parsed.Hostname(); host != "" {
+			return host
+		}
+	}
+	host, _, ok := strings.Cut(connection, ":")
+	if ok && host != "" && !strings.Contains(host, "/") {
+		return host
+	}
+	return connection
 }

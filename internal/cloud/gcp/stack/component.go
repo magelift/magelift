@@ -88,7 +88,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 	}
 	component.Runtime, err = runtime.New(ctx, naming.Resource(spec.Identity.Project, spec.Identity.Environment, "app"), runtime.Args{
 		Project: spec.Identity.GCPProject, MagentoProject: spec.Identity.Project, Environment: spec.Identity.Environment,
-		Region: spec.Identity.Region,
+		Region:          spec.Identity.Region,
 		NetworkSelfLink: component.Network.NetworkSelfLink, PrivateSubnetNames: component.Network.PrivateSubnetNames,
 		Image: spec.Artifact.ImageDigest, ApplicationMode: spec.Application.Mode, WebRuntime: spec.Application.WebRuntime,
 		DatabaseWriter: component.Database.WriterEndpoint, DatabaseName: spec.Dependencies.DatabaseName,
@@ -96,6 +96,8 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 		SearchMode: spec.Catalog.SearchMode, SearchReplicas: spec.Catalog.SearchReplicas,
 		QueueMode: spec.Catalog.QueueMode, QueueReplicas: spec.Catalog.QueueReplicas,
 		MediaBucket: component.Storage.BucketName, MediaURL: component.Storage.MediaURL,
+		// EncryptionKeySecret is plumbed for day-2 secret injection; CoreEnvBindings does not
+		// emit MAGENTO_DC_CRYPT__KEY yet (shared K8s ceiling with OVH/Scaleway — wire via SecretKeyRef).
 		EncryptionKeySecret: spec.Dependencies.EncryptionKeySecret,
 		CPURequest:          spec.Catalog.AutopilotCPURequest, MemoryRequest: spec.Catalog.AutopilotMemoryRequest,
 		DesiredWebReplicas: spec.Catalog.DesiredWebReplicas, QueueConsumerCount: spec.Catalog.QueueConsumerCount,

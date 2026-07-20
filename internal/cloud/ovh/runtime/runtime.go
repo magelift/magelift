@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/cloud/ovh/naming"
 	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/ovh/pulumi-ovh/sdk/v2/go/ovh/cloudproject"
@@ -123,11 +124,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("create Kubernetes provider: %w", err)
 	}
 	k8sOpts := []pulumi.ResourceOption{parent, pulumi.Provider(k8sProvider), pulumi.DependsOn([]pulumi.Resource{cluster})}
+	skipAwait := kube.SkipAwaitAnnotations()
 
 	env := containerEnv(args)
 
 	web, err := appsv1.NewDeployment(ctx, name+"-web", &appsv1.DeploymentArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web"), Annotations: skipAwait},
 		Spec: &appsv1.DeploymentSpecArgs{
 			Replicas: pulumi.Int(args.DesiredWebReplicas),
 			Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-web")}},
@@ -154,7 +156,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	service, err := corev1.NewService(ctx, name+"-web-svc", &corev1.ServiceArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web"), Annotations: skipAwait},
 		Spec: &corev1.ServiceSpecArgs{
 			Type:     pulumi.String("LoadBalancer"),
 			Selector: pulumi.StringMap{"app": pulumi.String(name + "-web")},
@@ -168,7 +170,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	_, err = appsv1.NewDeployment(ctx, name+"-cron", &appsv1.DeploymentArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-cron")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-cron"), Annotations: skipAwait},
 		Spec: &appsv1.DeploymentSpecArgs{
 			Replicas: pulumi.Int(1),
 			Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-cron")}},
@@ -179,7 +181,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 						&corev1.ContainerArgs{
 							Name:    pulumi.String("cron"),
 							Image:   pulumi.String(args.Image),
-							Command: toStringArray(platform.MagentoCronShell()),
+							Command: kube.ToStringArray(platform.MagentoCronShell()),
 							Env:     env,
 							Resources: &corev1.ResourceRequirementsArgs{
 								Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
@@ -195,7 +197,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	_, err = batchv1.NewJob(ctx, name+"-deploy", &batchv1.JobArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-deploy")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-deploy"), Annotations: skipAwait},
 		Spec: &batchv1.JobSpecArgs{
 			Template: &corev1.PodTemplateSpecArgs{
 				Spec: &corev1.PodSpecArgs{
@@ -204,7 +206,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 						&corev1.ContainerArgs{
 							Name:    pulumi.String("deploy"),
 							Image:   pulumi.String(args.Image),
-							Command: toStringArray(platform.MagentoMigrationShell()),
+							Command: kube.ToStringArray(platform.MagentoMigrationShell()),
 							Env:     env,
 						},
 					},
@@ -218,7 +220,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	if args.QueueConsumerCount > 0 {
 		_, err = appsv1.NewDeployment(ctx, name+"-queue", &appsv1.DeploymentArgs{
-			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-queue")},
+			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-queue"), Annotations: skipAwait},
 			Spec: &appsv1.DeploymentSpecArgs{
 				Replicas: pulumi.Int(args.QueueConsumerCount),
 				Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-queue")}},
@@ -229,7 +231,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 							&corev1.ContainerArgs{
 								Name:    pulumi.String("queue"),
 								Image:   pulumi.String(args.Image),
-								Command: toStringArray(platform.MagentoQueueArgs()),
+								Command: kube.ToStringArray(platform.MagentoQueueArgs()),
 								Env:     env,
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
@@ -283,19 +285,6 @@ func containerEnv(args Args) corev1.EnvVarArrayOutput {
 			CacheEndpoint:   values[1].(string),
 			SessionEndpoint: session,
 		})
-		env := make([]corev1.EnvVar, 0, len(bindings))
-		for _, binding := range bindings {
-			value := binding.Value
-			env = append(env, corev1.EnvVar{Name: binding.Name, Value: &value})
-		}
-		return env
+		return kube.EnvVars(bindings)
 	}).(corev1.EnvVarArrayOutput)
-}
-
-func toStringArray(values []string) pulumi.StringArray {
-	out := make(pulumi.StringArray, 0, len(values))
-	for _, value := range values {
-		out = append(out, pulumi.String(value))
-	}
-	return out
 }

@@ -38,9 +38,9 @@ func TestProgramBuildsMockGraph(t *testing.T) {
 			Region: "europe-west1", EnvironmentClass: "preview", Preset: "preview",
 			Labels: map[string]string{"magelift-managed-by": "magelift"},
 		},
-		Application:  Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:     Artifact{ImageDigest: "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
-		Policy:       NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c"}},
+		Application: Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		Artifact:    Artifact{ImageDigest: "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Policy:      NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c"}},
 		Catalog: CatalogSelection{
 			CloudSQLTier: "db-custom-1-3840", CloudSQLAvailability: "ZONAL",
 			MemorystoreNodeType: "SHARED_CORE_NANO", AutopilotCPURequest: "500m", AutopilotMemoryRequest: "1Gi",

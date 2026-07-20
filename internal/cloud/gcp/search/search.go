@@ -17,7 +17,7 @@ const TypeToken = "magelift:gcp:OpenSearch"
 const OpenSearchPort = 9200
 
 type Args struct {
-	Replicas   int
+	Replicas    int
 	K8sProvider *kubernetes.Provider
 }
 

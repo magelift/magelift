@@ -16,15 +16,15 @@ import (
 const TypeToken = "magelift:gcp:CloudSQL"
 
 type Args struct {
-	Project         string
-	Region          string
-	NetworkID       pulumi.StringInput
-	NetworkSelfLink pulumi.StringInput
-	DatabaseName    string
-	MasterUsername  string
-	Tier            string
+	Project          string
+	Region           string
+	NetworkID        pulumi.StringInput
+	NetworkSelfLink  pulumi.StringInput
+	DatabaseName     string
+	MasterUsername   string
+	Tier             string
 	AvailabilityType string // ZONAL | REGIONAL
-	Labels          map[string]string
+	Labels           map[string]string
 }
 
 type Component struct {

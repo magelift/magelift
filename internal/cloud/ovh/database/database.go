@@ -110,6 +110,8 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}); err != nil {
 		return nil, err
 	}
-	_ = args.MasterUsername // reserved for cloudprojectdatabase.User when day-2 secrets land
+	_ = args.MasterUsername
+	// Ceiling: NewDatabase provisions the MySQL engine only. Magento schema + login
+	// user (cloudprojectdatabase.Database / User) and Secret injection remain day-2.
 	return component, nil
 }

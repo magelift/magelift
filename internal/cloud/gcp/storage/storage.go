@@ -49,14 +49,14 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	parent := pulumi.Parent(component)
 
 	bucket, err := storage.NewBucket(ctx, name, &storage.BucketArgs{
-		Project:                     pulumi.String(args.Project),
-		Name:                        pulumi.String(bucketName),
-		Location:                    pulumi.String(args.Location),
-		UniformBucketLevelAccess:    pulumi.Bool(true),
-		PublicAccessPrevention:      pulumi.String("enforced"),
-		ForceDestroy:                pulumi.Bool(true),
-		Versioning:                  &storage.BucketVersioningArgs{Enabled: pulumi.Bool(true)},
-		Labels:                      pulumi.ToStringMap(args.Labels),
+		Project:                  pulumi.String(args.Project),
+		Name:                     pulumi.String(bucketName),
+		Location:                 pulumi.String(args.Location),
+		UniformBucketLevelAccess: pulumi.Bool(true),
+		PublicAccessPrevention:   pulumi.String("enforced"),
+		ForceDestroy:             pulumi.Bool(true),
+		Versioning:               &storage.BucketVersioningArgs{Enabled: pulumi.Bool(true)},
+		Labels:                   pulumi.ToStringMap(args.Labels),
 	}, parent)
 	if err != nil {
 		return nil, fmt.Errorf("create media GCS bucket: %w", err)

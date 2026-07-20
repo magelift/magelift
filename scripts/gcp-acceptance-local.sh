@@ -509,8 +509,7 @@ force_clean_orphans() {
 	done
 	printf '+ force_clean: soaking %ss for Cloud SQL PSA release\n' "$soak_secs"
 	sleep "$soak_secs"
-	local i
-	for i in $(seq 1 20); do
+	for _ in $(seq 1 20); do
 		if ! gcloud compute networks describe "$net" --project="$PROJECT" >/dev/null 2>&1; then
 			printf '+ force_clean: network %s already gone\n' "$net"
 			break

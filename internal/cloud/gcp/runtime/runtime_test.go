@@ -1,13 +1,17 @@
 package runtime
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 )
 
 func TestBuildKubeconfigUsesOAuthTokenNotExecPlugin(t *testing.T) {
 	t.Parallel()
-	kubeconfig := buildKubeconfig("shop-project", "shop-preview-cluster", "34.140.218.185", "Y2E=", "ya29.mock-access-token")
+	contextName := fmt.Sprintf("%s_magelift_%s", "shop-project", "shop-preview-cluster")
+	kubeconfig := kube.BuildStaticTokenKubeconfig(contextName, "https://34.140.218.185", "Y2E=", "ya29.mock-access-token")
 
 	if strings.Contains(kubeconfig, "gke-gcloud-auth-plugin") {
 		t.Fatal("kubeconfig must not depend on gke-gcloud-auth-plugin")

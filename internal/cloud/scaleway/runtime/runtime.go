@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/cloud/scaleway/naming"
 	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
@@ -21,6 +22,8 @@ const ApplicationPort = 8080
 
 type Args struct {
 	ProjectID           string
+	MagentoProject      string
+	Environment         string
 	Region              string
 	PrivateNetworkID    pulumi.StringInput
 	Image               string
@@ -56,6 +59,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if strings.TrimSpace(args.ProjectID) == "" || strings.TrimSpace(args.Region) == "" {
 		return nil, errors.New("Scaleway project ID and region are required")
 	}
+	if strings.TrimSpace(args.MagentoProject) == "" || strings.TrimSpace(args.Environment) == "" {
+		return nil, errors.New("Magento project and environment are required for cluster naming")
+	}
 	if strings.TrimSpace(args.Image) == "" {
 		return nil, errors.New("container image digest is required")
 	}
@@ -90,7 +96,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		tags = append(tags, pulumi.String(key+"="+value))
 	}
 
-	clusterName := naming.ClusterName(args.ProjectID, name)
+	clusterName := naming.ClusterName(args.MagentoProject, args.Environment)
 	cluster, err := scwk8s.NewCluster(ctx, name+"-cluster", &scwk8s.ClusterArgs{
 		Name:                      pulumi.String(clusterName),
 		Version:                   pulumi.String(args.KapsuleVersion),
@@ -125,11 +131,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("create Kubernetes provider: %w", err)
 	}
 	k8sOpts := []pulumi.ResourceOption{parent, pulumi.Provider(k8sProvider), pulumi.DependsOn([]pulumi.Resource{cluster, pool})}
+	skipAwait := kube.SkipAwaitAnnotations()
 
 	env := containerEnv(args)
 
 	web, err := appsv1.NewDeployment(ctx, name+"-web", &appsv1.DeploymentArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web"), Annotations: skipAwait},
 		Spec: &appsv1.DeploymentSpecArgs{
 			Replicas: pulumi.Int(args.DesiredWebReplicas),
 			Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-web")}},
@@ -156,7 +163,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	service, err := corev1.NewService(ctx, name+"-web-svc", &corev1.ServiceArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web"), Annotations: skipAwait},
 		Spec: &corev1.ServiceSpecArgs{
 			Type:     pulumi.String("LoadBalancer"),
 			Selector: pulumi.StringMap{"app": pulumi.String(name + "-web")},
@@ -170,7 +177,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	_, err = appsv1.NewDeployment(ctx, name+"-cron", &appsv1.DeploymentArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-cron")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-cron"), Annotations: skipAwait},
 		Spec: &appsv1.DeploymentSpecArgs{
 			Replicas: pulumi.Int(1),
 			Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-cron")}},
@@ -181,7 +188,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 						&corev1.ContainerArgs{
 							Name:    pulumi.String("cron"),
 							Image:   pulumi.String(args.Image),
-							Command: toStringArray(platform.MagentoCronShell()),
+							Command: kube.ToStringArray(platform.MagentoCronShell()),
 							Env:     env,
 							Resources: &corev1.ResourceRequirementsArgs{
 								Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
@@ -197,7 +204,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	_, err = batchv1.NewJob(ctx, name+"-deploy", &batchv1.JobArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-deploy")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-deploy"), Annotations: skipAwait},
 		Spec: &batchv1.JobSpecArgs{
 			Template: &corev1.PodTemplateSpecArgs{
 				Spec: &corev1.PodSpecArgs{
@@ -206,7 +213,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 						&corev1.ContainerArgs{
 							Name:    pulumi.String("deploy"),
 							Image:   pulumi.String(args.Image),
-							Command: toStringArray(platform.MagentoMigrationShell()),
+							Command: kube.ToStringArray(platform.MagentoMigrationShell()),
 							Env:     env,
 						},
 					},
@@ -220,7 +227,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	if args.QueueConsumerCount > 0 {
 		_, err = appsv1.NewDeployment(ctx, name+"-queue", &appsv1.DeploymentArgs{
-			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-queue")},
+			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-queue"), Annotations: skipAwait},
 			Spec: &appsv1.DeploymentSpecArgs{
 				Replicas: pulumi.Int(args.QueueConsumerCount),
 				Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-queue")}},
@@ -231,7 +238,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 							&corev1.ContainerArgs{
 								Name:    pulumi.String("queue"),
 								Image:   pulumi.String(args.Image),
-								Command: toStringArray(platform.MagentoQueueArgs()),
+								Command: kube.ToStringArray(platform.MagentoQueueArgs()),
 								Env:     env,
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
@@ -286,21 +293,8 @@ func containerEnv(args Args) corev1.EnvVarArrayOutput {
 			CacheEndpoint:   values[1].(string),
 			SessionEndpoint: session,
 		})
-		env := make([]corev1.EnvVar, 0, len(bindings))
-		for _, binding := range bindings {
-			value := binding.Value
-			env = append(env, corev1.EnvVar{Name: binding.Name, Value: &value})
-		}
-		return env
+		return kube.EnvVars(bindings)
 	}).(corev1.EnvVarArrayOutput)
-}
-
-func toStringArray(values []string) pulumi.StringArray {
-	out := make(pulumi.StringArray, 0, len(values))
-	for _, value := range values {
-		out = append(out, pulumi.String(value))
-	}
-	return out
 }
 
 // generateKubeconfig builds a static token-authenticated kubeconfig from the
@@ -313,7 +307,9 @@ func generateKubeconfig(clusterName string, kubeconfigs scwk8s.ClusterKubeconfig
 			return "", errors.New("Scaleway cluster produced no kubeconfig entries")
 		}
 		cfg := configs[0]
-		return buildKubeconfig(clusterName, stringOrEmpty(cfg.Host), stringOrEmpty(cfg.ClusterCaCertificate), stringOrEmpty(cfg.Token)), nil
+		contextName := "magelift_" + clusterName
+		server := naming.FormatURL(stringOrEmpty(cfg.Host))
+		return kube.BuildStaticTokenKubeconfig(contextName, server, stringOrEmpty(cfg.ClusterCaCertificate), stringOrEmpty(cfg.Token)), nil
 	}).(pulumi.StringOutput)
 }
 
@@ -322,27 +318,4 @@ func stringOrEmpty(value *string) string {
 		return ""
 	}
 	return *value
-}
-
-func buildKubeconfig(clusterName, host, caCert, token string) string {
-	contextName := "magelift_" + clusterName
-	server := naming.FormatURL(host)
-	return fmt.Sprintf(`apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data: %s
-    server: %s
-  name: %s
-contexts:
-- context:
-    cluster: %s
-    user: %s
-  name: %s
-current-context: %s
-kind: Config
-users:
-- name: %s
-  user:
-    token: %s
-`, caCert, server, contextName, contextName, contextName, contextName, contextName, contextName, token)
 }

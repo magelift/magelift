@@ -112,7 +112,7 @@ func (s smClient) Set(ctx context.Context, project, name string, value []byte) e
 		}
 	}
 	_, err = s.client.AddSecretVersion(ctx, &secretmanagerpb.AddSecretVersionRequest{
-		Parent: secretName,
+		Parent:  secretName,
 		Payload: &secretmanagerpb.SecretPayload{Data: value},
 	})
 	if err != nil {

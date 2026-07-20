@@ -67,11 +67,14 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *scaleway.Provide
 		return nil, fmt.Errorf("create Scaleway cache: %w", err)
 	}
 	component.Runtime, err = runtime.New(ctx, naming.Resource(spec.Identity.Project, spec.Identity.Environment, "app"), runtime.Args{
-		ProjectID: spec.Identity.ScalewayProject, Region: spec.Identity.Region,
+		ProjectID: spec.Identity.ScalewayProject, MagentoProject: spec.Identity.Project, Environment: spec.Identity.Environment,
+		Region:           spec.Identity.Region,
 		PrivateNetworkID: component.Network.PrivateNetworkID,
 		Image:            spec.Artifact.ImageDigest, ApplicationMode: spec.Application.Mode, WebRuntime: spec.Application.WebRuntime,
 		DatabaseWriter: component.Database.WriterEndpoint, DatabaseName: spec.Dependencies.DatabaseName,
 		CacheEndpoint: component.Cache.PrimaryEndpoint, SessionEndpoint: component.Cache.PrimaryEndpoint,
+		// EncryptionKeySecret is plumbed for day-2 secret injection; CoreEnvBindings does not
+		// emit MAGENTO_DC_CRYPT__KEY yet (shared K8s ceiling with GCP — wire via SecretKeyRef).
 		EncryptionKeySecret: spec.Dependencies.EncryptionKeySecret,
 		KapsuleVersion:      spec.Catalog.KapsuleVersion, NodeType: spec.Catalog.NodeType, NodeCount: spec.Catalog.NodeCount,
 		CPURequest: spec.Catalog.CPURequest, MemoryRequest: spec.Catalog.MemoryRequest,

@@ -8,6 +8,7 @@ import (
 	"github.com/acourtiol/magelift/internal/cloud/gcp/naming"
 	"github.com/acourtiol/magelift/internal/cloud/gcp/queue"
 	"github.com/acourtiol/magelift/internal/cloud/gcp/search"
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/container"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/organizations"
@@ -92,7 +93,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 	parent := pulumi.Parent(component)
-	skipAwait := pulumi.StringMap{"pulumi.com/skipAwait": pulumi.String("true")}
+	skipAwait := kube.SkipAwaitAnnotations()
 
 	clusterName := naming.ClusterName(args.MagentoProject, args.Environment)
 	cluster, err := container.NewCluster(ctx, name+"-cluster", &container.ClusterArgs{
@@ -205,7 +206,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 						&corev1.ContainerArgs{
 							Name:    pulumi.String("cron"),
 							Image:   pulumi.String(args.Image),
-							Command: toStringArray(platform.MagentoCronShell()),
+							Command: kube.ToStringArray(platform.MagentoCronShell()),
 							Env:     env,
 							Resources: &corev1.ResourceRequirementsArgs{
 								Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
@@ -233,7 +234,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 							&corev1.ContainerArgs{
 								Name:    pulumi.String("queue"),
 								Image:   pulumi.String(args.Image),
-								Command: toStringArray(platform.MagentoQueueArgs()),
+								Command: kube.ToStringArray(platform.MagentoQueueArgs()),
 								Env:     env,
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
@@ -307,18 +308,15 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 			MediaBucket:     values[5].(string),
 			MediaURL:        values[6].(string),
 		})
-		env := make([]corev1.EnvVar, 0, len(bindings))
-		for _, binding := range bindings {
-			value := binding.Value
-			env = append(env, corev1.EnvVar{Name: binding.Name, Value: &value})
-		}
-		return env
+		return kube.EnvVars(bindings)
 	}).(corev1.EnvVarArrayOutput)
 }
 
 func generateKubeconfig(ctx *pulumi.Context, project string, name, endpoint pulumi.StringOutput, auth container.ClusterMasterAuthOutput) pulumi.StringOutput {
 	return pulumi.All(name, endpoint, auth.ClusterCaCertificate(), organizations.GetClientConfigOutput(ctx).AccessToken()).ApplyT(func(values []interface{}) (string, error) {
-		return buildKubeconfig(project, asString(values[0]), asString(values[1]), asString(values[2]), asString(values[3])), nil
+		contextName := fmt.Sprintf("%s_magelift_%s", project, asString(values[0]))
+		server := "https://" + asString(values[1])
+		return kube.BuildStaticTokenKubeconfig(contextName, server, asString(values[2]), asString(values[3])), nil
 	}).(pulumi.StringOutput)
 }
 
@@ -334,34 +332,4 @@ func asString(value interface{}) string {
 	default:
 		return fmt.Sprintf("%v", value)
 	}
-}
-
-func buildKubeconfig(project, clusterName, endpoint, caCert, accessToken string) string {
-	contextName := fmt.Sprintf("%s_magelift_%s", project, clusterName)
-	return fmt.Sprintf(`apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data: %s
-    server: https://%s
-  name: %s
-contexts:
-- context:
-    cluster: %s
-    user: %s
-  name: %s
-current-context: %s
-kind: Config
-users:
-- name: %s
-  user:
-    token: %s
-`, caCert, endpoint, contextName, contextName, contextName, contextName, contextName, contextName, accessToken)
-}
-
-func toStringArray(values []string) pulumi.StringArray {
-	out := make(pulumi.StringArray, 0, len(values))
-	for _, value := range values {
-		out = append(out, pulumi.String(value))
-	}
-	return out
 }

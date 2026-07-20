@@ -31,6 +31,7 @@ func sanitize(value string) string {
 }
 
 func ClusterName(project, environment string) string {
+	// Uses Magento project + environment only — never the Scaleway project UUID.
 	return Resource(project, environment, "kapsule")
 }
 

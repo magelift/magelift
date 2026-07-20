@@ -146,8 +146,8 @@ func (g gcsBuckets) BucketExists(ctx context.Context, name string) (bool, error)
 
 func (g gcsBuckets) CreateBucket(ctx context.Context, name, project, location string, labels map[string]string) error {
 	attrs := &storage.BucketAttrs{
-		Location: location,
-		Labels:   labels,
+		Location:                 location,
+		Labels:                   labels,
 		UniformBucketLevelAccess: storage.UniformBucketLevelAccess{Enabled: true},
 		PublicAccessPrevention:   storage.PublicAccessPreventionEnforced,
 	}

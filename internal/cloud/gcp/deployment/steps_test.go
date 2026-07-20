@@ -77,10 +77,10 @@ func TestRegisterCandidateBootstrapsGreenfieldStack(t *testing.T) {
 	backend := &stepsBackend{
 		outputs: map[string]any{},
 		afterUpdate: map[string]any{
-			platform.OutputClusterName:     "shop-preview-app-gke",
-			platform.OutputServiceName:     "shop-preview-app-web",
-			platform.OutputDatabaseWriter:  "10.20.1.5",
-			platform.OutputCacheEndpoint:   "10.20.2.5",
+			platform.OutputClusterName:      "shop-preview-app-gke",
+			platform.OutputServiceName:      "shop-preview-app-web",
+			platform.OutputDatabaseWriter:   "10.20.1.5",
+			platform.OutputCacheEndpoint:    "10.20.2.5",
 			platform.OutputPrivateSubnetIDs: []any{"subnet-a"},
 		},
 	}

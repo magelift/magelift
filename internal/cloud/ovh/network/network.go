@@ -44,6 +44,15 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if len(args.Zones) == 0 {
 		return nil, errors.New("at least one zone is required")
 	}
+	// Each zone gets its own /24 carved from NetworkCIDR. Reject up front if the
+	// parent prefix cannot hold one /24 per zone, rather than failing mid-loop.
+	bits := prefix.Bits()
+	if bits > 24 {
+		return nil, fmt.Errorf("network CIDR %s must be /24 or wider to carve per-zone /24 subnets", args.NetworkCIDR)
+	}
+	if available := 1 << (24 - bits); len(args.Zones) > available {
+		return nil, fmt.Errorf("network CIDR %s has room for %d /24 subnet(s) but %d zone(s) were requested", args.NetworkCIDR, available, len(args.Zones))
+	}
 
 	component := &Component{}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{

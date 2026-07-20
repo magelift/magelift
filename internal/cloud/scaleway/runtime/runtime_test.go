@@ -3,11 +3,14 @@ package runtime
 import (
 	"strings"
 	"testing"
+
+	"github.com/acourtiol/magelift/internal/cloud/kube"
+	"github.com/acourtiol/magelift/internal/cloud/scaleway/naming"
 )
 
 func TestBuildKubeconfigUsesStaticTokenNotExecPlugin(t *testing.T) {
 	t.Parallel()
-	kubeconfig := buildKubeconfig("shop-preview-kapsule", "https://xxx.pub.k8s.fr-par.scw.cloud:6443", "Y2E=", "mock-scw-token")
+	kubeconfig := kube.BuildStaticTokenKubeconfig("magelift_shop-preview-kapsule", naming.FormatURL("https://xxx.pub.k8s.fr-par.scw.cloud:6443"), "Y2E=", "mock-scw-token")
 
 	if strings.Contains(kubeconfig, "exec:") {
 		t.Fatal("kubeconfig must not depend on an exec auth plugin")
@@ -28,7 +31,7 @@ func TestBuildKubeconfigUsesStaticTokenNotExecPlugin(t *testing.T) {
 
 func TestBuildKubeconfigAddsSchemeWhenHostHasNone(t *testing.T) {
 	t.Parallel()
-	kubeconfig := buildKubeconfig("shop-preview-kapsule", "1.2.3.4:6443", "Y2E=", "mock-scw-token")
+	kubeconfig := kube.BuildStaticTokenKubeconfig("magelift_shop-preview-kapsule", naming.FormatURL("1.2.3.4:6443"), "Y2E=", "mock-scw-token")
 	if !strings.Contains(kubeconfig, "server: https://1.2.3.4:6443") {
 		t.Fatalf("expected an https scheme to be added: %s", kubeconfig)
 	}
