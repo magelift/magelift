@@ -53,7 +53,7 @@ magelift bootstrap [flags]
 Options:
 
 ```text
-      --access-log-bucket string   existing S3 bucket for state access logs
+      --access-log-bucket string   existing object-storage bucket for state access logs (AWS)
       --github-owner string        GitHub repository owner for the deployment role
       --github-repo string         GitHub repository name for the deployment role
 ```
@@ -77,7 +77,7 @@ Options:
 ```
 ## magelift cache-flush
 
-Run the Magento cache-flush operation through ECS Exec
+Run the Magento cache-flush operation on the web workload
 
 ```text
 magelift cache-flush
@@ -174,7 +174,7 @@ Options:
 ```
 ## magelift cron-run
 
-Run the Magento cron-run operation through ECS Exec
+Run the Magento cron-run operation on the web workload
 
 ```text
 magelift cron-run
@@ -369,7 +369,7 @@ Options:
 ```
 ## magelift exec
 
-Run a command through ECS Exec
+Run a command on a Magento workload
 
 ```text
 magelift exec --service web --container web -- <command> [flags]
@@ -379,7 +379,7 @@ Options:
 
 ```text
       --container string   container name (default "web")
-      --service string     logical service: web, deploy, or cron (default "web")
+      --service string     logical service: web or cron (default "web")
       --session-only       print the resolved session command without starting it
 ```
 ## magelift health
@@ -411,14 +411,14 @@ magelift init
 ```
 ## magelift login
 
-Verify AWS credentials for the selected environment
+Verify cloud credentials for the selected environment
 
 ```text
 magelift login
 ```
 ## magelift logs
 
-Read recent ECS application logs
+Read recent Magento application logs
 
 ```text
 magelift logs [flags]
@@ -427,7 +427,7 @@ magelift logs [flags]
 Options:
 
 ```text
-      --filter string    CloudWatch Logs filter pattern
+      --filter string    provider log filter pattern
       --limit int        maximum number of events (default 100)
       --service string   log service: web, deploy, or cron (default "web")
       --since string     duration or RFC3339 start time (default "15m")
@@ -464,14 +464,14 @@ Options:
 ```
 ## magelift queue-status
 
-Run the Magento queue-status operation through ECS Exec
+Run the Magento queue-status operation on the web workload
 
 ```text
 magelift queue-status
 ```
 ## magelift reindex
 
-Run the Magento reindex operation through ECS Exec
+Run the Magento reindex operation on the web workload
 
 ```text
 magelift reindex
@@ -499,21 +499,21 @@ magelift secret
 ```
 ### magelift secret list
 
-List AWS Secrets Manager secret names
+List application secret names
 
 ```text
 magelift secret list
 ```
 ### magelift secret remove
 
-Schedule an AWS Secrets Manager secret for deletion
+Schedule an application secret for deletion
 
 ```text
 magelift secret remove <name>
 ```
 ### magelift secret set
 
-Create or update an AWS Secrets Manager secret
+Create or update an application secret
 
 ```text
 magelift secret set <name> [flags]
@@ -526,7 +526,7 @@ Options:
 ```
 ## magelift ssh
 
-Open an SSH-compatible shell through ECS Exec
+Open a shell on a Magento workload
 
 ```text
 magelift ssh [flags]
@@ -537,7 +537,7 @@ Options:
 ```text
       --command string     shell command to run (default "/bin/sh")
       --container string   container name (default "web")
-      --service string     logical service: web, deploy, or cron (default "web")
+      --service string     logical service: web or cron (default "web")
       --session-only       print the resolved session command without starting it
 ```
 ## magelift state

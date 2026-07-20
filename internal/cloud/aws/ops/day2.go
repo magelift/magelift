@@ -262,11 +262,13 @@ func (Observe) PrepareExec(ctx context.Context, planned platform.PlannedStack, o
 	if workload == "" {
 		workload = "web"
 	}
+	// Deploy is a one-off candidate task definition, not a long-lived ECS service.
+	// Exec attaches to a running service task; use logs --service deploy for migrate output.
+	if workload == "deploy" {
+		return platform.ExecTarget{}, errors.New("exec does not support --service deploy; migrate runs as a one-off candidate task — use logs --service deploy, or exec against web/cron")
+	}
 	serviceKey := "serviceName"
-	switch workload {
-	case "deploy":
-		serviceKey = "deployServiceName"
-	case "cron":
+	if workload == "cron" {
 		serviceKey = "cronServiceName"
 	}
 	service, _ := outputs[serviceKey].(string)

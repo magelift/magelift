@@ -152,6 +152,8 @@ fixed Magento command. `magelift ssh` is a compatibility name for an ECS Exec
 shell. The runtime has no inbound SSH rule. The command runner never interpolates user
 arguments into a local shell, although the command string is interpreted by the
 selected container as required by ECS Exec.
+`--service deploy` is rejected: migrate is a one-off candidate task, not a durable
+service. Use `magelift logs --service deploy` for migration output.
 `magelift tunnel` is not exposed for the Fargate-only v1 runtime because there is no
 managed bastion or inbound network path to forward through.
 

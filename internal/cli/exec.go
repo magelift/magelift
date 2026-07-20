@@ -42,7 +42,7 @@ func execCommand(o *options) *cobra.Command {
 			return o.runExecTarget(cmd.Context(), target)
 		},
 	}
-	command.Flags().StringVar(&service, "service", "web", "logical service: web, deploy, or cron")
+	command.Flags().StringVar(&service, "service", "web", "logical service: web or cron")
 	command.Flags().StringVar(&container, "container", "web", "container name")
 	command.Flags().BoolVar(&sessionOnly, "session-only", false, "print the resolved session command without starting it")
 	return command
@@ -88,7 +88,7 @@ func sshCommand(o *options) *cobra.Command {
 			return o.runExecTarget(cmd.Context(), target)
 		},
 	}
-	command.Flags().StringVar(&service, "service", "web", "logical service: web, deploy, or cron")
+	command.Flags().StringVar(&service, "service", "web", "logical service: web or cron")
 	command.Flags().StringVar(&container, "container", "web", "container name")
 	command.Flags().StringVar(&commandText, "command", "/bin/sh", "shell command to run")
 	command.Flags().BoolVar(&sessionOnly, "session-only", false, "print the resolved session command without starting it")
@@ -124,8 +124,11 @@ func (o *options) prepareRemoteCommand(ctx context.Context, service, container s
 	}
 	service = strings.TrimSpace(service)
 	container = strings.TrimSpace(container)
-	if service != "web" && service != "deploy" && service != "cron" {
-		return remoteCommandResult{}, platform.ExecTarget{}, invalid(fmt.Errorf("unsupported service %q", service))
+	if service == "deploy" {
+		return remoteCommandResult{}, platform.ExecTarget{}, invalid(errors.New("exec does not support --service deploy; migrate runs as a one-off candidate task — use logs --service deploy, or exec against web/cron"))
+	}
+	if service != "web" && service != "cron" {
+		return remoteCommandResult{}, platform.ExecTarget{}, invalid(fmt.Errorf("unsupported service %q (want web or cron)", service))
 	}
 	if len(command) == 0 {
 		return remoteCommandResult{}, platform.ExecTarget{}, invalid(errors.New("a command is required"))
