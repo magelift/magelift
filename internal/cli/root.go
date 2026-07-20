@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/acourtiol/magelift/internal/automation"
+	awseksops "github.com/acourtiol/magelift/internal/cloud/aws/eksops"
 	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
 	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
@@ -119,6 +120,9 @@ func New() *cobra.Command {
 func newCommand(stdout, stderr io.Writer) *cobra.Command {
 	modules := platform.NewModuleRegistry()
 	if err := modules.RegisterModule(awsops.Module{}); err != nil {
+		panic(err)
+	}
+	if err := modules.RegisterModule(awseksops.Module{}); err != nil {
 		panic(err)
 	}
 	if err := modules.RegisterModule(gcpstack.Module{}); err != nil {
