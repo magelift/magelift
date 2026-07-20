@@ -103,7 +103,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("create OVH Managed Kubernetes cluster: %w", err)
 	}
 
-	_, err = cloudproject.NewKubeNodePool(ctx, name+"-pool", &cloudproject.KubeNodePoolArgs{
+	pool, err := cloudproject.NewKubeNodePool(ctx, name+"-pool", &cloudproject.KubeNodePoolArgs{
 		ServiceName:  pulumi.String(args.ServiceName),
 		KubeId:       cluster.ID().ToStringOutput(),
 		Name:         pulumi.String(strings.ReplaceAll(name, "_", "-") + "-pool"),
@@ -116,14 +116,17 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("create OVH node pool: %w", err)
 	}
 
+	// Workloads depend on the pool, not just the cluster: MKS schedules pods and
+	// runs the LB controller on pool nodes, so the pool must exist first (mirrors
+	// the Scaleway Kapsule adapter). skipAwait keeps Pulumi from blocking on readiness.
 	k8sProvider, err := kubernetes.NewProvider(ctx, name+"-k8s", &kubernetes.ProviderArgs{
 		Kubeconfig:        pulumi.ToSecret(cluster.Kubeconfig).(pulumi.StringOutput),
 		ClusterIdentifier: cluster.ID().ToStringOutput(),
-	}, parent, pulumi.DependsOn([]pulumi.Resource{cluster}))
+	}, parent, pulumi.DependsOn([]pulumi.Resource{cluster, pool}))
 	if err != nil {
 		return nil, fmt.Errorf("create Kubernetes provider: %w", err)
 	}
-	k8sOpts := []pulumi.ResourceOption{parent, pulumi.Provider(k8sProvider), pulumi.DependsOn([]pulumi.Resource{cluster})}
+	k8sOpts := []pulumi.ResourceOption{parent, pulumi.Provider(k8sProvider), pulumi.DependsOn([]pulumi.Resource{cluster, pool})}
 	skipAwait := kube.SkipAwaitAnnotations()
 
 	env := containerEnv(args)
