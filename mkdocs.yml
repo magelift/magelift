@@ -16,6 +16,8 @@ nav:
   - Benchmarking: benchmarks.md
   - AWS bootstrap: bootstrap.md
   - Local AWS acceptance: aws-acceptance.md
+  - Migrating from ACC / Platform.sh: migrating-from-paas.md
+  - AWS EKS experimental: aws-eks-experimental.md
   - GCP experimental: gcp-experimental.md
   - Local GCP acceptance: gcp-acceptance.md
   - Deployment operations: operations.md

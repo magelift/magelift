@@ -84,6 +84,14 @@ escape hatches — not every AWS SKU.
 See [aws-eks-experimental.md](aws-eks-experimental.md) for the EKS path and
 [gcp-experimental.md](gcp-experimental.md) for GCP.
 
+Evidence tiers differ: Pulumi mocks prove composition, Floci proves selected AWS
+API contracts without an account, and `scripts/aws-acceptance-local.sh` proves a
+real account path with destroy + `assert_clean`. Mocks alone do not certify a
+matrix cell for production use.
+
+Coming from Adobe Commerce Cloud or Platform.sh? Start with
+[migrating-from-paas.md](migrating-from-paas.md).
+
 See [ADR 0002](adr/0002-provider-runtime-extension-boundary.md) and
 [ADR 0008](adr/0008-ports-and-adapters-multi-provider.md). Contributor checklist:
 [adding-a-provider.md](adding-a-provider.md).
