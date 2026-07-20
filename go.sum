@@ -311,6 +311,8 @@ github.com/opentracing/basictracer-go v1.1.0/go.mod h1:V2HZueSJEp879yv285Aap1BS6
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/opentracing/opentracing-go v1.2.0 h1:uEJPy/1a5RIPAJ0Ov+OIO8OxWu77jEv+1B0VhjKrZUs=
 github.com/opentracing/opentracing-go v1.2.0/go.mod h1:GxEUsuufX4nBwe+T+Wl9TAgYrxe9dPLANfrWvHYVTgc=
+github.com/ovh/pulumi-ovh/sdk/v2 v2.17.0 h1:1QQPFk6OOI8DUUjWkGsCmQszHVAXLRutjppyi7RSr8s=
+github.com/ovh/pulumi-ovh/sdk/v2 v2.17.0/go.mod h1:uKc6SFavaTdsxPtSCNgEq3W9aAf9N2OYXhNMKqMzYrQ=
 github.com/pgavlin/fx v0.1.6 h1:r9jEg69DhNoCd3Xh0+5mIbdbS3PqWrVWujkY76MFRTU=
 github.com/pgavlin/fx v0.1.6/go.mod h1:KWZJ6fqBBSh8GxHYqwYCf3rYE7Gp2p0N8tJp8xv9u9M=
 github.com/pgavlin/fx/v2 v2.0.12 h1:SjjaJ68Dt8Z4zHwOpY/RPijd7lShs6xYupJbF9ra00M=
@@ -338,6 +340,8 @@ github.com/pulumi/pulumi-random/sdk/v4 v4.21.0 h1:j6LtoXue77y16trYOR40iqCUxXxv8T
 github.com/pulumi/pulumi-random/sdk/v4 v4.21.0/go.mod h1:92+w+95clbBPdrYdi0uCajihmgol52w/pWgZJ9wT0To=
 github.com/pulumi/pulumi/sdk/v3 v3.253.0 h1:YWdKcZMZC7DtYSqNBn1Yv2UXmFMcgx7RqG3lhhBNZyE=
 github.com/pulumi/pulumi/sdk/v3 v3.253.0/go.mod h1:iTb2Yb9mn0kfUfMjwHgSuI5sxVUOcXRy0JcV7DLWsrc=
+github.com/pulumiverse/pulumi-scaleway/sdk v1.53.0 h1:7FhFYpz5JXpTB6kGfefyFG/Gds81L+wZT80lAPVX1aY=
+github.com/pulumiverse/pulumi-scaleway/sdk v1.53.0/go.mod h1:0Qe5c1gi4SLx/VwU9BWQXNzdvM9JlJ05/wq/f9lBQZo=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/rogpeppe/go-internal v1.15.0 h1:D0RCU5rMAp+SpgkiNdrjfJ+LX4J1M32V2NeCY7EJ6hc=

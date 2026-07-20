@@ -66,10 +66,59 @@ type Composer struct {
 	Credentials string `yaml:"credentials,omitempty" json:"credentials,omitempty" config:"Composer credentials secret reference" schema:"pattern=^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$"`
 }
 type Target struct {
-	Provider string     `yaml:"provider" json:"provider" config:"Infrastructure provider" schema:"enum=aws|gcp"`
-	Runtime  string     `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"enum=ecs-fargate|eks-autopilot|gke-autopilot"`
-	AWS      *AWSTarget `yaml:"aws,omitempty" json:"aws,omitempty" config:"AWS deployment inputs"`
-	GCP      *GCPTarget `yaml:"gcp,omitempty" json:"gcp,omitempty" config:"GCP deployment inputs (experimental)"`
+	Provider string          `yaml:"provider" json:"provider" config:"Infrastructure provider" schema:"enum=aws|gcp|ovh|scaleway"`
+	Runtime  string          `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"enum=ecs-fargate|eks-autopilot|gke-autopilot|mks|kapsule"`
+	AWS      *AWSTarget      `yaml:"aws,omitempty" json:"aws,omitempty" config:"AWS deployment inputs"`
+	GCP      *GCPTarget      `yaml:"gcp,omitempty" json:"gcp,omitempty" config:"GCP deployment inputs (experimental)"`
+	OVH      *OVHTarget      `yaml:"ovh,omitempty" json:"ovh,omitempty" config:"OVHcloud deployment inputs (experimental)"`
+	Scaleway *ScalewayTarget `yaml:"scaleway,omitempty" json:"scaleway,omitempty" config:"Scaleway deployment inputs (experimental)"`
+}
+
+// OVHTarget holds provider-specific OVHcloud inputs. Topology stays out of portable YAML.
+type OVHTarget struct {
+	ServiceName         string            `yaml:"serviceName" json:"serviceName" config:"OVH Public Cloud project service name" schema:"minLength=1"`
+	Region              string            `yaml:"region,omitempty" json:"region,omitempty" config:"OVH Public Cloud region (e.g. GRA9)" schema:"nullable"`
+	NetworkCIDR         string            `yaml:"networkCidr,omitempty" json:"networkCidr,omitempty" config:"Private network IPv4 CIDR" schema:"nullable"`
+	Zones               []string          `yaml:"zones,omitempty" json:"zones,omitempty" config:"OVH regions used as network availability zones" schema:"nullable"`
+	ImageDigest         string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Signed immutable OCI image digest" schema:"nullable"`
+	DatabaseName        string            `yaml:"databaseName,omitempty" json:"databaseName,omitempty" config:"Magento database name" schema:"nullable"`
+	MasterUsername      string            `yaml:"masterUsername,omitempty" json:"masterUsername,omitempty" config:"Managed MySQL master username" schema:"nullable"`
+	EncryptionKeySecret string            `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Secret reference for Magento encryption key" schema:"nullable"`
+	DatabaseFlavor      string            `yaml:"databaseFlavor,omitempty" json:"databaseFlavor,omitempty" config:"OVH managed MySQL flavor" schema:"nullable"`
+	DatabasePlan        string            `yaml:"databasePlan,omitempty" json:"databasePlan,omitempty" config:"OVH managed MySQL plan" schema:"nullable"`
+	ValkeyFlavor        string            `yaml:"valkeyFlavor,omitempty" json:"valkeyFlavor,omitempty" config:"OVH managed Valkey flavor" schema:"nullable"`
+	ValkeyPlan          string            `yaml:"valkeyPlan,omitempty" json:"valkeyPlan,omitempty" config:"OVH managed Valkey plan" schema:"nullable"`
+	NodeFlavor          string            `yaml:"nodeFlavor,omitempty" json:"nodeFlavor,omitempty" config:"MKS node pool flavor" schema:"nullable"`
+	NodeCount           int               `yaml:"nodeCount,omitempty" json:"nodeCount,omitempty" config:"MKS node pool size" schema:"nullable"`
+	CPURequest          string            `yaml:"cpuRequest,omitempty" json:"cpuRequest,omitempty" config:"Kubernetes CPU request" schema:"nullable"`
+	MemoryRequest       string            `yaml:"memoryRequest,omitempty" json:"memoryRequest,omitempty" config:"Kubernetes memory request" schema:"nullable"`
+	DesiredWebReplicas  int               `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
+	QueueConsumerCount  int               `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
+	Labels              map[string]string `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
+}
+
+// ScalewayTarget holds provider-specific Scaleway inputs. Topology stays out of portable YAML.
+type ScalewayTarget struct {
+	ProjectID           string            `yaml:"projectId" json:"projectId" config:"Scaleway project ID" schema:"minLength=1"`
+	Region              string            `yaml:"region,omitempty" json:"region,omitempty" config:"Scaleway region (e.g. fr-par)" schema:"nullable"`
+	Zone                string            `yaml:"zone,omitempty" json:"zone,omitempty" config:"Scaleway availability zone (e.g. fr-par-1)" schema:"nullable"`
+	NetworkCIDR         string            `yaml:"networkCidr,omitempty" json:"networkCidr,omitempty" config:"Private network IPv4 CIDR" schema:"nullable"`
+	Zones               []string          `yaml:"zones,omitempty" json:"zones,omitempty" config:"Scaleway zones" schema:"nullable"`
+	ImageDigest         string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Signed immutable OCI image digest" schema:"nullable"`
+	DatabaseName        string            `yaml:"databaseName,omitempty" json:"databaseName,omitempty" config:"Magento database name" schema:"nullable"`
+	MasterUsername      string            `yaml:"masterUsername,omitempty" json:"masterUsername,omitempty" config:"Managed MySQL master username" schema:"nullable"`
+	EncryptionKeySecret string            `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Secret reference for Magento encryption key" schema:"nullable"`
+	DatabaseNodeType    string            `yaml:"databaseNodeType,omitempty" json:"databaseNodeType,omitempty" config:"Scaleway RDB node type" schema:"nullable"`
+	RedisNodeType       string            `yaml:"redisNodeType,omitempty" json:"redisNodeType,omitempty" config:"Scaleway Redis node type" schema:"nullable"`
+	CacheMode           string            `yaml:"cacheMode,omitempty" json:"cacheMode,omitempty" config:"Cache engine escape hatch" schema:"nullable,enum=redis"`
+	CPURequest          string            `yaml:"cpuRequest,omitempty" json:"cpuRequest,omitempty" config:"Kubernetes CPU request" schema:"nullable"`
+	MemoryRequest       string            `yaml:"memoryRequest,omitempty" json:"memoryRequest,omitempty" config:"Kubernetes memory request" schema:"nullable"`
+	DesiredWebReplicas  int               `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
+	QueueConsumerCount  int               `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
+	KapsuleVersion      string            `yaml:"kapsuleVersion,omitempty" json:"kapsuleVersion,omitempty" config:"Kapsule Kubernetes version" schema:"nullable"`
+	NodeType            string            `yaml:"nodeType,omitempty" json:"nodeType,omitempty" config:"Kapsule pool node type" schema:"nullable"`
+	NodeCount           int               `yaml:"nodeCount,omitempty" json:"nodeCount,omitempty" config:"Kapsule pool size" schema:"nullable"`
+	Labels              map[string]string `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
 }
 
 // GCPTarget holds provider-specific GCP inputs. Topology stays out of portable YAML.

@@ -12,6 +12,11 @@ Use `config effective` to inspect the values and their provenance.
 target (ADR 0007 / 0008). It requires `target.gcp.project` and keeps GCP topology under
 `target.gcp` only. Do not reuse `target.aws` fields for GCP.
 
+`target.provider: ovh` / `runtime: mks` and `target.provider: scaleway` / `runtime: kapsule`
+are also experimental. See [ovh-experimental.md](ovh-experimental.md) and
+[scaleway-experimental.md](scaleway-experimental.md). Scaleway requires
+`cacheMode: redis` (no managed Valkey yet).
+
 Deployments require `target.aws.encryptionKeySecretArn` to reference a stable
 Secrets Manager value. MageLift injects it at task start as the Magento encryption
 key. The key must remain stable for the lifetime of encrypted Magento data.
@@ -52,8 +57,8 @@ access. The VPC CIDR is still required for security-group rules.
 | `build.hooks.*.retries.idempotent` | boolean | no |  | Whether retrying is safe |
 | `build.hooks.*.failure` | string | no | abort, continue | Failure action |
 | `target` | object | yes |  | Deployment target |
-| `target.provider` | string | yes | aws, gcp | Infrastructure provider |
-| `target.runtime` | string | yes | ecs-fargate, eks-autopilot, gke-autopilot | Application runtime |
+| `target.provider` | string | yes | aws, gcp, ovh, scaleway | Infrastructure provider |
+| `target.runtime` | string | yes | ecs-fargate, eks-autopilot, gke-autopilot, mks, kapsule | Application runtime |
 | `target.aws` | object or null | no |  | AWS deployment inputs |
 | `target.aws.kmsKeyArn` | string or null | no |  | Customer-managed KMS key ARN |
 | `target.aws.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID |
@@ -140,6 +145,47 @@ access. The VPC CIDR is still required for security-group rules.
 | `target.gcp.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
 | `target.gcp.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
 | `target.gcp.labels` | object or null | no |  | Resource labels |
+| `target.ovh` | object or null | no |  | OVHcloud deployment inputs (experimental) |
+| `target.ovh.serviceName` | string | yes |  | OVH Public Cloud project service name |
+| `target.ovh.region` | string or null | no |  | OVH Public Cloud region (e.g. GRA9) |
+| `target.ovh.networkCidr` | string or null | no |  | Private network IPv4 CIDR |
+| `target.ovh.zones` | array or null | no |  | OVH regions used as network availability zones |
+| `target.ovh.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
+| `target.ovh.databaseName` | string or null | no |  | Magento database name |
+| `target.ovh.masterUsername` | string or null | no |  | Managed MySQL master username |
+| `target.ovh.encryptionKeySecret` | string or null | no |  | Secret reference for Magento encryption key |
+| `target.ovh.databaseFlavor` | string or null | no |  | OVH managed MySQL flavor |
+| `target.ovh.databasePlan` | string or null | no |  | OVH managed MySQL plan |
+| `target.ovh.valkeyFlavor` | string or null | no |  | OVH managed Valkey flavor |
+| `target.ovh.valkeyPlan` | string or null | no |  | OVH managed Valkey plan |
+| `target.ovh.nodeFlavor` | string or null | no |  | MKS node pool flavor |
+| `target.ovh.nodeCount` | integer or null | no |  | MKS node pool size |
+| `target.ovh.cpuRequest` | string or null | no |  | Kubernetes CPU request |
+| `target.ovh.memoryRequest` | string or null | no |  | Kubernetes memory request |
+| `target.ovh.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
+| `target.ovh.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
+| `target.ovh.labels` | object or null | no |  | Resource labels |
+| `target.scaleway` | object or null | no |  | Scaleway deployment inputs (experimental) |
+| `target.scaleway.projectId` | string | yes |  | Scaleway project ID |
+| `target.scaleway.region` | string or null | no |  | Scaleway region (e.g. fr-par) |
+| `target.scaleway.zone` | string or null | no |  | Scaleway availability zone (e.g. fr-par-1) |
+| `target.scaleway.networkCidr` | string or null | no |  | Private network IPv4 CIDR |
+| `target.scaleway.zones` | array or null | no |  | Scaleway zones |
+| `target.scaleway.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
+| `target.scaleway.databaseName` | string or null | no |  | Magento database name |
+| `target.scaleway.masterUsername` | string or null | no |  | Managed MySQL master username |
+| `target.scaleway.encryptionKeySecret` | string or null | no |  | Secret reference for Magento encryption key |
+| `target.scaleway.databaseNodeType` | string or null | no |  | Scaleway RDB node type |
+| `target.scaleway.redisNodeType` | string or null | no |  | Scaleway Redis node type |
+| `target.scaleway.cacheMode` | string or null | no | redis | Cache engine escape hatch |
+| `target.scaleway.cpuRequest` | string or null | no |  | Kubernetes CPU request |
+| `target.scaleway.memoryRequest` | string or null | no |  | Kubernetes memory request |
+| `target.scaleway.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
+| `target.scaleway.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
+| `target.scaleway.kapsuleVersion` | string or null | no |  | Kapsule Kubernetes version |
+| `target.scaleway.nodeType` | string or null | no |  | Kapsule pool node type |
+| `target.scaleway.nodeCount` | integer or null | no |  | Kapsule pool size |
+| `target.scaleway.labels` | object or null | no |  | Resource labels |
 | `defaults` | object | yes |  | Project defaults |
 | `defaults.region` | string | no |  | Default AWS region |
 | `defaults.preset` | string | no | preview, standard, high-availability | Default infrastructure preset |
@@ -182,8 +228,8 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.build.hooks.*.retries.idempotent` | boolean | no |  | Whether retrying is safe |
 | `environments.*.build.hooks.*.failure` | string | no | abort, continue | Failure action |
 | `environments.*.target` | object or null | no |  |  |
-| `environments.*.target.provider` | string | no | aws, gcp | Infrastructure provider |
-| `environments.*.target.runtime` | string | no | ecs-fargate, eks-autopilot, gke-autopilot | Application runtime |
+| `environments.*.target.provider` | string | no | aws, gcp, ovh, scaleway | Infrastructure provider |
+| `environments.*.target.runtime` | string | no | ecs-fargate, eks-autopilot, gke-autopilot, mks, kapsule | Application runtime |
 | `environments.*.target.aws` | object or null | no |  | AWS deployment inputs |
 | `environments.*.target.aws.kmsKeyArn` | string or null | no |  | Customer-managed KMS key ARN |
 | `environments.*.target.aws.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID |
@@ -270,6 +316,47 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.target.gcp.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
 | `environments.*.target.gcp.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
 | `environments.*.target.gcp.labels` | object or null | no |  | Resource labels |
+| `environments.*.target.ovh` | object or null | no |  | OVHcloud deployment inputs (experimental) |
+| `environments.*.target.ovh.serviceName` | string | no |  | OVH Public Cloud project service name |
+| `environments.*.target.ovh.region` | string or null | no |  | OVH Public Cloud region (e.g. GRA9) |
+| `environments.*.target.ovh.networkCidr` | string or null | no |  | Private network IPv4 CIDR |
+| `environments.*.target.ovh.zones` | array or null | no |  | OVH regions used as network availability zones |
+| `environments.*.target.ovh.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
+| `environments.*.target.ovh.databaseName` | string or null | no |  | Magento database name |
+| `environments.*.target.ovh.masterUsername` | string or null | no |  | Managed MySQL master username |
+| `environments.*.target.ovh.encryptionKeySecret` | string or null | no |  | Secret reference for Magento encryption key |
+| `environments.*.target.ovh.databaseFlavor` | string or null | no |  | OVH managed MySQL flavor |
+| `environments.*.target.ovh.databasePlan` | string or null | no |  | OVH managed MySQL plan |
+| `environments.*.target.ovh.valkeyFlavor` | string or null | no |  | OVH managed Valkey flavor |
+| `environments.*.target.ovh.valkeyPlan` | string or null | no |  | OVH managed Valkey plan |
+| `environments.*.target.ovh.nodeFlavor` | string or null | no |  | MKS node pool flavor |
+| `environments.*.target.ovh.nodeCount` | integer or null | no |  | MKS node pool size |
+| `environments.*.target.ovh.cpuRequest` | string or null | no |  | Kubernetes CPU request |
+| `environments.*.target.ovh.memoryRequest` | string or null | no |  | Kubernetes memory request |
+| `environments.*.target.ovh.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
+| `environments.*.target.ovh.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
+| `environments.*.target.ovh.labels` | object or null | no |  | Resource labels |
+| `environments.*.target.scaleway` | object or null | no |  | Scaleway deployment inputs (experimental) |
+| `environments.*.target.scaleway.projectId` | string | no |  | Scaleway project ID |
+| `environments.*.target.scaleway.region` | string or null | no |  | Scaleway region (e.g. fr-par) |
+| `environments.*.target.scaleway.zone` | string or null | no |  | Scaleway availability zone (e.g. fr-par-1) |
+| `environments.*.target.scaleway.networkCidr` | string or null | no |  | Private network IPv4 CIDR |
+| `environments.*.target.scaleway.zones` | array or null | no |  | Scaleway zones |
+| `environments.*.target.scaleway.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
+| `environments.*.target.scaleway.databaseName` | string or null | no |  | Magento database name |
+| `environments.*.target.scaleway.masterUsername` | string or null | no |  | Managed MySQL master username |
+| `environments.*.target.scaleway.encryptionKeySecret` | string or null | no |  | Secret reference for Magento encryption key |
+| `environments.*.target.scaleway.databaseNodeType` | string or null | no |  | Scaleway RDB node type |
+| `environments.*.target.scaleway.redisNodeType` | string or null | no |  | Scaleway Redis node type |
+| `environments.*.target.scaleway.cacheMode` | string or null | no | redis | Cache engine escape hatch |
+| `environments.*.target.scaleway.cpuRequest` | string or null | no |  | Kubernetes CPU request |
+| `environments.*.target.scaleway.memoryRequest` | string or null | no |  | Kubernetes memory request |
+| `environments.*.target.scaleway.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
+| `environments.*.target.scaleway.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
+| `environments.*.target.scaleway.kapsuleVersion` | string or null | no |  | Kapsule Kubernetes version |
+| `environments.*.target.scaleway.nodeType` | string or null | no |  | Kapsule pool node type |
+| `environments.*.target.scaleway.nodeCount` | integer or null | no |  | Kapsule pool size |
+| `environments.*.target.scaleway.labels` | object or null | no |  | Resource labels |
 | `environments.*.defaults` | object or null | no |  |  |
 | `environments.*.defaults.region` | string | no |  | Default AWS region |
 | `environments.*.defaults.preset` | string | no | preview, standard, high-availability | Default infrastructure preset |

@@ -308,6 +308,12 @@ func validate(c Config) (CompatibilityAssessment, error) {
 		if c.Target.GCP != nil {
 			problems = append(problems, "target.gcp is not valid when provider is aws")
 		}
+		if c.Target.OVH != nil {
+			problems = append(problems, "target.ovh is not valid when provider is aws")
+		}
+		if c.Target.Scaleway != nil {
+			problems = append(problems, "target.scaleway is not valid when provider is aws")
+		}
 		problems = append(problems, validateAWSRuntimeCatalog(c)...)
 	case "gcp":
 		if c.Target.Runtime != "gke-autopilot" {
@@ -316,11 +322,52 @@ func validate(c Config) (CompatibilityAssessment, error) {
 		if c.Target.AWS != nil {
 			problems = append(problems, "target.aws is not valid when provider is gcp")
 		}
+		if c.Target.OVH != nil {
+			problems = append(problems, "target.ovh is not valid when provider is gcp")
+		}
+		if c.Target.Scaleway != nil {
+			problems = append(problems, "target.scaleway is not valid when provider is gcp")
+		}
 		if c.Target.GCP == nil || c.Target.GCP.Project == "" {
 			problems = append(problems, "target.gcp.project is required when provider is gcp")
 		}
+	case "ovh":
+		if c.Target.Runtime != "mks" {
+			problems = append(problems, "target.runtime must be mks when provider is ovh")
+		}
+		if c.Target.AWS != nil {
+			problems = append(problems, "target.aws is not valid when provider is ovh")
+		}
+		if c.Target.GCP != nil {
+			problems = append(problems, "target.gcp is not valid when provider is ovh")
+		}
+		if c.Target.Scaleway != nil {
+			problems = append(problems, "target.scaleway is not valid when provider is ovh")
+		}
+		if c.Target.OVH == nil || c.Target.OVH.ServiceName == "" {
+			problems = append(problems, "target.ovh.serviceName is required when provider is ovh")
+		}
+	case "scaleway":
+		if c.Target.Runtime != "kapsule" {
+			problems = append(problems, "target.runtime must be kapsule when provider is scaleway")
+		}
+		if c.Target.AWS != nil {
+			problems = append(problems, "target.aws is not valid when provider is scaleway")
+		}
+		if c.Target.GCP != nil {
+			problems = append(problems, "target.gcp is not valid when provider is scaleway")
+		}
+		if c.Target.OVH != nil {
+			problems = append(problems, "target.ovh is not valid when provider is scaleway")
+		}
+		if c.Target.Scaleway == nil || c.Target.Scaleway.ProjectID == "" {
+			problems = append(problems, "target.scaleway.projectId is required when provider is scaleway")
+		}
+		if c.Target.Scaleway != nil && c.Target.Scaleway.CacheMode != "" && c.Target.Scaleway.CacheMode != "redis" {
+			problems = append(problems, "target.scaleway.cacheMode must be redis when set")
+		}
 	default:
-		problems = append(problems, "target.provider must be aws or gcp")
+		problems = append(problems, "target.provider must be aws, gcp, ovh, or scaleway")
 	}
 	if c.Defaults.Preset != "preview" && c.Defaults.Preset != "standard" && c.Defaults.Preset != "high-availability" {
 		problems = append(problems, "defaults.preset must be preview, standard, or high-availability")

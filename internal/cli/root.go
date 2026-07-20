@@ -19,6 +19,8 @@ import (
 	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
 	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
+	ovhstack "github.com/acourtiol/magelift/internal/cloud/ovh/stack"
+	scwstack "github.com/acourtiol/magelift/internal/cloud/scaleway/stack"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
@@ -127,6 +129,12 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 		panic(err)
 	}
 	if err := modules.RegisterModule(gcpops.Module{}); err != nil {
+		panic(err)
+	}
+	if err := modules.RegisterModule(ovhstack.Module{}); err != nil {
+		panic(err)
+	}
+	if err := modules.RegisterModule(scwstack.Module{}); err != nil {
 		panic(err)
 	}
 	o := &options{
