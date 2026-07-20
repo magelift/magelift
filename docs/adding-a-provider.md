@@ -21,7 +21,8 @@ A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`
 3. Capability packages (`network`, `database`, …) as needed; keep them typed and small.
 4. Optional day-2 ports on the module (`HasOps`, `HasBootstrap`, `HasState`,
    `HasSecrets`, `HasRuntimeObserve`). Return `ErrNotSupported` until ready.
-   See [ADR 0009](adr/0009-day2-magento-ports.md).
+   See [ADR 0009](adr/0009-day2-magento-ports.md). GCP’s experimental module
+   implements these in `internal/cloud/gcp/ops` (GitHub WIF still deferred).
 5. `internal/config` — provider block, enums, validation, then `make generate` for schema.
 6. `internal/cli/root.go` — `RegisterModule(...)`.
 7. Mock Pulumi graph tests; docs for experimental vs acceptance.

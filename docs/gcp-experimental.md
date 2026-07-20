@@ -11,35 +11,37 @@ target:
   runtime: gke-autopilot
   gcp:
     project: your-gcp-project-id
-    region: europe-west1          # optional; falls back to defaults.region
-    networkCidr: 10.20.0.0/16    # optional
-    zones: [europe-west1-b, europe-west1-c]
+    region: europe-west1
+    networkCidr: 10.20.0.0/16
+    zones: [europe-west1-b, europe-west1-c]   # HA needs 3 zones
     imageDigest: ghcr.io/org/magento@sha256:...
-    encryptionKeySecret: magento-crypt-key   # Secret Manager secret id
+    encryptionKeySecret: magento-crypt-key
 ```
 
-## What this stack provisions
+## Magento capability map (production-shaped)
 
-| Magento need | GCP product |
-| --- | --- |
-| Network | VPC, private/public subnets, Cloud Router + NAT |
-| MySQL | Cloud SQL MySQL 8 (private IP) |
-| Valkey | Memorystore for Valkey |
-| Compute | GKE Autopilot (web, cron, deploy Job, optional queue) |
-| Ingress | Kubernetes Service `LoadBalancer` (no Cloud CDN yet) |
+| Magento need | Preview | Standard / HA |
+| --- | --- | --- |
+| Network | VPC + NAT, 2 zones | Same; HA uses 3 zones |
+| MySQL | Cloud SQL zonal | Cloud SQL **REGIONAL** HA + backups |
+| Valkey | Memorystore 0 replicas | 1 / 2 replicas |
+| Search | OpenSearch on GKE (1) | OpenSearch on GKE (1 / 3) |
+| Queue | Magento DB queue | RabbitMQ on GKE |
+| Media | GCS versioned bucket | Same |
+| Edge | optional Armor | Cloud Armor policy |
+| Compute | GKE Autopilot web/cron | + queue consumers; replicas 2 / 3 |
+| Migrate | GKE Job via Magento Ops | Same |
 
-Deferred: search, RabbitMQ, media/CDN, WIF/OIDC bootstrap, GCS DIY state, Floci-gcp,
-candidate deploy orchestration.
+Magento env contracts (`platform.CoreEnvBindings`, migration shell) stay in core.
+GCP only adapts products.
 
-## Architecture seam
+## Offline verification
 
-Portable Magento ports live in `internal/platform` (`StackModule`, output keys,
-env bindings). GCP code under `internal/cloud/gcp` is an adapter only — it does not
-share Pulumi resource types with AWS.
+- Pulumi mocks: `go test ./internal/cloud/gcp/...` (preview / standard / HA graphs)
+- Floci is **AWS-only** today — there is no floci-gcp. Do not invent GCP emulator coverage;
+  use mocks + short-lived real GCP acceptance.
 
-## Verification
+## Real cloud
 
-- Unit/mock: `go test ./internal/cloud/gcp/... ./internal/platform/...`
-- Real preview against a billed project: use [Local GCP acceptance](gcp-acceptance.md)
-  (`MAGELIFT_GCP_ACCEPTANCE=1`, destroy on exit). Do not leave Autopilot / Cloud SQL /
-  Memorystore running.
+See [gcp-acceptance.md](gcp-acceptance.md). Use a **pullable** image digest for `up`
+(placeholder digests fail ImagePull). Destroy + assert_clean always.

@@ -9,8 +9,9 @@ without editing Pulumi or Go for the supported path.
 ## Boundaries
 
 - V1 certifies AWS ECS Fargate. GCP (`gcp` / `gke-autopilot`) and AWS EKS
-  (`aws` / `eks-autopilot`) are experimental (ADR 0007 / 0008). Multi-cloud is
-  not claimed until two targets are certified.
+  (`aws` / `eks-autopilot`) are experimental (ADR 0007 / 0008). GCP Magento Ops
+  and day-2 ports exist as cloud adapters. Multi-cloud is not claimed until two
+  targets are certified.
 - Stable interfaces may exist for config, lifecycle, and capabilities;
   experimental targets must be labeled in docs and CLI output.
 - The CLI orchestrates; Pulumi owns durable infrastructure.
@@ -28,6 +29,7 @@ validate compatibility, then drive build, Pulumi, and ops. On certified AWS the
 request path is Route 53, CloudFront, WAF, ALB, and private ECS Fargate. Managed
 AWS services hold state; S3 is the media path. Experimental GCP maps Magento onto
 GKE Autopilot, Cloud SQL, and Memorystore — see [gcp-experimental.md](gcp-experimental.md).
+Magento migrate candidates run as GKE Jobs through the shared `deployflow` port.
 
 The PHP package exposes a lifecycle DAG: validate, build, package, deploy,
 post-deploy. The build runner runs the first three without runtime credentials.

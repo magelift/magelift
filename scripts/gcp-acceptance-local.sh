@@ -9,14 +9,16 @@ if [[ "${MAGELIFT_GCP_ACCEPTANCE:-}" != "1" ]]; then
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORKDIR="${MAGELIFT_GCP_ACCEPTANCE_DIR:-/tmp/magelift-gcp-acceptance}"
+WORKDIR="${MAGELIFT_GCP_ACCEPTANCE_DIR:-/tmp/magelift-gcp-wt}"
 PROJECT="${MAGELIFT_GCP_PROJECT:-digital-lab-341608}"
 REGION="${MAGELIFT_GCP_REGION:-europe-west1}"
 MODE="${1:-preview}"
 PROFILE="${MAGELIFT_GCP_ACCEPTANCE_PROFILE:-preview}"
 DIGEST="${MAGELIFT_GCP_ACCEPTANCE_DIGEST:-ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}"
-NAME="${MAGELIFT_GCP_ACCEPTANCE_NAME:-mlacc}"
-STACK_NAME="${NAME}-${PROFILE}"
+# Isolation prefix for this worktree — do not reuse mlacc (other agents / prior orphans).
+NAME="${MAGELIFT_GCP_ACCEPTANCE_NAME:-mlgcpwt}"
+# Magelift DIY stack identity is project-env-provider-runtime (see platform.FormatStackName).
+STACK_NAME="${NAME}-${PROFILE}-gcp-gke-autopilot"
 PULUMI_PROJECT="magelift"
 LOG_DIR="${WORKDIR}/logs"
 BIN="${WORKDIR}/magelift"
@@ -49,13 +51,71 @@ exec > >(tee -a "${LOG_DIR}/acceptance.log") 2>&1
 printf 'gcp acceptance start mode=%s profile=%s project=%s region=%s at=%s\n' \
 	"$MODE" "$PROFILE" "$PROJECT" "$REGION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-# Pulumi GCP provider reads ADC or GOOGLE_OAUTH_ACCESS_TOKEN.
-if [[ -z "${GOOGLE_OAUTH_ACCESS_TOKEN:-}" ]]; then
-	if ! GOOGLE_OAUTH_ACCESS_TOKEN="$(gcloud auth print-access-token --project="$PROJECT" 2>/dev/null)"; then
-		printf 'unable to obtain GCP access token; run gcloud auth login (and preferably application-default login)\n' >&2
-		exit 2
+# Prefer Application Default Credentials (refreshable). A static
+# GOOGLE_OAUTH_ACCESS_TOKEN expires mid-create (~40m) and surfaces as
+# ACCESS_TOKEN_TYPE_UNSUPPORTED on GKE/Memorystore operation polls.
+ensure_gcp_adc() {
+	local adc="${GOOGLE_APPLICATION_CREDENTIALS:-$HOME/.config/gcloud/application_default_credentials.json}"
+	local account
+	if [[ -f "$adc" ]]; then
+		export GOOGLE_APPLICATION_CREDENTIALS="$adc"
+		unset GOOGLE_OAUTH_ACCESS_TOKEN || true
+		printf '+ using existing ADC at %s\n' "$adc"
+		return 0
 	fi
-	export GOOGLE_OAUTH_ACCESS_TOKEN
+	account="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null | head -n 1 | tr -d '[:space:]')"
+	if [[ -z "$account" ]]; then
+		printf 'no active gcloud account; run gcloud auth login\n' >&2
+		return 1
+	fi
+	mkdir -p "$(dirname "$adc")"
+	if ! python3 - "$account" "$adc" <<'PY'
+import json, sqlite3, sys
+from pathlib import Path
+account, dest = sys.argv[1], Path(sys.argv[2])
+db = Path.home() / ".config/gcloud/credentials.db"
+con = sqlite3.connect(db)
+row = con.execute("select value from credentials where account_id = ?", (account,)).fetchone()
+if not row:
+    # fall back to any authorized_user row
+    row = con.execute("select value from credentials limit 1").fetchone()
+if not row:
+    raise SystemExit(f"no gcloud credentials for {account}")
+data = json.loads(row[0])
+if data.get("type") != "authorized_user" or "refresh_token" not in data:
+    raise SystemExit("gcloud credentials are not refreshable authorized_user")
+adc = {
+    "type": "authorized_user",
+    "client_id": data["client_id"],
+    "client_secret": data["client_secret"],
+    "refresh_token": data["refresh_token"],
+}
+if "universe_domain" in data:
+    adc["universe_domain"] = data["universe_domain"]
+dest.write_text(json.dumps(adc))
+dest.chmod(0o600)
+print(account)
+PY
+	then
+		printf 'unable to materialize ADC from gcloud credentials.db\n' >&2
+		return 1
+	fi
+	export GOOGLE_APPLICATION_CREDENTIALS="$adc"
+	unset GOOGLE_OAUTH_ACCESS_TOKEN || true
+	printf '+ materialized ADC for %s at %s (GOOGLE_OAUTH_ACCESS_TOKEN unset)\n' "$account" "$adc"
+	return 0
+}
+
+if ! ensure_gcp_adc; then
+	# Last resort: short-lived user access token (will fail long Ups).
+	if [[ -z "${GOOGLE_OAUTH_ACCESS_TOKEN:-}" ]]; then
+		if ! GOOGLE_OAUTH_ACCESS_TOKEN="$(gcloud auth print-access-token --project="$PROJECT" 2>/dev/null)"; then
+			printf 'unable to obtain GCP credentials; run gcloud auth login and preferably application-default login\n' >&2
+			exit 2
+		fi
+		export GOOGLE_OAUTH_ACCESS_TOKEN
+		printf 'WARNING: using static GOOGLE_OAUTH_ACCESS_TOKEN; long Ups may fail when it expires\n' >&2
+	fi
 fi
 export CLOUDSDK_CORE_PROJECT="$PROJECT"
 export GOOGLE_PROJECT="$PROJECT"
@@ -139,6 +199,7 @@ cleanup() {
 	local ec=$?
 	if [[ "$created" == 1 && "${MAGELIFT_GCP_ACCEPTANCE_KEEP:-false}" != true ]]; then
 		printf '+ magelift destroy --yes (EXIT trap)\n'
+		ensure_gcp_adc || refresh_gcp_access_token || true
 		run destroy --yes || printf 'destroy failed; attempting force_clean_orphans\n' >&2
 		force_clean_orphans || true
 	fi
@@ -150,7 +211,7 @@ cleanup() {
 trap cleanup EXIT
 
 prefix_match() {
-	# Resources named from naming.Resource(project, env, ...) → mlacc-preview-...
+	# Resources named from naming.Resource(project, env, ...) → mlgcpwt-preview-...
 	local kind="$1"
 	shift
 	local leftover=0
@@ -183,7 +244,7 @@ pulumi_cli() {
 }
 
 # Magelift uses automation.NewInlineStackWithBackend(..., stackName, "magelift", backendURL).
-# Stack name is project-environment (e.g. mlacc-preview); backend is pulumi login or PULUMI_BACKEND_URL.
+# Stack name is project-environment (e.g. mlgcpwt-preview); backend is pulumi login or PULUMI_BACKEND_URL.
 pulumi_fq_stack_ref() {
 	local ref org
 	if ! command -v pulumi >/dev/null 2>&1; then
@@ -326,6 +387,16 @@ assert_clean() {
 		| prefix_match secret || failed=1
 	gcloud compute addresses list --global --project="$PROJECT" --format='value(name)' 2>/dev/null \
 		| prefix_match address || failed=1
+	local bucket
+	while IFS= read -r bucket; do
+		[[ -z "$bucket" ]] && continue
+		# DIY Pulumi state buckets are bootstrap artefacts (magelift-…-state), not stack leftovers.
+		[[ "$bucket" == magelift-*-state ]] && continue
+		if [[ "$bucket" == ${NAME}-* ]] || [[ "$bucket" == *"${NAME}-${PROFILE}"* ]]; then
+			printf 'leftover bucket: %s\n' "$bucket" >&2
+			failed=1
+		fi
+	done < <(gcloud storage buckets list --project="$PROJECT" --format='value(name)' 2>/dev/null || true)
 	if [[ "$failed" != 0 ]]; then
 		printf 'assert_clean FAILED: leftovers remain in %s\n' "$PROJECT" >&2
 		return 1
@@ -361,6 +432,11 @@ issue_producer_deletes() {
 		[[ -z "$resource" ]] && continue
 		gcloud network-connectivity service-connection-policies delete "$(resource_id "$resource")" --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
 	done < <(gcloud network-connectivity service-connection-policies list --region="$REGION" --project="$PROJECT" --format='value(name)' 2>/dev/null | acceptance_resource_lines || true)
+	while IFS= read -r resource; do
+		[[ -z "$resource" ]] && continue
+		[[ "$resource" == magelift-*-state ]] && continue
+		gcloud storage rm -r "gs://${resource}" --project="$PROJECT" 2>/dev/null || true
+	done < <(gcloud storage buckets list --project="$PROJECT" --format='value(name)' 2>/dev/null | acceptance_resource_lines || true)
 }
 
 producer_resources_remain() {
@@ -409,11 +485,15 @@ wait_for_producer_deletes() {
 	return 0
 }
 
-# Cloud SQL soft-delete can briefly block Service Networking peering removal.
+# Cloud SQL release of PSA can lag minutes after instance delete
+# (FLOW_SN_DC_RESOURCE_PREVENTING_DELETE_CONNECTION). Prefer compute removePeering
+# after a soak; fall back to services vpc-peerings delete.
 force_clean_orphans() {
 	local net="${NAME}-${PROFILE}-net"
 	local resource
-	printf '+ force_clean_orphans prefix=%s-%s timeout=%ss\n' "$NAME" "$PROFILE" "$FORCE_CLEAN_TIMEOUT_SECS"
+	local soak_secs="${MAGELIFT_GCP_PSA_SOAK_SECS:-180}"
+	printf '+ force_clean_orphans prefix=%s-%s timeout=%ss psa_soak=%ss\n' \
+		"$NAME" "$PROFILE" "$FORCE_CLEAN_TIMEOUT_SECS" "$soak_secs"
 	issue_producer_deletes
 	wait_for_producer_deletes || return 1
 	while IFS= read -r resource; do
@@ -427,11 +507,32 @@ force_clean_orphans() {
 	for subnet in private-0 private-1 public-0 public-1; do
 		gcloud compute networks subnets delete "${NAME}-${PROFILE}-net-${subnet}" --region="$REGION" --project="$PROJECT" --quiet 2>/dev/null || true
 	done
-	for _ in 1 2 3 4 5 6 7 8; do
-		if gcloud services vpc-peerings delete --network="$net" --service=servicenetworking.googleapis.com --project="$PROJECT" --quiet 2>/dev/null; then
+	printf '+ force_clean: soaking %ss for Cloud SQL PSA release\n' "$soak_secs"
+	sleep "$soak_secs"
+	local i
+	for i in $(seq 1 20); do
+		if ! gcloud compute networks describe "$net" --project="$PROJECT" >/dev/null 2>&1; then
+			printf '+ force_clean: network %s already gone\n' "$net"
 			break
 		fi
-		sleep 20
+		if gcloud compute networks peerings list --network="$net" --project="$PROJECT" --format='value(peerings[].name)' 2>/dev/null | grep -qx 'servicenetworking-googleapis-com'; then
+			TOKEN="$(gcloud auth print-access-token --project="$PROJECT" 2>/dev/null || true)"
+			if [[ -n "$TOKEN" ]]; then
+				curl -sS -X POST \
+					-H "Authorization: Bearer ${TOKEN}" \
+					-H 'Content-Type: application/json' \
+					"https://compute.googleapis.com/compute/v1/projects/${PROJECT}/global/networks/${net}/removePeering" \
+					-d '{"name":"servicenetworking-googleapis-com"}' >/dev/null || true
+			fi
+			gcloud services vpc-peerings delete --network="$net" --service=servicenetworking.googleapis.com --project="$PROJECT" --quiet --async 2>/dev/null || true
+			sleep 30
+			continue
+		fi
+		gcloud compute addresses delete "${NAME}-${PROFILE}-sql-psa" --global --project="$PROJECT" --quiet 2>/dev/null || true
+		if gcloud compute networks delete "$net" --project="$PROJECT" --quiet 2>/dev/null; then
+			break
+		fi
+		sleep 30
 	done
 	gcloud compute addresses delete "${NAME}-${PROFILE}-sql-psa" --global --project="$PROJECT" --quiet 2>/dev/null || true
 	gcloud compute networks delete "$net" --project="$PROJECT" --quiet 2>/dev/null || true
@@ -446,10 +547,15 @@ fi
 run preview | tee "${LOG_DIR}/preview.json"
 created=1
 
-if [[ "$MODE" == up ]]; then
+	if [[ "$MODE" == up ]]; then
 	printf 'WARNING: up creates GKE Autopilot + Cloud SQL + Memorystore; destroy runs on EXIT\n'
-	refresh_gcp_access_token || true
-	run deploy --yes | tee "${LOG_DIR}/deploy.json"
+	ensure_gcp_adc || refresh_gcp_access_token || true
+	printf '+ magelift bootstrap (GCS DIY state bucket)\n'
+	run bootstrap --yes 2>&1 | tee "${LOG_DIR}/bootstrap.json" || true
+	# Placeholder digests cannot run Magento migrate; validate the production-shaped
+	# infrastructure graph + outputs, then destroy. Full Magento suite needs a pullable digest.
+	printf '+ magelift deploy --yes --infra-only\n'
+	"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json deploy --yes --infra-only | tee "${LOG_DIR}/deploy.json"
 	run outputs | tee "${LOG_DIR}/outputs.json"
 fi
 
