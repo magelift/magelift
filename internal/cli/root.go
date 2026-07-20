@@ -18,7 +18,7 @@ import (
 	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
 	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
-	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
+	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
@@ -76,6 +76,7 @@ type options struct {
 	testState          platform.State
 	testSecrets        platform.Secrets
 	testRuntimeObserve platform.RuntimeObserve
+	infraOnly          bool
 }
 
 type environmentTerminal interface {
@@ -125,7 +126,7 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 	if err := modules.RegisterModule(awseksops.Module{}); err != nil {
 		panic(err)
 	}
-	if err := modules.RegisterModule(gcpstack.Module{}); err != nil {
+	if err := modules.RegisterModule(gcpops.Module{}); err != nil {
 		panic(err)
 	}
 	o := &options{
@@ -186,20 +187,24 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 		if ops == nil {
 			return nil, platform.ErrNotSupported
 		}
-		awsOps, ok := ops.(awsops.Ops)
-		if ok {
-			awsOps.RecordRelease = func(ctx context.Context, request deployflow.Request, _ deployflow.Result) error {
-				store, err := o.releaseStore(planned.Environment())
-				if err != nil {
-					return err
-				}
-				_, err = store.Append(ctx, releasejournal.Entry{
-					Action: releasejournal.ActionDeploy, Environment: planned.Environment(),
-					DigestReference: request.ImageDigest, ForwardOnly: true,
-				})
+		recordRelease := func(ctx context.Context, request deployflow.Request, _ deployflow.Result) error {
+			store, err := o.releaseStore(planned.Environment())
+			if err != nil {
 				return err
 			}
+			_, err = store.Append(ctx, releasejournal.Entry{
+				Action: releasejournal.ActionDeploy, Environment: planned.Environment(),
+				DigestReference: request.ImageDigest, ForwardOnly: true,
+			})
+			return err
+		}
+		if awsOps, ok := ops.(awsops.Ops); ok {
+			awsOps.RecordRelease = recordRelease
 			ops = awsOps
+		}
+		if gcpOps, ok := ops.(gcpops.Ops); ok {
+			gcpOps.RecordRelease = recordRelease
+			ops = gcpOps
 		}
 		return ops.NewDeploySteps(ctx, backend, planned, diagnostics)
 	}

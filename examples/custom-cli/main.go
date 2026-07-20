@@ -16,7 +16,7 @@ import (
 
 	awseksops "github.com/acourtiol/magelift/internal/cloud/aws/eksops"
 	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
-	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
+	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
@@ -28,7 +28,7 @@ func main() {
 	if err := registry.RegisterModule(awseksops.Module{}); err != nil {
 		fail(err)
 	}
-	if err := registry.RegisterModule(gcpstack.Module{}); err != nil {
+	if err := registry.RegisterModule(gcpops.Module{}); err != nil {
 		fail(err)
 	}
 	// Community providers register the same way:

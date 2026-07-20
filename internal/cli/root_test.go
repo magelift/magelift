@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
-	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
+	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
 )
@@ -28,7 +28,7 @@ func (t *fakeTerminal) SelectEnvironment([]string) (string, error) {
 func testOptions(out *bytes.Buffer, terminal environmentTerminal) *options {
 	modules := platform.NewModuleRegistry()
 	_ = modules.RegisterModule(awsops.Module{})
-	_ = modules.RegisterModule(gcpstack.Module{})
+	_ = modules.RegisterModule(gcpops.Module{})
 	return &options{
 		stdout:        out,
 		stderr:        out,

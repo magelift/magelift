@@ -50,7 +50,11 @@ func infrastructureCommands(o *options) []*cobra.Command {
 
 func infrastructureCommand(o *options, name, short string, operation func(context.Context, infrastructureBackend, automation.Request) (infrastructureResult, error)) *cobra.Command {
 	var digest string
+	var infraOnly bool
 	command := &cobra.Command{Use: name, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+		if name == "deploy" {
+			o.infraOnly = infraOnly
+		}
 		result, err := o.executeInfrastructure(cmd.Context(), name, operation, digest)
 		if err != nil {
 			return err
@@ -59,6 +63,7 @@ func infrastructureCommand(o *options, name, short string, operation func(contex
 	}}
 	if name == "deploy" {
 		command.Flags().StringVar(&digest, "digest", "", "override the configured immutable image digest")
+		command.Flags().BoolVar(&infraOnly, "infra-only", false, "update the infrastructure graph only (skip Magento migrate/health)")
 	}
 	return command
 }
@@ -131,10 +136,11 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 type deploymentOptions struct {
 	rollback                 bool
 	acknowledgeForwardOnlyDB bool
+	infraOnly                bool
 }
 
 func (o *options) runDeployment(ctx context.Context, environment string, planned platform.PlannedStack, digest string) (infrastructureResult, error) {
-	return o.runDeploymentWithOptions(ctx, environment, planned, digest, deploymentOptions{})
+	return o.runDeploymentWithOptions(ctx, environment, planned, digest, deploymentOptions{infraOnly: o.infraOnly})
 }
 
 func (o *options) runDeploymentWithOptions(ctx context.Context, environment string, planned platform.PlannedStack, digest string, deployOptions deploymentOptions) (infrastructureResult, error) {
@@ -147,7 +153,7 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
 	requestTarget := planned.TargetDescriptor()
-	if o.newDeploySteps != nil {
+	if !deployOptions.infraOnly && o.newDeploySteps != nil {
 		steps, stepsErr := o.newDeploySteps(ctx, backend, planned, o.stderr)
 		if stepsErr == nil && steps != nil {
 			if planned.EnvironmentClass() == "production" {
