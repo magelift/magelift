@@ -68,7 +68,13 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	}
 	zones := append([]string(nil), gcp.Zones...)
 	if len(zones) == 0 {
-		zones = []string{region + "-a", region + "-b"}
+		zones = []string{region + "-b", region + "-c"}
+		if preset == sdk.PresetHighAvailability {
+			zones = []string{region + "-b", region + "-c", region + "-d"}
+		}
+	}
+	if preset == sdk.PresetHighAvailability && len(zones) < 3 {
+		return Spec{}, fmt.Errorf("high-availability preset requires at least 3 zones")
 	}
 	expiresAt, err := parseExpiration(cfg.ExpiresAt)
 	if err != nil {
@@ -100,12 +106,23 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 			cloudSQLTier = "db-custom-2-7680"
 		}
 	}
+	availability := "ZONAL"
+	if preset != sdk.PresetPreview {
+		availability = "REGIONAL"
+	}
 	memorystoreNodeType := gcp.MemorystoreNodeType
 	if memorystoreNodeType == "" {
 		memorystoreNodeType = "SHARED_CORE_NANO"
 		if preset != sdk.PresetPreview {
 			memorystoreNodeType = "STANDARD_SMALL"
 		}
+	}
+	memorystoreReplicas := 0
+	if preset == sdk.PresetStandard {
+		memorystoreReplicas = 1
+	}
+	if preset == sdk.PresetHighAvailability {
+		memorystoreReplicas = 2
 	}
 	cpuRequest := gcp.AutopilotCPURequest
 	if cpuRequest == "" {
@@ -114,6 +131,27 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	memoryRequest := gcp.AutopilotMemoryRequest
 	if memoryRequest == "" {
 		memoryRequest = "1Gi"
+	}
+	searchMode := "opensearch"
+	searchReplicas := 1
+	if preset == sdk.PresetHighAvailability {
+		searchReplicas = 3
+	}
+	queueMode := "database"
+	queueReplicas := 0
+	queueConsumers := gcp.QueueConsumerCount
+	if preset != sdk.PresetPreview {
+		queueMode = "rabbitmq"
+		queueReplicas = 1
+		if queueConsumers == 0 {
+			queueConsumers = 1
+		}
+		if preset == sdk.PresetHighAvailability {
+			queueReplicas = 2
+			if queueConsumers < 2 {
+				queueConsumers = 2
+			}
+		}
 	}
 	labels := map[string]string{
 		"magelift-managed-by":  "magelift",
@@ -134,9 +172,13 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		Lifecycle:   Lifecycle{ExpiresAt: expiresAt, Protection: cfg.Protection},
 		Policy:      NetworkPolicy{NetworkCIDR: cidr, Zones: zones},
 		Catalog: CatalogSelection{
-			CloudSQLTier: cloudSQLTier, MemorystoreNodeType: memorystoreNodeType,
+			CloudSQLTier: cloudSQLTier, CloudSQLAvailability: availability,
+			MemorystoreNodeType: memorystoreNodeType, MemorystoreReplicas: memorystoreReplicas,
 			AutopilotCPURequest: cpuRequest, AutopilotMemoryRequest: memoryRequest,
-			DesiredWebReplicas: desiredWeb, QueueConsumerCount: gcp.QueueConsumerCount,
+			DesiredWebReplicas: desiredWeb, QueueConsumerCount: queueConsumers,
+			SearchMode: searchMode, SearchReplicas: searchReplicas,
+			QueueMode: queueMode, QueueReplicas: queueReplicas,
+			EnableCloudArmor: preset != sdk.PresetPreview || class == "production",
 		},
 		Dependencies: Dependencies{
 			DatabaseName: databaseName, MasterUsername: masterUsername, EncryptionKeySecret: gcp.EncryptionKeySecret,

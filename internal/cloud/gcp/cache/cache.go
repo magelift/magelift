@@ -22,6 +22,7 @@ type Args struct {
 	NetworkID        pulumi.StringInput
 	PrivateSubnetIDs pulumi.StringArrayInput
 	NodeType         string
+	ReplicaCount     int
 	Labels           map[string]string
 }
 
@@ -74,7 +75,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		InstanceId:                pulumi.String(instanceID),
 		Location:                  pulumi.String(args.Region),
 		ShardCount:                pulumi.Int(1),
-		ReplicaCount:              pulumi.Int(0),
+		ReplicaCount:              pulumi.Int(args.ReplicaCount),
 		NodeType:                  pulumi.String(args.NodeType),
 		Mode:                      pulumi.String("CLUSTER_DISABLED"),
 		EngineVersion:             pulumi.String("VALKEY_8_0"),

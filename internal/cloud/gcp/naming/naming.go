@@ -36,9 +36,14 @@ func sanitize(value string) string {
 	return value
 }
 
-// ClusterName returns the Autopilot cluster name.
+// ClusterName returns the Autopilot cluster name (GKE limit: 40 characters).
+// Uses Magento project + environment only — never the GCP project ID.
 func ClusterName(project, environment string) string {
-	return Resource(project, environment, "gke")
+	base := Resource(project, environment, "gke")
+	if len(base) > 40 {
+		base = strings.TrimRight(base[:40], "-")
+	}
+	return base
 }
 
 // FormatURL builds an https URL from a load balancer address.

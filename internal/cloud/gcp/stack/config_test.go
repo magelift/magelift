@@ -30,11 +30,14 @@ func TestPlanFromConfigMapsExplicitGCPInputs(t *testing.T) {
 	if spec.Policy.NetworkCIDR != "10.20.0.0/16" {
 		t.Fatalf("network CIDR = %q", spec.Policy.NetworkCIDR)
 	}
-	if len(spec.Policy.Zones) != 2 || spec.Policy.Zones[0] != "europe-west1-a" {
+	if len(spec.Policy.Zones) != 2 || spec.Policy.Zones[0] != "europe-west1-b" {
 		t.Fatalf("zones = %#v", spec.Policy.Zones)
 	}
 	if spec.Catalog.CloudSQLTier != "db-custom-2-7680" || spec.Catalog.DesiredWebReplicas != 2 {
 		t.Fatalf("catalog was not mapped: %#v", spec.Catalog)
+	}
+	if spec.Catalog.CloudSQLAvailability != "REGIONAL" || spec.Catalog.QueueMode != "rabbitmq" {
+		t.Fatalf("standard production catalog = %#v", spec.Catalog)
 	}
 	if spec.Dependencies.DatabaseName != "magento" || spec.Dependencies.MasterUsername != "magento" {
 		t.Fatalf("dependencies were not mapped: %#v", spec.Dependencies)

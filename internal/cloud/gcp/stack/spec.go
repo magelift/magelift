@@ -60,11 +60,18 @@ type NetworkPolicy struct {
 
 type CatalogSelection struct {
 	CloudSQLTier           string
+	CloudSQLAvailability   string // ZONAL | REGIONAL
 	MemorystoreNodeType    string
+	MemorystoreReplicas    int
 	AutopilotCPURequest    string
 	AutopilotMemoryRequest string
 	DesiredWebReplicas     int
 	QueueConsumerCount     int
+	SearchMode             string // opensearch | disabled
+	SearchReplicas         int
+	QueueMode              string // database | rabbitmq
+	QueueReplicas          int
+	EnableCloudArmor       bool
 }
 
 type Dependencies struct {

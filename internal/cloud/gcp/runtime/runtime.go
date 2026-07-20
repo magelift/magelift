@@ -6,12 +6,13 @@ import (
 	"strings"
 
 	"github.com/acourtiol/magelift/internal/cloud/gcp/naming"
+	"github.com/acourtiol/magelift/internal/cloud/gcp/queue"
+	"github.com/acourtiol/magelift/internal/cloud/gcp/search"
 	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/container"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/organizations"
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
-	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/batch/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -22,6 +23,8 @@ const ApplicationPort = 8080
 
 type Args struct {
 	Project             string
+	MagentoProject      string
+	Environment         string
 	Region              string
 	NetworkSelfLink     pulumi.StringInput
 	PrivateSubnetNames  pulumi.StringArrayInput
@@ -32,6 +35,12 @@ type Args struct {
 	DatabaseName        string
 	CacheEndpoint       pulumi.StringInput
 	SessionEndpoint     pulumi.StringInput
+	SearchMode          string
+	SearchReplicas      int
+	QueueMode           string
+	QueueReplicas       int
+	MediaBucket         pulumi.StringInput
+	MediaURL            pulumi.StringInput
 	EncryptionKeySecret string
 	CPURequest          string
 	MemoryRequest       string
@@ -46,6 +55,9 @@ type Component struct {
 	ServiceName     pulumi.StringOutput
 	ApplicationURL  pulumi.StringOutput
 	ClusterEndpoint pulumi.StringOutput
+	SearchEndpoint  pulumi.StringOutput
+	QueueHost       pulumi.StringOutput
+	QueueMode       pulumi.StringOutput
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
@@ -58,6 +70,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if strings.TrimSpace(args.Image) == "" {
 		return nil, errors.New("container image digest is required")
 	}
+	if strings.TrimSpace(args.MagentoProject) == "" || strings.TrimSpace(args.Environment) == "" {
+		return nil, errors.New("Magento project and environment are required for GKE cluster naming")
+	}
 	if args.DesiredWebReplicas < 1 {
 		args.DesiredWebReplicas = 1
 	}
@@ -67,6 +82,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if args.MemoryRequest == "" {
 		args.MemoryRequest = "1Gi"
 	}
+	if args.QueueMode == "" {
+		args.QueueMode = "database"
+	}
 	component := &Component{}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{
 		"project": pulumi.String(args.Project),
@@ -74,8 +92,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 	parent := pulumi.Parent(component)
+	skipAwait := pulumi.StringMap{"pulumi.com/skipAwait": pulumi.String("true")}
 
-	clusterName := naming.ClusterName(args.Project, name)
+	clusterName := naming.ClusterName(args.MagentoProject, args.Environment)
 	cluster, err := container.NewCluster(ctx, name+"-cluster", &container.ClusterArgs{
 		Project:         pulumi.String(args.Project),
 		Name:            pulumi.String(clusterName),
@@ -107,10 +126,34 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	k8sOpts := []pulumi.ResourceOption{parent, pulumi.Provider(k8sProvider), pulumi.DependsOn([]pulumi.Resource{cluster})}
 
-	env := containerEnv(args)
+	searchEndpoint := pulumi.String("").ToStringOutput()
+	if args.SearchMode == "opensearch" {
+		searchComp, err := search.New(ctx, naming.Resource(args.MagentoProject, args.Environment, "search"), search.Args{
+			Replicas: args.SearchReplicas, K8sProvider: k8sProvider,
+		}, k8sOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("create OpenSearch: %w", err)
+		}
+		searchEndpoint = searchComp.Endpoint
+	}
+
+	queueHost := pulumi.String("").ToStringOutput()
+	queueUser := ""
+	if args.QueueMode == "rabbitmq" {
+		queueComp, err := queue.New(ctx, naming.Resource(args.MagentoProject, args.Environment, "rabbitmq"), queue.Args{
+			Replicas: args.QueueReplicas, K8sProvider: k8sProvider, Username: "magento",
+		}, k8sOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("create RabbitMQ: %w", err)
+		}
+		queueHost = queueComp.Host
+		queueUser = "magento"
+	}
+
+	env := containerEnv(args, searchEndpoint, queueHost, queueUser)
 
 	web, err := appsv1.NewDeployment(ctx, name+"-web", &appsv1.DeploymentArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web"), Annotations: skipAwait},
 		Spec: &appsv1.DeploymentSpecArgs{
 			Replicas: pulumi.Int(args.DesiredWebReplicas),
 			Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-web")}},
@@ -137,7 +180,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	service, err := corev1.NewService(ctx, name+"-web-svc", &corev1.ServiceArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web"), Annotations: skipAwait},
 		Spec: &corev1.ServiceSpecArgs{
 			Type:     pulumi.String("LoadBalancer"),
 			Selector: pulumi.StringMap{"app": pulumi.String(name + "-web")},
@@ -151,7 +194,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	_, err = appsv1.NewDeployment(ctx, name+"-cron", &appsv1.DeploymentArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-cron")},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-cron"), Annotations: skipAwait},
 		Spec: &appsv1.DeploymentSpecArgs{
 			Replicas: pulumi.Int(1),
 			Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-cron")}},
@@ -162,7 +205,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 						&corev1.ContainerArgs{
 							Name:    pulumi.String("cron"),
 							Image:   pulumi.String(args.Image),
-							Command: pulumi.StringArray{pulumi.String("/bin/sh"), pulumi.String("-ec"), pulumi.String("while true; do bin/magento cron:run; sleep 60; done")},
+							Command: toStringArray(platform.MagentoCronShell()),
 							Env:     env,
 							Resources: &corev1.ResourceRequirementsArgs{
 								Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
@@ -177,31 +220,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("create cron Deployment: %w", err)
 	}
 
-	_, err = batchv1.NewJob(ctx, name+"-deploy", &batchv1.JobArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-deploy")},
-		Spec: &batchv1.JobSpecArgs{
-			Template: &corev1.PodTemplateSpecArgs{
-				Spec: &corev1.PodSpecArgs{
-					RestartPolicy: pulumi.String("Never"),
-					Containers: corev1.ContainerArray{
-						&corev1.ContainerArgs{
-							Name:    pulumi.String("deploy"),
-							Image:   pulumi.String(args.Image),
-							Command: pulumi.StringArray{pulumi.String("/bin/sh"), pulumi.String("-ec"), pulumi.String("bin/magento app:config:import --no-interaction && bin/magento setup:upgrade --keep-generated --no-interaction && bin/magento cache:flush")},
-							Env:     env,
-						},
-					},
-				},
-			},
-		},
-	}, k8sOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("create deploy Job: %w", err)
-	}
-
 	if args.QueueConsumerCount > 0 {
 		_, err = appsv1.NewDeployment(ctx, name+"-queue", &appsv1.DeploymentArgs{
-			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-queue")},
+			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-queue"), Annotations: skipAwait},
 			Spec: &appsv1.DeploymentSpecArgs{
 				Replicas: pulumi.Int(args.QueueConsumerCount),
 				Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-queue")}},
@@ -212,7 +233,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 							&corev1.ContainerArgs{
 								Name:    pulumi.String("queue"),
 								Image:   pulumi.String(args.Image),
-								Command: pulumi.StringArray{pulumi.String("bin/magento"), pulumi.String("queue:consumers:start"), pulumi.String("--max-messages=10000")},
+								Command: toStringArray(platform.MagentoQueueArgs()),
 								Env:     env,
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
@@ -231,6 +252,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.ClusterName = cluster.Name
 	component.ServiceName = pulumi.String(name + "-web").ToStringOutput()
 	component.ClusterEndpoint = cluster.Endpoint
+	component.SearchEndpoint = searchEndpoint
+	component.QueueHost = queueHost
+	component.QueueMode = pulumi.String(args.QueueMode).ToStringOutput()
 	component.ApplicationURL = service.Status.ApplyT(func(status *corev1.ServiceStatus) string {
 		if status == nil || len(status.LoadBalancer.Ingress) == 0 {
 			return ""
@@ -246,15 +270,25 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}).(pulumi.StringOutput)
 
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"clusterName": component.ClusterName, "serviceName": component.ServiceName, "applicationURL": component.ApplicationURL,
+		"clusterName": component.ClusterName, "serviceName": component.ServiceName,
+		"applicationURL": component.ApplicationURL, "searchEndpoint": component.SearchEndpoint,
+		"queueMode": component.QueueMode, "queueHost": component.QueueHost,
 	}); err != nil {
 		return nil, err
 	}
 	return component, nil
 }
 
-func containerEnv(args Args) corev1.EnvVarArrayOutput {
-	return pulumi.All(args.DatabaseWriter, args.CacheEndpoint, args.SessionEndpoint).ApplyT(func(values []interface{}) []corev1.EnvVar {
+func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queueUser string) corev1.EnvVarArrayOutput {
+	mediaBucket := args.MediaBucket
+	if mediaBucket == nil {
+		mediaBucket = pulumi.String("")
+	}
+	mediaURL := args.MediaURL
+	if mediaURL == nil {
+		mediaURL = pulumi.String("")
+	}
+	return pulumi.All(args.DatabaseWriter, args.CacheEndpoint, args.SessionEndpoint, searchEndpoint, queueHost, mediaBucket, mediaURL).ApplyT(func(values []interface{}) []corev1.EnvVar {
 		session := values[2].(string)
 		if session == "" {
 			session = values[1].(string)
@@ -266,6 +300,12 @@ func containerEnv(args Args) corev1.EnvVarArrayOutput {
 			DatabaseName:    args.DatabaseName,
 			CacheEndpoint:   values[1].(string),
 			SessionEndpoint: session,
+			SearchEndpoint:  values[3].(string),
+			QueueMode:       args.QueueMode,
+			QueueHost:       values[4].(string),
+			QueueUsername:   queueUser,
+			MediaBucket:     values[5].(string),
+			MediaURL:        values[6].(string),
 		})
 		env := make([]corev1.EnvVar, 0, len(bindings))
 		for _, binding := range bindings {
@@ -277,18 +317,23 @@ func containerEnv(args Args) corev1.EnvVarArrayOutput {
 }
 
 func generateKubeconfig(ctx *pulumi.Context, project string, name, endpoint pulumi.StringOutput, auth container.ClusterMasterAuthOutput) pulumi.StringOutput {
-	clientConfig := organizations.GetClientConfigOutput(ctx)
-	return pulumi.All(name, endpoint, auth, clientConfig.AccessToken()).ApplyT(func(values []interface{}) (string, error) {
-		clusterName := values[0].(string)
-		clusterEndpoint := values[1].(string)
-		masterAuth := values[2].(container.ClusterMasterAuth)
-		accessToken := values[3].(string)
-		ca := ""
-		if masterAuth.ClusterCaCertificate != nil {
-			ca = *masterAuth.ClusterCaCertificate
-		}
-		return buildKubeconfig(project, clusterName, clusterEndpoint, ca, accessToken), nil
+	return pulumi.All(name, endpoint, auth.ClusterCaCertificate(), organizations.GetClientConfigOutput(ctx).AccessToken()).ApplyT(func(values []interface{}) (string, error) {
+		return buildKubeconfig(project, asString(values[0]), asString(values[1]), asString(values[2]), asString(values[3])), nil
 	}).(pulumi.StringOutput)
+}
+
+func asString(value interface{}) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case *string:
+		if typed == nil {
+			return ""
+		}
+		return *typed
+	default:
+		return fmt.Sprintf("%v", value)
+	}
 }
 
 func buildKubeconfig(project, clusterName, endpoint, caCert, accessToken string) string {
@@ -311,4 +356,12 @@ users:
   user:
     token: %s
 `, caCert, endpoint, contextName, contextName, contextName, contextName, contextName, contextName, accessToken)
+}
+
+func toStringArray(values []string) pulumi.StringArray {
+	out := make(pulumi.StringArray, 0, len(values))
+	for _, value := range values {
+		out = append(out, pulumi.String(value))
+	}
+	return out
 }

@@ -23,6 +23,7 @@ type Args struct {
 	DatabaseName    string
 	MasterUsername  string
 	Tier            string
+	AvailabilityType string // ZONAL | REGIONAL
 	Labels          map[string]string
 }
 
@@ -47,6 +48,10 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	if strings.TrimSpace(args.Tier) == "" {
 		args.Tier = "db-custom-1-3840"
+	}
+	availability := args.AvailabilityType
+	if availability == "" {
+		availability = "ZONAL"
 	}
 	component := &Component{}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{
@@ -73,7 +78,10 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		ReservedPeeringRanges: pulumi.StringArray{
 			address.Name,
 		},
-	}, parent, pulumi.DependsOn([]pulumi.Resource{address}))
+	}, parent, pulumi.DependsOn([]pulumi.Resource{address}),
+		// Cloud SQL can keep the producer allocation briefly after instance delete;
+		// give the provider time before surfacing FLOW_SN_DC_* to the stack.
+		pulumi.Timeouts(&pulumi.CustomTimeouts{Delete: "45m"}))
 	if err != nil {
 		return nil, fmt.Errorf("create private service connection: %w", err)
 	}
@@ -113,7 +121,10 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		Region:          pulumi.String(args.Region),
 		Settings: &sql.DatabaseInstanceSettingsArgs{
 			Tier:             pulumi.String(args.Tier),
-			AvailabilityType: pulumi.String("ZONAL"),
+			AvailabilityType: pulumi.String(availability),
+			BackupConfiguration: &sql.DatabaseInstanceSettingsBackupConfigurationArgs{
+				Enabled: pulumi.Bool(availability == "REGIONAL"),
+			},
 			IpConfiguration: &sql.DatabaseInstanceSettingsIpConfigurationArgs{
 				Ipv4Enabled:    pulumi.Bool(false),
 				PrivateNetwork: args.NetworkSelfLink,
