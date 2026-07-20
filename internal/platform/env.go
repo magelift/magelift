@@ -38,9 +38,28 @@ const (
 
 	EnvMagentoCryptKey = "MAGENTO_DC_CRYPT__KEY"
 
-	DefaultMySQLPort  = "3306"
-	DefaultValkeyPort = "6379"
-	RedisCacheBackend = "Magento\\Framework\\Cache\\Backend\\Redis"
+	EnvSearchEndpoint = "MAGELIFT_SEARCH_ENDPOINT"
+	EnvMediaBucket    = "MAGELIFT_MEDIA_BUCKET"
+	EnvMediaURL       = "MAGELIFT_MEDIA_URL"
+	EnvQueueMode      = "MAGELIFT_QUEUE_MODE"
+
+	EnvMagentoSearchEngine       = "MAGENTO_DC_CATALOG__SEARCH__ENGINE"
+	EnvMagentoSearchHost         = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME"
+	EnvMagentoSearchPort         = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT"
+	EnvMagentoSearchIndexPrefix  = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX"
+	EnvMagentoSearchEnableAuth   = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH"
+	EnvMagentoSearchTimeout      = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_TIMEOUT"
+
+	EnvMagentoQueueHost     = "MAGENTO_DC_QUEUE__AMQP__HOST"
+	EnvMagentoQueuePort     = "MAGENTO_DC_QUEUE__AMQP__PORT"
+	EnvMagentoQueueSSL      = "MAGENTO_DC_QUEUE__AMQP__SSL"
+	EnvMagentoQueueUsername = "MAGENTO_DC_QUEUE__AMQP__USERNAME"
+
+	DefaultMySQLPort      = "3306"
+	DefaultValkeyPort     = "6379"
+	DefaultOpenSearchPort = "9200"
+	DefaultAMQPPort       = "5672"
+	RedisCacheBackend     = "Magento\\Framework\\Cache\\Backend\\Redis"
 )
 
 // EnvBinding is a literal container environment entry.
@@ -57,17 +76,22 @@ type CapabilityEndpoints struct {
 	DatabaseName    string
 	CacheEndpoint   string
 	SessionEndpoint string
+	SearchEndpoint  string
+	QueueMode       string // database | rabbitmq
+	QueueHost       string
+	QueueUsername   string
+	MediaBucket     string
+	MediaURL        string
 }
 
 // CoreEnvBindings returns the Magento env contract for database + Valkey cache
-// and session. Search, queue, and media bindings remain adapter-local until
-// those capabilities are ported.
+// and session. Optional search/queue/media bindings are appended when set.
 func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 	session := endpoints.SessionEndpoint
 	if session == "" {
 		session = endpoints.CacheEndpoint
 	}
-	return []EnvBinding{
+	bindings := []EnvBinding{
 		{Name: EnvApplicationMode, Value: endpoints.ApplicationMode},
 		{Name: EnvWebRuntime, Value: endpoints.WebRuntime},
 		{Name: EnvDatabaseWriter, Value: endpoints.DatabaseWriter},
@@ -94,4 +118,39 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 		{Name: EnvMagentoSessionPort, Value: DefaultValkeyPort},
 		{Name: EnvMagentoSessionDB, Value: "2"},
 	}
+	if endpoints.SearchEndpoint != "" {
+		bindings = append(bindings,
+			EnvBinding{Name: EnvSearchEndpoint, Value: endpoints.SearchEndpoint},
+			EnvBinding{Name: EnvMagentoSearchEngine, Value: "opensearch"},
+			EnvBinding{Name: EnvMagentoSearchHost, Value: endpoints.SearchEndpoint},
+			EnvBinding{Name: EnvMagentoSearchPort, Value: DefaultOpenSearchPort},
+			EnvBinding{Name: EnvMagentoSearchIndexPrefix, Value: "magento2"},
+			EnvBinding{Name: EnvMagentoSearchEnableAuth, Value: "0"},
+			EnvBinding{Name: EnvMagentoSearchTimeout, Value: "15"},
+		)
+	}
+	queueMode := endpoints.QueueMode
+	if queueMode == "" {
+		queueMode = "database"
+	}
+	bindings = append(bindings, EnvBinding{Name: EnvQueueMode, Value: queueMode})
+	if queueMode == "rabbitmq" && endpoints.QueueHost != "" {
+		user := endpoints.QueueUsername
+		if user == "" {
+			user = "magento"
+		}
+		bindings = append(bindings,
+			EnvBinding{Name: EnvMagentoQueueHost, Value: endpoints.QueueHost},
+			EnvBinding{Name: EnvMagentoQueuePort, Value: DefaultAMQPPort},
+			EnvBinding{Name: EnvMagentoQueueSSL, Value: "0"},
+			EnvBinding{Name: EnvMagentoQueueUsername, Value: user},
+		)
+	}
+	if endpoints.MediaBucket != "" {
+		bindings = append(bindings, EnvBinding{Name: EnvMediaBucket, Value: endpoints.MediaBucket})
+	}
+	if endpoints.MediaURL != "" {
+		bindings = append(bindings, EnvBinding{Name: EnvMediaURL, Value: endpoints.MediaURL})
+	}
+	return bindings
 }

@@ -1,20 +1,25 @@
 package platform
 
-import sdk "github.com/acourtiol/magelift/sdk/v1"
+// Magento workload shell contracts. Cloud adapters pass these into ECS tasks /
+// GKE Jobs/Deployments; they must not invent alternate Magento CLI sequences.
 
-// Magento workload IDs shared across certified and experimental targets.
-const (
-	WorkloadWeb           sdk.WorkloadID = "web"
-	WorkloadDeploy        sdk.WorkloadID = "deploy"
-	WorkloadCron          sdk.WorkloadID = "cron"
-	WorkloadQueueConsumer sdk.WorkloadID = "queue-consumer"
-)
-
-// ExperimentalMinimumCapabilities is the capability set a first experimental
-// cloud adapter (GCP) must satisfy before search, queue brokers, or edge.
-func ExperimentalMinimumCapabilities() []sdk.CapabilityID {
-	return []sdk.CapabilityID{
-		sdk.CapabilityDatabaseMySQL,
-		sdk.CapabilityCacheValkey,
+// MagentoMigrationShell is the pre-traffic migrate candidate command
+// (config import, setup:upgrade, cache clean+flush).
+func MagentoMigrationShell() []string {
+	return []string{
+		"/bin/sh", "-ec",
+		"bin/magento app:config:import --no-interaction && " +
+			"bin/magento setup:upgrade --keep-generated --no-interaction && " +
+			"bin/magento cache:clean && bin/magento cache:flush",
 	}
+}
+
+// MagentoCronShell is the long-running cron loop used by certified runtimes.
+func MagentoCronShell() []string {
+	return []string{"/bin/sh", "-ec", "while true; do bin/magento cron:run; sleep 60; done"}
+}
+
+// MagentoQueueArgs starts Magento message-queue consumers.
+func MagentoQueueArgs() []string {
+	return []string{"bin/magento", "queue:consumers:start", "--max-messages=10000"}
 }

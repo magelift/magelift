@@ -829,7 +829,7 @@ func appendEncryptionSecret(secrets []SecretReference, encryptionARN string) []S
 }
 
 func deploymentCommand() []string {
-	return []string{"/bin/sh", "-ec", "bin/magento app:config:import --no-interaction && bin/magento setup:upgrade --keep-generated --no-interaction && bin/magento cache:clean && bin/magento cache:flush"}
+	return platform.MagentoMigrationShell()
 }
 
 // nginxHealthCheck probes the ALB-facing /health location without booting Magento.

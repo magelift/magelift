@@ -2,12 +2,11 @@ package platform_test
 
 import (
 	"context"
-	"errors"
 	"io"
 	"testing"
 
 	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
-	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
+	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
@@ -17,13 +16,25 @@ func TestModuleOpsAWSAndGCP(t *testing.T) {
 	if awsOps == nil {
 		t.Fatal("AWS module must expose Ops")
 	}
-	gcpOps := platform.ModuleOps(gcpstack.Module{})
+	gcpOps := platform.ModuleOps(gcpops.Module{})
 	if gcpOps == nil {
 		t.Fatal("GCP module must expose Ops")
 	}
+	if platform.ModuleBootstrap(gcpops.Module{}) == nil {
+		t.Fatal("GCP module must expose Bootstrap")
+	}
+	if platform.ModuleState(gcpops.Module{}) == nil {
+		t.Fatal("GCP module must expose State")
+	}
+	if platform.ModuleSecrets(gcpops.Module{}) == nil {
+		t.Fatal("GCP module must expose Secrets")
+	}
+	if platform.ModuleRuntimeObserve(gcpops.Module{}) == nil {
+		t.Fatal("GCP module must expose RuntimeObserve")
+	}
 	_, err := gcpOps.NewDeploySteps(context.Background(), nil, nil, io.Discard)
-	if !errors.Is(err, platform.ErrNotSupported) {
-		t.Fatalf("GCP NewDeploySteps error = %v, want ErrNotSupported", err)
+	if err == nil {
+		t.Fatal("GCP NewDeploySteps with nil planned should fail")
 	}
 }
 
