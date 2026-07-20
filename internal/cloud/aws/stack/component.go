@@ -194,6 +194,16 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		QueueUsername: pulumi.String(spec.Dependencies.MasterUsername),
 		MediaBucket:   component.Storage.BucketName,
 	}
+	logGroupPrefix := "/magelift/" + spec.Identity.Project + "/" + spec.Identity.Environment
+	logGroups, err := observability.NewLogGroups(ctx, name+"-observability", observability.Args{
+		Region: spec.Identity.Region, EnvironmentClass: spec.Identity.EnvironmentClass, LogGroupPrefix: logGroupPrefix,
+		KMSKeyARN: spec.Dependencies.KMSKeyARN, RetentionInDays: spec.Catalog.Retention.LogDays, Tags: tags,
+	}, regional...)
+	if err != nil {
+		return nil, fmt.Errorf("create AWS workload log groups: %w", err)
+	}
+	runtimeOpts := append([]pulumi.ResourceOption{}, regional...)
+	runtimeOpts = append(runtimeOpts, pulumi.DependsOn([]pulumi.Resource{logGroups}))
 	component.Runtime, err = runtime.New(ctx, name+"-runtime", runtime.Args{
 		ApplicationMode: spec.Application.Mode, WebRuntime: spec.Application.WebRuntime,
 		Region: spec.Identity.Region, VpcID: component.Network.VpcID.ToStringOutput(), PrivateSubnetIDs: privateSubnets,
@@ -202,8 +212,9 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		Secrets: runtimeSecrets(spec), Identity: component.RuntimeIdentity,
 		Capabilities:     capabilityConfig,
 		EncryptionKeyARN: pulumi.String(spec.Dependencies.EncryptionKeyARN),
+		LogGroupPrefix:   logGroupPrefix,
 		Tags:             tags,
-	}, regional...)
+	}, runtimeOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("create AWS ECS runtime: %w", err)
 	}
@@ -215,10 +226,11 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		return nil, fmt.Errorf("create AWS edge: %w", err)
 	}
 	component.Observability, err = observability.New(ctx, name+"-observability", observability.Args{
-		Region: spec.Identity.Region, EnvironmentClass: spec.Identity.EnvironmentClass, LogGroupPrefix: "/magelift/" + spec.Identity.Project + "/" + spec.Identity.Environment,
+		Region: spec.Identity.Region, EnvironmentClass: spec.Identity.EnvironmentClass, LogGroupPrefix: logGroupPrefix,
 		KMSKeyARN: spec.Dependencies.KMSKeyARN, RetentionInDays: spec.Catalog.Retention.LogDays, ECSClusterNameInput: component.Runtime.ClusterName, ECSServiceNameInput: component.Runtime.ServiceName,
 		DesiredTaskCount: spec.Catalog.Fargate.DesiredCount, LoadBalancerDimensionInput: component.Ingress.LoadBalancerDimension, NotificationTopicARN: spec.Existing.SNSTopicARN,
 		SyntheticEnabled: spec.Identity.EnvironmentClass == "production", SyntheticURL: "https://" + spec.Policy.ApplicationDomain + "/health", SyntheticArtifactRetentionDays: spec.Catalog.Retention.ArtifactDays, Tags: tags,
+		ExistingLogGroups: logGroups,
 	}, regional...)
 	if err != nil {
 		return nil, fmt.Errorf("create AWS observability: %w", err)

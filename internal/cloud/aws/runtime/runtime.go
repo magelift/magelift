@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/ec2"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/ecs"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
@@ -93,7 +94,9 @@ type Args struct {
 	Secrets            []SecretReference
 	Identity           *Identity
 	Capabilities       *CapabilityConfig
-	Tags               map[string]string
+	// LogGroupPrefix is /magelift/<project>/<env>; containers append /web|/deploy|/cron.
+	LogGroupPrefix string
+	Tags           map[string]string
 }
 
 type Component struct {
@@ -126,12 +129,12 @@ func NewIdentity(ctx *pulumi.Context, name string, args IdentityArgs, opts ...pu
 			return nil, errors.New("MAGELIFT_DATABASE_CREDENTIALS is reserved for the managed database secret")
 		}
 	}
-	if !hasSecretReference(secrets, "MAGENTO_DC_CRYPT__KEY") {
-		return nil, errors.New("runtime secrets must include MAGENTO_DC_CRYPT__KEY")
+	if !hasSecretReference(secrets, platform.EnvMagentoCryptKey) {
+		return nil, errors.New("runtime secrets must include " + platform.EnvMagentoCryptKey)
 	}
 	for _, secret := range secrets {
-		if secret.Name == "MAGENTO_DC_CRYPT__KEY" && secret.JSONKey != "" {
-			return nil, errors.New("MAGENTO_DC_CRYPT__KEY must reference the full secret value")
+		if secret.Name == platform.EnvMagentoCryptKey && secret.JSONKey != "" {
+			return nil, errors.New(platform.EnvMagentoCryptKey + " must reference the full secret value")
 		}
 	}
 	identity := &Identity{}
@@ -216,6 +219,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	component.ExecutionRoleARN, component.TaskRoleARN, component.TaskRoleName = identity.ExecutionRoleARN, identity.TaskRoleARN, identity.TaskRoleName
 	component.DeploymentRoleARN, component.DeploymentRoleName = identity.DeploymentRoleARN, identity.DeploymentRoleName
+	if err := attachExecutionLogPolicy(ctx, name, args, identity, component); err != nil {
+		return nil, err
+	}
 
 	var securityGroupID pulumi.StringOutput
 	if args.WebSecurityGroupID != nil {
@@ -418,17 +424,17 @@ func validate(name string, args Args) ([]SecretReference, error) {
 			return nil, errors.New("MAGELIFT_DATABASE_CREDENTIALS is reserved for the managed database secret")
 		}
 	}
-	if !hasSecretReference(secrets, "MAGENTO_DC_CRYPT__KEY") {
-		return nil, errors.New("runtime secrets must include MAGENTO_DC_CRYPT__KEY")
+	if !hasSecretReference(secrets, platform.EnvMagentoCryptKey) {
+		return nil, errors.New("runtime secrets must include " + platform.EnvMagentoCryptKey)
 	}
 	for _, secret := range secrets {
-		if secret.Name == "MAGENTO_DC_CRYPT__KEY" && secret.JSONKey != "" {
-			return nil, errors.New("MAGENTO_DC_CRYPT__KEY must reference the full secret value")
+		if secret.Name == platform.EnvMagentoCryptKey && secret.JSONKey != "" {
+			return nil, errors.New(platform.EnvMagentoCryptKey + " must reference the full secret value")
 		}
 	}
 	if encryptionInput, ok := args.EncryptionKeyARN.(pulumi.String); ok {
 		for _, secret := range secrets {
-			if secret.Name == "MAGENTO_DC_CRYPT__KEY" && secret.ARN != string(encryptionInput) {
+			if secret.Name == platform.EnvMagentoCryptKey && secret.ARN != string(encryptionInput) {
 				return nil, errors.New("runtime encryption key secret reference does not match the task secret")
 			}
 		}
@@ -511,6 +517,41 @@ func executionPolicy(secrets []SecretReference) (string, error) {
 	}
 	if values := byService["ssm"]; len(values) > 0 {
 		document.Statement = append(document.Statement, statement{Effect: "Allow", Action: []string{"ssm:GetParameters"}, Resource: values})
+	}
+	encoded, err := json.Marshal(document)
+	return string(encoded), err
+}
+
+// attachExecutionLogPolicy grants awslogs drivers CreateLogStream/PutLogEvents on
+// the Magento workload groups created before the runtime.
+func attachExecutionLogPolicy(ctx *pulumi.Context, name string, args Args, identity *Identity, parent pulumi.Resource) error {
+	prefix := strings.TrimSpace(args.LogGroupPrefix)
+	region := strings.TrimSpace(args.Region)
+	if prefix == "" || region == "" {
+		return nil
+	}
+	policy, err := executionLogPolicy(region, prefix)
+	if err != nil {
+		return err
+	}
+	_, err = iam.NewRolePolicy(ctx, name+"-execution-logs-policy", &iam.RolePolicyArgs{
+		Role: identity.ExecutionRoleName, Policy: pulumi.String(policy),
+	}, pulumi.Parent(parent))
+	return err
+}
+
+func executionLogPolicy(region, logGroupPrefix string) (string, error) {
+	groupARN := "arn:aws:logs:" + region + ":*:log-group:" + logGroupPrefix + "/*"
+	document := map[string]any{
+		"Version": "2012-10-17",
+		"Statement": []map[string]any{{
+			"Effect": "Allow",
+			"Action": []string{"logs:CreateLogStream", "logs:PutLogEvents"},
+			"Resource": []string{
+				groupARN,
+				groupARN + ":log-stream:*",
+			},
+		}},
 	}
 	encoded, err := json.Marshal(document)
 	return string(encoded), err
@@ -619,20 +660,26 @@ type containerHealthCheck struct {
 	StartPeriod int      `json:"startPeriod"`
 }
 
+type containerLogConfiguration struct {
+	LogDriver string            `json:"logDriver"`
+	Options   map[string]string `json:"options"`
+}
+
 type containerDefinition struct {
-	Name                   string                 `json:"name"`
-	Image                  string                 `json:"image"`
-	Command                []string               `json:"command,omitempty"`
-	Essential              bool                   `json:"essential"`
-	User                   string                 `json:"user,omitempty"`
-	ReadonlyRootFilesystem bool                   `json:"readonlyRootFilesystem"`
-	LinuxParameters        containerLinux         `json:"linuxParameters"`
-	PortMappings           []containerPort        `json:"portMappings"`
-	MountPoints            []containerMount       `json:"mountPoints,omitempty"`
-	DependsOn              []containerDependency  `json:"dependsOn,omitempty"`
-	HealthCheck            *containerHealthCheck  `json:"healthCheck,omitempty"`
-	Secrets                []containerSecret      `json:"secrets,omitempty"`
-	Environment            []containerEnvironment `json:"environment,omitempty"`
+	Name                   string                     `json:"name"`
+	Image                  string                     `json:"image"`
+	Command                []string                   `json:"command,omitempty"`
+	Essential              bool                       `json:"essential"`
+	User                   string                     `json:"user,omitempty"`
+	ReadonlyRootFilesystem bool                       `json:"readonlyRootFilesystem"`
+	LinuxParameters        containerLinux             `json:"linuxParameters"`
+	PortMappings           []containerPort            `json:"portMappings"`
+	MountPoints            []containerMount           `json:"mountPoints,omitempty"`
+	DependsOn              []containerDependency      `json:"dependsOn,omitempty"`
+	HealthCheck            *containerHealthCheck      `json:"healthCheck,omitempty"`
+	Secrets                []containerSecret          `json:"secrets,omitempty"`
+	Environment            []containerEnvironment     `json:"environment,omitempty"`
+	LogConfiguration       *containerLogConfiguration `json:"logConfiguration,omitempty"`
 }
 
 func containerDefinitionsForInput(args Args, secrets []SecretReference, name string, command []string, exposePort bool) (pulumi.StringInput, error) {
@@ -687,6 +734,7 @@ func appendSearchProxy(args Args, containers []containerDefinition, endpoint str
 		Essential:              true,
 		ReadonlyRootFilesystem: true,
 		LinuxParameters:        containerLinux{InitProcessEnabled: false},
+		LogConfiguration:       awslogsConfig(args, "web"),
 	}
 	for index := range containers {
 		if args.WebRuntime != "nginx-fpm" || containers[index].Name == "php-fpm" {
@@ -726,6 +774,7 @@ func appendVarnish(args Args, containers []containerDefinition) ([]containerDefi
 		LinuxParameters:        containerLinux{InitProcessEnabled: false},
 		PortMappings:           []containerPort{{ContainerPort: VarnishPort, Protocol: "tcp"}},
 		DependsOn:              []containerDependency{{ContainerName: "web", Condition: "HEALTHY"}},
+		LogConfiguration:       awslogsConfig(args, "web"),
 		Environment: []containerEnvironment{
 			{Name: "VARNISH_BACKEND_HOST", Value: "127.0.0.1"},
 			{Name: "VARNISH_BACKEND_PORT", Value: strconv.Itoa(ApplicationPort)},
@@ -761,8 +810,8 @@ func appendDatabaseSecret(secrets []SecretReference, databaseARN string) []Secre
 		name string
 		key  string
 	}{
-		{"MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME", "username"},
-		{"MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD", "password"},
+		{platform.EnvMagentoDBUser, "username"},
+		{platform.EnvMagentoDBPass, "password"},
 	} {
 		result = append(result, SecretReference{Name: field.name, ARN: databaseARN, JSONKey: field.key})
 	}
@@ -772,11 +821,11 @@ func appendDatabaseSecret(secrets []SecretReference, databaseARN string) []Secre
 func appendEncryptionSecret(secrets []SecretReference, encryptionARN string) []SecretReference {
 	result := append([]SecretReference(nil), secrets...)
 	for _, secret := range result {
-		if secret.Name == "MAGENTO_DC_CRYPT__KEY" {
+		if secret.Name == platform.EnvMagentoCryptKey {
 			return result
 		}
 	}
-	return append(result, SecretReference{Name: "MAGENTO_DC_CRYPT__KEY", ARN: encryptionARN})
+	return append(result, SecretReference{Name: platform.EnvMagentoCryptKey, ARN: encryptionARN})
 }
 
 func deploymentCommand() []string {
@@ -803,19 +852,47 @@ func baseContainer(args Args, secrets []SecretReference, environment []container
 	// /tmp). Fargate empty volumes mount as root:root, so overlaying /tmp or
 	// /app/var breaks non-root nginx/php — match magento-aws-stack (writable root,
 	// no bind-mount overlays) until EFS access points own the paths.
-	container := containerDefinition{Name: name, Image: args.Image, Command: command, Essential: true, User: "10001:10001", ReadonlyRootFilesystem: false, LinuxParameters: containerLinux{InitProcessEnabled: true}, Secrets: selected, Environment: environment}
+	container := containerDefinition{
+		Name: name, Image: args.Image, Command: command, Essential: true, User: "10001:10001",
+		ReadonlyRootFilesystem: false, LinuxParameters: containerLinux{InitProcessEnabled: true},
+		Secrets: selected, Environment: environment, LogConfiguration: awslogsConfig(args, name),
+	}
 	if exposePort {
 		container.PortMappings = []containerPort{{ContainerPort: args.ContainerPort, Protocol: "tcp"}}
 	}
 	return container
 }
 
+// awslogsConfig maps Magento workload containers onto the observability log
+// groups (web/deploy/cron). Sidecars share the web group.
+func awslogsConfig(args Args, containerName string) *containerLogConfiguration {
+	prefix := strings.TrimSpace(args.LogGroupPrefix)
+	if prefix == "" || strings.TrimSpace(args.Region) == "" {
+		return nil
+	}
+	role := "web"
+	switch containerName {
+	case "deploy":
+		role = "deploy"
+	case "cron":
+		role = "cron"
+	}
+	return &containerLogConfiguration{
+		LogDriver: "awslogs",
+		Options: map[string]string{
+			"awslogs-group":         prefix + "/" + role,
+			"awslogs-region":        args.Region,
+			"awslogs-stream-prefix": "ecs",
+		},
+	}
+}
+
 func capabilityEnvironment(args Args) pulumi.Output {
 	if args.Capabilities == nil {
-		return pulumi.ToOutput([]containerEnvironment{
-			{Name: "MAGELIFT_APPLICATION_MODE", Value: args.ApplicationMode},
-			{Name: "MAGELIFT_WEB_RUNTIME", Value: args.WebRuntime},
-		})
+		return pulumi.ToOutput(containerEnvFromBindings(platform.CoreEnvBindings(platform.CapabilityEndpoints{
+			ApplicationMode: args.ApplicationMode,
+			WebRuntime:      args.WebRuntime,
+		})))
 	}
 	capabilities := args.Capabilities
 	return pulumi.All(
@@ -830,43 +907,31 @@ func capabilityEnvironment(args Args) pulumi.Output {
 			queueConnection = "amqp"
 		}
 		queueHost, queuePort, queueSSL := amqpSettings(queueEndpoint)
-		environment := []containerEnvironment{
-			{Name: "MAGELIFT_APPLICATION_MODE", Value: args.ApplicationMode},
-			{Name: "MAGELIFT_WEB_RUNTIME", Value: args.WebRuntime},
-			{Name: "MAGELIFT_DATABASE_WRITER", Value: values[0].(string)},
-			{Name: "MAGELIFT_DATABASE_SECRET_ARN", Value: values[1].(string)},
-			{Name: "MAGELIFT_CACHE_ENDPOINT", Value: values[2].(string)},
-			{Name: "MAGELIFT_SESSION_ENDPOINT", Value: values[3].(string)},
-			{Name: "MAGELIFT_SEARCH_ENDPOINT", Value: searchEndpoint},
-			{Name: "MAGELIFT_QUEUE_MODE", Value: queueMode},
-			{Name: "MAGELIFT_QUEUE_ENDPOINT", Value: queueEndpoint},
-			{Name: "MAGELIFT_MEDIA_BUCKET", Value: values[8].(string)},
-			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST", Value: values[0].(string)},
-			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT", Value: "3306"},
-			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME", Value: capabilities.DatabaseName},
-			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__MODEL", Value: "mysql4"},
-			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__ENGINE", Value: "innodb"},
-			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__INITSTATEMENTS", Value: "SET NAMES utf8;"},
-			{Name: "MAGENTO_DC_DB__CONNECTION__DEFAULT__ACTIVE", Value: "1"},
-			{Name: "MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND", Value: "Magento\\Framework\\Cache\\Backend\\Redis"},
-			{Name: "MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__SERVER", Value: values[2].(string)},
-			{Name: "MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__PORT", Value: "6379"},
-			{Name: "MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__DATABASE", Value: "0"},
-			{Name: "MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND", Value: "Magento\\Framework\\Cache\\Backend\\Redis"},
-			{Name: "MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__SERVER", Value: values[2].(string)},
-			{Name: "MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__PORT", Value: "6379"},
-			{Name: "MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__DATABASE", Value: "1"},
-			{Name: "MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__COMPRESS_DATA", Value: "0"},
-			{Name: "MAGENTO_DC_SESSION__SAVE", Value: "redis"},
-			{Name: "MAGENTO_DC_SESSION__REDIS_HOST", Value: values[3].(string)},
-			{Name: "MAGENTO_DC_SESSION__REDIS_PORT", Value: "6379"},
-			{Name: "MAGENTO_DC_SESSION__REDIS_DB", Value: "2"},
-			{Name: "MAGENTO_DC_QUEUE__DEFAULT_CONNECTION", Value: queueConnection},
-			{Name: "MAGENTO_DC_QUEUE__AMQP__HOST", Value: queueHost},
-			{Name: "MAGENTO_DC_QUEUE__AMQP__PORT", Value: queuePort},
-			{Name: "MAGENTO_DC_QUEUE__AMQP__SSL", Value: queueSSL},
-			{Name: "MAGENTO_DC_QUEUE__AMQP__USERNAME", Value: values[7].(string)},
+		session := values[3].(string)
+		if session == "" {
+			session = values[2].(string)
 		}
+		environment := containerEnvFromBindings(platform.CoreEnvBindings(platform.CapabilityEndpoints{
+			ApplicationMode: args.ApplicationMode,
+			WebRuntime:      args.WebRuntime,
+			DatabaseWriter:  values[0].(string),
+			DatabaseName:    capabilities.DatabaseName,
+			CacheEndpoint:   values[2].(string),
+			SessionEndpoint: session,
+		}))
+		// AWS adapter-local: secret ARNs, search/queue/media until those ports land.
+		environment = append(environment,
+			containerEnvironment{Name: "MAGELIFT_DATABASE_SECRET_ARN", Value: values[1].(string)},
+			containerEnvironment{Name: "MAGELIFT_SEARCH_ENDPOINT", Value: searchEndpoint},
+			containerEnvironment{Name: "MAGELIFT_QUEUE_MODE", Value: queueMode},
+			containerEnvironment{Name: "MAGELIFT_QUEUE_ENDPOINT", Value: queueEndpoint},
+			containerEnvironment{Name: "MAGELIFT_MEDIA_BUCKET", Value: values[8].(string)},
+			containerEnvironment{Name: "MAGENTO_DC_QUEUE__DEFAULT_CONNECTION", Value: queueConnection},
+			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__HOST", Value: queueHost},
+			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__PORT", Value: queuePort},
+			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__SSL", Value: queueSSL},
+			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__USERNAME", Value: values[7].(string)},
+		)
 		if args.SearchProxyImage != "" {
 			environment = append(environment,
 				containerEnvironment{Name: "MAGENTO_DC_CATALOG__SEARCH__ENGINE", Value: "opensearch"},
@@ -879,6 +944,14 @@ func capabilityEnvironment(args Args) pulumi.Output {
 		}
 		return environment
 	})
+}
+
+func containerEnvFromBindings(bindings []platform.EnvBinding) []containerEnvironment {
+	environment := make([]containerEnvironment, 0, len(bindings))
+	for _, binding := range bindings {
+		environment = append(environment, containerEnvironment{Name: binding.Name, Value: binding.Value})
+	}
+	return environment
 }
 
 func amqpSettings(endpoint string) (string, string, string) {

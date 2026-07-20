@@ -45,6 +45,17 @@ type Args struct {
 	SyntheticURL                   string
 	SyntheticArtifactRetentionDays int
 	Tags                           map[string]string
+	// ExistingLogGroups, when set, skips creating the Magento workload groups
+	// (created earlier so ECS task definitions can depend on them).
+	ExistingLogGroups *LogGroups
+}
+
+// LogGroups are the CloudWatch groups ECS awslogs drivers write into.
+type LogGroups struct {
+	pulumi.ResourceState
+	Web    *cloudwatch.LogGroup
+	Deploy *cloudwatch.LogGroup
+	Cron   *cloudwatch.LogGroup
 }
 
 type Component struct {
@@ -72,16 +83,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 	child := pulumi.Parent(component)
-	logGroups := make([]*cloudwatch.LogGroup, 0, 3)
-	for _, role := range []string{"web", "deploy", "cron"} {
-		group, err := cloudwatch.NewLogGroup(ctx, name+"-"+role+"-logs", &cloudwatch.LogGroupArgs{
-			Name: pulumi.String(args.LogGroupPrefix + "/" + role), Region: pulumi.String(args.Region), KmsKeyId: pulumi.String(args.KMSKeyARN),
-			RetentionInDays: pulumi.Int(args.RetentionInDays), DeletionProtectionEnabled: pulumi.Bool(args.EnvironmentClass == "production"), SkipDestroy: pulumi.Bool(args.EnvironmentClass == "production"), Tags: pulumi.ToStringMap(tags(args.Tags, name, role)),
-		}, child)
-		if err != nil {
-			return nil, fmt.Errorf("create %s log group: %w", role, err)
-		}
-		logGroups = append(logGroups, group)
+	logGroups, err := resolveLogGroups(ctx, name, args, child)
+	if err != nil {
+		return nil, err
 	}
 	dashboard, err := cloudwatch.NewDashboard(ctx, name+"-dashboard", &cloudwatch.DashboardArgs{DashboardName: pulumi.String(name), DashboardBody: dashboardBodyInput(args), Region: pulumi.String(args.Region)}, child)
 	if err != nil {
@@ -147,6 +151,69 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 	return component, nil
+}
+
+// NewLogGroups creates Magento workload CloudWatch groups before the ECS
+// runtime so task definitions can DependOn them and awslogs has somewhere to write.
+func NewLogGroups(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*LogGroups, error) {
+	if err := validateLogGroups(name, args); err != nil {
+		return nil, err
+	}
+	groups := &LogGroups{}
+	if err := ctx.RegisterComponentResource(ComponentToken+"LogGroups", name, groups, opts...); err != nil {
+		return nil, err
+	}
+	created, err := createLogGroups(ctx, name, args, pulumi.Parent(groups))
+	if err != nil {
+		return nil, err
+	}
+	groups.Web, groups.Deploy, groups.Cron = created[0], created[1], created[2]
+	if err := ctx.RegisterResourceOutputs(groups, pulumi.Map{
+		"webLogGroupArn": groups.Web.Arn, "deployLogGroupArn": groups.Deploy.Arn, "cronLogGroupArn": groups.Cron.Arn,
+	}); err != nil {
+		return nil, err
+	}
+	return groups, nil
+}
+
+func resolveLogGroups(ctx *pulumi.Context, name string, args Args, parent pulumi.ResourceOption) ([]*cloudwatch.LogGroup, error) {
+	if args.ExistingLogGroups != nil {
+		existing := args.ExistingLogGroups
+		if existing.Web == nil || existing.Deploy == nil || existing.Cron == nil {
+			return nil, errors.New("observability ExistingLogGroups must include web, deploy, and cron")
+		}
+		return []*cloudwatch.LogGroup{existing.Web, existing.Deploy, existing.Cron}, nil
+	}
+	return createLogGroups(ctx, name, args, parent)
+}
+
+func createLogGroups(ctx *pulumi.Context, name string, args Args, parent pulumi.ResourceOption) ([]*cloudwatch.LogGroup, error) {
+	logGroups := make([]*cloudwatch.LogGroup, 0, 3)
+	for _, role := range []string{"web", "deploy", "cron"} {
+		group, err := cloudwatch.NewLogGroup(ctx, name+"-"+role+"-logs", &cloudwatch.LogGroupArgs{
+			Name: pulumi.String(args.LogGroupPrefix + "/" + role), Region: pulumi.String(args.Region), KmsKeyId: pulumi.String(args.KMSKeyARN),
+			RetentionInDays: pulumi.Int(args.RetentionInDays), DeletionProtectionEnabled: pulumi.Bool(args.EnvironmentClass == "production"), SkipDestroy: pulumi.Bool(args.EnvironmentClass == "production"), Tags: pulumi.ToStringMap(tags(args.Tags, name, role)),
+		}, parent)
+		if err != nil {
+			return nil, fmt.Errorf("create %s log group: %w", role, err)
+		}
+		logGroups = append(logGroups, group)
+	}
+	return logGroups, nil
+}
+
+func validateLogGroups(name string, args Args) error {
+	if strings.TrimSpace(name) == "" || strings.TrimSpace(args.Region) == "" || strings.TrimSpace(args.LogGroupPrefix) == "" {
+		return errors.New("log groups require a name, region, and log group prefix")
+	}
+	if !kmsARNPattern.MatchString(args.KMSKeyARN) {
+		return errors.New("log groups require a KMS key ARN")
+	}
+	allowedRetention := map[int]bool{1: true, 3: true, 5: true, 7: true, 14: true, 30: true, 60: true, 90: true, 120: true, 150: true, 180: true, 365: true, 400: true, 545: true, 731: true, 1096: true, 1827: true, 2192: true, 2557: true, 2922: true, 3288: true, 3653: true}
+	if !allowedRetention[args.RetentionInDays] {
+		return errors.New("observability log retention must use an AWS-supported retention period")
+	}
+	return nil
 }
 
 func newAlarm(ctx *pulumi.Context, name, description string, args Args, alarmArgs cloudwatch.MetricAlarmArgs, parent pulumi.ResourceOption) (*cloudwatch.MetricAlarm, error) {

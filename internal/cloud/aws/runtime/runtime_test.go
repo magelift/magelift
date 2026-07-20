@@ -38,7 +38,7 @@ func TestRuntimeResourceGraphAndSecurityContract(t *testing.T) {
 	m := deploy(t, validArgs())
 	want := []string{
 		"aws:ec2/securityGroup:SecurityGroup:shop-web-sg", "aws:ecs/cluster:Cluster:shop-cluster", "aws:ecs/service:Service:shop-cron-service", "aws:ecs/service:Service:shop-web-service", "aws:ecs/taskDefinition:TaskDefinition:shop-cron-task", "aws:ecs/taskDefinition:TaskDefinition:shop-deploy-task", "aws:ecs/taskDefinition:TaskDefinition:shop-web-task",
-		"aws:iam/role:Role:shop-deployment-role", "aws:iam/role:Role:shop-execution-role", "aws:iam/role:Role:shop-task-role", "aws:iam/rolePolicy:RolePolicy:shop-execution-policy", TypeToken + ":shop",
+		"aws:iam/role:Role:shop-deployment-role", "aws:iam/role:Role:shop-execution-role", "aws:iam/role:Role:shop-task-role", "aws:iam/rolePolicy:RolePolicy:shop-execution-logs-policy", "aws:iam/rolePolicy:RolePolicy:shop-execution-policy", TypeToken + ":shop",
 	}
 	if got := m.snapshot(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("resource graph:\n%s", strings.Join(got, "\n"))
@@ -133,6 +133,9 @@ func TestRuntimeResourceGraphAndSecurityContract(t *testing.T) {
 	if !strings.Contains(task.inputs["containerDefinitions"].StringValue(), "MAGENTO_DC_CRYPT__KEY") || !strings.Contains(task.inputs["containerDefinitions"].StringValue(), "encryption-key") {
 		t.Fatalf("container definitions do not inject the Magento encryption key reference: %s", task.inputs["containerDefinitions"].StringValue())
 	}
+	if !strings.Contains(task.inputs["containerDefinitions"].StringValue(), `"logDriver":"awslogs"`) || !strings.Contains(task.inputs["containerDefinitions"].StringValue(), "/magelift/shop/preview/web") {
+		t.Fatalf("container definitions lack awslogs configuration: %s", task.inputs["containerDefinitions"].StringValue())
+	}
 	if strings.Contains(task.inputs["containerDefinitions"].StringValue(), "plaintext") {
 		t.Fatal("container definition contains plaintext secret material")
 	}
@@ -142,6 +145,9 @@ func TestRuntimeResourceGraphAndSecurityContract(t *testing.T) {
 	}
 	if !strings.Contains(deployTask.inputs["containerDefinitions"].StringValue(), "MAGELIFT_DATABASE_CREDENTIALS") {
 		t.Fatal("deploy task does not receive the managed database secret reference")
+	}
+	if !strings.Contains(deployTask.inputs["containerDefinitions"].StringValue(), "/magelift/shop/preview/deploy") {
+		t.Fatal("deploy task lacks awslogs group for deploy workload")
 	}
 	service := m.one(t, "aws:ecs/service:Service")
 	if !service.inputs["enableExecuteCommand"].BoolValue() {
@@ -301,7 +307,7 @@ func TestRuntimeInjectsNonSecretCapabilityReferences(t *testing.T) {
 func TestExecutionPolicyScopesSecretReadsToARNs(t *testing.T) {
 	t.Parallel()
 	m := deploy(t, validArgs())
-	policy := m.one(t, "aws:iam/rolePolicy:RolePolicy").inputs["policy"].StringValue()
+	policy := m.named(t, "aws:iam/rolePolicy:RolePolicy", "shop-execution-policy").inputs["policy"].StringValue()
 	for _, value := range []string{"secretsmanager:GetSecretValue", "ssm:GetParameters", "arn:aws:secretsmanager:eu-west-3:123456789012:secret:composer", "arn:aws:ssm:eu-west-3:123456789012:parameter/shop/license"} {
 		if !strings.Contains(policy, value) {
 			t.Fatalf("execution policy is missing %q: %s", value, policy)
@@ -309,6 +315,10 @@ func TestExecutionPolicyScopesSecretReadsToARNs(t *testing.T) {
 	}
 	if strings.Contains(policy, `"Action":["secretsmanager:GetSecretValue"],"Resource":"*"`) {
 		t.Fatal("secret read permission is unscoped")
+	}
+	logsPolicy := m.named(t, "aws:iam/rolePolicy:RolePolicy", "shop-execution-logs-policy")
+	if !strings.Contains(logsPolicy.inputs["policy"].StringValue(), "logs:CreateLogStream") || !strings.Contains(logsPolicy.inputs["policy"].StringValue(), "/magelift/shop/preview/*") {
+		t.Fatalf("execution logs policy missing awslogs permissions: %#v", logsPolicy.inputs)
 	}
 }
 
@@ -439,7 +449,7 @@ func environmentByName(definition map[string]any) map[string]string {
 }
 
 func validArgs() Args {
-	return Args{Region: "eu-west-3", ApplicationMode: "integrated", WebRuntime: "nginx-fpm", VpcID: pulumi.String("vpc-private"), PrivateSubnetIDs: pulumi.StringArray{pulumi.String("subnet-private-a"), pulumi.String("subnet-private-b")}, Image: testImage, VarnishImage: testVarnishImage, DatabaseSecretARN: pulumi.String("arn:aws:secretsmanager:eu-west-3:123456789012:secret:database"), EncryptionKeyARN: pulumi.String("arn:aws:secretsmanager:eu-west-3:123456789012:secret:encryption-key"), ContainerPort: VarnishPort, TaskCPU: "256", TaskMemory: "512", DesiredCount: 2, Secrets: []SecretReference{
+	return Args{Region: "eu-west-3", ApplicationMode: "integrated", WebRuntime: "nginx-fpm", VpcID: pulumi.String("vpc-private"), PrivateSubnetIDs: pulumi.StringArray{pulumi.String("subnet-private-a"), pulumi.String("subnet-private-b")}, Image: testImage, VarnishImage: testVarnishImage, DatabaseSecretARN: pulumi.String("arn:aws:secretsmanager:eu-west-3:123456789012:secret:database"), EncryptionKeyARN: pulumi.String("arn:aws:secretsmanager:eu-west-3:123456789012:secret:encryption-key"), ContainerPort: VarnishPort, TaskCPU: "256", TaskMemory: "512", DesiredCount: 2, LogGroupPrefix: "/magelift/shop/preview", Secrets: []SecretReference{
 		{Name: "COMPOSER_AUTH", ARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:composer"},
 		{Name: "MAGENTO_LICENSE", ARN: "arn:aws:ssm:eu-west-3:123456789012:parameter/shop/license"},
 		{Name: "MAGENTO_DC_CRYPT__KEY", ARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:encryption-key"},
