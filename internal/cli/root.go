@@ -16,6 +16,7 @@ import (
 	"github.com/acourtiol/magelift/internal/automation"
 	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
 	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
+	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
 	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
@@ -46,28 +47,29 @@ func ExitCode(err error) int {
 }
 
 type options struct {
-	configPath      string
-	environment     string
-	output          string
-	noInteraction   bool
-	yes             bool
-	verbose         int
-	stdout          io.Writer
-	stderr          io.Writer
-	getenv          func(string) string
-	currentBranch   func(string) (string, error)
-	terminal        environmentTerminal
-	modules         *platform.ModuleRegistry
-	newBackend      func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error)
-	newDeploySteps  func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error)
-	newLock         func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
-	runCommand      func(context.Context, string, []string, io.Writer, io.Writer) error
-	runCompose      func(context.Context, string, []string, []string, io.Writer, io.Writer) error
-	newReleaseStore func(string, string) (releaseStore, error)
-	verifyRelease   func(context.Context, string, cosign.VerifyOptions) error
-	newPricing      func(context.Context, string) (costEstimator, error)
-	newUpgrade      func() upgradeClient
-	executable      func() (string, error)
+	configPath         string
+	environment        string
+	output             string
+	noInteraction      bool
+	yes                bool
+	verbose            int
+	stdout             io.Writer
+	stderr             io.Writer
+	getenv             func(string) string
+	currentBranch      func(string) (string, error)
+	terminal           environmentTerminal
+	modules            *platform.ModuleRegistry
+	newBackend         func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error)
+	newDeploySteps     func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error)
+	newLock            func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
+	runCommand         func(context.Context, string, []string, io.Writer, io.Writer) error
+	runCompose         func(context.Context, string, []string, []string, io.Writer, io.Writer) error
+	newReleaseStore    func(string, string) (releaseStore, error)
+	verifyRelease      func(context.Context, string, cosign.VerifyOptions) error
+	newPricing         func(context.Context, string) (costEstimator, error)
+	newComposerSecrets func(context.Context, string) (composerSecretProvider, error)
+	newUpgrade         func() upgradeClient
+	executable         func() (string, error)
 	// Test doubles for day-2 ports (override Module* resolution).
 	testBootstrap      platform.Bootstrap
 	testState          platform.State
@@ -164,6 +166,9 @@ func newCommand(stdout, stderr io.Writer) *cobra.Command {
 		verifyRelease: cosign.New().Verify,
 		newPricing: func(ctx context.Context, region string) (costEstimator, error) {
 			return awspricing.New(ctx, region)
+		},
+		newComposerSecrets: func(ctx context.Context, region string) (composerSecretProvider, error) {
+			return awssecrets.New(ctx, region)
 		},
 		newUpgrade: func() upgradeClient { return mageliftupgrade.New(nil) },
 		executable: os.Executable,

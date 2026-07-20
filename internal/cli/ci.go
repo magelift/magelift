@@ -81,7 +81,11 @@ func expectedWorkflow(o *options, flags *ciFlags) ([]byte, string, error) {
 		return nil, "", errors.New("at least one environment is required")
 	}
 	for _, environment := range environments {
-		if _, err := file.Resolve(environment, config.ResolveOptions{}); err != nil {
+		effective, err := file.Resolve(environment, config.ResolveOptions{})
+		if err != nil {
+			return nil, "", fmt.Errorf("environment %s: %w", environment, err)
+		}
+		if err := requireAWSCITarget(effective.Config); err != nil {
 			return nil, "", fmt.Errorf("environment %s: %w", environment, err)
 		}
 	}
@@ -97,6 +101,20 @@ func expectedWorkflow(o *options, flags *ciFlags) ([]byte, string, error) {
 	}
 	workflow := renderWorkflow(filepath.Base(o.configPath), flags.version, environments)
 	return workflow, filepath.Clean(path), nil
+}
+
+func requireAWSCITarget(cfg config.Config) error {
+	if cfg.Target.Provider != "aws" {
+		return errors.New("ci generate currently supports AWS targets only")
+	}
+	runtime := cfg.Target.Runtime
+	if runtime == "" {
+		runtime = "ecs-fargate"
+	}
+	if runtime != "ecs-fargate" {
+		return fmt.Errorf("ci generate does not support runtime %q yet", runtime)
+	}
+	return nil
 }
 
 func renderWorkflow(configFile, version string, environments []string) []byte {

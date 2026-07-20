@@ -13,7 +13,6 @@ import (
 
 	buildkit "github.com/acourtiol/magelift/internal/build/kit"
 	buildpipeline "github.com/acourtiol/magelift/internal/build/pipeline"
-	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
 	"github.com/acourtiol/magelift/internal/cosign"
 	"github.com/acourtiol/magelift/internal/secretref"
 	"github.com/acourtiol/magelift/internal/source"
@@ -58,7 +57,7 @@ func buildCommand(o *options) *cobra.Command {
 				return &exitError{code: 3, err: err}
 			}
 		}
-		composerAuth, err := loadComposerCredentials(cmd.Context(), spec.Build.Composer.Credentials, defaults.Region)
+		composerAuth, err := o.loadComposerCredentials(cmd.Context(), spec.Build.Composer.Credentials, defaults.Region)
 		if err != nil {
 			return &exitError{code: 3, err: err}
 		}
@@ -220,7 +219,7 @@ func immutableSourceURL(raw, revision string) (string, error) {
 	return parsed.String(), nil
 }
 
-func loadComposerCredentials(ctx context.Context, rawReference, region string) ([]byte, error) {
+func (o *options) loadComposerCredentials(ctx context.Context, rawReference, region string) ([]byte, error) {
 	if rawReference == "" {
 		return nil, nil
 	}
@@ -234,9 +233,12 @@ func loadComposerCredentials(ctx context.Context, rawReference, region string) (
 		if err != nil {
 			return nil, err
 		}
-		provider, err := awssecrets.New(ctx, region)
+		if o == nil || o.newComposerSecrets == nil {
+			return nil, errors.New("Composer credentials resolution is not configured for this CLI")
+		}
+		provider, err := o.newComposerSecrets(ctx, region)
 		if err != nil {
-			return nil, fmt.Errorf("initialize AWS secret provider: %w", err)
+			return nil, fmt.Errorf("initialize secret provider: %w", err)
 		}
 		return resolveComposerCredentials(ctx, reference, provider)
 	case secretref.GCPSecretManager:

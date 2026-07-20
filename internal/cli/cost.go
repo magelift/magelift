@@ -56,6 +56,9 @@ func costCommand(o *options) *cobra.Command {
 			if err != nil {
 				return invalid(err)
 			}
+			if err := requireAWSCostTarget(effective.Config); err != nil {
+				return invalid(err)
+			}
 			if !live {
 				return o.write(newCostReport(effective.Config, environment))
 			}
@@ -75,6 +78,20 @@ func costCommand(o *options) *cobra.Command {
 	}
 	command.Flags().BoolVar(&live, "live", false, "query current AWS on-demand prices")
 	return command
+}
+
+func requireAWSCostTarget(cfg config.Config) error {
+	if cfg.Target.Provider != "aws" {
+		return errors.New("cost estimation is certified for AWS ECS Fargate only")
+	}
+	runtime := cfg.Target.Runtime
+	if runtime == "" {
+		runtime = "ecs-fargate"
+	}
+	if runtime != "ecs-fargate" {
+		return fmt.Errorf("cost estimation is not available for runtime %q yet", runtime)
+	}
+	return nil
 }
 
 func newCostReport(cfg config.Config, environment string) costReport {

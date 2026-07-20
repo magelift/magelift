@@ -160,7 +160,7 @@ func TestResolveComposerCredentialsRejectsInvalidOrLeakingValues(t *testing.T) {
 }
 
 func TestLoadComposerCredentialsSkipsAWSWhenUnset(t *testing.T) {
-	value, err := loadComposerCredentials(context.Background(), "", "eu-west-3")
+	value, err := (&options{}).loadComposerCredentials(context.Background(), "", "eu-west-3")
 	if err != nil || value != nil {
 		t.Fatalf("value=%v error=%v", value, err)
 	}
