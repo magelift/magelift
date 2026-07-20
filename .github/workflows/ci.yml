@@ -5,11 +5,61 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      docs: ${{ steps.filter.outputs.docs }}
+      php: ${{ steps.filter.outputs.php }}
+      images: ${{ steps.filter.outputs.images }}
+      scripts: ${{ steps.filter.outputs.scripts }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+      release: ${{ steps.filter.outputs.release }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'schema/**'
+              - 'Makefile'
+            docs:
+              - 'docs/**'
+              - 'mkdocs.yml'
+            php:
+              - 'build/**'
+            images:
+              - 'images/**'
+              - 'docker-bake.hcl'
+              - 'scripts/frankenphp-tls-test.sh'
+              - 'scripts/varnish-test.sh'
+            scripts:
+              - 'scripts/**'
+            workflows:
+              - '.github/workflows/**'
+              - '.github/dependabot.yml'
+            release:
+              - '.goreleaser.yml'
+              - '.goreleaser.yaml'
+              - 'cmd/**'
+
   go:
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -36,7 +86,10 @@ jobs:
           go-package: ./...
       - name: Check Go dependency licenses
         run: go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown
+
   docs:
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -50,12 +103,16 @@ jobs:
         run: pip install --disable-pip-version-check mkdocs==1.6.1
       - name: Build docs
         run: mkdocs build --strict
+
   php:
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        php-version: ['8.2', '8.3', '8.4', '8.5']
+        # Full matrix on main; PR samples current + previous minor.
+        php-version: ${{ github.event_name == 'push' && fromJSON('["8.2","8.3","8.4","8.5"]') || fromJSON('["8.3","8.5"]') }}
     defaults:
       run:
         working-directory: build
@@ -73,7 +130,10 @@ jobs:
       - run: composer analyse
       - run: composer psalm
       - run: vendor/bin/phpunit --fail-on-deprecation --fail-on-notice --fail-on-warning
+
   container:
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -121,8 +181,28 @@ jobs:
           test "$(docker run --rm --entrypoint php "$image" -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" = "$PHP_BRANCH"
           test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.php.base" }}')" = "$(docker image inspect "$runtime" --format '{{ index .Config.Labels "io.magelift.php.base" }}')"
           docker run --rm --entrypoint composer "$image" --version
+      - name: Scan runtime image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: magelift/php-runtime:${{ matrix.php.branch }}-local
+          format: table
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          exit-code: '1'
+      - name: Scan builder image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: magelift/php-builder:${{ matrix.php.branch }}-local
+          format: table
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          exit-code: '1'
 
   frankenphp:
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -147,8 +227,19 @@ jobs:
           test "$(docker run --rm --entrypoint id "$image" -u)" = 10001
           docker run --rm --entrypoint frankenphp "$image" version
           MAGELIFT_FRANKENPHP_IMAGE="$image" ./scripts/frankenphp-tls-test.sh
+      - name: Scan frankenphp image
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: magelift/frankenphp-classic:${{ matrix.php.branch }}-local
+          format: table
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          exit-code: '1'
 
   varnish:
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -158,6 +249,8 @@ jobs:
         run: ./scripts/varnish-test.sh
 
   floci:
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     services:
       floci:
@@ -183,6 +276,8 @@ jobs:
         run: go test -race -tags=floci ./tests/floci -count=1
 
   release-config:
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -195,6 +290,8 @@ jobs:
           args: check
 
   workflow-lint:
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -207,6 +304,8 @@ jobs:
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
 
   shellcheck:
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -219,38 +318,38 @@ jobs:
           koalaman/shellcheck-alpine:v0.11.0@sha256:9955be09ea7f0dbf7ae942ac1f2094355bb30d96fffba0ec09f5432207544002
           -c 'shellcheck --severity=warning /src/scripts/*.sh'
 
-  image-security:
+  # Single required status check: skipped path-filtered jobs count as OK.
+  result:
+    name: CI passed
+    needs:
+      - changes
+      - go
+      - docs
+      - php
+      - container
+      - frankenphp
+      - varnish
+      - floci
+      - release-config
+      - workflow-lint
+      - shellcheck
+    if: always()
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {target: 'php-runtime-8-2', image: 'magelift/php-runtime:8.2-local'}
-          - {target: 'php-runtime-8-3', image: 'magelift/php-runtime:8.3-local'}
-          - {target: 'php-runtime-8-4', image: 'magelift/php-runtime:8.4-local'}
-          - {target: 'php-runtime-8-5', image: 'magelift/php-runtime:8.5-local'}
-          - {target: 'php-builder-8-2', image: 'magelift/php-builder:8.2-local'}
-          - {target: 'php-builder-8-3', image: 'magelift/php-builder:8.3-local'}
-          - {target: 'php-builder-8-4', image: 'magelift/php-builder:8.4-local'}
-          - {target: 'php-builder-8-5', image: 'magelift/php-builder:8.5-local'}
-          - {target: 'frankenphp-classic-8-2', image: 'magelift/frankenphp-classic:8.2-local'}
-          - {target: 'frankenphp-classic-8-3', image: 'magelift/frankenphp-classic:8.3-local'}
-          - {target: 'frankenphp-classic-8-4', image: 'magelift/frankenphp-classic:8.4-local'}
-          - {target: 'frankenphp-classic-8-5', image: 'magelift/frankenphp-classic:8.5-local'}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-      - name: Build image for scanning
+      - name: Aggregate job results
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          needs = json.loads(os.environ["NEEDS_JSON"])
+          bad = sorted(
+              name
+              for name, job in needs.items()
+              if job.get("result") not in ("success", "skipped")
+          )
+          if bad:
+              print("failing jobs:", ", ".join(bad))
+              sys.exit(1)
+          print("all jobs succeeded or were skipped by path filters")
+          PY
         env:
-          TARGET: ${{ matrix.target }}
-        run: docker buildx bake "$TARGET" --load --provenance=false --sbom=false --set "$TARGET.platform=linux/amd64"
-      - uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-        with:
-          image-ref: ${{ matrix.image }}
-          format: table
-          ignore-unfixed: true
-          severity: CRITICAL,HIGH
-          vuln-type: os,library
-          exit-code: '1'
+          NEEDS_JSON: ${{ toJSON(needs) }}

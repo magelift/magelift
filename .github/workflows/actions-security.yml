@@ -1,25 +1,21 @@
 name: Actions Security
 
+# Workflow/config changes + weekly. dependency-review requires GitHub
+# Advanced Security / Dependency graph, which this public repo does not have.
 on:
   pull_request:
+    paths:
+      - '.github/**'
   push:
     branches: [main]
+    paths:
+      - '.github/**'
   schedule:
     - cron: '17 4 * * 1'
 
 permissions: {}
 
 jobs:
-  dependency-review:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
-        with:
-          fail-on-severity: high
-
   zizmor:
     runs-on: ubuntu-latest
     permissions:

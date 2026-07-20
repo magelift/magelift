@@ -1,8 +1,8 @@
 name: CodeQL
 
+# PR + weekly only: avoid re-running the same analysis on every main push
+# after a green PR, and skip GitHub API flakes on docs-only merges.
 on:
-  push:
-    branches: [main]
   pull_request:
   schedule:
     - cron: '23 3 * * 1'
