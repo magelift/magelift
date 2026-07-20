@@ -111,7 +111,12 @@ func validateSubnetCarve(networkCIDR string, zones []string) (netip.Prefix, erro
 	if bits > 24 {
 		return netip.Prefix{}, fmt.Errorf("network CIDR %s must be /24 or wider to carve per-zone /24 subnets", networkCIDR)
 	}
-	if available := 1 << (24 - bits); len(zones) > available {
+	// subnetCIDR caps index at 15, so never advertise more than 16 slots even for a /16.
+	available := 1 << (24 - bits)
+	if available > 16 {
+		available = 16
+	}
+	if len(zones) > available {
 		return netip.Prefix{}, fmt.Errorf("network CIDR %s has room for %d /24 subnet(s) but %d zone(s) were requested", networkCIDR, available, len(zones))
 	}
 	return prefix, nil

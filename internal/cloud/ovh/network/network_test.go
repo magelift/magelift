@@ -37,3 +37,18 @@ func TestValidateSubnetCarveOK(t *testing.T) {
 		t.Fatalf("got %s", prefix)
 	}
 }
+
+func TestValidateSubnetCarveCapsWidePrefixes(t *testing.T) {
+	t.Parallel()
+	zones := make([]string, 17)
+	for i := range zones {
+		zones[i] = "Z"
+	}
+	_, err := validateSubnetCarve("10.0.0.0/16", zones)
+	if err == nil {
+		t.Fatal("expected cap at 16 /24 slots")
+	}
+	if !strings.Contains(err.Error(), "room for 16") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
