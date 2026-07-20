@@ -45,8 +45,23 @@ func (m *stackMocks) NewResource(args pulumi.MockResourceArgs) (string, resource
 		state["endpoint"] = resource.NewStringProperty("shop.writer")
 		state["readerEndpoint"] = resource.NewStringProperty("shop.reader")
 		state["masterUserSecrets"] = resource.NewArrayProperty([]resource.PropertyValue{resource.NewObjectProperty(resource.PropertyMap{"secretArn": resource.NewStringProperty("arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed")})})
+	case "aws:rds/instance:Instance":
+		state["arn"] = resource.NewStringProperty("arn:aws:rds:eu-west-3:123456789012:db:shop")
+		state["address"] = resource.NewStringProperty("shop.writer")
+		state["endpoint"] = resource.NewStringProperty("shop.writer:3306")
+		state["masterUserSecrets"] = resource.NewArrayProperty([]resource.PropertyValue{resource.NewObjectProperty(resource.PropertyMap{"secretArn": resource.NewStringProperty("arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed")})})
 	case "aws:elasticache/replicationGroup:ReplicationGroup":
 		state["primaryEndpointAddress"] = resource.NewStringProperty(args.Name + ".cache.amazonaws.com")
+	case "aws:ec2/instance:Instance":
+		state["id"] = resource.NewStringProperty("i-" + args.Name)
+		state["privateIp"] = resource.NewStringProperty("10.42.0.10")
+	case "aws:ec2/eip:Eip":
+		state["id"] = resource.NewStringProperty("eipalloc-" + args.Name)
+		state["publicIp"] = resource.NewStringProperty("203.0.113.10")
+	case "aws:ec2/securityGroup:SecurityGroup":
+		state["id"] = resource.NewStringProperty("sg-" + args.Name)
+	case "aws:ec2/ami:Ami":
+		state["id"] = resource.NewStringProperty("ami-fcknat")
 	case "aws:mq/broker:Broker":
 		state["arn"] = resource.NewStringProperty("arn:aws:mq:eu-west-3:123456789012:broker:shop")
 		state["instances"] = resource.NewArrayProperty([]resource.PropertyValue{resource.NewObjectProperty(resource.PropertyMap{
@@ -81,7 +96,15 @@ func (m *stackMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error
 	m.mu.Lock()
 	m.invokes = append(m.invokes, args)
 	m.mu.Unlock()
-	return resource.PropertyMap{"secretString": resource.MakeSecret(resource.NewStringProperty("mock-secret"))}, nil
+	switch args.Token {
+	case "aws:ec2/getAmi:getAmi", "aws:index/getAmi:getAmi":
+		return resource.PropertyMap{
+			"id":           resource.NewStringProperty("ami-fcknat"),
+			"architecture": resource.NewStringProperty("arm64"),
+		}, nil
+	default:
+		return resource.PropertyMap{"secretString": resource.MakeSecret(resource.NewStringProperty("mock-secret"))}, nil
+	}
 }
 
 func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
@@ -245,6 +268,79 @@ func TestNewRejectsInvalidPlanBeforePulumiRegistration(t *testing.T) {
 	}, pulumi.WithMocks("magelift", "test", m))
 	if err == nil || len(m.resources) != 2 {
 		t.Fatalf("invalid plan registration = %d resources, error = %v", len(m.resources), err)
+	}
+}
+
+func TestNewComposesPreviewEscapeHatches(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		edit func(*Spec)
+		want map[string]int
+		deny []string
+	}{
+		{
+			name: "fck-nat",
+			edit: func(spec *Spec) { spec.Policy.NatMode = NatModeFckNat },
+			want: map[string]int{
+				"aws:ec2/instance:Instance": 1,
+				"aws:ec2/natGateway:NatGateway": 0,
+			},
+		},
+		{
+			name: "rds-mysql",
+			edit: func(spec *Spec) {
+				spec.Catalog.DatabaseEngine = DatabaseEngineRDSMySQL
+				spec.Catalog.Versions.MySQL = "8.4.10"
+				spec.Catalog.AuroraProvisioned = AuroraProvisionedProfile{InstanceClass: "db.t4g.micro"}
+			},
+			want: map[string]int{
+				"magelift:aws:AuroraMysql":  0,
+				"magelift:aws:RdsMysql":     1,
+				"aws:rds/instance:Instance": 1,
+				"aws:rds/cluster:Cluster":   0,
+			},
+		},
+		{
+			name: "search-disabled",
+			edit: func(spec *Spec) { spec.Catalog.SearchMode = SearchModeDisabled },
+			want: map[string]int{
+				"magelift:aws:OpenSearch":                        0,
+				"aws:opensearch/serverlessCollection:ServerlessCollection": 0,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			m := &stackMocks{}
+			spec := validSpec()
+			test.edit(&spec)
+			if err := spec.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+				providers, err := NewProviders(ctx, "shop", "eu-west-3")
+				if err != nil {
+					return err
+				}
+				_, err = New(ctx, "shop-preview-1", spec, providers)
+				return err
+			}, pulumi.WithMocks("magelift", "test", m))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for token, count := range test.want {
+				if got := componentCount(m, token); got != count {
+					t.Fatalf("%s count = %d, want %d", token, got, count)
+				}
+			}
+			for _, token := range test.deny {
+				if componentCount(m, token) != 0 {
+					t.Fatalf("unexpected resource %s", token)
+				}
+			}
+		})
 	}
 }
 
