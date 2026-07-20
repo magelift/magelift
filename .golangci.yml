@@ -1,9 +1,9 @@
 version: "2"
 
 run:
-  concurrency: 4
+  concurrency: 1
   # Cold CI package-load of Pulumi-heavy graphs needs headroom beyond local runs.
-  timeout: 20m
+  timeout: 30m
   tests: true
 
 issues:

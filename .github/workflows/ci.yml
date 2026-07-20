@@ -82,11 +82,6 @@ jobs:
           git diff --exit-code
       - run: go build -o /tmp/genconfig ./cmd/genconfig && /tmp/genconfig --check
       - run: go build -o /tmp/gendocs ./cmd/gendocs && /tmp/gendocs --check
-      # Compile library packages into GOCACHE without linking fat mains (cmd/magelift).
-      - name: Warm Go package cache
-        run: |
-          mapfile -t pkgs < <(go list -f '{{if ne .Name "main"}}{{.ImportPath}}{{end}}' ./...)
-          go build "${pkgs[@]}"
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
