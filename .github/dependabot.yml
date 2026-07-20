@@ -1,15 +1,28 @@
 version: 2
 updates:
+  # Pulumi provider SDKs live in go.mod (no Dependabot "pulumi" ecosystem).
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 15
     labels: [dependencies, go]
     commit-message:
       prefix: chore
       include: scope
     groups:
+      pulumi:
+        patterns:
+          - "github.com/pulumi/*"
+          - "github.com/pulumiverse/*"
+          - "github.com/ovh/pulumi-*"
+      aws-sdk:
+        patterns:
+          - "github.com/aws/*"
+      google-cloud:
+        patterns:
+          - "cloud.google.com/*"
+          - "google.golang.org/*"
       go-dependencies:
         patterns: ["*"]
   - package-ecosystem: composer
@@ -28,6 +41,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 15
     labels: [dependencies, ci]
     commit-message:
       prefix: chore
@@ -35,6 +49,15 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies, docs]
+    commit-message:
+      prefix: chore
+      include: scope
   - package-ecosystem: docker
     directory: /images/php-runtime
     schedule:
