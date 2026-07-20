@@ -37,21 +37,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if strings.TrimSpace(args.ServiceName) == "" || strings.TrimSpace(args.Region) == "" {
 		return nil, errors.New("OVH service name and region are required")
 	}
-	prefix, err := netip.ParsePrefix(args.NetworkCIDR)
-	if err != nil || !prefix.Addr().Is4() {
-		return nil, fmt.Errorf("network CIDR must be IPv4: %w", err)
-	}
-	if len(args.Zones) == 0 {
-		return nil, errors.New("at least one zone is required")
-	}
-	// Each zone gets its own /24 carved from NetworkCIDR. Reject up front if the
-	// parent prefix cannot hold one /24 per zone, rather than failing mid-loop.
-	bits := prefix.Bits()
-	if bits > 24 {
-		return nil, fmt.Errorf("network CIDR %s must be /24 or wider to carve per-zone /24 subnets", args.NetworkCIDR)
-	}
-	if available := 1 << (24 - bits); len(args.Zones) > available {
-		return nil, fmt.Errorf("network CIDR %s has room for %d /24 subnet(s) but %d zone(s) were requested", args.NetworkCIDR, available, len(args.Zones))
+	prefix, err := validateSubnetCarve(args.NetworkCIDR, args.Zones)
+	if err != nil {
+		return nil, err
 	}
 
 	component := &Component{}
@@ -108,6 +96,25 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 	return component, nil
+}
+
+// validateSubnetCarve ensures NetworkCIDR is IPv4 and can hold one /24 per zone.
+func validateSubnetCarve(networkCIDR string, zones []string) (netip.Prefix, error) {
+	prefix, err := netip.ParsePrefix(networkCIDR)
+	if err != nil || !prefix.Addr().Is4() {
+		return netip.Prefix{}, fmt.Errorf("network CIDR must be IPv4: %w", err)
+	}
+	if len(zones) == 0 {
+		return netip.Prefix{}, errors.New("at least one zone is required")
+	}
+	bits := prefix.Bits()
+	if bits > 24 {
+		return netip.Prefix{}, fmt.Errorf("network CIDR %s must be /24 or wider to carve per-zone /24 subnets", networkCIDR)
+	}
+	if available := 1 << (24 - bits); len(zones) > available {
+		return netip.Prefix{}, fmt.Errorf("network CIDR %s has room for %d /24 subnet(s) but %d zone(s) were requested", networkCIDR, available, len(zones))
+	}
+	return prefix, nil
 }
 
 func subnetCIDR(prefix netip.Prefix, index int) (string, error) {
