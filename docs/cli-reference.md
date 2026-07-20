@@ -191,6 +191,7 @@ Options:
 
 ```text
       --digest string   override the configured immutable image digest
+      --infra-only      update the infrastructure graph only (skip Magento migrate/health)
 ```
 ## magelift destroy
 
