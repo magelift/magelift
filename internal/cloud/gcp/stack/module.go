@@ -3,6 +3,7 @@ package stack
 import (
 	"fmt"
 
+	"github.com/acourtiol/magelift/internal/cloud/gcp/naming"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
 	sdk "github.com/acourtiol/magelift/sdk/v1"
@@ -65,5 +66,20 @@ func (Module) Program(planned platform.PlannedStack) (pulumi.RunFunc, error) {
 }
 
 func (Module) OutputKeys() []string {
-	return platform.RequiredOutputKeys()
+	keys := append([]string(nil), platform.RequiredOutputKeys()...)
+	return append(keys, "mediaURL", "mediaBucket", "searchEndpoint", "queueMode", "queueHost", "securityPolicyName")
+}
+
+// GCPSpec exposes the concrete Spec for GCP-only deploy/lock factories.
+func (p Planned) GCPSpec() Spec { return p.Spec }
+
+// AsGCPPlanned extracts the GCP Planned value when present.
+func AsGCPPlanned(planned platform.PlannedStack) (Planned, bool) {
+	value, ok := planned.(Planned)
+	return value, ok
+}
+
+// ClusterHint returns the deterministic Autopilot cluster name matching runtime.New.
+func ClusterHint(spec Spec) string {
+	return naming.ClusterName(spec.Identity.Project, spec.Identity.Environment)
 }
