@@ -22,9 +22,20 @@
             }
           ]
         },
+        "eks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSCatalogEKS",
+              "description": "EKS Autopilot capacity (eks-autopilot)"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "fargate": {
           "$ref": "#/$defs/aWSCatalogFargate",
-          "description": "Fargate capacity"
+          "description": "Fargate capacity (ecs-fargate)"
         },
         "rabbitMq": {
           "$ref": "#/$defs/aWSCatalogRabbitMQ",
@@ -136,6 +147,106 @@
       },
       "type": "object"
     },
+    "aWSCatalogEKS": {
+      "additionalProperties": false,
+      "properties": {
+        "cpuRequest": {
+          "anyOf": [
+            {
+              "description": "Web/cron CPU request",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "desiredWebReplicas": {
+          "anyOf": [
+            {
+              "description": "Desired web Deployment replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memoryRequest": {
+          "anyOf": [
+            {
+              "description": "Web/cron memory request",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueConsumerCount": {
+          "anyOf": [
+            {
+              "description": "Queue consumer Deployment replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "aWSCatalogEKSOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "cpuRequest": {
+          "anyOf": [
+            {
+              "description": "Web/cron CPU request",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "desiredWebReplicas": {
+          "anyOf": [
+            {
+              "description": "Desired web Deployment replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memoryRequest": {
+          "anyOf": [
+            {
+              "description": "Web/cron memory request",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueConsumerCount": {
+          "anyOf": [
+            {
+              "description": "Queue consumer Deployment replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
     "aWSCatalogFargate": {
       "additionalProperties": false,
       "properties": {
@@ -194,9 +305,20 @@
             }
           ]
         },
+        "eks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSCatalogEKSOverlay",
+              "description": "EKS Autopilot capacity (eks-autopilot)"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "fargate": {
           "$ref": "#/$defs/aWSCatalogFargateOverlay",
-          "description": "Fargate capacity"
+          "description": "Fargate capacity (ecs-fargate)"
         },
         "rabbitMq": {
           "$ref": "#/$defs/aWSCatalogRabbitMQOverlay",
@@ -2034,6 +2156,7 @@
           "description": "Application runtime",
           "enum": [
             "ecs-fargate",
+            "eks-autopilot",
             "gke-autopilot"
           ],
           "type": "string"
@@ -2082,6 +2205,7 @@
           "description": "Application runtime",
           "enum": [
             "ecs-fargate",
+            "eks-autopilot",
             "gke-autopilot"
           ],
           "type": "string"

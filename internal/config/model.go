@@ -67,7 +67,7 @@ type Composer struct {
 }
 type Target struct {
 	Provider string     `yaml:"provider" json:"provider" config:"Infrastructure provider" schema:"enum=aws|gcp"`
-	Runtime  string     `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"enum=ecs-fargate|gke-autopilot"`
+	Runtime  string     `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"enum=ecs-fargate|eks-autopilot|gke-autopilot"`
 	AWS      *AWSTarget `yaml:"aws,omitempty" json:"aws,omitempty" config:"AWS deployment inputs"`
 	GCP      *GCPTarget `yaml:"gcp,omitempty" json:"gcp,omitempty" config:"GCP deployment inputs (experimental)"`
 }
@@ -133,7 +133,8 @@ type AWSCatalog struct {
 	Valkey         AWSCatalogValkey    `yaml:"valkey,omitempty" json:"valkey,omitempty" config:"Valkey capacity"`
 	Search         AWSCatalogSearch    `yaml:"search,omitempty" json:"search,omitempty" config:"OpenSearch capacity"`
 	RabbitMQ       AWSCatalogRabbitMQ  `yaml:"rabbitMq,omitempty" json:"rabbitMq,omitempty" config:"RabbitMQ capacity"`
-	Fargate        AWSCatalogFargate   `yaml:"fargate,omitempty" json:"fargate,omitempty" config:"Fargate capacity"`
+	Fargate        AWSCatalogFargate   `yaml:"fargate,omitempty" json:"fargate,omitempty" config:"Fargate capacity (ecs-fargate)"`
+	EKS            AWSCatalogEKS       `yaml:"eks,omitempty" json:"eks,omitempty" config:"EKS Autopilot capacity (eks-autopilot)" schema:"nullable"`
 	Retention      AWSCatalogRetention `yaml:"retention,omitempty" json:"retention,omitempty" config:"Retention policy"`
 	Versions       AWSCatalogVersions  `yaml:"versions,omitempty" json:"versions,omitempty" config:"Managed service versions"`
 }
@@ -172,6 +173,14 @@ type AWSCatalogFargate struct {
 	CPU          int `yaml:"cpu,omitempty" json:"cpu,omitempty" config:"Fargate task CPU"`
 	MemoryMiB    int `yaml:"memoryMiB,omitempty" json:"memoryMiB,omitempty" config:"Fargate task memory"`
 	DesiredCount int `yaml:"desiredCount,omitempty" json:"desiredCount,omitempty" config:"Fargate desired task count"`
+}
+
+// AWSCatalogEKS sizes Magento workloads on EKS Auto Mode (experimental).
+type AWSCatalogEKS struct {
+	CPURequest         string `yaml:"cpuRequest,omitempty" json:"cpuRequest,omitempty" config:"Web/cron CPU request" schema:"nullable"`
+	MemoryRequest      string `yaml:"memoryRequest,omitempty" json:"memoryRequest,omitempty" config:"Web/cron memory request" schema:"nullable"`
+	DesiredWebReplicas int    `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
+	QueueConsumerCount int    `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
 }
 
 type AWSCatalogRetention struct {

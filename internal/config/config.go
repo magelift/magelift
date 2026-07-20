@@ -300,12 +300,15 @@ func validate(c Config) (CompatibilityAssessment, error) {
 	}
 	switch c.Target.Provider {
 	case "aws":
-		if c.Target.Runtime != "ecs-fargate" {
-			problems = append(problems, "target.runtime must be ecs-fargate when provider is aws")
+		switch c.Target.Runtime {
+		case "ecs-fargate", "eks-autopilot":
+		default:
+			problems = append(problems, "target.runtime must be ecs-fargate or eks-autopilot when provider is aws")
 		}
 		if c.Target.GCP != nil {
 			problems = append(problems, "target.gcp is not valid when provider is aws")
 		}
+		problems = append(problems, validateAWSRuntimeCatalog(c)...)
 	case "gcp":
 		if c.Target.Runtime != "gke-autopilot" {
 			problems = append(problems, "target.runtime must be gke-autopilot when provider is gcp")
@@ -358,6 +361,28 @@ func validate(c Config) (CompatibilityAssessment, error) {
 		return compatibility, errors.New("invalid configuration: " + strings.Join(problems, "; "))
 	}
 	return compatibility, nil
+}
+
+func validateAWSRuntimeCatalog(c Config) []string {
+	if c.Target.AWS == nil {
+		return nil
+	}
+	catalog := c.Target.AWS.Catalog
+	eksSet := catalog.EKS.CPURequest != "" || catalog.EKS.MemoryRequest != "" || catalog.EKS.DesiredWebReplicas > 0 || catalog.EKS.QueueConsumerCount > 0
+	// Preset defaults always populate Fargate desiredCount for AWS projects; treat
+	// CPU/memory as the signal that the ECS catalog was intentionally sized.
+	fargateSized := catalog.Fargate.CPU > 0 || catalog.Fargate.MemoryMiB > 0
+	switch c.Target.Runtime {
+	case "ecs-fargate":
+		if eksSet {
+			return []string{"target.aws.catalog.eks requires runtime eks-autopilot"}
+		}
+	case "eks-autopilot":
+		if fargateSized {
+			return []string{"target.aws.catalog.fargate requires runtime ecs-fargate"}
+		}
+	}
+	return nil
 }
 
 func validateBuildHooks(hooks map[string]BuildHook) []string {
