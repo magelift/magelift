@@ -13,9 +13,12 @@ drive builds, Pulumi, and day-2 ops.
 | Migrate from ACC / Platform.sh | [Migrating from PaaS](migrating-from-paas.md) |
 | AWS EKS (experimental) | [AWS EKS experimental](aws-eks-experimental.md) |
 | GCP (experimental) | [GCP experimental](gcp-experimental.md) |
+| OVH (experimental) | [OVH experimental](ovh-experimental.md) |
+| Scaleway (experimental) | [Scaleway experimental](scaleway-experimental.md) |
 | Clean-room rules | [Provenance](provenance.md) |
 
-Certified target: AWS ECS Fargate. Experimental: GCP GKE Autopilot. Multi-cloud
+Certified target: AWS ECS Fargate. Experimental: GCP GKE Autopilot, OVH MKS,
+Scaleway Kapsule. Multi-cloud
 is not claimed until two targets are certified (ADR 0007).
 
 Independent of Adobe Inc. Product names are descriptive only.

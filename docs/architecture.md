@@ -8,8 +8,9 @@ without editing Pulumi or Go for the supported path.
 
 ## Boundaries
 
-- V1 certifies AWS ECS Fargate. GCP (`gcp` / `gke-autopilot`) and AWS EKS
-  (`aws` / `eks-autopilot`) are experimental (ADR 0007 / 0008). GCP Magento Ops
+- V1 certifies AWS ECS Fargate. GCP (`gcp` / `gke-autopilot`), AWS EKS
+  (`aws` / `eks-autopilot`), OVH (`ovh` / `mks`), and Scaleway
+  (`scaleway` / `kapsule`) are experimental (ADR 0007 / 0008). GCP Magento Ops
   and day-2 ports exist as cloud adapters. Multi-cloud is not claimed until two
   targets are certified.
 - Stable interfaces may exist for config, lifecycle, and capabilities;
@@ -225,7 +226,9 @@ aliases or migration logic before renaming. Material decisions are recorded as A
 Provider growth follows [ADR 0007](adr/0007-multi-provider-community-targets.md) and
 [ADR 0008](adr/0008-ports-and-adapters-multi-provider.md): AWS is the certified v1
 target; Magento-shaped ports live in `internal/platform`; cloud adapters live under
-`internal/cloud/<provider>`. GCP (`gcp` / `gke-autopilot`) is the experimental v1.1
-first-party candidate — see [gcp-experimental.md](gcp-experimental.md). Later clouds
+`internal/cloud/<provider>`. GCP (`gcp` / `gke-autopilot`), OVH (`ovh` / `mks`), and
+Scaleway (`scaleway` / `kapsule`) are experimental first-party candidates — see
+[gcp-experimental.md](gcp-experimental.md), [ovh-experimental.md](ovh-experimental.md),
+and [scaleway-experimental.md](scaleway-experimental.md). Later clouds
 register another adapter without expanding portable YAML into a lowest-common-denominator
 cloud schema.

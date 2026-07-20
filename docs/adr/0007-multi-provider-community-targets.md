@@ -38,9 +38,11 @@ boundaries as AWS (ADR 0004). Planned order:
 1. **AWS** — v1 certified target (ECS Fargate).
 2. **GCP** — v1.1 candidate (`internal/cloud/gcp`), validated on a maintainer GCP
    project; offline work may use floci-gcp where useful.
-3. **Azure / OVHcloud / Hetzner** — later first-party or community, depending on
-   demand and ownership. Hetzner/OVH often map to Kubernetes/K3s-shaped targets
-   rather than copying the AWS managed-service graph.
+3. **Azure / OVHcloud / Scaleway / Hetzner** — later first-party or community, depending on
+   demand and ownership. Hetzner/OVH/Scaleway often map to Kubernetes/K3s-shaped targets
+   rather than copying the AWS managed-service graph. OVH (`ovh` / `mks`) and Scaleway
+   (`scaleway` / `kapsule`) ship as experimental first-party adapters validated with Pulumi
+   mocks (no paid multi-cloud CI by default).
 
 Portable contracts (`Target`, `CapabilityProvider`, artifact requirements, deploy
 orchestrator) remain provider-neutral. Topology, cost, and recovery stay
