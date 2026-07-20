@@ -81,3 +81,4 @@ cli-docs: ## Generate the CLI reference from the Cobra command tree
 
 cli-docs-check: ## Check the generated CLI reference for drift
 	go run ./cmd/gendocs --check
+
