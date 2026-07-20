@@ -77,7 +77,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *ovh.Provider, op
 		CacheEndpoint: component.Cache.PrimaryEndpoint, SessionEndpoint: component.Cache.PrimaryEndpoint,
 		EncryptionKeySecret: spec.Dependencies.EncryptionKeySecret,
 		// EncryptionKeySecret is plumbed for day-2 secret injection; CoreEnvBindings does not
-		// emit MAGENTO_DC_CRYPT__KEY yet (shared K8s ceiling with GCP — wire via SecretKeyRef).
+		// emit MAGENTO_DC_CRYPT__KEY yet (shared K8s ceiling with GCP; wire via SecretKeyRef).
 		CPURequest: spec.Catalog.CPURequest, MemoryRequest: spec.Catalog.MemoryRequest,
 		DesiredWebReplicas: spec.Catalog.DesiredWebReplicas, QueueConsumerCount: spec.Catalog.QueueConsumerCount,
 		NodeFlavor: spec.Catalog.NodeFlavor, NodeCount: spec.Catalog.NodeCount,

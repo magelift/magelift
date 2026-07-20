@@ -227,7 +227,7 @@ Provider growth follows [ADR 0007](adr/0007-multi-provider-community-targets.md)
 [ADR 0008](adr/0008-ports-and-adapters-multi-provider.md): AWS is the certified v1
 target; Magento-shaped ports live in `internal/platform`; cloud adapters live under
 `internal/cloud/<provider>`. GCP (`gcp` / `gke-autopilot`), OVH (`ovh` / `mks`), and
-Scaleway (`scaleway` / `kapsule`) are experimental first-party candidates — see
+Scaleway (`scaleway` / `kapsule`) are experimental first-party candidates. See
 [gcp-experimental.md](gcp-experimental.md), [ovh-experimental.md](ovh-experimental.md),
 and [scaleway-experimental.md](scaleway-experimental.md). Later clouds
 register another adapter without expanding portable YAML into a lowest-common-denominator

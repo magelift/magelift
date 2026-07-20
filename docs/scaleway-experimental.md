@@ -2,7 +2,7 @@
 
 Status: **experimental** (ADR 0007 / ADR 0008). Not Magento-acceptance certified.
 AWS ECS Fargate remains the only certified v1 path. Validated with Pulumi
-`WithMocks` graph tests — no Scaleway account required for CI.
+`WithMocks` graph tests, so CI needs no Scaleway account.
 
 ## Target
 
