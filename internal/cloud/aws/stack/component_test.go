@@ -283,7 +283,7 @@ func TestNewComposesPreviewEscapeHatches(t *testing.T) {
 			name: "fck-nat",
 			edit: func(spec *Spec) { spec.Policy.NatMode = NatModeFckNat },
 			want: map[string]int{
-				"aws:ec2/instance:Instance": 1,
+				"aws:ec2/instance:Instance":     1,
 				"aws:ec2/natGateway:NatGateway": 0,
 			},
 		},
@@ -305,7 +305,7 @@ func TestNewComposesPreviewEscapeHatches(t *testing.T) {
 			name: "search-disabled",
 			edit: func(spec *Spec) { spec.Catalog.SearchMode = SearchModeDisabled },
 			want: map[string]int{
-				"magelift:aws:OpenSearch":                        0,
+				"magelift:aws:OpenSearch":                                  0,
 				"aws:opensearch/serverlessCollection:ServerlessCollection": 0,
 			},
 		},
