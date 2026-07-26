@@ -8,18 +8,18 @@ require (
 	cloud.google.com/go/container v1.53.0
 	cloud.google.com/go/secretmanager v1.20.0
 	cloud.google.com/go/storage v1.63.1
-	github.com/aws/aws-sdk-go-v2 v1.42.1
-	github.com/aws/aws-sdk-go-v2/config v1.32.30
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.29
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.79.1
-	github.com/aws/aws-sdk-go-v2/service/ecs v1.88.1
-	github.com/aws/aws-sdk-go-v2/service/iam v1.55.1
-	github.com/aws/aws-sdk-go-v2/service/kms v1.54.1
-	github.com/aws/aws-sdk-go-v2/service/pricing v1.43.1
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.105.2
-	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.43.1
-	github.com/aws/aws-sdk-go-v2/service/ssm v1.72.0
-	github.com/aws/aws-sdk-go-v2/service/sts v1.44.1
+	github.com/aws/aws-sdk-go-v2 v1.43.0
+	github.com/aws/aws-sdk-go-v2/config v1.32.31
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.30
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.80.0
+	github.com/aws/aws-sdk-go-v2/service/ecs v1.89.0
+	github.com/aws/aws-sdk-go-v2/service/iam v1.56.0
+	github.com/aws/aws-sdk-go-v2/service/kms v1.55.0
+	github.com/aws/aws-sdk-go-v2/service/pricing v1.44.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.106.0
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.44.0
+	github.com/aws/aws-sdk-go-v2/service/ssm v1.73.0
+	github.com/aws/aws-sdk-go-v2/service/sts v1.45.0
 	github.com/aws/smithy-go v1.27.4
 	github.com/ovh/pulumi-ovh/sdk/v2 v2.17.0
 	github.com/pulumi/pulumi-aws/sdk/v7 v7.37.0
@@ -56,17 +56,17 @@ require (
 	github.com/apparentlymart/go-textseg/v17 v17.0.1 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.14 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.31 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.32 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.23 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.30 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.31 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.4.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.32.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.37.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.24 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.31 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.32 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.5.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.33.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.38.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
