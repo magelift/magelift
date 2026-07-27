@@ -1,0 +1,303 @@
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**MageLift**
+
+MageLift is a Go CLI that lets any Magento 2 Open Source (or Adobe Commerce) development team deploy, manage, and monitor their store on their own public cloud account — AWS, GCP, OVH, or Scaleway — without renting a PaaS. It uses Pulumi's Go Automation API under the hood and a minimal, clean PHP build system that mimics `ece-tools`, so the YAML and CLI feel familiar to anyone who has used Magento Cloud, Adobe Commerce Cloud, or Platform.sh/Upsun. It manages both ephemeral environments (PR previews, throwaway test envs) and static ones (prod, staging, UAT), and exposes a capability matrix so each team can tune architecture to its own budget and HA needs.
+
+This milestone takes MageLift from "advanced private project" to a public open-source release the community can adopt and contribute to.
+
+**Core Value:** **A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.**
+
+If everything else fails, that must work — for at least one certified provider, honestly documented.
+
+### Constraints
+
+- **Team**: Solo maintainer — no parallel human review, so automated gates and honest self-checks carry the quality load
+- **Timeline**: No deadline, but the goal is public as soon as the bar is met; sequencing should front-load what unblocks a public tag
+- **Budget**: Cloud acceptance is self-funded on both AWS and GCP — acceptance must run only when needed, batch efficiently, and destroy reliably
+- **Verifiability**: Some AWS cells are blocked by free-tier API limits regardless of budget — the roadmap must never depend on verifying them
+- **Local machine**: Full multi-platform `goreleaser release` cannot run locally (parallel cross-compiles of this Pulumi-linked binary have caused kernel panics); serial single-target only, outside Cursor. Full matrices belong on CI.
+- **CI**: golangci-lint already OOMs/times out on cold multi-cloud Pulumi graphs; it is serialized at `concurrency: 1` with a 30-minute timeout. Any new provider code makes this worse.
+- **Legal/trademark**: Independent of Adobe. Magento and Adobe Commerce are Adobe trademarks used descriptively only; non-affiliation language must stay accurate everywhere
+- **Licensing**: Apache-2.0; `go-licenses` cannot classify `github.com/ovh/pulumi-ovh` nested packages, so its license is recorded manually in `NOTICE` and must be re-verified by hand
+- **Architecture**: ADR 0002/0004 — cloud adapter internals must not leak into the CLI or `internal/deploy`; only `sdk/v1` types and `platform` interfaces cross the boundary
+- **Provider gate**: ADR 0007/0008 — no fifth provider until a second is certified
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:codebase/STACK.md -->
+## Technology Stack
+
+## Languages
+- Go 1.26.0 (toolchain go1.26.5) - CLI, Pulumi infrastructure code, cloud adapters (`internal/`, `cmd/`, `sdk/v1`)
+- PHP ^8.2 - Build/lifecycle runner package shipped inside the runtime image (`build/composer.json`, `build/src/`, PSR-4 `MageLift\Build\`)
+- YAML - user-facing application config (`magelift.yaml` schema), Pulumi/compose definitions
+- Shell (bash) - CI/dev scripts (`scripts/*.sh`, e.g. `scripts/floci-test.sh`, `scripts/varnish-test.sh`, `scripts/image-health-test.sh`)
+- HCL - Docker Bake build matrix (`docker-bake.hcl`)
+- JSON Schema - `schema/magelift.schema.json` (generated, validates `magelift.yaml`)
+## Runtime
+- Go module: `github.com/acourtiol/magelift`
+- Distributed as a single static CLI binary `magelift` (also `genconfig`, `gendocs` dev tools in `cmd/`)
+- CGO disabled in release builds (`CGO_ENABLED=0`, `.goreleaser.yaml`)
+- Go modules (`go.mod` / `go.sum`) - lockfile present
+- Composer for the PHP subpackage (`build/composer.json`, presumably `composer.lock` alongside)
+## Frameworks
+- Pulumi Go SDK v3 (`github.com/pulumi/pulumi/sdk/v3` v3.253.0) - infrastructure-as-code engine driving all cloud stacks
+- Pulumi provider SDKs - `pulumi-aws` v7, `pulumi-gcp` v9, `pulumi-kubernetes` v4, `pulumi-random` v4, `pulumi-ovh` v2 (`github.com/ovh/pulumi-ovh`), `pulumiverse/pulumi-scaleway` v1
+- Cobra (`github.com/spf13/cobra` v1.10.2) - CLI command tree (`internal/cli/root.go`)
+- `k8s.io/client-go`, `k8s.io/api`, `k8s.io/apimachinery` v0.33.2 - Kubernetes API access for GKE/EKS/OVH MKS/Scaleway Kapsule day-2 operations
+- PHPUnit 11.5 - PHP lifecycle package tests (`build/composer.json` require-dev)
+- Go standard `testing` package with `go test -race ./...` (`Makefile` `test` target)
+- PHPStan 2.2 and Psalm 6.16 - static analysis for the PHP package (`build/composer.json`)
+- Floci (`floci/floci:1.5.33`, Docker image) - account-free AWS API emulator for integration tests tagged `floci` (`tests/floci`, `docker-compose.floci.yml`, `scripts/floci-test.sh`)
+- golangci-lint v2.12.2 (pinned via `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2`, config `.golangci.yml`)
+- GoReleaser v2.17.0 (`.goreleaser.yaml`) - builds/releases `linux, darwin, windows` × `amd64, arm64` archives, generates SBOMs, signs artifacts
+- Docker Buildx Bake (`docker-bake.hcl`, images under `images/`) - builds `php-runtime`, `frankenphp-classic`, `php-builder`, `varnish` container images
+- MkDocs (`mkdocs.yml`) - documentation site build (published under `site/`)
+- `go run github.com/google/go-licenses/v2` - dependency license compliance check in CI
+- `actionlint` - GitHub Actions workflow linting (`.github/workflows/ci.yml`)
+- Makefile-driven workflow: `make verify` runs generate-check, cli-docs-check, fmt-check, lint, test, license-check, php-test, docs, workflow-check
+## Key Dependencies
+- `github.com/pulumi/pulumi/sdk/v3` v3.253.0 - core IaC engine; all cloud stack components (`internal/cloud/*/stack`) build on this
+- `github.com/aws/aws-sdk-go-v2` (+ service packages: ecs, s3, secretsmanager, ssm, kms, sts, iam, cloudwatchlogs, pricing) - direct AWS API calls for day-2 ops, cost, and runtime outside Pulumi (`internal/cloud/aws/ops`, `internal/cloud/aws/cost`, `internal/cloud/aws/runtime`)
+- `google.golang.org/api`, `cloud.google.com/go/{container,secretmanager,storage}` - GCP day-2 ops (`internal/cloud/gcp/ops`)
+- `golang.org/x/oauth2` - GCP/OIDC auth flows
+- `go.yaml.in/yaml/v4` - YAML parsing for `magelift.yaml` and config models (`internal/config/model.go`)
+- `github.com/spf13/cobra` - CLI command framework
+- `sdk/v1` (internal, `github.com/acourtiol/magelift/sdk/v1`) - typed topology/validation contracts shared across providers (`sdk/v1/types.go`, `topology.go`, `validation.go`)
+- `internal/platform` - `StackModule` abstraction each cloud provider implements (referenced in `docs/architecture.md`)
+- `cosign` CLI (invoked via `os/exec`, not a Go import) - artifact signing/verification (`internal/cosign/cosign.go`)
+## Configuration
+- User config: `magelift.yaml`, validated against `schema/magelift.schema.json` (generated by `cmd/genconfig`)
+- Runtime env vars observed in code/docs: `PULUMI_BACKEND_URL`, `MAGELIFT_AWS_ENDPOINT_URL`, `MAGELIFT_LOCAL_ADMIN_PASSWORD`, `MAGELIFT_LOCAL_*_IMAGE` (database/cache/search/queue image overrides), `MAGELIFT_LOCAL_HTTPS_PORT`
+- Local secrets file: `.magelift/local.env` (gitignored, mode 0600) - never committed, holds local dev admin password
+- `.env*` files: none detected as tracked; treat any `.env` presence as containing local secrets only
+- `.goreleaser.yaml` - release build matrix and signing
+- `docker-bake.hcl` - image build targets (`php-runtime`, `frankenphp-classic`, `php-builder`, `varnish`)
+- `.golangci.yml` - lint ruleset
+- `mkdocs.yml` - docs site config
+## Platform Requirements
+- Go 1.26.x toolchain
+- Docker (Buildx) for image builds and Floci-based integration tests; no AWS account required for `make floci-test`
+- Composer + PHP 8.2 for `build/` package (`make php-test`)
+- Certified target: AWS ECS Fargate (Route 53, CloudFront, WAF, ALB, private ECS Fargate; S3 for media)
+- Experimental targets: GCP GKE Autopilot, AWS EKS Autopilot, OVH Managed Kubernetes (MKS), Scaleway Kapsule
+- Pulumi state backend configurable via `PULUMI_BACKEND_URL` (DIY/local supported); AWS provider lock uses S3 today
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+## Naming Patterns
+- Snake-free, lowercase, package-scoped: `component.go`, `config.go`, `ops.go`, `spec.go` inside per-domain packages (e.g. `internal/cloud/aws/stack/component.go`).
+- Tests co-located as `<name>_test.go` in the same package (white-box tests), e.g. `internal/cloud/aws/queue/component_test.go`.
+- One responsibility per package under `internal/cloud/<provider>/<domain>/` (e.g. `internal/cloud/aws/queue`, `internal/cloud/aws/security`, `internal/cloud/aws/stack`). Package names are short nouns (`queue`, `stack`, `runtime`, `security`, `ops`).
+- Constructors named `New` (Pulumi component constructors: `func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error)`).
+- Exported `Args` struct is the standard parameter-object pattern for component constructors (see `internal/cloud/aws/queue/component.go`).
+- Config/schema structs use PascalCase field names with parallel `yaml`/`json` struct tags and a project-specific `config:`/`schema:` tag for doc generation and JSON-Schema constraints, e.g. `internal/config/model.go`:
+- `revive` linter has `error-naming` and `error-strings` rules disabled — sentinel/error string casing is not enforced by lint; still, exported sentinel errors follow `Err...` where present. Custom structured error type lives in `internal/usererr/usererr.go`.
+## Code Style
+- `gofmt` is the only formatter; `make fmt` runs `gofmt -w` over all non-vendor `.go` files, and `make lint`/CI enforce `gofmt -l` returns empty (`Makefile:9`, `Makefile:12`). `gofmt` is also enabled as a `golangci-lint` linter (`.golangci.yml:114`).
+- No `goimports`, no `gofumpt` — plain `gofmt` only.
+- `golangci-lint` v2 config at `.golangci.yml`. Enabled linters: `govet`, `staticcheck`, `ineffassign`, `misspell`, `unused`, `errcheck`, `revive`, `gocritic`, `gofmt`.
+- `staticcheck` has stylistic checks disabled (`-ST1000`, `-ST1003`, `-ST1005`, `-QF1001`, `-QF1008`, `-S1002`, `-SA1019`) — naming/doc-comment style and deprecated-API warnings are intentionally not enforced (Pulumi SDKs frequently deprecate/replace APIs).
+- `revive` runs a narrow rule subset only (blank-imports, context-as-argument, error-return, errorf, indent-error-flow, range, receiver-naming, time-naming, unexported-return, increment-decrement) — capitalization/exported/var-naming/package-comments rules are explicitly disabled to avoid churn across large Pulumi resource graphs.
+- `gocritic` diagnostic tag enabled; several checks disabled (`hugeParam`, `rangeValCopy`, `sloppyReassign`, `appendAssign`, `dupImport`, `ifElseChain`, `elseif`, `unlambda`, `assignOp`) — tolerates large value copies and reassignment patterns common in Pulumi args structs.
+- `errcheck` ignores a small allowlist of best-effort calls (`cobra.Command.Help`, `MarkFlagRequired`, YAML encoder `Close`, `fmt.Fprint(f)`).
+- Lint run is single-threaded (`concurrency: 1`) with a 30-minute timeout — CI cold-cache runs on large multi-cloud Pulumi graphs are memory/CPU heavy; do not parallelize lint invocations locally in ways that fight this.
+- See `docs/lint-policy.md` for the policy narrative behind these choices.
+## Import Organization
+- Standard library first, then third-party (Pulumi SDKs, AWS SDK v2, etc.), each as its own `import (...)` group separated by a blank line — standard `gofmt`/`goimports`-style grouping observed throughout (e.g. `internal/cloud/aws/queue/component_test.go`).
+- Aliased imports used when package name collides or is ambiguous, e.g. `awsprovider "github.com/pulumi/pulumi-aws/sdk/v7/go/aws"`.
+## Error Handling
+- Validation failures in Pulumi components are returned **before** any resource registration (see `internal/cloud/aws/queue/component.go` — invalid `Args` reject early, verified by `TestRejectsUnsafeProductionInputsBeforeRegistration` in `internal/cloud/aws/queue/component_test.go:77-107`, which asserts zero resources were registered on error).
+## Comments
+## Function Design
+## Module Design
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+## System Overview
+```text
+```
+## Component Responsibilities
+| Component | Responsibility | File |
+|-----------|----------------|------|
+| CLI commands | Parse flags, load config, wire dependencies, print output | `internal/cli/root.go`, `internal/cli/lifecycle.go`, `internal/cli/build.go` |
+| Config model | YAML/JSON schema for `magelift.yaml`, validation, presets | `internal/config/model.go`, `internal/config/presets.go` |
+| SDK contracts | Cross-cutting types (`TargetDescriptor`, `Application`, `BuildArtifact`), topology + validation rules shared by every adapter | `sdk/v1/types.go`, `sdk/v1/topology.go`, `sdk/v1/validation.go` |
+| Platform ports | Interfaces every cloud adapter must implement (`StackModule`, `Ops`, `Bootstrap`, `State`, `Secrets`, `CostEstimator`, `RuntimeObserve`) plus the `ModuleRegistry` that dispatches by provider/runtime | `internal/platform/module.go`, `internal/platform/ops.go`, `internal/platform/cost.go` |
+| Cloud adapters | Provider-specific Pulumi component resources, plan/program construction, and day-2 ops (deploy steps, locks, releases) | `internal/cloud/aws/stack/component.go`, `internal/cloud/aws/ops/day2.go`, `internal/cloud/gcp/ops/day2.go`, `internal/cloud/ovh/stack/ops.go`, `internal/cloud/scaleway/stack/ops.go` |
+| Deploy orchestrator | Provider-agnostic candidate deploy flow (validate → preview → register candidate → migrate → cleanup → update → stabilize → health → record) | `internal/deploy/orchestrator.go`, `internal/deploy/hooks.go` |
+| Build pipeline | Multi-stage container image build orchestration (kit assembly, plan, runner execution) | `internal/build/pipeline/pipeline.go`, `internal/build/plan/plan.go`, `internal/build/runner/protocol.go`, `internal/build/kit/buildkit.go` |
+| Automation wrapper | Thin layer over Pulumi Automation API (stack up/preview/destroy, change summaries) | `internal/automation/` |
+| Local dev | Docker Compose-based local environment orchestration | `internal/localdev/compose.go` |
+| Topology | Cross-provider infra shape resolution (what components a runtime/provider combo needs) | `internal/topology/` |
+## Pattern Overview
+- Cloud providers are pluggable modules registered at startup (`cmd/magelift/main.go`) implementing the `platform.StackModule` interface; the CLI and deploy orchestrator never import concrete cloud packages directly — only through the registry and typed adapters.
+- Optional capabilities (day-2 Magento deploy, release recording) are expressed as narrow interface extensions (`platform.HasOps`, `platform.HasRecordRelease`) rather than a single fat interface, so infrastructure-only adapters can omit them.
+- `sdk/v1` acts as the stable contract package shared by all adapters and the core — it defines provider-agnostic types (`TargetDescriptor`, `Application`, `BuildArtifact`) and validation rules referenced by ADRs (e.g. `docs/adr/0002-provider-runtime-extension-boundary`, `0004-provider-package-layout`).
+- Each cloud provider directory (`internal/cloud/{aws,gcp,ovh,scaleway}`) mirrors the same sub-package shape (`stack`, `ops`/`day2`, `runtime`, `database`, `network`, `secrets`, `cache`, `naming`, `target`), making it straightforward to add a new provider by cloning the shape.
+- Certification tiers (`platform.TierCertified` / `TierExperimental`) gate which providers are production-ready vs experimental (AWS is certified; GCP/OVH/Scaleway are experimental per `docs/gcp-experimental.md`, `docs/ovh-experimental.md`, `docs/scaleway-experimental.md`).
+## Layers
+- Purpose: User-facing commands; wires config, modules, and infra backends together per invocation
+- Location: `internal/cli/`
+- Contains: Cobra command definitions (`root.go`, `lifecycle.go`, `build.go`, `dev.go`, `env.go`, `secrets.go`, `state.go`, `releases.go`, `ci.go`, `doctor.go`, `health.go`, `upgrade.go`, `cost.go`, `ports.go`)
+- Depends on: `internal/config`, `internal/platform`, `internal/deploy`, `internal/automation`, `internal/cosign`, `internal/releasejournal`, `internal/upgrade`
+- Used by: `cmd/magelift/main.go` entry point
+- Purpose: Define and validate the `magelift.yaml` schema and shared cross-provider domain types
+- Location: `internal/config/`, `sdk/v1/`
+- Contains: Struct definitions with `yaml`/`json`/`config`/`schema` tags used to generate `schema/magelift.schema.json` (via `cmd/genconfig`), validation logic, topology resolution
+- Depends on: nothing internal (leaf package)
+- Used by: every other layer
+- Purpose: Define the contracts cloud adapters must satisfy; provide the module registry that dispatches by `(provider, runtime)`
+- Location: `internal/platform/`
+- Contains: `StackModule`, `Ops`, `Bootstrap`, `State`, `Secrets`, `CostEstimator`, `RuntimeObserve` interfaces; `ModuleRegistry`; output-key constants
+- Depends on: `internal/config`, `sdk/v1`, `internal/deploy` (for the `Steps` type used in `Ops.NewDeploySteps`), Pulumi SDK
+- Used by: CLI layer, all cloud adapters (implement its interfaces)
+- Purpose: Translate provider-agnostic plans into Pulumi resource graphs and provider-specific day-2 operations
+- Location: `internal/cloud/aws/`, `internal/cloud/gcp/`, `internal/cloud/ovh/`, `internal/cloud/scaleway/`, `internal/cloud/kube/`
+- Contains: `stack/component.go` (Pulumi `ComponentResource`), `stack/spec.go` (resolved spec), `stack/module.go` (StackModule impl), `ops/day2.go` or `eksops/ops.go` (Ops impl), plus per-concern packages (`network`, `database`, `secrets`, `cache`, `runtime`, `naming`, `target`, `queue`, `edge`, `ingress`, `observability`, `cost`, `pricing`, `state`, `storage`, `search`)
+- Depends on: `internal/platform`, `internal/config`, `sdk/v1`, provider Pulumi SDKs (`pulumi-aws`, `pulumi-gcp`, `pulumi-ovh`, `pulumi-scaleway`, `pulumi-kubernetes`)
+- Used by: `cmd/magelift/main.go` (registration), `internal/platform.ModuleRegistry` (dispatch)
+- Purpose: Provider-agnostic candidate deploy state machine (Magento-specific: build → migrate → cutover → health-check)
+- Location: `internal/deploy/`
+- Contains: `orchestrator.go` (`Steps` interface, `Request`/`Result` types), `hooks.go`, `registry.go`, `ownership.go`
+- Depends on: `internal/automation`, `sdk/v1`
+- Used by: `internal/cli/lifecycle.go`, each provider's `ops`/`day2` package (implements `deploy.Steps`)
+- Purpose: Build Magento container images through a pluggable, protocol-driven pipeline
+- Location: `internal/build/`
+- Contains: `pipeline/pipeline.go` (stage orchestration), `plan/plan.go` (build plan resolution), `runner/protocol.go` + `runner/client.go` + `runner/codec.go` (subprocess/runner protocol), `kit/buildkit.go` (BuildKit invocation)
+- Depends on: `internal/config`, `sdk/v1`
+- Used by: `internal/cli/build.go`, `internal/cli/ci.go`
+- Purpose: Wraps Pulumi's Automation API (inline programs, stack lifecycle, change summaries)
+- Location: `internal/automation/`
+- Depends on: `github.com/pulumi/pulumi/sdk/v3`
+- Used by: `internal/cli/root.go` (infrastructure backend), cloud adapter `ops` packages
+- `internal/localdev/` — Docker Compose local environment (`compose.go`)
+- `internal/topology/` — cross-provider infra shape resolution
+- `internal/health/`, `internal/releasejournal/`, `internal/cosign/`, `internal/secretref/`, `internal/upgrade/`, `internal/toolchain/`, `internal/containerrunner/`, `internal/source/`, `internal/infra/`, `internal/usererr/` — focused single-purpose leaf packages used by the CLI
+## Data Flow
+### Primary Deploy Path
+### Build Path
+- Infrastructure state lives in Pulumi backends (per-provider `state` packages, e.g. `internal/cloud/aws/state/`), not in-process.
+- CLI-level runtime state is passed explicitly through function parameters and small option structs (`options` in `internal/cli/root.go`) — no global mutable state observed.
+## Key Abstractions
+- Purpose: Opaque, validated, immutable-ish representation of a resolved deployment target
+- Examples: `internal/platform/module.go:29`, implemented per-provider (e.g. AWS spec in `internal/cloud/aws/stack/spec.go`)
+- Pattern: Value object with a `WithImageDigest` "wither" method for post-plan digest injection
+- Purpose: The single extension point new cloud providers implement
+- Examples: `internal/cloud/aws/stack/module.go`, `internal/cloud/gcp/.../module.go` (equivalent), `internal/cloud/ovh/stack/`, `internal/cloud/scaleway/stack/`
+- Pattern: Strategy/plugin pattern; selected at runtime by `(Provider, Runtime)` key
+- Purpose: Optional capability interface for day-2 Magento operations, kept separate from infra provisioning
+- Examples: `internal/cloud/aws/ops/day2.go`, `internal/cloud/aws/eksops/ops.go`, `internal/cloud/gcp/ops/day2.go`
+- Pattern: Interface segregation / optional capability via type assertion (`platform.ModuleOps`)
+- Purpose: Provider-agnostic template method for the Magento candidate-deploy sequence
+- Examples: `internal/deploy/orchestrator.go:39-49`
+- Pattern: Template method / strategy — CLI drives fixed step order, provider supplies implementation
+- Purpose: Stable, versioned contract types shared across the module boundary (ADR-governed)
+- Examples: `sdk/v1/types.go`, `sdk/v1/topology.go`
+- Pattern: Anti-corruption layer / shared kernel between core and adapters
+## Entry Points
+- Location: `cmd/magelift/main.go`
+- Triggers: `magelift` command invocation
+- Responsibilities: Register all cloud `StackModule`s into a `platform.ModuleRegistry`, construct the Cobra root command via `cli.NewWithModules`, execute, map errors to exit codes
+- Location: `cmd/genconfig/`
+- Triggers: `make` target / CI, regenerates `schema/magelift.schema.json` from `internal/config` struct tags
+- Location: `cmd/gendocs/`
+- Triggers: `make` target, generates CLI reference docs from Cobra command tree
+## Architectural Constraints
+- **Threading:** Primarily single-threaded CLI execution per command; Pulumi Automation API and provider SDKs may use internal goroutines/worker pools not exposed to callers.
+- **Global state:** None observed at the package level in `internal/cli` or `internal/platform` — dependencies are injected through the `options` struct and constructor functions (`NewWithModules`), not package-level singletons.
+- **Provider boundary:** By ADR 0002/0004, cloud adapter internals must not leak into the CLI or `internal/deploy`; only `sdk/v1` types and `platform` interfaces cross the boundary. Adapters type-assert `backend any` in `Ops.NewDeploySteps` to reach provider-specific backend methods (`internal/platform/ops.go:24`).
+- **Certification tiers:** Experimental providers (GCP, OVH, Scaleway) may have thinner test coverage and no DIY lock (`AcquireLock` may return a no-op release) — see `internal/platform/ops.go:19-20`.
+## Anti-Patterns
+### `backend any` parameter in Ops.NewDeploySteps
+## Error Handling
+- Sentinel errors declared at package scope (`deploy.ErrApprovalRequired`, `deploy.ErrDigestRequired`, `deploy.ErrForwardOnlyRollbackAck`, `deploy.ErrLockRelease` in `internal/deploy/orchestrator.go:16-19`; `platform.ErrNotSupported` in `internal/platform/ops.go:13`)
+- CLI maps errors to process exit codes via a custom `exitError` type implementing `Unwrap` for `errors.As` compatibility (`internal/cli/root.go:29-42`)
+- User-facing errors distinguished via `internal/usererr/` package
+## Cross-Cutting Concerns
+<!-- GSD:architecture-end -->
+
+<!-- GSD:skills-start source:skills/ -->
+## Project Skills
+
+| Skill | Description | Path |
+|-------|-------------|------|
+| ai-seo | "When the user wants to optimize content for AI search engines, get cited by LLMs, or appear in AI-generated answers. Also use when the user mentions 'AI SEO,' 'AEO,' 'GEO,' 'LLMO,' 'answer engine optimization,' 'generative engine optimization,' 'LLM optimization,' 'AI Overviews,' 'optimize for ChatGPT,' 'optimize for Perplexity,' 'AI citations,' 'AI visibility,' 'zero-click search,' 'how do I show up in AI answers,' 'LLM mentions,' 'optimize for Claude/Gemini,' 'llms.txt,' 'OKF,' 'Open Knowledge Format,' 'knowledge bundle,' or 'agent-readable site.' Use this whenever someone wants their content to be cited or surfaced by AI assistants and AI search engines. For traditional technical and on-page SEO audits, see seo-audit. For structured data implementation, see schema." | `.agents/skills/ai-seo/SKILL.md` |
+| community-marketing | "Build and leverage online communities to drive product growth and brand loyalty. Use when the user wants to create a community strategy, grow a Discord or Slack community, manage a forum or subreddit, build brand advocates, increase word-of-mouth, drive community-led growth, engage users post-signup, or turn customers into evangelists. Trigger phrases: \"build a community,\" \"community strategy,\" \"Discord community,\" \"Slack community,\" \"community-led growth,\" \"brand advocates,\" \"user community,\" \"forum strategy,\" \"community engagement,\" \"grow our community,\" \"ambassador program,\" \"community flywheel.\"" | `.agents/skills/community-marketing/SKILL.md` |
+| content-strategy | When the user wants to plan a content strategy, decide what content to create, or figure out what topics to cover. Also use when the user mentions "content strategy," "what should I write about," "content ideas," "blog strategy," "topic clusters," "content planning," "editorial calendar," "content marketing," "content roadmap," "what content should I create," "blog topics," "content pillars," or "I don't know what to write." Use this whenever someone needs help deciding what content to produce, not just writing it. For writing individual pieces, see copywriting. For SEO-specific audits, see seo-audit. For social media content specifically, see social. | `.agents/skills/content-strategy/SKILL.md` |
+| copy-editing | "When the user wants to edit, review, or improve existing marketing copy, or refresh outdated content. Also use when the user mentions 'edit this copy,' 'review my copy,' 'copy feedback,' 'proofread,' 'polish this,' 'make this better,' 'copy sweep,' 'tighten this up,' 'this reads awkwardly,' 'clean up this text,' 'too wordy,' 'sharpen the messaging,' 'refresh this content,' 'update this page,' 'this content is outdated,' or 'content audit.' Use this when the user already has copy and wants it improved or refreshed rather than rewritten from scratch. For writing new copy, see copywriting." | `.agents/skills/copy-editing/SKILL.md` |
+| copywriting | When the user wants to write, rewrite, or improve marketing copy for any page — including homepage, landing pages, pricing pages, feature pages, about pages, or product pages. Also use when the user says "write copy for," "improve this copy," "rewrite this page," "marketing copy," "headline help," "CTA copy," "value proposition," "tagline," "subheadline," "hero section copy," "above the fold," "this copy is weak," "make this more compelling," or "help me describe my product." Use this whenever someone is working on website text that needs to persuade or convert. For email copy, see emails. For popup copy, see popups. For editing existing copy, see copy-editing. For the offer underneath the copy (bonuses, guarantees, value framing), see offers. | `.agents/skills/copywriting/SKILL.md` |
+| free-tools | When the user wants to plan, evaluate, or build a free tool for marketing purposes — lead generation, SEO value, or brand awareness. Also use when the user mentions "engineering as marketing," "free tool," "marketing tool," "calculator," "generator," "interactive tool," "lead gen tool," "build a tool for leads," "free resource," "ROI calculator," "grader tool," "audit tool," "should I build a free tool," or "tools for lead gen." Use this whenever someone wants to build something useful and give it away to attract leads or earn links. For downloadable content lead magnets (ebooks, checklists, templates), see lead-magnets. | `.agents/skills/free-tools/SKILL.md` |
+| golang-benchmark | "Golang benchmarking, profiling, and performance measurement. Use when writing, running, or comparing Go benchmarks, profiling hot paths with pprof, interpreting CPU/memory/trace profiles, analyzing results with benchstat, setting up CI benchmark regression detection, or investigating production performance with Prometheus runtime metrics. Also use when the developer needs deep analysis on a specific performance indicator - this skill provides the measurement methodology, while `samber/cc-skills-golang@golang-performance` provides the optimization patterns." | `.agents/skills/golang-benchmark/SKILL.md` |
+| golang-cli | "Golang CLI application development. Use when building, modifying, or reviewing a Go CLI tool — especially for command structure, flag handling, configuration layering, version embedding, exit codes, I/O patterns, signal handling, shell completion, argument validation, and CLI unit testing. Also triggers when code uses cobra, viper, or urfave/cli. For cobra-specific APIs → See `samber/cc-skills-golang@golang-spf13-cobra` skill; for viper configuration layering → See `samber/cc-skills-golang@golang-spf13-viper` skill." | `.agents/skills/golang-cli/SKILL.md` |
+| golang-code-style | "Golang code style conventions — line length and breaking, variable declarations, control flow clarity, when comments help vs hurt. Use when writing or reviewing Go code, asking about style or clarity, or establishing project coding standards. Not for naming conventions (→ See `samber/cc-skills-golang@golang-naming` skill), linter configuration (→ See `samber/cc-skills-golang@golang-lint` skill), or doc comments (→ See `samber/cc-skills-golang@golang-documentation` skill)." | `.agents/skills/golang-code-style/SKILL.md` |
+| golang-concurrency | "Golang concurrency patterns. Use when writing or reviewing concurrent Go code involving goroutines, channels, select, locks, sync primitives, errgroup, singleflight, worker pools, or fan-out/fan-in pipelines. Also triggers when you detect goroutine leaks, race conditions, channel ownership issues, or need to choose between channels and mutexes." | `.agents/skills/golang-concurrency/SKILL.md` |
+| golang-context | "Idiomatic context.Context usage in Golang — propagation through API boundaries, cancellation, timeouts and deadlines, request-scoped values, context.WithoutCancel for background work outliving requests. Apply when designing context propagation across layers, debugging leaked or unexpired contexts, choosing between context.Background/TODO/WithoutCancel, or storing values in context. Not for code that merely accepts ctx as first parameter." | `.agents/skills/golang-context/SKILL.md` |
+| golang-continuous-integration | "CI/CD pipeline configuration using GitHub Actions for Golang projects — testing, linting, SAST, security scanning, code coverage, Dependabot, Renovate, GoReleaser, code review automation, and release pipelines. Use when setting up or improving Go project CI, configuring GitHub Actions workflows, adding linters or security scanners, automating dependency updates, or adding quality gates." | `.agents/skills/golang-continuous-integration/SKILL.md` |
+| golang-data-structures | "Golang data structures — slices (internals, capacity growth, preallocation, slices package), maps (internals, hash buckets, maps package), arrays, container/list/heap/ring, strings.Builder vs bytes.Buffer, generic collections, pointers (unsafe.Pointer, weak.Pointer), and copy semantics. Use when choosing or optimizing Go data structures, implementing generic containers, using container/ packages, unsafe or weak pointers, or questioning slice/map internals." | `.agents/skills/golang-data-structures/SKILL.md` |
+| golang-dependency-injection | "Comprehensive guide for dependency injection (DI) in Golang. Covers why DI matters (testability, loose coupling, separation of concerns, lifecycle management), manual constructor injection, and DI library comparison (google/wire, uber-go/dig, uber-go/fx, samber/do). Use this skill when designing service architecture, setting up dependency injection, refactoring tightly coupled code, managing singletons or service factories, or when the user asks about inversion of control, service containers, or wiring dependencies in Go. For a specific DI library, → See `samber/cc-skills-golang@golang-google-wire`, `samber/cc-skills-golang@golang-uber-dig`, `samber/cc-skills-golang@golang-uber-fx`, or `samber/cc-skills-golang@golang-samber-do` skills." | `.agents/skills/golang-dependency-injection/SKILL.md` |
+| golang-dependency-management | "Dependency management strategies for Golang projects — go.mod management, installing/upgrading packages, Minimal Version Selection, vulnerability scanning, outdated dependency tracking, binary size analysis, Dependabot/Renovate setup, conflict resolution, and go.work workspaces. Use when adding, removing, or upgrading Go dependencies, auditing vulnerabilities, resolving version conflicts, or setting up automated dependency updates." | `.agents/skills/golang-dependency-management/SKILL.md` |
+| golang-design-patterns | "Idiomatic Golang design patterns — functional options, constructors, error flow and cascading, resource management and lifecycle, graceful shutdown, resilience, architecture, dependency injection, data handling, streaming, and more. Apply when explicitly choosing between architectural patterns, implementing functional options, designing constructor APIs, setting up graceful shutdown, applying resilience patterns, or asking which idiomatic Go pattern fits a specific problem." | `.agents/skills/golang-design-patterns/SKILL.md` |
+| golang-documentation | "Comprehensive documentation guide for Golang projects, covering godoc comments, README, CONTRIBUTING, CHANGELOG, Go Playground, Example tests, API docs, and llms.txt. Use when writing or reviewing doc comments, documentation, adding code examples, setting up doc sites, or discussing documentation best practices. Triggers for both libraries and applications/CLIs." | `.agents/skills/golang-documentation/SKILL.md` |
+| golang-error-handling | "Idiomatic Golang error handling — creation, wrapping with %w, errors.Is/As, errors.Join, custom error types, sentinel errors, panic/recover, the single handling rule, structured logging with slog, HTTP request logging middleware, and samber/oops for production errors. Built to make logs usable at scale with log aggregation 3rd-party tools. Apply when creating, wrapping, inspecting, or logging errors in Go code. For samber/oops specifics → See `samber/cc-skills-golang@golang-samber-oops` skill; for slog handler ecosystem → See `samber/cc-skills-golang@golang-samber-slog` skill." | `.agents/skills/golang-error-handling/SKILL.md` |
+| golang-gopls | "Golang semantic code intelligence via `gopls`, the official Go language server — go-to-definition, find references, call/implementation hierarchy, workspace symbol search, package API discovery, diagnostics, safe rename, refactors (extract/inline/fill/rewrite code actions), formatting, and generated tests. Reaches an agent via gopls's own MCP server (`go_*` tools), Claude Code's native `LSP` tool, or the `gopls` CLI. Use when navigating or refactoring Go code — jumping to a definition, finding call sites before a rename, understanding a file's or package's dependencies, running diagnostics after an edit, or extracting/inlining/renaming. Not for the published ecosystem — packages not in your `go.mod`, versions, licenses, importers — → See `samber/cc-skills-golang@golang-pkg-go-dev` skill (`godig`). Not for a whole-tree vulnerability audit → See `samber/cc-skills-golang@golang-security` skill (`govulncheck`)." | `.agents/skills/golang-gopls/SKILL.md` |
+| golang-how-to | "Golang skills orchestrator — always active on any Golang coding, review, debug, or setup task. Reads the task context and loads the most relevant skills from samber/cc-skills-golang, often multiple at once: writing a gRPC service loads golang-grpc + golang-testing + golang-error-handling; debugging a panic loads golang-troubleshooting + golang-safety; auditing security loads golang-security + golang-lint + golang-safety. Also: disambiguates competing clusters when two skills seem to overlap (performance vs benchmark vs troubleshooting, samber/lo vs mo vs ro, DI cluster, safety vs security), and configures CLAUDE.md or AGENTS.md to force-trigger skills in a project (/golang-how-to configure)." | `.agents/skills/golang-how-to/SKILL.md` |
+| golang-lint | "Linting best practices and golangci-lint configuration for Golang projects — running linters, configuring .golangci.yml, suppressing warnings with nolint directives, interpreting lint output, and selecting linters. Use when configuring golangci-lint, asking about lint warnings or nolint suppressions, setting up code quality tooling, or choosing linters. Also use when the user mentions golangci-lint, go vet, staticcheck, or revive." | `.agents/skills/golang-lint/SKILL.md` |
+| golang-modernize | "Modernize Golang code to use recent language features, standard library improvements, and idiomatic patterns. Trigger proactively when writing or reviewing Go code and old-style patterns are detected, or when encountering a deprecation warning. Also use when the user explicitly asks for modernization, a Go version upgrade, or a CI/tooling refresh." | `.agents/skills/golang-modernize/SKILL.md` |
+| golang-naming | "Go (Golang) naming conventions — covers packages, constructors, structs, interfaces, constants, enums, errors, booleans, receivers, getters/setters, functional options, acronyms, test functions, and subtest names. Use this skill when writing new Go code, reviewing or refactoring, choosing between naming alternatives (New vs NewTypeName, isConnected vs connected, ErrNotFound vs NotFoundError, StatusReady vs StatusUnknown at iota 0), debating Go package names (utils/helpers anti-patterns), or asking about Go naming best practices. Also trigger when the user mentions MixedCaps vs snake_case, ALL_CAPS constants, Get-prefix on getters, or error string casing. Do NOT use for general Go implementation questions that don't involve naming decisions." | `.agents/skills/golang-naming/SKILL.md` |
+| golang-observability | "Golang everyday observability — the always-on signals in production. Covers structured logging with slog, Prometheus metrics, OpenTelemetry distributed tracing, continuous profiling with pprof/Pyroscope, server-side RUM event tracking, alerting, and Grafana dashboards. Apply when instrumenting Go services for production monitoring, setting up metrics or alerting, adding OpenTelemetry tracing, correlating logs with traces, migrating legacy loggers (zap/logrus/zerolog) to slog, adding observability to new features, or implementing GDPR/CCPA-compliant tracking with Customer Data Platforms (CDP). Not for temporary deep-dive performance investigation (→ See `samber/cc-skills-golang@golang-benchmark` and `samber/cc-skills-golang@golang-performance` skills)." | `.agents/skills/golang-observability/SKILL.md` |
+| golang-performance | "Golang performance optimization patterns and methodology - if X bottleneck, then apply Y. Covers allocation reduction, CPU efficiency, memory layout, GC tuning, pooling, caching, and hot-path optimization. Use when profiling or benchmarks have identified a bottleneck and you need the right optimization pattern to fix it. Also use when performing performance code review to suggest improvements or benchmarks that could help identify quick performance gains. Not for measurement methodology (→ See `samber/cc-skills-golang@golang-benchmark` skill) or debugging workflow (→ See `samber/cc-skills-golang@golang-troubleshooting` skill)." | `.agents/skills/golang-performance/SKILL.md` |
+| golang-popular-libraries | "Recommends production-ready Golang libraries and frameworks. Apply when the user explicitly asks for library suggestions, wants to compare alternatives, needs to choose a library for a specific task, or when a new dependency is being added to the project." | `.agents/skills/golang-popular-libraries/SKILL.md` |
+| golang-project-layout | "Provides a guide for setting up Golang project layouts and workspaces. Use when starting a new Go project, organizing an existing codebase, setting up a monorepo with multiple packages, creating CLI tools with multiple main packages, deciding between cmd/internal/pkg directory conventions, or discussing package restructuring, package splits, or module splits." | `.agents/skills/golang-project-layout/SKILL.md` |
+| golang-refactoring | "Golang refactoring — the safe, at-scale process for restructuring existing Go code: a coverage-adaptive safety net, tool-driven behavior-preserving transforms (gopls Rename/Inline/Extract, `gofmt -r`, `eg`, `gopatch`, `go/analysis` fixers), the Fowler catalog mapped to Go, breaking import cycles, moving types across packages, and a human-in-the-loop workflow of small stacked PRs on a refactoring branch. Apply when code is hard to maintain, a function/type has grown too large, a code smell needs fixing, adding a feature is blocked by the current structure, or the user asks to clean up, refactor, or improve Go code — also for renaming at scale, extracting functions/interfaces, moving code between packages, splitting packages, or planning a multi-step refactor. Target styles owned elsewhere → See `samber/cc-skills-golang@golang-naming` (renames), `@golang-project-layout` (splits), `@golang-modernize` (idioms), `@golang-code-style` (control flow), `@golang-design-patterns` (patterns/DI)." | `.agents/skills/golang-refactoring/SKILL.md` |
+| golang-safety | "Defensive Golang coding to prevent panics, silent data corruption, and subtle runtime bugs. Use when encountering nil panics, append aliasing, map concurrent access, float comparison pitfalls, or zero-value design questions. Also use when reviewing code for nil-safety, numeric conversion overflow, resource lifecycle issues (defer in loops), or defensive copying of slices and maps." | `.agents/skills/golang-safety/SKILL.md` |
+| golang-security | "Security best practices and vulnerability prevention for Golang. Covers injection (SQL, command, XSS), cryptography, filesystem safety, network security, cookies, secrets management, memory safety, and logging. Apply when writing, reviewing, or auditing Go code for security, or when working on any risky code involving crypto, I/O, secrets management, user input handling, or authentication. Includes configuration of security tools." | `.agents/skills/golang-security/SKILL.md` |
+| golang-stay-updated | "Provides resources to stay updated with Golang news, communities and people to follow. Use when seeking Go learning resources, discovering new libraries, finding community channels, or keeping up with Go language changes and releases." | `.agents/skills/golang-stay-updated/SKILL.md` |
+| golang-structs-interfaces | 'Golang struct and interface design patterns — composition, embedding, type assertions, type switches, interface segregation, dependency injection via interfaces, struct field tags, and pointer vs value receivers. Use this skill when designing Go types, defining or implementing interfaces, embedding structs or interfaces, writing type assertions or type switches, adding struct field tags for JSON/YAML/DB serialization, or choosing between pointer and value receivers. Also use when the user asks about "accept interfaces, return structs", compile-time interface checks, or composing small interfaces into larger ones.' | `.agents/skills/golang-structs-interfaces/SKILL.md` |
+| golang-testing | "Production-ready Golang tests — table-driven tests, testify suites and mocks, parallel tests, fuzzing, fixtures, goroutine leak detection with goleak, snapshot testing, code coverage, integration tests, idiomatic test naming. Use when writing or reviewing Go tests, choosing a testing approach, setting up Go test CI, or debugging flaky/slow tests. For testify-specific APIs see `samber/cc-skills-golang@golang-stretchr-testify`; for measurement methodology see `samber/cc-skills-golang@golang-benchmark`." | `.agents/skills/golang-testing/SKILL.md` |
+| golang-troubleshooting | "Troubleshoot Golang programs systematically - find and fix the root cause. Use when encountering bugs, crashes, deadlocks, or unexpected behavior in Go code. Covers debugging methodology, common Go pitfalls, test-driven debugging, pprof setup and capture, Delve debugger, race detection, GODEBUG tracing, and production debugging. Start here for any 'something is wrong' situation. Not for interpreting profiles or benchmarking (→ See `samber/cc-skills-golang@golang-benchmark` skill) or applying optimization patterns (→ See `samber/cc-skills-golang@golang-performance` skill)." | `.agents/skills/golang-troubleshooting/SKILL.md` |
+| lead-magnets | When the user wants to create, plan, or optimize a lead magnet for email capture or lead generation. Also use when the user mentions "lead magnet," "gated content," "content upgrade," "downloadable," "ebook," "cheat sheet," "checklist," "template download," "opt-in," "freebie," "PDF download," "resource library," "content offer," "email capture content," "Notion template," "spreadsheet template," or "what should I give away for emails." Use this for planning what to create and how to distribute it. For interactive tools as lead magnets, see free-tools. For writing the actual content, see copywriting. For the email sequence after capture, see emails. | `.agents/skills/lead-magnets/SKILL.md` |
+| marketing-council | "When the user wants multiple expert perspectives on a marketing question — a simulated board of advisors staffed by legendary marketers (Seth Godin, David Ogilvy, Eugene Schwartz, April Dunford, Rory Sutherland, Alex Hormozi, Byron Sharp, and more). Also use when the user mentions 'marketing council,' 'board of advisors,' 'advisory board,' 'what would Seth Godin say,' 'what would Ogilvy think,' 'channel Hormozi,' 'get multiple perspectives,' 'debate this,' 'have the council review,' 'marketing mentors,' or asks how a famous marketer would approach their problem. The council gives each advisor's take through their documented frameworks, surfaces where they disagree, and synthesizes a recommendation. For executing the winning direction, hand off to positioning, offers, copywriting, ads, or the relevant skill." | `.agents/skills/marketing-council/SKILL.md` |
+| marketing-ideas | "When the user needs marketing ideas, inspiration, or strategies for their SaaS or software product. Also use when the user asks for 'marketing ideas,' 'growth ideas,' 'how to market,' 'marketing strategies,' 'marketing tactics,' 'ways to promote,' 'ideas to grow,' 'what else can I try,' 'I don't know how to market this,' 'brainstorm marketing,' or 'what marketing should I do.' Use this as a starting point whenever someone is stuck or looking for inspiration on how to grow. For specific channel execution, see the relevant skill (ads, social, emails, etc.)." | `.agents/skills/marketing-ideas/SKILL.md` |
+| marketing-loops | "When the user wants to set up a recurring, self-running marketing workflow — a repeatable loop an AI agent runs on a cadence (weekly, daily, on a trigger) rather than a one-off task. Also use when the user mentions 'marketing loop,' 'recurring marketing workflow,' 'automate my marketing,' 'marketing on autopilot,' 'weekly marketing review,' 'ad fatigue check,' 'content refresh loop,' 'churn watch,' 'ranking drop alert,' 'always-on marketing,' 'marketing automation workflow,' or 'run this every week.' Use this to pick, adapt, and schedule an ongoing marketing loop that orchestrates the other marketing skills. For one-off marketing ideas, see marketing-ideas. For the experimentation loop specifically, see ab-testing." | `.agents/skills/marketing-loops/SKILL.md` |
+| marketing-plan | When the user needs a comprehensive marketing plan for a client, a company they advise, or their own product. Also use when the user mentions "marketing plan," "growth plan," "GTM plan," "go-to-market plan," "AARRR plan," "90-day marketing plan," "12-month marketing roadmap," "fractional CMO plan," or "fCMO plan." Generates an exhaustive 13-section plan structured by AARRR (Acquisition, Activation, Retention, Referral, Revenue), customized to the client's current budget, team, and stage, mapped to future funding milestones, cross-referenced with the 139-idea marketing-ideas library and an embedded 17-section current-state audit rubric, with a full marketing operations stack showing which skills and MCP/API integrations execute each part. Outputs a Notion-paste-ready markdown document. For positioning and ICP context before planning, see product-marketing. For stage-specific deep work, see onboarding, signup, emails, referrals, pricing. | `.agents/skills/marketing-plan/SKILL.md` |
+| marketing-psychology | "When the user wants to apply psychological principles, mental models, or behavioral science to marketing. Also use when the user mentions 'psychology,' 'mental models,' 'cognitive bias,' 'persuasion,' 'behavioral science,' 'why people buy,' 'decision-making,' 'consumer behavior,' 'anchoring,' 'social proof,' 'scarcity,' 'loss aversion,' 'framing,' or 'nudge.' Use this whenever someone wants to understand or leverage how people think and make decisions in a marketing context. For applying psychology to specific pages, see cro; for pricing tactics, see pricing; for copy framing, see copywriting." | `.agents/skills/marketing-psychology/SKILL.md` |
+| offers | "When the user wants to design, construct, or improve an offer — the thing they actually sell — including value framing, bonus stacking, guarantee design, scarcity/urgency, naming, and payment structure. Also use when the user mentions 'offer,' 'offer design,' 'build an offer,' 'grand slam offer,' 'irresistible offer,' 'value stack,' 'bonus stack,' 'guarantee,' 'risk reversal,' 'money-back guarantee,' 'scarcity,' 'urgency,' 'high-ticket offer,' 'productize a service,' 'naming an offer,' 'payment plan,' 'down-sell,' 'upsell offer,' or 'why isn't my offer converting.' Best for services, agencies, courses, coaching, info products, high-ticket B2B, and direct-response. If you run pure self-serve SaaS, read pricing first — tiers and packaging do more work there. For price level itself (tiers, freemium, value metric), see pricing. For the page that presents the offer, see copywriting. For the launch moment, see launch. For sales collateral, see sales-enablement." | `.agents/skills/offers/SKILL.md` |
+| onboarding | When the user wants to optimize post-signup onboarding, user activation, first-run experience, or time-to-value. Also use when the user mentions "onboarding flow," "activation rate," "user activation," "first-run experience," "empty states," "onboarding checklist," "aha moment," "new user experience," "users aren't activating," "nobody completes setup," "low activation rate," "users sign up but don't use the product," "time to value," or "first session experience." Use this whenever users are signing up but not sticking around. For signup/registration optimization, see signup. For ongoing email sequences, see emails. | `.agents/skills/onboarding/SKILL.md` |
+| product-marketing | "When the user wants to create or update their product marketing context document. Also use when the user mentions 'product context,' 'marketing context,' 'set up context,' 'positioning,' 'who is my target audience,' 'describe my product,' 'ICP,' 'ideal customer profile,' or wants to avoid repeating foundational information across marketing tasks. Use this at the start of any new project before using other marketing skills — it creates `.agents/product-marketing.md` that all other skills reference for product, audience, and positioning context." | `.agents/skills/product-marketing/SKILL.md` |
+| pulumi-automation-api | Load this skill when a user asks how to run Pulumi programmatically, embed Pulumi in an application, orchestrate multiple stacks in code, build a self-service infrastructure portal, replace pulumi CLI shell scripts with code, or use the Pulumi Automation API (LocalWorkspace, createOrSelectStack, inline programs). Also load for questions about multi-stack sequencing, parallel deployments, or passing outputs between stacks via code. | `.agents/skills/pulumi-automation-api/SKILL.md` |
+| pulumi-best-practices | Load when the user is writing, reviewing, or debugging Pulumi TypeScript/Python programs; asks about Output<T> or apply() usage; wants to create ComponentResource classes; needs to refactor resources without destroying them (aliases); is setting up secrets or config; or is configuring a pulumi preview/up CI workflow. Also load for questions about resource dependency order, parent/child resource relationships, or pulumi.interpolate. | `.agents/skills/pulumi-best-practices/SKILL.md` |
+| pulumi-component | Guide for authoring Pulumi ComponentResource classes. Use when creating reusable infrastructure components, designing component interfaces, setting up multi-language support, or distributing component packages. | `.agents/skills/pulumi-component/SKILL.md` |
+| pulumi-debug-failed-operation | \| Debug a Pulumi update or preview that failed: read the failure Pulumi already recorded, find what caused it, and fix it. Load this skill when the user asks to debug, diagnose, or fix a failed update or preview, or points at a failing `pulumi up` or `pulumi preview`. Don't load it for authoring new infrastructure, migrations, or provider upgrades; those have their own skills. | `.agents/skills/pulumi-debug-failed-operation/SKILL.md` |
+| pulumi-esc | Guidance for working with Pulumi ESC (Environments, Secrets, and Configuration). Use when users ask about managing secrets, configuration, environments, short-term credentials, configuring OIDC for AWS, Azure, GCP, integrating with secret stores (AWS Secrets Manager, Azure Key Vault, HashiCorp Vault, 1Password), or using ESC with Pulumi stacks. | `.agents/skills/pulumi-esc/SKILL.md` |
+| pulumi-overview | Use this skill for any task that creates, modifies, inspects, or destroys cloud infrastructure or SaaS configuration, from one-off CLI operations to full multi-resource projects, across providers in the Pulumi ecosystem. A typical project spans many providers (AWS or Azure or GCP, Kubernetes, Cloudflare, Auth0, Datadog, Vercel, and others), and Pulumi drives them through one CLI, one state model, and one credential layer. Trigger even when the user does not name Pulumi; phrasings like "deploy this app," "provision a database," "stand up a VPC," "configure Auth0," "set up Datadog monitoring," or "tear down staging" qualify. Also trigger for tasks that migrate, port, or convert existing infrastructure code (Terraform, CloudFormation, CDK, Bicep, ARM) to Pulumi. Do not trigger for application runtime code that reads or writes data via cloud SDKs; that is application code, not infrastructure. | `.agents/skills/pulumi-overview/SKILL.md` |
+| schema | When the user wants to add, fix, or optimize schema markup and structured data on their site. Also use when the user mentions "schema markup," "structured data," "JSON-LD," "rich snippets," "schema.org," "FAQ schema," "product schema," "review schema," "breadcrumb schema," "Google rich results," "knowledge panel," "star ratings in search," or "add structured data." Use this whenever someone wants their pages to show enhanced results in Google. For broader SEO issues, see seo-audit. For AI search optimization, see ai-seo. | `.agents/skills/schema/SKILL.md` |
+| seo-audit | When the user wants to audit, review, or diagnose SEO issues on their site. Also use when the user mentions "SEO audit," "technical SEO," "why am I not ranking," "SEO issues," "on-page SEO," "meta tags review," "SEO health check," "my traffic dropped," "lost rankings," "not showing up in Google," "site isn't ranking," "Google update hit me," "page speed," "core web vitals," "crawl errors," or "indexing issues." Use this even if the user just says something vague like "my SEO is bad" or "help with SEO" — start with an audit. For building pages at scale to target keywords, see programmatic-seo. For adding structured data, see schema. For AI search optimization, see ai-seo. | `.agents/skills/seo-audit/SKILL.md` |
+<!-- GSD:skills-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd-debug` for investigation and bug fixing
+- `/gsd-execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->

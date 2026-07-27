@@ -147,17 +147,85 @@ Acknowledged and deferred. Not in this roadmap.
 
 ## Traceability
 
-Populated during roadmap creation.
+Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exactly one phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| — | — | Pending |
+| ACCEPT-01 | Phase 3 | Pending |
+| ACCEPT-02 | Phase 3 | Pending |
+| ACCEPT-03 | Phase 3 | Pending |
+| ACCEPT-04 | Phase 3 | Pending |
+| ACCEPT-05 | Phase 3 | Pending |
+| ACCEPT-06 | Phase 3 | Pending |
+| TRUST-01 | Phase 1 | Pending |
+| TRUST-02 | Phase 1 | Pending |
+| TRUST-03 | Phase 3 | Pending |
+| TRUST-04 | Phase 3 | Pending |
+| GCP-01 | Phase 7 | Pending |
+| GCP-02 | Phase 7 | Pending |
+| GCP-03 | Phase 7 | Pending |
+| GCP-04 | Phase 7 | Pending |
+| GCP-05 | Phase 7 | Pending |
+| GCP-06 | Phase 7 | Pending |
+| KUBE-01 | Phase 6 | Pending |
+| KUBE-02 | Phase 6 | Pending |
+| KUBE-03 | Phase 6 | Pending |
+| KUBE-04 | Phase 6 | Pending |
+| KUBE-05 | Phase 6 | Pending |
+| KUBE-06 | Phase 6 | Pending |
+| KUBE-07 | Phase 6 | Pending |
+| IMPORT-01 | Phase 4 | Pending |
+| IMPORT-02 | Phase 4 | Pending |
+| IMPORT-03 | Phase 4 | Pending |
+| IMPORT-04 | Phase 4 | Pending |
+| IMPORT-05 | Phase 4 | Pending |
+| IMPORT-06 | Phase 4 | Pending |
+| MIGRATE-01 | Phase 5 | Pending |
+| MIGRATE-02 | Phase 5 | Pending |
+| MIGRATE-03 | Phase 5 | Pending |
+| MIGRATE-04 | Phase 5 | Pending |
+| MIGRATE-05 | Phase 5 | Pending |
+| ECE-01 | Phase 4 | Pending |
+| ECE-02 | Phase 4 | Pending |
+| ECE-03 | Phase 4 | Pending |
+| ECE-04 | Phase 4 | Pending |
+| ATTACH-01 | Phase 8 | Pending |
+| ATTACH-02 | Phase 8 | Pending |
+| ATTACH-03 | Phase 8 | Pending |
+| ATTACH-04 | Phase 8 | Pending |
+| QUALITY-01 | Phase 1 | Pending |
+| QUALITY-02 | Phase 1 | Pending |
+| QUALITY-03 | Phase 1 | Pending |
+| QUALITY-04 | Phase 1 | Pending |
+| QUALITY-05 | Phase 1 | Pending |
+| QUALITY-06 | Phase 1 | Pending |
+| QUALITY-07 | Phase 1 | Pending |
+| QUALITY-08 | Phase 1 | Pending |
+| RELEASE-01 | Phase 2 | Pending |
+| RELEASE-02 | Phase 2 | Pending |
+| RELEASE-03 | Phase 2 | Pending |
+| RELEASE-04 | Phase 2 | Pending |
+| RELEASE-05 | Phase 8 | Pending |
+| RELEASE-06 | Phase 2 | Pending |
 
 **Coverage:**
 - v1 requirements: 56 total
-- Mapped to phases: 0
-- Unmapped: 56 ⚠️
+- Mapped to phases: 56
+- Unmapped: 0 ✓
+
+**By phase:**
+
+| Phase | Name | Requirements | Cloud spend |
+|-------|------|--------------|-------------|
+| 1 | Publishable Baseline & Honest Fallbacks | 10 | None |
+| 2 | Tag-Ready Release Surface | 5 | None |
+| 3 | Credit-Efficient Acceptance Harness & Evidence Tiering | 8 | PAID (AWS free-tier, pass 1 of 3) |
+| 4 | Brownfield Onramp — PaaS Import & ece-tools Parity | 10 | None |
+| 5 | Data Migration & Cutover | 5 | Mostly none (one cell rides Phase 7) |
+| 6 | Shared Kubernetes Day-2 | 7 | None |
+| 7 | GCP Certification | 6 | PAID (GCP, pass 2 of 3) |
+| 8 | Brownfield Attach & Tag Day | 5 | PAID small (AWS free-tier, pass 3 of 3) |
 
 ---
 *Requirements defined: 2026-07-27*
-*Last updated: 2026-07-27 after initial definition*
+*Last updated: 2026-07-27 after roadmap creation — traceability populated*

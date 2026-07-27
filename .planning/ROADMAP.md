@@ -1,0 +1,194 @@
+# Roadmap: MageLift v1.0.0
+
+## Overview
+
+This is a brownfield hardening-and-capability milestone on a codebase that already deploys production Magento on AWS ECS Fargate. The journey has one binding constraint — self-funded cloud credits — so the roadmap is ordered to spend as little as possible and to spend it late, after offline verification has bought everything mocks can buy.
+
+The shape is: clear the debt and make the product honest about its own limits (Phase 1), make `v1.0.0-rc.1` taggable (Phase 2), then build the acceptance harness that makes every later paid pass cheap (Phase 3). With that in place, the two independent capability tracks run: the brownfield onramp that lets a real store move onto MageLift (Phases 4-5, fully offline), and the shared Kubernetes day-2 layer that makes GCP certification affordable and lifts EKS/MKS/Kapsule with it (Phases 6-7, one paid GCP pass). The hardest and narrowest capability, adopting infrastructure MageLift did not create, comes last alongside the gate-board audit (Phase 8).
+
+Phases 4-8 are deliberately droppable in reverse order. A maintainer who wants to tag `v1.0.0-rc.1` after Phase 3 can do so without leaving anything half-wired: Phases 1-3 deliver a repository that lints, tells the truth about every capability tier, and has a closed packaging gate.
+
+## Phases
+
+**Phase Numbering:**
+- Integer phases (1, 2, 3): Planned milestone work
+- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+
+Decimal phases appear between their surrounding integers in numeric order.
+
+- [ ] **Phase 1: Publishable Baseline & Honest Fallbacks** - Clear the debt that worsens with every later phase, and make every target state its own tier
+- [ ] **Phase 2: Tag-Ready Release Surface** - Make `v1.0.0-rc.1` taggable: version story, contract statement, packaging smoke, contributor path
+- [ ] **Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering** - One long-lived stack, resumable runs, automatic evidence, and a matrix that never over-claims
+- [ ] **Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity** - A store on Adobe Commerce Cloud or Upsun gets a reviewable `magelift.yaml` and a build system it can trust
+- [ ] **Phase 5: Data Migration & Cutover** - `seedDump` stops being a status string; a documented cutover moves a live store over
+- [ ] **Phase 6: Shared Kubernetes Day-2** - One `Observe` and one `deploy.Steps` in `internal/cloud/kube`, inherited by all four Kubernetes targets
+- [ ] **Phase 7: GCP Certification** - GKE Autopilot reaches certified tier on real-account evidence, making multi-cloud truthful
+- [ ] **Phase 8: Brownfield Attach & Tag Day** - Adopt existing VPC and database safely, then close or defer every gate-board row
+
+## Cloud Spend Map
+
+Decision-relevant for a self-funded solo maintainer. The plan is **three paid passes total**.
+
+| Phase | Cloud spend | What pays for it |
+|-------|-------------|------------------|
+| 1 | **None** | `make verify`, `make test -race`, `make floci-test` |
+| 2 | **None** | `make release-smoke` (local, serial, single-target, outside Cursor) |
+| 3 | **PAID — pass 1 of 3** | One AWS free-tier `preview` stack proving the harness itself (single stack, resume, evidence, `assert_clean`) |
+| 4 | **None** | Fixture ACC/Upsun repositories, `make test`, `make php-test` |
+| 5 | **Mostly none** | `magelift dev` MySQL + Floci for media; one real dump-import cell rides Phase 7's pass |
+| 6 | **None** | Fake clientset / envtest, Pulumi mocks, local S3-compatible endpoint for OVH/Scaleway state |
+| 7 | **PAID — pass 2 of 3** | One batched GCP pass (~19m21s create + PSA soak + force-clean); do not enter until 3, 5, 6 are green offline |
+| 8 | **PAID — pass 3 of 3, small** | Floci for import mechanics; one free-tier AWS confirmation of a real VPC + RDS adoption |
+
+Never depend on: Aurora `CreateDBCluster` (free-tier API block), `amazon-mq` × `preview` (2-AZ vs 3-AZ, incompatible by design), or the live OpenSearch SigV4 data plane (deferred to post-tag paid acceptance).
+
+## Architectural Guardrails
+
+Every phase respects these; they are not phase work, they are constraints on phase work.
+
+- **ADR 0002/0004** — cloud adapter internals must not leak into `internal/cli` or `internal/deploy`; only `sdk/v1` types and `internal/platform` interfaces cross the boundary. The shared Kubernetes layer in Phase 6 lives in `internal/cloud/kube` and is reached through `platform`, not by the CLI importing it.
+- **ADR 0007/0008** — no fifth provider in this milestone; the multi-provider gate opens only once a second target is certified (Phase 7).
+- **Split by port nature, not by provider** — k8s-shaped ports (`Observe`, `deploy.Steps`) shared once; cloud-shaped ports (`Bootstrap`, `State`, `Secrets`, `CostEstimator`) stay per-provider.
+- **Nothing claims a tier above its recorded evidence** — enforced in the product from Phase 1 and in the matrix from Phase 3.
+
+## Phase Details
+
+### Phase 1: Publishable Baseline & Honest Fallbacks
+**Goal**: The repository survives a stranger's first read — CI lints without OOM, the highest-risk file is no longer a single 991-line construction path, every recently fixed bug has a regression guard, and no target can silently pretend to support something it does not.
+**Depends on**: Nothing (first phase)
+**Cloud spend**: None — fully offline
+**Requirements**: QUALITY-01, QUALITY-02, QUALITY-03, QUALITY-04, QUALITY-05, QUALITY-06, QUALITY-07, QUALITY-08, TRUST-01, TRUST-02
+**Success Criteria** (what must be TRUE):
+  1. CI lint runs as per-provider partitioned jobs that each complete green, and `.golangci.yml` no longer needs `run.concurrency: 1` or the 30-minute timeout to pass
+  2. No file under `internal/cloud/aws/runtime/` exceeds 400 lines, and the pre-existing `runtime_test.go` suite passes unchanged after the split — proving the refactor moved code without changing behaviour
+  3. `go test -race ./...` includes new guards that fail on regression: rendered IAM permissions-boundary over 6KiB, an AOSS OCU value AWS rejects, subnet index at cap and cap+1 for every provider, OVH MKS node-pool dependency ordering, `queueMode` × `searchMode` × `webRuntime` in combination, and `internal/cli/cost.go` flag parsing / error paths / `ErrNotSupported` on non-AWS targets
+  4. Any mutating command against `gcp`, `ovh`, or `scaleway` prints an experimental-tier warning naming the tier before Pulumi is invoked — asserted by a CLI test, not by reading docs
+  5. Every unimplemented day-2 command on an experimental target exits non-zero with a message naming the capability and its certification tier; a test enumerates the `ErrNotSupported` sites (15 each in `internal/cloud/ovh/stack/ops.go` and `internal/cloud/scaleway/stack/ops.go`) and asserts none of them returns a nil-success path
+**Plans**: TBD
+
+### Phase 2: Tag-Ready Release Surface
+**Goal**: `v1.0.0-rc.1` becomes taggable — the version story is consistent everywhere, the contract carries an explicit RC stability statement, the packaging gate is closed, and a stranger can go from clone to green.
+**Depends on**: Phase 1 (CONTRIBUTING.md promises a green `make verify`, which Phase 1 makes true)
+**Cloud spend**: None
+**Requirements**: RELEASE-01, RELEASE-02, RELEASE-03, RELEASE-04, RELEASE-06
+**Success Criteria** (what must be TRUE):
+  1. `README.md`, `docs/versioning.md`, and `docs/release-readiness.md` each name `v1.0.0-rc.1` as the first public tag, and no remaining sentence in them describes the project as pre-alpha or `v0.x` (CHANGELOG history excepted)
+  2. `docs/versioning.md` carries a stability statement for `sdk/v1` and `platform.StackModule` that names what may change during the RC series — explicitly reserving the shared-Kubernetes port changes planned for Phase 6
+  3. `make release-smoke` completes on the maintainer's machine in a plain Terminal (serial, single-target), and the packaging-smoke row moves from Partial to Closed with the run date and output recorded
+  4. A fresh clone, following only the steps written in `CONTRIBUTING.md`, reaches a green `make verify` — run in a clean checkout, not from the working tree
+  5. `examples/custom-cli` builds and registers an out-of-tree provider following `docs/adding-a-provider.md` alone, verified from a clean module cache with no core source consulted
+**Plans**: TBD
+
+### Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering
+**Goal**: Every later paid pass costs one stack and buys only what mocks cannot prove — and no cell in the capability matrix claims more than the harness actually recorded.
+**Depends on**: Phase 1 (the tier labels TRUST-01/02 introduce are what the matrix records per cell)
+**Cloud spend**: **PAID** — one AWS free-tier `preview` pass to prove the harness. The GCP harness path (ACCEPT-05) is written here and first exercised for real in Phase 7.
+**Requirements**: ACCEPT-01, ACCEPT-02, ACCEPT-03, ACCEPT-04, ACCEPT-05, ACCEPT-06, TRUST-03, TRUST-04
+**Success Criteria** (what must be TRUE):
+  1. An acceptance run iterates at least three catalog cells against a single stack — the run log shows one Pulumi create followed by updates, never a re-create between cells — and killing the run mid-matrix then re-invoking it resumes at the first uncompleted cell, skipping recorded ones
+  2. After a run, `.magelift/matrix-results.md` has one appended row per cell carrying cell, result, duration, provider, account, and date, written by the harness — the git diff shows no hand-typed evidence
+  3. Teardown destroys everything it created and `assert_clean` exits non-zero when a resource is deliberately left behind, zero on a clean account — both outcomes demonstrated, not assumed
+  4. The GCP harness path runs the same shape end to end including PSA soak and force-clean teardown, verified at least as far as a dry run / preview pass before Phase 7 spends credits
+  5. `docs/capability-matrix.md` records an evidence tier per cell plus an explicit unverifiable reason for Aurora `CreateDBCluster`, `amazon-mq` × `preview`, and the OpenSearch SigV4 data plane; a checked-in port-coverage table maps every day-2 port to mocks / Floci / paid-only, and `make floci-test` covers every port marked mockable
+**Plans**: TBD
+
+### Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity
+**Goal**: A store already running on Adobe Commerce Cloud or Upsun can generate a reviewable `magelift.yaml` from its existing config and trust that MageLift's PHP build system does what `ece-tools` did for it.
+**Depends on**: Phase 1 (the loud-failure mechanism unmappable keys use), Phase 2 (the schema and version story the generated file targets). Independent of all cloud work — may run in parallel with Phases 6-7.
+**Cloud spend**: None — fixture repositories, `make test`, `make php-test`
+**Requirements**: IMPORT-01, IMPORT-02, IMPORT-03, IMPORT-04, IMPORT-05, IMPORT-06, ECE-01, ECE-02, ECE-03, ECE-04
+**Success Criteria** (what must be TRUE):
+  1. `magelift init --from-acc` in an Adobe Commerce Cloud fixture repository and `magelift init --from-upsun` in an Upsun fixture repository each write a `magelift.yaml` that passes `magelift config validate` and validates against `schema/magelift.schema.json` with zero hand edits
+  2. A fixture carrying unmappable keys produces a report naming every source key that could not be translated and refuses to claim success, with tests asserting key-by-key coverage of application config, services, routes, and cron definitions
+  3. Import output is always a file the operator diffs first: `magelift config validate` and `magelift deploy` reject `.magento.app.yaml` / `.platform.app.yaml` as direct input (test asserts), and the importer's clean-room provenance is recorded in `docs/knowledge/` with a check confirming no reference-repository source was vendored
+  4. `docs/ece-parity.md` enumerates every `ece-tools` build, deploy, and post-deploy hook plus every env-var-driven Magento setting in the ACC/Upsun shape, each marked closed or intentionally-gapped with a reason — no row blank
+  5. `make php-test` covers `magento-cloud-patches`-style patch application and static-content-deploy settings (locales, themes, strategy, thread count) for the supported configurations
+**Plans**: TBD
+
+### Phase 5: Data Migration & Cutover
+**Goal**: A live store's data actually lands in MageLift — `seedDump` stops being a recorded status string, media follows, and a documented runbook moves a real store over with a way back.
+**Depends on**: Phase 3 (the dump-import cell rides the harness rather than buying its own pass), Phase 4 (the imported config is what a migrating team deploys)
+**Cloud spend**: Mostly none — verified against the `magelift dev` MySQL and Floci for media; one real dump-import cell batches into Phase 7's GCP pass
+**Requirements**: MIGRATE-01, MIGRATE-02, MIGRATE-03, MIGRATE-04, MIGRATE-05
+**Success Criteria** (what must be TRUE):
+  1. `magelift env create --dump <file>` leaves the dumped tables present and queryable in the target database after the first successful deploy — verified against local dev MySQL and once on a managed instance; `internal/cli/env.go:144` no longer writes a placeholder status in place of doing the work
+  2. `magelift env status` shows `seedDumpStatus` moving recorded → importing → imported on a good dump, and `failed` with a readable reason on a deliberately corrupt one
+  3. Re-running an import against a non-empty database exits non-zero without an explicit confirmation flag, and an interrupted import re-run converges to the same database state (both asserted by tests)
+  4. A media-sync run copies a fixture media tree into the target's object storage and a listing diff against the source is empty
+  5. `docs/migrating-from-paas.md` carries a cutover runbook (DNS, maintenance mode, reindex, verification, rollback) that has been followed end to end at least once against a non-production target, with the run recorded
+**Plans**: TBD
+
+### Phase 6: Shared Kubernetes Day-2
+**Goal**: One Kubernetes day-2 implementation serves GKE Autopilot, EKS Autopilot, OVH MKS, and Scaleway Kapsule — so certifying GCP in Phase 7 lifts three more targets without three more implementations.
+**Depends on**: Phase 1 (QUALITY-06 lint partitioning must land before this adds provider code, and TRUST-02 supplies the loud-failure mechanism KUBE-06 relies on), Phase 3 (the mock/Floci coverage targets this work must hit before any paid pass)
+**Cloud spend**: None — fake clientset / envtest for the Kubernetes API, Pulumi mocks for graphs, a local S3-compatible endpoint for OVH/Scaleway state. Live exercise happens in Phase 7.
+**Requirements**: KUBE-01, KUBE-02, KUBE-03, KUBE-04, KUBE-05, KUBE-06, KUBE-07
+**Success Criteria** (what must be TRUE):
+  1. `Observe.TailLogs`, `Observe.CheckRuntime`, and `Observe.PrepareExec` exist once in `internal/cloud/kube` and all four Kubernetes modules resolve to that single implementation — a test asserts each module returns the shared type and no provider package defines its own copy
+  2. The Kubernetes `deploy.Steps` implementation lives once in `internal/cloud/kube` and drives the full sequence (Validate → RegisterCandidate → RunMigrations → CleanupCandidate → UpdateServices → Stabilize → Health → Record) against a fake cluster, exercised through all four module registrations
+  3. State lock, backup, and restore succeed for OVH and Scaleway through the existing S3-compatible manager with nothing but an endpoint override — verified against a local S3-compatible endpoint, with no third state implementation added
+  4. `internal/cloud/ovh/stack/ops.go` and `internal/cloud/scaleway/stack/ops.go` hold no `unsupported{}` stub for any capability the shared layer now provides (a grep gate over the 15 `ErrNotSupported` sites each carries today), and every remaining gap returns a tier-named error
+  5. `docs/capability-matrix.md` rows for `eks-autopilot`, `mks`, and `kapsule` state the day-2 surface that now works with its evidence tier, while `Bootstrap` and `Secrets` remain per-provider with a test asserting no nil-success path in either
+**Plans**: TBD
+
+### Phase 7: GCP Certification
+**Goal**: GCP GKE Autopilot reaches certified tier on real-account evidence, making the multi-cloud claim truthful and opening the ADR 0007/0008 provider gate.
+**Depends on**: Phase 6 (the shared `Observe` and `deploy.Steps` must exist before certification exercises them — GCP-03 and GCP-04 are unreachable otherwise), Phase 3 (the harness is what makes this one pass instead of several exploratory ones), Phase 5 (the dump-import cell rides this pass), Phase 1 (GCP-02 needs the loud-failure mechanism so no secrets path returns a false success)
+**Cloud spend**: **PAID** — the single efficient GCP pass (~19m21s create, plus PSA soak and force-clean teardown). Do not enter this phase until Phases 3, 5, and 6 are green offline.
+**Requirements**: GCP-01, GCP-02, GCP-03, GCP-04, GCP-05, GCP-06
+**Success Criteria** (what must be TRUE):
+  1. `magelift` bootstrap provisions Workload Identity Federation on a real GCP project and a CI run authenticates successfully with no long-lived service-account key present in repository secrets
+  2. Composer credentials are written to and read back from GCP Secret Manager during both build and deploy on that project, and a test asserts every GCP secrets path either succeeds for real or fails loudly — none returns nil success
+  3. `logs`, `exec`, `secrets`, `state`, and `health` each succeed against the live GKE Autopilot target, with a harness-recorded evidence row per command in `.magelift/gcp-matrix/matrix-results.md`
+  4. `magelift deploy` completes migrate → cutover → health → record on GKE Autopilot and the resulting release is readable from the releases journal
+  5. `magelift cost` returns a per-cell estimate for the GCP target, and both `docs/capability-matrix.md` and the `docs/release-readiness.md` gate board record `gcp` / `gke-autopilot` as certified, citing this acceptance pass as evidence
+**Plans**: TBD
+
+### Phase 8: Brownfield Attach & Tag Day
+**Goal**: The hardest brownfield case works safely — adopting infrastructure MageLift did not create, without ever destroying it — and the gate board tells the truth on tag day.
+**Depends on**: Phase 7 (the board cannot be closed before the GCP row is settled) and, transitively, every earlier phase, since RELEASE-05 audits all of them. Attach itself is independently droppable: deferring ATTACH-01..04 to a later RC leaves nothing half-wired, provided the deferral is recorded on the board.
+**Cloud spend**: **PAID but small** — Floci for the import mechanics, one free-tier AWS confirmation adopting a real VPC and RDS instance
+**Requirements**: ATTACH-01, ATTACH-02, ATTACH-03, ATTACH-04, RELEASE-05
+**Success Criteria** (what must be TRUE):
+  1. `magelift preview` against a config referencing an existing VPC reports it as an import rather than a create, and the subsequent apply adopts it without replacing it
+  2. An existing managed database instance (RDS or Cloud SQL) is adopted into a MageLift stack, and a following `preview` reports no destructive change against it
+  3. Any attempt to replace or destroy an adopted resource MageLift does not own fails before mutate with a message naming the resource — asserted by a test, not by convention
+  4. Documented adoption limits state what can be attached, what cannot, and a detach path — verified by detaching an adopted resource and confirming it still exists in the account afterwards
+  5. Every row in `docs/release-readiness.md` is Closed with named evidence or Deferred with a reason, and every unchecked requirement in `.planning/REQUIREMENTS.md` has a recorded deferral — no row and no requirement left in an undetermined state on tag day
+**Plans**: TBD
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+
+Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes plus GCP certification) are independent tracks after Phase 3. Either pair may be pulled ahead of the other; `parallelization: true` in config permits interleaving their plans. Phase 8 requires both tracks to be settled.
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. Publishable Baseline & Honest Fallbacks | 0/TBD | Not started | - |
+| 2. Tag-Ready Release Surface | 0/TBD | Not started | - |
+| 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 0/TBD | Not started | - |
+| 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 0/TBD | Not started | - |
+| 5. Data Migration & Cutover | 0/TBD | Not started | - |
+| 6. Shared Kubernetes Day-2 | 0/TBD | Not started | - |
+| 7. GCP Certification | 0/TBD | Not started | - |
+| 8. Brownfield Attach & Tag Day | 0/TBD | Not started | - |
+
+## Requirement Coverage
+
+56 of 56 v1 requirements mapped, each to exactly one phase.
+
+| Phase | Requirements | Count |
+|-------|--------------|-------|
+| 1 | QUALITY-01..08, TRUST-01, TRUST-02 | 10 |
+| 2 | RELEASE-01, RELEASE-02, RELEASE-03, RELEASE-04, RELEASE-06 | 5 |
+| 3 | ACCEPT-01..06, TRUST-03, TRUST-04 | 8 |
+| 4 | IMPORT-01..06, ECE-01..04 | 10 |
+| 5 | MIGRATE-01..05 | 5 |
+| 6 | KUBE-01..07 | 7 |
+| 7 | GCP-01..06 | 6 |
+| 8 | ATTACH-01..04, RELEASE-05 | 5 |
+
+---
+*Roadmap created: 2026-07-27*
