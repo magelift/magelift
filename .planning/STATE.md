@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
 status: executing
-stopped_at: Completed 01-02-PLAN.md (offline; CI deferred)
-last_updated: "2026-07-28T11:29:03.633Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-07-28T11:37:43.790Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-02 SUMMARY offline; next 01-03
+last_activity_desc: 01-03 SUMMARY offline; next 01-04 sequential
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 9
-  completed_plans: 2
-  percent: 22
+  completed_plans: 3
+  percent: 33
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 3 of 9 in current phase (01-02 closed offline; CI proof still deferred)
+Plan: 4 of 9 in current phase (01-03 closed offline; next 01-04 sequential)
 Status: Executing — offline mode (no GitHub Actions minutes)
-Last activity: 2026-07-28 — 01-02 SUMMARY; continue 01-03 without CI
+Last activity: 2026-07-28 — 01-03 SUMMARY; continue 01-04 without CI
 
-Progress: [██░░░░░░░░] 22%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [██░░░░░░░░] 22%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P02 | 20 | 3 tasks | 4 files |
+| Phase 01 P03 | 6 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ Recent decisions affecting current work:
 - Roadmap: Phases 4-5 (brownfield, offline) and 6-7 (shared Kubernetes + GCP) are independent tracks after Phase 3
 - [Phase ?]: Offline 01-02: lint coverage guard shipped; CI race + force-all verify deferred-ci until Actions minutes return
 - [Phase ?]: Full local go test -race ./... deferred-local under Cursor (16GB Mac); narrow race sample only
+- [Phase ?]: 01-03: preserve cost not-supported prefix for plan 01-08 tier append
+- [Phase ?]: 01-03: platform go test -race deferred-local under Cursor; non-race verified
 
 ### Pending Todos
 
@@ -102,7 +105,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T11:28:54.250Z
-Stopped at: Completed 01-02-PLAN.md (offline; CI deferred)
+Last session: 2026-07-28T11:37:43.785Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
 Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset
