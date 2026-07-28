@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 3
 current_phase_name: Credit-Efficient Acceptance Harness & Evidence Tiering
 status: planning
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-07-28T15:58:17.302Z"
+stopped_at: Completed 03-05-PLAN.md; next=03-06 HUMAN_GATE paid AWS
+last_updated: "2026-07-28T15:59:42.634Z"
 last_activity: 2026-07-28
 last_activity_desc: phase planning (offline-first waves; 03-06 paid HUMAN_GATE)
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 25
 ---
 
@@ -34,7 +34,7 @@ Plan: 03-01 of 03-06 (wave 1: 03-01 + 03-03; paid HUMAN_GATE = 03-06)
 Status: 6 PLAN.md files at `.planning/phases/03-credit-efficient-acceptance-harness-evidence-tiering/`
 Last activity: 2026-07-28 — phase planning (offline-first waves; 03-06 paid HUMAN_GATE)
 
-Progress: [█████████░] 90%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Progress: [█████████░] 90%
 | Phase 03 P03 | 8min | 2 tasks | 2 files |
 | Phase 03 P02 | 6min | 2 tasks | 5 files |
 | Phase 03 P04 | 15min | 2 tasks | 4 files |
+| Phase 03 P05 | 10min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ Recent decisions affecting current work:
 - [Phase ?]: PrepareExec / ECS ExecuteCommand marked unit-fake or paid-only
 - [Phase ?]: Stub only under MAGELIFT_ACCEPTANCE_AWS_STUB=1 with PATH isolation
 - [Phase ?]: NewDeploySteps covered by unit-fake reject path, not Floci
+- [Phase ?]: GCP evidence under .magelift/gcp-matrix/ to avoid clobbering AWS
+- [Phase ?]: Live GCP up + PSA soak deferred to Phase 7
 
 ### Pending Todos
 
@@ -143,6 +146,7 @@ None yet.
 - `go.yaml.in/yaml/v4` pinned to a release candidate; re-verify strict-decoding/merge/provenance tests on every bump
 - GitHub Actions billing/spending limit: jobs refuse to start (annotation on run 30354658603). Must increase spending limit or fix payment before QUALITY-06 CI proof.
 - RELEASE-06 closed: scratch/02-02-verify-proof.txt is VERIFY_PROOF_OK (worktree make verify exit 0 at 2026-07-28T15:32:54Z); 02-02-SUMMARY.md still narrates BLOCKED (stale)
+- 03-06 HUMAN_GATE: paid AWS free-tier spend approval required before live create
 
 ## Deferred Items
 
@@ -157,7 +161,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T15:58:17.292Z
-Stopped at: Completed 03-04-PLAN.md
+Last session: 2026-07-28T15:59:42.438Z
+Stopped at: Completed 03-05-PLAN.md; next=03-06 HUMAN_GATE paid AWS
 Resume file: None
 Note: Hosted CI / QUALITY-06 remains Phase 1 HUMAN_GATE. Phase 3 must not spend AWS until 03-06 HUMAN_GATE.

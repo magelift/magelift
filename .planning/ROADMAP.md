@@ -128,7 +128,7 @@ Plans:
   4. The GCP harness path runs the same shape end to end including PSA soak and force-clean teardown, verified at least as far as a dry run / preview pass before Phase 7 spends credits
   5. `docs/capability-matrix.md` records an evidence tier per cell plus an explicit unverifiable reason for Aurora `CreateDBCluster`, `amazon-mq` × `preview`, and the OpenSearch SigV4 data plane; a checked-in port-coverage table maps every day-2 port to mocks / Floci / paid-only, and `make floci-test` covers every port marked mockable
 
-**Plans:** 4/6 plans executed
+**Plans:** 5/6 plans executed
 
 Plans:
 
@@ -136,7 +136,7 @@ Plans:
 - [x] 03-02-PLAN.md — Shared assert_clean + offline dual-outcome stub tests
 - [x] 03-03-PLAN.md — Capability-matrix evidence tiers, unverifiable reasons, port-coverage table
 - [x] 03-04-PLAN.md — Floci/unit-fake coverage for every mockable day-2 port
-- [ ] 03-05-PLAN.md — GCP harness same shape via preview/dry-run (no live up)
+- [x] 03-05-PLAN.md — GCP harness same shape via preview/dry-run (no live up)
 - [ ] 03-06-PLAN.md — HUMAN_GATE paid AWS free-tier create-once proof (≥3 cells, resume, evidence, assert_clean)
 
 ### Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity
@@ -230,7 +230,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 |-------|----------------|--------|-----------|
 | 1. Publishable Baseline & Honest Fallbacks | 10/10 | In Progress|  |
 | 2. Tag-Ready Release Surface | 4/4 | In Progress|  |
-| 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 4/6 | In Progress|  |
+| 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 5/6 | In Progress|  |
 | 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 0/TBD | Not started | - |
 | 5. Data Migration & Cutover | 0/TBD | Not started | - |
 | 6. Shared Kubernetes Day-2 | 0/TBD | Not started | - |
