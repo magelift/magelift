@@ -118,12 +118,12 @@ Floci gap closure is a later plan). Prefer under-claim.
 | Port | Evidence | Notes |
 | --- | --- | --- |
 | Bootstrap (`VerifyAccount` / `Ensure`) | paid-only | Live OIDC / account bootstrap not certified by Floci |
-| State (`Status` / `Lock` / `Unlock` / `Backup` / `Restore`) | Floci | `tests/floci/state_test.go` |
-| Secrets (`List` / `Set` / `Remove`) | Floci | Account-free API contracts via Floci |
-| RuntimeObserve.TailLogs | Floci | Log describe/filter contracts offline |
-| RuntimeObserve.CheckRuntime | Floci / paid-only | Health path partial offline; ALB+ECS live health is paid |
+| State (`Status` / `Lock` / `Unlock` / `Backup` / `Restore`) | Floci | `TestBootstrapStateAndLockAgainstFloci` |
+| Secrets (`List` / `Set` / `Remove`) | Floci | `TestSecretsManagerAgainstFloci` |
+| RuntimeObserve.TailLogs | Floci | `TestCloudWatchLogsAgainstFloci` |
+| RuntimeObserve.CheckRuntime | Floci / paid-only | `TestECSRuntimeHealthAgainstFloci`; ALB+ECS live health remains paid |
 | RuntimeObserve.PrepareExec | unit-fake / paid-only | `TestPrepareExecRejectsDeployWorkload`; live ECS ExecuteCommand is paid-only |
-| Ops.AcquireLock | Floci / unit-fake | DIY lock contracts offline where Floci covers S3/state |
+| Ops.AcquireLock | Floci / unit-fake | Covered by `TestBootstrapStateAndLockAgainstFloci` (S3 DIY lock) |
 | Ops.NewDeploySteps | unit-fake / paid-only | `TestNewDeployStepsRejectsWrongBackend`; live Magento cutover paid |
 | Media / storage (S3 paths exercised by Floci) | Floci | `tests/floci/storage_test.go` (`TestVersionedMediaRestoreAgainstFloci`) |
 | SelectTask (PrepareExec helper) | unit-fake | `TestSelectTaskSortsRunningTaskARNs` in `internal/cloud/aws/operations` |

@@ -70,6 +70,7 @@ acceptance-harness-test: ## Run offline acceptance harness shell tests (serial; 
 	MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/evidence_append_test.sh
 	MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/checkpoint_resume_test.sh
 	bash tests/acceptance/matrix_tier_guard_test.sh
+	bash tests/acceptance/port_coverage_floci_gate_test.sh
 	MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh --clean
 	MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh --leftover; test $$? -ne 0
 
