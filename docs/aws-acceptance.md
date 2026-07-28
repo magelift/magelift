@@ -5,6 +5,33 @@ opt-in maintainer activity**, not a GitHub Actions workflow. Use it sparingly to
 stretch free credits: keep stacks up only for the duration of the script, default
 to the `preview` preset, and destroy on exit.
 
+## Offline harness (dry-run)
+
+Before any paid create, prove resume and evidence append with zero AWS spend:
+
+```sh
+export MAGELIFT_ACCEPTANCE_DRY_RUN=1
+make acceptance-harness-test
+# or: ./scripts/aws-acceptance-local.sh
+```
+
+| Artifact | Path |
+|----------|------|
+| Cell catalog | `scripts/acceptance/cells-aws-preview.txt` |
+| Checkpoint | `.magelift/acceptance-checkpoint.json` (gitignored) |
+| Evidence table | `.magelift/matrix-results.md` (gitignored; SC#2 columns) |
+| Shared libs | `scripts/acceptance/lib-checkpoint.sh`, `lib-evidence.sh` |
+
+Dry-run iterates the catalog against one logical stack: logs `acceptance create-once`
+once, then `acceptance cell-update` per incomplete cell — never destroy-between-cells.
+Re-invoking with an existing checkpoint skips recorded cell IDs (ACCEPT-02).
+
+**Resume / lock hygiene:** if a live (non-dry-run) deploy was killed mid-create, DIY
+locks or `pending_operations` may block the next run. Unlock only when the account
+is empty of acceptance resources (confirm with `assert_clean` / aws-cli tag scan) —
+never force-unlock while create is still in flight. Live multi-cell proof remains a
+paid HUMAN_GATE pass; dry-run does not claim that yet.
+
 ## Prerequisites
 
 - AWS credentials for a disposable account (aws-cli `aws sts get-caller-identity`)

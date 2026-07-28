@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help generate generate-check cli-docs cli-docs-check fmt fmt-check test lint license-check php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test floci-test aws-acceptance-local gcp-acceptance-local docs workflow-check verify release-smoke ci-act-go
+.PHONY: help generate generate-check cli-docs cli-docs-check fmt fmt-check test lint license-check php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test floci-test acceptance-harness-test aws-acceptance-local gcp-acceptance-local docs workflow-check verify release-smoke ci-act-go
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -65,6 +65,10 @@ build-e2e-test: builder-image-test ## Build the fixture through the CLI, Docker,
 
 floci-test: ## Run account-free AWS state and lock integration tests through Floci
 	./scripts/floci-test.sh
+
+acceptance-harness-test: ## Run offline acceptance harness shell tests (serial; no AWS)
+	MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/evidence_append_test.sh
+	MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/checkpoint_resume_test.sh
 
 aws-acceptance-local: ## Run a local real-AWS acceptance pass (preview; destroys on exit)
 	./scripts/aws-acceptance-local.sh
