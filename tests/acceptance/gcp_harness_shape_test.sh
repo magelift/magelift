@@ -32,9 +32,22 @@ if ! grep -q 'lib-checkpoint.sh' "$SCRIPT" || ! grep -q 'lib-evidence.sh' "$SCRI
 	printf 'gcp script must source shared checkpoint/evidence libs\n' >&2
 	exit 1
 fi
-# cleanup path: destroy then force_clean then assert_clean
-if ! grep -q 'force_clean_orphans' "$SCRIPT" || ! grep -A20 'cleanup()' "$SCRIPT" | grep -q 'assert_clean'; then
-	printf 'EXIT cleanup must call force_clean_orphans / assert_clean\n' >&2
+# cleanup path: destroy then force_clean then assert_clean (live EXIT contract)
+cleanup_block=$(awk '/^cleanup\(\)/,/^}/' "$SCRIPT")
+if ! printf '%s\n' "$cleanup_block" | grep -q 'destroy'; then
+	printf 'EXIT cleanup must call destroy when created\n' >&2
+	exit 1
+fi
+if ! printf '%s\n' "$cleanup_block" | grep -q 'force_clean_orphans'; then
+	printf 'EXIT cleanup must call force_clean_orphans\n' >&2
+	exit 1
+fi
+if ! printf '%s\n' "$cleanup_block" | grep -q 'assert_clean'; then
+	printf 'EXIT cleanup must call assert_clean\n' >&2
+	exit 1
+fi
+if ! grep -q 'MAGELIFT_GCP_ACCEPTANCE_KEEP' "$SCRIPT"; then
+	printf 'KEEP gate missing from gcp harness\n' >&2
 	exit 1
 fi
 
@@ -59,8 +72,8 @@ if ! grep -q 'created=0' "$LOG"; then
 	cat "$LOG" >&2
 	exit 1
 fi
-if grep -Eq '\+ magelift (up|destroy)|gcloud .+ create' "$LOG"; then
-	printf 'dry-run must not invoke spending mutate\n' >&2
+if grep -Eq '\+ magelift (up|destroy)|gcloud .+ create|created=1' "$LOG"; then
+	printf 'dry-run must not invoke spending mutate or set created=1\n' >&2
 	cat "$LOG" >&2
 	exit 1
 fi

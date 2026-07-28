@@ -24,6 +24,10 @@ bash tests/acceptance/gcp_harness_shape_test.sh
 Dry-run never sets `created=1` and never calls Pulumi/gcloud `up`. Live create,
 PSA soak timing (`MAGELIFT_GCP_PSA_SOAK_SECS`), and leftover proof are **Phase 7**.
 
+Live EXIT contract (unchanged for Phase 7): when `created=1` and KEEP is false,
+cleanup runs `destroy` → `force_clean_orphans` (PSA soak + peering teardown) →
+`assert_clean`. Dry-run short-circuits soaks and never enters that path.
+
 ## Safety rules
 
 - Set `MAGELIFT_GCP_ACCEPTANCE=1` or the script refuses to run (unless dry-run).

@@ -73,6 +73,7 @@ acceptance-harness-test: ## Run offline acceptance harness shell tests (serial; 
 	bash tests/acceptance/port_coverage_floci_gate_test.sh
 	MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh --clean
 	MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh --leftover; test $$? -ne 0
+	MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/gcp_harness_shape_test.sh
 
 aws-acceptance-local: ## Run a local real-AWS acceptance pass (preview; destroys on exit)
 	./scripts/aws-acceptance-local.sh
