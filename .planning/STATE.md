@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Tag-Ready Release Surface
 status: planning
-stopped_at: Completed 02-02-PLAN.md (RELEASE-06 blocked on PHP/Composer)
-last_updated: "2026-07-28T14:46:09.426Z"
+stopped_at: Completed 02-01..02-03; 02-04 HUMAN_GATE (plain Terminal make release-smoke)
+last_updated: "2026-07-28T15:07:25.529Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 2 PLAN.md files created
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
   percent: 13
 ---
 
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 2 of 8 (Tag-Ready Release Surface)
-Plan: 02-01 of 02-04 (wave 1 next)
-Status: Phase 2 plans written (`02-01`…`02-04`); ready for `/gsd-execute-phase 2`
-Last activity: 2026-07-28 — Phase 2 PLAN.md files created
+Plan: 02-04 of 02-04 (HUMAN_GATE — plain Terminal `make release-smoke`)
+Status: 02-01..02-03 complete offline; RELEASE-06 blocked on PHP/Composer; 02-04 awaiting human packaging smoke
+Last activity: 2026-07-28 — executed 02-01, 02-02, 02-03
 
-Progress: [█████████░] 86% (Phase 1 offline complete; Phase 2 planning)
+Progress: [█████████░] 93% (Phase 1 offline complete; Phase 2 planning)
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Progress: [█████████░] 86% (Phase 1 offline complete; Phase 
 | Phase 01-publishable-baseline-honest-fallbacks P10 | 10min | 2 tasks | 15 files |
 | Phase 02 P01 | 2min | 3 tasks | 7 files |
 | Phase 02 P02 | 2min | 2 tasks | 3 files |
+| Phase 02 P03 | 22min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,7 @@ Recent decisions affecting current work:
 - [Phase ?]: First public tag is v1.0.0-rc.1 on README/versioning/gate board (D-01)
 - [Phase ?]: RC locks sdk/v1 + StackModule core; Phase 6 may change kube-shaped platform ports without v2
 - [Phase ?]: Contributor gate is local make verify; hosted force-all remains HUMAN_GATE deferred
+- [Phase ?]: Community providers are compile-time custom binaries; separate modules cannot import internal/
 
 ### Pending Todos
 
@@ -145,7 +147,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T14:46:09.419Z
-Stopped at: Completed 02-02-PLAN.md (RELEASE-06 blocked on PHP/Composer)
+Last session: 2026-07-28T15:07:25.522Z
+Stopped at: Completed 02-01..02-03; 02-04 HUMAN_GATE (plain Terminal make release-smoke)
 Resume file: None
 Note: `02-RESEARCH.md` written; hosted CI remains HUMAN_GATE; packaging smoke needs plain Terminal; PHP/Composer required for RELEASE-06 proof on this Mac

@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 8
+open_count: 9
 waived_count: 0
 fixed_count: 0
-total_count: 8
-last_updated: 2026-07-28T14:45:35.231Z
+total_count: 9
+last_updated: 2026-07-28T15:07:25.170Z
 ---
 
 # Broken Windows Ledger
@@ -23,6 +23,7 @@ last_updated: 2026-07-28T14:45:35.231Z
 | 6 | 01 | deviation | internal/cloud/aws/stack/component_test.go |  | preview×amazon-mq rejection now exercises queue AZ guard (c7435d2), not Spec.Validate zone-count | open |  | 2026-07-28T13:46:30.826Z |  |
 | 7 | 01 | todo | internal/cloud/aws/runtime/runtime.go |  | F-01-07-1: search-proxy DependsOn skipped for nginx-fpm queue/deploy/cron Magento containers | open |  | 2026-07-28T13:46:30.886Z |  |
 | 8 | 02 | unmet-truth | CONTRIBUTING.md |  | RELEASE-06 fresh-clone make verify blocked: PHP 8.2+ and Composer missing on proof host | open |  | 2026-07-28T14:45:35.231Z |  |
+| 9 | 02 | stub | examples/custom-cli/stub_module.go |  | Intentional stubModule Plan/Program refuse deploy — registration demo only | open |  | 2026-07-28T15:07:25.170Z |  |
 
 ````json
 [
@@ -120,6 +121,18 @@ last_updated: 2026-07-28T14:45:35.231Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-28T14:45:35.231Z",
+    "resolved_at": null
+  },
+  {
+    "id": 9,
+    "kind": "stub",
+    "phase": "02",
+    "file": "examples/custom-cli/stub_module.go",
+    "line": null,
+    "description": "Intentional stubModule Plan/Program refuse deploy — registration demo only",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-28T15:07:25.170Z",
     "resolved_at": null
   }
 ]

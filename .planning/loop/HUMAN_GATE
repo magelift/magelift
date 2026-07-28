@@ -1,0 +1,6 @@
+Phase 2: 02-01..02-03 complete offline.
+02-04 HUMAN_GATE — run in a plain Terminal (not Cursor): make release-smoke
+  (serial single-target only; see AGENTS.md / scripts/release-smoke-local.sh)
+Also open: RELEASE-06 fresh-clone make verify blocked until PHP 8.2+ and Composer installed
+  (see .planning/phases/02-tag-ready-release-surface/scratch/02-02-verify-proof.txt)
+Hosted CI / QUALITY-06 still deferred (Actions minutes).
