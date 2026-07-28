@@ -520,3 +520,144 @@ func TestExperimentalWarningLeavesJSONStdoutParseable(t *testing.T) {
 		t.Fatalf("stdout must remain parseable JSON with warning on stderr: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
 	}
 }
+
+func TestDeployRefusesInfraOnlyWithoutFlag(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	var stdout, stderr bytes.Buffer
+	backendCalls := 0
+	o := testOptions(&stdout, &fakeTerminal{interactive: false})
+	o.stderr = &stderr
+	o.configPath = path
+	o.environment = "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		backendCalls++
+		return &fakeInfrastructureBackend{}, nil
+	}
+	o.newDeploySteps = func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error) {
+		return nil, platform.ErrNotSupported
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		t.Fatal("lock must not be acquired when Magento deploy steps are refused")
+		return nil, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "deploy"})
+	err := cmd.Execute()
+	if err == nil || ExitCode(err) != 2 {
+		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "Magento migrate, cutover, and health") {
+		t.Fatalf("refusal must name skipped Magento steps: %v", err)
+	}
+	if !strings.Contains(msg, "aws/ecs-fargate") {
+		t.Fatalf("refusal must name target: %v", err)
+	}
+	if !strings.Contains(msg, string(platform.TierCertified)) {
+		t.Fatalf("refusal must name tier: %v", err)
+	}
+	if !strings.Contains(msg, "--infra-only") {
+		t.Fatalf("refusal must name the flag that proceeds: %v", err)
+	}
+	if strings.Contains(msg, "create deployment workflow") {
+		t.Fatalf("refusal must differ from genuine construction errors: %v", err)
+	}
+}
+
+func TestDeployInfraOnlyFlagAnnouncesSkip(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	var stdout, stderr bytes.Buffer
+	backend := &fakeInfrastructureBackend{}
+	o := testOptions(&stdout, &fakeTerminal{interactive: false})
+	o.stderr = &stderr
+	o.configPath = path
+	o.environment = "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newDeploySteps = func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error) {
+		return nil, platform.ErrNotSupported
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "deploy", "--infra-only"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	notice := stderr.String()
+	if !strings.Contains(notice, "Magento migrate, cutover, and health") {
+		t.Fatalf("infra-only must announce skipped Magento steps; stderr=%q", notice)
+	}
+	if !strings.Contains(notice, "--infra-only") {
+		t.Fatalf("notice must name the flag; stderr=%q", notice)
+	}
+	if !reflect.DeepEqual(backend.calls, []string{"preview", "update", "outputs"}) {
+		t.Fatalf("backend calls = %v", backend.calls)
+	}
+}
+
+func TestDeployFullFlowUnaffectedWhenStepsExist(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	var stdout, stderr bytes.Buffer
+	backend := &fakeInfrastructureBackend{}
+	order := []string{}
+	o := testOptions(&stdout, &fakeTerminal{interactive: false})
+	o.stderr = &stderr
+	o.configPath = path
+	o.environment = "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newDeploySteps = func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error) {
+		return fakeDeploymentSteps{order: &order}, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		order = append(order, "lock.acquire")
+		return func(context.Context) error { order = append(order, "lock.release"); return nil }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "deploy"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stderr.String(), "Magento migrate, cutover, and health were skipped") {
+		t.Fatalf("full deploy must not announce infra-only skip; stderr=%q", stderr.String())
+	}
+	want := []string{"validate", "lock.acquire", "preview", "candidate", "migrate", "update", "stabilize", "health", "record", "cleanup", "lock.release"}
+	if !reflect.DeepEqual(order, want) {
+		t.Fatalf("workflow order = %v, want %v", order, want)
+	}
+}
+
+func TestDeployGenuineStepsConstructionErrorDiffersFromRefusal(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.environment = "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return &fakeInfrastructureBackend{}, nil
+	}
+	o.newDeploySteps = func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error) {
+		return nil, errors.New("ops wiring exploded")
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "deploy"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected construction failure")
+	}
+	if !strings.Contains(err.Error(), "create deployment workflow") {
+		t.Fatalf("genuine error must keep construction wrap: %v", err)
+	}
+	if !strings.Contains(err.Error(), "ops wiring exploded") {
+		t.Fatalf("genuine error must preserve cause: %v", err)
+	}
+	if strings.Contains(err.Error(), "--infra-only") {
+		t.Fatalf("genuine construction error must not look like the refusal: %v", err)
+	}
+}
