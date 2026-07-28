@@ -1,11 +1,19 @@
 ---
-gsd_state_version: '1.0'
-status: planning
+gsd_state_version: 1.0
+milestone: v1.0.0
+milestone_name: milestone
+current_phase: 1
+current_phase_name: Publishable Baseline & Honest Fallbacks
+status: executing
+stopped_at: 01-01 Task 2 blocked on GitHub Actions billing
+last_updated: "2026-07-28T11:25:44.786Z"
+last_activity: 2026-07-27
+last_activity_desc: Roadmap created, 56/56 v1 requirements mapped across 8 phases
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 9
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,15 +29,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-07-27 — Roadmap created, 56/56 v1 requirements mapped across 8 phases
+Plan: 1 of 9 in current phase (01-01 closed offline; CI proof deferred)
+Status: Executing — offline mode (no GitHub Actions minutes)
+Last activity: 2026-07-28 — 01-01 SUMMARY; continue 01-02 without CI
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: —
 - Total execution time: —
@@ -41,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: —
 - Trend: —
 
@@ -64,11 +74,13 @@ None yet.
 
 ### Blockers/Concerns
 
+- GitHub Actions free minutes exhausted 2026-07-28 — Phase 1 criterion 1 CI proof deferred; continue offline (see `.planning/loop/HUMAN_GATE`)
 - Cloud budget: acceptance is self-funded on AWS and GCP; never enter Phase 7 before Phases 3, 5, 6 are green offline
 - Unverifiable at any price: Aurora `CreateDBCluster` (free-tier API block), `amazon-mq` × `preview` (2-AZ vs 3-AZ), live OpenSearch SigV4 data plane (post-tag)
 - Local machine: full multi-platform `goreleaser release` cannot run locally (kernel panics); serial single-target only, outside Cursor
 - CI: golangci-lint OOM/timeout is a workaround, not a fix — worsens with every provider package added in Phase 6, so QUALITY-06 must land in Phase 1
 - `go.yaml.in/yaml/v4` pinned to a release candidate; re-verify strict-decoding/merge/provenance tests on every bump
+- GitHub Actions billing/spending limit: jobs refuse to start (annotation on run 30354658603). Must increase spending limit or fix payment before QUALITY-06 CI proof.
 
 ## Deferred Items
 
@@ -83,6 +95,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-27
-Stopped at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability populated
-Resume file: None
+Last session: 2026-07-28T11:25:44.704Z
+Stopped at: 01-01 Task 2 blocked on GitHub Actions billing
+Resume file: .planning/loop/HUMAN_GATE
+Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset
