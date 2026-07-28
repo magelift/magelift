@@ -16,7 +16,9 @@ type Args struct {
 	Region        string
 	VPCID         pulumi.StringInput
 	WebTargetPort int
-	Tags          map[string]string
+	// QueuePort is Magento → broker traffic (5671 for amazon-mq / AMQPS, 5672 for ecs brokers).
+	QueuePort int
+	Tags      map[string]string
 }
 
 type Component struct {
@@ -112,7 +114,7 @@ func createRules(ctx *pulumi.Context, name string, args Args, groups groupSet, p
 		{name: "data-mysql", description: "Web tasks to Aurora MySQL", port: 3306, from: groups.web, to: groups.data},
 		{name: "cache-valkey", description: "Web tasks to Valkey", port: 6379, from: groups.web, to: groups.cache},
 		{name: "search-https", description: "Web tasks to OpenSearch", port: 443, from: groups.web, to: groups.search},
-		{name: "queue-amqps", description: "Web tasks to RabbitMQ over TLS", port: 5671, from: groups.web, to: groups.queue},
+		{name: "queue-amqps", description: "Web tasks to Magento AMQP broker", port: queuePort(args), from: groups.web, to: groups.queue},
 	}
 	for _, spec := range ingress {
 		ruleArgs := &vpc.SecurityGroupIngressRuleArgs{
@@ -134,8 +136,10 @@ func createRules(ctx *pulumi.Context, name string, args Args, groups groupSet, p
 		{name: "web-data", description: "Web tasks to Aurora MySQL", port: 3306, from: groups.web, to: groups.data},
 		{name: "web-cache", description: "Web tasks to Valkey", port: 6379, from: groups.web, to: groups.cache},
 		{name: "web-search", description: "Web tasks to OpenSearch", port: 443, from: groups.web, to: groups.search},
-		{name: "web-queue", description: "Web tasks to RabbitMQ over TLS", port: 5671, from: groups.web, to: groups.queue},
+		{name: "web-queue", description: "Web tasks to Magento AMQP broker", port: queuePort(args), from: groups.web, to: groups.queue},
 		{name: "web-https", description: "Web tasks to HTTPS services", port: 443, from: groups.web, cidr: "0.0.0.0/0"},
+		// ECS self-hosted brokers need Secrets Manager + image registry pulls (fck-nat / NAT).
+		{name: "queue-https", description: "Queue broker to HTTPS services", port: 443, from: groups.queue, cidr: "0.0.0.0/0"},
 	}
 	for _, spec := range egress {
 		ruleArgs := &vpc.SecurityGroupEgressRuleArgs{
@@ -172,6 +176,13 @@ func targetPort(args Args) int {
 		return 8080
 	}
 	return args.WebTargetPort
+}
+
+func queuePort(args Args) int {
+	if args.QueuePort == 0 {
+		return 5671
+	}
+	return args.QueuePort
 }
 
 func tags(input map[string]string, component, role string) pulumi.StringMap {

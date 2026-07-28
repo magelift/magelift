@@ -108,10 +108,43 @@ func TestRejectsUnsafeProductionInputsBeforeRegistration(t *testing.T) {
 
 func productionArgs() Args {
 	return Args{
-		Topology: TopologyStandard, Region: "eu-west-3", EngineVersion: "3.13", InstanceType: "mq.m7g.large",
+		Mode: ModeAmazonMQ, Topology: TopologyStandard, Region: "eu-west-3", EngineVersion: "3.13", InstanceType: "mq.m7g.large",
 		AvailabilityZones: []string{"eu-west-3a", "eu-west-3b", "eu-west-3c"}, SubnetIDs: []string{"subnet-a", "subnet-b", "subnet-c"},
 		SecurityGroupIDs: []string{"sg-queue"}, KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000",
 		Credentials: Credentials{SecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop/rabbit-auth-AbCd", Username: "magelift"},
+	}
+}
+
+func TestECSRabbitMQCreatesBrokerService(t *testing.T) {
+	m := &mocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		provider, err := awsprovider.NewProvider(ctx, "regional", &awsprovider.ProviderArgs{Region: pulumi.String("eu-west-3")})
+		if err != nil {
+			return err
+		}
+		_, err = New(ctx, "shop", Args{
+			Mode: ModeECSRabbitMQ, Topology: TopologyStandard, Region: "eu-west-3",
+			SubnetIDs: []string{"subnet-a"}, SecurityGroupIDs: []string{"sg-queue"},
+			Credentials:      Credentials{SecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop/rabbit-auth-AbCd", Username: "magelift"},
+			Provider:         provider,
+			VpcID:            pulumi.String("vpc-123"),
+			ExecutionRoleARN: pulumi.String("arn:aws:iam::123456789012:role/exec"),
+			TaskRoleARN:      pulumi.String("arn:aws:iam::123456789012:role/task"),
+			LogGroupPrefix:   "/magelift/shop/staging",
+		})
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.count("aws:mq/broker:Broker"); got != 0 {
+		t.Fatalf("ecs-rabbitmq must not create Amazon MQ broker, got %d", got)
+	}
+	if got := m.count("aws:ecs/service:Service"); got != 1 {
+		t.Fatalf("broker service count = %d", got)
+	}
+	if got := m.count("aws:servicediscovery/privateDnsNamespace:PrivateDnsNamespace"); got != 1 {
+		t.Fatalf("discovery namespace count = %d", got)
 	}
 }
 

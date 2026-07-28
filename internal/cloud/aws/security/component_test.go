@@ -40,7 +40,7 @@ func TestCreatesStableLeastPrivilegeSecurityGraph(t *testing.T) {
 	if got := m.count("aws:vpc/securityGroupIngressRule:SecurityGroupIngressRule"); got != 6 {
 		t.Fatalf("ingress rules = %d", got)
 	}
-	if got := m.count("aws:vpc/securityGroupEgressRule:SecurityGroupEgressRule"); got != 6 {
+	if got := m.count("aws:vpc/securityGroupEgressRule:SecurityGroupEgressRule"); got != 7 {
 		t.Fatalf("egress rules = %d", got)
 	}
 
@@ -69,6 +69,7 @@ func TestCreatesStableLeastPrivilegeSecurityGraph(t *testing.T) {
 	assertRule(t, m, "aws:vpc/securityGroupEgressRule:SecurityGroupEgressRule", "shop-egress-web-search", "shop-web-id", "shop-search-id", "", 443)
 	assertRule(t, m, "aws:vpc/securityGroupEgressRule:SecurityGroupEgressRule", "shop-egress-web-queue", "shop-web-id", "shop-queue-id", "", 5671)
 	assertRule(t, m, "aws:vpc/securityGroupEgressRule:SecurityGroupEgressRule", "shop-egress-web-https", "shop-web-id", "", "0.0.0.0/0", 443)
+	assertRule(t, m, "aws:vpc/securityGroupEgressRule:SecurityGroupEgressRule", "shop-egress-queue-https", "shop-queue-id", "", "0.0.0.0/0", 443)
 
 	for _, ingress := range m.ofType("aws:vpc/securityGroupIngressRule:SecurityGroupIngressRule") {
 		cidr, hasCIDR := ingress.inputs["cidrIpv4"]
