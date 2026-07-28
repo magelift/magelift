@@ -2,19 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-current_phase: 1
-current_phase_name: Publishable Baseline & Honest Fallbacks
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-07-28T11:37:43.790Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-07-28T11:44:41.128Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-03 SUMMARY offline; next 01-04 sequential
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 9
-  completed_plans: 3
-  percent: 33
+  completed_plans: 4
+  percent: 0
 ---
 
 # Project State
@@ -29,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 4 of 9 in current phase (01-03 closed offline; next 01-04 sequential)
-Status: Executing — offline mode (no GitHub Actions minutes)
-Last activity: 2026-07-28 — 01-03 SUMMARY; continue 01-04 without CI
+Plan: 5 of 9 in current phase (01-03 closed offline; next 01-04 sequential)
+Status: Ready to execute
+Last activity: 2026-07-28
 
-Progress: [███░░░░░░░] 33%
+Progress: [████░░░░░░] 44%
 
 ## Performance Metrics
 
@@ -61,6 +58,7 @@ Progress: [███░░░░░░░] 33%
 |------|----------|-------|-------|
 | Phase 01 P02 | 20 | 3 tasks | 4 files |
 | Phase 01 P03 | 6 | 2 tasks | 2 files |
+| Phase 01 P04 | 6 | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -77,6 +75,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Full local go test -race ./... deferred-local under Cursor (16GB Mac); narrow race sample only
 - [Phase ?]: 01-03: preserve cost not-supported prefix for plan 01-08 tier append
 - [Phase ?]: 01-03: platform go test -race deferred-local under Cursor; non-race verified
+- [Phase ?]: 01-04: compacted CI Resource:* statements so inline cleared 90% of PutRolePolicy quota
+- [Phase ?]: 01-04: OCU step rule recorded as empirical/unpublished; 1700 ceiling marker only
 
 ### Pending Todos
 
@@ -105,7 +105,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T11:37:43.785Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-07-28T11:44:41.121Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
 Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset

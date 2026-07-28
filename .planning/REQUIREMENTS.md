@@ -96,8 +96,8 @@
 <!-- The debt that would embarrass a public repository, plus the guards that stop known bugs recurring. -->
 
 - [x] **QUALITY-01**: `internal/cli/cost.go` has test coverage restored — flag parsing, error paths, and `ErrNotSupported` handling for non-AWS targets
-- [ ] **QUALITY-02**: A test asserts the rendered IAM permissions-boundary policy stays under AWS's 6KiB limit, so future policy growth fails CI instead of failing silently in AWS
-- [ ] **QUALITY-03**: Table-driven tests enumerate the AOSS collection-group OCU values AWS accepts, preventing silent drift
+- [x] **QUALITY-02**: A test asserts the rendered IAM permissions-boundary policy stays under AWS's 6KiB limit, so future policy growth fails CI instead of failing silently in AWS
+- [x] **QUALITY-03**: Table-driven tests enumerate the AOSS collection-group OCU values AWS accepts, preventing silent drift
 - [ ] **QUALITY-04**: Combination tests cover `queueMode` × `searchMode` × `webRuntime` together, not just each catalog cell in isolation
 - [ ] **QUALITY-05**: Every provider's subnet/CIDR carving has explicit boundary tests (min index, max index, max index + 1)
 - [x] **QUALITY-06**: `golangci-lint` completes in CI without OOM or timeout by partitioning work per provider, rather than by serializing one 30-minute job
@@ -194,8 +194,8 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | ATTACH-03 | Phase 8 | Pending |
 | ATTACH-04 | Phase 8 | Pending |
 | QUALITY-01 | Phase 1 | Complete |
-| QUALITY-02 | Phase 1 | Pending |
-| QUALITY-03 | Phase 1 | Pending |
+| QUALITY-02 | Phase 1 | Complete |
+| QUALITY-03 | Phase 1 | Complete |
 | QUALITY-04 | Phase 1 | Pending |
 | QUALITY-05 | Phase 1 | Pending |
 | QUALITY-06 | Phase 1 | Complete |
