@@ -96,7 +96,7 @@ status: complete
 1. **Task 1: Cover the cost command's flags, output formats, and both error exits** - `41e5c9d` (test)
 2. **Task 2: Cover the platform cost helper before Phase 2 freezes it** - `229d5af` (test)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `9731983` (docs: complete plan)
 
 ## Files Created/Modified
 
