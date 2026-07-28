@@ -321,6 +321,7 @@ Options:
       --branches strings           Git branches mapped to this environment
       --class string               environment class
       --domain string              environment domain
+      --dump string                path to a MySQL dump to seed after first deploy (ADR 0010)
       --expires-at string          preview expiration as RFC3339
       --monthly-budget-cents int   maximum monthly AWS budget in cents
       --preset string              infrastructure preset
