@@ -111,7 +111,7 @@
 - [x] **RELEASE-03**: A third party can follow `docs/adding-a-provider.md` plus `examples/custom-cli` to register an out-of-tree provider without reading core source
 - [x] **RELEASE-04**: `make release-smoke` completes on the maintainer's machine (serial, single-target, outside Cursor), closing the Partial packaging gate
 - [ ] **RELEASE-05**: Every release-readiness gate board row is Closed or explicitly Deferred with a reason, and the board reflects reality on tag day
-- [ ] **RELEASE-06**: A new contributor can go from `git clone` to a green `make verify` following `CONTRIBUTING.md` alone
+- [x] **RELEASE-06**: A new contributor can go from `git clone` to a green `make verify` following `CONTRIBUTING.md` alone
 
 ## v2 Requirements
 
@@ -206,7 +206,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | RELEASE-03 | Phase 2 | Complete |
 | RELEASE-04 | Phase 2 | Complete |
 | RELEASE-05 | Phase 8 | Pending |
-| RELEASE-06 | Phase 2 | Pending |
+| RELEASE-06 | Phase 2 | Complete |
 
 **Coverage:**
 
