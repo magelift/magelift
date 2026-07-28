@@ -396,10 +396,10 @@ func TestDeployReportsLockReleaseFailure(t *testing.T) {
 
 func TestExperimentalTargetWarnsAtPlanStack(t *testing.T) {
 	tests := []struct {
-		name        string
-		configPath  func(*testing.T) string
-		command     string
-		wantWarn    bool
+		name         string
+		configPath   func(*testing.T) string
+		command      string
+		wantWarn     bool
 		wantProvider string
 		wantRuntime  string
 	}{

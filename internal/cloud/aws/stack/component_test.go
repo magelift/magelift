@@ -375,15 +375,15 @@ func TestCatalogCellProjectionMatrix(t *testing.T) {
 
 	webRuntimes := []string{"nginx-fpm", "frankenphp-classic"}
 	type cell struct {
-		name               string
-		preset             sdk.PresetID
-		searchMode         string
-		queueMode          string
-		webRuntime         string
-		leaveSearchUnset   bool
-		leaveQueueUnset    bool
-		wantRejected       bool
-		wantRejectReason   string
+		name             string
+		preset           sdk.PresetID
+		searchMode       string
+		queueMode        string
+		webRuntime       string
+		leaveSearchUnset bool
+		leaveQueueUnset  bool
+		wantRejected     bool
+		wantRejectReason string
 	}
 
 	var tests []cell
