@@ -26,8 +26,8 @@
     },
     "scripts": {
         "test": "phpunit",
-        "analyse": "phpstan analyse --configuration=phpstan.neon",
-        "psalm": "psalm --config=psalm.xml --no-cache"
+        "analyse": "phpstan analyse --configuration=phpstan.neon --memory-limit=512M",
+        "psalm": "psalm --config=psalm.xml --no-cache --memory-limit=512M"
     },
     "config": {
         "allow-plugins": {},
