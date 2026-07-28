@@ -90,7 +90,7 @@ Each task was committed atomically:
 1. **Task 1: Warn at the planning choke point whenever the target is experimental** - `d471d05` (feat)
 2. **Task 2: Stop `deploy` from reporting success for an infrastructure-only update** - `9a75f53` (test/RED) → `54fdcf6` (feat/GREEN)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `fa8a622` (docs: complete plan)
 
 ## Verbatim operator-facing strings
 
