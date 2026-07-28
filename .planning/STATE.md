@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Tag-Ready Release Surface
 status: planning
-stopped_at: Phase 2 research complete — ready to plan
+stopped_at: Phase 2 plans created — ready to execute
 last_updated: "2026-07-28T14:36:47.481Z"
 last_activity: 2026-07-28
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 10
+  total_plans: 14
   completed_plans: 10
   percent: 13
-last_activity_desc: Phase 2 RESEARCH.md written; 4 plans / 3 waves recommended
+last_activity_desc: Phase 2: 4 PLAN.md files (3 waves); 02-04 is HUMAN_GATE for release-smoke
 ---
 
 # Project State
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 2 of 8 (Tag-Ready Release Surface)
-Plan: — (research complete; plans TBD)
-Status: Phase 2 research done (`02-RESEARCH.md`); ready for `/gsd-plan-phase` planner — recommend 4 plans / 3 waves
-Last activity: 2026-07-28 — Phase 2 RESEARCH.md committed
+Plan: 02-01 of 02-04 (wave 1 next)
+Status: Phase 2 plans written (`02-01`…`02-04`); ready for `/gsd-execute-phase 2`
+Last activity: 2026-07-28 — Phase 2 PLAN.md files created
 
 Progress: [█░░░░░░░░░] 13% (Phase 1 offline complete; Phase 2 planning)
 
