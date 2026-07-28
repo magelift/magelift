@@ -105,14 +105,14 @@ Every phase respects these; they are not phase work, they are constraints on pha
   4. A fresh clone, following only the steps written in `CONTRIBUTING.md`, reaches a green `make verify` — run in a clean checkout, not from the working tree
   5. `examples/custom-cli` builds and registers an out-of-tree provider following `docs/adding-a-provider.md` alone, verified from a clean module cache with no core source consulted
 
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans executed
 
 Plans:
 
 - [x] 02-01-PLAN.md — Version story + RC contract (`v1.0.0-rc.1`, sdk/v1 + StackModule stability, Phase 6 reservation)
 - [x] 02-02-PLAN.md — CONTRIBUTING verify honesty + fresh-clone `make verify` proof
 - [x] 02-03-PLAN.md — Custom-cli clean-GOMODCACHE proof + community stub registration
-- [ ] 02-04-PLAN.md — HUMAN_GATE plain Terminal `make release-smoke` → Packaging smoke Closed
+- [x] 02-04-PLAN.md — HUMAN_GATE plain Terminal `make release-smoke` → Packaging smoke Closed
 
 ### Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering
 

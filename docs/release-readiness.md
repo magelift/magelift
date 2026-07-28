@@ -69,7 +69,7 @@ If clearance fails, rename every identifier before the first public tag.
 | GCP Magento deploy Ops | **Deferred** | Experimental — no multi-cloud claim |
 | NOTICE + license review | **Closed** | `NOTICE`, `LICENSE`, `make license-check` (recorded below) |
 | First ship path | GitHub Release archives | Homebrew cask optional post-tag; Windows = archive until winget/Scoop owned |
-| Packaging smoke | **Partial** | `goreleaser check` green 2026-07-22; host binary smoke aborted under Cursor when swap thrashing — re-run `make release-smoke` in a plain Terminal when idle (serial only) |
+| Packaging smoke | **Closed** | 2026-07-28T15:11:04Z — `release smoke ok binary=dist/magelift_darwin_arm64_v8.0/magelift (serial single-target)` via `make release-smoke` (`GOMAXPROCS=1`, `--parallelism=1`) |
 
 ### Time-to-preview
 
@@ -109,10 +109,10 @@ runners.
 
 ### Packaging smoke record
 
+- 2026-07-28: `make release-smoke` exit 0 — `release smoke ok binary=dist/magelift_darwin_arm64_v8.0/magelift (serial single-target)` (~159s; goreleaser check + host darwin/arm64 snapshot). Maintainer allowed agent serial smoke under Cursor with abort-on-pressure; free pages stayed healthy.
 - 2026-07-22: `goreleaser check` validated `.goreleaser.yaml`. Host
   `--single-target` build started compiling Pulumi SDKs, drove swap ~2.3 GB with
   near-zero free pages under Cursor — aborted to avoid another kernel panic.
-  Re-run `make release-smoke` outside Cursor when the machine is idle.
 
 ### License check record
 
