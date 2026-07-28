@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 3
 current_phase_name: Credit-Efficient Acceptance Harness & Evidence Tiering
 status: planning
-stopped_at: Phase 3 plans created; ready for execute-phase (paid AWS = 03-06 HUMAN_GATE)
-last_updated: "2026-07-28T15:55:00Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-07-28T15:53:02.050Z"
 last_activity: 2026-07-28
-last_activity_desc: Phase 3 PLAN.md files written (03-01…03-06; paid HUMAN_GATE = 03-06)
+last_activity_desc: phase planning (offline-first waves; 03-06 paid HUMAN_GATE)
 progress:
   total_phases: 8
-  completed_phases: 1
-  total_plans: 14
-  completed_plans: 14
-  percent: 14
+  completed_phases: 2
+  total_plans: 20
+  completed_plans: 15
+  percent: 25
 ---
 
 # Project State
@@ -34,7 +34,7 @@ Plan: 03-01 of 03-06 (wave 1: 03-01 + 03-03; paid HUMAN_GATE = 03-06)
 Status: 6 PLAN.md files at `.planning/phases/03-credit-efficient-acceptance-harness-evidence-tiering/`
 Last activity: 2026-07-28 — phase planning (offline-first waves; 03-06 paid HUMAN_GATE)
 
-Progress: Phase 2 complete; Phase 3 ready to execute; Phase 1 hosted-CI HUMAN_GATE still open
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Progress: Phase 2 complete; Phase 3 ready to execute; Phase 1 hosted-CI HUMAN_GA
 | Phase 02 P01 | 2min | 3 tasks | 7 files |
 | Phase 02 P02 | 2min | 2 tasks | 3 files |
 | Phase 02 P03 | 22min | 2 tasks | 5 files |
+| Phase 03 P01 | 12min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,8 @@ Recent decisions affecting current work:
 - [Phase ?]: RC locks sdk/v1 + StackModule core; Phase 6 may change kube-shaped platform ports without v2
 - [Phase ?]: Contributor gate is local make verify; hosted force-all remains HUMAN_GATE deferred
 - [Phase ?]: Community providers are compile-time custom binaries; separate modules cannot import internal/
+- [Phase ?]: Env var MAGELIFT_ACCEPTANCE_DRY_RUN=1 for offline fixture path
+- [Phase ?]: Checkpoint JSON schema {cells:{id:{result,at}}} under .magelift/
 
 ### Pending Todos
 
@@ -147,7 +150,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T15:47:00Z
-Stopped at: Phase 3 RESEARCH complete; next = plan-phase (03-01…03-06; paid HUMAN_GATE = 03-06)
+Last session: 2026-07-28T15:53:02.044Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
 Note: Hosted CI / QUALITY-06 remains Phase 1 HUMAN_GATE. Phase 3 must not spend AWS until 03-06 HUMAN_GATE.
