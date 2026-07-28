@@ -52,6 +52,8 @@ jobs:
               - 'schema/**'
               - 'Makefile'
               - '.golangci.yml'
+              # CI Go jobs live here — workflow-only edits must still exercise them.
+              - '.github/workflows/ci.yml'
             docs:
               - 'docs/**'
               - 'mkdocs.yml'
@@ -178,6 +180,7 @@ jobs:
           key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+            go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}-
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
@@ -480,15 +483,25 @@ jobs:
           python3 - <<'PY'
           import json, os, sys
           needs = json.loads(os.environ["NEEDS_JSON"])
+          # cache-prime is best-effort warm-up; lint + go-verify are the Go gate.
+          soft_fail_ok = {"cache-prime"}
           bad = sorted(
               name
               for name, job in needs.items()
               if job.get("result") not in ("success", "skipped")
+              and name not in soft_fail_ok
           )
           if bad:
               print("failing jobs:", ", ".join(bad))
               sys.exit(1)
-          print("all jobs succeeded or were skipped by path filters")
+          soft = sorted(
+              name
+              for name in soft_fail_ok
+              if needs.get(name, {}).get("result") not in ("success", "skipped", None)
+          )
+          if soft:
+              print("soft-fail (non-blocking):", ", ".join(soft))
+          print("all required jobs succeeded or were skipped by path filters")
           PY
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
