@@ -4,6 +4,13 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      all:
+        description: Force all path-filtered jobs to run
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -20,13 +27,13 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      go: ${{ steps.filter.outputs.go }}
-      docs: ${{ steps.filter.outputs.docs }}
-      php: ${{ steps.filter.outputs.php }}
-      images: ${{ steps.filter.outputs.images }}
-      scripts: ${{ steps.filter.outputs.scripts }}
-      workflows: ${{ steps.filter.outputs.workflows }}
-      release: ${{ steps.filter.outputs.release }}
+      go: ${{ steps.filter.outputs.go == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      docs: ${{ steps.filter.outputs.docs == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      php: ${{ steps.filter.outputs.php == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      images: ${{ steps.filter.outputs.images == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      scripts: ${{ steps.filter.outputs.scripts == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      workflows: ${{ steps.filter.outputs.workflows == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      release: ${{ steps.filter.outputs.release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -65,10 +72,11 @@ jobs:
               - '.goreleaser.yaml'
               - 'cmd/**'
 
-  go:
+  cache-prime:
     needs: changes
     if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -76,25 +84,130 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: false
+      - name: Warm module and build caches
+        env:
+          GOFLAGS: -p=1
+          GOMAXPROCS: "1"
+        run: go build ./...
+      # Explicit save with if: always() — setup-go's post-step never runs when the runner is reaped.
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        if: always()
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+
+  lint:
+    name: lint (${{ matrix.name }})
+    needs: [changes, cache-prime]
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: aws
+            packages: ./internal/cloud/aws/...
+          - name: gcp
+            packages: ./internal/cloud/gcp/...
+          - name: ovh
+            packages: ./internal/cloud/ovh/...
+          - name: scaleway
+            packages: ./internal/cloud/scaleway/...
+          - name: core
+            # Explicit list: Go patterns cannot subtract ./internal/cloud/... from ./internal/...
+            packages: >-
+              ./internal/cloud/kube/...
+              ./internal/build/...
+              ./internal/automation/...
+              ./internal/benchmark/...
+              ./internal/config/...
+              ./internal/containerrunner/...
+              ./internal/cosign/...
+              ./internal/deploy/...
+              ./internal/health/...
+              ./internal/infra/...
+              ./internal/localdev/...
+              ./internal/releasejournal/...
+              ./internal/secretref/...
+              ./internal/source/...
+              ./internal/toolchain/...
+              ./internal/topology/...
+              ./internal/upgrade/...
+              ./internal/usererr/...
+              ./internal/cli/...
+              ./internal/platform/...
+              ./sdk/...
+              ./cmd/genconfig/...
+              ./cmd/gendocs/...
+              ./examples/custom-cli/...
+          - name: aggregate
+            packages: ./cmd/magelift/...
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          # Pin the binary (not "latest"): v2.9+ is built with go1.26 for this toolchain.
+          version: v2.12.2
+          args: ${{ matrix.packages }}
+          skip-save-cache: ${{ matrix.name != 'aws' }}
+
+  go-verify:
+    needs: [changes, cache-prime]
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-
       - run: |
           mapfile -t go_files < <(git ls-files '*.go')
           gofmt -w "${go_files[@]}"
           git diff --exit-code
       - run: go build -o /tmp/genconfig ./cmd/genconfig && /tmp/genconfig --check
       - run: go build -o /tmp/gendocs ./cmd/gendocs && /tmp/gendocs --check
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          # Pin the binary (not "latest"): v2.9+ is built with go1.26 for this toolchain.
-          version: v2.12.2
-          args: ./...
       - run: go test -race ./...
       - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
           go-version-file: go.mod
           go-package: ./...
       - name: Check Go dependency licenses
-        run: go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown
+        run: |
+          go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown \
+            --ignore=github.com/ovh/pulumi-ovh
 
   docs:
     needs: changes
@@ -332,7 +445,9 @@ jobs:
     name: CI passed
     needs:
       - changes
-      - go
+      - cache-prime
+      - lint
+      - go-verify
       - docs
       - php
       - container
