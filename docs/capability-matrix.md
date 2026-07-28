@@ -68,20 +68,32 @@ is claimed there.
 
 Keep one preview stack up and iterate cells; destroy once at the end.
 
-| Cell | Free-tier? | Notes |
-| --- | --- | --- |
-| `natMode: fck-nat` | yes | Prefer over NAT Gateway |
-| `databaseEngine: rds-mysql` | yes | Aurora CreateDBCluster often blocked on free-tier |
-| `searchMode: disabled` | yes | Certified free-tier cell; OpenSearch spend avoided |
-| `queueMode: db` | yes | Default preview |
-| `queueMode: ecs-rabbitmq` | yes | Needs queue SG HTTPS egress + Cloud Map SRV |
-| `queueMode: ecs-artemis` | yes (experimental) | Same network path as RabbitMQ cell |
-| `queueMode: amazon-mq` | **no** | Skip apply on disposable accounts; preview preset is 2-AZ while Amazon MQ CLUSTER_MULTI_AZ needs 3 — plan is incompatible by design |
-| OpenSearch serverless/provisioned | **avoid apply** | Preview-only on free-tier; live SigV4 data-plane = post-tag paid acceptance |
-| `webRuntime: frankenphp-classic` | needs matching image digest | Not a free YAML toggle alone |
+| Cell | Free-tier? | Evidence tier | Notes |
+| --- | --- | --- | --- |
+| `natMode: fck-nat` | yes | Pulumi mocks | Prefer over NAT Gateway |
+| `databaseEngine: rds-mysql` | yes | real-account acceptance | Prior free-tier create measured 2026-07-21 |
+| `databaseEngine: aurora-mysql` | **unverifiable** | — | See [Unverifiable on maintainer accounts](#unverifiable-on-maintainer-accounts) |
+| `searchMode: disabled` | yes | real-account acceptance | Certified free-tier cell; OpenSearch spend avoided |
+| `queueMode: db` | yes | real-account acceptance | Default preview; harness dry-run + prior live create |
+| `queueMode: ecs-rabbitmq` | yes | Pulumi mocks | Needs queue SG HTTPS egress + Cloud Map SRV; live cell deferred to paid harness |
+| `queueMode: ecs-artemis` | yes (experimental) | Pulumi mocks | Same network path as RabbitMQ cell |
+| `queueMode: amazon-mq` | **no** | — | Skip apply on disposable accounts; see unverifiable |
+| OpenSearch serverless/provisioned | **avoid apply** | Pulumi mocks | Preview-only on free-tier; live SigV4 = unverifiable here |
+| `webRuntime: frankenphp-classic` | needs matching image digest | Pulumi mocks | Not a free YAML toggle alone |
 
 Measured first create (2026-07-21, eu-north-1 free-tier): **~10m31s** Pulumi apply for
 `preview` + `rds-mysql` + `fck-nat` + `searchMode=disabled` + `queueMode=db`.
+
+### Unverifiable on maintainer accounts
+
+These cells must not be marked certified or real-account-accepted on free-tier /
+disposable maintainer accounts. Reasons are specific (TRUST-04):
+
+| Cell | Why unverifiable |
+| --- | --- |
+| Aurora `CreateDBCluster` | Free-tier API block: disposable accounts often cannot call `CreateDBCluster`; do not claim Aurora apply proof from free-tier acceptance |
+| `amazon-mq` × `preview` | Preview preset is 2-AZ while Amazon MQ `CLUSTER_MULTI_AZ` requires 3 AZs — plan is incompatible by design; skip apply on disposable accounts |
+| OpenSearch SigV4 data-plane | Live SigV4 search data-plane is deferred paid / not free-tier certifiable; Pulumi graph mocks do not prove SigV4 query auth |
 
 ## Evidence tiers
 
@@ -89,9 +101,28 @@ Measured first create (2026-07-21, eu-north-1 free-tier): **~10m31s** Pulumi app
 | --- | --- |
 | Pulumi mocks | Composition / resource graph |
 | Floci | Selected AWS API contracts without an account |
-| `scripts/aws-acceptance-local.sh` | Real account path with destroy + `assert_clean` |
+| real-account acceptance (`scripts/aws-acceptance-local.sh`) | Real account path with destroy + `assert_clean` |
 
-Mocks alone do not certify a matrix cell for production use.
+**Honesty rule (TRUST-03):** a catalog cell's evidence tier must not exceed recorded
+evidence. Mocks alone do not certify a matrix cell for production use. Do not claim
+real-account acceptance without harness / matrix-results evidence.
+
+## Day-2 port coverage
+
+Checked-in map of AWS ECS day-2 ports → offline vs paid evidence (ACCEPT-06 foundation;
+Floci gap closure is a later plan). Prefer under-claim.
+
+| Port | Evidence | Notes |
+| --- | --- | --- |
+| Bootstrap (`VerifyAccount` / `Ensure`) | paid-only | Live OIDC / account bootstrap not certified by Floci |
+| State (`Status` / `Lock` / `Unlock` / `Backup` / `Restore`) | Floci | `tests/floci/state_test.go` |
+| Secrets (`List` / `Set` / `Remove`) | Floci | Account-free API contracts via Floci |
+| RuntimeObserve.TailLogs | Floci | Log describe/filter contracts offline |
+| RuntimeObserve.CheckRuntime | Floci / paid-only | Health path partial offline; ALB+ECS live health is paid |
+| RuntimeObserve.PrepareExec | unit-fake / paid-only | SelectTask/PrepareExec unit-fake allowed; live ECS ExecuteCommand is paid-only |
+| Ops.AcquireLock | Floci / unit-fake | DIY lock contracts offline where Floci covers S3/state |
+| Ops.NewDeploySteps | Pulumi mocks / paid-only | Magento deploy step graph offline; live cutover paid |
+| Media / storage (S3 paths exercised by Floci) | Floci | `tests/floci/storage_test.go` |
 
 ## GCP GKE Autopilot cells (experimental)
 
@@ -107,7 +138,7 @@ Measured preview create (2026-07-21, `digital-lab-341608` / europe-west1, prefix
 **~19m21s** Pulumi Duration for infra-only. Evidence: `.magelift/gcp-matrix/matrix-results.md`.
 Destroy often needs PSA soak + `force_clean` after Cloud SQL (see gcp-acceptance.md).
 
-## Evidence tiers
+## Community / out-of-tree modules
 
 Out-of-tree modules register through a custom binary
 (see `examples/custom-cli` in the repo, [ADR 0007](adr/0007-multi-provider-community-targets.md)).
