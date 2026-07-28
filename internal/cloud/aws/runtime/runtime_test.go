@@ -490,6 +490,171 @@ func TestFrontendPortSelectsIntegratedVarnishBoundary(t *testing.T) {
 	}
 }
 
+const testSearchProxyImage = "public.ecr.aws/aws-observability/aws-sigv4-proxy:1.11.1@sha256:34bbec3cb98403d3e040ec1dadb53bb02285f70d2f0ead2d16435fd30980abaa"
+
+func TestRuntimeContainerGraphInteractions(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		mutate func(*Args)
+		check  func(*testing.T, *mocks)
+	}{
+		{
+			name: "U1_frankenphp_search_proxy_depends_on_web",
+			mutate: func(args *Args) {
+				args.WebRuntime = "frankenphp-classic"
+				args.ApplicationMode = "headless"
+				args.ContainerPort = ApplicationPort
+				args.VarnishImage = ""
+				args.SearchProxyImage = testSearchProxyImage
+				args.Capabilities = testCapabilities()
+			},
+			check: func(t *testing.T, m *mocks) {
+				byName := taskContainers(t, m, "shop-web-task")
+				if byName["search-proxy"] == nil {
+					t.Fatalf("search-proxy missing: %#v", byName)
+				}
+				if _, hasVarnish := byName["varnish"]; hasVarnish {
+					t.Fatal("headless frankenphp must not append varnish")
+				}
+				assertDependsOnSearchProxy(t, byName["web"])
+			},
+		},
+		{
+			name: "U2_frankenphp_integrated_appends_varnish",
+			mutate: func(args *Args) {
+				args.WebRuntime = "frankenphp-classic"
+				args.ApplicationMode = "integrated"
+				args.ContainerPort = VarnishPort
+				args.VarnishImage = testVarnishImage
+			},
+			check: func(t *testing.T, m *mocks) {
+				byName := taskContainers(t, m, "shop-web-task")
+				if byName["web"] == nil || byName["varnish"] == nil {
+					t.Fatalf("frankenphp integrated containers = %#v", byName)
+				}
+				if _, hasProxy := byName["search-proxy"]; hasProxy {
+					t.Fatal("unexpected search-proxy without SearchProxyImage")
+				}
+				if byName["varnish"]["image"] != testVarnishImage {
+					t.Fatalf("varnish image = %#v", byName["varnish"]["image"])
+				}
+			},
+		},
+		{
+			name: "U3_queue_consumers_carry_search_proxy",
+			mutate: func(args *Args) {
+				args.QueueConsumerCount = 2
+				args.SearchProxyImage = testSearchProxyImage
+				args.Capabilities = testCapabilities()
+			},
+			check: func(t *testing.T, m *mocks) {
+				byName := taskContainers(t, m, "shop-queue-task")
+				if byName["queue"] == nil || byName["search-proxy"] == nil {
+					t.Fatalf("queue task containers = %#v", byName)
+				}
+			},
+		},
+		{
+			name: "U4_deploy_and_cron_carry_search_proxy",
+			mutate: func(args *Args) {
+				args.SearchProxyImage = testSearchProxyImage
+				args.Capabilities = testCapabilities()
+			},
+			check: func(t *testing.T, m *mocks) {
+				for _, taskName := range []string{"shop-deploy-task", "shop-cron-task"} {
+					byName := taskContainers(t, m, taskName)
+					appName := strings.TrimPrefix(strings.TrimSuffix(taskName, "-task"), "shop-")
+					if byName[appName] == nil || byName["search-proxy"] == nil {
+						t.Fatalf("%s containers = %#v", taskName, byName)
+					}
+				}
+			},
+		},
+		{
+			name: "U5_queue_mode_db_sets_magento_connection",
+			mutate: func(args *Args) {
+				caps := testCapabilities()
+				caps.QueueMode = pulumi.String("db")
+				caps.QueueEndpoint = pulumi.String("")
+				args.Capabilities = caps
+			},
+			check: func(t *testing.T, m *mocks) {
+				byName := taskContainers(t, m, "shop-web-task")
+				env := environmentByName(byName["php-fpm"])
+				if got := env["MAGENTO_DC_QUEUE__DEFAULT_CONNECTION"]; got != "db" {
+					t.Fatalf("MAGENTO_DC_QUEUE__DEFAULT_CONNECTION = %q, want db", got)
+				}
+				if got := env["MAGELIFT_QUEUE_MODE"]; got != "db" {
+					t.Fatalf("MAGELIFT_QUEUE_MODE = %q, want db", got)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			args := validArgs()
+			args.Secrets = append([]SecretReference(nil), args.Secrets...)
+			tt.mutate(&args)
+			m := deploy(t, args)
+			tt.check(t, m)
+		})
+	}
+}
+
+func TestAMQPSettingsBrokerEndpointShapes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		endpoint string
+		wantHost string
+		wantPort string
+		wantSSL  string
+	}{
+		{name: "amqps_explicit_port", endpoint: "amqps://broker.example:5671", wantHost: "broker.example", wantPort: "5671", wantSSL: "1"},
+		{name: "amqp_explicit_port", endpoint: "amqp://broker.example:5672", wantHost: "broker.example", wantPort: "5672", wantSSL: "0"},
+		{name: "amqp_default_port", endpoint: "amqp://broker.example", wantHost: "broker.example", wantPort: "5672", wantSSL: "0"},
+		{name: "amqps_default_port", endpoint: "amqps://broker.example", wantHost: "broker.example", wantPort: "5671", wantSSL: "1"},
+		{name: "artemis_custom_port", endpoint: "amqp://artemis.example:61616", wantHost: "artemis.example", wantPort: "61616", wantSSL: "0"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			host, port, ssl := amqpSettings(tt.endpoint)
+			if host != tt.wantHost || port != tt.wantPort || ssl != tt.wantSSL {
+				t.Fatalf("amqpSettings(%q) = %q:%q ssl=%q, want %q:%q ssl=%q", tt.endpoint, host, port, ssl, tt.wantHost, tt.wantPort, tt.wantSSL)
+			}
+		})
+	}
+}
+
+func taskContainers(t *testing.T, m *mocks, taskName string) map[string]map[string]any {
+	t.Helper()
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", taskName)
+	return definitionsByName(decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue()))
+}
+
+func assertDependsOnSearchProxy(t *testing.T, definition map[string]any) {
+	t.Helper()
+	if definition == nil {
+		t.Fatal("container definition is nil")
+	}
+	deps, ok := definition["dependsOn"].([]any)
+	if !ok || len(deps) == 0 {
+		t.Fatalf("missing search-proxy DependsOn: %#v", definition)
+	}
+	for _, raw := range deps {
+		dep := raw.(map[string]any)
+		if dep["containerName"] == "search-proxy" {
+			return
+		}
+	}
+	t.Fatalf("DependsOn lacks search-proxy: %#v", definition["dependsOn"])
+}
+
 func testCapabilities() *CapabilityConfig {
 	return &CapabilityConfig{
 		DatabaseWriterEndpoint: pulumi.String("shop.writer"), DatabaseName: "magento", DatabaseSecretARN: pulumi.String("arn:aws:secretsmanager:eu-west-3:123456789012:secret:database"),
