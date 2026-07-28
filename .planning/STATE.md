@@ -4,17 +4,17 @@ milestone: v1.0.0
 milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
-status: executing
-stopped_at: Completed 01-08-PLAN.md
-last_updated: "2026-07-28T13:52:08.341Z"
+status: verifying
+stopped_at: Completed 01-09-PLAN.md — Phase 1 plans complete offline; CI criterion 1 deferred (HUMAN_GATE/act)
+last_updated: "2026-07-28T13:58:03.692Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-07 SUMMARY; continue 01-08 without CI
+last_activity_desc: 01-09 SUMMARY; Phase 1 plans complete offline; CI criterion 1 deferred
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 9
-  completed_plans: 8
-  percent: 0
+  completed_plans: 9
+  percent: 13
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 9 of 9 in current phase (01-07 closed offline; next 01-08 sequential)
-Status: Ready to execute
-Last activity: 2026-07-28 — 01-07 SUMMARY; continue 01-08 without CI
+Plan: 9 of 9 complete (01-01 … 01-09 executed offline)
+Status: Phase complete — ready for verification
+Last activity: 2026-07-28 — 01-09 SUMMARY; Phase 1 plans complete offline; CI criterion 1 still deferred (HUMAN_GATE / act)
 
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -67,6 +67,8 @@ Progress: [█████████░] 89%
 | Phase 01-publishable-baseline-honest-fallbacks P06 | 5min | 3 tasks | 3 files |
 | Phase 01 P07 | 25min | 2 tasks | 2 files |
 | Phase 01-publishable-baseline-honest-fallbacks P08 | 8min | 3 tasks | 8 files |
+| Phase 01-publishable-baseline-honest-fallbacks P09 | 5min | 2 tasks | 7 files |
+| Phase 01-publishable-baseline-honest-fallbacks P09 | 3min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -99,6 +101,11 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-08: append tier after yet — costNotSupportedPrefix remains byte prefix
 - [Phase ?]: 01-08: stubExperimentalModule (ovh.mks) for CLI tier tests without cloud imports
 - [Phase ?]: 01-08: AcquireLock named AST-guard exception for plan 01-10
+- [Phase ?]: 01-09: Warning keyed on CertificationTier at planStack, never provider allowlist
+- [Phase ?]: 01-09: Deploy refuses Magento-less path unless --infra-only; announces when flag set
+- [Phase ?]: 01-09: warn at planStack keyed on CertificationTier (includes aws/eks-autopilot)
+- [Phase ?]: 01-09: Magento-less deploy refuses without --infra-only; announces when flagged
+- [Phase ?]: Phase 1 plans complete offline; CI criterion 1 still deferred (HUMAN_GATE / act)
 
 ### Pending Todos
 
@@ -127,7 +134,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T13:52:08.335Z
-Stopped at: Completed 01-08-PLAN.md
+Last session: 2026-07-28T13:58:03.686Z
+Stopped at: Completed 01-09-PLAN.md — Phase 1 plans complete offline; CI criterion 1 deferred (HUMAN_GATE/act)
 Resume file: None
 Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset

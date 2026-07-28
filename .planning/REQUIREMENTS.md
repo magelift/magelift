@@ -24,7 +24,7 @@
 
 <!-- Some cells are unverifiable on the maintainer's accounts at any price. The product must never claim more than its evidence supports. -->
 
-- [ ] **TRUST-01**: Operator selecting an experimental provider or runtime sees an unmistakable warning from the CLI itself before any mutating command, not only in documentation
+- [x] **TRUST-01**: Operator selecting an experimental provider or runtime sees an unmistakable warning from the CLI itself before any mutating command, not only in documentation
 - [x] **TRUST-02**: Operator invoking an unimplemented day-2 command on an experimental target gets an actionable error naming the capability and its certification tier — never a silent no-op or a false success
 - [ ] **TRUST-03**: Capability matrix records an evidence tier per cell (Pulumi mocks / Floci / real-account acceptance) and no cell claims a tier above its recorded evidence
 - [ ] **TRUST-04**: Cells that cannot be verified on the maintainer's accounts are marked unverifiable with the specific reason (free-tier API block, AZ requirement, cost), so a reader can distinguish "untested" from "broken"
@@ -157,7 +157,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | ACCEPT-04 | Phase 3 | Pending |
 | ACCEPT-05 | Phase 3 | Pending |
 | ACCEPT-06 | Phase 3 | Pending |
-| TRUST-01 | Phase 1 | Pending |
+| TRUST-01 | Phase 1 | Complete |
 | TRUST-02 | Phase 1 | Complete |
 | TRUST-03 | Phase 3 | Pending |
 | TRUST-04 | Phase 3 | Pending |
