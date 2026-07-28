@@ -4,6 +4,7 @@
 
 * [Add context imports with injected CLI factories](Add%20context%20imports%20with%20injected%20CLI%20factories.md) - On 2026-07-18 bootstrap CLI wiring introduced a context-based injected factory but omitted the root package context import, causing an immediate compile failure.
 * [ALB target port must match web security rules](ALB%20target%20port%20must%20match%20web%20security%20rules.md) - The ingress target group and ECS container use port 8080.
+* [AOSS collection-group OCU rule is undocumented by AWS](AOSS%20collection-group%20OCU%20rule%20is%20undocumented%20by%20AWS.md) - MageLift's serverless OCU step rule is empirically observed, not published by AWS — do not relax the validator against the docs.
 * [AOSS collection-group OCU values cannot be zero](AOSS%20collection-group%20OCU%20values%20cannot%20be%20zero.md) - CreateCollectionGroup rejects minIndexingCapacityInOCU=0.
 * [AWS free plan blocks Aurora MySQL 2026-07-19](AWS%20free%20plan%20blocks%20Aurora%20MySQL%202026-07-19.md) - Free plan AWS accounts reject CreateDBCluster for aurora-mysql (FreeTierRestrictionError); only aurora-postgresql allowed.
 * [AWS Magento: ECS CoreEnvBindings + logs; experimental eks-autopilot](AWS%20Magento%20-%20ECS%20CoreEnvBindings%20%2B%20logs%3B%20experimental%20eks-autopilot.md) - ECS Magento env goes through platform.CoreEnvBindings; queue/search/media stay adapter-local.

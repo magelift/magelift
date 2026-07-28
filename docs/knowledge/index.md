@@ -12,5 +12,5 @@ Knowledge bundle in [OKF](https://github.com/GoogleCloudPlatform/knowledge-catal
 
 ## Sections
 
-* [lessons](lessons/index.md) - 240 notes
+* [lessons](lessons/index.md) - 241 notes
 * [reference](reference/index.md) - 4 notes
