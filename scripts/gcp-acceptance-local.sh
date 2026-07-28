@@ -1,14 +1,71 @@
 #!/usr/bin/env bash
 # Local, credit-efficient GCP acceptance: preview by default, destroy on EXIT.
 # Experimental target only (ADR 0007/0008). Never leave Autopilot/SQL/Valkey running.
+# Phase 3: MAGELIFT_ACCEPTANCE_DRY_RUN=1 exercises harness shape without spending.
 set -Eeuo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=acceptance/lib-checkpoint.sh
+source "$ROOT/scripts/acceptance/lib-checkpoint.sh"
+# shellcheck source=acceptance/lib-evidence.sh
+source "$ROOT/scripts/acceptance/lib-evidence.sh"
+
+CELL_CATALOG="${MAGELIFT_ACCEPTANCE_CELL_CATALOG:-$ROOT/scripts/acceptance/cells-gcp-preview.txt}"
+DRY_RUN="${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}"
+
+gcp_dry_run_cell_loop() {
+	# GCP-scoped paths so AWS/GCP evidence do not clobber (ACCEPT-05).
+	export ACCEPTANCE_CHECKPOINT="${ACCEPTANCE_CHECKPOINT:-.magelift/gcp-matrix/acceptance-checkpoint.json}"
+	export ACCEPTANCE_EVIDENCE="${ACCEPTANCE_EVIDENCE:-.magelift/gcp-matrix/matrix-results.md}"
+	local cell provider account date_s duration started created_once=0
+	local CELLS=()
+	local line
+	provider="${MAGELIFT_ACCEPTANCE_PROVIDER:-gcp}"
+	account="${MAGELIFT_ACCEPTANCE_ACCOUNT:-dry-run}"
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+		CELLS+=("$line")
+	done <"$CELL_CATALOG"
+	if [[ ${#CELLS[@]} -eq 0 ]]; then
+		printf 'no cells in catalog: %s\n' "$CELL_CATALOG" >&2
+		exit 2
+	fi
+	acceptance_checkpoint_load
+	acceptance_evidence_ensure
+	printf 'gcp acceptance dry-run start cells=%d catalog=%s\n' "${#CELLS[@]}" "$CELL_CATALOG" >&2
+	# Structural markers: EXIT contract symbols remain defined in live path below.
+	printf 'gcp harness shape: force_clean_orphans + assert_clean + PSA soak (live Phase 7)\n' >&2
+	for cell in "${CELLS[@]}"; do
+		if cell_done "$cell"; then
+			printf 'acceptance skip cell=%s (checkpoint)\n' "$cell" >&2
+			continue
+		fi
+		if [[ "$created_once" -eq 0 ]]; then
+			printf 'acceptance create-once\n' >&2
+			created_once=1
+		fi
+		printf 'acceptance cell-update cell=%s\n' "$cell" >&2
+		started=$(date +%s)
+		duration="$(( $(date +%s) - started ))s"
+		date_s=$(date -u +%Y-%m-%d)
+		append_row "$cell" "PASS" "$duration" "$provider" "$account" "$date_s"
+		record_cell "$cell" "PASS"
+		printf 'acceptance cell-done cell=%s result=PASS\n' "$cell" >&2
+	done
+	# Dry-run never sets created=1 / never calls up.
+	printf 'gcp acceptance dry-run ok; created=0; no GCP up invoked\n' >&2
+}
+
+if [[ "$DRY_RUN" == "1" || "$DRY_RUN" == "true" ]]; then
+	gcp_dry_run_cell_loop
+	exit 0
+fi
+
 if [[ "${MAGELIFT_GCP_ACCEPTANCE:-}" != "1" ]]; then
-	printf 'refusing to run without MAGELIFT_GCP_ACCEPTANCE=1\n' >&2
+	printf 'refusing to run without MAGELIFT_GCP_ACCEPTANCE=1 (or MAGELIFT_ACCEPTANCE_DRY_RUN=1)\n' >&2
 	exit 2
 fi
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKDIR="${MAGELIFT_GCP_ACCEPTANCE_DIR:-/tmp/magelift-gcp-wt}"
 PROJECT="${MAGELIFT_GCP_PROJECT:-digital-lab-341608}"
 REGION="${MAGELIFT_GCP_REGION:-europe-west1}"
@@ -29,7 +86,7 @@ preview|up) ;;
 *)
 	printf 'usage: %s [preview|up]\n' "$(basename "$0")" >&2
 	exit 2
-	;;
+;;
 esac
 case "$PROFILE" in
 preview) ;;

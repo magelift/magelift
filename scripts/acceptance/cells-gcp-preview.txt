@@ -1,0 +1,3 @@
+# Ordered GCP preview cells for offline harness shape (Phase 3 — no up).
+# Live create + PSA soak timing = Phase 7.
+preset:preview

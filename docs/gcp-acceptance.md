@@ -3,9 +3,30 @@
 Status: **experimental**. Not Magento-certified. Prefer
 [aws-acceptance.md](aws-acceptance.md) for the certified path.
 
+## Phase 3 offline harness shape
+
+GCP shares the AWS acceptance control-flow shape (checkpoint/resume + evidence
+append + destroy/`force_clean_orphans`/`assert_clean` on EXIT) without spending
+credits in Phase 3:
+
+```sh
+export MAGELIFT_ACCEPTANCE_DRY_RUN=1
+bash tests/acceptance/gcp_harness_shape_test.sh
+# or: ./scripts/gcp-acceptance-local.sh
+```
+
+| Artifact | Path |
+|----------|------|
+| Cell catalog | `scripts/acceptance/cells-gcp-preview.txt` |
+| Checkpoint | `.magelift/gcp-matrix/acceptance-checkpoint.json` |
+| Evidence | `.magelift/gcp-matrix/matrix-results.md` (SC#2 columns; provider=`gcp`) |
+
+Dry-run never sets `created=1` and never calls Pulumi/gcloud `up`. Live create,
+PSA soak timing (`MAGELIFT_GCP_PSA_SOAK_SECS`), and leftover proof are **Phase 7**.
+
 ## Safety rules
 
-- Set `MAGELIFT_GCP_ACCEPTANCE=1` or the script refuses to run.
+- Set `MAGELIFT_GCP_ACCEPTANCE=1` or the script refuses to run (unless dry-run).
 - Default mode is `preview` (Pulumi plan only).
 - `up` creates real GKE Autopilot, Cloud SQL, and Memorystore Valkey — costly and
   slow. Destroy always runs on EXIT unless `MAGELIFT_GCP_ACCEPTANCE_KEEP=true`.
