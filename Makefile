@@ -69,6 +69,9 @@ floci-test: ## Run account-free AWS state and lock integration tests through Flo
 acceptance-harness-test: ## Run offline acceptance harness shell tests (serial; no AWS)
 	MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/evidence_append_test.sh
 	MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/checkpoint_resume_test.sh
+	bash tests/acceptance/matrix_tier_guard_test.sh
+	MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh --clean
+	MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh --leftover; test $$? -ne 0
 
 aws-acceptance-local: ## Run a local real-AWS acceptance pass (preview; destroys on exit)
 	./scripts/aws-acceptance-local.sh

@@ -32,6 +32,23 @@ is empty of acceptance resources (confirm with `assert_clean` / aws-cli tag scan
 never force-unlock while create is still in flight. Live multi-cell proof remains a
 paid HUMAN_GATE pass; dry-run does not claim that yet.
 
+### assert_clean dual outcome (offline)
+
+Shared helper: `scripts/acceptance/lib-assert-clean-aws.sh` (sourced by the EXIT
+cleanup path after destroy unless `MAGELIFT_AWS_ACCEPTANCE_KEEP=true`).
+
+Offline dual-outcome is proven with a PATH-isolated fake `aws` — never export the
+stub in a live session:
+
+```sh
+MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh --clean
+MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh --leftover
+# leftover mode exits non-zero when leftovers are detected (expected)
+```
+
+Live leftover demonstration (deliberate keep/orphan then fail-loud `assert_clean`)
+requires the paid 03-06 HUMAN_GATE — offline stubs do not claim that half closed.
+
 ## Prerequisites
 
 - AWS credentials for a disposable account (aws-cli `aws sts get-caller-identity`)
