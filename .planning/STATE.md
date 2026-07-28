@@ -4,15 +4,15 @@ milestone: v1.0.0
 milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
-status: gaps_found
-stopped_at: Phase 1 verification gaps_found — QUALITY-07 + AcquireLock (missing 01-10); CI deferred
-last_updated: "2026-07-28T14:00:52Z"
+status: ready_to_execute
+stopped_at: Gap-closure plan 01-10 written — execute QUALITY-07 + AcquireLock; CI deferred
+last_updated: "2026-07-28T16:15:00Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-VERIFICATION.md gaps_found (2/5 roadmap SCs); do not start Phase 2
+last_activity_desc: 01-10-PLAN.md gap closure created (QUALITY-07 + TRUST-02 AcquireLock)
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 9
+  total_plans: 10
   completed_plans: 9
   percent: 0
 ---
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 9 of 9 executed offline; verification **gaps_found** (2/5 roadmap SCs)
-Status: Blocked on gap closure — missing plan 01-10 (QUALITY-07 split + AcquireLock warn); hosted CI deferred
-Last activity: 2026-07-28 — 01-VERIFICATION.md written; do not advance to Phase 2
+Plan: 9 of 10 executed; **01-10** planned (gap closure) — verification gaps_found (2/5 roadmap SCs)
+Status: Ready to execute 01-10 (QUALITY-07 runtime split + AcquireLock warn); hosted CI deferred
+Last activity: 2026-07-28 — 01-10-PLAN.md written for gap closure
 
-Progress: plans done, phase goal not achieved
+Progress: gap-closure plan ready; phase goal not yet achieved
 
 ## Performance Metrics
 
@@ -134,7 +134,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T13:58:03.686Z
-Stopped at: Completed 01-09-PLAN.md — Phase 1 plans complete offline; CI criterion 1 deferred (HUMAN_GATE/act)
+Last session: 2026-07-28T16:15:00Z
+Stopped at: Gap-closure plan 01-10 written (QUALITY-07 split + AcquireLock warn); execute next; CI still deferred
 Resume file: None
-Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset
+Note: Do not advance to Phase 2 until 01-10 executes and verification re-runs; hosted CI remains HUMAN_GATE
