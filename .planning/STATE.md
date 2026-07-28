@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
 status: executing
-stopped_at: 01-01 Task 2 blocked on GitHub Actions billing
-last_updated: "2026-07-28T11:25:44.786Z"
-last_activity: 2026-07-27
-last_activity_desc: Roadmap created, 56/56 v1 requirements mapped across 8 phases
+stopped_at: Completed 01-02-PLAN.md (offline; CI deferred)
+last_updated: "2026-07-28T11:29:03.633Z"
+last_activity: 2026-07-28
+last_activity_desc: 01-02 SUMMARY offline; next 01-03
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 9
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 22
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 1 of 9 in current phase (01-01 closed offline; CI proof deferred)
+Plan: 3 of 9 in current phase (01-02 closed offline; CI proof still deferred)
 Status: Executing — offline mode (no GitHub Actions minutes)
-Last activity: 2026-07-28 — 01-01 SUMMARY; continue 01-02 without CI
+Last activity: 2026-07-28 — 01-02 SUMMARY; continue 01-03 without CI
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 22%
 
 ## Performance Metrics
 
@@ -55,6 +55,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 01 P02 | 20 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -67,6 +72,8 @@ Recent decisions affecting current work:
 - Roadmap: three paid passes planned total — AWS harness proof (Phase 3), batched GCP certification (Phase 7), small attach confirmation (Phase 8)
 - Roadmap: `v1.0.0-rc.1` is taggable after Phase 3; Phases 4-8 are droppable in reverse order
 - Roadmap: Phases 4-5 (brownfield, offline) and 6-7 (shared Kubernetes + GCP) are independent tracks after Phase 3
+- [Phase ?]: Offline 01-02: lint coverage guard shipped; CI race + force-all verify deferred-ci until Actions minutes return
+- [Phase ?]: Full local go test -race ./... deferred-local under Cursor (16GB Mac); narrow race sample only
 
 ### Pending Todos
 
@@ -95,7 +102,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T11:25:44.704Z
-Stopped at: 01-01 Task 2 blocked on GitHub Actions billing
-Resume file: .planning/loop/HUMAN_GATE
+Last session: 2026-07-28T11:28:54.250Z
+Stopped at: Completed 01-02-PLAN.md (offline; CI deferred)
+Resume file: None
 Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset
