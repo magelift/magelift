@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
 status: executing
-stopped_at: Completed 01-06-PLAN.md
-last_updated: "2026-07-28T11:56:38.748Z"
+stopped_at: Completed 01-07-PLAN.md
+last_updated: "2026-07-28T13:42:03.559Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-06 SUMMARY; continue 01-07 without CI
+last_activity_desc: 01-07 SUMMARY; continue 01-08 without CI
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 9
-  completed_plans: 6
-  percent: 67
+  completed_plans: 7
+  percent: 78
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 7 of 9 in current phase (01-06 closed offline; next 01-07 sequential)
+Plan: 8 of 9 in current phase (01-07 closed offline; next 01-08 sequential)
 Status: Ready to execute
-Last activity: 2026-07-28 — 01-06 SUMMARY; continue 01-07 without CI
+Last activity: 2026-07-28 — 01-07 SUMMARY; continue 01-08 without CI
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [███████░░░] 67%
 | Phase 01-publishable-baseline-honest-fallbacks P05 | 4min | 2 tasks | 4 files |
 | Phase 01 P05 | 5 | 2 tasks | 4 files |
 | Phase 01-publishable-baseline-honest-fallbacks P06 | 5min | 3 tasks | 3 files |
+| Phase 01 P07 | 25min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-06: Match DependsOn URNs by substring via RegisterRPC; never registration order
 - [Phase ?]: 01-06: Scaleway QUALITY-05 closed as documented non-carving invariant
 - [Phase ?]: 01-06: Phase 6 ceiling — lift RegisterRPC DependsOn helper for Kapsule/GKE
+- [Phase ?]: 01-07: preview×amazon-mq rejected via Spec.Validate 3-AZ naming 2-AZ guard
+- [Phase ?]: 01-07: U3/U4 assert sidecar presence; DependsOn gap is Finding F-01-07-1 not a baseline fix
+- [Phase ?]: 01-07: go test -race deferred-local under Cursor; non-race package verifies passed
 
 ### Pending Todos
 
@@ -118,7 +122,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T11:56:38.743Z
-Stopped at: Completed 01-06-PLAN.md
+Last session: 2026-07-28T13:42:03.550Z
+Stopped at: Completed 01-07-PLAN.md
 Resume file: None
 Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset
