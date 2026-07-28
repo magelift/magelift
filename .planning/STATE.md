@@ -2,19 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-current_phase: 1
-current_phase_name: Publishable Baseline & Honest Fallbacks
 status: executing
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-07-28T11:51:16.360Z"
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-07-28T11:56:38.748Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-05 SUMMARY; continue 01-06 without CI
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 9
-  completed_plans: 5
-  percent: 56
+  completed_plans: 6
+  percent: 0
 ---
 
 # Project State
@@ -29,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 6 of 9 in current phase (01-05 closed offline; next 01-06 sequential)
+Plan: 7 of 9 in current phase (01-05 closed offline; next 01-06 sequential)
 Status: Ready to execute
-Last activity: 2026-07-28 — 01-05 SUMMARY; continue 01-06 without CI
+Last activity: 2026-07-28
 
-Progress: [██████░░░░] 56%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -64,6 +61,7 @@ Progress: [██████░░░░] 56%
 | Phase 01 P04 | 6 | 3 tasks | 8 files |
 | Phase 01-publishable-baseline-honest-fallbacks P05 | 4min | 2 tasks | 4 files |
 | Phase 01 P05 | 5 | 2 tasks | 4 files |
+| Phase 01-publishable-baseline-honest-fallbacks P06 | 5min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -86,6 +84,9 @@ Recent decisions affecting current work:
 - [Phase ?]: GCP carve: /20 → 8 indices (0-7); caller zone cap before Pulumi registration
 - [Phase ?]: 01-05: AWS carve capacity before preset zone-count so 6+ zones fail isolation
 - [Phase ?]: 01-05: GCP keeps caller zone-capacity and helper index errors separate
+- [Phase ?]: 01-06: Match DependsOn URNs by substring via RegisterRPC; never registration order
+- [Phase ?]: 01-06: Scaleway QUALITY-05 closed as documented non-carving invariant
+- [Phase ?]: 01-06: Phase 6 ceiling — lift RegisterRPC DependsOn helper for Kapsule/GKE
 
 ### Pending Todos
 
@@ -114,7 +115,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T11:51:16.353Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-07-28T11:56:38.743Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
 Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset
