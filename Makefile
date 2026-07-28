@@ -1,3 +1,4 @@
+# CI Go path filter: cache-prime / lint / go-verify (QUALITY-06).
 .DEFAULT_GOAL := help
 
 .PHONY: help generate generate-check cli-docs cli-docs-check fmt fmt-check test lint license-check php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test floci-test aws-acceptance-local gcp-acceptance-local docs workflow-check verify
