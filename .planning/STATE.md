@@ -25,16 +25,17 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 3 planned — execute 03-01…03-05 offline, then 03-06 HUMAN_GATE for paid AWS
+**Current focus:** Phase 3 offline 03-01…03-05 done — HUMAN_GATE before 03-06 paid AWS
 
 ## Current Position
 
-Phase: 3 of 8 (Credit-Efficient Acceptance Harness & Evidence Tiering) — **plans ready**
-Plan: 03-01 of 03-06 (wave 1: 03-01 + 03-03; paid HUMAN_GATE = 03-06)
-Status: 6 PLAN.md files at `.planning/phases/03-credit-efficient-acceptance-harness-evidence-tiering/`
-Last activity: 2026-07-28 — phase planning (offline-first waves; 03-06 paid HUMAN_GATE)
+Phase: 3 of 8 (Credit-Efficient Acceptance Harness & Evidence Tiering) — **offline plans complete**
+Plan: 03-06 of 03-06 (**HUMAN_GATE** — paid AWS free-tier spend approval)
+Status: 03-01…03-05 SUMMARY.md complete; do not execute 03-06 until spend OK
+Last activity: 2026-07-28 — executed 03-01→03-03→03-02→03-04→03-05 offline
 
-Progress: [██████████] 95%
+Progress: Phase 3 offline harness ready; waiting on HUMAN_GATE for 03-06
+
 
 ## Performance Metrics
 
