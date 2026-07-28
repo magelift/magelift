@@ -106,8 +106,8 @@
 
 ### Public Release
 
-- [ ] **RELEASE-01**: The version story is consistent across `README.md`, `docs/versioning.md`, and the release-readiness gate board: the first public tag is `v1.0.0-rc.1`, and nothing still describes the project as pre-alpha `v0.x`
-- [ ] **RELEASE-02**: `sdk/v1` and `platform.StackModule` are documented as a compatibility contract with an explicit stability statement covering what may change during the RC series
+- [x] **RELEASE-01**: The version story is consistent across `README.md`, `docs/versioning.md`, and the release-readiness gate board: the first public tag is `v1.0.0-rc.1`, and nothing still describes the project as pre-alpha `v0.x`
+- [x] **RELEASE-02**: `sdk/v1` and `platform.StackModule` are documented as a compatibility contract with an explicit stability statement covering what may change during the RC series
 - [ ] **RELEASE-03**: A third party can follow `docs/adding-a-provider.md` plus `examples/custom-cli` to register an out-of-tree provider without reading core source
 - [ ] **RELEASE-04**: `make release-smoke` completes on the maintainer's machine (serial, single-target, outside Cursor), closing the Partial packaging gate
 - [ ] **RELEASE-05**: Every release-readiness gate board row is Closed or explicitly Deferred with a reason, and the board reflects reality on tag day
@@ -201,8 +201,8 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | QUALITY-06 | Phase 1 | Complete |
 | QUALITY-07 | Phase 1 | Complete |
 | QUALITY-08 | Phase 1 | Complete |
-| RELEASE-01 | Phase 2 | Pending |
-| RELEASE-02 | Phase 2 | Pending |
+| RELEASE-01 | Phase 2 | Complete |
+| RELEASE-02 | Phase 2 | Complete |
 | RELEASE-03 | Phase 2 | Pending |
 | RELEASE-04 | Phase 2 | Pending |
 | RELEASE-05 | Phase 8 | Pending |

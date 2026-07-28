@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Tag-Ready Release Surface
 status: planning
-stopped_at: Phase 2 plans created — ready to execute
-last_updated: "2026-07-28T14:36:47.481Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-07-28T14:44:49.348Z"
 last_activity: 2026-07-28
+last_activity_desc: Phase 2 PLAN.md files created
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 14
-  completed_plans: 10
+  completed_plans: 11
   percent: 13
-last_activity_desc: Phase 2: 4 PLAN.md files (3 waves); 02-04 is HUMAN_GATE for release-smoke
 ---
 
 # Project State
@@ -34,7 +34,7 @@ Plan: 02-01 of 02-04 (wave 1 next)
 Status: Phase 2 plans written (`02-01`…`02-04`); ready for `/gsd-execute-phase 2`
 Last activity: 2026-07-28 — Phase 2 PLAN.md files created
 
-Progress: [█░░░░░░░░░] 13% (Phase 1 offline complete; Phase 2 planning)
+Progress: [████████░░] 79% (Phase 1 offline complete; Phase 2 planning)
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Progress: [█░░░░░░░░░] 13% (Phase 1 offline complete; Phase 
 | Phase 01-publishable-baseline-honest-fallbacks P09 | 5min | 2 tasks | 7 files |
 | Phase 01-publishable-baseline-honest-fallbacks P09 | 3min | 2 tasks | 6 files |
 | Phase 01-publishable-baseline-honest-fallbacks P10 | 10min | 2 tasks | 15 files |
+| Phase 02 P01 | 2min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -111,6 +112,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-10: warn+noop AcquireLock via platform.WarnNoDIYLock (not ErrNotSupported)
 - [Phase ?]: 01-10: AST ErrNotSupported walk covers unsupported only; AcquireLock via warning tests
 - [Phase ?]: 01-10: F-01-07-1 DependsOn gap deferred untouched during runtime split
+- [Phase ?]: First public tag is v1.0.0-rc.1 on README/versioning/gate board (D-01)
+- [Phase ?]: RC locks sdk/v1 + StackModule core; Phase 6 may change kube-shaped platform ports without v2
 
 ### Pending Todos
 
@@ -139,7 +142,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T14:36:47.404Z
-Stopped at: Phase 2 research complete — ready to plan
+Last session: 2026-07-28T14:44:49.342Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None
 Note: `02-RESEARCH.md` written; hosted CI remains HUMAN_GATE; packaging smoke needs plain Terminal; PHP/Composer required for RELEASE-06 proof on this Mac
