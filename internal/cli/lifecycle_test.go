@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -390,5 +391,132 @@ func TestDeployReportsLockReleaseFailure(t *testing.T) {
 	cmd.SetArgs([]string{"--config", path, "--env", "staging", "deploy"})
 	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "release deployment lock") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExperimentalTargetWarnsAtPlanStack(t *testing.T) {
+	tests := []struct {
+		name        string
+		configPath  func(*testing.T) string
+		command     string
+		wantWarn    bool
+		wantProvider string
+		wantRuntime  string
+	}{
+		{
+			name:         "experimental ovh mutate preview",
+			configPath:   writeExperimentalOVHConfig,
+			command:      "preview",
+			wantWarn:     true,
+			wantProvider: "ovh",
+			wantRuntime:  "mks",
+		},
+		{
+			name:         "experimental ovh read-only outputs",
+			configPath:   writeExperimentalOVHConfig,
+			command:      "outputs",
+			wantWarn:     true,
+			wantProvider: "ovh",
+			wantRuntime:  "mks",
+		},
+		{
+			name: "experimental aws kubernetes",
+			configPath: func(t *testing.T) string {
+				t.Helper()
+				contents := strings.Replace(starterConfig, "runtime: ecs-fargate", "runtime: eks-autopilot", 1)
+				path := filepath.Join(t.TempDir(), "magelift.yaml")
+				if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				return path
+			},
+			command:      "preview",
+			wantWarn:     true,
+			wantProvider: "aws",
+			wantRuntime:  "eks-autopilot",
+		},
+		{
+			name: "certified aws no warning",
+			configPath: func(t *testing.T) string {
+				return writeLifecycleConfig(t, "staging", false)
+			},
+			command:  "preview",
+			wantWarn: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := tt.configPath(t)
+			var stdout, stderr bytes.Buffer
+			o := testOptions(&stdout, &fakeTerminal{interactive: false})
+			o.stderr = &stderr
+			o.configPath = path
+			o.environment = "staging"
+			// No backend factory: construction would fail loudly if it ran before the warning.
+			o.newBackend = nil
+			cmd := newCommandWithOptions(o)
+			args := []string{"--config", path, "--env", "staging", "--output", "json", tt.command}
+			cmd.SetArgs(args)
+			err := cmd.Execute()
+			if tt.wantWarn {
+				warn := stderr.String()
+				if !strings.Contains(warn, "experimental") {
+					t.Fatalf("stderr must name experimental tier; got %q", warn)
+				}
+				if !strings.Contains(warn, tt.wantProvider+"/"+tt.wantRuntime) {
+					t.Fatalf("stderr must name target %s/%s; got %q", tt.wantProvider, tt.wantRuntime, warn)
+				}
+				if !strings.Contains(warn, "capability-matrix") {
+					t.Fatalf("stderr must point at capability matrix; got %q", warn)
+				}
+				if !strings.Contains(warn, "day-2") && !strings.Contains(warn, "day-2 operations") {
+					t.Fatalf("stderr must mention day-2 operations; got %q", warn)
+				}
+				if !strings.Contains(warn, "acceptance") {
+					t.Fatalf("stderr must mention acceptance evidence; got %q", warn)
+				}
+				if strings.Contains(warn, "arn:") || strings.Contains(warn, "PULUMI_BACKEND") {
+					t.Fatalf("warning must not leak account identifiers or backend URL: %q", warn)
+				}
+				if err == nil {
+					t.Fatal("expected failure without backend factory")
+				}
+				if !strings.Contains(err.Error(), "infrastructure backend factory is required") {
+					t.Fatalf("backend must not be constructed before warning; got err=%v", err)
+				}
+				if stdout.Len() != 0 && tt.command == "outputs" {
+					// json payloads stay on stdout; with early failure stdout may be empty
+				}
+			} else {
+				if strings.Contains(stderr.String(), "experimental") {
+					t.Fatalf("certified target must not warn; stderr=%q", stderr.String())
+				}
+			}
+		})
+	}
+}
+
+func TestExperimentalWarningLeavesJSONStdoutParseable(t *testing.T) {
+	path := writeExperimentalOVHConfig(t)
+	var stdout, stderr bytes.Buffer
+	backend := &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop"}}
+	o := testOptions(&stdout, &fakeTerminal{interactive: false})
+	o.stderr = &stderr
+	o.configPath = path
+	o.environment = "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "outputs"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stderr.String(), "experimental") {
+		t.Fatalf("expected experimental warning on stderr; got %q", stderr.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("stdout must remain parseable JSON with warning on stderr: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
 	}
 }

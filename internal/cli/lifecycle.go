@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/acourtiol/magelift/internal/automation"
@@ -278,7 +279,19 @@ func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedS
 	if err != nil {
 		return "", nil, err
 	}
+	warnExperimentalTarget(o.stderr, planned)
 	return environment, planned, nil
+}
+
+// experimentalTargetWarningFmt is the TRUST-01 stderr line. Keep factual: tier,
+// provider/runtime, day-2 honesty, acceptance evidence, docs — never ARNs or backend URLs.
+const experimentalTargetWarningFmt = "warning: target %s/%s is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md"
+
+func warnExperimentalTarget(stderr io.Writer, planned platform.PlannedStack) {
+	if planned == nil || planned.CertificationTier() != platform.TierExperimental || stderr == nil {
+		return
+	}
+	_, _ = fmt.Fprintf(stderr, experimentalTargetWarningFmt+"\n", planned.Provider(), planned.Runtime())
 }
 
 func (o *options) acquireProviderLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {

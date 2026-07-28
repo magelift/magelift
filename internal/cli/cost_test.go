@@ -202,8 +202,30 @@ func TestCostModuleWithoutEstimatorExits2(t *testing.T) {
 }
 
 func TestCostUnregisteredTargetFailsBeforeEstimator(t *testing.T) {
-	// aws/eks-autopilot validates in config but is not registered by registerTestModules.
-	contents := strings.Replace(starterConfig, "runtime: ecs-fargate", "runtime: eks-autopilot", 1)
+	// gcp/gke-autopilot validates in config but is not registered by registerTestModules
+	// (aws/eks-autopilot is registered for tier-keyed experimental warning tests).
+	contents := `schemaVersion: 1
+project:
+  name: example-shop
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+build:
+  php: "8.5"
+target:
+  provider: gcp
+  runtime: gke-autopilot
+  gcp:
+    project: example-shop
+defaults:
+  region: europe-west1
+  preset: preview
+environments:
+  staging:
+    account: "example-shop"
+extensions: {}
+`
 	path := writeCostConfig(t, contents)
 	var out bytes.Buffer
 	estimator := &recordingCostEstimator{report: sampleCostReport()}
@@ -215,7 +237,7 @@ func TestCostUnregisteredTargetFailsBeforeEstimator(t *testing.T) {
 	if err == nil || ExitCode(err) != 2 {
 		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
 	}
-	if !strings.Contains(err.Error(), `no stack module registered for target "aws"/"eks-autopilot"`) {
+	if !strings.Contains(err.Error(), `no stack module registered for target "gcp"/"gke-autopilot"`) {
 		t.Fatalf("expected planning gate error, got: %v", err)
 	}
 	if estimator.calls != 0 {

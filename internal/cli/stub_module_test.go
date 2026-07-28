@@ -97,6 +97,50 @@ func (stubExperimentalModule) Plan(cfg config.Config, environment string, _ plat
 	}, nil
 }
 
+// stubExperimentalAWSEKSModule is aws/eks-autopilot so tier-keyed warnings cannot
+// pass by allowlisting provider names (same provider as certified ecs-fargate).
+type stubExperimentalAWSEKSModule struct{}
+
+func (stubExperimentalAWSEKSModule) Descriptor() sdk.TargetDescriptor {
+	return sdk.TargetDescriptor{
+		ID:       "aws.eks-autopilot",
+		Provider: "aws",
+		Runtime:  "eks-autopilot",
+	}
+}
+
+func (stubExperimentalAWSEKSModule) CertificationTier() platform.CertificationTier {
+	return platform.TierExperimental
+}
+
+func (stubExperimentalAWSEKSModule) OutputKeys() []string { return platform.RequiredOutputKeys() }
+
+func (stubExperimentalAWSEKSModule) Program(platform.PlannedStack) (pulumi.RunFunc, error) {
+	return nil, nil
+}
+
+func (stubExperimentalAWSEKSModule) Plan(cfg config.Config, environment string, _ platform.PlanOptions) (platform.PlannedStack, error) {
+	if strings.TrimSpace(environment) == "" {
+		return nil, fmt.Errorf("environment is required")
+	}
+	digest := ""
+	if cfg.Target.AWS != nil {
+		digest = cfg.Target.AWS.ImageDigest
+	}
+	return stubPlanned{
+		stackName:   cfg.Project.Name + "-" + environment,
+		provider:    "aws",
+		runtime:     "eks-autopilot",
+		project:     cfg.Project.Name,
+		environment: environment,
+		region:      cfg.Defaults.Region,
+		envClass:    cfg.Class,
+		protected:   cfg.Protection,
+		digest:      digest,
+		tier:        platform.TierExperimental,
+	}, nil
+}
+
 type stubPlanned struct {
 	stackName, provider, runtime, project, environment, region, envClass, digest string
 	protected                                                                    bool
@@ -126,6 +170,8 @@ func (p stubPlanned) TargetDescriptor() sdk.TargetDescriptor {
 	switch {
 	case p.provider == "ovh" && p.runtime == "mks":
 		return stubExperimentalModule{}.Descriptor()
+	case p.provider == "aws" && p.runtime == "eks-autopilot":
+		return stubExperimentalAWSEKSModule{}.Descriptor()
 	default:
 		return stubAWSModule{}.Descriptor()
 	}
@@ -136,6 +182,9 @@ func registerTestModules(modules *platform.ModuleRegistry) {
 		panic(err)
 	}
 	if err := modules.RegisterModule(stubExperimentalModule{}); err != nil {
+		panic(err)
+	}
+	if err := modules.RegisterModule(stubExperimentalAWSEKSModule{}); err != nil {
 		panic(err)
 	}
 }
