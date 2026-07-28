@@ -47,6 +47,15 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if len(args.Zones) == 0 {
 		return nil, errors.New("at least one zone is required")
 	}
+	if prefix.Bits() > 20 {
+		return nil, errors.New("network CIDR must be at most /20 so subnets can be carved")
+	}
+	// Two /24s per zone index; reject before any Pulumi registration so an
+	// over-long zone list fails with a capacity message the operator can act on.
+	maxZones := subnetIndexCapacity(prefix)
+	if len(args.Zones) > maxZones {
+		return nil, fmt.Errorf("network CIDR %s has room for %d zone(s) but %d were requested", prefix, maxZones, len(args.Zones))
+	}
 	component := &Component{}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{
 		"project": pulumi.String(args.Project), "region": pulumi.String(args.Region),
@@ -137,9 +146,19 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	return component, nil
 }
 
+// subnetIndexCapacity is how many zone indices fit when carving two /24s each
+// from prefix (even private, odd public).
+func subnetIndexCapacity(prefix netip.Prefix) int {
+	return (1 << (24 - prefix.Bits())) / 2
+}
+
 func subnetCIDRs(prefix netip.Prefix, index int) (privateCIDR, publicCIDR string, err error) {
 	if prefix.Bits() > 20 {
 		return "", "", errors.New("network CIDR must be at most /20 so subnets can be carved")
+	}
+	capacity := subnetIndexCapacity(prefix)
+	if index < 0 || index >= capacity {
+		return "", "", fmt.Errorf("subnet index %d out of range: network CIDR %s holds %d index(es)", index, prefix, capacity)
 	}
 	base := prefix.Masked().Addr().As4()
 	addr := binary.BigEndian.Uint32(base[:])
