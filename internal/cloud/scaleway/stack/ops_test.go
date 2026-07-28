@@ -1,6 +1,7 @@
 package stack
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -173,9 +174,9 @@ func TestModuleAccessorsReturnNonNilUnsupportedShells(t *testing.T) {
 }
 
 // TestUnsupportedSourceGuardSentinelReturns parses ops.go and requires every
-// method on unsupported (and Ops except AcquireLock) to return
-// platform.ErrNotSupported in the error position. AcquireLock is the named
-// exception: it deliberately returns a working release today (plan 01-10).
+// method on unsupported to return platform.ErrNotSupported in the error
+// position. Ops.AcquireLock is covered by TestAcquireLockWarnsNoDIYLockTaken
+// (warn-then-noop), not by this ErrNotSupported walk.
 func TestUnsupportedSourceGuardSentinelReturns(t *testing.T) {
 	guardUnsupportedSentinelReturns(t, "ops.go")
 }
@@ -188,12 +189,6 @@ func guardUnsupportedSentinelReturns(t *testing.T, sourceFile string) {
 		t.Fatalf("parse %s: %v (guard must fail closed on parse errors)", sourceFile, err)
 	}
 
-	// Ops.AcquireLock: returns a no-op release today so lifecycle can proceed;
-	// plan 01-10 revisits this silent-success path. Named here so the carve-out
-	// is visible rather than implicit.
-	const acquireLockException = "AcquireLock"
-	const acquireLockReason = "deliberately returns a working release function today; plan 01-10 revisits this exception"
-
 	var failures []string
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
@@ -201,15 +196,7 @@ func guardUnsupportedSentinelReturns(t *testing.T, sourceFile string) {
 			continue
 		}
 		recvType := receiverTypeName(fn.Recv.List[0].Type)
-		switch recvType {
-		case "unsupported":
-			// all methods must return the sentinel
-		case "Ops":
-			if fn.Name.Name == acquireLockException {
-				t.Logf("exception %s.%s: %s", recvType, acquireLockException, acquireLockReason)
-				continue
-			}
-		default:
+		if recvType != "unsupported" {
 			continue
 		}
 		if !methodReturnsNotSupported(fn) {
@@ -261,4 +248,30 @@ func isPlatformErrNotSupported(expr ast.Expr) bool {
 	}
 	pkg, ok := sel.X.(*ast.Ident)
 	return ok && pkg.Name == "platform"
+}
+
+func TestAcquireLockWarnsNoDIYLockTaken(t *testing.T) {
+	var buf bytes.Buffer
+	prev := diyLockWarnOut
+	diyLockWarnOut = &buf
+	t.Cleanup(func() { diyLockWarnOut = prev })
+
+	release, err := Ops{}.AcquireLock(context.Background(), Planned{})
+	if err != nil {
+		t.Fatalf("AcquireLock error: %v", err)
+	}
+	if release == nil {
+		t.Fatal("AcquireLock must return a noop release")
+	}
+	if err := release(context.Background()); err != nil {
+		t.Fatalf("noop release: %v", err)
+	}
+	msg := buf.String()
+	lower := strings.ToLower(msg)
+	if !strings.Contains(lower, "lock") || !strings.Contains(msg, "DIY") || !strings.Contains(lower, "not taken") {
+		t.Fatalf("expected warning that no DIY lock was taken, got %q", msg)
+	}
+	if !strings.Contains(msg, "scaleway") && !strings.Contains(msg, "kapsule") {
+		t.Fatalf("expected provider/runtime context in warning, got %q", msg)
+	}
 }

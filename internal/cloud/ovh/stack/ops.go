@@ -3,11 +3,15 @@ package stack
 import (
 	"context"
 	"io"
+	"os"
 
 	"github.com/acourtiol/magelift/internal/config"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/platform"
 )
+
+// diyLockWarnOut is the sink for AcquireLock honesty warnings; tests redirect it.
+var diyLockWarnOut io.Writer = os.Stderr
 
 // unsupported implements optional day-2 ports for experimental OVH.
 type unsupported struct{}

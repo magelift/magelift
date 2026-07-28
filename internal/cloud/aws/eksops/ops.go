@@ -5,19 +5,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	awsbootstrap "github.com/acourtiol/magelift/internal/cloud/aws/bootstrap"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
 	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
+	"github.com/acourtiol/magelift/internal/config"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/platform"
 )
+
+// diyLockWarnOut is the sink for AcquireLock honesty warnings; tests redirect it.
+var diyLockWarnOut io.Writer = os.Stderr
 
 func (Module) Bootstrap() platform.Bootstrap           { return Bootstrap{} }
 func (Module) State() platform.State                   { return State{} }
 func (Module) Secrets() platform.Secrets               { return Secrets{} }
 func (Module) RuntimeObserve() platform.RuntimeObserve { return unsupported{} }
+func (Module) CostEstimator() platform.CostEstimator   { return unsupportedCost{} }
 func (Module) Ops() platform.Ops                       { return Ops{} }
 
 // Bootstrap reuses the certified AWS account DIY bootstrap packages.
@@ -199,6 +205,12 @@ func (unsupported) CheckRuntime(context.Context, platform.PlannedStack, map[stri
 }
 func (unsupported) PrepareExec(context.Context, platform.PlannedStack, map[string]any, platform.ExecQuery) (platform.ExecTarget, error) {
 	return platform.ExecTarget{}, platform.ErrNotSupported
+}
+
+type unsupportedCost struct{}
+
+func (unsupportedCost) Estimate(context.Context, platform.PlannedStack, config.Config, platform.CostOptions) (platform.CostReport, error) {
+	return platform.CostReport{}, platform.ErrNotSupported
 }
 
 type Ops struct{}
