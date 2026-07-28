@@ -1,107 +1,224 @@
 package cli
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
-	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
 	"github.com/acourtiol/magelift/internal/config"
+	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/acourtiol/magelift/internal/usererr"
 )
 
-type fakeCostEstimator struct {
-	prices  map[string]awspricing.Price
-	queries []awspricing.Query
+// Stable leading portion of the not-supported message. Plan 01-08 appends the
+// certification tier after this prefix; keep assertions on the prefix only.
+const costNotSupportedPrefix = "cost estimation is not supported for target aws/ecs-fargate yet"
+
+type recordingCostEstimator struct {
+	lastLive *bool
+	calls    int
+	report   platform.CostReport
+	err      error
 }
 
-func (f *fakeCostEstimator) Estimate(_ context.Context, query awspricing.Query) (awspricing.Price, error) {
-	f.queries = append(f.queries, query)
-	if price, ok := f.prices[query.Resource]; ok {
-		return price, nil
-	}
-	return awspricing.Price{}, awspricing.ErrNoPrice
+func (e *recordingCostEstimator) Estimate(_ context.Context, _ platform.PlannedStack, _ config.Config, opts platform.CostOptions) (platform.CostReport, error) {
+	e.calls++
+	live := opts.Live
+	e.lastLive = &live
+	return e.report, e.err
 }
 
-func TestAccountFreeCostReportClassifiesInputs(t *testing.T) {
-	cfg := config.Config{
-		Target: config.Target{Provider: "aws", AWS: &config.AWSTarget{Catalog: config.AWSCatalog{
-			Fargate:  config.AWSCatalogFargate{CPU: 1024, MemoryMiB: 2048, DesiredCount: 2},
-			Valkey:   config.AWSCatalogValkey{NodeType: "cache.t4g.small", ReplicaCount: 1},
-			Aurora:   config.AWSCatalogAurora{InstanceClass: "db.r7g.large", InstanceCount: 2},
-			Search:   config.AWSCatalogSearch{InstanceType: "r7g.large.search", InstanceCount: 3},
-			RabbitMQ: config.AWSCatalogRabbitMQ{InstanceType: "mq.m7g.large"},
-		}}},
-		Defaults: config.Defaults{Region: "eu-west-3"}, Preset: "standard", MonthlyBudgetCents: 50000,
+func sampleCostReport() platform.CostReport {
+	return platform.CostReport{
+		Environment: "staging",
+		Provider:    "aws",
+		Region:      "eu-west-3",
+		Preset:      "preview",
+		Mode:        "account-free",
+		Currency:    "USD",
+		Notice:      "capacity only",
 	}
-	report := newCostReport(cfg, "staging")
+}
 
-	if report.Mode != "account-free" || report.MonthlyTotalCents != nil || len(report.Priced) != 0 {
-		t.Fatalf("account-free report claimed a price: %#v", report)
-	}
-	if len(report.Estimated) != 5 || len(report.Unsupported) != 2 {
-		t.Fatalf("unexpected classifications: %#v", report)
-	}
-	data, err := json.Marshal(report)
-	if err != nil {
+func writeCostConfig(t *testing.T, contents string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	var shape map[string]any
-	if err := json.Unmarshal(data, &shape); err != nil {
-		t.Fatal(err)
+	return path
+}
+
+func TestCostRejectsPositionalArgs(t *testing.T) {
+	path := writeCostConfig(t, starterConfig)
+	var out bytes.Buffer
+	o := testOptions(&out, nil)
+	o.testCostEstimator = &recordingCostEstimator{report: sampleCostReport()}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "cost", "extra"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected positional argument rejection")
 	}
-	for _, field := range []string{"priced", "estimated", "unsupported", "monthlyTotalCents"} {
-		if _, found := shape[field]; !found {
-			t.Fatalf("required field %q is absent from %s", field, data)
+	if ExitCode(err) != 1 && !strings.Contains(err.Error(), "unknown command") && !strings.Contains(err.Error(), "accepts no") {
+		// cobra.NoArgs typically surfaces as "accepts no args" with exit 1 from cobra
+		// when SilenceErrors is set; accept either message shape.
+		if !strings.Contains(strings.ToLower(err.Error()), "arg") {
+			t.Fatalf("unexpected error: %v (code %d)", err, ExitCode(err))
 		}
 	}
 }
 
-func TestCostReportWithoutCatalogIsExplicit(t *testing.T) {
-	report := newCostReport(config.Config{Target: config.Target{Provider: "aws"}, Defaults: config.Defaults{Region: "eu-west-3", Preset: "preview"}}, "preview")
-	if len(report.Estimated) != 1 || len(report.Unsupported) != 3 {
-		t.Fatalf("missing catalog was not classified: %#v", report)
+func TestCostLiveFlag(t *testing.T) {
+	path := writeCostConfig(t, starterConfig)
+	tests := []struct {
+		name string
+		args []string
+		live bool
+	}{
+		{name: "default account-free", args: []string{"cost"}, live: false},
+		{name: "live", args: []string{"cost", "--live"}, live: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			estimator := &recordingCostEstimator{report: sampleCostReport()}
+			o := testOptions(&out, nil)
+			o.testCostEstimator = estimator
+			cmd := newCommandWithOptions(o)
+			args := append([]string{"--config", path, "--env", "staging", "-o", "json"}, tt.args...)
+			cmd.SetArgs(args)
+			if err := cmd.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			if estimator.calls != 1 || estimator.lastLive == nil || *estimator.lastLive != tt.live {
+				t.Fatalf("calls=%d live=%v want live=%v", estimator.calls, estimator.lastLive, tt.live)
+			}
+		})
 	}
 }
 
-func TestLiveCostReportSumsCurrentPricesAndSeparatesMissingProducts(t *testing.T) {
-	cfg := config.Config{
-		Target: config.Target{Provider: "aws", AWS: &config.AWSTarget{Catalog: config.AWSCatalog{
-			Fargate: config.AWSCatalogFargate{CPU: 1024, MemoryMiB: 2048, DesiredCount: 2},
-			Valkey:  config.AWSCatalogValkey{NodeType: "cache.t4g.small", ReplicaCount: 1},
-			Aurora:  config.AWSCatalogAurora{InstanceClass: "db.r7g.large", InstanceCount: 2},
-		}}},
-		Defaults: config.Defaults{Region: "eu-west-3"}, Preset: "standard",
+func TestCostOutputFormats(t *testing.T) {
+	path := writeCostConfig(t, starterConfig)
+	tests := []struct {
+		name       string
+		format     string
+		wantSubstr string
+		wantCode   int
+	}{
+		{name: "json", format: "json", wantSubstr: `"environment": "staging"`},
+		{name: "yaml", format: "yaml", wantSubstr: "environment: staging"},
+		{name: "table", format: "table", wantSubstr: "environment: staging"},
+		{name: "unsupported", format: "xml", wantCode: 2},
 	}
-	estimator := &fakeCostEstimator{prices: map[string]awspricing.Price{
-		"ECS Fargate vCPU":   {Resource: "ECS Fargate vCPU", MonthlyCents: 1000, Currency: "USD", Basis: "vCPU"},
-		"ECS Fargate memory": {Resource: "ECS Fargate memory", MonthlyCents: 2000, Currency: "USD", Basis: "memory"},
-		"ElastiCache Valkey": {Resource: "ElastiCache Valkey", MonthlyCents: 3000, Currency: "USD", Basis: "cache"},
-	}}
-	report, err := newLiveCostReport(context.Background(), cfg, "staging", estimator)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report.Mode != "live" || report.MonthlyTotalCents == nil || *report.MonthlyTotalCents != 6000 {
-		t.Fatalf("unexpected live total: %#v", report)
-	}
-	if len(report.Priced) != 3 || len(report.Estimated) != 2 || len(report.Unsupported) != 2 {
-		t.Fatalf("unexpected live classifications: %#v", report)
-	}
-	if len(estimator.queries) != 4 {
-		t.Fatalf("query count = %d, want 4", len(estimator.queries))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			o := testOptions(&out, nil)
+			o.testCostEstimator = &recordingCostEstimator{report: sampleCostReport()}
+			cmd := newCommandWithOptions(o)
+			cmd.SetArgs([]string{"--config", path, "--env", "staging", "-o", tt.format, "cost"})
+			err := cmd.Execute()
+			if tt.wantCode != 0 {
+				if err == nil || ExitCode(err) != tt.wantCode {
+					t.Fatalf("error/code = %v/%d", err, ExitCode(err))
+				}
+				if !strings.Contains(err.Error(), "unsupported output format") {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out.String(), tt.wantSubstr) {
+				t.Fatalf("output missing %q: %s", tt.wantSubstr, out.String())
+			}
+		})
 	}
 }
 
-func TestLiveCostReportPropagatesProviderFailure(t *testing.T) {
-	cfg := config.Config{Target: config.Target{Provider: "aws", AWS: &config.AWSTarget{Catalog: config.AWSCatalog{Fargate: config.AWSCatalogFargate{CPU: 1024, MemoryMiB: 2048, DesiredCount: 1}}}}, Defaults: config.Defaults{Region: "eu-west-3"}}
-	estimator := &failingCostEstimator{}
-	if _, err := newLiveCostReport(context.Background(), cfg, "preview", estimator); err == nil {
-		t.Fatal("provider failure was hidden")
+func TestCostErrNotSupportedExits2(t *testing.T) {
+	path := writeCostConfig(t, starterConfig)
+	var out bytes.Buffer
+	o := testOptions(&out, nil)
+	o.testCostEstimator = &recordingCostEstimator{err: platform.ErrNotSupported}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "cost"})
+	err := cmd.Execute()
+	if err == nil || ExitCode(err) != 2 {
+		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
+	}
+	if !strings.HasPrefix(err.Error(), costNotSupportedPrefix) && !strings.Contains(err.Error(), costNotSupportedPrefix) {
+		t.Fatalf("message must identify target; got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "aws") || !strings.Contains(err.Error(), "ecs-fargate") {
+		t.Fatalf("message must name provider/runtime: %v", err)
 	}
 }
 
-type failingCostEstimator struct{}
+func TestCostOtherEstimatorErrorExits3(t *testing.T) {
+	path := writeCostConfig(t, starterConfig)
+	var out bytes.Buffer
+	o := testOptions(&out, nil)
+	o.testCostEstimator = &recordingCostEstimator{err: errors.New("pricing catalog unavailable")}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "cost"})
+	err := cmd.Execute()
+	if err == nil || ExitCode(err) != 3 {
+		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
+	}
+	ue, ok := usererr.As(err)
+	if !ok {
+		t.Fatalf("expected usererr chain, got %T: %v", err, err)
+	}
+	if ue.Cause != "cost estimation failed" {
+		t.Fatalf("cause = %q", ue.Cause)
+	}
+	if !strings.Contains(ue.Next, "catalog") && !strings.Contains(ue.Next, "credentials") {
+		t.Fatalf("next step = %q", ue.Next)
+	}
+}
 
-func (*failingCostEstimator) Estimate(context.Context, awspricing.Query) (awspricing.Price, error) {
-	return awspricing.Price{}, context.DeadlineExceeded
+func TestCostModuleWithoutEstimatorExits2(t *testing.T) {
+	path := writeCostConfig(t, starterConfig)
+	var out bytes.Buffer
+	o := testOptions(&out, nil)
+	// testCostEstimator left nil — certified stubAWSModule implements no CostEstimator.
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "cost"})
+	err := cmd.Execute()
+	if err == nil || ExitCode(err) != 2 {
+		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
+	}
+	if !strings.Contains(err.Error(), costNotSupportedPrefix) {
+		t.Fatalf("expected not-supported shape naming aws/ecs-fargate: %v", err)
+	}
+}
+
+func TestCostUnregisteredTargetFailsBeforeEstimator(t *testing.T) {
+	// aws/eks-autopilot validates in config but is not registered by registerTestModules.
+	contents := strings.Replace(starterConfig, "runtime: ecs-fargate", "runtime: eks-autopilot", 1)
+	path := writeCostConfig(t, contents)
+	var out bytes.Buffer
+	estimator := &recordingCostEstimator{report: sampleCostReport()}
+	o := testOptions(&out, nil)
+	o.testCostEstimator = estimator
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "cost"})
+	err := cmd.Execute()
+	if err == nil || ExitCode(err) != 2 {
+		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
+	}
+	if !strings.Contains(err.Error(), `no stack module registered for target "aws"/"eks-autopilot"`) {
+		t.Fatalf("expected planning gate error, got: %v", err)
+	}
+	if estimator.calls != 0 {
+		t.Fatalf("estimator consulted %d times; planning gate must run first", estimator.calls)
+	}
 }
