@@ -114,7 +114,7 @@ CI inline is the growth hotspot (88% after compaction). Boundaries and trusts ha
 2. **Task 2: Lock the serverless OCU validator with accept-and-reject table** - `ca8ab3b` (test)
 3. **Task 3: Record the OCU provenance in the knowledge bundle** - `791f0b0` + `a8e1ec9` (docs)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `e9c362f` (docs: complete plan)
 
 ## Files Created/Modified
 
