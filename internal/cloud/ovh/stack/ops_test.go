@@ -3,8 +3,13 @@ package stack
 import (
 	"context"
 	"errors"
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/acourtiol/magelift/internal/config"
@@ -165,4 +170,95 @@ func TestModuleAccessorsReturnNonNilUnsupportedShells(t *testing.T) {
 	if m.CostEstimator() == nil {
 		t.Fatal("CostEstimator must return the unsupported shell, not nil")
 	}
+}
+
+// TestUnsupportedSourceGuardSentinelReturns parses ops.go and requires every
+// method on unsupported (and Ops except AcquireLock) to return
+// platform.ErrNotSupported in the error position. AcquireLock is the named
+// exception: it deliberately returns a working release today (plan 01-10).
+func TestUnsupportedSourceGuardSentinelReturns(t *testing.T) {
+	guardUnsupportedSentinelReturns(t, "ops.go")
+}
+
+func guardUnsupportedSentinelReturns(t *testing.T, sourceFile string) {
+	t.Helper()
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, sourceFile, nil, 0)
+	if err != nil {
+		t.Fatalf("parse %s: %v (guard must fail closed on parse errors)", sourceFile, err)
+	}
+
+	// Ops.AcquireLock: returns a no-op release today so lifecycle can proceed;
+	// plan 01-10 revisits this silent-success path. Named here so the carve-out
+	// is visible rather than implicit.
+	const acquireLockException = "AcquireLock"
+	const acquireLockReason = "deliberately returns a working release function today; plan 01-10 revisits this exception"
+
+	var failures []string
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Recv == nil || len(fn.Recv.List) != 1 || fn.Body == nil {
+			continue
+		}
+		recvType := receiverTypeName(fn.Recv.List[0].Type)
+		switch recvType {
+		case "unsupported":
+			// all methods must return the sentinel
+		case "Ops":
+			if fn.Name.Name == acquireLockException {
+				t.Logf("exception %s.%s: %s", recvType, acquireLockException, acquireLockReason)
+				continue
+			}
+		default:
+			continue
+		}
+		if !methodReturnsNotSupported(fn) {
+			failures = append(failures, fmt.Sprintf(
+				"%s.%s no longer returns platform.ErrNotSupported in the error position; restore the sentinel or remove this method from the unsupported sentinel guard deliberately",
+				recvType, fn.Name.Name,
+			))
+		}
+	}
+	if len(failures) > 0 {
+		t.Fatalf("sentinel guard failed:\n  - %s", strings.Join(failures, "\n  - "))
+	}
+}
+
+func receiverTypeName(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.StarExpr:
+		if id, ok := t.X.(*ast.Ident); ok {
+			return id.Name
+		}
+	}
+	return ""
+}
+
+func methodReturnsNotSupported(fn *ast.FuncDecl) bool {
+	sawReturn := false
+	allGood := true
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		ret, ok := n.(*ast.ReturnStmt)
+		if !ok || len(ret.Results) == 0 {
+			return true
+		}
+		sawReturn = true
+		if !isPlatformErrNotSupported(ret.Results[len(ret.Results)-1]) {
+			allGood = false
+			return false
+		}
+		return true
+	})
+	return sawReturn && allGood
+}
+
+func isPlatformErrNotSupported(expr ast.Expr) bool {
+	sel, ok := expr.(*ast.SelectorExpr)
+	if !ok || sel.Sel == nil || sel.Sel.Name != "ErrNotSupported" {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	return ok && pkg.Name == "platform"
 }

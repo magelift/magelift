@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/acourtiol/magelift/internal/config"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/platform"
 )
@@ -15,6 +16,7 @@ func (Module) Bootstrap() platform.Bootstrap           { return unsupported{} }
 func (Module) State() platform.State                   { return unsupported{} }
 func (Module) Secrets() platform.Secrets               { return unsupported{} }
 func (Module) RuntimeObserve() platform.RuntimeObserve { return unsupported{} }
+func (Module) CostEstimator() platform.CostEstimator   { return unsupported{} }
 
 func (unsupported) VerifyAccount(context.Context, platform.PlannedStack) error {
 	return platform.ErrNotSupported
@@ -54,6 +56,9 @@ func (unsupported) CheckRuntime(context.Context, platform.PlannedStack, map[stri
 }
 func (unsupported) PrepareExec(context.Context, platform.PlannedStack, map[string]any, platform.ExecQuery) (platform.ExecTarget, error) {
 	return platform.ExecTarget{}, platform.ErrNotSupported
+}
+func (unsupported) Estimate(context.Context, platform.PlannedStack, config.Config, platform.CostOptions) (platform.CostReport, error) {
+	return platform.CostReport{}, platform.ErrNotSupported
 }
 
 type Ops struct{}
