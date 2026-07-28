@@ -299,3 +299,72 @@ func assertBoolObject(t *testing.T, values resource.PropertyMap, objectKey, key 
 		t.Fatalf("%s.%s = %t, want %t", objectKey, key, got, want)
 	}
 }
+
+// TestValidServerlessOCU locks MageLift's collection-group OCU step rule.
+//
+// This is MageLift's empirically observed rule (commit b8b957e, 2026-07-19),
+// not AWS-documented behaviour. AWS publishes only min/max floors for
+// collection-group capacity fields; the step rule is unpublished. Do not
+// "fix" the validator against the docs — a relaxed rule fails at create
+// time on a live account. Re-verify on the next paid AWS pass.
+func TestValidServerlessOCU(t *testing.T) {
+	cases := []struct {
+		name  string
+		value float64
+		want  bool
+	}{
+		{name: "accept 1", value: 1, want: true},
+		{name: "accept 2", value: 2, want: true},
+		{name: "accept 4", value: 4, want: true},
+		{name: "accept 8", value: 8, want: true},
+		{name: "accept 16", value: 16, want: true},
+		{name: "accept 32", value: 32, want: true},
+		{name: "accept 48", value: 48, want: true},
+		{name: "accept 64", value: 64, want: true},
+		{name: "reject 0", value: 0, want: false},
+		{name: "reject 0.5", value: 0.5, want: false},
+		{name: "reject 3", value: 3, want: false},
+		{name: "reject 6", value: 6, want: false},
+		{name: "reject 12", value: 12, want: false},
+		{name: "reject 17", value: 17, want: false},
+		{name: "reject 24", value: 24, want: false},
+		{name: "reject 33", value: 33, want: false},
+		{name: "reject negative", value: -1, want: false},
+		{name: "reject NaN", value: math.NaN(), want: false},
+		{name: "reject +Inf", value: math.Inf(1), want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := validServerlessOCU(tc.value); got != tc.want {
+				t.Fatalf("validServerlessOCU(%v) = %t, want %t", tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidCapacityRange(t *testing.T) {
+	cases := []struct {
+		name    string
+		minimum float64
+		maximum float64
+		want    bool
+	}{
+		{name: "accept equal bounds", minimum: 4, maximum: 4, want: true},
+		{name: "accept maximum above minimum", minimum: 1, maximum: 16, want: true},
+		{name: "reject maximum below minimum", minimum: 8, maximum: 4, want: false},
+		{name: "reject zero minimum", minimum: 0, maximum: 4, want: false},
+		{name: "reject negative minimum", minimum: -1, maximum: 4, want: false},
+		{name: "reject zero maximum", minimum: 1, maximum: 0, want: false},
+		{name: "reject NaN minimum", minimum: math.NaN(), maximum: 4, want: false},
+		{name: "reject NaN maximum", minimum: 1, maximum: math.NaN(), want: false},
+		{name: "reject +Inf maximum", minimum: 1, maximum: math.Inf(1), want: false},
+		{name: "reject -Inf minimum", minimum: math.Inf(-1), maximum: 4, want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := validCapacityRange(tc.minimum, tc.maximum); got != tc.want {
+				t.Fatalf("validCapacityRange(%v, %v) = %t, want %t", tc.minimum, tc.maximum, got, tc.want)
+			}
+		})
+	}
+}

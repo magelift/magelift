@@ -224,7 +224,9 @@ func validate(name string, args Args) error {
 			return errors.New("preview search must explicitly accept Serverless cold starts")
 		}
 		capacity := args.Serverless.Capacity
-		// AOSS collection-group capacity no longer allows 0; AWS accepts 1, 2, 4, 8, 16, or multiples of 16.
+		// AOSS collection-group capacity: MageLift accepts 1, 2, 4, 8, 16, or
+		// multiples of 16 at/above 32. See validServerlessOCU for provenance —
+		// this step rule is unpublished by AWS.
 		if !validServerlessOCU(capacity.MinimumIndexingOCU) || !validServerlessOCU(capacity.MinimumSearchOCU) {
 			return errors.New("Serverless minimum indexing and search capacity must be 1, 2, 4, 8, 16, or a multiple of 16")
 		}
@@ -276,6 +278,22 @@ func validCapacityRange(minimum, maximum float64) bool {
 	return !math.IsNaN(minimum) && !math.IsInf(minimum, 0) && !math.IsNaN(maximum) && !math.IsInf(maximum, 0) && minimum > 0 && maximum > 0 && maximum >= minimum
 }
 
+// validServerlessOCU reports whether value is an OCU step MageLift accepts for
+// OpenSearch Serverless collection-group capacity.
+//
+// Provenance: derived empirically from a collection-group rejection observed
+// on 2026-07-19 under commit b8b957e — not from AWS documentation. AWS
+// publishes only the minimum floor (≥0) and maximum floor (≥1) for these
+// fields (https://docs.aws.amazon.com/opensearch-service/latest/developerguide/serverless-scaling.html);
+// the step rule is unpublished. The nearest documented granularity
+// (multiples of two) belongs to the account-level capacity settings API, not
+// collection groups. Re-verify on the next paid AWS pass before treating this
+// as AWS behaviour.
+//
+// Ceiling: no maximum is enforced here. The documented account-level figure is
+// 1700 OCU — confirm that ceiling against a live collection-group create on
+// the next paid pass before enforcing it (a wrong ceiling rejects configs that
+// would have worked).
 func validServerlessOCU(value float64) bool {
 	switch value {
 	case 1, 2, 4, 8, 16:
