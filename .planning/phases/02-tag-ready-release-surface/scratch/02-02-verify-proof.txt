@@ -1,0 +1,9 @@
+VERIFY_PROOF_BLOCKED
+proof_path_type: none (precondition failed before clean checkout)
+commit_sha: 0c97c15a97bef9284cf0497045ca797ff8844608
+utc: 2026-07-28T14:45:35Z
+failing_target: php-test (make verify chain)
+first_actionable_error: php: command not found; composer: command not found
+missing_tools: PHP 8.2+, Composer
+present_tools: Go go1.26.5, MkDocs mkdocs, version 1.6.1 from /opt/homebrew/Cellar/mkdocs/1.6.1_3/libexec/lib/python3.14/site-packages/mkdocs (Python 3.14)
+note: Do not claim RELEASE-06 closed until user_setup installs PHP+Composer and fresh-clone make verify exits 0
