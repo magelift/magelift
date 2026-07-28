@@ -104,7 +104,7 @@ Do not assert on registration-slice order; the Go SDK registers concurrently.
 2. **Task 2: Assert the MKS node-pool dependency ordering** - `4c1d49a` (test)
 3. **Task 3: Make Scaleway's single-range model explicit** - `94139b6` (test)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `40ec8b7` (docs: complete plan)
 
 ## Files Created/Modified
 
