@@ -93,45 +93,32 @@ func ciPermissionsPolicy(partition, account, region, providerARN, stateBucket, k
 		return "", err
 	}
 	statements = append(statements, stateDocument.Statement...)
+	// Collapse Resource:"*" allow statements into one Action list so the
+	// inline document stays under 90% of the 10240-character PutRolePolicy
+	// quota (QUALITY-02). Effective permissions are unchanged.
 	statements = append(statements,
 		map[string]any{"Effect": "Allow", "Action": []string{
 			"sts:GetCallerIdentity", "ecr:GetAuthorizationToken", "ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:DescribeImages", "ecr:GetDownloadUrlForLayer",
-		}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{
 			"ec2:DescribeAvailabilityZones", "ec2:DescribeVpcs", "ec2:DescribeSubnets", "ec2:DescribeRouteTables", "ec2:DescribeNatGateways", "ec2:DescribeVpcEndpoints", "ec2:DescribeSecurityGroups", "ec2:DescribeAddresses", "ec2:DescribeNetworkInterfaces",
 			"ec2:CreateVpc", "ec2:DeleteVpc", "ec2:ModifyVpcAttribute", "ec2:CreateSubnet", "ec2:DeleteSubnet", "ec2:ModifySubnetAttribute", "ec2:CreateRouteTable", "ec2:DeleteRouteTable", "ec2:AssociateRouteTable", "ec2:DisassociateRouteTable", "ec2:CreateRoute", "ec2:ReplaceRoute", "ec2:DeleteRoute", "ec2:CreateNatGateway", "ec2:DeleteNatGateway", "ec2:AllocateAddress", "ec2:ReleaseAddress", "ec2:CreateInternetGateway", "ec2:DeleteInternetGateway", "ec2:AttachInternetGateway", "ec2:DetachInternetGateway", "ec2:CreateVpcEndpoint", "ec2:DeleteVpcEndpoint", "ec2:CreateSecurityGroup", "ec2:DeleteSecurityGroup", "ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress", "ec2:AuthorizeSecurityGroupEgress", "ec2:RevokeSecurityGroupEgress", "ec2:CreateTags", "ec2:DeleteTags",
-		}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{
 			"elasticloadbalancing:DescribeLoadBalancers", "elasticloadbalancing:DescribeListeners", "elasticloadbalancing:DescribeTargetGroups", "elasticloadbalancing:DescribeTags", "elasticloadbalancing:CreateLoadBalancer", "elasticloadbalancing:DeleteLoadBalancer", "elasticloadbalancing:CreateListener", "elasticloadbalancing:DeleteListener", "elasticloadbalancing:ModifyListener", "elasticloadbalancing:CreateTargetGroup", "elasticloadbalancing:DeleteTargetGroup", "elasticloadbalancing:ModifyTargetGroup", "elasticloadbalancing:RegisterTargets", "elasticloadbalancing:DeregisterTargets", "elasticloadbalancing:AddTags", "elasticloadbalancing:RemoveTags",
-		}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{
 			"ecs:DescribeClusters", "ecs:DescribeServices", "ecs:DescribeTaskDefinition", "ecs:DescribeTasks", "ecs:ListTagsForResource", "ecs:CreateCluster", "ecs:DeleteCluster", "ecs:RegisterTaskDefinition", "ecs:DeregisterTaskDefinition", "ecs:CreateService", "ecs:UpdateService", "ecs:DeleteService", "ecs:TagResource", "ecs:UntagResource", "ecs:UpdateClusterSettings", "ecs:ExecuteCommand", "ecs:RunTask", "ecs:StopTask",
-		}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{
 			"rds:DescribeDBClusters", "rds:DescribeDBInstances", "rds:DescribeDBSubnetGroups", "rds:DescribeDBClusterParameters", "rds:CreateDBCluster", "rds:ModifyDBCluster", "rds:DeleteDBCluster", "rds:CreateDBInstance", "rds:ModifyDBInstance", "rds:DeleteDBInstance", "rds:CreateDBSubnetGroup", "rds:ModifyDBSubnetGroup", "rds:DeleteDBSubnetGroup", "rds:AddTagsToResource", "rds:RemoveTagsFromResource", "rds:ListTagsForResource",
-		}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{
 			"elasticache:DescribeReplicationGroups", "elasticache:DescribeSubnetGroups", "elasticache:DescribeCacheClusters", "elasticache:CreateReplicationGroup", "elasticache:ModifyReplicationGroup", "elasticache:DeleteReplicationGroup", "elasticache:CreateCacheSubnetGroup", "elasticache:ModifyCacheSubnetGroup", "elasticache:DeleteCacheSubnetGroup", "elasticache:AddTagsToResource", "elasticache:RemoveTagsFromResource", "elasticache:ListTagsForResource",
-		}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{
 			"es:DescribeDomain", "es:DescribeDomains", "es:ListDomainNames", "es:CreateDomain", "es:UpdateDomainConfig", "es:DeleteDomain", "es:CreateVpcEndpoint", "es:DeleteVpcEndpoint", "es:CreateCollection", "es:UpdateCollection", "es:DeleteCollection", "es:CreateSecurityPolicy", "es:UpdateSecurityPolicy", "es:DeleteSecurityPolicy", "es:CreateAccessPolicy", "es:UpdateAccessPolicy", "es:DeleteAccessPolicy", "es:TagResource", "es:UntagResource", "aoss:CreateCollection", "aoss:UpdateCollection", "aoss:DeleteCollection", "aoss:CreateSecurityPolicy", "aoss:UpdateSecurityPolicy", "aoss:DeleteSecurityPolicy", "aoss:CreateAccessPolicy", "aoss:UpdateAccessPolicy", "aoss:DeleteAccessPolicy", "aoss:CreateVpcEndpoint", "aoss:DeleteVpcEndpoint", "aoss:TagResource", "aoss:UntagResource",
-		}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{
 			"mq:DescribeBroker", "mq:ListBrokers", "mq:CreateBroker", "mq:UpdateBroker", "mq:DeleteBroker", "mq:RebootBroker", "mq:ListTags", "mq:CreateTags", "mq:DeleteTags",
+			"cloudfront:CreateDistribution", "cloudfront:GetDistribution", "cloudfront:UpdateDistribution", "cloudfront:DeleteDistribution", "cloudfront:CreateCachePolicy", "cloudfront:GetCachePolicy", "cloudfront:DeleteCachePolicy", "cloudfront:CreateOriginRequestPolicy", "cloudfront:GetOriginRequestPolicy", "cloudfront:DeleteOriginRequestPolicy", "cloudfront:ListTagsForResource", "cloudfront:TagResource", "cloudfront:UntagResource", "cloudfront:CreateInvalidation",
+			"route53:ListHostedZonesByName", "route53:GetHostedZone", "route53:ListResourceRecordSets", "route53:ChangeResourceRecordSets", "route53:ListTagsForResource",
+			"wafv2:GetWebACL", "wafv2:CreateWebACL", "wafv2:UpdateWebACL", "wafv2:DeleteWebACL", "wafv2:ListTagsForResource", "wafv2:TagResource", "wafv2:UntagResource",
+			"acm:DescribeCertificate", "acm:ListCertificates", "acm:ListTagsForCertificate",
+			"logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:DescribeLogGroups", "logs:PutRetentionPolicy", "logs:DeleteRetentionPolicy", "logs:PutResourcePolicy", "logs:DeleteResourcePolicy", "logs:TagResource", "logs:UntagResource", "cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:DescribeAlarms", "cloudwatch:PutDashboard", "cloudwatch:DeleteDashboards", "cloudwatch:GetDashboard", "cloudwatch:PutMetricData",
+			"synthetics:CreateCanary", "synthetics:UpdateCanary", "synthetics:DeleteCanary", "synthetics:GetCanary", "synthetics:StartCanary", "synthetics:StopCanary", "synthetics:TagResource", "synthetics:UntagResource",
+			"iam:ListRoles", "iam:ListPolicies", "iam:ListOpenIDConnectProviders",
 		}, "Resource": "*"},
 		map[string]any{"Effect": "Allow", "Action": []string{
 			"s3:CreateBucket", "s3:DeleteBucket", "s3:GetBucketLocation", "s3:ListBucket", "s3:ListBucketVersions", "s3:GetBucketVersioning", "s3:PutBucketVersioning", "s3:GetBucketEncryption", "s3:PutEncryptionConfiguration", "s3:GetBucketPolicy", "s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:GetBucketTagging", "s3:PutBucketTagging", "s3:GetLifecycleConfiguration", "s3:PutLifecycleConfiguration", "s3:DeleteLifecycleConfiguration", "s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload",
 		}, "Resource": []string{mediaARN, mediaARN + "/*"}},
-		map[string]any{"Effect": "Allow", "Action": []string{
-			"cloudfront:CreateDistribution", "cloudfront:GetDistribution", "cloudfront:UpdateDistribution", "cloudfront:DeleteDistribution", "cloudfront:CreateCachePolicy", "cloudfront:GetCachePolicy", "cloudfront:DeleteCachePolicy", "cloudfront:CreateOriginRequestPolicy", "cloudfront:GetOriginRequestPolicy", "cloudfront:DeleteOriginRequestPolicy", "cloudfront:ListTagsForResource", "cloudfront:TagResource", "cloudfront:UntagResource", "cloudfront:CreateInvalidation",
-		}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{"route53:ListHostedZonesByName", "route53:GetHostedZone", "route53:ListResourceRecordSets", "route53:ChangeResourceRecordSets", "route53:ListTagsForResource"}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{"wafv2:GetWebACL", "wafv2:CreateWebACL", "wafv2:UpdateWebACL", "wafv2:DeleteWebACL", "wafv2:ListTagsForResource", "wafv2:TagResource", "wafv2:UntagResource"}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{"acm:DescribeCertificate", "acm:ListCertificates", "acm:ListTagsForCertificate"}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{"logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:DescribeLogGroups", "logs:PutRetentionPolicy", "logs:DeleteRetentionPolicy", "logs:PutResourcePolicy", "logs:DeleteResourcePolicy", "logs:TagResource", "logs:UntagResource", "cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:DescribeAlarms", "cloudwatch:PutDashboard", "cloudwatch:DeleteDashboards", "cloudwatch:GetDashboard", "cloudwatch:PutMetricData"}, "Resource": "*"},
-		map[string]any{"Effect": "Allow", "Action": []string{"synthetics:CreateCanary", "synthetics:UpdateCanary", "synthetics:DeleteCanary", "synthetics:GetCanary", "synthetics:StartCanary", "synthetics:StopCanary", "synthetics:TagResource", "synthetics:UntagResource"}, "Resource": "*"},
 		map[string]any{"Effect": "Allow", "Action": []string{"secretsmanager:CreateSecret", "secretsmanager:DescribeSecret", "secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue", "secretsmanager:UpdateSecret", "secretsmanager:DeleteSecret", "secretsmanager:TagResource", "secretsmanager:ListSecretVersionIds"}, "Resource": []string{"arn:" + partition + ":secretsmanager:" + region + ":" + account + ":secret:magelift-*", "arn:" + partition + ":secretsmanager:" + region + ":" + account + ":secret:magelift/*"}},
-		map[string]any{"Effect": "Allow", "Action": []string{"iam:ListRoles", "iam:ListPolicies", "iam:ListOpenIDConnectProviders"}, "Resource": "*"},
 		map[string]any{"Effect": "Allow", "Action": []string{"iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:UpdateAssumeRolePolicy", "iam:PutRolePermissionsBoundary", "iam:TagRole", "iam:UntagRole"}, "Resource": roleARN},
 		map[string]any{"Effect": "Allow", "Action": []string{"iam:PassRole"}, "Resource": roleARN, "Condition": map[string]any{"StringEquals": map[string][]string{"iam:PassedToService": {"ecs-tasks.amazonaws.com", "synthetics.amazonaws.com"}}}},
 		map[string]any{"Effect": "Allow", "Action": []string{"iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy", "iam:GetPolicyVersion", "iam:ListPolicyVersions", "iam:CreatePolicyVersion", "iam:DeletePolicyVersion", "iam:SetDefaultPolicyVersion", "iam:TagPolicy", "iam:UntagPolicy"}, "Resource": policyARN},

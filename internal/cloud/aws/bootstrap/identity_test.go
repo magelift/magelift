@@ -235,15 +235,109 @@ func TestIdentityPlanIsRepoScopedAndLeastPrivilege(t *testing.T) {
 	if !strings.Contains(plan.CITrustPolicy, "repo:acourtiol/magelift:environment:production") {
 		t.Fatal("CI trust policy is not repository scoped")
 	}
-	boundary, err := ciPermissionsBoundaryPolicy()
+}
+
+// TestIdentityPolicyDocumentsStayUnderIAMQuotas asserts every rendered IAM
+// document against the character quota of the API that submits it.
+//
+// Quotas (AWS IAM quotas; whitespace is excluded from AWS's count — we measure
+// len() on canonicalJSON compact output, which is a sound upper bound):
+// https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html
+//
+//   - Customer managed policy document: 6,144 characters (CreatePolicy /
+//     CreatePolicyVersion) — used for the three permissions boundaries.
+//   - Inline role policy document: 10,240 characters (PutRolePolicy).
+//   - Role trust policy (AssumeRolePolicyDocument): 2,048 characters by
+//     default, raisable to 8,192 — we guard the default so a raise is a
+//     deliberate decision.
+func TestIdentityPolicyDocumentsStayUnderIAMQuotas(t *testing.T) {
+	plan := testIdentityPlan(t)
+	ciBoundary, err := ciPermissionsBoundaryPolicy()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(boundary) > 6144 {
-		t.Fatalf("CI permissions boundary exceeds the IAM managed-policy limit: %d", len(boundary))
+
+	const (
+		managedPolicyQuota = 6144
+		inlinePolicyQuota  = 10240
+		trustPolicyQuota   = 2048 // default; AWS can raise to 8192
+	)
+
+	// Documents map to the API that submits them (ensureManagedPolicy → 6144,
+	// ensureRoleSpec inline PutRolePolicy → 10240, AssumeRolePolicyDocument → 2048).
+	cases := []struct {
+		name   string
+		doc    string
+		quota  int
+		remedy string
+	}{
+		{
+			name:   "CI permissions boundary",
+			doc:    ciBoundary,
+			quota:  managedPolicyQuota,
+			remedy: "move detail into the CI inline role policy (see commit 8c3a4c6)",
+		},
+		{
+			name:   "state permissions boundary",
+			doc:    plan.PermissionsPolicy,
+			quota:  managedPolicyQuota,
+			remedy: "move detail into the state inline role policy (see commit 8c3a4c6)",
+		},
+		{
+			name:   "build permissions boundary",
+			doc:    plan.BuildPermissionsPolicy,
+			quota:  managedPolicyQuota,
+			remedy: "move detail into the build inline role policy (see commit 8c3a4c6)",
+		},
+		{
+			name:   "CI inline role policy",
+			doc:    plan.CIPermissionsPolicy,
+			quota:  inlinePolicyQuota,
+			remedy: "split actions across additional scoped policies or shrink the allowlist",
+		},
+		{
+			name:   "state inline role policy",
+			doc:    plan.StatePermissionsPolicy,
+			quota:  inlinePolicyQuota,
+			remedy: "split actions across additional scoped policies or shrink the allowlist",
+		},
+		{
+			name:   "build inline role policy",
+			doc:    plan.BuildPermissionsPolicy,
+			quota:  inlinePolicyQuota,
+			remedy: "split actions across additional scoped policies or shrink the allowlist",
+		},
+		{
+			name:   "CI role trust policy",
+			doc:    plan.CITrustPolicy,
+			quota:  trustPolicyQuota,
+			remedy: "narrow conditions or request an AWS quota raise to 8192 before growing further",
+		},
+		{
+			name:   "state role trust policy",
+			doc:    plan.TrustPolicy,
+			quota:  trustPolicyQuota,
+			remedy: "narrow conditions or request an AWS quota raise to 8192 before growing further",
+		},
+		{
+			name:   "build role trust policy",
+			doc:    plan.BuildTrustPolicy,
+			quota:  trustPolicyQuota,
+			remedy: "narrow conditions or request an AWS quota raise to 8192 before growing further",
+		},
 	}
-	if len(plan.CIPermissionsPolicy) > 10240 {
-		t.Fatalf("CI inline permissions exceed the IAM role-policy limit: %d", len(plan.CIPermissionsPolicy))
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			size := len(tc.doc)
+			warnAt := (tc.quota * 90) / 100
+			if size > tc.quota {
+				t.Fatalf("%s is %d characters, over the IAM quota of %d; %s", tc.name, size, tc.quota, tc.remedy)
+			}
+			if size > warnAt {
+				t.Fatalf("%s is %d characters (%.0f%% of the %d-character IAM quota); %s before the next permission pushes it over", tc.name, size, 100*float64(size)/float64(tc.quota), tc.quota, tc.remedy)
+			}
+		})
 	}
 }
 
