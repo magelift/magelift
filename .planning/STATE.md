@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
 status: executing
-stopped_at: Completed 01-07-PLAN.md
-last_updated: "2026-07-28T13:46:30.948Z"
+stopped_at: Completed 01-08-PLAN.md
+last_updated: "2026-07-28T13:52:08.341Z"
 last_activity: 2026-07-28
 last_activity_desc: 01-07 SUMMARY; continue 01-08 without CI
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 8 of 9 in current phase (01-07 closed offline; next 01-08 sequential)
+Plan: 9 of 9 in current phase (01-07 closed offline; next 01-08 sequential)
 Status: Ready to execute
 Last activity: 2026-07-28 — 01-07 SUMMARY; continue 01-08 without CI
 
-Progress: [████████░░] 78%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [████████░░] 78%
 | Phase 01 P05 | 5 | 2 tasks | 4 files |
 | Phase 01-publishable-baseline-honest-fallbacks P06 | 5min | 3 tasks | 3 files |
 | Phase 01 P07 | 25min | 2 tasks | 2 files |
+| Phase 01-publishable-baseline-honest-fallbacks P08 | 8min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-07: U3/U4 assert sidecar presence; DependsOn gap is Finding F-01-07-1 not a baseline fix
 - [Phase ?]: 01-07: go test -race deferred-local under Cursor; non-race package verifies passed
 - [Phase ?]: 01-07: preview×amazon-mq rejected via queue AZ guard (3 unique zones), not Spec.Validate
+- [Phase ?]: 01-08: append tier after yet — costNotSupportedPrefix remains byte prefix
+- [Phase ?]: 01-08: stubExperimentalModule (ovh.mks) for CLI tier tests without cloud imports
+- [Phase ?]: 01-08: AcquireLock named AST-guard exception for plan 01-10
 
 ### Pending Todos
 
@@ -123,7 +127,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T13:42:03.550Z
-Stopped at: Completed 01-07-PLAN.md
+Last session: 2026-07-28T13:52:08.335Z
+Stopped at: Completed 01-08-PLAN.md
 Resume file: None
 Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset
