@@ -49,12 +49,58 @@ func (stubAWSModule) Plan(cfg config.Config, environment string, _ platform.Plan
 		envClass:    cfg.Class,
 		protected:   cfg.Protection,
 		digest:      digest,
+		tier:        platform.TierCertified,
+	}, nil
+}
+
+// stubExperimentalModule is an OVH/MKS stub so CLI tests can assert experimental
+// tier messaging without importing cloud packages.
+type stubExperimentalModule struct{}
+
+func (stubExperimentalModule) Descriptor() sdk.TargetDescriptor {
+	return sdk.TargetDescriptor{
+		ID:       "ovh.mks",
+		Provider: "ovh",
+		Runtime:  "mks",
+	}
+}
+
+func (stubExperimentalModule) CertificationTier() platform.CertificationTier {
+	return platform.TierExperimental
+}
+
+func (stubExperimentalModule) OutputKeys() []string { return platform.RequiredOutputKeys() }
+
+func (stubExperimentalModule) Program(platform.PlannedStack) (pulumi.RunFunc, error) {
+	return nil, nil
+}
+
+func (stubExperimentalModule) Plan(cfg config.Config, environment string, _ platform.PlanOptions) (platform.PlannedStack, error) {
+	if strings.TrimSpace(environment) == "" {
+		return nil, fmt.Errorf("environment is required")
+	}
+	digest := ""
+	if cfg.Target.OVH != nil {
+		digest = cfg.Target.OVH.ImageDigest
+	}
+	return stubPlanned{
+		stackName:   cfg.Project.Name + "-" + environment,
+		provider:    "ovh",
+		runtime:     "mks",
+		project:     cfg.Project.Name,
+		environment: environment,
+		region:      cfg.Defaults.Region,
+		envClass:    cfg.Class,
+		protected:   cfg.Protection,
+		digest:      digest,
+		tier:        platform.TierExperimental,
 	}, nil
 }
 
 type stubPlanned struct {
 	stackName, provider, runtime, project, environment, region, envClass, digest string
 	protected                                                                    bool
+	tier                                                                         platform.CertificationTier
 }
 
 func (p stubPlanned) StackName() string        { return p.stackName }
@@ -64,7 +110,10 @@ func (p stubPlanned) Project() string          { return p.project }
 func (p stubPlanned) Environment() string      { return p.environment }
 func (p stubPlanned) Region() string           { return p.region }
 func (p stubPlanned) CertificationTier() platform.CertificationTier {
-	return platform.TierCertified
+	if p.tier == "" {
+		return platform.TierCertified
+	}
+	return p.tier
 }
 func (p stubPlanned) EnvironmentClass() string { return p.envClass }
 func (p stubPlanned) Protected() bool          { return p.protected }
@@ -74,11 +123,19 @@ func (p stubPlanned) WithImageDigest(digest string) (platform.PlannedStack, erro
 	return p, nil
 }
 func (p stubPlanned) TargetDescriptor() sdk.TargetDescriptor {
-	return stubAWSModule{}.Descriptor()
+	switch {
+	case p.provider == "ovh" && p.runtime == "mks":
+		return stubExperimentalModule{}.Descriptor()
+	default:
+		return stubAWSModule{}.Descriptor()
+	}
 }
 
 func registerTestModules(modules *platform.ModuleRegistry) {
 	if err := modules.RegisterModule(stubAWSModule{}); err != nil {
+		panic(err)
+	}
+	if err := modules.RegisterModule(stubExperimentalModule{}); err != nil {
 		panic(err)
 	}
 }
