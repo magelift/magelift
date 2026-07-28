@@ -16,7 +16,7 @@
 - [x] **ACCEPT-01**: Maintainer can run an acceptance pass that creates one long-lived stack and iterates catalog cells on it without recreating infrastructure between cells
 - [x] **ACCEPT-02**: Maintainer can resume an interrupted acceptance run from the last completed cell instead of restarting the matrix
 - [x] **ACCEPT-03**: Acceptance runs record evidence automatically (cell, result, duration, provider, account, date) into a matrix results file, with no hand transcription
-- [ ] **ACCEPT-04**: Acceptance runs destroy every created resource on exit and assert the account is clean, failing loudly if anything remains
+- [x] **ACCEPT-04**: Acceptance runs destroy every created resource on exit and assert the account is clean, failing loudly if anything remains
 - [ ] **ACCEPT-05**: Maintainer can run the same acceptance harness shape against GCP as against AWS, including GCP's PSA soak and force-clean teardown path
 - [x] **ACCEPT-06**: Every day-2 port that can be exercised without a paid account is covered by Floci or Pulumi mocks, so a paid pass only buys what mocks cannot prove
 
@@ -154,7 +154,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | ACCEPT-01 | Phase 3 | Complete |
 | ACCEPT-02 | Phase 3 | Complete |
 | ACCEPT-03 | Phase 3 | Complete |
-| ACCEPT-04 | Phase 3 | Pending |
+| ACCEPT-04 | Phase 3 | Complete |
 | ACCEPT-05 | Phase 3 | Pending |
 | ACCEPT-06 | Phase 3 | Complete |
 | TRUST-01 | Phase 1 | Complete |
