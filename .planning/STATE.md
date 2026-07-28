@@ -4,17 +4,17 @@ milestone: v1.0.0
 milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
-status: verifying
-stopped_at: Phase 1 plans 01-01..01-09 complete offline; awaiting verify (CI deferred)
-last_updated: "2026-07-28T13:58:03.692Z"
+status: gaps_found
+stopped_at: Phase 1 verification gaps_found — QUALITY-07 + AcquireLock (missing 01-10); CI deferred
+last_updated: "2026-07-28T14:00:52Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-09 SUMMARY; next gsd-verify-phase with act/local evidence
+last_activity_desc: 01-VERIFICATION.md gaps_found (2/5 roadmap SCs); do not start Phase 2
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 9
   completed_plans: 9
-  percent: 13
+  percent: 0
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 9 of 9 complete (01-01 … 01-09 executed offline)
-Status: Phase complete — ready for verification
-Last activity: 2026-07-28 — 01-09 SUMMARY; Phase 1 plans complete offline; CI criterion 1 still deferred (HUMAN_GATE / act)
+Plan: 9 of 9 executed offline; verification **gaps_found** (2/5 roadmap SCs)
+Status: Blocked on gap closure — missing plan 01-10 (QUALITY-07 split + AcquireLock warn); hosted CI deferred
+Last activity: 2026-07-28 — 01-VERIFICATION.md written; do not advance to Phase 2
 
-Progress: [██████████] 100%
+Progress: plans done, phase goal not achieved
 
 ## Performance Metrics
 
