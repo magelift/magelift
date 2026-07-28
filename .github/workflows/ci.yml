@@ -78,9 +78,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
-    # Warm only the aggregate binary (imports every provider). Full `go build ./...`
-    # was SIGTERM'd at ~12m on the private runner (runs 30346222966 / 30349296118).
-    timeout-minutes: 20
+    # Module download only — compiling was SIGTERM'd ~10m on the private runner (30350692845).
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -88,8 +87,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache: false
-      # Restore any prior prime before building so module download is not cold every time.
+          cache: true
       - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: |
@@ -100,13 +98,11 @@ jobs:
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-
             go-prime-${{ runner.os }}-
           lookup-only: true
-      - name: Warm module and build caches
+      - name: Warm module cache
         env:
           GOFLAGS: -p=1
           GOMAXPROCS: "1"
-        run: |
-          go mod download
-          go build -o /tmp/magelift ./cmd/magelift
+        run: go mod download
       # Explicit save with if: always() — setup-go's post-step never runs when the runner is reaped.
       - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         if: always()
@@ -125,6 +121,8 @@ jobs:
     timeout-minutes: 15
     strategy:
       fail-fast: false
+      # Private-repo runners: too many cold partitions + go-verify cancel each other.
+      max-parallel: 2
       matrix:
         include:
           - name: aws
@@ -171,7 +169,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache: false
+          cache: true
       - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: |
@@ -202,7 +200,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache: false
+          cache: true
       - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: |
