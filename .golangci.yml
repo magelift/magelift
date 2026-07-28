@@ -1,6 +1,7 @@
 version: "2"
 
 run:
+  # Job-level timeout-minutes on CI lint partitions replaces run.timeout (QUALITY-06).
   tests: true
 
 issues:
