@@ -91,7 +91,7 @@ status: complete
 1. **Task 1: Cap the AWS subnet carve and test its boundaries** - `beda109` (feat)
 2. **Task 2: Cap the GCP subnet carve and give the package its first tests** - `ca0f31c` (test RED) + `c884e16` (feat GREEN)
 
-**Plan metadata:** _(pending final docs commit)_
+**Plan metadata:** `ce3c5c5` (docs: complete plan; STATE position fixed in follow-up)
 
 ## Files Created/Modified
 
