@@ -4,11 +4,11 @@ milestone: v1.0.0
 milestone_name: milestone
 current_phase: 2
 current_phase_name: Tag-Ready Release Surface
-status: planning
-stopped_at: Completed 02-01..02-03; 02-04 HUMAN_GATE (plain Terminal make release-smoke)
+status: executing
+stopped_at: Completed 02-01..02-03; awaiting 02-04 HUMAN_GATE (release-smoke)
 last_updated: "2026-07-28T15:07:25.529Z"
 last_activity: 2026-07-28
-last_activity_desc: Phase 2 PLAN.md files created
+last_activity_desc: Phase 2 wave 1-2 complete; 02-04 packaging smoke HUMAN_GATE
 progress:
   total_phases: 8
   completed_phases: 1
