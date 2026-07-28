@@ -6,7 +6,7 @@ current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
 status: executing
 stopped_at: Completed 01-07-PLAN.md
-last_updated: "2026-07-28T13:42:03.559Z"
+last_updated: "2026-07-28T13:46:30.948Z"
 last_activity: 2026-07-28
 last_activity_desc: 01-07 SUMMARY; continue 01-08 without CI
 progress:
@@ -14,7 +14,7 @@ progress:
   completed_phases: 0
   total_plans: 9
   completed_plans: 7
-  percent: 78
+  percent: 0
 ---
 
 # Project State
@@ -94,6 +94,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-07: preview×amazon-mq rejected via Spec.Validate 3-AZ naming 2-AZ guard
 - [Phase ?]: 01-07: U3/U4 assert sidecar presence; DependsOn gap is Finding F-01-07-1 not a baseline fix
 - [Phase ?]: 01-07: go test -race deferred-local under Cursor; non-race package verifies passed
+- [Phase ?]: 01-07: preview×amazon-mq rejected via queue AZ guard (3 unique zones), not Spec.Validate
 
 ### Pending Todos
 

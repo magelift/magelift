@@ -27,9 +27,9 @@ key-files:
     - internal/cloud/aws/runtime/runtime_test.go
 
 key-decisions:
-  - "preview×amazon-mq rejected via Spec.Validate with three AZs — reason preset requires 2 availability zones"
+  - "preview×amazon-mq rejected via queue.New under mocks with preview's 2 AZs — reason names the CLUSTER_MULTI_AZ three-zone guard"
   - "U3/U4 assert sidecar presence in the container set; DependsOn gap recorded as finding, not fixed in this baseline"
-  - "go test -race deferred-local under Cursor after swap exhaustion; non-race package verifies passed"
+  - "stack package go test -race passed after serial rebuild; runtime race deferred-local under Cursor after swap pressure"
 
 patterns-established:
   - "TestCatalogCellProjectionMatrix — exhaustive cheap projection over cells that live only in stack"
@@ -82,7 +82,7 @@ status: complete
 
 ## Accomplishments
 
-- Added `TestCatalogCellProjectionMatrix` covering 12 preview + 16 standard legal cells, preset defaults, and an explicit preview×amazon-mq rejection naming the 2-AZ guard.
+- Added `TestCatalogCellProjectionMatrix` covering 12 preview + 16 standard legal cells, preset defaults, and an explicit preview×amazon-mq rejection naming the CLUSTER_MULTI_AZ three-zone guard.
 - Added `TestRuntimeContainerGraphInteractions` (U1–U5) and `TestAMQPSettingsBrokerEndpointShapes` (U6) without editing any pre-existing runtime test.
 - Documented Finding F-01-07-1 (search-proxy DependsOn skipped on nginx-fpm queue/deploy/cron) without changing production code — plan forbids mixing a fix into the 01-10 baseline.
 
@@ -90,6 +90,7 @@ status: complete
 
 1. **Task 1: Projection matrix over every legal cell combination** - `90e9355` (test)
 2. **Task 2: Container-graph matrix over the six uncovered interactions** - `7836a39` (test)
+3. **Task 1 follow-up: exercise real amazon-mq AZ guard** - `c7435d2` (test)
 
 **Plan metadata:** `973210d` (docs: complete plan)
 
@@ -100,26 +101,31 @@ status: complete
 
 ## Decisions Made
 
-- Reject preview×amazon-mq by giving it the three AZs amazon-mq needs and asserting `Spec.Validate` fails with `preset "preview" requires 2 availability zones` (pure, no Pulumi).
+- Reject preview×amazon-mq by keeping preview at 2 AZs and calling `queue.New` under mocks so the real `amazon-mq cluster deployment requires exactly three unique availability zones` guard is under test (not the preset zone-count check).
 - For U3/U4, assert sidecar **presence** in the task container set; do not lock the missing DependsOn into the test.
-- Skip local `go test -race` for these packages under Cursor after swap exhaustion; non-race package runs passed. Full race remains deferred-local / CI when minutes return.
+- Stack package `go test -race` passed serially after orphan race compiles were reaped; runtime package race remains deferred-local under Cursor after swap pressure. Full matrix race still belongs on CI when minutes return.
 
 ## Deviations from Plan
 
 ### Auto-fixed Issues
 
-None - plan executed as written for test additions.
+**1. [Rule 1 - Bug] Rejection row was asserting the wrong guard**
+- **Found during:** Task 1 follow-up review
+- **Issue:** Initial helper forced 3 AZs under preview and asserted `Spec.Validate` zone-count failure — that does not exercise the amazon-mq CLUSTER_MULTI_AZ guard
+- **Fix:** Keep preview at 2 AZs; call `queue.New` with a non-nil provider stub and assert the three-zone amazon-mq error; assert no broker resource registered
+- **Files modified:** `internal/cloud/aws/stack/component_test.go`
+- **Commit:** `c7435d2`
 
 ### Verification adjustments
 
-**1. [Rule 3 - Blocking] Aborted `go test -race` under Cursor**
+**1. [Rule 3 - Blocking] Aborted overlapping `go test -race` under Cursor**
 - **Found during:** Task 1 verify
-- **Issue:** Multiple concurrent race compiles of pulumi-aws drove swap to ~14 GB / 15 GB
-- **Fix:** Killed builds, reaped `darwin_arm64` compile orphans, verified with `GOMAXPROCS=1 GOFLAGS=-p=1 go test` (non-race) per package
-- **Impact:** Race coverage deferred-local; behavior coverage still proven
+- **Issue:** Multiple concurrent race compiles of pulumi-aws drove swap above 8 GB used
+- **Fix:** Killed builds, reaped `darwin_arm64` compile orphans, re-ran one serial `GOMAXPROCS=1 GOFLAGS=-p=1 go test -race ./internal/cloud/aws/stack/` (59 passed); runtime verified non-race
+- **Impact:** Runtime race deferred-local; stack race proven offline
 
-**Total deviations:** 1 verification adjustment
-**Impact on plan:** No scope change; QUALITY-04 assertions land offline
+**Total deviations:** 1 auto-fix + 1 verification adjustment
+**Impact on plan:** No scope change; QUALITY-04 assertions land offline; rejection guard now matches the plan's named reason
 
 ## Findings (not fixed — baseline purity)
 
@@ -132,7 +138,7 @@ None - plan executed as written for test additions.
 
 ### Plan 01-10 baseline note
 
-**Plan 01-10 must recapture its verbose test baseline from this plan's final tree** (`7836a39` tip of runtime_test.go additions on top of the pre-existing SigV4 sentinels). Do not edit those sentinel tests when splitting files.
+**Plan 01-10 must recapture its verbose test baseline from this plan's final tree** (`7836a39` tip of `runtime_test.go` additions on top of the pre-existing SigV4 sentinels; stack rejection helper tip `c7435d2`). Do not edit those sentinel tests when splitting files.
 
 ## Issues Encountered
 
@@ -155,4 +161,5 @@ None - no external service configuration required.
 
 ## Self-Check: PASSED
 
-- SUMMARY, both test files, commits 90e9355 and 7836a39 present.
+- SUMMARY, both test files, commits `90e9355`, `7836a39`, `c7435d2` present.
+- VERIFY: `go test` (non-race) stack+runtime matrix/SigV4 filters — 46 passed; stack `go test -race` — 59 passed.
