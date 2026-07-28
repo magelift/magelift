@@ -118,11 +118,11 @@ jobs:
     # Run even when cache-prime fails so a cold lint matrix still gates merges.
     if: ${{ always() && !cancelled() && needs.changes.outputs.go == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
-      # Private-repo runners: too many cold partitions + go-verify cancel each other.
-      max-parallel: 2
+      # Private-repo runners reap concurrent cold golangci jobs (aws/gcp SIGTERM ~9m on 30352974916).
+      max-parallel: 1
       matrix:
         include:
           - name: aws
@@ -188,8 +188,8 @@ jobs:
           skip-save-cache: ${{ matrix.name != 'aws' }}
 
   go-verify:
-    needs: [changes, cache-prime]
-    # Run even when cache-prime fails so tests are not hidden behind a warm-up flake.
+    needs: [changes, cache-prime, lint]
+    # After lint so private runners are not sharing cold compile load with the matrix.
     if: ${{ always() && !cancelled() && needs.changes.outputs.go == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
