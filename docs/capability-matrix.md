@@ -122,10 +122,11 @@ Floci gap closure is a later plan). Prefer under-claim.
 | Secrets (`List` / `Set` / `Remove`) | Floci | Account-free API contracts via Floci |
 | RuntimeObserve.TailLogs | Floci | Log describe/filter contracts offline |
 | RuntimeObserve.CheckRuntime | Floci / paid-only | Health path partial offline; ALB+ECS live health is paid |
-| RuntimeObserve.PrepareExec | unit-fake / paid-only | SelectTask/PrepareExec unit-fake allowed; live ECS ExecuteCommand is paid-only |
+| RuntimeObserve.PrepareExec | unit-fake / paid-only | `TestPrepareExecRejectsDeployWorkload`; live ECS ExecuteCommand is paid-only |
 | Ops.AcquireLock | Floci / unit-fake | DIY lock contracts offline where Floci covers S3/state |
-| Ops.NewDeploySteps | Pulumi mocks / paid-only | Magento deploy step graph offline; live cutover paid |
-| Media / storage (S3 paths exercised by Floci) | Floci | `tests/floci/storage_test.go` |
+| Ops.NewDeploySteps | unit-fake / paid-only | `TestNewDeployStepsRejectsWrongBackend`; live Magento cutover paid |
+| Media / storage (S3 paths exercised by Floci) | Floci | `tests/floci/storage_test.go` (`TestVersionedMediaRestoreAgainstFloci`) |
+| SelectTask (PrepareExec helper) | unit-fake | `TestSelectTaskSortsRunningTaskARNs` in `internal/cloud/aws/operations` |
 
 ## GCP GKE Autopilot cells (experimental)
 
