@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 3
 current_phase_name: Credit-Efficient Acceptance Harness & Evidence Tiering
 status: planning
-stopped_at: Phase 2 passed; starting Phase 3 (paid AWS pass needs HUMAN_GATE)
-last_updated: "2026-07-28T15:43:00Z"
+stopped_at: Phase 3 research complete; ready for planning (paid AWS = 03-06 HUMAN_GATE)
+last_updated: "2026-07-28T15:47:00Z"
 last_activity: 2026-07-28
-last_activity_desc: Phase 2 verified 5/5; Phase 3 planning next
+last_activity_desc: Phase 3 RESEARCH.md written (6 plans; offline first; 03-06 paid HUMAN_GATE)
 progress:
   total_phases: 8
   completed_phases: 1
@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 2 verified — recommend mark complete and start Phase 3
+**Current focus:** Phase 3 research complete — planner can create PLAN.md files
 
 ## Current Position
 
-Phase: 2 of 8 (Tag-Ready Release Surface) — **verification passed**
-Plan: 02-04 of 02-04 complete (Packaging smoke Closed; RELEASE-06 VERIFY_PROOF_OK)
-Status: All Phase 2 ROADMAP SCs VERIFIED (5/5). Report: `.planning/phases/02-tag-ready-release-surface/02-VERIFICATION.md`
-Last activity: 2026-07-28 — re-verified after agent closed packaging + fresh-verify gates
+Phase: 3 of 8 (Credit-Efficient Acceptance Harness & Evidence Tiering) — **research complete**
+Plan: none yet (recommend 03-01…03-06; paid HUMAN_GATE = 03-06)
+Status: RESEARCH at `.planning/phases/03-credit-efficient-acceptance-harness-evidence-tiering/03-RESEARCH.md`
+Last activity: 2026-07-28 — phase research (offline-first waves; no cloud spend)
 
-Progress: Phase 2 ready to close; Phase 1 hosted-CI HUMAN_GATE still open (not a Phase 2 blocker)
+Progress: Phase 2 complete; Phase 3 awaiting plan-phase; Phase 1 hosted-CI HUMAN_GATE still open
 
 ## Performance Metrics
 
@@ -147,7 +147,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T15:43:00Z
-Stopped at: Phase 2 verification passed (5/5); do not start Phase 3 until orchestrator marks phase complete
+Last session: 2026-07-28T15:47:00Z
+Stopped at: Phase 3 RESEARCH complete; next = plan-phase (03-01…03-06; paid HUMAN_GATE = 03-06)
 Resume file: None
-Note: Hosted CI / QUALITY-06 remains Phase 1 HUMAN_GATE only. Packaging smoke Closed; RELEASE-06 VERIFY_PROOF_OK.
+Note: Hosted CI / QUALITY-06 remains Phase 1 HUMAN_GATE. Phase 3 must not spend AWS until 03-06 HUMAN_GATE.
