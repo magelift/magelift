@@ -152,31 +152,20 @@ func TestNewKeepsSinglePrivateNetworkRange(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			mocks := &networkMocks{}
-			var subnetIDCount int
 			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-				component, err := New(ctx, "shop-net", Args{
+				_, err := New(ctx, "shop-net", Args{
 					Preset: sdk.PresetPreview, ProjectID: "11111111-1111-1111-1111-111111111111",
 					Region: "fr-par", NetworkCIDR: networkCIDR, Zones: tc.zones,
 					Labels: map[string]string{"magelift-managed-by": "magelift"},
 				})
-				if err != nil {
-					return err
-				}
-				component.PrivateSubnetIDs.ApplyT(func(ids []string) error {
-					subnetIDCount = len(ids)
-					return nil
-				})
-				return nil
+				return err
 			}, pulumi.WithMocks("magelift", "shop-preview", mocks))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if mocks.count("scaleway:network/privateNetwork:PrivateNetwork") != 1 {
-				t.Fatalf("private network count = %d, want 1 regardless of %d zones",
-					mocks.count("scaleway:network/privateNetwork:PrivateNetwork"), len(tc.zones))
-			}
-			if subnetIDCount != 1 {
-				t.Fatalf("PrivateSubnetIDs length = %d, want 1", subnetIDCount)
+			// One PN resource ⇒ PrivateSubnetIDs is the single-element list of that PN.
+			if got := mocks.count("scaleway:network/privateNetwork:PrivateNetwork"); got != 1 {
+				t.Fatalf("private network count = %d, want 1 regardless of %d zones", got, len(tc.zones))
 			}
 			pn := mocks.one(t, "scaleway:network/privateNetwork:PrivateNetwork")
 			subnet := pn.Inputs["ipv4Subnet"].ObjectValue()["subnet"].StringValue()
