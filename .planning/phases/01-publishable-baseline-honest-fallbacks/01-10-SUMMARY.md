@@ -99,7 +99,7 @@ status: complete
 2. **Task 2 RED: AcquireLock warning tests + AST narrow** - `43ae293` (test)
 3. **Task 2 GREEN: WarnNoDIYLock + adapter wiring** - `da47fa2` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `9400582` (docs: complete plan)
 
 ## Files Created/Modified
 
