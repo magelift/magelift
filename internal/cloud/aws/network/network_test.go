@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"net/netip"
 	"reflect"
 	"sort"
 	"strings"
@@ -162,6 +163,105 @@ func TestNetworkRejectsInvalidInputsBeforeRegistration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSubnetCarveBoundaries(t *testing.T) {
+	t.Parallel()
+	prefix := netip.MustParsePrefix("10.40.0.0/16")
+	// Carve widens by 4 bits → 16 slots; each zone consumes 3 (public/private/data).
+	const slotsPerZone = 3
+	available := 1 << uint((prefix.Bits()+4)-prefix.Bits())
+	maxZones := available / slotsPerZone
+
+	t.Run("min", func(t *testing.T) {
+		t.Parallel()
+		zones := 1
+		cidrs := subnetCIDRs(prefix, zones*slotsPerZone)
+		if len(cidrs) != zones*slotsPerZone {
+			t.Fatalf("cidr count = %d, want %d", len(cidrs), zones*slotsPerZone)
+		}
+		seen := map[string]bool{}
+		for _, cidr := range cidrs {
+			if seen[cidr] {
+				t.Fatalf("duplicate CIDR %s", cidr)
+			}
+			seen[cidr] = true
+			block := netip.MustParsePrefix(cidr)
+			if !prefix.Contains(block.Addr()) || !prefix.Contains(lastAddr(block)) {
+				t.Fatalf("%s not contained in %s", cidr, prefix)
+			}
+		}
+		if err := validateCarveCapacity(prefix, zones); err != nil {
+			t.Fatalf("min zones should fit: %v", err)
+		}
+	})
+
+	t.Run("max", func(t *testing.T) {
+		t.Parallel()
+		cidrs := subnetCIDRs(prefix, maxZones*slotsPerZone)
+		if len(cidrs) != maxZones*slotsPerZone {
+			t.Fatalf("cidr count = %d, want %d", len(cidrs), maxZones*slotsPerZone)
+		}
+		last := netip.MustParsePrefix(cidrs[len(cidrs)-1])
+		if !prefix.Contains(last.Addr()) || !prefix.Contains(lastAddr(last)) {
+			t.Fatalf("last carved block %s not contained in %s", last, prefix)
+		}
+		if err := validateCarveCapacity(prefix, maxZones); err != nil {
+			t.Fatalf("max zones should fit: %v", err)
+		}
+	})
+
+	t.Run("max+1", func(t *testing.T) {
+		t.Parallel()
+		err := validateCarveCapacity(prefix, maxZones+1)
+		if err == nil {
+			t.Fatal("expected carve capacity error")
+		}
+		demand := (maxZones + 1) * slotsPerZone
+		if !strings.Contains(err.Error(), fmt.Sprint(available)) || !strings.Contains(err.Error(), fmt.Sprint(demand)) {
+			t.Fatalf("error should name available=%d and demanded=%d: %v", available, demand, err)
+		}
+
+		zones := zonesNamed(maxZones + 1)
+		mocks := &networkMocks{}
+		runErr := pulumi.RunErr(func(ctx *pulumi.Context) error {
+			_, err := New(ctx, "shop", Args{
+				Preset: sdk.PresetHighAvailability, Region: "eu-west-3", VPCCIDR: prefix.String(),
+				AvailabilityZones: zones,
+			})
+			return err
+		}, pulumi.WithMocks("project", "stack", mocks))
+		if runErr == nil {
+			t.Fatal("overflow zone count was accepted")
+		}
+		if !strings.Contains(runErr.Error(), fmt.Sprint(available)) || !strings.Contains(runErr.Error(), fmt.Sprint(demand)) {
+			t.Fatalf("New error should name carve limit: %v", runErr)
+		}
+		if len(mocks.snapshot()) != 0 {
+			t.Fatalf("resources registered before carve rejection: %v", mocks.snapshot())
+		}
+	})
+}
+
+func zonesNamed(n int) []string {
+	zones := make([]string, n)
+	for i := range zones {
+		zones[i] = fmt.Sprintf("eu-west-3%c", 'a'+i)
+	}
+	return zones
+}
+
+func lastAddr(prefix netip.Prefix) netip.Addr {
+	addr := prefix.Addr().As4()
+	base := uint32(addr[0])<<24 | uint32(addr[1])<<16 | uint32(addr[2])<<8 | uint32(addr[3])
+	mask := uint32(0xffffffff) >> uint(prefix.Bits())
+	end := base | mask
+	var raw [4]byte
+	raw[0] = byte(end >> 24)
+	raw[1] = byte(end >> 16)
+	raw[2] = byte(end >> 8)
+	raw[3] = byte(end)
+	return netip.AddrFrom4(raw)
 }
 
 func deploy(t *testing.T, args Args) *networkMocks {

@@ -348,13 +348,6 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 }
 
 func validate(args Args) ([]string, error) {
-	// Aurora requires a DB subnet group spanning two zones, even for disposable
-	// preview environments. Web workloads can still use only the first zone.
-	wantZones := map[sdk.PresetID]int{sdk.PresetPreview: 2, sdk.PresetStandard: 2, sdk.PresetHighAvailability: 3}[args.Preset]
-	standardQueueLayout := args.Preset == sdk.PresetStandard && len(args.AvailabilityZones) == 3
-	if wantZones == 0 || (len(args.AvailabilityZones) != wantZones && !standardQueueLayout) {
-		return nil, fmt.Errorf("preset %q requires exactly %d availability zones, or three for a standard RabbitMQ queue layout", args.Preset, wantZones)
-	}
 	if strings.TrimSpace(args.Region) == "" {
 		return nil, errors.New("AWS region is required")
 	}
@@ -388,7 +381,33 @@ func validate(args Args) ([]string, error) {
 	if err != nil || !prefix.Addr().Is4() || prefix != prefix.Masked() || prefix.Bits() > 24 {
 		return nil, errors.New("VPC CIDR must be a canonical IPv4 prefix of /24 or larger")
 	}
+	// Carve capacity before preset zone counts so a user-supplied list that
+	// would emit CIDRs outside the VPC fails closed with the isolation error
+	// rather than a preset-policy message (six or more zones demand >16 blocks).
+	if err := validateCarveCapacity(prefix, len(args.AvailabilityZones)); err != nil {
+		return nil, err
+	}
+	// Aurora requires a DB subnet group spanning two zones, even for disposable
+	// preview environments. Web workloads can still use only the first zone.
+	wantZones := map[sdk.PresetID]int{sdk.PresetPreview: 2, sdk.PresetStandard: 2, sdk.PresetHighAvailability: 3}[args.Preset]
+	standardQueueLayout := args.Preset == sdk.PresetStandard && len(args.AvailabilityZones) == 3
+	if wantZones == 0 || (len(args.AvailabilityZones) != wantZones && !standardQueueLayout) {
+		return nil, fmt.Errorf("preset %q requires exactly %d availability zones, or three for a standard RabbitMQ queue layout", args.Preset, wantZones)
+	}
 	return subnetCIDRs(prefix, len(args.AvailabilityZones)*3), nil
+}
+
+// validateCarveCapacity rejects a zone count whose public/private/data carve
+// would demand more blocks than prefix.Bits()+4 can hold.
+func validateCarveCapacity(prefix netip.Prefix, zoneCount int) error {
+	const blocksPerZone = 3
+	bits := prefix.Bits() + 4
+	available := 1 << uint(bits-prefix.Bits())
+	demand := zoneCount * blocksPerZone
+	if demand > available {
+		return fmt.Errorf("VPC CIDR %s has room for %d subnet blocks but %d are demanded (%d zones × %d)", prefix, available, demand, zoneCount, blocksPerZone)
+	}
+	return nil
 }
 
 func validateExistingNetwork(args Args, existing *ExistingNetwork) error {
