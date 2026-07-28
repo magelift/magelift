@@ -36,8 +36,9 @@ SchemaVersion int `yaml:"schemaVersion" json:"schemaVersion" config:"MageLift co
 - `revive` runs a narrow rule subset only (blank-imports, context-as-argument, error-return, errorf, indent-error-flow, range, receiver-naming, time-naming, unexported-return, increment-decrement) — capitalization/exported/var-naming/package-comments rules are explicitly disabled to avoid churn across large Pulumi resource graphs.
 - `gocritic` diagnostic tag enabled; several checks disabled (`hugeParam`, `rangeValCopy`, `sloppyReassign`, `appendAssign`, `dupImport`, `ifElseChain`, `elseif`, `unlambda`, `assignOp`) — tolerates large value copies and reassignment patterns common in Pulumi args structs.
 - `errcheck` ignores a small allowlist of best-effort calls (`cobra.Command.Help`, `MarkFlagRequired`, YAML encoder `Close`, `fmt.Fprint(f)`).
-- Lint run is single-threaded (`concurrency: 1`) with a 30-minute timeout — CI cold-cache runs on large multi-cloud Pulumi graphs are memory/CPU heavy; do not parallelize lint invocations locally in ways that fight this.
-- See `docs/lint-policy.md` for the policy narrative behind these choices.
+- CI lint is **partitioned** across six matrix jobs (`aws`, `gcp`, `ovh`, `scaleway`, `core`, `aggregate`) in `.github/workflows/ci.yml`. `.golangci.yml` no longer sets `run.concurrency` or a 30-minute `run.timeout` — job-level `timeout-minutes` and `max-parallel: 1` on the matrix replace those workarounds. See `docs/lint-policy.md`.
+- Coverage guard: `go test ./internal/lintcoverage/` fails if the matrix union stops covering `go list ./...`.
+- **Local machine still serial for heavy Go work:** never parallelize `go build` / `go test -race ./...` / goreleaser on the 16 GB Mac (AGENTS.md kernel-panic history). Prefer `GOMAXPROCS=1 GOFLAGS=-p=1` and narrow package sets under Cursor.
 
 ## Import Organization
 
