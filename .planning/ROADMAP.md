@@ -18,7 +18,7 @@ Phases 4-8 are deliberately droppable in reverse order. A maintainer who wants t
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Publishable Baseline & Honest Fallbacks** - Clear the debt that worsens with every later phase, and make every target state its own tier
-- [ ] **Phase 2: Tag-Ready Release Surface** - Make `v1.0.0-rc.1` taggable: version story, contract statement, packaging smoke, contributor path
+- [x] **Phase 2: Tag-Ready Release Surface** - Make `v1.0.0-rc.1` taggable: version story, contract statement, packaging smoke, contributor path
 - [ ] **Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering** - One long-lived stack, resumable runs, automatic evidence, and a matrix that never over-claims
 - [ ] **Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity** - A store on Adobe Commerce Cloud or Upsun gets a reviewable `magelift.yaml` and a build system it can trust
 - [ ] **Phase 5: Data Migration & Cutover** - `seedDump` stops being a status string; a documented cutover moves a live store over
@@ -220,7 +220,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Publishable Baseline & Honest Fallbacks | 10/10 | In Progress|  |
-| 2. Tag-Ready Release Surface | 3/4 | In Progress|  |
+| 2. Tag-Ready Release Surface | 4/4 | In Progress|  |
 | 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 0/TBD | Not started | - |
 | 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 0/TBD | Not started | - |
 | 5. Data Migration & Cutover | 0/TBD | Not started | - |

@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-current_phase: 2
-current_phase_name: Tag-Ready Release Surface
-status: executing
-stopped_at: Completed 02-01..02-03; awaiting 02-04 HUMAN_GATE (release-smoke)
-last_updated: "2026-07-28T15:07:25.529Z"
+current_phase: 3
+current_phase_name: Credit-Efficient Acceptance Harness & Evidence Tiering
+status: planning
+stopped_at: Phase 2 passed; starting Phase 3 (paid AWS pass needs HUMAN_GATE)
+last_updated: "2026-07-28T15:43:00Z"
 last_activity: 2026-07-28
-last_activity_desc: Phase 2 wave 1-2 complete; 02-04 packaging smoke HUMAN_GATE
+last_activity_desc: Phase 2 verified 5/5; Phase 3 planning next
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 14
-  completed_plans: 13
-  percent: 13
+  completed_plans: 14
+  percent: 14
 ---
 
 # Project State
@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 2 — Tag-Ready Release Surface
+**Current focus:** Phase 2 verified — recommend mark complete and start Phase 3
 
 ## Current Position
 
-Phase: 2 of 8 (Tag-Ready Release Surface)
-Plan: 02-04 of 02-04 (HUMAN_GATE — plain Terminal `make release-smoke`)
-Status: 02-01..02-03 complete offline; RELEASE-06 blocked on PHP/Composer; 02-04 awaiting human packaging smoke
-Last activity: 2026-07-28 — executed 02-01, 02-02, 02-03
+Phase: 2 of 8 (Tag-Ready Release Surface) — **verification passed**
+Plan: 02-04 of 02-04 complete (Packaging smoke Closed; RELEASE-06 VERIFY_PROOF_OK)
+Status: All Phase 2 ROADMAP SCs VERIFIED (5/5). Report: `.planning/phases/02-tag-ready-release-surface/02-VERIFICATION.md`
+Last activity: 2026-07-28 — re-verified after agent closed packaging + fresh-verify gates
 
-Progress: [█████████░] 93% (Phase 1 offline complete; Phase 2 planning)
+Progress: Phase 2 ready to close; Phase 1 hosted-CI HUMAN_GATE still open (not a Phase 2 blocker)
 
 ## Performance Metrics
 
@@ -132,7 +132,7 @@ None yet.
 - CI: golangci-lint OOM/timeout is a workaround, not a fix — worsens with every provider package added in Phase 6, so QUALITY-06 must land in Phase 1
 - `go.yaml.in/yaml/v4` pinned to a release candidate; re-verify strict-decoding/merge/provenance tests on every bump
 - GitHub Actions billing/spending limit: jobs refuse to start (annotation on run 30354658603). Must increase spending limit or fix payment before QUALITY-06 CI proof.
-- RELEASE-06: PHP 8.2+ and Composer missing — fresh-clone make verify blocked (scratch/02-02-verify-proof.txt)
+- RELEASE-06 closed: scratch/02-02-verify-proof.txt is VERIFY_PROOF_OK (worktree make verify exit 0 at 2026-07-28T15:32:54Z); 02-02-SUMMARY.md still narrates BLOCKED (stale)
 
 ## Deferred Items
 
@@ -147,7 +147,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T15:07:25.522Z
-Stopped at: Completed 02-01..02-03; 02-04 HUMAN_GATE (plain Terminal make release-smoke)
+Last session: 2026-07-28T15:43:00Z
+Stopped at: Phase 2 verification passed (5/5); do not start Phase 3 until orchestrator marks phase complete
 Resume file: None
-Note: `02-RESEARCH.md` written; hosted CI remains HUMAN_GATE; packaging smoke needs plain Terminal; PHP/Composer required for RELEASE-06 proof on this Mac
+Note: Hosted CI / QUALITY-06 remains Phase 1 HUMAN_GATE only. Packaging smoke Closed; RELEASE-06 VERIFY_PROOF_OK.
