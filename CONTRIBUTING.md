@@ -4,10 +4,26 @@ Thanks for helping. Open an issue before a large change.
 
 ## Prerequisites
 
-- Go and toolchain from [`go.mod`](go.mod) (CI uses `go-version-file`)
-- Docker for Floci, images, and local Compose
-- PHP 8.2+ and Composer when you touch the `build/` Magento package
-- AWS or GCP credentials only if you run real-cloud acceptance
+For a full green `make verify` (the default local gate):
+
+- **Go** toolchain matching [`go.mod`](go.mod) (CI uses `go-version-file`)
+- **PHP 8.2+** and **Composer** — required because `make verify` runs `php-test`
+  on the `build/` Magento package
+- **MkDocs** — required because `make verify` runs `docs` (strict link/nav build)
+
+Pulled automatically via pinned `go run` from Makefile targets (no separate
+global install needed for these):
+
+- golangci-lint (`make lint`)
+- go-licenses (`make license-check`)
+- actionlint (`make workflow-check`)
+
+Optional / situational:
+
+- **Docker** — only for Floci, image builds, and local Compose (`make floci-test`,
+  `magelift dev`, image targets). Not required for default `make verify`.
+- **AWS or GCP credentials** — only for real-cloud acceptance targets
+  (`make aws-acceptance-local`, `make gcp-acceptance-local`).
 
 Layout:
 
@@ -49,6 +65,19 @@ otherwise.
 | Account-free AWS paths | `make floci-test` |
 | Real AWS (destroy on exit) | `make aws-acceptance-local` — read `docs/aws-acceptance.md` |
 | Real GCP experimental | `make gcp-acceptance-local` — read `docs/gcp-acceptance.md` |
+
+### Local verification vs hosted CI
+
+The contributor gate is local **`make verify`**. Hosted GitHub Actions
+force-all / QUALITY-06 green-on-main proof remains **deferred** while Actions
+minutes are exhausted (Phase 1 HUMAN_GATE). See
+[docs/lint-policy.md](docs/lint-policy.md) (`deferred-ci`) and
+`.planning/loop/HUMAN_GATE` for the deferral record. Do not treat `main` as
+proven green on hosted CI until that gate closes.
+
+Optional: `make ci-act-go` runs Go CI jobs locally via nektos/act (serial; no
+Actions minutes). It is **not** a substitute for full `make verify` (missing
+php-test, docs, and other local targets).
 
 More detail: [tests/README.md](tests/README.md).
 
