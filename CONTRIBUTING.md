@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. MageLift is pre-alpha; open an issue before a large change.
+Thanks for helping. Open an issue before a large change.
 
 ## Prerequisites
 

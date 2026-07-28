@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-MageLift is pre-alpha and has no supported release line yet. Once releases begin,
-this document will list supported versions and security-maintenance windows.
+Until the first public release line (`v1.0.0-rc.1` and later) is listed here,
+treat security support as best-effort on `main`. Once releases begin, this
+document will list supported versions and security-maintenance windows.
 
 ## Reporting a vulnerability
 

@@ -1,6 +1,6 @@
 # Support
 
-MageLift is pre-alpha community software and currently has no service-level agreement.
+MageLift is community software and currently has no service-level agreement.
 
 - Use GitHub Discussions for usage and design questions.
 - Use GitHub Issues for reproducible defects and narrowly scoped feature requests.
