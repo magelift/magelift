@@ -220,6 +220,82 @@ func TestRuntimeAddsSigV4ProxyForMagentoOpenSearch(t *testing.T) {
 	}
 }
 
+func TestRuntimeOmitsSigV4ProxyWhenSearchDisabled(t *testing.T) {
+	t.Parallel()
+	args := validArgs()
+	args.Capabilities = testCapabilities()
+	args.SearchProxyImage = ""
+	m := deploy(t, args)
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+	definitions := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
+	if definitionsByName(definitions)["search-proxy"] != nil {
+		t.Fatalf("search proxy must be absent when SearchProxyImage is empty: %#v", definitions)
+	}
+	php := definitionsByName(definitions)["php-fpm"]
+	environment := environmentByName(php)
+	for _, name := range []string{
+		"MAGENTO_DC_CATALOG__SEARCH__ENGINE",
+		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME",
+		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT",
+	} {
+		if _, ok := environment[name]; ok {
+			t.Fatalf("%s must not be set when search proxy is disabled", name)
+		}
+	}
+}
+
+func TestRuntimeSigV4ProxySignsAOSSServiceName(t *testing.T) {
+	t.Parallel()
+	args := validArgs()
+	args.Capabilities = testCapabilities()
+	args.Capabilities.SearchEndpoint = pulumi.String("https://abc123.eu-west-3.aoss.amazonaws.com")
+	args.SearchProxyImage = "public.ecr.aws/aws-observability/aws-sigv4-proxy:1.11.1@sha256:34bbec3cb98403d3e040ec1dadb53bb02285f70d2f0ead2d16435fd30980abaa"
+	m := deploy(t, args)
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+	definitions := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
+	proxy := definitionsByName(definitions)["search-proxy"]
+	if proxy == nil {
+		t.Fatal("search proxy is missing for AOSS endpoint")
+	}
+	command := proxy["command"].([]any)
+	for _, required := range []string{"--name", "aoss", "--host", "abc123.eu-west-3.aoss.amazonaws.com", "--sign-host", "abc123.eu-west-3.aoss.amazonaws.com"} {
+		found := false
+		for _, value := range command {
+			if value == required {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("AOSS search proxy command lacks %q: %#v", required, command)
+		}
+	}
+}
+
+func TestSearchProxyTargetServiceName(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		endpoint string
+		wantHost string
+		wantSvc  string
+	}{
+		{name: "provisioned_domain", endpoint: "https://shop.search.eu-west-3.es.amazonaws.com", wantHost: "shop.search.eu-west-3.es.amazonaws.com", wantSvc: "es"},
+		{name: "serverless_aoss", endpoint: "https://abc.eu-west-3.aoss.amazonaws.com", wantHost: "abc.eu-west-3.aoss.amazonaws.com", wantSvc: "aoss"},
+		{name: "bare_host", endpoint: "shop.search", wantHost: "shop.search", wantSvc: "es"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			host, service := searchProxyTarget(tc.endpoint)
+			if host != tc.wantHost || service != tc.wantSvc {
+				t.Fatalf("searchProxyTarget(%q) = (%q, %q), want (%q, %q)", tc.endpoint, host, service, tc.wantHost, tc.wantSvc)
+			}
+		})
+	}
+}
+
 func TestRuntimeCreatesQueueConsumerServiceWhenRequested(t *testing.T) {
 	t.Parallel()
 	args := validArgs()
