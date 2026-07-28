@@ -99,7 +99,7 @@ func (o *options) runtimeHealthEvidence(ctx context.Context) []health.Check {
 	items, err := observe.CheckRuntime(ctx, planned, outputs)
 	if err != nil {
 		if errors.Is(err, platform.ErrNotSupported) {
-			return []health.Check{{ID: "runtime.observe", Status: health.StatusUnavailable, Message: fmt.Sprintf("runtime health is not supported for target %s/%s yet", planned.Provider(), planned.Runtime())}}
+			return []health.Check{{ID: "runtime.observe", Status: health.StatusUnavailable, Message: notSupportedForPlanned(planned, "runtime health")}}
 		}
 		return unavailable
 	}

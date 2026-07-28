@@ -53,8 +53,8 @@ func logsCommand(o *options) *cobra.Command {
 				Limit:    limit,
 			})
 			if err != nil {
-				if errors.Is(err, platform.ErrNotSupported) {
-					return invalid(fmt.Errorf("logs are not supported for target %s/%s yet", planned.Provider(), planned.Runtime()))
+				if mapped := notSupported(err, planned, "logs"); mapped != err {
+					return mapped
 				}
 				return &exitError{code: 3, err: err}
 			}
@@ -86,7 +86,7 @@ func (o *options) runtimeObserve() (platform.RuntimeObserve, error) {
 	}
 	observe := platform.ModuleRuntimeObserve(module)
 	if observe == nil {
-		return nil, invalid(fmt.Errorf("logs are not supported for target %s/%s yet", effective.Config.Target.Provider, effective.Config.Target.Runtime))
+		return nil, invalid(fmt.Errorf("%s", notSupportedForModule(module, "logs")))
 	}
 	return observe, nil
 }

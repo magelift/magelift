@@ -141,7 +141,7 @@ func TestLogsErrNotSupportedNamesTier(t *testing.T) {
 	if err == nil || ExitCode(err) != 2 {
 		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
 	}
-	wantPrefix := "logs are not supported for target aws/ecs-fargate yet"
+	wantPrefix := "logs is not supported for target aws/ecs-fargate yet"
 	if !strings.HasPrefix(err.Error(), wantPrefix) {
 		t.Fatalf("leading portion must survive; got: %v", err)
 	}
