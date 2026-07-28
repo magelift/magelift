@@ -91,7 +91,7 @@ status: complete
 1. **Task 1: Projection matrix over every legal cell combination** - `90e9355` (test)
 2. **Task 2: Container-graph matrix over the six uncovered interactions** - `7836a39` (test)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `973210d` (docs: complete plan)
 
 ## Files Created/Modified
 
