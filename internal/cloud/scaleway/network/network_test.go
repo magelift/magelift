@@ -2,6 +2,7 @@ package network
 
 import (
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 
@@ -55,6 +56,18 @@ func (mocks *networkMocks) one(t *testing.T, typeToken string) pulumi.MockResour
 	}
 	t.Fatalf("resource type %s not found", typeToken)
 	return pulumi.MockResourceArgs{}
+}
+
+func (mocks *networkMocks) count(typeToken string) int {
+	mocks.mu.Lock()
+	defer mocks.mu.Unlock()
+	n := 0
+	for _, node := range mocks.nodes {
+		if node.TypeToken == typeToken {
+			n++
+		}
+	}
+	return n
 }
 
 func TestNewCreatesVpcAndPrivateNetworkWithSubnet(t *testing.T) {
@@ -115,6 +128,73 @@ func TestNewRejectsInvalidInputsBeforeRegistration(t *testing.T) {
 			}
 			if len(mocks.snapshot()) != 0 {
 				t.Fatalf("resources registered before input validation for %+v", tc.args)
+			}
+		})
+	}
+}
+
+// TestNewKeepsSinglePrivateNetworkRange documents that Scaleway deliberately
+// does not carve per-zone subnets. A Scaleway private network is the Magento
+// attachment unit, so the configured NetworkCIDR is attached verbatim and
+// PrivateSubnetIDs always holds exactly one entry — there is no index cap or
+// "cap plus one" boundary to assert the way OVH/AWS/GCP carve helpers do.
+func TestNewKeepsSinglePrivateNetworkRange(t *testing.T) {
+	t.Parallel()
+	const networkCIDR = "172.16.0.0/22"
+	cases := []struct {
+		name  string
+		zones []string
+	}{
+		{name: "one zone", zones: []string{"fr-par-1"}},
+		{name: "three zones", zones: []string{"fr-par-1", "fr-par-2", "fr-par-3"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mocks := &networkMocks{}
+			var subnetIDCount int
+			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+				component, err := New(ctx, "shop-net", Args{
+					Preset: sdk.PresetPreview, ProjectID: "11111111-1111-1111-1111-111111111111",
+					Region: "fr-par", NetworkCIDR: networkCIDR, Zones: tc.zones,
+					Labels: map[string]string{"magelift-managed-by": "magelift"},
+				})
+				if err != nil {
+					return err
+				}
+				component.PrivateSubnetIDs.ApplyT(func(ids []string) error {
+					subnetIDCount = len(ids)
+					return nil
+				})
+				return nil
+			}, pulumi.WithMocks("magelift", "shop-preview", mocks))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mocks.count("scaleway:network/privateNetwork:PrivateNetwork") != 1 {
+				t.Fatalf("private network count = %d, want 1 regardless of %d zones",
+					mocks.count("scaleway:network/privateNetwork:PrivateNetwork"), len(tc.zones))
+			}
+			if subnetIDCount != 1 {
+				t.Fatalf("PrivateSubnetIDs length = %d, want 1", subnetIDCount)
+			}
+			pn := mocks.one(t, "scaleway:network/privateNetwork:PrivateNetwork")
+			subnet := pn.Inputs["ipv4Subnet"].ObjectValue()["subnet"].StringValue()
+			if subnet != networkCIDR {
+				t.Fatalf("private network subnet = %q, want configured %q (no carve)", subnet, networkCIDR)
+			}
+			if pn.RegisterRPC == nil {
+				t.Fatal("RegisterRPC missing; cannot assert VPC dependency")
+			}
+			foundVPC := false
+			for _, dep := range pn.RegisterRPC.GetDependencies() {
+				if strings.Contains(dep, "-vpc") {
+					foundVPC = true
+					break
+				}
+			}
+			if !foundVPC {
+				t.Fatalf("private network missing VPC dependency; deps=%v", pn.RegisterRPC.GetDependencies())
 			}
 		})
 	}
