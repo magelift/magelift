@@ -484,9 +484,6 @@ func TestExperimentalTargetWarnsAtPlanStack(t *testing.T) {
 				if !strings.Contains(err.Error(), "infrastructure backend factory is required") {
 					t.Fatalf("backend must not be constructed before warning; got err=%v", err)
 				}
-				if stdout.Len() != 0 && tt.command == "outputs" {
-					// json payloads stay on stdout; with early failure stdout may be empty
-				}
 			} else {
 				if strings.Contains(stderr.String(), "experimental") {
 					t.Fatalf("certified target must not warn; stderr=%q", stderr.String())

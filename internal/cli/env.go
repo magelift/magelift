@@ -44,7 +44,7 @@ func envListCommand(o *options) *cobra.Command {
 }
 
 func envCreateCommand(o *options) *cobra.Command {
-	var account, class, preset, domain, expiresAt string
+	var account, class, preset, domain, expiresAt, dumpPath string
 	var monthlyBudgetCents int64
 	var protection bool
 	var branches []string
@@ -59,6 +59,15 @@ func envCreateCommand(o *options) *cobra.Command {
 			}
 			if cmd.Flags().Changed("monthly-budget-cents") && monthlyBudgetCents <= 0 {
 				return invalid(errors.New("monthly budget must be greater than zero"))
+			}
+			if dumpPath != "" {
+				if _, err := os.Stat(dumpPath); err != nil {
+					return guidedWrap(err,
+						fmt.Sprintf("database dump %q is not readable", dumpPath),
+						"pass an existing .sql or .sql.gz path; import runs after the environment first deploy (ADR 0010)",
+						"docs/adr/0010-database-dump-seed.md",
+					)
+				}
 			}
 			file, err := o.load()
 			if err != nil {
@@ -106,6 +115,9 @@ func envCreateCommand(o *options) *cobra.Command {
 			if cmd.Flags().Changed("branches") {
 				overlay["branches"] = branches
 			}
+			if dumpPath != "" {
+				overlay["seedDump"] = dumpPath
+			}
 			environments[name] = overlay
 			document["environments"] = environments
 			updated, err := yaml.Marshal(document)
@@ -126,7 +138,12 @@ func envCreateCommand(o *options) *cobra.Command {
 			if err := replaceFile(filepath.Clean(o.configPath), updated, info.Mode().Perm()); err != nil {
 				return err
 			}
-			return o.write(map[string]any{"environment": name, "created": true})
+			result := map[string]any{"environment": name, "created": true}
+			if dumpPath != "" {
+				result["seedDump"] = dumpPath
+				result["seedDumpStatus"] = "recorded; import after first deploy is tracked in ADR 0010"
+			}
+			return o.write(result)
 		},
 	}
 	command.Flags().StringVar(&account, "account", "", "AWS account ID")
@@ -137,6 +154,7 @@ func envCreateCommand(o *options) *cobra.Command {
 	command.Flags().Int64Var(&monthlyBudgetCents, "monthly-budget-cents", 0, "maximum monthly AWS budget in cents")
 	command.Flags().BoolVar(&protection, "protection", false, "protect destructive operations")
 	command.Flags().StringSliceVar(&branches, "branches", nil, "Git branches mapped to this environment")
+	command.Flags().StringVar(&dumpPath, "dump", "", "path to a MySQL dump to seed after first deploy (ADR 0010)")
 	return command
 }
 
