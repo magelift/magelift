@@ -54,8 +54,32 @@ on AWS is not every SKU.
 ## Community binary
 
 The released `magelift` binary includes first-party modules only. External
-providers ship a Go module; consumers build a main that registers it. See
-`examples/custom-cli`. No unsigned dynamic plugins in v1.1.
+providers ship as a **compile-time custom binary** of this module (or a fork)
+that calls `RegisterModule` — see `examples/custom-cli`. There is no Go
+`plugin` ABI and no unsigned dynamic loader in v1 (ADR 0007).
+
+**Honesty about `internal/`:** Go's visibility rule means a *separate* module
+path cannot import `internal/platform` or `internal/cli`. Community providers
+today live in this repository's module graph (custom `main` under
+`examples/custom-cli`, or a fork). Do not claim publish-to-proxy.golang.org of
+an external module that imports those packages. Exporting a public platform API
+is out of Phase 2 scope.
+
+### Clean-cache verification (RELEASE-03)
+
+Use only this document and `examples/custom-cli` — do not browse
+`internal/cloud/**` to learn registration. From the repo root (serial build;
+never raise parallelism on a 16 GB host):
+
+```sh
+export GOMODCACHE="$(mktemp -d /tmp/magelift-modcache.XXXXXX)"
+export GOCACHE="$(mktemp -d /tmp/magelift-gocache.XXXXXX)"
+GOMAXPROCS=1 GOFLAGS=-p=1 go build -o /tmp/magelift-ext ./examples/custom-cli
+/tmp/magelift-ext version
+```
+
+A green `version` line proves the custom binary builds from an empty module and
+build cache without consulting core source beyond the example tree's imports.
 
 ## Non-goals
 
