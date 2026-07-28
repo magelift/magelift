@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/acourtiol/magelift/internal/automation"
-	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
@@ -22,6 +21,7 @@ import (
 	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/acourtiol/magelift/internal/releasejournal"
 	mageliftupgrade "github.com/acourtiol/magelift/internal/upgrade"
+	"github.com/acourtiol/magelift/internal/usererr"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 )
@@ -64,7 +64,6 @@ type options struct {
 	runCompose         func(context.Context, string, []string, []string, io.Writer, io.Writer) error
 	newReleaseStore    func(string, string) (releaseStore, error)
 	verifyRelease      func(context.Context, string, cosign.VerifyOptions) error
-	newPricing         func(context.Context, string) (costEstimator, error)
 	newComposerSecrets func(context.Context, string) (composerSecretProvider, error)
 	newUpgrade         func() upgradeClient
 	executable         func() (string, error)
@@ -73,6 +72,7 @@ type options struct {
 	testState          platform.State
 	testSecrets        platform.Secrets
 	testRuntimeObserve platform.RuntimeObserve
+	testCostEstimator  platform.CostEstimator
 	infraOnly          bool
 }
 
@@ -168,9 +168,6 @@ func newCommand(stdout, stderr io.Writer, modules *platform.ModuleRegistry) *cob
 			return releasejournal.New(root, environment)
 		},
 		verifyRelease: cosign.New().Verify,
-		newPricing: func(ctx context.Context, region string) (costEstimator, error) {
-			return awspricing.New(ctx, region)
-		},
 		newComposerSecrets: func(ctx context.Context, region string) (composerSecretProvider, error) {
 			return awssecrets.New(ctx, region)
 		},
@@ -377,7 +374,11 @@ func (o *options) selectEnvironment(file *config.File) (string, error) {
 		}
 	}
 	if o.noInteraction || !o.terminal.Interactive() {
-		return "", errors.New("environment is required in non-interactive mode: use --env, MAGELIFT_ENV, or configure a Git branch mapping")
+		return "", invalid(usererr.New(
+			"environment is required in non-interactive mode",
+			"pass --env, set MAGELIFT_ENV, or map the current Git branch under environments.*.branches",
+			"docs/configuration.md",
+		))
 	}
 	return o.terminal.SelectEnvironment(file.Environments())
 }
@@ -422,6 +423,14 @@ func (o *options) write(value any) error {
 }
 
 func invalid(err error) error { return &exitError{code: 2, err: err} }
+
+func guided(cause, next, doc string) error {
+	return invalid(usererr.New(cause, next, doc))
+}
+
+func guidedWrap(err error, cause, next, doc string) error {
+	return invalid(usererr.Wrap(err, cause, next, doc))
+}
 
 func completionCommand(root *cobra.Command) *cobra.Command {
 	return &cobra.Command{Use: "completion [bash|zsh|fish|powershell]", Short: "Generate shell completion", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
