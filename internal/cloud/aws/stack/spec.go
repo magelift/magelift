@@ -99,6 +99,11 @@ const (
 	SearchModeServerless  = "serverless"
 	SearchModeProvisioned = "provisioned"
 	SearchModeDisabled    = "disabled"
+
+	QueueModeDB          = "db"
+	QueueModeAmazonMQ    = "amazon-mq"
+	QueueModeECSRabbitMQ = "ecs-rabbitmq"
+	QueueModeECSArtemis  = "ecs-artemis"
 )
 
 type NetworkPolicy struct {
@@ -113,6 +118,7 @@ type CatalogSelection struct {
 	Version           string
 	DatabaseEngine    string
 	SearchMode        string
+	QueueMode         string
 	Aurora            AuroraPreviewProfile
 	Valkey            ValkeyPreviewProfile
 	Search            SearchPreviewProfile
@@ -193,7 +199,7 @@ func (s Spec) ValidateAllowExpiredPreview() error {
 
 func (s Spec) validate(allowExpiredPreview bool) error {
 	var problems []error
-	problems = append(problems, s.Identity.validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset), s.Lifecycle.validate(s.Identity.Preset, allowExpiredPreview), s.Existing.validate(), s.Dependencies.validate(s.Identity.Preset), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset))
+	problems = append(problems, s.Identity.validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Lifecycle.validate(s.Identity.Preset, allowExpiredPreview), s.Existing.validate(), s.Dependencies.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset))
 	if s.Existing.Network != nil {
 		for _, group := range []struct {
 			name   string
@@ -248,7 +254,7 @@ func (a Application) validate() error {
 	return errors.Join(problems...)
 }
 
-func (a Artifact) validate(preset sdk.PresetID) error {
+func (a Artifact) validate(preset sdk.PresetID, queueMode string) error {
 	var problems []error
 	if !digest.MatchString(a.ImageDigest) {
 		problems = append(problems, errors.New("artifact image must be a registry digest"))
@@ -256,11 +262,11 @@ func (a Artifact) validate(preset sdk.PresetID) error {
 	if a.CompatibilityStatus != "compatible" && a.CompatibilityStatus != "unsupported-allowed" {
 		problems = append(problems, fmt.Errorf("unsupported compatibility status %q", a.CompatibilityStatus))
 	}
-	problems = append(problems, sdk.ValidateCapabilityRequirements(a.RequiredRuntimeCapabilities, awsCapabilities(preset)))
+	problems = append(problems, sdk.ValidateCapabilityRequirements(a.RequiredRuntimeCapabilities, awsCapabilities(preset, queueMode)))
 	return errors.Join(problems...)
 }
 
-func awsCapabilities(preset sdk.PresetID) []sdk.CapabilityID {
+func awsCapabilities(preset sdk.PresetID, queueMode string) []sdk.CapabilityID {
 	capabilities := []sdk.CapabilityID{
 		sdk.CapabilityDatabaseMySQL,
 		sdk.CapabilityCacheValkey,
@@ -269,7 +275,15 @@ func awsCapabilities(preset sdk.PresetID) []sdk.CapabilityID {
 		sdk.CapabilityEdgeCDN,
 		sdk.CapabilityObservabilityLogs,
 	}
-	if preset == sdk.PresetPreview {
+	mode := queueMode
+	if mode == "" {
+		if preset == sdk.PresetPreview {
+			mode = QueueModeDB
+		} else {
+			mode = QueueModeAmazonMQ
+		}
+	}
+	if mode == QueueModeDB {
 		return append(capabilities, sdk.CapabilityQueueDatabase)
 	}
 	return append(capabilities, sdk.CapabilityQueueRabbitMQ)
@@ -342,7 +356,7 @@ func validateSubnetIDs(name string, values []string) error {
 	return nil
 }
 
-func (d Dependencies) validate(preset sdk.PresetID) error {
+func (d Dependencies) validate(preset sdk.PresetID, queueMode string) error {
 	var problems []error
 	if !kmsARN.MatchString(d.KMSKeyARN) {
 		problems = append(problems, errors.New("stack requires a customer-managed KMS key ARN"))
@@ -356,8 +370,16 @@ func (d Dependencies) validate(preset sdk.PresetID) error {
 	if preset != sdk.PresetPreview && !secretARN.MatchString(d.SessionSecretARN) {
 		problems = append(problems, errors.New("non-preview stacks require a session token Secrets Manager ARN"))
 	}
-	if preset != sdk.PresetPreview && !secretARN.MatchString(d.QueueSecretARN) {
-		problems = append(problems, errors.New("non-preview stacks require a RabbitMQ password Secrets Manager ARN"))
+	mode := queueMode
+	if mode == "" {
+		if preset == sdk.PresetPreview {
+			mode = QueueModeDB
+		} else {
+			mode = QueueModeAmazonMQ
+		}
+	}
+	if mode != QueueModeDB && !secretARN.MatchString(d.QueueSecretARN) {
+		problems = append(problems, errors.New("broker queue modes require a RabbitMQ password Secrets Manager ARN"))
 	}
 	if !databaseName.MatchString(d.DatabaseName) || !username.MatchString(d.MasterUsername) {
 		problems = append(problems, errors.New("stack database name and master username are invalid"))
@@ -406,6 +428,9 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 	}
 	if c.SearchMode != SearchModeServerless && c.SearchMode != SearchModeProvisioned && c.SearchMode != SearchModeDisabled {
 		problems = append(problems, errors.New("searchMode must be serverless, provisioned, or disabled"))
+	}
+	if c.QueueMode != "" && c.QueueMode != QueueModeDB && c.QueueMode != QueueModeAmazonMQ && c.QueueMode != QueueModeECSRabbitMQ && c.QueueMode != QueueModeECSArtemis {
+		problems = append(problems, errors.New("queueMode must be db, amazon-mq, ecs-rabbitmq, or ecs-artemis"))
 	}
 	if c.DatabaseEngine == DatabaseEngineRDSMySQL && preset != sdk.PresetPreview {
 		problems = append(problems, errors.New("rds-mysql is only supported for the preview preset"))
@@ -475,8 +500,12 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 				problems = append(problems, errors.New("non-preview catalog requires explicit OpenSearch capacity"))
 			}
 		}
-		if strings.TrimSpace(c.RabbitMQ.InstanceType) == "" {
-			problems = append(problems, errors.New("non-preview catalog requires an explicit RabbitMQ instance type"))
+		queueMode := c.QueueMode
+		if queueMode == "" {
+			queueMode = QueueModeAmazonMQ
+		}
+		if queueMode == QueueModeAmazonMQ && strings.TrimSpace(c.RabbitMQ.InstanceType) == "" {
+			problems = append(problems, errors.New("amazon-mq queueMode requires an explicit RabbitMQ instance type"))
 		}
 		if preset == sdk.PresetStandard && c.Valkey.ReplicaCount < 1 {
 			problems = append(problems, errors.New("standard Valkey catalog profile requires at least one replica"))

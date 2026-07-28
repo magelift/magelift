@@ -136,6 +136,7 @@ func validateAWSServiceCompatibility(cfg config.Config) error {
 		presetName = cfg.Defaults.Preset
 	}
 	searchMode := resolveSearchMode(cfg.Target.AWS.Catalog.SearchMode, sdk.PresetID(presetName))
+	queueMode := resolveQueueMode(cfg.Target.AWS.Catalog.QueueMode, sdk.PresetID(presetName))
 	if searchMode != SearchModeDisabled {
 		searchCompatible := strings.HasPrefix(versions.OpenSearch, policy.openSearchPrefix)
 		if versionLine == "2.4.7" || versionLine == "2.4.6" {
@@ -148,12 +149,16 @@ func validateAWSServiceCompatibility(cfg config.Config) error {
 	if !hasPrefix(versions.Valkey, policy.valkeyPrefixes) {
 		return fmt.Errorf("Magento %s requires an Adobe-listed AWS Valkey version", versionLine)
 	}
-	if !strings.HasPrefix(versions.RabbitMQ, "3.13") && !strings.HasPrefix(versions.RabbitMQ, "4.2") {
-		return fmt.Errorf("Magento %s requires AWS MQ RabbitMQ 3.13 or 4.2 for the v1 target", versionLine)
+	if queueMode == QueueModeAmazonMQ || queueMode == QueueModeECSRabbitMQ {
+		if !strings.HasPrefix(versions.RabbitMQ, "3.13") && !strings.HasPrefix(versions.RabbitMQ, "4.2") {
+			return fmt.Errorf("Magento %s requires RabbitMQ 3.13 or 4.2 for queueMode %s", versionLine, queueMode)
+		}
 	}
-	// Preview uses Magento database queues, so the RabbitMQ instance type may be unset.
-	if instanceType := strings.TrimSpace(cfg.Target.AWS.Catalog.RabbitMQ.InstanceType); strings.HasPrefix(versions.RabbitMQ, "4.2") && instanceType != "" && !strings.HasPrefix(instanceType, "mq.m7g.") {
-		return errors.New("AWS MQ RabbitMQ 4.2 requires an mq.m7g instance type")
+	// Amazon MQ 4.2 instance gate; ecs / db modes may leave instance type empty.
+	if queueMode == QueueModeAmazonMQ {
+		if instanceType := strings.TrimSpace(cfg.Target.AWS.Catalog.RabbitMQ.InstanceType); strings.HasPrefix(versions.RabbitMQ, "4.2") && instanceType != "" && !strings.HasPrefix(instanceType, "mq.m7g.") {
+			return errors.New("AWS MQ RabbitMQ 4.2 requires an mq.m7g instance type")
+		}
 	}
 	if engine == DatabaseEngineRDSMySQL {
 		if strings.TrimSpace(versions.MySQL) == "" || (!strings.HasPrefix(versions.MySQL, "8.0.") && !strings.HasPrefix(versions.MySQL, "8.4.")) {
@@ -192,6 +197,7 @@ func catalogFromConfig(input config.AWSCatalog, preset sdk.PresetID) CatalogSele
 		Version:           input.Version,
 		DatabaseEngine:    resolveDatabaseEngine(input.DatabaseEngine),
 		SearchMode:        resolveSearchMode(input.SearchMode, preset),
+		QueueMode:         resolveQueueMode(input.QueueMode, preset),
 		Aurora:            AuroraPreviewProfile{MinimumACU: input.Aurora.MinimumACU, MaximumACU: input.Aurora.MaximumACU, AutoPauseSeconds: input.Aurora.AutoPauseSeconds, EngineSupportsAutoPause: input.Aurora.EngineSupportsAutoPause},
 		Valkey:            ValkeyPreviewProfile{NodeType: input.Valkey.NodeType, ReplicaCount: input.Valkey.ReplicaCount},
 		Search:            SearchPreviewProfile{MaximumIndexingOCU: input.Search.MaximumIndexingOCU, MaximumSearchOCU: input.Search.MaximumSearchOCU, AcceptColdStarts: input.Search.AcceptColdStarts},
@@ -226,4 +232,14 @@ func resolveSearchMode(value string, preset sdk.PresetID) string {
 		return SearchModeServerless
 	}
 	return SearchModeProvisioned
+}
+
+func resolveQueueMode(value string, preset sdk.PresetID) string {
+	if strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	if preset == sdk.PresetPreview {
+		return QueueModeDB
+	}
+	return QueueModeAmazonMQ
 }

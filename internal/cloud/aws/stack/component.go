@@ -92,7 +92,10 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	if err != nil {
 		return nil, fmt.Errorf("create AWS network: %w", err)
 	}
-	component.Security, err = security.New(ctx, name+"-security", security.Args{Region: spec.Identity.Region, VPCID: component.Network.VpcID.ToStringOutput(), WebTargetPort: frontendPort, Tags: tags}, regional...)
+	component.Security, err = security.New(ctx, name+"-security", security.Args{
+		Region: spec.Identity.Region, VPCID: component.Network.VpcID.ToStringOutput(), WebTargetPort: frontendPort,
+		QueuePort: queue.AMQPPortForMode(spec.Catalog.QueueMode), Tags: tags,
+	}, regional...)
 	if err != nil {
 		return nil, fmt.Errorf("create AWS security groups: %w", err)
 	}
@@ -167,10 +170,12 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		searchARN = component.Search.ARN
 	}
 
+	logGroupPrefix := "/magelift/" + spec.Identity.Project + "/" + spec.Identity.Environment
 	component.Queue, err = queue.New(ctx, name+"-queue", queue.Args{
-		Topology: queue.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: spec.Catalog.Versions.RabbitMQ, InstanceType: spec.Catalog.RabbitMQ.InstanceType,
+		Mode: spec.Catalog.QueueMode, Topology: queue.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: spec.Catalog.Versions.RabbitMQ, InstanceType: spec.Catalog.RabbitMQ.InstanceType,
 		AvailabilityZones: spec.Policy.AvailabilityZones, SubnetIDInputs: privateSubnets, SubnetCount: len(privateSubnets), SecurityGroupIDInputs: pulumi.StringArray{component.Security.QueueSecurityGroupID}, SecurityGroupCount: 1,
 		KMSKeyARN: spec.Dependencies.KMSKeyARN, Credentials: queue.Credentials{SecretARN: spec.Dependencies.QueueSecretARN, Username: spec.Dependencies.MasterUsername}, Provider: providers.Regional, Tags: tags,
+		VpcID: component.Network.VpcID.ToStringOutput(), ExecutionRoleARN: component.RuntimeIdentity.ExecutionRoleARN, TaskRoleARN: component.RuntimeIdentity.TaskRoleARN, LogGroupPrefix: logGroupPrefix,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create AWS queue: %w", err)
@@ -194,7 +199,6 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		QueueUsername: pulumi.String(spec.Dependencies.MasterUsername),
 		MediaBucket:   component.Storage.BucketName,
 	}
-	logGroupPrefix := "/magelift/" + spec.Identity.Project + "/" + spec.Identity.Environment
 	logGroups, err := observability.NewLogGroups(ctx, name+"-observability", observability.Args{
 		Region: spec.Identity.Region, EnvironmentClass: spec.Identity.EnvironmentClass, LogGroupPrefix: logGroupPrefix,
 		KMSKeyARN: spec.Dependencies.KMSKeyARN, RetentionInDays: spec.Catalog.Retention.LogDays, Tags: tags,
@@ -297,7 +301,10 @@ func taskPolicy(spec Spec, component *Component, searchARN pulumi.StringOutput) 
 		}
 		secrets := []string{spec.Dependencies.CacheSecretARN, spec.Dependencies.EncryptionKeyARN}
 		if spec.Identity.Preset != sdk.PresetPreview {
-			secrets = append(secrets, spec.Dependencies.SessionSecretARN, spec.Dependencies.QueueSecretARN)
+			secrets = append(secrets, spec.Dependencies.SessionSecretARN)
+		}
+		if queue.NeedsBrokerSecret(effectiveQueueMode(spec)) {
+			secrets = append(secrets, spec.Dependencies.QueueSecretARN)
 		}
 		if databaseSecretARN != "" {
 			secrets = append(secrets, databaseSecretARN)
@@ -377,7 +384,15 @@ func serverlessDatabase(spec Spec) *database.ServerlessV2 {
 }
 
 func queueConsumerCount(spec Spec) int {
-	if spec.Identity.Preset == sdk.PresetPreview {
+	mode := spec.Catalog.QueueMode
+	if mode == "" {
+		if spec.Identity.Preset == sdk.PresetPreview {
+			mode = QueueModeDB
+		} else {
+			mode = QueueModeAmazonMQ
+		}
+	}
+	if mode == QueueModeDB {
 		return 0
 	}
 	return 2
@@ -417,6 +432,10 @@ func runtimeSecrets(spec Spec) []runtime.SecretReference {
 		sessionSecret = spec.Dependencies.SessionSecretARN
 		secrets = append(secrets,
 			runtime.SecretReference{Name: "MAGELIFT_SESSION_TOKEN", ARN: spec.Dependencies.SessionSecretARN},
+		)
+	}
+	if queue.NeedsBrokerSecret(effectiveQueueMode(spec)) {
+		secrets = append(secrets,
 			runtime.SecretReference{Name: "MAGELIFT_QUEUE_PASSWORD", ARN: spec.Dependencies.QueueSecretARN},
 			runtime.SecretReference{Name: "MAGENTO_DC_QUEUE__AMQP__PASSWORD", ARN: spec.Dependencies.QueueSecretARN},
 		)
@@ -424,4 +443,14 @@ func runtimeSecrets(spec Spec) []runtime.SecretReference {
 	secrets = append(secrets, runtime.SecretReference{Name: "MAGENTO_DC_SESSION__REDIS_PASSWORD", ARN: sessionSecret})
 	secrets = append(secrets, runtime.SecretReference{Name: "MAGENTO_DC_CRYPT__KEY", ARN: spec.Dependencies.EncryptionKeyARN})
 	return secrets
+}
+
+func effectiveQueueMode(spec Spec) string {
+	if mode := strings.TrimSpace(spec.Catalog.QueueMode); mode != "" {
+		return mode
+	}
+	if spec.Identity.Preset == sdk.PresetPreview {
+		return QueueModeDB
+	}
+	return QueueModeAmazonMQ
 }

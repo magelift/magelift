@@ -55,7 +55,11 @@ func TestRunUsesIsolatedMountsAndProtocolStdin(t *testing.T) {
 	assertContainsArgument(t, invocation.Args, "/tmp:rw,noexec,nosuid,nodev,mode=1777")
 	assertContainsArgument(t, invocation.Args, "--env")
 	assertContainsArgument(t, invocation.Args, "HOME=/tmp")
-	assertContainsArgument(t, invocation.Args, "type=bind,src="+source+",dst=/workspace,readonly")
+	sourceResolved, err := filepath.EvalSymlinks(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContainsArgument(t, invocation.Args, "type=bind,src="+sourceResolved+",dst=/workspace,readonly")
 	assertContainsArgument(t, invocation.Args, "type=bind,src="+result.OutputDir+",dst=/output")
 	if !containsMountDestination(invocation.Args, "/run/secrets/composer-auth") {
 		t.Fatalf("composer secret mount missing from %#v", invocation.Args)
@@ -94,8 +98,12 @@ func TestRunInOutputReusesPrivateDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.OutputDir != output {
-		t.Fatalf("output directory = %q", result.OutputDir)
+	outputResolved, err := filepath.EvalSymlinks(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OutputDir != outputResolved {
+		t.Fatalf("output directory = %q, want %q", result.OutputDir, outputResolved)
 	}
 	if contents, err := os.ReadFile(marker); err != nil || string(contents) != "prepared" {
 		t.Fatalf("prepared marker=%q error=%v", contents, err)
@@ -104,7 +112,7 @@ func TestRunInOutputReusesPrivateDirectory(t *testing.T) {
 	if err := json.Unmarshal(result.Response, &invocation); err != nil {
 		t.Fatal(err)
 	}
-	assertContainsArgument(t, invocation.Args, "type=bind,src="+output+",dst=/output")
+	assertContainsArgument(t, invocation.Args, "type=bind,src="+outputResolved+",dst=/output")
 }
 
 func TestRunInOutputRejectsNonPrivateDirectory(t *testing.T) {

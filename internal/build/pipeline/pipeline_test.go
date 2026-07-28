@@ -43,8 +43,12 @@ func TestPipelineCoordinatesBuildAndPublishesVerifiedManifest(t *testing.T) {
 	if string(contents) != containers.manifest {
 		t.Fatalf("manifest = %q", contents)
 	}
-	if filepath.Dir(result.Manifest) != request.ArtifactDirectory {
-		t.Fatalf("manifest was not published externally: %q", result.Manifest)
+	artifacts, err := filepath.EvalSymlinks(request.ArtifactDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Dir(result.Manifest) != artifacts {
+		t.Fatalf("manifest was not published externally: %q (artifact dir %q)", result.Manifest, artifacts)
 	}
 	if containers.prepareImage != pinnedBuilder || containers.finalizeImage != pinnedBuilder {
 		t.Fatal("builder image was not bound to both container stages")

@@ -178,10 +178,11 @@ type AWSCatalog struct {
 	Version        string              `yaml:"version,omitempty" json:"version,omitempty" config:"Benchmark catalog version" schema:"nullable"`
 	DatabaseEngine string              `yaml:"databaseEngine,omitempty" json:"databaseEngine,omitempty" config:"MySQL engine shape" schema:"nullable,enum=aurora-mysql|rds-mysql"`
 	SearchMode     string              `yaml:"searchMode,omitempty" json:"searchMode,omitempty" config:"OpenSearch provisioning mode" schema:"nullable,enum=serverless|provisioned|disabled"`
+	QueueMode      string              `yaml:"queueMode,omitempty" json:"queueMode,omitempty" config:"Magento messaging broker mode" schema:"nullable,enum=db|amazon-mq|ecs-rabbitmq|ecs-artemis"`
 	Aurora         AWSCatalogAurora    `yaml:"aurora,omitempty" json:"aurora,omitempty" config:"Aurora or RDS MySQL capacity"`
 	Valkey         AWSCatalogValkey    `yaml:"valkey,omitempty" json:"valkey,omitempty" config:"Valkey capacity"`
 	Search         AWSCatalogSearch    `yaml:"search,omitempty" json:"search,omitempty" config:"OpenSearch capacity"`
-	RabbitMQ       AWSCatalogRabbitMQ  `yaml:"rabbitMq,omitempty" json:"rabbitMq,omitempty" config:"RabbitMQ capacity"`
+	RabbitMQ       AWSCatalogRabbitMQ  `yaml:"rabbitMq,omitempty" json:"rabbitMq,omitempty" config:"Amazon MQ RabbitMQ capacity (queueMode amazon-mq)"`
 	Fargate        AWSCatalogFargate   `yaml:"fargate,omitempty" json:"fargate,omitempty" config:"Fargate capacity (ecs-fargate)"`
 	EKS            AWSCatalogEKS       `yaml:"eks,omitempty" json:"eks,omitempty" config:"EKS Autopilot capacity (eks-autopilot)" schema:"nullable"`
 	Retention      AWSCatalogRetention `yaml:"retention,omitempty" json:"retention,omitempty" config:"Retention policy"`
