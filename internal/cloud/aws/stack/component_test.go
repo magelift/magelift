@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	sdk "github.com/acourtiol/magelift/sdk/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -365,4 +366,162 @@ func resourceInput(m *stackMocks, token, name string) resource.PropertyMap {
 		}
 	}
 	return nil
+}
+
+func TestCatalogCellProjectionMatrix(t *testing.T) {
+	t.Parallel()
+
+	webRuntimes := []string{"nginx-fpm", "frankenphp-classic"}
+	type cell struct {
+		name               string
+		preset             sdk.PresetID
+		searchMode         string
+		queueMode          string
+		webRuntime         string
+		leaveSearchUnset   bool
+		leaveQueueUnset    bool
+		wantRejected       bool
+		wantRejectReason   string
+	}
+
+	var tests []cell
+	for _, searchMode := range []string{SearchModeDisabled, SearchModeServerless} {
+		for _, queueMode := range []string{QueueModeDB, QueueModeECSRabbitMQ, QueueModeECSArtemis} {
+			for _, webRuntime := range webRuntimes {
+				tests = append(tests, cell{
+					name:       "preview/" + searchMode + "/" + queueMode + "/" + webRuntime,
+					preset:     sdk.PresetPreview,
+					searchMode: searchMode,
+					queueMode:  queueMode,
+					webRuntime: webRuntime,
+				})
+			}
+		}
+	}
+	for _, searchMode := range []string{SearchModeDisabled, SearchModeProvisioned} {
+		for _, queueMode := range []string{QueueModeDB, QueueModeAmazonMQ, QueueModeECSRabbitMQ, QueueModeECSArtemis} {
+			for _, webRuntime := range webRuntimes {
+				tests = append(tests, cell{
+					name:       "standard/" + searchMode + "/" + queueMode + "/" + webRuntime,
+					preset:     sdk.PresetStandard,
+					searchMode: searchMode,
+					queueMode:  queueMode,
+					webRuntime: webRuntime,
+				})
+			}
+		}
+	}
+	tests = append(tests,
+		cell{name: "preview/defaults", preset: sdk.PresetPreview, webRuntime: "nginx-fpm", leaveSearchUnset: true, leaveQueueUnset: true},
+		cell{name: "standard/defaults", preset: sdk.PresetStandard, webRuntime: "nginx-fpm", leaveSearchUnset: true, leaveQueueUnset: true},
+		cell{
+			name: "preview/amazon-mq/rejected", preset: sdk.PresetPreview, searchMode: SearchModeServerless,
+			queueMode: QueueModeAmazonMQ, webRuntime: "nginx-fpm", wantRejected: true,
+			// Preview is fixed at 2 AZs; amazon-mq CLUSTER_MULTI_AZ needs 3 — Spec.Validate names the zone guard.
+			wantRejectReason: `preset "preview" requires 2 availability zones`,
+		},
+	)
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if tt.wantRejected {
+				assertPreviewAmazonMQRejected(t, tt.wantRejectReason)
+				return
+			}
+
+			spec := validSpec()
+			spec.Identity.Preset = tt.preset
+			spec.Application.WebRuntime = tt.webRuntime
+			if tt.leaveSearchUnset {
+				spec.Catalog.SearchMode = ""
+			} else {
+				spec.Catalog.SearchMode = tt.searchMode
+			}
+			if tt.leaveQueueUnset {
+				spec.Catalog.QueueMode = ""
+			} else {
+				spec.Catalog.QueueMode = tt.queueMode
+			}
+
+			resolvedSearch := resolveSearchMode(spec.Catalog.SearchMode, tt.preset)
+			resolvedQueue := resolveQueueMode(spec.Catalog.QueueMode, tt.preset)
+			if tt.leaveSearchUnset {
+				wantSearch := SearchModeServerless
+				if tt.preset == sdk.PresetStandard {
+					wantSearch = SearchModeProvisioned
+				}
+				if resolvedSearch != wantSearch {
+					t.Fatalf("resolveSearchMode default = %q, want %q", resolvedSearch, wantSearch)
+				}
+				spec.Catalog.SearchMode = resolvedSearch
+			}
+			if tt.leaveQueueUnset {
+				wantQueue := QueueModeDB
+				if tt.preset == sdk.PresetStandard {
+					wantQueue = QueueModeAmazonMQ
+				}
+				if resolvedQueue != wantQueue {
+					t.Fatalf("resolveQueueMode default = %q, want %q", resolvedQueue, wantQueue)
+				}
+			}
+
+			wantConsumers := 2
+			effectiveQueue := effectiveQueueMode(spec)
+			if effectiveQueue == QueueModeDB {
+				wantConsumers = 0
+			}
+			if got := queueConsumerCount(spec); got != wantConsumers {
+				t.Fatalf("queueConsumerCount = %d, want %d (queueMode=%q effective=%q)", got, wantConsumers, spec.Catalog.QueueMode, effectiveQueue)
+			}
+			if !tt.leaveQueueUnset && effectiveQueue != tt.queueMode {
+				t.Fatalf("effectiveQueueMode = %q, want %q", effectiveQueue, tt.queueMode)
+			}
+			if tt.leaveQueueUnset && effectiveQueue != resolvedQueue {
+				t.Fatalf("effectiveQueueMode default = %q, want %q", effectiveQueue, resolvedQueue)
+			}
+
+			wantVarnish := varnishImage
+			if spec.Application.Mode != "integrated" {
+				wantVarnish = ""
+			}
+			if got := varnishImageFor(spec.Application.Mode); got != wantVarnish {
+				t.Fatalf("varnishImageFor = %q, want %q", got, wantVarnish)
+			}
+
+			// Mirrors component.go searchProxyImage projection.
+			searchProxyImage := ""
+			if spec.Catalog.SearchMode != SearchModeDisabled {
+				searchProxyImage = sigV4ProxyImage
+			}
+			if spec.Catalog.SearchMode == SearchModeDisabled {
+				if searchProxyImage != "" {
+					t.Fatalf("searchProxyImage = %q, want empty for disabled search", searchProxyImage)
+				}
+			} else if searchProxyImage != sigV4ProxyImage {
+				t.Fatalf("searchProxyImage = %q, want %q", searchProxyImage, sigV4ProxyImage)
+			}
+			if spec.Application.WebRuntime != tt.webRuntime {
+				t.Fatalf("WebRuntime = %q, want %q", spec.Application.WebRuntime, tt.webRuntime)
+			}
+		})
+	}
+}
+
+// assertPreviewAmazonMQRejected exercises the AZ guard that makes preview × amazon-mq
+// incompatible by design (2-AZ preview vs CLUSTER_MULTI_AZ's three zones). Giving
+// amazon-mq the three zones it needs under preview must fail Spec.Validate with the
+// zone-count reason named — so the guard is under test rather than merely avoided.
+func assertPreviewAmazonMQRejected(t *testing.T, wantReason string) {
+	t.Helper()
+	spec := validSpec()
+	spec.Catalog.QueueMode = QueueModeAmazonMQ
+	spec.Catalog.RabbitMQ = RabbitMQProfile{InstanceType: "mq.m7g.large"}
+	spec.Dependencies.QueueSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-queue-token"
+	spec.Policy.AvailabilityZones = []string{"eu-west-3a", "eu-west-3b", "eu-west-3c"}
+	err := spec.Validate()
+	if err == nil || !strings.Contains(err.Error(), wantReason) {
+		t.Fatalf("preview×amazon-mq rejection = %v, want reason containing %q", err, wantReason)
+	}
 }
