@@ -1,7 +1,69 @@
 #!/usr/bin/env bash
-# Local, credit-efficient AWS acceptance: preview by default, destroy on EXIT.
-# Requires real AWS credentials (aws-cli / SDK default chain) and Pulumi via MageLift.
+# Local, credit-efficient AWS acceptance: multi-cell catalog on one logical stack.
+# Dry-run (MAGELIFT_ACCEPTANCE_DRY_RUN=1): fixture path — no Pulumi/AWS mutate.
+# Live: preview by default; destroy on EXIT unless MAGELIFT_AWS_ACCEPTANCE_KEEP=true.
 set -Eeuo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=acceptance/lib-checkpoint.sh
+source "$ROOT/scripts/acceptance/lib-checkpoint.sh"
+# shellcheck source=acceptance/lib-evidence.sh
+source "$ROOT/scripts/acceptance/lib-evidence.sh"
+
+CELL_CATALOG="${MAGELIFT_ACCEPTANCE_CELL_CATALOG:-$ROOT/scripts/acceptance/cells-aws-preview.txt}"
+DRY_RUN="${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}"
+
+load_cells() {
+	local line
+	CELLS=()
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+		CELLS+=("$line")
+	done <"$CELL_CATALOG"
+	if [[ ${#CELLS[@]} -eq 0 ]]; then
+		printf 'no cells in catalog: %s\n' "$CELL_CATALOG" >&2
+		exit 2
+	fi
+}
+
+dry_run_cell_loop() {
+	local cell provider account date_s duration started created_once=0
+	provider="${MAGELIFT_ACCEPTANCE_PROVIDER:-aws}"
+	account="${MAGELIFT_ACCEPTANCE_ACCOUNT:-dry-run}"
+	load_cells
+	acceptance_checkpoint_load
+	acceptance_evidence_ensure
+
+	printf 'aws acceptance dry-run start cells=%d catalog=%s\n' "${#CELLS[@]}" "$CELL_CATALOG" >&2
+
+	for cell in "${CELLS[@]}"; do
+		if cell_done "$cell"; then
+			printf 'acceptance skip cell=%s (checkpoint)\n' "$cell" >&2
+			continue
+		fi
+
+		if [[ "$created_once" -eq 0 ]]; then
+			printf 'acceptance create-once\n' >&2
+			created_once=1
+		fi
+		printf 'acceptance cell-update cell=%s\n' "$cell" >&2
+
+		started=$(date +%s)
+		# Fixture success — no magelift / aws mutate.
+		duration="$(( $(date +%s) - started ))s"
+		date_s=$(date -u +%Y-%m-%d)
+		append_row "$cell" "PASS" "$duration" "$provider" "$account" "$date_s"
+		record_cell "$cell" "PASS"
+		printf 'acceptance cell-done cell=%s result=PASS\n' "$cell" >&2
+	done
+
+	printf 'aws acceptance dry-run ok; no AWS create invoked\n' >&2
+}
+
+if [[ "$DRY_RUN" == "1" || "$DRY_RUN" == "true" ]]; then
+	dry_run_cell_loop
+	exit 0
+fi
 
 : "${MAGELIFT_BIN:?set MAGELIFT_BIN to a built magelift executable}"
 : "${MAGELIFT_CONFIG:?set MAGELIFT_CONFIG to an acceptance configuration file}"
