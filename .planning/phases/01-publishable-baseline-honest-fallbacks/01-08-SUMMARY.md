@@ -116,7 +116,7 @@ Examples:
 3. **Task 2: enumerate thirty unsupported methods** - `3f0fd55` (test)
 4. **Task 3: AST sentinel guard (+ CostEstimator stubs)** - `e23cebe` (test)
 
-**Plan metadata:** _(pending final docs commit)_
+**Plan metadata:** `0911bc6` (docs: complete plan)
 
 ## Files Created/Modified
 
