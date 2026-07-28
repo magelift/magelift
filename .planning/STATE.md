@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 3
 current_phase_name: Credit-Efficient Acceptance Harness & Evidence Tiering
 status: planning
-stopped_at: Phase 3 research complete; ready for planning (paid AWS = 03-06 HUMAN_GATE)
-last_updated: "2026-07-28T15:47:00Z"
+stopped_at: Phase 3 plans created; ready for execute-phase (paid AWS = 03-06 HUMAN_GATE)
+last_updated: "2026-07-28T15:55:00Z"
 last_activity: 2026-07-28
-last_activity_desc: Phase 3 RESEARCH.md written (6 plans; offline first; 03-06 paid HUMAN_GATE)
+last_activity_desc: Phase 3 PLAN.md files written (03-01…03-06; paid HUMAN_GATE = 03-06)
 progress:
   total_phases: 8
   completed_phases: 1
@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 3 research complete — planner can create PLAN.md files
+**Current focus:** Phase 3 planned — execute 03-01…03-05 offline, then 03-06 HUMAN_GATE for paid AWS
 
 ## Current Position
 
-Phase: 3 of 8 (Credit-Efficient Acceptance Harness & Evidence Tiering) — **research complete**
-Plan: none yet (recommend 03-01…03-06; paid HUMAN_GATE = 03-06)
-Status: RESEARCH at `.planning/phases/03-credit-efficient-acceptance-harness-evidence-tiering/03-RESEARCH.md`
-Last activity: 2026-07-28 — phase research (offline-first waves; no cloud spend)
+Phase: 3 of 8 (Credit-Efficient Acceptance Harness & Evidence Tiering) — **plans ready**
+Plan: 03-01 of 03-06 (wave 1: 03-01 + 03-03; paid HUMAN_GATE = 03-06)
+Status: 6 PLAN.md files at `.planning/phases/03-credit-efficient-acceptance-harness-evidence-tiering/`
+Last activity: 2026-07-28 — phase planning (offline-first waves; 03-06 paid HUMAN_GATE)
 
-Progress: Phase 2 complete; Phase 3 awaiting plan-phase; Phase 1 hosted-CI HUMAN_GATE still open
+Progress: Phase 2 complete; Phase 3 ready to execute; Phase 1 hosted-CI HUMAN_GATE still open
 
 ## Performance Metrics
 

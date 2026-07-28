@@ -128,7 +128,15 @@ Plans:
   4. The GCP harness path runs the same shape end to end including PSA soak and force-clean teardown, verified at least as far as a dry run / preview pass before Phase 7 spends credits
   5. `docs/capability-matrix.md` records an evidence tier per cell plus an explicit unverifiable reason for Aurora `CreateDBCluster`, `amazon-mq` × `preview`, and the OpenSearch SigV4 data plane; a checked-in port-coverage table maps every day-2 port to mocks / Floci / paid-only, and `make floci-test` covers every port marked mockable
 
-**Plans**: TBD
+**Plans:** 6 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Offline harness core: cell catalog, checkpoint/resume, evidence append, dry-run
+- [ ] 03-02-PLAN.md — Shared assert_clean + offline dual-outcome stub tests
+- [ ] 03-03-PLAN.md — Capability-matrix evidence tiers, unverifiable reasons, port-coverage table
+- [ ] 03-04-PLAN.md — Floci/unit-fake coverage for every mockable day-2 port
+- [ ] 03-05-PLAN.md — GCP harness same shape via preview/dry-run (no live up)
+- [ ] 03-06-PLAN.md — HUMAN_GATE paid AWS free-tier create-once proof (≥3 cells, resume, evidence, assert_clean)
 
 ### Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity
 
