@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Tag-Ready Release Surface
 status: planning
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-07-28T14:44:49.348Z"
+stopped_at: Completed 02-02-PLAN.md (RELEASE-06 blocked on PHP/Composer)
+last_updated: "2026-07-28T14:46:09.426Z"
 last_activity: 2026-07-28
 last_activity_desc: Phase 2 PLAN.md files created
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
   percent: 13
 ---
 
@@ -34,7 +34,7 @@ Plan: 02-01 of 02-04 (wave 1 next)
 Status: Phase 2 plans written (`02-01`…`02-04`); ready for `/gsd-execute-phase 2`
 Last activity: 2026-07-28 — Phase 2 PLAN.md files created
 
-Progress: [████████░░] 79% (Phase 1 offline complete; Phase 2 planning)
+Progress: [█████████░] 86% (Phase 1 offline complete; Phase 2 planning)
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Progress: [████████░░] 79% (Phase 1 offline complete; Phase 
 | Phase 01-publishable-baseline-honest-fallbacks P09 | 3min | 2 tasks | 6 files |
 | Phase 01-publishable-baseline-honest-fallbacks P10 | 10min | 2 tasks | 15 files |
 | Phase 02 P01 | 2min | 3 tasks | 7 files |
+| Phase 02 P02 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-10: F-01-07-1 DependsOn gap deferred untouched during runtime split
 - [Phase ?]: First public tag is v1.0.0-rc.1 on README/versioning/gate board (D-01)
 - [Phase ?]: RC locks sdk/v1 + StackModule core; Phase 6 may change kube-shaped platform ports without v2
+- [Phase ?]: Contributor gate is local make verify; hosted force-all remains HUMAN_GATE deferred
 
 ### Pending Todos
 
@@ -128,6 +130,7 @@ None yet.
 - CI: golangci-lint OOM/timeout is a workaround, not a fix — worsens with every provider package added in Phase 6, so QUALITY-06 must land in Phase 1
 - `go.yaml.in/yaml/v4` pinned to a release candidate; re-verify strict-decoding/merge/provenance tests on every bump
 - GitHub Actions billing/spending limit: jobs refuse to start (annotation on run 30354658603). Must increase spending limit or fix payment before QUALITY-06 CI proof.
+- RELEASE-06: PHP 8.2+ and Composer missing — fresh-clone make verify blocked (scratch/02-02-verify-proof.txt)
 
 ## Deferred Items
 
@@ -142,7 +145,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T14:44:49.342Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-07-28T14:46:09.419Z
+Stopped at: Completed 02-02-PLAN.md (RELEASE-06 blocked on PHP/Composer)
 Resume file: None
 Note: `02-RESEARCH.md` written; hosted CI remains HUMAN_GATE; packaging smoke needs plain Terminal; PHP/Composer required for RELEASE-06 proof on this Mac
