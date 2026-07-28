@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-current_phase: 1
-current_phase_name: Publishable Baseline & Honest Fallbacks
-status: phase_complete_pending_verification
+current_phase: 2
+current_phase_name: Tag-Ready Release Surface
+status: planning
 stopped_at: Completed 01-10-PLAN.md
-last_updated: "2026-07-28T14:23:14.155Z"
+last_updated: "2026-07-28T14:36:47.481Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-10 executed — QUALITY-07 split + AcquireLock warn; hosted CI still deferred
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 10
   completed_plans: 10
   percent: 13
+last_activity_desc: 01-10 SUMMARY landed (`4c73516` / `43ae293` / `da47fa2`)
 ---
 
 # Project State
@@ -24,16 +24,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
-**Current focus:** Phase 1 — Publishable Baseline & Honest Fallbacks
+
+**Current focus:** Phase 2 — Tag-Ready Release Surface
 
 ## Current Position
 
-Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 10 of 10 executed (gap closure QUALITY-07 + TRUST-02 AcquireLock)
-Status: 01-10 complete offline; re-run `/gsd-verify-work` for roadmap SCs; hosted CI criterion 1 still HUMAN_GATE
-Last activity: 2026-07-28 — 01-10 SUMMARY landed (`4c73516` / `43ae293` / `da47fa2`)
+Phase: 2 of 8 (Tag-Ready Release Surface)
+Plan: — (research complete; plans TBD)
+Status: Phase 2 research done (`02-RESEARCH.md`); ready for `/gsd-plan-phase` planner — recommend 4 plans / 3 waves
+Last activity: 2026-07-28 — Phase 2 RESEARCH.md committed
 
-Progress: [██████████] 100% (plans); phase goal pending verification + CI
+Progress: [█░░░░░░░░░] 13% (Phase 1 offline complete; Phase 2 planning)
 
 ## Performance Metrics
 
@@ -138,7 +139,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T14:23:14.149Z
-Stopped at: Completed 01-10-PLAN.md
+Last session: 2026-07-28T14:36:47.404Z
+Stopped at: Phase 2 research complete — ready to plan
 Resume file: None
-Note: 01-10 executed; re-run phase verification before Phase 2; hosted CI remains HUMAN_GATE; F-01-07-1 still deferred
+Note: `02-RESEARCH.md` written; hosted CI remains HUMAN_GATE; packaging smoke needs plain Terminal; PHP/Composer required for RELEASE-06 proof on this Mac
