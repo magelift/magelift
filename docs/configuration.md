@@ -88,6 +88,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `target.aws.catalog.version` | string or null | no |  | Benchmark catalog version |
 | `target.aws.catalog.databaseEngine` | string or null | no | aurora-mysql, rds-mysql | MySQL engine shape |
 | `target.aws.catalog.searchMode` | string or null | no | serverless, provisioned, disabled | OpenSearch provisioning mode |
+| `target.aws.catalog.queueMode` | string or null | no | db, amazon-mq, ecs-rabbitmq, ecs-artemis | Magento messaging broker mode |
 | `target.aws.catalog.aurora` | object | no |  | Aurora or RDS MySQL capacity |
 | `target.aws.catalog.aurora.minimumAcu` | number | no |  | Minimum Aurora Serverless v2 capacity |
 | `target.aws.catalog.aurora.maximumAcu` | number | no |  | Maximum Aurora Serverless v2 capacity |
@@ -108,7 +109,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `target.aws.catalog.search.dedicatedMasterCount` | integer | no |  | OpenSearch dedicated master count |
 | `target.aws.catalog.search.ebsVolumeType` | string | no |  | OpenSearch EBS volume type |
 | `target.aws.catalog.search.ebsVolumeSizeGiB` | integer | no |  | OpenSearch EBS volume size |
-| `target.aws.catalog.rabbitMq` | object | no |  | RabbitMQ capacity |
+| `target.aws.catalog.rabbitMq` | object | no |  | Amazon MQ RabbitMQ capacity (queueMode amazon-mq) |
 | `target.aws.catalog.rabbitMq.instanceType` | string | no |  | RabbitMQ broker instance type |
 | `target.aws.catalog.fargate` | object | no |  | Fargate capacity (ecs-fargate) |
 | `target.aws.catalog.fargate.cpu` | integer | no |  | Fargate task CPU |
@@ -259,6 +260,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.target.aws.catalog.version` | string or null | no |  | Benchmark catalog version |
 | `environments.*.target.aws.catalog.databaseEngine` | string or null | no | aurora-mysql, rds-mysql | MySQL engine shape |
 | `environments.*.target.aws.catalog.searchMode` | string or null | no | serverless, provisioned, disabled | OpenSearch provisioning mode |
+| `environments.*.target.aws.catalog.queueMode` | string or null | no | db, amazon-mq, ecs-rabbitmq, ecs-artemis | Magento messaging broker mode |
 | `environments.*.target.aws.catalog.aurora` | object | no |  | Aurora or RDS MySQL capacity |
 | `environments.*.target.aws.catalog.aurora.minimumAcu` | number | no |  | Minimum Aurora Serverless v2 capacity |
 | `environments.*.target.aws.catalog.aurora.maximumAcu` | number | no |  | Maximum Aurora Serverless v2 capacity |
@@ -279,7 +281,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.target.aws.catalog.search.dedicatedMasterCount` | integer | no |  | OpenSearch dedicated master count |
 | `environments.*.target.aws.catalog.search.ebsVolumeType` | string | no |  | OpenSearch EBS volume type |
 | `environments.*.target.aws.catalog.search.ebsVolumeSizeGiB` | integer | no |  | OpenSearch EBS volume size |
-| `environments.*.target.aws.catalog.rabbitMq` | object | no |  | RabbitMQ capacity |
+| `environments.*.target.aws.catalog.rabbitMq` | object | no |  | Amazon MQ RabbitMQ capacity (queueMode amazon-mq) |
 | `environments.*.target.aws.catalog.rabbitMq.instanceType` | string | no |  | RabbitMQ broker instance type |
 | `environments.*.target.aws.catalog.fargate` | object | no |  | Fargate capacity (ecs-fargate) |
 | `environments.*.target.aws.catalog.fargate.cpu` | integer | no |  | Fargate task CPU |
