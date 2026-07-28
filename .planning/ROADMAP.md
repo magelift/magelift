@@ -78,7 +78,7 @@ Every phase respects these; they are not phase work, they are constraints on pha
   4. Any mutating command against a target whose certification tier is `platform.TierExperimental` prints a tier-naming warning before Pulumi is invoked — keyed on **tier, not a provider allowlist**, so `aws/eks-autopilot` is covered and no future experimental target can slip through. Asserted by a CLI test, not by reading docs.
   5. No experimental target can silently appear to succeed. Specifically: every unimplemented day-2 command exits non-zero naming the capability and its tier, with a test enumerating the `ErrNotSupported` sites (15 each in `internal/cloud/ovh/stack/ops.go` and `internal/cloud/scaleway/stack/ops.go`) and asserting none returns a nil-success path; `magelift deploy` no longer silently degrades to infrastructure-only when `Ops` returns `ErrNotSupported` (`internal/cli/lifecycle.go:176-180`) but announces it loudly or refuses without an explicit flag; and no-op `AcquireLock` implementations warn that no lock was taken rather than returning a release function that implies one was.
 
-**Plans**: 9/10 plans executed
+**Plans**: 10/10 plans executed
 
 - [x] 01-01-PLAN.md
 - [x] 01-02-PLAN.md
@@ -89,7 +89,7 @@ Every phase respects these; they are not phase work, they are constraints on pha
 - [x] 01-07-PLAN.md
 - [x] 01-08-PLAN.md
 - [x] 01-09-PLAN.md
-- [ ] 01-10-PLAN.md — gap closure: QUALITY-07 runtime split + TRUST-02 AcquireLock warn
+- [x] 01-10-PLAN.md — gap closure: QUALITY-07 runtime split + TRUST-02 AcquireLock warn
 
 ### Phase 2: Tag-Ready Release Surface
 
@@ -212,7 +212,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Publishable Baseline & Honest Fallbacks | 9/9 | In Progress|  |
+| 1. Publishable Baseline & Honest Fallbacks | 10/10 | In Progress|  |
 | 2. Tag-Ready Release Surface | 0/TBD | Not started | - |
 | 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 0/TBD | Not started | - |
 | 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 0/TBD | Not started | - |

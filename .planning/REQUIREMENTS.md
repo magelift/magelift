@@ -101,7 +101,7 @@
 - [x] **QUALITY-04**: Combination tests cover `queueMode` × `searchMode` × `webRuntime` together, not just each catalog cell in isolation
 - [x] **QUALITY-05**: Every provider's subnet/CIDR carving has explicit boundary tests (min index, max index, max index + 1)
 - [x] **QUALITY-06**: `golangci-lint` completes in CI without OOM or timeout by partitioning work per provider, rather than by serializing one 30-minute job
-- [ ] **QUALITY-07**: `internal/cloud/aws/runtime/runtime.go` is split by concern (task definition, service, sidecar injection) so no single 991-line file owns all AWS runtime wiring
+- [x] **QUALITY-07**: `internal/cloud/aws/runtime/runtime.go` is split by concern (task definition, service, sidecar injection) so no single 991-line file owns all AWS runtime wiring
 - [x] **QUALITY-08**: The two recently fixed OVH bugs — MKS node-pool dependency ordering and subnet index cap validation — have explicit regression tests
 
 ### Public Release
@@ -199,7 +199,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | QUALITY-04 | Phase 1 | Complete |
 | QUALITY-05 | Phase 1 | Complete |
 | QUALITY-06 | Phase 1 | Complete |
-| QUALITY-07 | Phase 1 | Pending |
+| QUALITY-07 | Phase 1 | Complete |
 | QUALITY-08 | Phase 1 | Complete |
 | RELEASE-01 | Phase 2 | Pending |
 | RELEASE-02 | Phase 2 | Pending |

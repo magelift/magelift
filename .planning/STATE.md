@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
 status: ready_to_execute
-stopped_at: Gap-closure plan 01-10 written — execute QUALITY-07 + AcquireLock; CI deferred
-last_updated: "2026-07-28T16:15:00Z"
+stopped_at: Completed 01-10-PLAN.md
+last_updated: "2026-07-28T14:23:14.155Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-10-PLAN.md gap closure created (QUALITY-07 + TRUST-02 AcquireLock)
+last_activity_desc: 01-10-PLAN.md written for gap closure
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 10
-  completed_plans: 9
-  percent: 0
+  completed_plans: 10
+  percent: 13
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 9 of 10 executed; **01-10** planned (gap closure) — verification gaps_found (2/5 roadmap SCs)
+Plan: 10 of 10 executed; **01-10** planned (gap closure) — verification gaps_found (2/5 roadmap SCs)
 Status: Ready to execute 01-10 (QUALITY-07 runtime split + AcquireLock warn); hosted CI deferred
 Last activity: 2026-07-28 — 01-10-PLAN.md written for gap closure
 
-Progress: gap-closure plan ready; phase goal not yet achieved
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -69,6 +69,7 @@ Progress: gap-closure plan ready; phase goal not yet achieved
 | Phase 01-publishable-baseline-honest-fallbacks P08 | 8min | 3 tasks | 8 files |
 | Phase 01-publishable-baseline-honest-fallbacks P09 | 5min | 2 tasks | 7 files |
 | Phase 01-publishable-baseline-honest-fallbacks P09 | 3min | 2 tasks | 6 files |
+| Phase 01-publishable-baseline-honest-fallbacks P10 | 10min | 2 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-09: warn at planStack keyed on CertificationTier (includes aws/eks-autopilot)
 - [Phase ?]: 01-09: Magento-less deploy refuses without --infra-only; announces when flagged
 - [Phase ?]: Phase 1 plans complete offline; CI criterion 1 still deferred (HUMAN_GATE / act)
+- [Phase ?]: 01-10: warn+noop AcquireLock via platform.WarnNoDIYLock (not ErrNotSupported)
+- [Phase ?]: 01-10: AST ErrNotSupported walk covers unsupported only; AcquireLock via warning tests
+- [Phase ?]: 01-10: F-01-07-1 DependsOn gap deferred untouched during runtime split
 
 ### Pending Todos
 
@@ -134,7 +138,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T16:15:00Z
-Stopped at: Gap-closure plan 01-10 written (QUALITY-07 split + AcquireLock warn); execute next; CI still deferred
+Last session: 2026-07-28T14:23:14.149Z
+Stopped at: Completed 01-10-PLAN.md
 Resume file: None
 Note: Do not advance to Phase 2 until 01-10 executes and verification re-runs; hosted CI remains HUMAN_GATE
