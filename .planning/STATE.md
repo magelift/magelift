@@ -4,14 +4,14 @@ milestone: v1.0.0
 milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
-status: ready_to_execute
+status: phase_complete_pending_verification
 stopped_at: Completed 01-10-PLAN.md
 last_updated: "2026-07-28T14:23:14.155Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-10-PLAN.md written for gap closure
+last_activity_desc: 01-10 executed — QUALITY-07 split + AcquireLock warn; hosted CI still deferred
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 10
   completed_plans: 10
   percent: 13
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 10 of 10 executed; **01-10** planned (gap closure) — verification gaps_found (2/5 roadmap SCs)
-Status: Ready to execute 01-10 (QUALITY-07 runtime split + AcquireLock warn); hosted CI deferred
-Last activity: 2026-07-28 — 01-10-PLAN.md written for gap closure
+Plan: 10 of 10 executed (gap closure QUALITY-07 + TRUST-02 AcquireLock)
+Status: 01-10 complete offline; re-run `/gsd-verify-work` for roadmap SCs; hosted CI criterion 1 still HUMAN_GATE
+Last activity: 2026-07-28 — 01-10 SUMMARY landed (`4c73516` / `43ae293` / `da47fa2`)
 
-Progress: [██████████] 100%
+Progress: [██████████] 100% (plans); phase goal pending verification + CI
 
 ## Performance Metrics
 
@@ -141,4 +141,4 @@ Items acknowledged and carried forward from previous milestone close:
 Last session: 2026-07-28T14:23:14.149Z
 Stopped at: Completed 01-10-PLAN.md
 Resume file: None
-Note: Do not advance to Phase 2 until 01-10 executes and verification re-runs; hosted CI remains HUMAN_GATE
+Note: 01-10 executed; re-run phase verification before Phase 2; hosted CI remains HUMAN_GATE; F-01-07-1 still deferred
