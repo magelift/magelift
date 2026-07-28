@@ -18,7 +18,7 @@
 - [x] **ACCEPT-03**: Acceptance runs record evidence automatically (cell, result, duration, provider, account, date) into a matrix results file, with no hand transcription
 - [ ] **ACCEPT-04**: Acceptance runs destroy every created resource on exit and assert the account is clean, failing loudly if anything remains
 - [ ] **ACCEPT-05**: Maintainer can run the same acceptance harness shape against GCP as against AWS, including GCP's PSA soak and force-clean teardown path
-- [ ] **ACCEPT-06**: Every day-2 port that can be exercised without a paid account is covered by Floci or Pulumi mocks, so a paid pass only buys what mocks cannot prove
+- [x] **ACCEPT-06**: Every day-2 port that can be exercised without a paid account is covered by Floci or Pulumi mocks, so a paid pass only buys what mocks cannot prove
 
 ### Honest Capability Claims
 
@@ -26,8 +26,8 @@
 
 - [x] **TRUST-01**: Operator selecting an experimental provider or runtime sees an unmistakable warning from the CLI itself before any mutating command, not only in documentation
 - [x] **TRUST-02**: Operator invoking an unimplemented day-2 command on an experimental target gets an actionable error naming the capability and its certification tier — never a silent no-op or a false success
-- [ ] **TRUST-03**: Capability matrix records an evidence tier per cell (Pulumi mocks / Floci / real-account acceptance) and no cell claims a tier above its recorded evidence
-- [ ] **TRUST-04**: Cells that cannot be verified on the maintainer's accounts are marked unverifiable with the specific reason (free-tier API block, AZ requirement, cost), so a reader can distinguish "untested" from "broken"
+- [x] **TRUST-03**: Capability matrix records an evidence tier per cell (Pulumi mocks / Floci / real-account acceptance) and no cell claims a tier above its recorded evidence
+- [x] **TRUST-04**: Cells that cannot be verified on the maintainer's accounts are marked unverifiable with the specific reason (free-tier API block, AZ requirement, cost), so a reader can distinguish "untested" from "broken"
 
 ### GCP Certification
 
@@ -156,11 +156,11 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | ACCEPT-03 | Phase 3 | Complete |
 | ACCEPT-04 | Phase 3 | Pending |
 | ACCEPT-05 | Phase 3 | Pending |
-| ACCEPT-06 | Phase 3 | Pending |
+| ACCEPT-06 | Phase 3 | Complete |
 | TRUST-01 | Phase 1 | Complete |
 | TRUST-02 | Phase 1 | Complete |
-| TRUST-03 | Phase 3 | Pending |
-| TRUST-04 | Phase 3 | Pending |
+| TRUST-03 | Phase 3 | Complete |
+| TRUST-04 | Phase 3 | Complete |
 | GCP-01 | Phase 7 | Pending |
 | GCP-02 | Phase 7 | Pending |
 | GCP-03 | Phase 7 | Pending |

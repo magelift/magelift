@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 3
 current_phase_name: Credit-Efficient Acceptance Harness & Evidence Tiering
 status: planning
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-07-28T15:53:02.050Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-07-28T15:54:09.971Z"
 last_activity: 2026-07-28
 last_activity_desc: phase planning (offline-first waves; 03-06 paid HUMAN_GATE)
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 20
-  completed_plans: 15
+  completed_plans: 16
   percent: 25
 ---
 
@@ -34,7 +34,7 @@ Plan: 03-01 of 03-06 (wave 1: 03-01 + 03-03; paid HUMAN_GATE = 03-06)
 Status: 6 PLAN.md files at `.planning/phases/03-credit-efficient-acceptance-harness-evidence-tiering/`
 Last activity: 2026-07-28 — phase planning (offline-first waves; 03-06 paid HUMAN_GATE)
 
-Progress: [████████░░] 75%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Progress: [████████░░] 75%
 | Phase 02 P02 | 2min | 2 tasks | 3 files |
 | Phase 02 P03 | 22min | 2 tasks | 5 files |
 | Phase 03 P01 | 12min | 2 tasks | 8 files |
+| Phase 03 P03 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Community providers are compile-time custom binaries; separate modules cannot import internal/
 - [Phase ?]: Env var MAGELIFT_ACCEPTANCE_DRY_RUN=1 for offline fixture path
 - [Phase ?]: Checkpoint JSON schema {cells:{id:{result,at}}} under .magelift/
+- [Phase ?]: Under-claim ecs-rabbitmq/artemis as Pulumi mocks until paid harness cites them
+- [Phase ?]: PrepareExec / ECS ExecuteCommand marked unit-fake or paid-only
 
 ### Pending Todos
 
@@ -150,7 +153,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T15:53:02.044Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-07-28T15:54:09.964Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None
 Note: Hosted CI / QUALITY-06 remains Phase 1 HUMAN_GATE. Phase 3 must not spend AWS until 03-06 HUMAN_GATE.
