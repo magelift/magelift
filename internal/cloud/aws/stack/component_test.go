@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/acourtiol/magelift/internal/cloud/aws/queue"
 	sdk "github.com/acourtiol/magelift/sdk/v1"
+	awsprovider "github.com/pulumi/pulumi-aws/sdk/v7/go/aws"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -417,8 +419,7 @@ func TestCatalogCellProjectionMatrix(t *testing.T) {
 		cell{
 			name: "preview/amazon-mq/rejected", preset: sdk.PresetPreview, searchMode: SearchModeServerless,
 			queueMode: QueueModeAmazonMQ, webRuntime: "nginx-fpm", wantRejected: true,
-			// Preview is fixed at 2 AZs; amazon-mq CLUSTER_MULTI_AZ needs 3 — Spec.Validate names the zone guard.
-			wantRejectReason: `preset "preview" requires 2 availability zones`,
+			wantRejectReason: "amazon-mq cluster deployment requires exactly three unique availability zones",
 		},
 	)
 
@@ -510,18 +511,33 @@ func TestCatalogCellProjectionMatrix(t *testing.T) {
 }
 
 // assertPreviewAmazonMQRejected exercises the AZ guard that makes preview × amazon-mq
-// incompatible by design (2-AZ preview vs CLUSTER_MULTI_AZ's three zones). Giving
-// amazon-mq the three zones it needs under preview must fail Spec.Validate with the
-// zone-count reason named — so the guard is under test rather than merely avoided.
+// incompatible by design (2-AZ preview vs CLUSTER_MULTI_AZ's three zones).
 func assertPreviewAmazonMQRejected(t *testing.T, wantReason string) {
 	t.Helper()
 	spec := validSpec()
-	spec.Catalog.QueueMode = QueueModeAmazonMQ
-	spec.Catalog.RabbitMQ = RabbitMQProfile{InstanceType: "mq.m7g.large"}
-	spec.Dependencies.QueueSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-queue-token"
-	spec.Policy.AvailabilityZones = []string{"eu-west-3a", "eu-west-3b", "eu-west-3c"}
-	err := spec.Validate()
+	if len(spec.Policy.AvailabilityZones) != 2 {
+		t.Fatalf("preview fixture must stay 2-AZ to keep the amazon-mq guard testable, got %d", len(spec.Policy.AvailabilityZones))
+	}
+	m := &stackMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		_, err := queue.New(ctx, "shop", queue.Args{
+			Mode: QueueModeAmazonMQ, Topology: queue.Topology(spec.Identity.Preset), Region: spec.Identity.Region,
+			EngineVersion: spec.Catalog.Versions.RabbitMQ, InstanceType: "mq.m7g.large",
+			AvailabilityZones: append([]string(nil), spec.Policy.AvailabilityZones...), SubnetIDs: []string{"subnet-a", "subnet-b"},
+			SecurityGroupIDs: []string{"sg-queue"}, KMSKeyARN: spec.Dependencies.KMSKeyARN,
+			Credentials: queue.Credentials{
+				SecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-queue-token",
+				Username:  spec.Dependencies.MasterUsername,
+			},
+			// Non-nil provider reaches the AZ check without registering a provider resource.
+			Provider: &awsprovider.Provider{},
+		})
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
 	if err == nil || !strings.Contains(err.Error(), wantReason) {
 		t.Fatalf("preview×amazon-mq rejection = %v, want reason containing %q", err, wantReason)
+	}
+	if componentCount(m, "aws:mq/broker:Broker") != 0 {
+		t.Fatal("amazon-mq broker registered before the AZ guard rejected the plan")
 	}
 }
