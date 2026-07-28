@@ -6,7 +6,7 @@ current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
 status: executing
 stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-07-28T11:50:37.616Z"
+last_updated: "2026-07-28T11:51:16.360Z"
 last_activity: 2026-07-28
 last_activity_desc: 01-04 SUMMARY; continue 01-05 without CI
 progress:
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 1 of 8 (Publishable Baseline & Honest Fallbacks)
-Plan: 6 of 9 in current phase (01-04 closed offline; next 01-05 sequential)
+Plan: 7 of 9 in current phase (01-04 closed offline; next 01-05 sequential)
 Status: Ready to execute
 Last activity: 2026-07-28 — 01-04 SUMMARY; continue 01-05 without CI
 
@@ -63,6 +63,7 @@ Progress: [██████░░░░] 56%
 | Phase 01 P03 | 6 | 2 tasks | 2 files |
 | Phase 01 P04 | 6 | 3 tasks | 8 files |
 | Phase 01-publishable-baseline-honest-fallbacks P05 | 4min | 2 tasks | 4 files |
+| Phase 01 P05 | 5 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 01-04: OCU step rule recorded as empirical/unpublished; 1700 ceiling marker only
 - [Phase ?]: AWS carve: 16 slots at bits+4, max 5 zones; capacity check before preset AZ policy
 - [Phase ?]: GCP carve: /20 → 8 indices (0-7); caller zone cap before Pulumi registration
+- [Phase ?]: 01-05: AWS carve capacity before preset zone-count so 6+ zones fail isolation
+- [Phase ?]: 01-05: GCP keeps caller zone-capacity and helper index errors separate
 
 ### Pending Todos
 
@@ -111,7 +114,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-28T11:50:37.610Z
+Last session: 2026-07-28T11:51:16.353Z
 Stopped at: Completed 01-05-PLAN.md
 Resume file: None
 Note: CI workflow partitioning landed on main; Task 2 evidence pending minutes reset
