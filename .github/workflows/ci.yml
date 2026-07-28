@@ -76,7 +76,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Cold serial go build ./... on ubuntu-latest measured >20m (run 30346222966);
+    # keep -p=1/GOMAXPROCS=1 (OOM-safe) but give the warm-up room to finish and save caches.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -89,7 +91,9 @@ jobs:
         env:
           GOFLAGS: -p=1
           GOMAXPROCS: "1"
-        run: go build ./...
+        run: |
+          go mod download
+          go build ./...
       # Explicit save with if: always() — setup-go's post-step never runs when the runner is reaped.
       - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         if: always()
