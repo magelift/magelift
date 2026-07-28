@@ -8,7 +8,7 @@ For a full green `make verify` (the default local gate):
 
 - **Go** toolchain matching [`go.mod`](go.mod) (CI uses `go-version-file`)
 - **PHP 8.2+** and **Composer** — required because `make verify` runs `php-test`
-  on the `build/` Magento package
+  on the `build/` Magento package. After clone, once: `composer install --working-dir=build`
 - **MkDocs** — required because `make verify` runs `docs` (strict link/nav build)
 
 Pulled automatically via pinned `go run` from Makefile targets (no separate
