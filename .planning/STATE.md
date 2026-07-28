@@ -5,7 +5,7 @@ milestone_name: milestone
 current_phase: 2
 current_phase_name: Tag-Ready Release Surface
 status: planning
-stopped_at: Completed 01-10-PLAN.md
+stopped_at: Phase 2 research complete — ready to plan
 last_updated: "2026-07-28T14:36:47.481Z"
 last_activity: 2026-07-28
 progress:
@@ -14,7 +14,7 @@ progress:
   total_plans: 10
   completed_plans: 10
   percent: 13
-last_activity_desc: 01-10 SUMMARY landed (`4c73516` / `43ae293` / `da47fa2`)
+last_activity_desc: Phase 2 RESEARCH.md written; 4 plans / 3 waves recommended
 ---
 
 # Project State
