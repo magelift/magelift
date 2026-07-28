@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Publishable Baseline & Honest Fallbacks
 status: verifying
-stopped_at: Completed 01-09-PLAN.md — Phase 1 plans complete offline; CI criterion 1 deferred (HUMAN_GATE/act)
+stopped_at: Phase 1 plans 01-01..01-09 complete offline; awaiting verify (CI deferred)
 last_updated: "2026-07-28T13:58:03.692Z"
 last_activity: 2026-07-28
-last_activity_desc: 01-09 SUMMARY; Phase 1 plans complete offline; CI criterion 1 deferred
+last_activity_desc: 01-09 SUMMARY; next gsd-verify-phase with act/local evidence
 progress:
   total_phases: 8
   completed_phases: 1
