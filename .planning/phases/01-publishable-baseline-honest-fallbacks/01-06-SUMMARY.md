@@ -64,7 +64,7 @@ coverage:
         status: pass
     human_judgment: false
 
-duration: 5min
+duration: 6min
 completed: 2026-07-28
 status: complete
 ---
@@ -82,13 +82,13 @@ Shape used in `internal/cloud/ovh/runtime/runtime_test.go`:
 3. `one(t, typeToken, nameSuffix)` — fail with "graph shape changed" if missing.
 4. `assertDependsOn(t, rec, substrings...)` — fail with "ordering regressed" + deps dump if a substring is absent.
 
-Do not assert on registration-slice order; the Go SDK registers concurrently.
+Do not assert on registration-slice order; the Go SDK registers concurrently. Phase 6 should lift this helper for Kapsule/GKE (ceiling marked in the test file).
 
 ## Performance
 
-- **Duration:** ~5 min
-- **Started:** 2026-07-28T11:51:42Z
-- **Completed:** 2026-07-28T11:56:13Z
+- **Duration:** ~6 min
+- **Started:** 2026-07-28T11:51:03Z
+- **Completed:** 2026-07-28T11:57:14Z
 - **Tasks:** 3
 - **Files modified:** 3
 
@@ -102,9 +102,9 @@ Do not assert on registration-slice order; the Go SDK registers concurrently.
 
 1. **Task 1: Assert the OVH carve at its exact index boundaries** - `68e7538` (test)
 2. **Task 2: Assert the MKS node-pool dependency ordering** - `4c1d49a` (test)
-3. **Task 3: Make Scaleway's single-range model explicit** - `94139b6` (test)
+3. **Task 3: Make Scaleway's single-range model explicit** - `94139b6` (test), `bf3c22f` (test cleanup: PN-count proxy for single PrivateSubnetIDs entry)
 
-**Plan metadata:** `40ec8b7` (docs: complete plan)
+**Plan metadata:** `40ec8b7` (docs: complete plan); follow-up SUMMARY refresh below
 
 ## Files Created/Modified
 
@@ -117,10 +117,15 @@ Do not assert on registration-slice order; the Go SDK registers concurrently.
 - Substring URN matching over exact URNs (stable under mock project/stack rename)
 - Scaleway closes QUALITY-05 as non-applicability with invariant + doc comment, not a fake carve boundary
 - Marker comment names Phase 6 shared-layer lift for Kapsule/GKE
+- Scaleway PrivateSubnetIDs length asserted via exactly-one PN resource (the sole element of that list)
 
 ## Deviations from Plan
 
 None - plan executed as written (test-only; production already correct). Task 2 deliberate regression (temporarily omit pool from `k8sOpts`) was observed failing then restored before commit; no production change shipped.
+
+## Known Stubs
+
+None.
 
 ## Threat Flags
 
@@ -131,5 +136,5 @@ None — no new network endpoints, auth paths, or trust-boundary schema changes.
 - FOUND: `internal/cloud/ovh/network/network_test.go`
 - FOUND: `internal/cloud/ovh/runtime/runtime_test.go`
 - FOUND: `internal/cloud/scaleway/network/network_test.go`
-- FOUND: commits `68e7538`, `4c1d49a`, `94139b6`
+- FOUND: commits `68e7538`, `4c1d49a`, `94139b6`, `bf3c22f`
 - VERIFY: all three packages pass `go test -race`
