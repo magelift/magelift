@@ -37,9 +37,26 @@
           "$ref": "#/$defs/aWSCatalogFargate",
           "description": "Fargate capacity (ecs-fargate)"
         },
+        "queueMode": {
+          "anyOf": [
+            {
+              "description": "Magento messaging broker mode",
+              "enum": [
+                "db",
+                "amazon-mq",
+                "ecs-rabbitmq",
+                "ecs-artemis"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "rabbitMq": {
           "$ref": "#/$defs/aWSCatalogRabbitMQ",
-          "description": "RabbitMQ capacity"
+          "description": "Amazon MQ RabbitMQ capacity (queueMode amazon-mq)"
         },
         "retention": {
           "$ref": "#/$defs/aWSCatalogRetention",
@@ -320,9 +337,26 @@
           "$ref": "#/$defs/aWSCatalogFargateOverlay",
           "description": "Fargate capacity (ecs-fargate)"
         },
+        "queueMode": {
+          "anyOf": [
+            {
+              "description": "Magento messaging broker mode",
+              "enum": [
+                "db",
+                "amazon-mq",
+                "ecs-rabbitmq",
+                "ecs-artemis"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "rabbitMq": {
           "$ref": "#/$defs/aWSCatalogRabbitMQOverlay",
-          "description": "RabbitMQ capacity"
+          "description": "Amazon MQ RabbitMQ capacity (queueMode amazon-mq)"
         },
         "retention": {
           "$ref": "#/$defs/aWSCatalogRetentionOverlay",
