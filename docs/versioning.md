@@ -61,7 +61,7 @@ kube-shaped `platform` ports as frozen for the full RC series.
 
 ## Changelog
 
-Keep [CHANGELOG.md](../CHANGELOG.md) current under `[Unreleased]` until the first
+Keep `CHANGELOG.md` (repository root) current under `[Unreleased]` until the first
 Release Please tag. After `v1.0.0-rc.1`, Conventional Commits drive release notes.
 
 ## First public tag criteria
