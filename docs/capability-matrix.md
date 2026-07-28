@@ -95,6 +95,9 @@ disposable maintainer accounts. Reasons are specific (TRUST-04):
 | `amazon-mq` × `preview` | Preview preset is 2-AZ while Amazon MQ `CLUSTER_MULTI_AZ` requires 3 AZs — plan is incompatible by design; skip apply on disposable accounts |
 | OpenSearch SigV4 data-plane | Live SigV4 search data-plane is deferred paid / not free-tier certifiable; Pulumi graph mocks do not prove SigV4 query auth |
 
+AOSS / OpenSearch Serverless OCU cost ceilings remain empirical/unpublished maintainer
+notes (Phase 1 honesty) — do not treat OCU quotes as certified AWS policy.
+
 ## Evidence tiers
 
 | Tier | Proves |
