@@ -6,8 +6,8 @@
 //
 //	go build -o magelift-ext ./examples/custom-cli
 //
-// Replace the stub module with an external Go module that implements
-// platform.StackModule (and optionally platform.HasOps).
+// Replace stubModule with an external (or in-module) StackModule that
+// implements a real Plan/Program when shipping a community provider.
 package main
 
 import (
@@ -27,8 +27,7 @@ func main() {
 		awsops.Module{},
 		awseksops.Module{},
 		gcpops.Module{},
-		// Community providers register the same way:
-		// community.Module{},
+		stubModule{}, // community registration demo (Plan refuses deploy)
 	} {
 		if err := modules.RegisterModule(module); err != nil {
 			fail(err)

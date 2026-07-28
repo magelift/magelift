@@ -31,7 +31,9 @@ GOMAXPROCS=1 GOFLAGS=-p=1 go build -o magelift-ext ./examples/custom-cli
 ```
 
 [`main.go`](main.go) registers the same first-party modules as upstream, then
-leaves a slot for a community `StackModule` (see upcoming stub in this package).
+registers [`stubModule`](stub_module.go) as a community slot. The stub proves
+`RegisterModule` wiring; its `Plan` refuses so it is not a fake deployable.
+Replace `Plan` / `Program` with a real stack when shipping a real provider.
 
 ## Contract
 
