@@ -3,7 +3,9 @@ package platform
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 )
@@ -15,13 +17,31 @@ var ErrNotSupported = errors.New("operation not supported for this target")
 // Ops is the optional Magento-facing operations surface for a StackModule.
 // Adapters that only manage the infrastructure graph omit HasOps.
 type Ops interface {
-	// AcquireLock returns a release function. Experimental targets may return a
-	// no-op release when they have no DIY lock yet.
+	// AcquireLock returns a release function. Experimental targets may still
+	// return a no-op release when they have no DIY lock, but they must warn on
+	// stderr that no lock was taken (see WarnNoDIYLock).
 	AcquireLock(ctx context.Context, planned PlannedStack) (release func(context.Context) error, err error)
 	// NewDeploySteps returns Magento candidate deploy steps, or ErrNotSupported
 	// when the adapter is infrastructure-only. backend is the CLI infrastructure
 	// backend (preview/update/destroy/outputs); adapters type-assert as needed.
 	NewDeploySteps(ctx context.Context, backend any, planned PlannedStack, diagnostics io.Writer) (deployflow.Steps, error)
+}
+
+// WarnNoDIYLock writes a clear warning that no DIY deployment lock was taken.
+// w defaults to os.Stderr when nil. Message shape is stable for adapter tests.
+func WarnNoDIYLock(w io.Writer, planned PlannedStack) {
+	if w == nil {
+		w = os.Stderr
+	}
+	target := "unknown target"
+	if planned != nil {
+		if id := planned.TargetDescriptor().ID; id != "" {
+			target = string(id)
+		} else {
+			target = string(planned.Provider()) + "/" + string(planned.Runtime())
+		}
+	}
+	fmt.Fprintf(w, "warning: DIY deployment lock was not taken for %s\n", target)
 }
 
 // HasOps is implemented by StackModules that expose Magento deploy Ops.

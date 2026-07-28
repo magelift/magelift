@@ -70,7 +70,8 @@ type Ops struct{}
 
 func (Module) Ops() platform.Ops { return Ops{} }
 
-func (Ops) AcquireLock(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+func (Ops) AcquireLock(_ context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
+	platform.WarnNoDIYLock(diyLockWarnOut, planned)
 	return func(context.Context) error { return nil }, nil
 }
 

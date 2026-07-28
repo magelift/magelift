@@ -215,7 +215,8 @@ func (unsupportedCost) Estimate(context.Context, platform.PlannedStack, config.C
 
 type Ops struct{}
 
-func (Ops) AcquireLock(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+func (Ops) AcquireLock(_ context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
+	platform.WarnNoDIYLock(diyLockWarnOut, planned)
 	return func(context.Context) error { return nil }, nil
 }
 
