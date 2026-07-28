@@ -11,6 +11,7 @@ import (
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/acourtiol/magelift/internal/usererr"
 	"github.com/spf13/cobra"
 )
 
@@ -154,7 +155,9 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
 	requestTarget := planned.TargetDescriptor()
-	if !deployOptions.infraOnly && o.newDeploySteps != nil {
+	if deployOptions.infraOnly {
+		announceInfraOnlyDeploy(o.stderr)
+	} else if o.newDeploySteps != nil {
 		steps, stepsErr := o.newDeploySteps(ctx, backend, planned, o.stderr)
 		if stepsErr == nil && steps != nil {
 			if planned.EnvironmentClass() == "production" {
@@ -177,7 +180,8 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 		if stepsErr != nil && !errors.Is(stepsErr, platform.ErrNotSupported) {
 			return infrastructureResult{}, fmt.Errorf("create deployment workflow: %w", stepsErr)
 		}
-		// ErrNotSupported or nil steps: infrastructure graph update only.
+		// ErrNotSupported or nil steps: refuse unless the operator asked for infra-only.
+		return infrastructureResult{}, refuseInfraOnlyDeploy(planned)
 	}
 	if o.newLock == nil {
 		return infrastructureResult{}, errors.New("deployment lock factory is required")
@@ -292,6 +296,28 @@ func warnExperimentalTarget(stderr io.Writer, planned platform.PlannedStack) {
 		return
 	}
 	_, _ = fmt.Fprintf(stderr, experimentalTargetWarningFmt+"\n", planned.Provider(), planned.Runtime())
+}
+
+// infraOnlyDeployNoticeFmt is the TRUST-02 stderr line when --infra-only proceeds.
+const infraOnlyDeployNoticeFmt = "notice: --infra-only: Magento migrate, cutover, and health were skipped\n"
+
+func announceInfraOnlyDeploy(stderr io.Writer) {
+	if stderr == nil {
+		return
+	}
+	_, _ = io.WriteString(stderr, infraOnlyDeployNoticeFmt)
+}
+
+func refuseInfraOnlyDeploy(planned platform.PlannedStack) error {
+	cause := fmt.Sprintf(
+		"deploy on target %s/%s (%s) cannot run Magento migrate, cutover, and health",
+		planned.Provider(), planned.Runtime(), planned.CertificationTier(),
+	)
+	return invalid(usererr.New(
+		cause,
+		"Re-run with --infra-only to update the infrastructure graph only.",
+		"docs/capability-matrix.md",
+	))
 }
 
 func (o *options) acquireProviderLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
