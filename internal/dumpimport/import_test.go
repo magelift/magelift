@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -60,6 +61,7 @@ func requireLocalMySQL(t *testing.T) dumpimport.Options {
 		t.Fatal(err)
 	}
 	// Minimal database-only compose (same image/credentials as localdev).
+	// Publish an ephemeral host port so a host `mysql` client (when present) can connect.
 	compose := `services:
   database:
     image: mysql:8.4@sha256:c592c15aaf4a1961e15d82eb31ea5987dda862d1c4b1e93424438c0e91dc1f8d
@@ -68,6 +70,8 @@ func requireLocalMySQL(t *testing.T) dumpimport.Options {
       MYSQL_USER: magento
       MYSQL_PASSWORD: magento
       MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "127.0.0.1:0:3306"
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot"]
       interval: 2s
@@ -109,7 +113,7 @@ func requireLocalMySQL(t *testing.T) dumpimport.Options {
 		}
 	}
 
-	return dumpimport.Options{
+	opts := dumpimport.Options{
 		Database:       "magento",
 		User:           "root",
 		Password:       "root",
@@ -117,6 +121,27 @@ func requireLocalMySQL(t *testing.T) dumpimport.Options {
 		ComposeProject: project,
 		WorkDir:        workDir,
 	}
+	if _, err := exec.LookPath("mysql"); err == nil {
+		portCmd := exec.CommandContext(ctx, "docker", "compose", "-f", composePath, "--project-name", project, "port", "database", "3306")
+		portCmd.Dir = workDir
+		out, err := portCmd.Output()
+		if err != nil {
+			t.Fatalf("compose port: %v", err)
+		}
+		// "127.0.0.1:xxxxx"
+		addr := strings.TrimSpace(string(out))
+		_, portStr, ok := strings.Cut(addr, ":")
+		if !ok {
+			t.Fatalf("unexpected compose port output %q", addr)
+		}
+		opts.Host = "127.0.0.1"
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			t.Fatalf("parse port %q: %v", portStr, err)
+		}
+		opts.Port = port
+	}
+	return opts
 }
 
 func TestImportCreatesTablesFromTinySQL(t *testing.T) {
