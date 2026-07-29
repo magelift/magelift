@@ -49,11 +49,11 @@ func TestResolveMergeAndProvenance(t *testing.T) {
 	if got := effective.Provenance["application.webRuntime"].Source; got != "built-in defaults" {
 		t.Fatalf("web runtime provenance = %q", got)
 	}
-	locales := effective.Config.Build.StaticContent["locales"].([]any)
+	locales := effective.Config.Build.StaticContent.Locales
 	if len(locales) != 1 || locales[0] != "de_DE" {
 		t.Fatalf("lists were not replaced: %#v", locales)
 	}
-	if _, exists := effective.Config.Build.StaticContent["strategy"]; exists {
+	if effective.Config.Build.StaticContent.Strategy != "" {
 		t.Fatal("null did not remove inherited value")
 	}
 	if got := effective.Provenance["defaults.region"].Source; got != "CLI override" {

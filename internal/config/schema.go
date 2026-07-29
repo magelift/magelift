@@ -151,7 +151,7 @@ func applySchemaRules(value map[string]any, rules map[string]string) {
 	if pattern := rules["pattern"]; pattern != "" {
 		value["pattern"] = pattern
 	}
-	for _, key := range []string{"minLength", "minProperties"} {
+	for _, key := range []string{"minLength", "minProperties", "minimum"} {
 		if raw := rules[key]; raw != "" {
 			integer, _ := strconv.Atoi(raw)
 			value[key] = integer

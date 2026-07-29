@@ -117,23 +117,23 @@ func hashInputs(root string) ([]buildrunner.InputFile, error) {
 	return inputs, nil
 }
 
-func staticContent(settings map[string]any) ([]buildrunner.StaticContent, error) {
-	locales, err := stringList(settings, "locales")
+func staticContent(settings config.StaticContentSettings) ([]buildrunner.StaticContent, error) {
+	locales, err := uniqueStrings("locales", settings.Locales)
 	if err != nil {
 		return nil, err
 	}
-	themes, err := stringList(settings, "themes")
+	themes, err := uniqueStrings("themes", settings.Themes)
 	if err != nil {
 		return nil, err
 	}
 	if (len(locales) == 0) != (len(themes) == 0) {
 		return nil, errors.New("build.staticContent.locales and themes must be configured together")
 	}
-	strategy, err := staticContentStrategy(settings)
+	strategy, err := staticContentStrategy(settings.Strategy)
 	if err != nil {
 		return nil, err
 	}
-	threads, err := staticContentThreads(settings)
+	threads, err := staticContentThreads(settings.Threads)
 	if err != nil {
 		return nil, err
 	}
@@ -160,14 +160,9 @@ func staticContent(settings map[string]any) ([]buildrunner.StaticContent, error)
 	return result, nil
 }
 
-func staticContentStrategy(settings map[string]any) (string, error) {
-	value, exists := settings["strategy"]
-	if !exists || value == nil {
+func staticContentStrategy(strategy string) (string, error) {
+	if strategy == "" {
 		return "", nil
-	}
-	strategy, ok := value.(string)
-	if !ok || strategy == "" {
-		return "", errors.New("build.staticContent.strategy must be quick, standard, or compact")
 	}
 	switch strategy {
 	case "quick", "standard", "compact":
@@ -177,54 +172,24 @@ func staticContentStrategy(settings map[string]any) (string, error) {
 	}
 }
 
-func staticContentThreads(settings map[string]any) (int, error) {
-	value, exists := settings["threads"]
-	if !exists || value == nil {
+func staticContentThreads(threads int) (int, error) {
+	if threads == 0 {
 		return 0, nil
 	}
-	threads, err := positiveInt(value)
-	if err != nil {
-		return 0, fmt.Errorf("build.staticContent.threads must be a positive integer: %w", err)
+	if threads < 1 {
+		return 0, errors.New("build.staticContent.threads must be a positive integer")
 	}
 	return threads, nil
 }
 
-func positiveInt(value any) (int, error) {
-	switch n := value.(type) {
-	case int:
-		if n < 1 {
-			return 0, errors.New("must be >= 1")
-		}
-		return n, nil
-	case int64:
-		if n < 1 {
-			return 0, errors.New("must be >= 1")
-		}
-		return int(n), nil
-	case uint64:
-		if n < 1 {
-			return 0, errors.New("must be >= 1")
-		}
-		return int(n), nil
-	default:
-		return 0, errors.New("not an integer")
-	}
-}
-
-func stringList(settings map[string]any, key string) ([]string, error) {
-	value, exists := settings[key]
-	if !exists {
+func uniqueStrings(key string, entries []string) ([]string, error) {
+	if len(entries) == 0 {
 		return nil, nil
-	}
-	entries, ok := value.([]any)
-	if !ok {
-		return nil, fmt.Errorf("build.staticContent.%s must be a list", key)
 	}
 	result := make([]string, 0, len(entries))
 	seen := map[string]bool{}
-	for _, entry := range entries {
-		text, ok := entry.(string)
-		if !ok || text == "" {
+	for _, text := range entries {
+		if text == "" {
 			return nil, fmt.Errorf("build.staticContent.%s must contain non-empty strings", key)
 		}
 		if seen[text] {

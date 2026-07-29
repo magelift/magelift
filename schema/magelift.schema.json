@@ -1285,9 +1285,8 @@
           "type": "string"
         },
         "staticContent": {
-          "additionalProperties": true,
-          "description": "Static content deployment settings",
-          "type": "object"
+          "$ref": "#/$defs/staticContentSettings",
+          "description": "Static content deployment settings"
         }
       },
       "required": [
@@ -1526,9 +1525,8 @@
           "type": "string"
         },
         "staticContent": {
-          "additionalProperties": true,
-          "description": "Static content deployment settings",
-          "type": "object"
+          "$ref": "#/$defs/staticContentSettingsOverlay",
+          "description": "Static content deployment settings"
         }
       },
       "type": "object"
@@ -3038,6 +3036,102 @@
                 "type": "string"
               },
               "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "staticContentSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "locales": {
+          "description": "Locales passed to setup:static-content:deploy --language",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "description": "Static content deploy strategy (-s)",
+              "enum": [
+                "quick",
+                "standard",
+                "compact"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "themes": {
+          "description": "Themes passed to setup:static-content:deploy --theme",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "threads": {
+          "anyOf": [
+            {
+              "description": "Static content deploy thread count (-j)",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "staticContentSettingsOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "locales": {
+          "description": "Locales passed to setup:static-content:deploy --language",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "description": "Static content deploy strategy (-s)",
+              "enum": [
+                "quick",
+                "standard",
+                "compact"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "themes": {
+          "description": "Themes passed to setup:static-content:deploy --theme",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "threads": {
+          "anyOf": [
+            {
+              "description": "Static content deploy thread count (-j)",
+              "minimum": 1,
+              "type": "integer"
             },
             {
               "type": "null"

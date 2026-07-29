@@ -31,10 +31,19 @@ type Application struct {
 }
 
 type Build struct {
-	PHP           string               `yaml:"php" json:"php" config:"Exact PHP branch or patch version"`
-	Composer      Composer             `yaml:"composer,omitempty" json:"composer,omitempty" config:"Composer settings"`
-	StaticContent map[string]any       `yaml:"staticContent,omitempty" json:"staticContent,omitempty" config:"Static content deployment settings"`
-	Hooks         map[string]BuildHook `yaml:"hooks,omitempty" json:"hooks,omitempty" config:"Build lifecycle hooks"`
+	PHP           string                `yaml:"php" json:"php" config:"Exact PHP branch or patch version"`
+	Composer      Composer              `yaml:"composer,omitempty" json:"composer,omitempty" config:"Composer settings"`
+	StaticContent StaticContentSettings `yaml:"staticContent,omitempty" json:"staticContent,omitempty" config:"Static content deployment settings"`
+	Hooks         map[string]BuildHook  `yaml:"hooks,omitempty" json:"hooks,omitempty" config:"Build lifecycle hooks"`
+}
+
+// StaticContentSettings configures Magento setup:static-content:deploy.
+// Locales and themes form a cartesian product; strategy/threads apply to each pair (-s/-j).
+type StaticContentSettings struct {
+	Locales  []string `yaml:"locales,omitempty" json:"locales,omitempty" config:"Locales passed to setup:static-content:deploy --language"`
+	Themes   []string `yaml:"themes,omitempty" json:"themes,omitempty" config:"Themes passed to setup:static-content:deploy --theme"`
+	Strategy string   `yaml:"strategy,omitempty" json:"strategy,omitempty" config:"Static content deploy strategy (-s)" schema:"enum=quick|standard|compact,nullable"`
+	Threads  int      `yaml:"threads,omitempty" json:"threads,omitempty" config:"Static content deploy thread count (-j)" schema:"minimum=1,nullable"`
 }
 
 // BuildHook is keyed by its stable ID in Build.Hooks. Commands are argument

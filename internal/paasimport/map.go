@@ -3,6 +3,7 @@ package paasimport
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v4"
@@ -124,10 +125,14 @@ func applyAllowlistEnv(doc *mageliftDocument, env accEnvDocument) {
 		doc.Build.StaticContent["strategy"] = strategy
 	}
 	if threads, ok := vars["SCD_THREADS"]; ok && threads != "" {
+		n, err := strconv.Atoi(threads)
+		if err != nil || n < 1 {
+			return
+		}
 		if doc.Build.StaticContent == nil {
 			doc.Build.StaticContent = map[string]any{}
 		}
-		doc.Build.StaticContent["threads"] = threads
+		doc.Build.StaticContent["threads"] = n
 	}
 	if _, ok := vars["CRYPT_KEY"]; ok {
 		if doc.Target.AWS == nil {

@@ -42,6 +42,10 @@ access. The VPC CIDR is still required for security-group rules.
 | `build.composer` | object | no |  | Composer settings |
 | `build.composer.credentials` | string | no |  | Composer credentials secret reference |
 | `build.staticContent` | object | no |  | Static content deployment settings |
+| `build.staticContent.locales` | array | no |  | Locales passed to setup:static-content:deploy --language |
+| `build.staticContent.themes` | array | no |  | Themes passed to setup:static-content:deploy --theme |
+| `build.staticContent.strategy` | string or null | no | quick, standard, compact | Static content deploy strategy (-s) |
+| `build.staticContent.threads` | integer or null | no |  | Static content deploy thread count (-j) |
 | `build.hooks` | object | no |  | Build lifecycle hooks |
 | `build.hooks.*.phase` | string | yes | validate, build, package | Preparation lifecycle phase |
 | `build.hooks.*.relationship` | string | yes | before, after, replace, disable | Relationship to the target step |
@@ -214,6 +218,10 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.build.composer` | object | no |  | Composer settings |
 | `environments.*.build.composer.credentials` | string | no |  | Composer credentials secret reference |
 | `environments.*.build.staticContent` | object | no |  | Static content deployment settings |
+| `environments.*.build.staticContent.locales` | array | no |  | Locales passed to setup:static-content:deploy --language |
+| `environments.*.build.staticContent.themes` | array | no |  | Themes passed to setup:static-content:deploy --theme |
+| `environments.*.build.staticContent.strategy` | string or null | no | quick, standard, compact | Static content deploy strategy (-s) |
+| `environments.*.build.staticContent.threads` | integer or null | no |  | Static content deploy thread count (-j) |
 | `environments.*.build.hooks` | object | no |  | Build lifecycle hooks |
 | `environments.*.build.hooks.*.phase` | string | no | validate, build, package | Preparation lifecycle phase |
 | `environments.*.build.hooks.*.relationship` | string | no | before, after, replace, disable | Relationship to the target step |

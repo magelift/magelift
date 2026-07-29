@@ -128,7 +128,7 @@ func TestPrepareRequestRejectsInvalidStaticContentStrategy(t *testing.T) {
 }
 
 func TestPrepareRequestRejectsNonPositiveStaticContentThreads(t *testing.T) {
-	input := strings.Replace(buildConfig, "    themes: [Magento/luma, Magento/blank]\n", "    themes: [Magento/luma, Magento/blank]\n    threads: 0\n", 1)
+	input := strings.Replace(buildConfig, "    themes: [Magento/luma, Magento/blank]\n", "    themes: [Magento/luma, Magento/blank]\n    threads: -1\n", 1)
 	file, err := config.Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)
