@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 5 plan 05-04 (auto-import + env import-dump)
+**Current focus:** Phase 5 plan 05-06 (cutover runbook + Phase 7 HUMAN_GATE split)
 
 ## Current Position
 
 Phase: 5 of 8 (Data Migration & Cutover)
-Plan: 6 of 6 (05-04 next)
+Plan: 6 of 6 (05-06 executing)
 Status: in_progress
-Last activity: 2026-07-29 — 05-03 SUMMARY complete (dumpimport D-04)
+Last activity: 2026-07-29 — 05-06 cutover runbook + local scratch + MIGRATE-04 honesty split
 
-Progress: [█████████░] 91% (35/44 plans; phase 5: 3/6)
+Progress: [█████████░] 91% (35/44 plans; phase 5: 5/6)
 
 ## Session Continuity
 
@@ -44,9 +44,9 @@ Progress: [█████████░] 91% (35/44 plans; phase 5: 3/6)
 
 - Phase 4: `04-VERIFICATION.md` status=passed (5/5); IMPORT/ECE closed
 - Phase 5 locked: hybrid auto-import + `env import-dump`; status journal under `.magelift/`; `--yes` overwrite; `env media-sync`; cutover local proof + Phase 7 DNS HUMAN_GATE
-- Phase 5: **05-01+05-02+05-03 done** → 05-04 auto+import-dump (D-01) → 05-05 media-sync ∥ 05-06 runbook/HUMAN_GATE
-- MIGRATE-02+MIGRATE-05 Complete; MIGRATE-01 Pending until auto-hook (05-04)
-- Next: execute 05-04-PLAN.md
+- Phase 5: **05-01…05-05 done**; **05-06** ships runbook + `scratch/05-cutover-local-proof.md`
+- MIGRATE-01/02/03/05 Complete; **MIGRATE-04 Pending** — local runbook+scratch closed in Phase 5; **DNS + live non-prod cutover + managed dump cell → Phase 7 HUMAN_GATE** (no new paid AWS pass in Phase 5)
+- Next after 05-06: phase verify / Phase 6 (do not mark MIGRATE-04 Complete for live DNS)
 
 ## Performance Metrics
 
