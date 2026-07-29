@@ -242,32 +242,60 @@ func versionCommand(o *options) *cobra.Command {
 }
 
 func initCommand(o *options) *cobra.Command {
-	var fromACC bool
+	var fromACC, fromUpsun bool
+	var configOut string
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Create a starter magelift.yaml",
 		Args:  cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
-			if _, err := os.Stat(o.configPath); err == nil {
-				return &exitError{code: 2, err: fmt.Errorf("%s already exists", o.configPath)}
+			if fromACC && fromUpsun {
+				return invalid(fmt.Errorf("--from-acc and --from-upsun are mutually exclusive"))
+			}
+			writePath := o.configPath
+			if configOut != "" {
+				writePath = configOut
+			}
+			writePath = filepath.Clean(writePath)
+			if _, err := os.Stat(writePath); err == nil {
+				if !o.yes {
+					return &exitError{code: 2, err: fmt.Errorf("%s already exists", writePath)}
+				}
 			} else if !errors.Is(err, os.ErrNotExist) {
 				return err
 			}
-			if fromACC {
+			var data []byte
+			switch {
+			case fromACC:
 				root, err := os.Getwd()
 				if err != nil {
 					return err
 				}
-				data, err := paasimport.MapACC(root)
+				data, err = paasimport.MapACC(root)
 				if err != nil {
 					return invalid(err)
 				}
-				return os.WriteFile(o.configPath, data, 0o644)
+			case fromUpsun:
+				root, err := os.Getwd()
+				if err != nil {
+					return err
+				}
+				data, err = paasimport.MapUpsun(root)
+				if err != nil {
+					return invalid(err)
+				}
+			default:
+				data = []byte(starterConfig)
 			}
-			return os.WriteFile(o.configPath, []byte(starterConfig), 0o644)
+			if err := os.MkdirAll(filepath.Dir(writePath), 0o755); err != nil {
+				return err
+			}
+			return os.WriteFile(writePath, data, 0o644)
 		},
 	}
 	cmd.Flags().BoolVar(&fromACC, "from-acc", false, "generate magelift.yaml from Adobe Commerce Cloud config")
+	cmd.Flags().BoolVar(&fromUpsun, "from-upsun", false, "generate magelift.yaml from Upsun / Platform.sh config")
+	cmd.Flags().StringVar(&configOut, "config-out", "", "write generated YAML to PATH for review (default: --config path)")
 	return cmd
 }
 
