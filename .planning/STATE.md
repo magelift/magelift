@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Data Migration & Cutover
 status: in_progress
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-07-29T16:22:38.440Z"
+stopped_at: Completed 05-06-PLAN.md
+last_updated: "2026-07-29T16:26:45.063Z"
 last_activity: 2026-07-29
-last_activity_desc: 05-03 SUMMARY complete (dumpimport D-04)
+last_activity_desc: 05-06 cutover runbook + local scratch + MIGRATE-04 honesty split
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 34
-  completed_plans: 31
+  completed_plans: 32
   percent: 38
 ---
 
@@ -34,12 +34,12 @@ Plan: 6 of 6 (05-06 executing)
 Status: in_progress
 Last activity: 2026-07-29 — 05-06 cutover runbook + local scratch + MIGRATE-04 honesty split
 
-Progress: [█████████░] 91% (35/44 plans; phase 5: 5/6)
+Progress: [█████████░] 94% (35/44 plans; phase 5: 5/6)
 
 ## Session Continuity
 
-**Last session:** 2026-07-29T16:22:38.434Z
-**Stopped at:** Completed 05-05-PLAN.md
+**Last session:** 2026-07-29T16:26:45.056Z
+**Stopped at:** Completed 05-06-PLAN.md
 **Resume file:** None
 
 - Phase 4: `04-VERIFICATION.md` status=passed (5/5); IMPORT/ECE closed
@@ -57,6 +57,7 @@ Progress: [█████████░] 91% (35/44 plans; phase 5: 5/6)
 | Phase 05 P03 | 5min | 2 tasks | 7 files |
 | Phase 05 P04 | 4min | 3 tasks | 5 files |
 | Phase 05 P05 | 4min | 2 tasks | 11 files |
+| Phase 5 P06 | 4min | 2 tasks | 5 files |
 
 ## Decisions
 
@@ -73,3 +74,4 @@ Progress: [█████████░] 91% (35/44 plans; phase 5: 5/6)
 - [Phase ?]: Default media-sync merge: missing-key drift fails; remote extras allowed
 - [Phase ?]: Export AWS stack mediaBucket for env media-sync bucket resolution
 - [Phase ?]: No seedMedia auto-after-deploy in 05-05 (D-05 follow-on)
+- [Phase ?]: D-06: MIGRATE-04 local runbook+scratch in Phase 5; DNS/live/managed dump Phase 7 HUMAN_GATE; no Phase 5 paid AWS pass
