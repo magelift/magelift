@@ -112,7 +112,7 @@ status: complete
 1. **Task 1: End-to-end create --dump → SeedDump Load → journal recorded** - `cd3fca0` (feat)
 2. **Task 2: Reject unknown seedDumpStatus YAML field honesty** - `b3efd46` (test)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `0ec2cf3` + `6531221` (docs: complete plan; keep MIGRATE pending)
 
 ## Files Created/Modified
 
