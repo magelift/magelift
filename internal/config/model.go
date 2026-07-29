@@ -17,6 +17,7 @@ type Config struct {
 	ExpiresAt          string         `yaml:"expiresAt,omitempty" json:"expiresAt,omitempty" config:"Preview expiration as RFC3339" schema:"nullable"`
 	MonthlyBudgetCents int64          `yaml:"monthlyBudgetCents,omitempty" json:"monthlyBudgetCents,omitempty" config:"Maximum monthly AWS budget in cents" schema:"nullable"`
 	Branches           []string       `yaml:"branches,omitempty" json:"branches,omitempty"`
+	SeedDump           string         `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local MySQL dump path seeded after first deploy" schema:"nullable"`
 }
 
 type Project struct {
@@ -281,6 +282,7 @@ type Environment struct {
 	ExpiresAt          string         `yaml:"expiresAt,omitempty" json:"expiresAt,omitempty" config:"Preview expiration as RFC3339" schema:"nullable"`
 	MonthlyBudgetCents int64          `yaml:"monthlyBudgetCents,omitempty" json:"monthlyBudgetCents,omitempty" config:"Maximum monthly AWS budget in cents" schema:"nullable"`
 	Branches           []string       `yaml:"branches,omitempty" json:"branches,omitempty" config:"Git branches mapped to this environment" schema:"nullable"`
+	SeedDump           string         `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local MySQL dump path seeded after first deploy" schema:"nullable"`
 	Project            *Project       `yaml:"project,omitempty" json:"project,omitempty"`
 	Application        *Application   `yaml:"application,omitempty" json:"application,omitempty"`
 	Build              *Build         `yaml:"build,omitempty" json:"build,omitempty"`

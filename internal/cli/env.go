@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/acourtiol/magelift/internal/config"
+	"github.com/acourtiol/magelift/internal/seeddump"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 )
@@ -140,8 +141,13 @@ func envCreateCommand(o *options) *cobra.Command {
 			}
 			result := map[string]any{"environment": name, "created": true}
 			if dumpPath != "" {
+				projectRoot := filepath.Dir(filepath.Clean(o.configPath))
+				record, err := seeddump.InitRecorded(cmd.Context(), projectRoot, name, dumpPath)
+				if err != nil {
+					return fmt.Errorf("initialize seed dump journal: %w", err)
+				}
 				result["seedDump"] = dumpPath
-				result["seedDumpStatus"] = "recorded; import after first deploy is tracked in ADR 0010"
+				result["seedDumpStatus"] = record.Status
 			}
 			return o.write(result)
 		},

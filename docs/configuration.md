@@ -211,6 +211,7 @@ See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
 | `environments.*.expiresAt` | string or null | no |  | Preview expiration as RFC3339 |
 | `environments.*.monthlyBudgetCents` | integer or null | no |  | Maximum monthly AWS budget in cents |
 | `environments.*.branches` | array or null | no |  | Git branches mapped to this environment |
+| `environments.*.seedDump` | string or null | no |  | Local MySQL dump path seeded after first deploy |
 | `environments.*.project` | object or null | no |  |  |
 | `environments.*.project.name` | string | no |  | Project name |
 | `environments.*.application` | object or null | no |  |  |

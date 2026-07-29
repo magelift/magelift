@@ -1818,6 +1818,17 @@
             }
           ]
         },
+        "seedDump": {
+          "anyOf": [
+            {
+              "description": "Local MySQL dump path seeded after first deploy",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "target": {
           "anyOf": [
             {
