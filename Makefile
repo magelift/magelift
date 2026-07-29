@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help generate generate-check cli-docs cli-docs-check fmt fmt-check test lint license-check php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test floci-test acceptance-harness-test aws-acceptance-local gcp-acceptance-local docs workflow-check verify release-smoke ci-act-go
+.PHONY: help generate generate-check cli-docs cli-docs-check fmt fmt-check test lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test floci-test acceptance-harness-test aws-acceptance-local gcp-acceptance-local docs workflow-check verify release-smoke ci-act-go
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -20,6 +20,9 @@ lint: ## Run static Go checks
 license-check: ## Check Go dependency licenses
 	go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown \
 		--ignore=github.com/ovh/pulumi-ovh
+
+check-clean-room: ## Fail if vendored ece-tools / cloud-patches / ACC cli trees appear
+	./scripts/check-clean-room.sh
 
 release-smoke: ## Serial single-target goreleaser smoke (safe on low-RAM Macs)
 	./scripts/release-smoke-local.sh
@@ -87,7 +90,7 @@ docs: ## Build documentation with strict link and navigation checks
 workflow-check: ## Validate GitHub Actions workflow syntax and expressions
 	go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
 
-verify: generate-check cli-docs-check fmt-check lint test license-check php-test docs workflow-check ## Run the local verification suite
+verify: generate-check cli-docs-check fmt-check lint test license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
 generate: ## Generate configuration schema and reference
 	go generate ./internal/config
 
