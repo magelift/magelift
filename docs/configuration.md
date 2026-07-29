@@ -27,6 +27,10 @@ does not create NAT gateways, route tables, or VPC endpoints in this mode, so th
 imported network must already provide the required egress and private AWS service
 access. The VPC CIDR is still required for security-group rules.
 
+`build.staticContent.strategy` and `build.staticContent.threads` map PaaS
+`SCD_STRATEGY` / `SCD_THREADS` on import and become Magento SCD `-s` / `-j`.
+See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
+
 | Field | Type | Required | Accepted values | Description |
 | --- | --- | --- | --- | --- |
 | `schemaVersion` | integer | yes | 1 | MageLift configuration schema version |
