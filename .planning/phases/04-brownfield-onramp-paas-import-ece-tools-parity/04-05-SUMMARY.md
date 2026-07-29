@@ -87,7 +87,7 @@ status: complete
 1. **Task 1: End-to-end m2-hotfixes apply after composer in PHP build** - `ed4802b` (feat)
 2. **Task 2: Record ECE-02 closed vs QUALITY_PATCHES gap stub for docs plan** - `508ff9d` (docs)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `d70ac03` (docs: complete plan)
 
 ## Files Created/Modified
 
