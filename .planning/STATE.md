@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Data Migration & Cutover
 status: in_progress
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-07-29T16:08:02.854Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-07-29T16:13:38.208Z"
 last_activity: 2026-07-29
-last_activity_desc: "05-02 complete — env status merges YAML seedDump + journal"
+last_activity_desc: 05-02 SUMMARY complete (env status + journal Mark*)
 progress:
   total_phases: 8
-  completed_phases: 4
-  total_plans: 44
-  completed_plans: 34
-  percent: 77
+  completed_phases: 3
+  total_plans: 34
+  completed_plans: 29
+  percent: 38
 ---
 
 # Project State
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 5 of 8 (Data Migration & Cutover)
-Plan: 3 of 6 (05-03 next)
+Plan: 4 of 6 (05-03 next)
 Status: in_progress
 Last activity: 2026-07-29 — 05-02 SUMMARY complete (env status + journal Mark*)
 
-Progress: [████████░░] 77% (34/44 plans; phase 5: 2/6)
+Progress: [█████████░] 85% (34/44 plans; phase 5: 2/6)
 
 ## Session Continuity
 
-**Last session:** 2026-07-29T16:08:02.847Z
-**Stopped at:** Completed 05-02-PLAN.md
+**Last session:** 2026-07-29T16:13:38.201Z
+**Stopped at:** Completed 05-03-PLAN.md
 **Resume file:** None
 
 - Phase 4: `04-VERIFICATION.md` status=passed (5/5); IMPORT/ECE closed
@@ -54,6 +54,7 @@ Progress: [████████░░] 77% (34/44 plans; phase 5: 2/6)
 |------|----------|-------|-------|
 | Phase 05 P01 | 3min | 2 tasks | 9 files |
 | Phase 05 P02 | 3min | 2 tasks | 6 files |
+| Phase 05 P03 | 5min | 2 tasks | 7 files |
 
 ## Decisions
 
@@ -63,3 +64,5 @@ Progress: [████████░░] 77% (34/44 plans; phase 5: 2/6)
 - [Phase 5]: failed→importing allowed as operator retry; imported→importing rejected
 - [Phase 5]: Missing journal with seedDump path reports seedDumpStatus=unavailable
 - [Phase 5]: seedDumpReason emitted only when status is failed
+- [Phase ?]: D-04 locked: persistent --yes + schema-replace for nonempty dump import; no --force
+- [Phase ?]: dumpimport NonEmpty = ≥1 BASE TABLE; journal Mark* stays in CLI (05-04)

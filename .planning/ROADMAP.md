@@ -178,13 +178,13 @@ Plans:
   4. A media-sync run copies a fixture media tree into the target's object storage and a listing diff against the source is empty
   5. `docs/migrating-from-paas.md` carries a cutover runbook (DNS, maintenance mode, reindex, verification, rollback) that has been followed end to end at least once against a non-production target, with the run recorded
 
-**Plans:** 2/6 plans executed
+**Plans:** 3/6 plans executed
 
 Plans:
 
 - [x] 05-01-PLAN.md — Config SeedDump + schema generate + create journal recorded (Wave 0 KnownFields)
 - [x] 05-02-PLAN.md — seeddump journal state machine + magelift env status merge
-- [ ] 05-03-PLAN.md — dumpimport local MySQL + nonempty/--yes schema-replace (D-04 gate)
+- [x] 05-03-PLAN.md — dumpimport local MySQL + nonempty/--yes schema-replace (D-04 gate)
 - [ ] 05-04-PLAN.md — env import-dump + post-deploy auto-import once-from-recorded (D-01 gate)
 - [ ] 05-05-PLAN.md — env media-sync --source + Floci/unit listing-diff
 - [ ] 05-06-PLAN.md — cutover runbook + local scratch proof + Phase 7 HUMAN_GATE split
@@ -250,7 +250,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | 2. Tag-Ready Release Surface | 4/4 | In Progress|  |
 | 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 5/6 | In Progress|  |
 | 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 6/6 | Complete    | 2026-07-29 |
-| 5. Data Migration & Cutover | 2/6 | In Progress|  |
+| 5. Data Migration & Cutover | 3/6 | In Progress|  |
 | 6. Shared Kubernetes Day-2 | 0/TBD | Not started | - |
 | 7. GCP Certification | 0/TBD | Not started | - |
 | 8. Brownfield Attach & Tag Day | 0/TBD | Not started | - |

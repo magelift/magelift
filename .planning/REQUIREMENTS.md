@@ -71,7 +71,7 @@
 - [x] **MIGRATE-02**: Operator sees an accurate `seedDumpStatus` progressing through recorded → importing → imported → failed, with the failure reason available
 - [ ] **MIGRATE-03**: Operator can sync Magento media from a source location into the target's object storage
 - [ ] **MIGRATE-04**: Operator can follow a documented cutover runbook (DNS, maintenance mode, reindex, verification, rollback) to move a live store onto MageLift
-- [ ] **MIGRATE-05**: Dump import is safe to retry and refuses to overwrite a non-empty production database without explicit confirmation
+- [x] **MIGRATE-05**: Dump import is safe to retry and refuses to overwrite a non-empty production database without explicit confirmation
 
 ### ece-tools Parity
 
@@ -184,7 +184,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | MIGRATE-02 | Phase 5 | Complete |
 | MIGRATE-03 | Phase 5 | Pending |
 | MIGRATE-04 | Phase 5 | Pending |
-| MIGRATE-05 | Phase 5 | Pending |
+| MIGRATE-05 | Phase 5 | Complete |
 | ECE-01 | Phase 4 | Complete |
 | ECE-02 | Phase 4 | Complete |
 | ECE-03 | Phase 4 | Complete |
