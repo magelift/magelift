@@ -52,6 +52,99 @@ func (s *Store) Path() string {
 
 // Read loads the journal record, or (nil, nil) when the file is absent.
 func (s *Store) Read(ctx context.Context) (*Record, error) {
+	return s.readUnlocked(ctx)
+}
+
+// InitRecorded writes status=recorded (idempotent overwrite of recorded→recorded).
+func InitRecorded(ctx context.Context, projectRoot, environment, dumpPath string) (*Record, error) {
+	store, err := New(projectRoot, environment)
+	if err != nil {
+		return nil, err
+	}
+	return store.write(ctx, Record{
+		Status:   StatusRecorded,
+		DumpPath: dumpPath,
+	})
+}
+
+// MarkImporting transitions recorded|failed|importing → importing (clears reason).
+func (s *Store) MarkImporting(ctx context.Context) (*Record, error) {
+	return s.transition(ctx, func(record *Record) error {
+		if err := canMarkImporting(record.Status); err != nil {
+			return err
+		}
+		record.Status = StatusImporting
+		record.Reason = ""
+		return nil
+	})
+}
+
+// MarkImported transitions importing → imported.
+func (s *Store) MarkImported(ctx context.Context) (*Record, error) {
+	return s.transition(ctx, func(record *Record) error {
+		if err := canMarkImported(record.Status); err != nil {
+			return err
+		}
+		record.Status = StatusImported
+		record.Reason = ""
+		return nil
+	})
+}
+
+// MarkFailed transitions importing → failed with a nonempty reason.
+func (s *Store) MarkFailed(ctx context.Context, reason string) (*Record, error) {
+	trimmed, err := validateFailedReason(reason)
+	if err != nil {
+		return nil, err
+	}
+	return s.transition(ctx, func(record *Record) error {
+		if err := canMarkFailed(record.Status); err != nil {
+			return err
+		}
+		record.Status = StatusFailed
+		record.Reason = trimmed
+		return nil
+	})
+}
+
+func (s *Store) transition(ctx context.Context, mutate func(*Record) error) (*Record, error) {
+	release, err := acquireLock(ctx, s.path+".lock")
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	current, err := s.readUnlocked(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, ErrMissingJournal
+	}
+	next := *current
+	if err := mutate(&next); err != nil {
+		return nil, err
+	}
+	next.UpdatedAt = s.now().UTC()
+	if err := writeAtomic(s.path, next); err != nil {
+		return nil, err
+	}
+	return &next, nil
+}
+
+func (s *Store) write(ctx context.Context, record Record) (*Record, error) {
+	release, err := acquireLock(ctx, s.path+".lock")
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	record.UpdatedAt = s.now().UTC()
+	if err := writeAtomic(s.path, record); err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
+
+func (s *Store) readUnlocked(ctx context.Context) (*Record, error) {
 	if cause := context.Cause(ctx); cause != nil {
 		return nil, cause
 	}
@@ -75,31 +168,6 @@ func (s *Store) Read(ctx context.Context) (*Record, error) {
 	}
 	if record.Status == "" {
 		return nil, errors.New("seed dump journal status is missing")
-	}
-	return &record, nil
-}
-
-// InitRecorded writes status=recorded (idempotent overwrite of recorded→recorded).
-func InitRecorded(ctx context.Context, projectRoot, environment, dumpPath string) (*Record, error) {
-	store, err := New(projectRoot, environment)
-	if err != nil {
-		return nil, err
-	}
-	return store.write(ctx, Record{
-		Status:   StatusRecorded,
-		DumpPath: dumpPath,
-	})
-}
-
-func (s *Store) write(ctx context.Context, record Record) (*Record, error) {
-	release, err := acquireLock(ctx, s.path+".lock")
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	record.UpdatedAt = s.now().UTC()
-	if err := writeAtomic(s.path, record); err != nil {
-		return nil, err
 	}
 	return &record, nil
 }

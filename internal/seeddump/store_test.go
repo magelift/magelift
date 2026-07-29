@@ -3,7 +3,6 @@ package seeddump
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -300,26 +299,9 @@ func TestMarkConcurrentWritersSerialize(t *testing.T) {
 			errs <- err
 		}()
 	}
-	var firstOK bool
 	for range writers {
-		err := <-errs
-		if err == nil {
-			if firstOK {
-				// Concurrent MarkImporting from recorded: only one should win;
-				// others may see importing→importing (idempotent) or race to recorded.
-				continue
-			}
-			firstOK = true
-			continue
-		}
-		// Contenders may fail on illegal transition if another already moved past importing
-		// via a different path; torn JSON must never occur.
-		if err != nil && !errors.Is(err, ErrInvalidTransition) && !errors.Is(err, context.Canceled) {
-			// Accept only transition errors after first success (idempotent importing OK).
-			if !errors.Is(err, ErrInvalidTransition) {
-				// MarkImporting from importing is allowed (idempotent); other errors fail the test.
-				t.Errorf("unexpected concurrent error: %v", err)
-			}
+		if err := <-errs; err != nil {
+			t.Errorf("concurrent MarkImporting: %v", err)
 		}
 	}
 	got, err := store.Read(context.Background())
@@ -336,5 +318,8 @@ func TestMarkConcurrentWritersSerialize(t *testing.T) {
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("torn or invalid JSON after concurrent writers: %v\n%s", err, data)
+	}
+	if raw["status"] != StatusImporting {
+		t.Fatalf("raw status = %#v", raw["status"])
 	}
 }
