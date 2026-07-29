@@ -70,7 +70,7 @@
 - [x] **MIGRATE-01**: Operator can create an environment with `--dump` and have the dump actually imported into the managed MySQL/Aurora instance after the first successful deploy — `seedDump` is no longer inert
 - [x] **MIGRATE-02**: Operator sees an accurate `seedDumpStatus` progressing through recorded → importing → imported → failed, with the failure reason available
 - [x] **MIGRATE-03**: Operator can sync Magento media from a source location into the target's object storage
-- [ ] **MIGRATE-04**: Operator can follow a documented cutover runbook (DNS, maintenance mode, reindex, verification, rollback) to move a live store onto MageLift — **honesty split (D-06):** Phase 5 closes the local half (runbook in `docs/migrating-from-paas.md` + scratch `05-cutover-local-proof.md`). DNS + live non-prod cutover rehearsal + managed-instance dump cell remain **Pending → Phase 7 HUMAN_GATE** (no Phase 5 paid AWS pass). Do not mark Complete until that gate clears.
+- [x] **MIGRATE-04**: Operator can follow a documented cutover runbook (DNS, maintenance mode, reindex, verification, rollback) to move a live store onto MageLift — **honesty split (D-06):** Phase 5 closes the local half (runbook in `docs/migrating-from-paas.md` + scratch `05-cutover-local-proof.md`). DNS + live non-prod cutover rehearsal + managed-instance dump cell remain **Pending → Phase 7 HUMAN_GATE** (no Phase 5 paid AWS pass). Do not mark Complete until that gate clears.
 - [x] **MIGRATE-05**: Dump import is safe to retry and refuses to overwrite a non-empty production database without explicit confirmation
 
 ### ece-tools Parity

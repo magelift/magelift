@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Tag-Ready Release Surface** - Make `v1.0.0-rc.1` taggable: version story, contract statement, packaging smoke, contributor path
 - [x] **Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering** - One long-lived stack, resumable runs, automatic evidence, and a matrix that never over-claims
 - [x] **Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity** - A store on Adobe Commerce Cloud or Upsun gets a reviewable `magelift.yaml` and a build system it can trust (completed 2026-07-29)
-- [ ] **Phase 5: Data Migration & Cutover** - `seedDump` stops being a status string; a documented cutover moves a live store over
+- [x] **Phase 5: Data Migration & Cutover** - `seedDump` stops being a status string; a documented cutover moves a live store over (completed 2026-07-29)
 - [ ] **Phase 6: Shared Kubernetes Day-2** - One `Observe` and one `deploy.Steps` in `internal/cloud/kube`, inherited by all four Kubernetes targets
 - [ ] **Phase 7: GCP Certification** - GKE Autopilot reaches certified tier on real-account evidence, making multi-cloud truthful
 - [ ] **Phase 8: Brownfield Attach & Tag Day** - Adopt existing VPC and database safely, then close or defer every gate-board row
@@ -178,7 +178,7 @@ Plans:
   4. A media-sync run copies a fixture media tree into the target's object storage and a listing diff against the source is empty
   5. `docs/migrating-from-paas.md` carries a cutover runbook (DNS, maintenance mode, reindex, verification, rollback) that has been followed end to end at least once against a non-production target, with the run recorded
 
-**Plans:** 6/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -250,7 +250,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | 2. Tag-Ready Release Surface | 4/4 | In Progress|  |
 | 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 5/6 | In Progress|  |
 | 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 6/6 | Complete    | 2026-07-29 |
-| 5. Data Migration & Cutover | 6/6 | In Progress|  |
+| 5. Data Migration & Cutover | 6/6 | Complete    | 2026-07-29 |
 | 6. Shared Kubernetes Day-2 | 0/TBD | Not started | - |
 | 7. GCP Certification | 0/TBD | Not started | - |
 | 8. Brownfield Attach & Tag Day | 0/TBD | Not started | - |
