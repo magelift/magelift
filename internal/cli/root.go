@@ -264,33 +264,49 @@ func initCommand(o *options) *cobra.Command {
 			} else if !errors.Is(err, os.ErrNotExist) {
 				return err
 			}
-			var data []byte
+			var (
+				data     []byte
+				unmapped []paasimport.UnmappedKey
+			)
 			switch {
 			case fromACC:
 				root, err := os.Getwd()
 				if err != nil {
 					return err
 				}
-				data, err = paasimport.MapACC(root)
+				result, err := paasimport.MapACC(root)
 				if err != nil {
 					return invalid(err)
 				}
+				data, unmapped = result.YAML, result.Unmapped
 			case fromUpsun:
 				root, err := os.Getwd()
 				if err != nil {
 					return err
 				}
-				data, err = paasimport.MapUpsun(root)
+				result, err := paasimport.MapUpsun(root)
 				if err != nil {
 					return invalid(err)
 				}
+				data, unmapped = result.YAML, result.Unmapped
 			default:
 				data = []byte(starterConfig)
 			}
 			if err := os.MkdirAll(filepath.Dir(writePath), 0o755); err != nil {
 				return err
 			}
-			return os.WriteFile(writePath, data, 0o644)
+			if err := os.WriteFile(writePath, data, 0o644); err != nil {
+				return err
+			}
+			if len(unmapped) > 0 {
+				sidecar := paasimport.SidecarPath(writePath)
+				report := paasimport.RenderUnmappedReport(unmapped)
+				if err := os.WriteFile(sidecar, []byte(report), 0o644); err != nil {
+					return err
+				}
+				return invalid(fmt.Errorf("import produced %d unmapped key(s); see %s", len(unmapped), sidecar))
+			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&fromACC, "from-acc", false, "generate magelift.yaml from Adobe Commerce Cloud config")

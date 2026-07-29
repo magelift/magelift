@@ -1,0 +1,16 @@
+# Synthetic ACC unmapped variant — free-form hooks/cron must appear in sidecar (D-05).
+name: sample-shop-unmapped
+type: php:8.5
+relationships:
+  database: "mysql:mysql"
+  redis: "redis:redis"
+hooks:
+  build: |
+    set -e
+    echo "custom-build-hook-must-be-unmapped"
+  deploy: |
+    curl -fsS https://example.invalid/hooks/deploy
+crons:
+  shell-cleanup:
+    spec: "0 3 * * *"
+    cmd: "find var/tmp -type f -mtime +7 -delete"

@@ -27,9 +27,15 @@ type mageliftProject struct {
 }
 
 type mageliftApplication struct {
-	Edition string `yaml:"edition"`
-	Version string `yaml:"version"`
-	Mode    string `yaml:"mode"`
+	Edition string              `yaml:"edition"`
+	Version string              `yaml:"version"`
+	Mode    string              `yaml:"mode"`
+	Cron    []mageliftCronEntry `yaml:"cron,omitempty"`
+}
+
+type mageliftCronEntry struct {
+	Schedule string `yaml:"schedule"`
+	Command  string `yaml:"command"`
 }
 
 type mageliftBuild struct {
@@ -59,7 +65,7 @@ type mageliftEnv struct {
 }
 
 // defaultEncryptionKeyPlaceholder is a secret-ref-shaped ARN placeholder.
-// Crypt plaintext from PaaS env must never be written into magelift.yaml (T-04-02).
+// Crypt plaintext from PaaS env must never be written into magelift.yaml (T-04-02 / T-04-06).
 const defaultEncryptionKeyPlaceholder = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:magelift/encryption-key"
 
 func emitMagelift(doc mageliftDocument) ([]byte, error) {
@@ -116,45 +122,71 @@ func catalogFromRelationships(rels map[string]string) map[string]any {
 	return catalog
 }
 
-func applyAllowlistEnv(doc *mageliftDocument, env accEnvDocument) {
-	vars := collectEnvVars(env)
-	if strategy, ok := vars["SCD_STRATEGY"]; ok && strategy != "" {
-		if doc.Build.StaticContent == nil {
-			doc.Build.StaticContent = map[string]any{}
-		}
-		doc.Build.StaticContent["strategy"] = strategy
+// applyAllowlistEnv maps D-07 env vars into doc and returns residual env keys.
+func applyAllowlistEnv(doc *mageliftDocument, source string, env accEnvDocument) []UnmappedKey {
+	type staged struct {
+		path string
+		key  string
+		val  string
 	}
-	if threads, ok := vars["SCD_THREADS"]; ok && threads != "" {
-		n, err := strconv.Atoi(threads)
-		if err != nil || n < 1 {
-			return
-		}
-		if doc.Build.StaticContent == nil {
-			doc.Build.StaticContent = map[string]any{}
-		}
-		doc.Build.StaticContent["threads"] = n
+	var vars []staged
+	for k, v := range env.Stage.Global {
+		vars = append(vars, staged{path: "stage.global." + k, key: k, val: v})
 	}
-	if _, ok := vars["CRYPT_KEY"]; ok {
-		if doc.Target.AWS == nil {
-			doc.Target.AWS = &mageliftAWS{}
-		}
-		doc.Target.AWS.EncryptionKeySecretARN = defaultEncryptionKeyPlaceholder
+	for k, v := range env.Stage.Deploy {
+		vars = append(vars, staged{path: "stage.deploy." + k, key: k, val: v})
 	}
-}
+	for k, v := range env.Stage.Build {
+		vars = append(vars, staged{path: "stage.build." + k, key: k, val: v})
+	}
+	for k, v := range env.Variables.Env {
+		vars = append(vars, staged{path: "variables.env." + k, key: k, val: v})
+	}
 
-func collectEnvVars(env accEnvDocument) map[string]string {
-	out := map[string]string{}
-	mergeStringMap(out, env.Stage.Global)
-	mergeStringMap(out, env.Stage.Deploy)
-	mergeStringMap(out, env.Stage.Build)
-	mergeStringMap(out, env.Variables.Env)
-	return out
-}
-
-func mergeStringMap(dst map[string]string, src map[string]string) {
-	for k, v := range src {
-		dst[k] = v
+	var unmapped []UnmappedKey
+	for _, item := range vars {
+		if !IsAllowlistedEnv(item.key) {
+			unmapped = append(unmapped, UnmappedKey{Source: source, Path: item.path})
+			continue
+		}
+		switch item.key {
+		case "SCD_STRATEGY":
+			if item.val == "" {
+				continue
+			}
+			if doc.Build.StaticContent == nil {
+				doc.Build.StaticContent = map[string]any{}
+			}
+			doc.Build.StaticContent["strategy"] = item.val
+		case "SCD_THREADS":
+			n, err := strconv.Atoi(item.val)
+			if err != nil || n < 1 {
+				unmapped = append(unmapped, UnmappedKey{Source: source, Path: item.path})
+				continue
+			}
+			if doc.Build.StaticContent == nil {
+				doc.Build.StaticContent = map[string]any{}
+			}
+			doc.Build.StaticContent["threads"] = n
+		case "CRYPT_KEY":
+			if doc.Target.AWS == nil {
+				doc.Target.AWS = &mageliftAWS{}
+			}
+			doc.Target.AWS.EncryptionKeySecretARN = defaultEncryptionKeyPlaceholder
+		case "UPDATE_URLS":
+			domain := strings.TrimSpace(item.val)
+			domain = strings.TrimPrefix(domain, "https://")
+			domain = strings.TrimPrefix(domain, "http://")
+			domain = strings.TrimSuffix(domain, "/")
+			if domain == "" {
+				continue
+			}
+			staging := doc.Environments["staging"]
+			staging.Domain = domain
+			doc.Environments["staging"] = staging
+		}
 	}
+	return unmapped
 }
 
 func baseDocument(name, php string) mageliftDocument {

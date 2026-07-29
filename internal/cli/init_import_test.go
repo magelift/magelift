@@ -221,7 +221,9 @@ func TestInitConfigOutRefusesExistingWithoutYes(t *testing.T) {
 }
 
 func TestInitFromUpsunAccepted(t *testing.T) {
+	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "upsun", "supported")
 	dir := t.TempDir()
+	copyTree(t, fixture, dir)
 	configPath := filepath.Join(dir, "magelift.yaml")
 
 	cwd, err := os.Getwd()
@@ -245,6 +247,87 @@ func TestInitFromUpsunAccepted(t *testing.T) {
 	}
 	if _, err := config.Load(data); err != nil {
 		t.Fatalf("config.Load: %v\nYAML:\n%s", err, data)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "magelift.unmapped.md")); !os.IsNotExist(err) {
+		t.Fatalf("supported Upsun import must not write sidecar: %v", err)
+	}
+}
+
+func TestInitFromAccUnmappedWritesSidecarAndExitsNonZero(t *testing.T) {
+	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "unmapped")
+	dir := t.TempDir()
+	copyTree(t, fixture, dir)
+	configPath := filepath.Join(dir, "magelift.yaml")
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", configPath, "init", "--from-acc"})
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected non-zero exit on unmapped keys")
+	}
+	if ExitCode(err) != 2 {
+		t.Fatalf("exit code = %d, want 2; err=%v", ExitCode(err), err)
+	}
+	if _, err := os.Stat(configPath); err != nil {
+		t.Fatalf("YAML must still be written: %v", err)
+	}
+	sidecar := filepath.Join(dir, "magelift.unmapped.md")
+	report, err := os.ReadFile(sidecar)
+	if err != nil {
+		t.Fatalf("sidecar missing: %v", err)
+	}
+	for _, want := range []string{"hooks.build", "crons.shell-cleanup", "CUSTOM_FEATURE_FLAG"} {
+		if !strings.Contains(string(report), want) {
+			t.Fatalf("sidecar missing %q:\n%s", want, report)
+		}
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.Load(data); err != nil {
+		t.Fatalf("written YAML must Load: %v", err)
+	}
+}
+
+func TestInitConfigOutUnmappedSidecarUsesStem(t *testing.T) {
+	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "unmapped")
+	dir := t.TempDir()
+	copyTree(t, fixture, dir)
+	sidePath := filepath.Join(dir, "review.magelift.yaml")
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"init", "--from-acc", "--config-out", sidePath})
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected non-zero exit on unmapped keys")
+	}
+	if ExitCode(err) != 2 {
+		t.Fatalf("exit code = %d, want 2", ExitCode(err))
+	}
+	sidecar := filepath.Join(dir, "review.magelift.unmapped.md")
+	if _, err := os.Stat(sidecar); err != nil {
+		t.Fatalf("stem sidecar missing: %v", err)
 	}
 }
 

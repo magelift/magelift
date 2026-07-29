@@ -38,6 +38,41 @@ func DetectACC(root string) error {
 	return nil
 }
 
+// DetectUpsun verifies root looks like an Upsun / Platform.sh config tree.
+func DetectUpsun(root string) error {
+	root = filepath.Clean(root)
+	info, err := os.Stat(root)
+	if err != nil {
+		return fmt.Errorf("Upsun config root: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("Upsun config root must be a directory: %s", root)
+	}
+	if _, err := os.Stat(filepath.Join(root, upsunAppFile)); err != nil {
+		return fmt.Errorf("Upsun config root requires %s: %w", upsunAppFile, err)
+	}
+	return nil
+}
+
+// ConfineConfigRoot cleans a maintainer-provided soak path and rejects escapes (T-04-07).
+func ConfineConfigRoot(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("config root is empty")
+	}
+	if strings.Contains(path, "..") {
+		return "", fmt.Errorf("config root must not contain ..")
+	}
+	cleaned := filepath.Clean(path)
+	info, err := os.Stat(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("config root: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("config root must be a directory: %s", cleaned)
+	}
+	return cleaned, nil
+}
+
 // readUnder reads a file relative to root, rejecting path escapes.
 func readUnder(root, rel string) ([]byte, error) {
 	root = filepath.Clean(root)
