@@ -129,7 +129,7 @@ status: complete
 2. **Task 2: env import-dump command** — `69f3e08` (feat)
 3. **Task 3: Post-deploy auto-import once from recorded** — `a716869` (feat)
 
-**Plan metadata:** _(pending docs commit)_
+**Plan metadata:** `cc152fb` (docs: complete plan)
 
 ## Files Created/Modified
 
