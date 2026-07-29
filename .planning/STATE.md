@@ -8,13 +8,13 @@ status: in_progress
 stopped_at: Completed 05-02-PLAN.md
 last_updated: "2026-07-29T16:08:02.854Z"
 last_activity: 2026-07-29
-last_activity_desc: 05-01 SUMMARY complete (SeedDump + journal recorded)
+last_activity_desc: "05-02 complete — env status merges YAML seedDump + journal"
 progress:
   total_phases: 8
-  completed_phases: 3
-  total_plans: 34
-  completed_plans: 28
-  percent: 38
+  completed_phases: 4
+  total_plans: 44
+  completed_plans: 34
+  percent: 77
 ---
 
 # Project State
@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 5 plan 05-02 (status merge)
+**Current focus:** Phase 5 plan 05-03 (dumpimport)
 
 ## Current Position
 
 Phase: 5 of 8 (Data Migration & Cutover)
-Plan: 3 of 6 (05-02 next)
+Plan: 3 of 6 (05-03 next)
 Status: in_progress
-Last activity: 2026-07-29 — 05-01 SUMMARY complete (SeedDump + journal recorded)
+Last activity: 2026-07-29 — 05-02 SUMMARY complete (env status + journal Mark*)
 
-Progress: [████████░░] 82% (33/44 plans; phase 5: 1/6)
+Progress: [████████░░] 77% (34/44 plans; phase 5: 2/6)
 
 ## Session Continuity
 
@@ -44,9 +44,9 @@ Progress: [████████░░] 82% (33/44 plans; phase 5: 1/6)
 
 - Phase 4: `04-VERIFICATION.md` status=passed (5/5); IMPORT/ECE closed
 - Phase 5 locked: hybrid auto-import + `env import-dump`; status journal under `.magelift/`; `--yes` overwrite; `env media-sync`; cutover local proof + Phase 7 DNS HUMAN_GATE
-- Phase 5: **05-01 done** → 05-02 status → 05-03 dumpimport (D-04) → 05-04 auto+import-dump (D-01) → 05-05 media-sync ∥ 05-06 runbook/HUMAN_GATE
-- MIGRATE-01/02 remain Pending until importer + full status machine land (05-01 only Wave 0 seam)
-- Next: execute 05-02-PLAN.md
+- Phase 5: **05-01+05-02 done** → 05-03 dumpimport (D-04) → 05-04 auto+import-dump (D-01) → 05-05 media-sync ∥ 05-06 runbook/HUMAN_GATE
+- MIGRATE-02 Complete (journal + env status); MIGRATE-01 Pending until importer + auto-hook (05-03/05-04)
+- Next: execute 05-03-PLAN.md
 
 ## Performance Metrics
 
@@ -60,6 +60,6 @@ Progress: [████████░░] 82% (33/44 plans; phase 5: 1/6)
 - [Phase 5]: Journal path is .magelift/seed-dumps/<env>.json (single JSON document, not jsonl)
 - [Phase 5]: create output seedDumpStatus is exactly journal StatusRecorded string
 - [Phase 5]: Generated docs live at docs/configuration.md + schema/magelift.schema.json (repo paths)
-- [Phase ?]: failed→importing allowed as operator retry; imported→importing rejected
-- [Phase ?]: Missing journal with seedDump path reports seedDumpStatus=unavailable
-- [Phase ?]: seedDumpReason emitted only when status is failed
+- [Phase 5]: failed→importing allowed as operator retry; imported→importing rejected
+- [Phase 5]: Missing journal with seedDump path reports seedDumpStatus=unavailable
+- [Phase 5]: seedDumpReason emitted only when status is failed

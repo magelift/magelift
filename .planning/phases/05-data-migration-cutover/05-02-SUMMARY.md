@@ -104,7 +104,7 @@ status: complete
 1. **Task 1: Journal state machine MarkImporting/Imported/Failed** - `15369ac` (test) + `6ae8f17` (feat)
 2. **Task 2: Wire magelift env status merge YAML + journal** - `51b789c` (test) + `943ad4b` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `5097f2c` (docs: complete plan)
 
 ## Files Created/Modified
 
