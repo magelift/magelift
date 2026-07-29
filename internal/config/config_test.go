@@ -128,6 +128,29 @@ func TestStrictUnknownKey(t *testing.T) {
 	}
 }
 
+func TestSeedDumpPathLoadsAndResolves(t *testing.T) {
+	input := strings.Replace(base, "    account: \"123\"\n", "    account: \"123\"\n    seedDump: /tmp/fixture.sql\n", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatalf("Load with seedDump: %v", err)
+	}
+	effective, err := f.Resolve("staging", ResolveOptions{})
+	if err != nil {
+		t.Fatalf("Resolve with seedDump: %v", err)
+	}
+	if effective.Config.SeedDump != "/tmp/fixture.sql" {
+		t.Fatalf("SeedDump = %q", effective.Config.SeedDump)
+	}
+}
+
+func TestSeedDumpStatusYAMLFieldRejected(t *testing.T) {
+	input := strings.Replace(base, "    account: \"123\"\n", "    account: \"123\"\n    seedDumpStatus: recorded\n", 1)
+	_, err := Load([]byte(input))
+	if err == nil || !strings.Contains(err.Error(), "field seedDumpStatus not found") {
+		t.Fatalf("seedDumpStatus must remain journal-only, got: %v", err)
+	}
+}
+
 func TestUnknownExtensionKeysAllowed(t *testing.T) {
 	if _, err := Load([]byte(base)); err != nil {
 		t.Fatal(err)
