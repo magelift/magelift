@@ -69,7 +69,7 @@
 
 - [x] **MIGRATE-01**: Operator can create an environment with `--dump` and have the dump actually imported into the managed MySQL/Aurora instance after the first successful deploy — `seedDump` is no longer inert
 - [x] **MIGRATE-02**: Operator sees an accurate `seedDumpStatus` progressing through recorded → importing → imported → failed, with the failure reason available
-- [ ] **MIGRATE-03**: Operator can sync Magento media from a source location into the target's object storage
+- [x] **MIGRATE-03**: Operator can sync Magento media from a source location into the target's object storage
 - [ ] **MIGRATE-04**: Operator can follow a documented cutover runbook (DNS, maintenance mode, reindex, verification, rollback) to move a live store onto MageLift
 - [x] **MIGRATE-05**: Dump import is safe to retry and refuses to overwrite a non-empty production database without explicit confirmation
 
@@ -182,7 +182,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | IMPORT-06 | Phase 4 | Complete |
 | MIGRATE-01 | Phase 5 | Complete |
 | MIGRATE-02 | Phase 5 | Complete |
-| MIGRATE-03 | Phase 5 | Pending |
+| MIGRATE-03 | Phase 5 | Complete |
 | MIGRATE-04 | Phase 5 | Pending |
 | MIGRATE-05 | Phase 5 | Complete |
 | ECE-01 | Phase 4 | Complete |

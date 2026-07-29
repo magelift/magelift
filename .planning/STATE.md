@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Data Migration & Cutover
 status: in_progress
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-07-29T16:18:26.558Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-07-29T16:22:38.440Z"
 last_activity: 2026-07-29
 last_activity_desc: 05-03 SUMMARY complete (dumpimport D-04)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 34
-  completed_plans: 30
+  completed_plans: 31
   percent: 38
 ---
 
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 5 of 8 (Data Migration & Cutover)
-Plan: 5 of 6 (05-04 next)
+Plan: 6 of 6 (05-04 next)
 Status: in_progress
 Last activity: 2026-07-29 — 05-03 SUMMARY complete (dumpimport D-04)
 
-Progress: [█████████░] 88% (35/44 plans; phase 5: 3/6)
+Progress: [█████████░] 91% (35/44 plans; phase 5: 3/6)
 
 ## Session Continuity
 
-**Last session:** 2026-07-29T16:18:26.551Z
-**Stopped at:** Completed 05-04-PLAN.md
+**Last session:** 2026-07-29T16:22:38.434Z
+**Stopped at:** Completed 05-05-PLAN.md
 **Resume file:** None
 
 - Phase 4: `04-VERIFICATION.md` status=passed (5/5); IMPORT/ECE closed
@@ -56,6 +56,7 @@ Progress: [█████████░] 88% (35/44 plans; phase 5: 3/6)
 | Phase 05 P02 | 3min | 2 tasks | 6 files |
 | Phase 05 P03 | 5min | 2 tasks | 7 files |
 | Phase 05 P04 | 4min | 3 tasks | 5 files |
+| Phase 05 P05 | 4min | 2 tasks | 11 files |
 
 ## Decisions
 
@@ -69,3 +70,6 @@ Progress: [█████████░] 88% (35/44 plans; phase 5: 3/6)
 - [Phase ?]: dumpimport NonEmpty = ≥1 BASE TABLE; journal Mark* stays in CLI (05-04)
 - [Phase ?]: D-01 locked option-a (AUTO): hybrid post-deployflow once-from-recorded + env import-dump; never env seed
 - [Phase ?]: Auto-import after deployflow.Run (lock released); failure marks failed and fails deploy CLI
+- [Phase ?]: Default media-sync merge: missing-key drift fails; remote extras allowed
+- [Phase ?]: Export AWS stack mediaBucket for env media-sync bucket resolution
+- [Phase ?]: No seedMedia auto-after-deploy in 05-05 (D-05 follow-on)

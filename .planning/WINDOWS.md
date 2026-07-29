@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 10
+open_count: 11
 waived_count: 0
 fixed_count: 0
-total_count: 10
-last_updated: 2026-07-29T15:31:04.697Z
+total_count: 11
+last_updated: 2026-07-29T16:22:38.617Z
 ---
 
 # Broken Windows Ledger
@@ -25,6 +25,7 @@ last_updated: 2026-07-29T15:31:04.697Z
 | 8 | 02 | unmet-truth | CONTRIBUTING.md |  | RELEASE-06 fresh-clone make verify blocked: PHP 8.2+ and Composer missing on proof host | open |  | 2026-07-28T14:45:35.231Z |  |
 | 9 | 02 | stub | examples/custom-cli/stub_module.go |  | Intentional stubModule Plan/Program refuse deploy — registration demo only | open |  | 2026-07-28T15:07:25.170Z |  |
 | 10 | 04 | stub | internal/paasimport/upsun.go | 12 | MapUpsun emits baseDocument stub without parsing Upsun trees until 04-03 | open |  | 2026-07-29T15:31:04.697Z |  |
+| 11 | 05 | deviation | internal/cloud/aws/stack/component.go |  | Rule 2: exported AWS mediaBucket output so media-sync can resolve target bucket | open |  | 2026-07-29T16:22:38.617Z |  |
 
 ````json
 [
@@ -146,6 +147,18 @@ last_updated: 2026-07-29T15:31:04.697Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-29T15:31:04.697Z",
+    "resolved_at": null
+  },
+  {
+    "id": 11,
+    "kind": "deviation",
+    "phase": "05",
+    "file": "internal/cloud/aws/stack/component.go",
+    "line": null,
+    "description": "Rule 2: exported AWS mediaBucket output so media-sync can resolve target bucket",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-29T16:22:38.617Z",
     "resolved_at": null
   }
 ]
