@@ -37,6 +37,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `application.version` | string | yes |  | Exact Magento release |
 | `application.mode` | string | yes | integrated, headless | Application mode |
 | `application.webRuntime` | string | no | nginx-fpm, frankenphp-classic | HTTP application runtime |
+| `application.cron` | array | no |  | Portable Magento cron schedule entries |
 | `build` | object | yes |  | Application build settings |
 | `build.php` | string | yes |  | Exact PHP branch or patch version |
 | `build.composer` | object | no |  | Composer settings |
@@ -213,6 +214,7 @@ access. The VPC CIDR is still required for security-group rules.
 | `environments.*.application.version` | string | no |  | Exact Magento release |
 | `environments.*.application.mode` | string | no | integrated, headless | Application mode |
 | `environments.*.application.webRuntime` | string | no | nginx-fpm, frankenphp-classic | HTTP application runtime |
+| `environments.*.application.cron` | array | no |  | Portable Magento cron schedule entries |
 | `environments.*.build` | object or null | no |  |  |
 | `environments.*.build.php` | string | no |  | Exact PHP branch or patch version |
 | `environments.*.build.composer` | object | no |  | Composer settings |

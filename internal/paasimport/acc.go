@@ -201,8 +201,10 @@ func mapCrons(source string, value any, doc *mageliftDocument) []UnmappedKey {
 			continue
 		}
 		if isMagentoCron(entry.Cmd) {
-			// Magento cron:run is consumed; schema destination lands in Task 2.
-			_ = doc
+			doc.Application.Cron = append(doc.Application.Cron, mageliftCronEntry{
+				Schedule: entry.Spec,
+				Command:  strings.TrimSpace(entry.Cmd),
+			})
 			continue
 		}
 		out = append(out, UnmappedKey{Source: source, Path: "crons." + name})

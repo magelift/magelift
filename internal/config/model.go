@@ -24,10 +24,18 @@ type Project struct {
 }
 
 type Application struct {
-	Edition    string `yaml:"edition" json:"edition" config:"Magento edition" schema:"enum=open-source|commerce"`
-	Version    string `yaml:"version" json:"version" config:"Exact Magento release"`
-	Mode       string `yaml:"mode" json:"mode" config:"Application mode" schema:"enum=integrated|headless"`
-	WebRuntime string `yaml:"webRuntime,omitempty" json:"webRuntime,omitempty" config:"HTTP application runtime" schema:"enum=nginx-fpm|frankenphp-classic"`
+	Edition    string      `yaml:"edition" json:"edition" config:"Magento edition" schema:"enum=open-source|commerce"`
+	Version    string      `yaml:"version" json:"version" config:"Exact Magento release"`
+	Mode       string      `yaml:"mode" json:"mode" config:"Application mode" schema:"enum=integrated|headless"`
+	WebRuntime string      `yaml:"webRuntime,omitempty" json:"webRuntime,omitempty" config:"HTTP application runtime" schema:"enum=nginx-fpm|frankenphp-classic"`
+	Cron       []CronEntry `yaml:"cron,omitempty" json:"cron,omitempty" config:"Portable Magento cron schedule entries"`
+}
+
+// CronEntry is a Magento cron:run-style schedule mapped from PaaS crons (IMPORT-03).
+// Free-form shell crons remain unmapped by the importer.
+type CronEntry struct {
+	Schedule string `yaml:"schedule" json:"schedule" config:"Cron schedule expression" schema:"minLength=1"`
+	Command  string `yaml:"command" json:"command" config:"Command to run (bin/magento cron:run style)" schema:"minLength=1"`
 }
 
 type Build struct {

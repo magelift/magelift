@@ -1196,6 +1196,13 @@
     "application": {
       "additionalProperties": false,
       "properties": {
+        "cron": {
+          "description": "Portable Magento cron schedule entries",
+          "items": {
+            "$ref": "#/$defs/cronEntry"
+          },
+          "type": "array"
+        },
         "edition": {
           "description": "Magento edition",
           "enum": [
@@ -1235,6 +1242,13 @@
     "applicationOverlay": {
       "additionalProperties": false,
       "properties": {
+        "cron": {
+          "description": "Portable Magento cron schedule entries",
+          "items": {
+            "$ref": "#/$defs/cronEntryOverlay"
+          },
+          "type": "array"
+        },
         "edition": {
           "description": "Magento edition",
           "enum": [
@@ -1568,6 +1582,42 @@
         "credentials": {
           "description": "Composer credentials secret reference",
           "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "cronEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "description": "Command to run (bin/magento cron:run style)",
+          "minLength": 1,
+          "type": "string"
+        },
+        "schedule": {
+          "description": "Cron schedule expression",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "schedule",
+        "command"
+      ],
+      "type": "object"
+    },
+    "cronEntryOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "description": "Command to run (bin/magento cron:run style)",
+          "minLength": 1,
+          "type": "string"
+        },
+        "schedule": {
+          "description": "Cron schedule expression",
+          "minLength": 1,
           "type": "string"
         }
       },

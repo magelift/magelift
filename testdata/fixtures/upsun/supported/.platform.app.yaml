@@ -7,3 +7,7 @@ relationships:
   redis: "redis:redis"
   opensearch: "opensearch:opensearch"
   rabbitmq: "rabbitmq:rabbitmq"
+crons:
+  magento:
+    spec: "*/5 * * * *"
+    cmd: "php bin/magento cron:run"

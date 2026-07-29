@@ -5,3 +5,7 @@ type: php:8.5
 relationships:
   database: "mysql:mysql"
   redis: "redis:redis"
+crons:
+  magento:
+    spec: "*/5 * * * *"
+    cmd: "php bin/magento cron:run"
