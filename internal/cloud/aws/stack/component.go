@@ -267,7 +267,7 @@ func (c *Component) Outputs() pulumi.Map {
 	}
 	return pulumi.Map{
 		"networkVpcId": c.Network.VpcID, "edgeDistributionId": c.Edge.DistributionID,
-		"applicationURL": pulumi.Sprintf("https://%s", c.Edge.DistributionDomainName), "mediaURL": c.Storage.DistributionURL,
+		"applicationURL": pulumi.Sprintf("https://%s", c.Edge.DistributionDomainName), "mediaURL": c.Storage.DistributionURL, "mediaBucket": c.Storage.BucketName,
 		"databaseWriter": c.Database.WriterEndpoint, "cacheEndpoint": c.Cache.CachePrimaryEndpoint, "searchEndpoint": searchEndpoint, "queueMode": c.Queue.QueueMode,
 		"clusterName": c.Runtime.ClusterName, "clusterArn": c.Runtime.ClusterARN, "serviceName": c.Runtime.ServiceName,
 		"taskDefinitionArn": c.Runtime.TaskDefinitionARN, "deployTaskDefinitionArn": c.Runtime.DeployTaskDefinitionARN,

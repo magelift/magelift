@@ -148,7 +148,7 @@ func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
 	if len(outputs) != 4 {
 		t.Fatalf("stack outputs did not resolve through Pulumi graph: %#v", outputs)
 	}
-	for _, key := range []string{"clusterName", "serviceName", "deployTaskDefinitionArn", "securityGroupId", "applicationURL", "mediaURL", "privateSubnetIds"} {
+	for _, key := range []string{"clusterName", "serviceName", "deployTaskDefinitionArn", "securityGroupId", "applicationURL", "mediaURL", "mediaBucket", "privateSubnetIds"} {
 		if _, ok := exported[key]; !ok {
 			t.Fatalf("Component.Outputs missing %q", key)
 		}

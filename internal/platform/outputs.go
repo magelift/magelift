@@ -19,6 +19,10 @@ const (
 	OutputClusterName      = "clusterName"
 	OutputServiceName      = "serviceName"
 	OutputPrivateSubnetIDs = "privateSubnetIds"
+	// OutputMediaBucket is the Magento media object-storage bucket (env media-sync).
+	// Not in RequiredOutputKeys yet — AWS historically exported mediaURL only; adapters
+	// that support media-sync must export this key (GCP already does; AWS added in 05-05).
+	OutputMediaBucket = "mediaBucket"
 )
 
 // RequiredOutputKeys are the Magento-facing exports every StackModule must

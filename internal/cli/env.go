@@ -10,10 +10,16 @@ import (
 	"strings"
 	"time"
 
+	awsendpoint "github.com/acourtiol/magelift/internal/cloud/aws/endpoint"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/dumpimport"
 	"github.com/acourtiol/magelift/internal/localdev"
+	"github.com/acourtiol/magelift/internal/mediasync"
+	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/acourtiol/magelift/internal/seeddump"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 )
@@ -408,6 +414,129 @@ func envImportDumpCommand(o *options) *cobra.Command {
 			return o.write(result)
 		},
 	}
+}
+
+func envMediaSyncCommand(o *options) *cobra.Command {
+	var source string
+	command := &cobra.Command{
+		Use:   "media-sync <environment>",
+		Short: "Upload a local media tree into the environment media bucket (merge)",
+		Long: strings.TrimSpace(`
+Upload files from --source into the environment's media object-storage bucket (stack output mediaBucket).
+
+Key mapping: if a path contains pub/media/, object keys are relative to that prefix; otherwise --source is treated as the media root and keys are relative to it.
+
+Default mode is merge: each local file is PutObject (overwrite on conflict). Remote keys absent locally are not deleted. After upload, listing is checked so every source key is present (empty missing-key diff).
+
+Does not auto-run after deploy; seedMedia auto-seed is a follow-on.
+`),
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			if !environmentName.MatchString(name) {
+				return invalid(errors.New("environment name must be a lowercase stable name"))
+			}
+			if strings.TrimSpace(source) == "" {
+				return invalid(errors.New("--source is required"))
+			}
+			result, err := o.runMediaSync(cmd.Context(), name, source)
+			if err != nil {
+				return err
+			}
+			return o.write(result)
+		},
+	}
+	command.Flags().StringVar(&source, "source", "", "local media directory to upload (required)")
+	_ = command.MarkFlagRequired("source")
+	return command
+}
+
+func (o *options) runMediaSync(ctx context.Context, environment, source string) (map[string]any, error) {
+	syncFn := o.mediaSync
+	bucket := ""
+	var client mediasync.API
+	if syncFn == nil {
+		environmentName, planned, err := o.planStackForEnvironment(environment)
+		if err != nil {
+			return nil, err
+		}
+		_ = environmentName
+		if o.newBackend == nil {
+			return nil, errors.New("infrastructure backend factory is required")
+		}
+		backendURL := strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL"))
+		backend, err := o.newBackend(ctx, planned, backendURL)
+		if err != nil {
+			return nil, fmt.Errorf("create infrastructure backend: %w", err)
+		}
+		outputs, err := backend.Outputs(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read infrastructure outputs: %w", err)
+		}
+		bucket, err = platform.RequireStringOutput(outputs, platform.OutputMediaBucket)
+		if err != nil {
+			return nil, invalid(err)
+		}
+		client, err = newMediaS3Client(ctx, planned.Region())
+		if err != nil {
+			return nil, err
+		}
+		syncFn = mediasync.Sync
+	}
+	syncResult, err := syncFn(ctx, mediasync.Options{Source: source, Bucket: bucket, Client: client})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"environment": environment,
+		"bucket":      bucket,
+		"uploaded":    syncResult.Uploaded,
+		"keys":        syncResult.Keys,
+		"listingDiff": map[string]any{
+			"missing": syncResult.Diff.Missing,
+			"extra":   syncResult.Diff.Extra,
+			"empty":   syncResult.Diff.Empty(),
+		},
+	}, nil
+}
+
+// planStackForEnvironment plans without mutating o.environment from flags when
+// the env name comes from the media-sync positional argument.
+func (o *options) planStackForEnvironment(environment string) (string, platform.PlannedStack, error) {
+	if o.modules == nil {
+		return "", nil, errors.New("stack module registry is required")
+	}
+	file, err := o.load()
+	if err != nil {
+		return "", nil, invalid(err)
+	}
+	effective, err := file.Resolve(environment, config.ResolveOptions{})
+	if err != nil {
+		return "", nil, invalid(err)
+	}
+	_, planned, err := o.modules.Plan(effective.Config, environment, platform.PlanOptions{})
+	if err != nil {
+		return "", nil, err
+	}
+	warnExperimentalTarget(o.stderr, planned)
+	return environment, planned, nil
+}
+
+func newMediaS3Client(ctx context.Context, region string) (*s3.Client, error) {
+	endpoint, err := awsendpoint.FromEnv()
+	if err != nil {
+		return nil, invalid(err)
+	}
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
+	if err != nil {
+		return nil, fmt.Errorf("load AWS config for media sync: %w", err)
+	}
+	return s3.NewFromConfig(cfg, func(options *s3.Options) {
+		if endpoint != "" {
+			options.BaseEndpoint = awssdk.String(endpoint)
+			options.UsePathStyle = true
+		}
+	}), nil
 }
 
 func envStatusCommand(o *options) *cobra.Command {

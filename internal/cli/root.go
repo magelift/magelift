@@ -19,6 +19,7 @@ import (
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/dumpimport"
+	"github.com/acourtiol/magelift/internal/mediasync"
 	"github.com/acourtiol/magelift/internal/paasimport"
 	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/acourtiol/magelift/internal/releasejournal"
@@ -62,6 +63,7 @@ type options struct {
 	newBackend         func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error)
 	newDeploySteps     func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error)
 	importSeedDump     func(context.Context, dumpimport.Options) error
+	mediaSync          func(context.Context, mediasync.Options) (mediasync.Result, error)
 	newLock            func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
 	runCommand         func(context.Context, string, []string, io.Writer, io.Writer) error
 	runCompose         func(context.Context, string, []string, []string, io.Writer, io.Writer) error
@@ -517,7 +519,7 @@ func completionCommand(root *cobra.Command) *cobra.Command {
 
 func commandGroups(o *options) []*cobra.Command {
 	groups := map[string][]string{
-		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "create", "status", "import-dump", "destroy", "protect", "sweep"},
+		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "create", "status", "import-dump", "media-sync", "destroy", "protect", "sweep"},
 		"secret": {"set", "list", "remove"},
 	}
 	var commands []*cobra.Command
@@ -536,6 +538,8 @@ func commandGroups(o *options) []*cobra.Command {
 				group.AddCommand(envStatusCommand(o))
 			} else if groupName == "env" && name == "import-dump" {
 				group.AddCommand(envImportDumpCommand(o))
+			} else if groupName == "env" && name == "media-sync" {
+				group.AddCommand(envMediaSyncCommand(o))
 			} else if groupName == "env" && name == "destroy" {
 				group.AddCommand(envDestroyCommand(o))
 			} else if groupName == "env" && name == "protect" {
