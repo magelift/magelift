@@ -9,7 +9,7 @@ final readonly class PrepareRequest
     /**
      * @param array{edition: string, version: string, mode: string, webRuntime: string} $application
      * @param list<array{path: string, sha256: string}> $inputFiles
-     * @param list<array{locale: string, theme: string}> $staticContent
+     * @param list<array{locale: string, theme: string, strategy?: string, threads?: int}> $staticContent
      * @param list<array<string, mixed>> $lifecycleHooks
      */
     private function __construct(
@@ -78,6 +78,20 @@ final readonly class PrepareRequest
         usort($inputFiles, static fn (array $a, array $b): int => strcmp($a['path'], $b['path']));
         $staticContent = $this->staticContent;
         usort($staticContent, static fn (array $a, array $b): int => [$a['locale'], $a['theme']] <=> [$b['locale'], $b['theme']]);
+        $staticContent = array_map(static function (array $content): array {
+            $canonical = [
+                'locale' => $content['locale'],
+                'theme' => $content['theme'],
+            ];
+            if (($content['strategy'] ?? '') !== '') {
+                $canonical['strategy'] = $content['strategy'];
+            }
+            if (($content['threads'] ?? 0) > 0) {
+                $canonical['threads'] = $content['threads'];
+            }
+
+            return $canonical;
+        }, $staticContent);
 
         $prepare = [
             'repositoryRoot' => $this->repositoryRoot,
@@ -168,14 +182,19 @@ final readonly class PrepareRequest
         return $result;
     }
 
-    /** @return list<array{locale: string, theme: string}> */
+    /** @return list<array{locale: string, theme: string, strategy?: string, threads?: int}> */
     private static function parseStaticContent(mixed $value): array
     {
         $result = [];
         $seen = [];
         foreach (ProtocolJson::list($value, 'prepare.staticContent') as $entry) {
             $content = ProtocolJson::object($entry, 'prepare.staticContent[]');
-            ProtocolJson::assertKeys($content, ['locale', 'theme'], ['locale', 'theme'], 'prepare.staticContent[]');
+            ProtocolJson::assertKeys(
+                $content,
+                ['locale', 'theme', 'strategy', 'threads'],
+                ['locale', 'theme'],
+                'prepare.staticContent[]',
+            );
             $locale = ProtocolJson::nonEmptyString($content['locale'], 'static content locale');
             $theme = ProtocolJson::nonEmptyString($content['theme'], 'static content theme');
             $key = $locale."\0".$theme;
@@ -183,7 +202,21 @@ final readonly class PrepareRequest
                 throw new InvalidProtocolRequest('Duplicate static content entry.');
             }
             $seen[$key] = true;
-            $result[] = ['locale' => $locale, 'theme' => $theme];
+            $parsed = ['locale' => $locale, 'theme' => $theme];
+            if (array_key_exists('strategy', $content)) {
+                $strategy = ProtocolJson::string($content['strategy'], 'static content strategy');
+                if (!in_array($strategy, ['quick', 'standard', 'compact'], true)) {
+                    throw new InvalidProtocolRequest('static content strategy must be quick, standard, or compact.');
+                }
+                $parsed['strategy'] = $strategy;
+            }
+            if (array_key_exists('threads', $content)) {
+                if (!is_int($content['threads']) || $content['threads'] < 1) {
+                    throw new InvalidProtocolRequest('static content threads must be a positive integer.');
+                }
+                $parsed['threads'] = $content['threads'];
+            }
+            $result[] = $parsed;
         }
 
         return $result;

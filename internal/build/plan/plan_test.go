@@ -38,6 +38,9 @@ func TestPrepareRequestContainsOnlyImmutableInputs(t *testing.T) {
 	if len(request.Prepare.StaticContent) != 4 || request.Prepare.StaticContent[0].Locale != "en_US" {
 		t.Fatalf("unexpected static content: %#v", request.Prepare.StaticContent)
 	}
+	if request.Prepare.StaticContent[0].Strategy != "" || request.Prepare.StaticContent[0].Threads != 0 {
+		t.Fatalf("unexpected strategy/threads on locale-only config: %#v", request.Prepare.StaticContent[0])
+	}
 	encoded, err := buildrunner.EncodeRequest(request)
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +77,69 @@ func TestPrepareRequestCarriesSortedLifecycleHooks(t *testing.T) {
 	}
 	if got := request.Prepare.LifecycleHooks[0].ID; got != "alpha" {
 		t.Fatalf("hooks are not sorted: %#v", request.Prepare.LifecycleHooks)
+	}
+}
+
+func TestPrepareRequestAppliesStaticContentStrategyAndThreads(t *testing.T) {
+	input := strings.Replace(buildConfig, "    themes: [Magento/luma, Magento/blank]\n", "    themes: [Magento/luma, Magento/blank]\n    strategy: compact\n    threads: 3\n", 1)
+	file, err := config.Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "composer.lock"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	request, err := PrepareRequest(file, source.Repository{Root: root, Revision: strings.Repeat("a", 40)}, "/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(request.Prepare.StaticContent) != 4 {
+		t.Fatalf("unexpected static content count: %#v", request.Prepare.StaticContent)
+	}
+	for _, entry := range request.Prepare.StaticContent {
+		if entry.Strategy != "compact" || entry.Threads != 3 {
+			t.Fatalf("strategy/threads not applied to matrix entry: %#v", entry)
+		}
+	}
+	encoded, err := buildrunner.EncodeRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"strategy":"compact"`) || !strings.Contains(string(encoded), `"threads":3`) {
+		t.Fatalf("encoded request missing strategy/threads: %s", encoded)
+	}
+}
+
+func TestPrepareRequestRejectsInvalidStaticContentStrategy(t *testing.T) {
+	input := strings.Replace(buildConfig, "    themes: [Magento/luma, Magento/blank]\n", "    themes: [Magento/luma, Magento/blank]\n    strategy: turbo\n", 1)
+	file, err := config.Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "composer.lock"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = PrepareRequest(file, source.Repository{Root: root, Revision: strings.Repeat("a", 40)}, "/workspace")
+	if err == nil || !strings.Contains(err.Error(), "strategy") {
+		t.Fatalf("expected strategy error, got: %v", err)
+	}
+}
+
+func TestPrepareRequestRejectsNonPositiveStaticContentThreads(t *testing.T) {
+	input := strings.Replace(buildConfig, "    themes: [Magento/luma, Magento/blank]\n", "    themes: [Magento/luma, Magento/blank]\n    threads: 0\n", 1)
+	file, err := config.Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "composer.lock"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = PrepareRequest(file, source.Repository{Root: root, Revision: strings.Repeat("a", 40)}, "/workspace")
+	if err == nil || !strings.Contains(err.Error(), "threads") {
+		t.Fatalf("expected threads error, got: %v", err)
 	}
 }
 

@@ -77,6 +77,24 @@ final class LifecyclePlanTest extends TestCase
         ));
     }
 
+    public function testPlansConfiguredStaticContentStrategyAndThreads(): void
+    {
+        $plan = new LifecyclePlan([], [
+            ['locale' => 'en_US', 'theme' => 'Magento/blank', 'strategy' => 'compact', 'threads' => 3],
+            ['locale' => 'fr_FR', 'theme' => 'Vendor/theme', 'strategy' => 'compact', 'threads' => 3],
+        ]);
+
+        self::assertSame([
+            ['composer', 'install', '--no-dev', '--prefer-dist', '--no-interaction', '--no-progress', '--optimize-autoloader'],
+            ['bin/magento', 'setup:di:compile'],
+            ['bin/magento', 'setup:static-content:deploy', '--language', 'en_US', '--theme', 'Magento/blank', '-s', 'compact', '-j', '3', '--no-interaction'],
+            ['bin/magento', 'setup:static-content:deploy', '--language', 'fr_FR', '--theme', 'Vendor/theme', '-s', 'compact', '-j', '3', '--no-interaction'],
+        ], array_map(
+            static fn ($command): array => $command->argv(),
+            $plan->commandsFor(Phase::Build),
+        ));
+    }
+
     public function testPreparationStepsHaveStableDependencyOrder(): void
     {
         $steps = (new LifecyclePlan())->steps();

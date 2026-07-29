@@ -14,7 +14,7 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
 {
     /**
      * @param array<string, list<CommandInterface>> $hookCommands
-     * @param list<array{locale: string, theme: string}> $staticContent
+     * @param list<array{locale: string, theme: string, strategy?: string, threads?: int}> $staticContent
      */
     public function __construct(
         private array $hookCommands = [],
@@ -104,14 +104,25 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
             if ($content['locale'] === '' || $content['theme'] === '') {
                 throw new InvalidArgumentException('Static content locale and theme must be non-empty.');
             }
-            $commands[] = new Command(Executable::Magento, [
+            $args = [
                 'setup:static-content:deploy',
                 '--language',
                 $content['locale'],
                 '--theme',
                 $content['theme'],
-                '--no-interaction',
-            ]);
+            ];
+            $strategy = $content['strategy'] ?? '';
+            if (is_string($strategy) && $strategy !== '') {
+                $args[] = '-s';
+                $args[] = $strategy;
+            }
+            $threads = $content['threads'] ?? 0;
+            if (is_int($threads) && $threads > 0) {
+                $args[] = '-j';
+                $args[] = (string) $threads;
+            }
+            $args[] = '--no-interaction';
+            $commands[] = new Command(Executable::Magento, $args);
         }
 
         return $commands;

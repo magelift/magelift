@@ -39,8 +39,10 @@ type InputFile struct {
 }
 
 type StaticContent struct {
-	Locale string `json:"locale"`
-	Theme  string `json:"theme"`
+	Locale   string `json:"locale"`
+	Theme    string `json:"theme"`
+	Strategy string `json:"strategy,omitempty"`
+	Threads  int    `json:"threads,omitempty"`
 }
 
 type LifecycleHook struct {
@@ -181,6 +183,12 @@ func (request PrepareRequest) validate() error {
 	for _, content := range request.StaticContent {
 		if strings.TrimSpace(content.Locale) == "" || strings.TrimSpace(content.Theme) == "" {
 			problems = append(problems, errors.New("static content locale and theme are required"))
+		}
+		if content.Strategy != "" && content.Strategy != "quick" && content.Strategy != "standard" && content.Strategy != "compact" {
+			problems = append(problems, fmt.Errorf("static content strategy %q must be quick, standard, or compact", content.Strategy))
+		}
+		if content.Threads < 0 {
+			problems = append(problems, errors.New("static content threads must be a positive integer"))
 		}
 		key := content.Locale + "\x00" + content.Theme
 		if _, exists := staticContent[key]; exists {

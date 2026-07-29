@@ -129,10 +129,26 @@ func staticContent(settings map[string]any) ([]buildrunner.StaticContent, error)
 	if (len(locales) == 0) != (len(themes) == 0) {
 		return nil, errors.New("build.staticContent.locales and themes must be configured together")
 	}
+	strategy, err := staticContentStrategy(settings)
+	if err != nil {
+		return nil, err
+	}
+	threads, err := staticContentThreads(settings)
+	if err != nil {
+		return nil, err
+	}
+	if (strategy != "" || threads > 0) && len(locales) == 0 {
+		return nil, errors.New("build.staticContent.strategy and threads require locales and themes")
+	}
 	result := make([]buildrunner.StaticContent, 0, len(locales)*len(themes))
 	for _, locale := range locales {
 		for _, theme := range themes {
-			result = append(result, buildrunner.StaticContent{Locale: locale, Theme: theme})
+			result = append(result, buildrunner.StaticContent{
+				Locale:   locale,
+				Theme:    theme,
+				Strategy: strategy,
+				Threads:  threads,
+			})
 		}
 	}
 	sort.Slice(result, func(i, j int) bool {
@@ -142,6 +158,57 @@ func staticContent(settings map[string]any) ([]buildrunner.StaticContent, error)
 		return result[i].Locale < result[j].Locale
 	})
 	return result, nil
+}
+
+func staticContentStrategy(settings map[string]any) (string, error) {
+	value, exists := settings["strategy"]
+	if !exists || value == nil {
+		return "", nil
+	}
+	strategy, ok := value.(string)
+	if !ok || strategy == "" {
+		return "", errors.New("build.staticContent.strategy must be quick, standard, or compact")
+	}
+	switch strategy {
+	case "quick", "standard", "compact":
+		return strategy, nil
+	default:
+		return "", fmt.Errorf("build.staticContent.strategy %q must be quick, standard, or compact", strategy)
+	}
+}
+
+func staticContentThreads(settings map[string]any) (int, error) {
+	value, exists := settings["threads"]
+	if !exists || value == nil {
+		return 0, nil
+	}
+	threads, err := positiveInt(value)
+	if err != nil {
+		return 0, fmt.Errorf("build.staticContent.threads must be a positive integer: %w", err)
+	}
+	return threads, nil
+}
+
+func positiveInt(value any) (int, error) {
+	switch n := value.(type) {
+	case int:
+		if n < 1 {
+			return 0, errors.New("must be >= 1")
+		}
+		return n, nil
+	case int64:
+		if n < 1 {
+			return 0, errors.New("must be >= 1")
+		}
+		return int(n), nil
+	case uint64:
+		if n < 1 {
+			return 0, errors.New("must be >= 1")
+		}
+		return int(n), nil
+	default:
+		return 0, errors.New("not an integer")
+	}
 }
 
 func stringList(settings map[string]any, key string) ([]string, error) {

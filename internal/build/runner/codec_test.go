@@ -68,6 +68,21 @@ func TestEncodeRequestPreservesEmptyStaticContentList(t *testing.T) {
 	}
 }
 
+func TestEncodeRequestIncludesStaticContentStrategyAndThreads(t *testing.T) {
+	request := validPrepareRequest()
+	request.Prepare.StaticContent = []StaticContent{
+		{Locale: "en_US", Theme: "Magento/luma", Strategy: "compact", Threads: 4},
+	}
+
+	encoded, err := EncodeRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(encoded, []byte(`"strategy":"compact"`)) || !bytes.Contains(encoded, []byte(`"threads":4`)) {
+		t.Fatalf("encoded request missing strategy/threads: %s", encoded)
+	}
+}
+
 func TestPrepareResponseCanonicalizesSetAndChecksumOrder(t *testing.T) {
 	response := Response{ProtocolVersion: 1, Stage: StagePrepare, Prepare: &PrepareResponse{
 		PreparedArtifact: "dist/rootfs.tar",
