@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/acourtiol/magelift/internal/config"
+	"github.com/acourtiol/magelift/internal/dumpimport"
+	"github.com/acourtiol/magelift/internal/localdev"
 	"github.com/acourtiol/magelift/internal/seeddump"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
@@ -388,6 +390,26 @@ func envProtectCommand(o *options) *cobra.Command {
 	return command
 }
 
+func envImportDumpCommand(o *options) *cobra.Command {
+	return &cobra.Command{
+		Use:   "import-dump <environment>",
+		Short: "Import the environment seedDump into the target database",
+		Long:  "Runs the dump importer with journal transitions (recorded|failed → importing → imported|failed). Retries into a non-empty database require persistent --yes (D-04). Named import-dump to avoid colliding with magelift dev seed.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			if !environmentName.MatchString(name) {
+				return invalid(errors.New("environment name must be a lowercase stable name"))
+			}
+			result, err := o.runSeedDumpImport(cmd.Context(), name, seedDumpImportExplicit)
+			if err != nil {
+				return err
+			}
+			return o.write(result)
+		},
+	}
+}
+
 func envStatusCommand(o *options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status <environment>",
@@ -437,4 +459,105 @@ func envStatusCommand(o *options) *cobra.Command {
 			return o.write(result)
 		},
 	}
+}
+
+type seedDumpImportKind int
+
+const (
+	seedDumpImportExplicit seedDumpImportKind = iota
+	seedDumpImportAuto
+)
+
+// runSeedDumpImport marks journal importing, runs dumpimport, then imported|failed.
+// First recorded path forces Yes=true (Pattern 3 / D-04); retries from failed require o.yes when nonempty.
+func (o *options) runSeedDumpImport(ctx context.Context, environment string, kind seedDumpImportKind) (map[string]any, error) {
+	file, err := o.load()
+	if err != nil {
+		return nil, invalid(err)
+	}
+	effective, err := file.Resolve(environment, config.ResolveOptions{})
+	if err != nil {
+		return nil, invalid(err)
+	}
+	dumpPath := strings.TrimSpace(effective.Config.SeedDump)
+	if dumpPath == "" {
+		if kind == seedDumpImportAuto {
+			return nil, nil
+		}
+		return nil, invalid(errors.New("environment has no seedDump configured"))
+	}
+
+	projectRoot := filepath.Dir(filepath.Clean(o.configPath))
+	store, err := seeddump.New(projectRoot, environment)
+	if err != nil {
+		return nil, invalid(err)
+	}
+	record, err := store.Read(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read seed dump journal: %w", err)
+	}
+	if record == nil {
+		if kind == seedDumpImportAuto {
+			return nil, nil
+		}
+		return nil, invalid(errors.New("seed dump journal is missing; run env create --dump first"))
+	}
+	if kind == seedDumpImportAuto && record.Status != seeddump.StatusRecorded {
+		return nil, nil
+	}
+
+	yes := o.yes
+	if record.Status == seeddump.StatusRecorded {
+		// First recorded path: operator intent already recorded via --dump (D-01/D-04 Pattern 3).
+		yes = true
+	}
+
+	if _, err := store.MarkImporting(ctx); err != nil {
+		return nil, invalid(err)
+	}
+
+	importFn := o.importSeedDump
+	if importFn == nil {
+		importFn = dumpimport.Import
+	}
+	opts := dumpimport.Options{
+		DumpPath: dumpPath,
+		Yes:      yes,
+		WorkDir:  projectRoot,
+	}
+	if name := strings.TrimSpace(effective.Config.Project.Name); name != "" {
+		if project, err := localdev.ProjectName(name); err == nil {
+			opts.ComposeProject = project
+		}
+	}
+
+	if err := importFn(ctx, opts); err != nil {
+		reason := strings.TrimSpace(err.Error())
+		if reason == "" {
+			reason = "dump import failed"
+		}
+		if _, markErr := store.MarkFailed(ctx, reason); markErr != nil {
+			return nil, fmt.Errorf("%w; mark seed dump failed: %v", err, markErr)
+		}
+		if errors.Is(err, dumpimport.ErrNonEmptyRequiresYes) {
+			return nil, invalid(err)
+		}
+		return nil, err
+	}
+
+	imported, err := store.MarkImported(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mark seed dump imported: %w", err)
+	}
+	return map[string]any{
+		"environment":    environment,
+		"seedDump":       dumpPath,
+		"seedDumpStatus": imported.Status,
+	}, nil
+}
+
+// maybeAutoImportSeedDump runs once after successful deploy when status is recorded (D-01/D-02).
+func (o *options) maybeAutoImportSeedDump(ctx context.Context, environment string) error {
+	_, err := o.runSeedDumpImport(ctx, environment, seedDumpImportAuto)
+	return err
 }
