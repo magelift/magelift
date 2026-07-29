@@ -153,7 +153,7 @@ Plans:
   4. `docs/ece-parity.md` enumerates every `ece-tools` build, deploy, and post-deploy hook plus every env-var-driven Magento setting in the ACC/Upsun shape, each marked closed or intentionally-gapped with a reason — no row blank
   5. `make php-test` covers `magento-cloud-patches`-style patch application and static-content-deploy settings (locales, themes, strategy, thread count) for the supported configurations
 
-**Plans:** 3/6 plans executed
+**Plans:** 4/6 plans executed
 
 Plans:
 
@@ -161,7 +161,7 @@ Plans:
 - [x] 04-02-PLAN.md — Init CLI contract: --from-* mutual exclusion, refuse/--yes, --config-out (D-03/D-04 gates)
 - [ ] 04-03-PLAN.md — Shared ACC/Upsun mapper, D-07 allowlist, unmapped sidecar (D-05), cron schema, soak skip
 - [x] 04-04-PLAN.md — SCD strategy/threads Go→PHP vertical slice (ECE-03)
-- [ ] 04-05-PLAN.md — Clean-room m2-hotfixes PatchApplier + php-test (ECE-02)
+- [x] 04-05-PLAN.md — Clean-room m2-hotfixes PatchApplier + php-test (ECE-02)
 - [ ] 04-06-PLAN.md — docs/ece-parity.md + D-07 docs + migration/provenance + clean-room check
 
 ### Phase 5: Data Migration & Cutover
@@ -240,7 +240,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | 1. Publishable Baseline & Honest Fallbacks | 10/10 | In Progress|  |
 | 2. Tag-Ready Release Surface | 4/4 | In Progress|  |
 | 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 5/6 | In Progress|  |
-| 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 3/6 | In Progress|  |
+| 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 4/6 | In Progress|  |
 | 5. Data Migration & Cutover | 0/TBD | Not started | - |
 | 6. Shared Kubernetes Day-2 | 0/TBD | Not started | - |
 | 7. GCP Certification | 0/TBD | Not started | - |
