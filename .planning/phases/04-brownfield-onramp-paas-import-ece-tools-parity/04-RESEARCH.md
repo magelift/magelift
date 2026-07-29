@@ -345,22 +345,16 @@ Tighten in this phase (or document allowed keys): `locales`, `themes`, `strategy
 | A3 | Minimal new `application.cron` schema is preferred over marking all crons intentional-gap | Pitfall 4 | Schema churn vs incomplete IMPORT-03 |
 | A4 | D-04 side-file flag may be named `--config-out` despite CONTEXT saying `--output` | Open Questions | Operator docs diverge from CONTEXT wording until confirmed |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **D-04 `--output PATH` vs persistent `--output` format**
-   - What we know: Root persistent `--output/-o` is format [VERIFIED: root.go].
-   - What's unclear: Whether user accepts `--config-out` / `--write` as the side-file flag.
-   - Recommendation: Use `--config-out PATH`; note D-04 intent preserved; update CONTEXT in discuss if needed.
+1. **D-04 `--output PATH` vs persistent `--output` format** — **RESOLVED**
+   - Decision: Use init-local `--config-out PATH` for the side-file write (04-02 checkpoint). Root persistent `--output/-o` stays output format. D-04 intent (optional path for generated YAML) preserved without colliding with format `-o`.
 
-2. **Cron destination schema**
-   - What we know: No cron schedule fields in `magelift.yaml` today.
-   - What's unclear: Whether Phase 4 adds schema or reports custom crons as unmapped.
-   - Recommendation: Add minimal portable cron list for Magento cron entries; unmapped for free-form shell crons that are not `bin/magento cron:run`.
+2. **Cron destination schema** — **RESOLVED**
+   - Decision: Add minimal portable `application.cron` list in schema/model for Magento cron entries (`bin/magento cron:run` and mapped schedules). Free-form shell crons that are not Magento cron → unmapped sidecar (04-03).
 
-3. **QUALITY_PATCHES depth**
-   - What we know: Adobe applies required cloud patches → quality patches → m2-hotfixes [CITED: experienceleague apply-patches].
-   - What's unclear: Whether ECE-02 requires quality-patch IDs or only m2-hotfixes-style custom patches.
-   - Recommendation: Implement m2-hotfixes apply + document QUALITY_PATCHES / cloud-required packages as intentional gaps unless trivial allowlist→status can be added without vendoring Adobe patch DBs.
+3. **QUALITY_PATCHES depth** — **RESOLVED**
+   - Decision: ECE-02 closes clean-room `m2-hotfixes` apply + php-test (04-05). QUALITY_PATCHES / cloud-required package patch DBs remain intentional-gap in `docs/ece-parity.md` (04-06) — do not vendor Adobe patch databases.
 
 ## Environment Availability
 
