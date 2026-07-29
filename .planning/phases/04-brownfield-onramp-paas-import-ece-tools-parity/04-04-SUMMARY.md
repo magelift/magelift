@@ -89,7 +89,7 @@ status: complete
 1. **Task 1: End-to-end SCD strategy/threads Go→PHP argv** - `967d879` (feat)
 2. **Task 2: Pin build.staticContent schema keys for strategy/threads** - `561b257` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `93529e2` (docs: complete plan)
 
 ## Files Created/Modified
 
