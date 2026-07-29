@@ -112,7 +112,7 @@ status: complete
 1. **Task 1: Lock D-04 overwrite confirmation contract** - (decision, no commit) ⚡ Auto-selected option-a
 2. **Task 2: dumpimport local MySQL + nonempty/--yes converge** - `2e6b979` (test RED) → `65b1082` (feat GREEN)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `7a2a047` (docs: complete dumpimport plan)
 
 ## Files Created/Modified
 
