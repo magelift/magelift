@@ -178,7 +178,15 @@ Plans:
   4. A media-sync run copies a fixture media tree into the target's object storage and a listing diff against the source is empty
   5. `docs/migrating-from-paas.md` carries a cutover runbook (DNS, maintenance mode, reindex, verification, rollback) that has been followed end to end at least once against a non-production target, with the run recorded
 
-**Plans**: TBD
+**Plans:** 6 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Config SeedDump + schema generate + create journal recorded (Wave 0 KnownFields)
+- [ ] 05-02-PLAN.md — seeddump journal state machine + magelift env status merge
+- [ ] 05-03-PLAN.md — dumpimport local MySQL + nonempty/--yes schema-replace (D-04 gate)
+- [ ] 05-04-PLAN.md — env import-dump + post-deploy auto-import once-from-recorded (D-01 gate)
+- [ ] 05-05-PLAN.md — env media-sync --source + Floci/unit listing-diff
+- [ ] 05-06-PLAN.md — cutover runbook + local scratch proof + Phase 7 HUMAN_GATE split
 
 ### Phase 6: Shared Kubernetes Day-2
 
