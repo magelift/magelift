@@ -133,7 +133,7 @@ status: complete
 2. **Task 2: Shared mapper + allowlist + sidecar** — `82774af` (feat)
 3. **Task 3: Cron schema + soak + validate** — `e710236` (feat)
 
-**Plan metadata:** _(pending final docs commit)_
+**Plan metadata:** `1b952ac` (docs: complete plan)
 
 ## Files Created/Modified
 
