@@ -188,6 +188,43 @@ final class NativePreparationTest extends TestCase
         );
     }
 
+    public function testExecutesHotfixPatchesAfterComposerInstall(): void
+    {
+        [$source, $workspace] = self::minimalSource();
+        mkdir($source.'/vendor', 0o700, true);
+        file_put_contents($source.'/app/etc/config.php', "<?php\nreturn ['modules' => ['Vendor_Custom' => 1]];\n");
+        file_put_contents($source.'/vendor/autoload.php', '<?php return true;');
+        mkdir($source.'/m2-hotfixes', 0o700);
+        file_put_contents($source.'/m2-hotfixes/b-second.patch', "diff\n");
+        file_put_contents($source.'/m2-hotfixes/a-first.patch', "diff\n");
+        $runner = new SuccessfulRunner();
+
+        (new NativePreparation($runner, $workspace, new FixedCapabilities(), new ConfigModuleReader()))
+            ->prepare(PrepareRequest::fromJson(self::request($source)));
+
+        $argv = array_map(static fn (ProcessRequest $process): array => $process->argv, $runner->requests);
+        $composerInstall = ['composer', 'install', '--no-dev', '--prefer-dist', '--no-interaction', '--no-progress', '--optimize-autoloader'];
+        $firstPatch = ['patch', '-p1', '--forward', '--batch', '-i', 'm2-hotfixes/a-first.patch'];
+        $secondPatch = ['patch', '-p1', '--forward', '--batch', '-i', 'm2-hotfixes/b-second.patch'];
+        $compile = ['bin/magento', 'setup:di:compile'];
+        self::assertContains($composerInstall, $argv);
+        self::assertContains($firstPatch, $argv);
+        self::assertContains($secondPatch, $argv);
+        self::assertContains($compile, $argv);
+        self::assertLessThan(
+            array_search($firstPatch, $argv, true),
+            array_search($composerInstall, $argv, true),
+        );
+        self::assertLessThan(
+            array_search($secondPatch, $argv, true),
+            array_search($firstPatch, $argv, true),
+        );
+        self::assertLessThan(
+            array_search($compile, $argv, true),
+            array_search($secondPatch, $argv, true),
+        );
+    }
+
     /** @return array{string, string} */
     private static function minimalSource(): array
     {

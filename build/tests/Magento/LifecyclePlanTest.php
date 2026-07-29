@@ -95,6 +95,25 @@ final class LifecyclePlanTest extends TestCase
         ));
     }
 
+    public function testPlansHotfixPatchesAfterComposerInstall(): void
+    {
+        $plan = new LifecyclePlan([], [], [
+            'm2-hotfixes/a-first.patch',
+            'm2-hotfixes/b-second.patch',
+        ]);
+
+        self::assertSame([
+            ['composer', 'install', '--no-dev', '--prefer-dist', '--no-interaction', '--no-progress', '--optimize-autoloader'],
+            ['patch', '-p1', '--forward', '--batch', '-i', 'm2-hotfixes/a-first.patch'],
+            ['patch', '-p1', '--forward', '--batch', '-i', 'm2-hotfixes/b-second.patch'],
+            ['bin/magento', 'setup:di:compile'],
+            ['bin/magento', 'setup:static-content:deploy', '--no-interaction'],
+        ], array_map(
+            static fn ($command): array => $command->argv(),
+            $plan->commandsFor(Phase::Build),
+        ));
+    }
+
     public function testPreparationStepsHaveStableDependencyOrder(): void
     {
         $steps = (new LifecyclePlan())->steps();

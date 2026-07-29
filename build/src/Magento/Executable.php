@@ -8,4 +8,5 @@ enum Executable: string
 {
     case Composer = 'composer';
     case Magento = 'bin/magento';
+    case Patch = 'patch';
 }

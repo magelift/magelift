@@ -15,10 +15,12 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
     /**
      * @param array<string, list<CommandInterface>> $hookCommands
      * @param list<array{locale: string, theme: string, strategy?: string, threads?: int}> $staticContent
+     * @param list<string> $hotfixPatches Relative m2-hotfixes/*.patch paths (alpha-sorted by caller)
      */
     public function __construct(
         private array $hookCommands = [],
         private array $staticContent = [],
+        private array $hotfixPatches = [],
     )
     {
     }
@@ -77,6 +79,7 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
                     '--no-progress',
                     '--optimize-autoloader',
                 ]),
+                ...$this->hotfixPatchCommands(),
                 new Command(Executable::Magento, ['setup:di:compile']),
                 ...$this->staticContentCommands(),
             ],
@@ -90,6 +93,16 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
                 new Command(Executable::Magento, ['cache:flush']),
             ],
         };
+    }
+
+    /** @return list<CommandInterface> */
+    private function hotfixPatchCommands(): array
+    {
+        if ($this->hotfixPatches === []) {
+            return [];
+        }
+
+        return PatchApplier::commands($this->hotfixPatches);
     }
 
     /** @return list<CommandInterface> */

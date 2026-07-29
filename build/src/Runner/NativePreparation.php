@@ -16,6 +16,7 @@ use MageLift\Build\Lifecycle\Step;
 use MageLift\Build\Magento\LifecyclePlan;
 use MageLift\Build\Magento\Command;
 use MageLift\Build\Magento\Executable;
+use MageLift\Build\Magento\PatchApplier;
 use MageLift\Build\Process\ProcessRunner;
 use RecursiveDirectoryIterator;
 use RecursiveCallbackFilterIterator;
@@ -40,7 +41,15 @@ final readonly class NativePreparation implements Preparation
         $buildRoot = rtrim($this->workspaceRoot, '/').'/rootfs';
         $this->copySource($request->repositoryRoot, $buildRoot);
 
-        $plan = new LifecyclePlan($this->hookCommands($request->lifecycleHooks), $request->staticContent);
+        $hotfixPatches = PatchApplier::discover($buildRoot);
+        if ($hotfixPatches !== []) {
+            (new PatchApplier($this->runner))->assertPatchToolAvailable();
+        }
+        $plan = new LifecyclePlan(
+            $this->hookCommands($request->lifecycleHooks),
+            $request->staticContent,
+            $hotfixPatches,
+        );
         $execution = (new LifecycleExecutor($this->runner, $plan))->execute(
             new LifecycleGraph($plan->steps(), $this->lifecycleHooks($request->lifecycleHooks)),
             $buildRoot,
