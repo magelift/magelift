@@ -114,7 +114,7 @@ status: complete
    - RED - `42e46b7` (test)
    - GREEN - `332568a` (feat)
 
-**Plan metadata:** *(pending final docs commit)*
+**Plan metadata:** `7fd2ac0` (docs: complete plan)
 
 ## Files Created/Modified
 
