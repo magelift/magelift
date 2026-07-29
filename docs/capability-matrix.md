@@ -127,7 +127,7 @@ Floci gap closure is a later plan). Prefer under-claim.
 | RuntimeObserve.PrepareExec | unit-fake / paid-only | `TestPrepareExecRejectsDeployWorkload`; live ECS ExecuteCommand is paid-only |
 | Ops.AcquireLock | Floci / unit-fake | Covered by `TestBootstrapStateAndLockAgainstFloci` (S3 DIY lock) |
 | Ops.NewDeploySteps | unit-fake / paid-only | `TestNewDeployStepsRejectsWrongBackend`; live Magento cutover paid |
-| Media / storage (S3 paths exercised by Floci) | Floci | `tests/floci/storage_test.go` (`TestVersionedMediaRestoreAgainstFloci`) |
+| Media / storage (S3 paths exercised by Floci) | Floci | `tests/floci/storage_test.go` (`TestVersionedMediaRestoreAgainstFloci`); `env media-sync` listing-diff: unit (`internal/mediasync`) + `tests/floci/media_sync_test.go` (`TestMediaSyncListingDiffAgainstFloci`). Live paid-account media cutover remains unpaid-proof (Phase 7 HUMAN_GATE with DNS). |
 | SelectTask (PrepareExec helper) | unit-fake | `TestSelectTaskSortsRunningTaskARNs` in `internal/cloud/aws/operations` |
 
 ## GCP GKE Autopilot cells (experimental)
