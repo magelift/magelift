@@ -27,10 +27,14 @@ once, then `acceptance cell-update` per incomplete cell — never destroy-betwee
 Re-invoking with an existing checkpoint skips recorded cell IDs (ACCEPT-02).
 
 **Resume / lock hygiene:** if a live (non-dry-run) deploy was killed mid-create, DIY
-locks or `pending_operations` may block the next run. Unlock only when the account
-is empty of acceptance resources (confirm with `assert_clean` / aws-cli tag scan) —
-never force-unlock while create is still in flight. Live multi-cell proof remains a
-paid HUMAN_GATE pass; dry-run does not claim that yet.
+locks or `pending_operations` may block the next run. Unlock only when no deploy is
+in flight (confirm with `magelift state status` / aws-cli) — never force-unlock while
+create is still running. Live multi-cell proof (create-once, ≥3 cells, kill+resume,
+dual `assert_clean`) closed 2026-07-29 on free-tier account `669890779205` /
+`eu-north-1` — see harness log under
+`.planning/phases/03-credit-efficient-acceptance-harness-evidence-tiering/scratch/03-06-live-run-health.log`
+and evidence sample in `scratch/03-06-paid-proof.md` (matrix rows stay gitignored under
+`.magelift/matrix-results.md`).
 
 ### Live multi-cell (paid)
 
@@ -63,8 +67,9 @@ MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh -
 # leftover mode exits non-zero when leftovers are detected (expected)
 ```
 
-Live leftover demonstration (deliberate keep/orphan then fail-loud `assert_clean`)
-requires the paid 03-06 HUMAN_GATE — offline stubs do not claim that half closed.
+Live leftover demonstration closed 2026-07-29: KEEP stack → `assert_clean FAILED`;
+after `magelift destroy --yes` → `assert_clean ok`. Offline stubs remain the
+default CI path.
 
 ## Prerequisites
 

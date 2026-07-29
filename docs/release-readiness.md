@@ -18,7 +18,7 @@ MageLift OpenSearch acceptance account. It closes with three substitutes:
 | Evidence | What it proves |
 | --- | --- |
 | MageLift offline wiring | Pulumi/unit mocks for SigV4 sidecar + Magento env (`TestRuntimeAddsSigV4ProxyForMagentoOpenSearch` and related); proxy absent when `searchMode: disabled` |
-| Free-tier AWS matrix | Applied `searchMode: disabled` + queue cells; preview-only OpenSearch serverless plan (2026-07-21). Evidence: `.magelift/matrix-results.md` |
+| Free-tier AWS matrix | Applied `searchMode: disabled` + queue cells; preview-only OpenSearch serverless plan (2026-07-21). Re-proven create-once + `db`/`ecs-rabbitmq`/`ecs-artemis` + kill/resume + dual assert_clean (2026-07-29). Evidence: `.magelift/matrix-results.md`; proof note `scratch/03-06-paid-proof.md` |
 | Chantelle external ops | Prior Terraform Magento+OpenSearch work at Chantelle (ElasticSuite, no SigV4) — see [sources/chantelle-opensearch.md](sources/chantelle-opensearch.md); private repos not named |
 
 **Honesty:** Chantelle proves Magento + AWS OpenSearch *ops*, not MageLift’s
@@ -63,7 +63,7 @@ If clearance fails, rename every identifier before the first public tag.
 | Contract freeze (`v1.0.0-rc.1`) | **Closed** | [versioning.md](versioning.md); CHANGELOG `[Unreleased]` baseline |
 | OpenSearch public-tag substitute | **Closed** | Offline SigV4 wiring + free-tier matrix + [prior Chantelle Terraform ops](sources/chantelle-opensearch.md) (repos not named) |
 | OpenSearch live SigV4 data-plane | **Deferred** | Post-tag / paid acceptance checklist above |
-| Queue matrix (`ecs-rabbitmq` + experimental Artemis) | **Closed** | Free-tier infra pass 2026-07-21 |
+| Queue matrix (`ecs-rabbitmq` + experimental Artemis) | **Closed** | Free-tier infra 2026-07-21; harness cell PASS 2026-07-29 |
 | Measured time-to-preview | **Closed** | ~631s / 10m31s eu-north-1 |
 | `/health` on MageLift runtime images | **Closed** | nginx + FrankenPHP short-circuit; `curl` in image; `scripts/image-health-test.sh`; Varnish pass-through |
 | GCP Magento deploy Ops | **Deferred** | Experimental — no multi-cloud claim |

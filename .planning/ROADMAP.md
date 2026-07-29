@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Publishable Baseline & Honest Fallbacks** - Clear the debt that worsens with every later phase, and make every target state its own tier
 - [x] **Phase 2: Tag-Ready Release Surface** - Make `v1.0.0-rc.1` taggable: version story, contract statement, packaging smoke, contributor path
-- [ ] **Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering** - One long-lived stack, resumable runs, automatic evidence, and a matrix that never over-claims
+- [x] **Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering** - One long-lived stack, resumable runs, automatic evidence, and a matrix that never over-claims
 - [ ] **Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity** - A store on Adobe Commerce Cloud or Upsun gets a reviewable `magelift.yaml` and a build system it can trust
 - [ ] **Phase 5: Data Migration & Cutover** - `seedDump` stops being a status string; a documented cutover moves a live store over
 - [ ] **Phase 6: Shared Kubernetes Day-2** - One `Observe` and one `deploy.Steps` in `internal/cloud/kube`, inherited by all four Kubernetes targets
@@ -128,7 +128,7 @@ Plans:
   4. The GCP harness path runs the same shape end to end including PSA soak and force-clean teardown, verified at least as far as a dry run / preview pass before Phase 7 spends credits
   5. `docs/capability-matrix.md` records an evidence tier per cell plus an explicit unverifiable reason for Aurora `CreateDBCluster`, `amazon-mq` × `preview`, and the OpenSearch SigV4 data plane; a checked-in port-coverage table maps every day-2 port to mocks / Floci / paid-only, and `make floci-test` covers every port marked mockable
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans executed
 
 Plans:
 
@@ -137,7 +137,7 @@ Plans:
 - [x] 03-03-PLAN.md — Capability-matrix evidence tiers, unverifiable reasons, port-coverage table
 - [x] 03-04-PLAN.md — Floci/unit-fake coverage for every mockable day-2 port
 - [x] 03-05-PLAN.md — GCP harness same shape via preview/dry-run (no live up)
-- [ ] 03-06-PLAN.md — HUMAN_GATE paid AWS free-tier create-once proof (≥3 cells, resume, evidence, assert_clean)
+- [x] 03-06-PLAN.md — HUMAN_GATE paid AWS free-tier create-once proof (≥3 cells, resume, evidence, assert_clean)
 
 ### Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity
 

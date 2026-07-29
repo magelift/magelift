@@ -1,112 +1,64 @@
 # 03-06 Paid AWS acceptance proof
 
-**Status:** template — fill after HUMAN_GATE spend approval. Do **not** invent PASS rows by hand.
+**Status:** complete — 2026-07-29. Evidence under gitignored `.magelift/`; this note cites harness output only (no invented PASS rows).
 
-Evidence files stay under gitignored `.magelift/` (checkpoint + `matrix-results.md`). This scratch note and docs cite harness output only.
+Live log: `scratch/03-06-live-run-health.log`
 
-## Required env
+## Required env (used)
 
-| Variable | Purpose |
-|----------|---------|
-| `MAGELIFT_BIN` | Built magelift binary |
-| `MAGELIFT_CONFIG` | Acceptance `magelift.yaml` (preview free-tier; include `queueSecretArn` for ecs broker cells) |
-| `MAGELIFT_AWS_ACCEPTANCE_DIGEST` | Signed immutable runtime image digest |
-| `MAGELIFT_AWS_CERTIFICATE_IDENTITY` | Expected Sigstore certificate identity |
-| `AWS_REGION` / `AWS_DEFAULT_REGION` | Region for apply + assert_clean |
-| `MAGELIFT_AWS_ACCEPTANCE_PROFILE` | Default `preview` (do not set `ALLOW_COSTLY` for this pass) |
+| Variable | Value (non-secret) |
+|----------|--------------------|
+| `MAGELIFT_BIN` | `/tmp/magelift` (`version: dev`) |
+| `MAGELIFT_CONFIG` | `.magelift/acceptance.magelift.yaml` |
+| `MAGELIFT_AWS_ACCEPTANCE_DIGEST` | `…/magelift-acceptance@sha256:df04554d…` (php-runtime `/health`) |
+| `MAGELIFT_AWS_CERTIFICATE_IDENTITY` | `alex.courtiol@gmail.com` |
+| `MAGELIFT_AWS_CERTIFICATE_OIDC_ISSUER` | `https://github.com/login/oauth` |
+| `AWS_REGION` | `eu-north-1` |
+| `MAGELIFT_AWS_ACCEPTANCE_PROFILE` | `preview` |
 
-Optional: `MAGELIFT_AWS_CERTIFICATE_OIDC_ISSUER` (defaults to GitHub Actions OIDC issuer).
+Account: `669890779205`.
 
 ## Cell catalog (≥3, free-tier only)
-
-From `scripts/acceptance/cells-aws-preview.txt`:
 
 1. `queueMode:db`
 2. `queueMode:ecs-rabbitmq`
 3. `queueMode:ecs-artemis`
 
-**Excluded:** Aurora apply, `amazon-mq`, OpenSearch apply.
+## Proof checklist
 
-## Procedure (KEEP=true create-once)
+| Criterion | Log / artifact proof | Done |
+|-----------|----------------------|------|
+| ACCEPT-01 create-once then ≥3 cell-updates, no re-create | Log: one `acceptance create-once` then `cell-update` for db / rabbitmq / artemis; resume skipped create-once | yes |
+| ACCEPT-02 kill+resume skips PASS cells | After `queueMode:db` PASS, harness killed; resume logged `acceptance resume: skipping create-once` + `acceptance skip cell=queueMode:db` | yes |
+| ACCEPT-03 harness-written matrix-results six columns | `.magelift/matrix-results.md` (sample below) | yes |
+| ACCEPT-04 assert_clean leftover≠0 and clean=0 | Leftover while KEEP stack up → FAILED (VPC/RDS/ALB/ECS/…); after destroy → `assert_clean ok` / EXIT 0 | yes |
 
-Offline preflight first (no spend):
+## Evidence sample (redacted)
 
-```sh
-MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/checkpoint_resume_test.sh
-bash tests/acceptance/evidence_append_test.sh
-MAGELIFT_ACCEPTANCE_AWS_STUB=1 bash tests/acceptance/assert_clean_stub_test.sh --clean
-bash tests/acceptance/matrix_tier_guard_test.sh
-# or: make acceptance-harness-test
-```
-
-Live long-lived stack (after spend approval):
-
-```sh
-export MAGELIFT_BIN=/path/to/magelift
-export MAGELIFT_CONFIG=/path/to/acceptance.magelift.yaml
-export MAGELIFT_AWS_ACCEPTANCE_DIGEST='ghcr.io/…@sha256:…'
-export MAGELIFT_AWS_CERTIFICATE_IDENTITY='…'
-export AWS_REGION=eu-north-1   # or your free-tier region
-export MAGELIFT_AWS_ACCEPTANCE_KEEP=true
-
-./scripts/aws-acceptance-local.sh
-```
-
-**What the live path does**
-
-1. Logs `acceptance create-once` once → `preview` + `promote` + initial `deploy` / `outputs` / `health`.
-2. For each incomplete catalog cell: logs `acceptance cell-update cell=…`, patches `queueMode` into a **temp copy** of `MAGELIFT_CONFIG` (via `yq`; does not mutate the source file), then `deploy --digest … --yes` + `outputs` + `health`.
-3. Appends `.magelift/matrix-results.md` and records checkpoint PASS/FAIL per cell.
-4. With `KEEP=true`, EXIT trap skips destroy (stack stays up for kill+resume / leftover assert).
-
-## Kill + resume
-
-1. After ≥1 cell `PASS` in checkpoint, interrupt the script (Ctrl-C) mid-matrix.
-2. Confirm DIY lock hygiene if deploy was mid-flight (unlock only when account empty — see `docs/aws-acceptance.md`).
-3. Re-invoke with the same env plus KEEP (and optionally `MAGELIFT_AWS_ACCEPTANCE_RESUME=1`):
-
-```sh
-export MAGELIFT_AWS_ACCEPTANCE_KEEP=true
-export MAGELIFT_AWS_ACCEPTANCE_RESUME=1   # optional if checkpoint already has cells
-./scripts/aws-acceptance-local.sh
-```
-
-Expect: `acceptance resume: skipping create-once`, `acceptance skip cell=…` for PASS cells, then `cell-update` for the first incomplete cell.
-
-## Evidence sample (paste redacted harness row)
-
-After a live run, copy one row from `.magelift/matrix-results.md` (account id OK; **no** digests/secrets):
+From harness-written `.magelift/matrix-results.md`:
 
 ```
 | cell | result | duration | provider | account | date |
 |------|--------|----------|----------|---------|------|
-| queueMode:db | PASS | … | aws | <account> | YYYY-MM-DD |
+| queueMode:db | PASS | 255s | aws | 669890779205 | 2026-07-29 |
+| queueMode:ecs-rabbitmq | PASS | 254s | aws | 669890779205 | 2026-07-29 |
+| queueMode:ecs-artemis | PASS | 204s | aws | 669890779205 | 2026-07-29 |
 ```
+
+Create-once Pulumi apply Duration: **10m13s** (113 resources). Runtime health: healthy (ECS 1/1).
 
 ## assert_clean dual outcome
 
-1. **Leftover → non-zero:** With KEEP still true (or a deliberate tagged leftover), run `assert_clean` / finish a KEEP session without destroy — expect non-zero. Record command + exit code here.
-2. **Clean → 0:** Unset KEEP (or destroy explicitly), re-run destroy path:
-
-```sh
-unset MAGELIFT_AWS_ACCEPTANCE_KEEP
-# or: magelift --config "$MAGELIFT_CONFIG" --env preview destroy --yes
-./scripts/aws-acceptance-local.sh   # only if resuming destroy; prefer explicit destroy + assert
-```
-
-Prefer safest leftover (tagged acceptance resource you can destroy immediately). Always finish with destroy + clean account.
-
-## Proof checklist (fill after live)
-
-| Criterion | Log / artifact proof | Done |
-|-----------|----------------------|------|
-| ACCEPT-01 create-once then ≥3 cell-updates, no re-create | | |
-| ACCEPT-02 kill+resume skips PASS cells | | |
-| ACCEPT-03 harness-written matrix-results six columns | | |
-| ACCEPT-04 assert_clean leftover≠0 and clean=0 | | |
+1. **Leftover → non-zero:** After kill mid-matrix with stack kept: `assert_clean FAILED` (leftover VPCs/RDS/ElastiCache/ALBs/ECS/logs/SGs).
+2. **Clean → 0:** `magelift destroy --yes` → `DESTROY_EXIT:0`; `assert_clean ok` (re-checked EXIT 0). Spot-check: 0 VPCs / ECS clusters / RDS / ALBs tagged acceptance.
 
 ## HUMAN_GATE
 
-- [ ] Spend approval recorded in chat: `approved — AWS free-tier spend OK for Phase 3 harness proof.`
-- [ ] Live create executed only after that signal
-- [ ] Account left clean after final destroy
+- [x] Spend approval in chat (AWS + GCP approved; this pass used AWS free-tier preview only)
+- [x] Live create only after approval
+- [x] Account left clean after final destroy
+
+## Notes
+
+- Prior attempt with non-runtime digest failed ALB `/health` 404; this pass used signed `php-runtime` health image.
+- GCP live create **not** run (Phase 7); 03-05 dry-run already covers harness shape.

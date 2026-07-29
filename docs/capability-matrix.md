@@ -74,15 +74,17 @@ Keep one preview stack up and iterate cells; destroy once at the end.
 | `databaseEngine: rds-mysql` | yes | real-account acceptance | Prior free-tier create measured 2026-07-21 |
 | `databaseEngine: aurora-mysql` | **unverifiable** | — | See [Unverifiable on maintainer accounts](#unverifiable-on-maintainer-accounts) |
 | `searchMode: disabled` | yes | real-account acceptance | Certified free-tier cell; OpenSearch spend avoided |
-| `queueMode: db` | yes | real-account acceptance | Default preview; harness dry-run + prior live create |
-| `queueMode: ecs-rabbitmq` | yes | Pulumi mocks | Needs queue SG HTTPS egress + Cloud Map SRV; live cell deferred to paid harness |
-| `queueMode: ecs-artemis` | yes (experimental) | Pulumi mocks | Same network path as RabbitMQ cell |
+| `queueMode: db` | yes | real-account acceptance | Default preview; harness create-once + cell PASS 2026-07-29 |
+| `queueMode: ecs-rabbitmq` | yes | real-account acceptance | Same stack cell-update 2026-07-29 (Cloud Map SRV + queue SG HTTPS egress) |
+| `queueMode: ecs-artemis` | yes (experimental) | real-account acceptance | Same stack cell-update 2026-07-29; experimental broker image |
 | `queueMode: amazon-mq` | **no** | — | Skip apply on disposable accounts; see unverifiable |
 | OpenSearch serverless/provisioned | **avoid apply** | Pulumi mocks | Preview-only on free-tier; live SigV4 = unverifiable here |
 | `webRuntime: frankenphp-classic` | needs matching image digest | Pulumi mocks | Not a free YAML toggle alone |
 
 Measured first create (2026-07-21, eu-north-1 free-tier): **~10m31s** Pulumi apply for
 `preview` + `rds-mysql` + `fck-nat` + `searchMode=disabled` + `queueMode=db`.
+Harness re-measure (2026-07-29, same account/shape): **~10m13s** create-once, then
+cell updates `db` 255s / `ecs-rabbitmq` 254s / `ecs-artemis` 204s (destroy clean).
 
 ### Unverifiable on maintainer accounts
 
