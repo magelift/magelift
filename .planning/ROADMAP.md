@@ -153,14 +153,14 @@ Plans:
   4. `docs/ece-parity.md` enumerates every `ece-tools` build, deploy, and post-deploy hook plus every env-var-driven Magento setting in the ACC/Upsun shape, each marked closed or intentionally-gapped with a reason — no row blank
   5. `make php-test` covers `magento-cloud-patches`-style patch application and static-content-deploy settings (locales, themes, strategy, thread count) for the supported configurations
 
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 
 Plans:
 
 - [x] 04-01-PLAN.md — Tracer: ACC fixture → init --from-acc → Load-valid YAML + foreign-schema reject
 - [ ] 04-02-PLAN.md — Init CLI contract: --from-* mutual exclusion, refuse/--yes, --config-out (D-03/D-04 gates)
 - [ ] 04-03-PLAN.md — Shared ACC/Upsun mapper, D-07 allowlist, unmapped sidecar (D-05), cron schema, soak skip
-- [ ] 04-04-PLAN.md — SCD strategy/threads Go→PHP vertical slice (ECE-03)
+- [x] 04-04-PLAN.md — SCD strategy/threads Go→PHP vertical slice (ECE-03)
 - [ ] 04-05-PLAN.md — Clean-room m2-hotfixes PatchApplier + php-test (ECE-02)
 - [ ] 04-06-PLAN.md — docs/ece-parity.md + D-07 docs + migration/provenance + clean-room check
 
