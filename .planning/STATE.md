@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Data Migration & Cutover
 status: in_progress
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-07-29T16:13:38.208Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-07-29T16:18:26.558Z"
 last_activity: 2026-07-29
-last_activity_desc: "05-03 complete — dumpimport nonempty/--yes schema-replace"
+last_activity_desc: 05-03 SUMMARY complete (dumpimport D-04)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 34
-  completed_plans: 29
+  completed_plans: 30
   percent: 38
 ---
 
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 5 of 8 (Data Migration & Cutover)
-Plan: 4 of 6 (05-04 next)
+Plan: 5 of 6 (05-04 next)
 Status: in_progress
 Last activity: 2026-07-29 — 05-03 SUMMARY complete (dumpimport D-04)
 
-Progress: [█████████░] 85% (35/44 plans; phase 5: 3/6)
+Progress: [█████████░] 88% (35/44 plans; phase 5: 3/6)
 
 ## Session Continuity
 
-**Last session:** 2026-07-29T16:13:38.201Z
-**Stopped at:** Completed 05-03-PLAN.md
+**Last session:** 2026-07-29T16:18:26.551Z
+**Stopped at:** Completed 05-04-PLAN.md
 **Resume file:** None
 
 - Phase 4: `04-VERIFICATION.md` status=passed (5/5); IMPORT/ECE closed
@@ -55,6 +55,7 @@ Progress: [█████████░] 85% (35/44 plans; phase 5: 3/6)
 | Phase 05 P01 | 3min | 2 tasks | 9 files |
 | Phase 05 P02 | 3min | 2 tasks | 6 files |
 | Phase 05 P03 | 5min | 2 tasks | 7 files |
+| Phase 05 P04 | 4min | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -66,3 +67,5 @@ Progress: [█████████░] 85% (35/44 plans; phase 5: 3/6)
 - [Phase 5]: seedDumpReason emitted only when status is failed
 - [Phase ?]: D-04 locked: persistent --yes + schema-replace for nonempty dump import; no --force
 - [Phase ?]: dumpimport NonEmpty = ≥1 BASE TABLE; journal Mark* stays in CLI (05-04)
+- [Phase ?]: D-01 locked option-a (AUTO): hybrid post-deployflow once-from-recorded + env import-dump; never env seed
+- [Phase ?]: Auto-import after deployflow.Run (lock released); failure marks failed and fails deploy CLI
