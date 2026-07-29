@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Data Migration & Cutover
 status: in_progress
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-07-29T16:05:00.000Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-07-29T16:08:02.854Z"
 last_activity: 2026-07-29
-last_activity_desc: "05-01 complete — SeedDump KnownFields + journal recorded"
+last_activity_desc: 05-01 SUMMARY complete (SeedDump + journal recorded)
 progress:
   total_phases: 8
-  completed_phases: 4
-  total_plans: 44
-  completed_plans: 33
-  percent: 75
+  completed_phases: 3
+  total_plans: 34
+  completed_plans: 28
+  percent: 38
 ---
 
 # Project State
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 5 of 8 (Data Migration & Cutover)
-Plan: 2 of 6 (05-02 next)
+Plan: 3 of 6 (05-02 next)
 Status: in_progress
 Last activity: 2026-07-29 — 05-01 SUMMARY complete (SeedDump + journal recorded)
 
-Progress: [████████░░] 75% (33/44 plans; phase 5: 1/6)
+Progress: [████████░░] 82% (33/44 plans; phase 5: 1/6)
 
 ## Session Continuity
 
-**Last session:** 2026-07-29T16:04:19.943Z
-**Stopped at:** Completed 05-01-PLAN.md
+**Last session:** 2026-07-29T16:08:02.847Z
+**Stopped at:** Completed 05-02-PLAN.md
 **Resume file:** None
 
 - Phase 4: `04-VERIFICATION.md` status=passed (5/5); IMPORT/ECE closed
@@ -53,9 +53,13 @@ Progress: [████████░░] 75% (33/44 plans; phase 5: 1/6)
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 05 P01 | 3min | 2 tasks | 9 files |
+| Phase 05 P02 | 3min | 2 tasks | 6 files |
 
 ## Decisions
 
 - [Phase 5]: Journal path is .magelift/seed-dumps/<env>.json (single JSON document, not jsonl)
 - [Phase 5]: create output seedDumpStatus is exactly journal StatusRecorded string
 - [Phase 5]: Generated docs live at docs/configuration.md + schema/magelift.schema.json (repo paths)
+- [Phase ?]: failed→importing allowed as operator retry; imported→importing rejected
+- [Phase ?]: Missing journal with seedDump path reports seedDumpStatus=unavailable
+- [Phase ?]: seedDumpReason emitted only when status is failed
