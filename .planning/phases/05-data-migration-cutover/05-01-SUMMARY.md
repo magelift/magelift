@@ -41,7 +41,7 @@ patterns-established:
   - "seeddump.InitRecorded: exclusive lock + atomic rename + 0600, mirrored from releasejournal"
   - "seedDumpStatus must never be a YAML Environment field (KnownFields rejection)"
 
-requirements-completed: [MIGRATE-01, MIGRATE-02]
+requirements-completed: []  # Wave 0 seam only; full MIGRATE-01/02 land in later Phase 5 plans
 
 coverage:
   - id: D1
@@ -147,6 +147,14 @@ None - plan executed as written for behavior.
 ### TDD note
 
 Task 2 `tdd="true"` honesty tests were written after the tracer already shipped SeedDump/KnownFields behavior; RED would have passed immediately. Committed as `test(05-01)` documenting the D-03 contract (no separate GREEN feat needed).
+
+### Requirement marking honesty
+
+**2. [Rule 1 - Bug] Did not leave MIGRATE-01/02 Complete after Wave 0 only**
+- **Found during:** State update
+- **Issue:** Plan frontmatter lists MIGRATE-01/02, but full req text needs importer + full status machine
+- **Fix:** Left REQUIREMENTS checkboxes Pending; SUMMARY `requirements-completed: []`
+- **Files modified:** `.planning/REQUIREMENTS.md`, `05-01-SUMMARY.md`
 
 ## Threat Flags
 
