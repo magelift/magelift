@@ -31,6 +31,19 @@ var builtInDefaults = map[string]any{
 }
 
 func Load(data []byte) (*File, error) {
+	var probe struct {
+		SchemaVersion int `yaml:"schemaVersion"`
+	}
+	if err := yaml.Unmarshal(data, &probe); err != nil {
+		return nil, fmt.Errorf("decode config: %w", err)
+	}
+	if probe.SchemaVersion != 1 {
+		if probe.SchemaVersion == 0 {
+			return nil, errors.New("not a MageLift configuration: missing schemaVersion: 1 (PaaS files such as .magento.app.yaml / .platform.app.yaml are not valid --config input; use magelift init --from-acc or --from-upsun)")
+		}
+		return nil, fmt.Errorf("schemaVersion must be 1 (got %d)", probe.SchemaVersion)
+	}
+
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	var doc document
