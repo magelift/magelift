@@ -56,12 +56,12 @@
 
 <!-- The strongest ICP demo, and entirely offline/unit-testable with zero cloud spend. -->
 
-- [ ] **IMPORT-01**: Operator can run `magelift init --from-acc` inside an Adobe Commerce Cloud repository and get a valid `magelift.yaml`
+- [x] **IMPORT-01**: Operator can run `magelift init --from-acc` inside an Adobe Commerce Cloud repository and get a valid `magelift.yaml`
 - [ ] **IMPORT-02**: Operator can run `magelift init --from-upsun` inside a Platform.sh or Upsun repository and get a valid `magelift.yaml`
 - [ ] **IMPORT-03**: Import translates application config, services, routes, and cron definitions, and reports every source key it could not map instead of dropping it silently
-- [ ] **IMPORT-04**: The generated `magelift.yaml` validates against `schema/magelift.schema.json` and passes `magelift config validate` with no hand editing for supported source shapes
-- [ ] **IMPORT-05**: Import output is a reviewable file the operator can diff and edit; a foreign schema is never accepted directly as deploy input
-- [ ] **IMPORT-06**: Importer implementation observes the clean-room policy recorded in `docs/knowledge/`
+- [x] **IMPORT-04**: The generated `magelift.yaml` validates against `schema/magelift.schema.json` and passes `magelift config validate` with no hand editing for supported source shapes
+- [x] **IMPORT-05**: Import output is a reviewable file the operator can diff and edit; a foreign schema is never accepted directly as deploy input
+- [x] **IMPORT-06**: Importer implementation observes the clean-room policy recorded in `docs/knowledge/`
 
 ### Data Migration
 
@@ -174,12 +174,12 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | KUBE-05 | Phase 6 | Pending |
 | KUBE-06 | Phase 6 | Pending |
 | KUBE-07 | Phase 6 | Pending |
-| IMPORT-01 | Phase 4 | Pending |
+| IMPORT-01 | Phase 4 | Complete |
 | IMPORT-02 | Phase 4 | Pending |
 | IMPORT-03 | Phase 4 | Pending |
-| IMPORT-04 | Phase 4 | Pending |
-| IMPORT-05 | Phase 4 | Pending |
-| IMPORT-06 | Phase 4 | Pending |
+| IMPORT-04 | Phase 4 | Complete |
+| IMPORT-05 | Phase 4 | Complete |
+| IMPORT-06 | Phase 4 | Complete |
 | MIGRATE-01 | Phase 5 | Pending |
 | MIGRATE-02 | Phase 5 | Pending |
 | MIGRATE-03 | Phase 5 | Pending |

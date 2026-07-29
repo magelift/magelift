@@ -153,10 +153,11 @@ Plans:
   4. `docs/ece-parity.md` enumerates every `ece-tools` build, deploy, and post-deploy hook plus every env-var-driven Magento setting in the ACC/Upsun shape, each marked closed or intentionally-gapped with a reason — no row blank
   5. `make php-test` covers `magento-cloud-patches`-style patch application and static-content-deploy settings (locales, themes, strategy, thread count) for the supported configurations
 
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 
 Plans:
-- [ ] 04-01-PLAN.md — Tracer: ACC fixture → init --from-acc → Load-valid YAML + foreign-schema reject
+
+- [x] 04-01-PLAN.md — Tracer: ACC fixture → init --from-acc → Load-valid YAML + foreign-schema reject
 - [ ] 04-02-PLAN.md — Init CLI contract: --from-* mutual exclusion, refuse/--yes, --config-out (D-03/D-04 gates)
 - [ ] 04-03-PLAN.md — Shared ACC/Upsun mapper, D-07 allowlist, unmapped sidecar (D-05), cron schema, soak skip
 - [ ] 04-04-PLAN.md — SCD strategy/threads Go→PHP vertical slice (ECE-03)
@@ -239,7 +240,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | 1. Publishable Baseline & Honest Fallbacks | 10/10 | In Progress|  |
 | 2. Tag-Ready Release Surface | 4/4 | In Progress|  |
 | 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 5/6 | In Progress|  |
-| 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 0/TBD | Not started | - |
+| 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 1/6 | In Progress|  |
 | 5. Data Migration & Cutover | 0/TBD | Not started | - |
 | 6. Shared Kubernetes Day-2 | 0/TBD | Not started | - |
 | 7. GCP Certification | 0/TBD | Not started | - |
