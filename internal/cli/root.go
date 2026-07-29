@@ -18,6 +18,7 @@ import (
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
+	"github.com/acourtiol/magelift/internal/paasimport"
 	"github.com/acourtiol/magelift/internal/platform"
 	"github.com/acourtiol/magelift/internal/releasejournal"
 	mageliftupgrade "github.com/acourtiol/magelift/internal/upgrade"
@@ -241,14 +242,33 @@ func versionCommand(o *options) *cobra.Command {
 }
 
 func initCommand(o *options) *cobra.Command {
-	return &cobra.Command{Use: "init", Short: "Create a starter magelift.yaml", Args: cobra.NoArgs, RunE: func(*cobra.Command, []string) error {
-		if _, err := os.Stat(o.configPath); err == nil {
-			return &exitError{code: 2, err: fmt.Errorf("%s already exists", o.configPath)}
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-		return os.WriteFile(o.configPath, []byte(starterConfig), 0o644)
-	}}
+	var fromACC bool
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Create a starter magelift.yaml",
+		Args:  cobra.NoArgs,
+		RunE: func(*cobra.Command, []string) error {
+			if _, err := os.Stat(o.configPath); err == nil {
+				return &exitError{code: 2, err: fmt.Errorf("%s already exists", o.configPath)}
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+			if fromACC {
+				root, err := os.Getwd()
+				if err != nil {
+					return err
+				}
+				data, err := paasimport.MapACC(root)
+				if err != nil {
+					return invalid(err)
+				}
+				return os.WriteFile(o.configPath, data, 0o644)
+			}
+			return os.WriteFile(o.configPath, []byte(starterConfig), 0o644)
+		},
+	}
+	cmd.Flags().BoolVar(&fromACC, "from-acc", false, "generate magelift.yaml from Adobe Commerce Cloud config")
+	return cmd
 }
 
 func configCommand(o *options) *cobra.Command {
