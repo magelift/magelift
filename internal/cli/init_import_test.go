@@ -96,6 +96,181 @@ func TestInitFromAccRefusesExistingConfig(t *testing.T) {
 	}
 }
 
+func TestInitFromAccAndFromUpsunMutualExclusion(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "magelift.yaml")
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", configPath, "init", "--from-acc", "--from-upsun"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected mutual exclusion error")
+	}
+	if ExitCode(err) != 2 {
+		t.Fatalf("exit code = %d, want 2; err=%v out=%s", ExitCode(err), err, out.String())
+	}
+	if !strings.Contains(err.Error(), "from-acc") || !strings.Contains(err.Error(), "from-upsun") {
+		t.Fatalf("error should mention both flags: %v", err)
+	}
+	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+		t.Fatalf("should not write config on mutual exclusion: %v", err)
+	}
+}
+
+func TestInitFromAccOverwriteWithYes(t *testing.T) {
+	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "supported")
+	dir := t.TempDir()
+	copyTree(t, fixture, dir)
+	configPath := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(configPath, []byte(starterConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", configPath, "--yes", "init", "--from-acc"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init --from-acc --yes: %v\n%s", err, out.String())
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) == starterConfig {
+		t.Fatal("expected overwrite of existing starter config")
+	}
+	if _, err := config.Load(data); err != nil {
+		t.Fatalf("config.Load after overwrite: %v", err)
+	}
+}
+
+func TestInitConfigOutWritesSideFileLeavesDefault(t *testing.T) {
+	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "supported")
+	dir := t.TempDir()
+	copyTree(t, fixture, dir)
+	defaultPath := filepath.Join(dir, "magelift.yaml")
+	sidePath := filepath.Join(dir, "review.magelift.yaml")
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", defaultPath, "init", "--from-acc", "--config-out", sidePath})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init --config-out: %v\n%s", err, out.String())
+	}
+	if _, err := os.Stat(defaultPath); !os.IsNotExist(err) {
+		t.Fatalf("default magelift.yaml should remain absent: %v", err)
+	}
+	data, err := os.ReadFile(sidePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.Load(data); err != nil {
+		t.Fatalf("config.Load side file: %v", err)
+	}
+}
+
+func TestInitConfigOutRefusesExistingWithoutYes(t *testing.T) {
+	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "supported")
+	dir := t.TempDir()
+	copyTree(t, fixture, dir)
+	sidePath := filepath.Join(dir, "review.magelift.yaml")
+	if err := os.WriteFile(sidePath, []byte("existing: true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"init", "--from-acc", "--config-out", sidePath})
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected refuse existing --config-out path")
+	}
+	if ExitCode(err) != 2 {
+		t.Fatalf("exit code = %d, want 2; err=%v", ExitCode(err), err)
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("want already-exists message, got %v", err)
+	}
+}
+
+func TestInitFromUpsunAccepted(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "magelift.yaml")
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", configPath, "init", "--from-upsun"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init --from-upsun: %v\n%s", err, out.String())
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.Load(data); err != nil {
+		t.Fatalf("config.Load: %v\nYAML:\n%s", err, data)
+	}
+}
+
+func TestInitBareWithYesOverwritesStarter(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "magelift.yaml")
+	old := starterConfig + "# marker\n"
+	if err := os.WriteFile(configPath, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", configPath, "--yes", "init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init --yes: %v\n%s", err, out.String())
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != starterConfig {
+		t.Fatalf("expected starter rewrite; got %q", data)
+	}
+}
+
 func cliRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
