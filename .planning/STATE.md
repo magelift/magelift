@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 4
 current_phase_name: Brownfield Onramp — PaaS Import & ece-tools Parity
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-07-29T15:43:10.746Z"
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-07-29T15:47:29.954Z"
 last_activity: 2026-07-29
-last_activity_desc: "Completed 04-03-PLAN.md (shared ACC/Upsun mapper + D-05 sidecar)"
+last_activity_desc: Completed 04-06-PLAN.md (ece-parity honesty close-out)
 progress:
   total_phases: 8
   completed_phases: 3
-  total_plans: 32
-  completed_plans: 31
-  percent: 93
+  total_plans: 27
+  completed_plans: 26
+  percent: 96
 ---
 
 # Project State
@@ -25,26 +25,26 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 4 executing — 04-01..04-05 complete; remaining 04-06
+**Current focus:** Phase 4 plans complete (04-01..04-06); awaiting phase verification
 
 ## Current Position
 
 Phase: 4 of 8 (Brownfield Onramp — PaaS Import & ece-tools Parity)
-Plan: 04-03 complete (shared mapper); remaining 04-06 (ece-parity docs)
+Plan: 04-06 complete (ece-parity docs + clean-room); all 6/6 phase plans done
 Status: executing
-Last activity: 2026-07-29 — Completed 04-03-PLAN.md
+Last activity: 2026-07-29 — Completed 04-06-PLAN.md
 
-Progress: [█████████░] 93%
+Progress: [██████████] 96%
 
 ## Session Continuity
 
-**Last session:** 2026-07-29T15:43:10.739Z
-**Stopped at:** Completed 04-03-PLAN.md
+**Last session:** 2026-07-29T15:47:29.945Z
+**Stopped at:** Completed 04-06-PLAN.md
 **Resume file:** None
 
 - Phase 3: `03-VERIFICATION.md` status=passed (5/5)
-- Phase 4: 04-01..04-05 SUMMARY complete; 1 plan remains (04-06 parity docs)
-- Next: execute 04-06 (do not start unless orchestrated)
+- Phase 4: 04-01..04-06 SUMMARY complete (6/6 plans)
+- Next: `/gsd-verify-work` for Phase 4 (do not start Phase 5 unless orchestrated)
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: [█████████░] 93%
 | Phase 04 P02 | 2min | 3 tasks | 4 files |
 | Phase 04 P05 | 3min | 2 tasks | 8 files |
 | Phase 04 P03 | 6min | 3 tasks | 22 files |
+| Phase 04 P06 | 3min | 2 tasks | 10 files |
 
 ## Decisions
 
@@ -71,3 +72,6 @@ Progress: [█████████░] 93%
 - [Phase 4]: 04-03: D-05 d05-loud — YAML + stem.unmapped.md + exit 2
 - [Phase 4]: 04-03: application.cron for Magento cron:run; free-form shells unmapped
 - [Phase 4]: 04-03: Shared ACC/Upsun mapper with D-07 allowlist (crypt/SCD/UPDATE_URLS/relationships)
+- [Phase 4]: 04-06: Only mark ece-parity closed what 04-03/04/05 shipped; QUALITY_PATCHES + long-tail stage vars intentional-gap
+- [Phase 4]: 04-06: D-07 allowlist documented as frozen v1 (CRYPT_KEY, UPDATE_URLS, SCD_*, relationships, cron:run)
+- [Phase 4]: 04-06: Post-beta roadmap drops PaaS config importers as future-only; dump/media remain deferred

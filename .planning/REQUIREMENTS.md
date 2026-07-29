@@ -77,7 +77,7 @@
 
 <!-- Gaps here silently break migrated projects, which is the worst possible first impression for the ICP. -->
 
-- [ ] **ECE-01**: A documented parity matrix compares MageLift's PHP build system against `ece-tools` build, deploy, and post-deploy hook behaviour, with every gap either closed or explicitly recorded as intentional
+- [x] **ECE-01**: A documented parity matrix compares MageLift's PHP build system against `ece-tools` build, deploy, and post-deploy hook behaviour, with every gap either closed or explicitly recorded as intentional
 - [x] **ECE-02**: Operator can apply `magento-cloud-patches`-style patches through MageLift's build system
 - [x] **ECE-03**: Static content deploy honours the settings real projects depend on (locales, themes, strategy, thread count) for supported configurations
 - [x] **ECE-04**: Environment-variable-driven Magento configuration in the ACC/Upsun shape is either honoured or explicitly mapped to its `magelift.yaml` equivalent, with the mapping documented
@@ -185,7 +185,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | MIGRATE-03 | Phase 5 | Pending |
 | MIGRATE-04 | Phase 5 | Pending |
 | MIGRATE-05 | Phase 5 | Pending |
-| ECE-01 | Phase 4 | Pending |
+| ECE-01 | Phase 4 | Complete |
 | ECE-02 | Phase 4 | Complete |
 | ECE-03 | Phase 4 | Complete |
 | ECE-04 | Phase 4 | Complete |
