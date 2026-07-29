@@ -387,3 +387,54 @@ func envProtectCommand(o *options) *cobra.Command {
 	command.Flags().Bool("off", false, "allow destructive operations")
 	return command
 }
+
+func envStatusCommand(o *options) *cobra.Command {
+	return &cobra.Command{
+		Use:   "status <environment>",
+		Short: "Show environment overlay status including seed dump journal",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			if !environmentName.MatchString(name) {
+				return invalid(errors.New("environment name must be a lowercase stable name"))
+			}
+			file, err := o.load()
+			if err != nil {
+				return invalid(err)
+			}
+			effective, err := file.Resolve(name, config.ResolveOptions{})
+			if err != nil {
+				return invalid(err)
+			}
+			result := map[string]any{
+				"environment": name,
+				"class":       effective.Config.Class,
+				"domain":      effective.Config.Domain,
+				"protected":   effective.Config.Protection,
+			}
+			seedDump := effective.Config.SeedDump
+			if seedDump == "" {
+				return o.write(result)
+			}
+			result["seedDump"] = seedDump
+			projectRoot := filepath.Dir(filepath.Clean(o.configPath))
+			store, err := seeddump.New(projectRoot, name)
+			if err != nil {
+				return invalid(err)
+			}
+			record, err := store.Read(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("read seed dump journal: %w", err)
+			}
+			if record == nil {
+				result["seedDumpStatus"] = "unavailable"
+				return o.write(result)
+			}
+			result["seedDumpStatus"] = record.Status
+			if record.Status == seeddump.StatusFailed && record.Reason != "" {
+				result["seedDumpReason"] = record.Reason
+			}
+			return o.write(result)
+		},
+	}
+}

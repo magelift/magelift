@@ -515,7 +515,7 @@ func completionCommand(root *cobra.Command) *cobra.Command {
 
 func commandGroups(o *options) []*cobra.Command {
 	groups := map[string][]string{
-		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "create", "destroy", "protect", "sweep"},
+		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "create", "status", "destroy", "protect", "sweep"},
 		"secret": {"set", "list", "remove"},
 	}
 	var commands []*cobra.Command
@@ -530,6 +530,8 @@ func commandGroups(o *options) []*cobra.Command {
 				group.AddCommand(envListCommand(o))
 			} else if groupName == "env" && name == "create" {
 				group.AddCommand(envCreateCommand(o))
+			} else if groupName == "env" && name == "status" {
+				group.AddCommand(envStatusCommand(o))
 			} else if groupName == "env" && name == "destroy" {
 				group.AddCommand(envDestroyCommand(o))
 			} else if groupName == "env" && name == "protect" {
