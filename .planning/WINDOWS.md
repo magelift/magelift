@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 9
+open_count: 10
 waived_count: 0
 fixed_count: 0
-total_count: 9
-last_updated: 2026-07-28T15:07:25.170Z
+total_count: 10
+last_updated: 2026-07-29T15:31:04.697Z
 ---
 
 # Broken Windows Ledger
@@ -24,6 +24,7 @@ last_updated: 2026-07-28T15:07:25.170Z
 | 7 | 01 | todo | internal/cloud/aws/runtime/runtime.go |  | F-01-07-1: search-proxy DependsOn skipped for nginx-fpm queue/deploy/cron Magento containers | open |  | 2026-07-28T13:46:30.886Z |  |
 | 8 | 02 | unmet-truth | CONTRIBUTING.md |  | RELEASE-06 fresh-clone make verify blocked: PHP 8.2+ and Composer missing on proof host | open |  | 2026-07-28T14:45:35.231Z |  |
 | 9 | 02 | stub | examples/custom-cli/stub_module.go |  | Intentional stubModule Plan/Program refuse deploy — registration demo only | open |  | 2026-07-28T15:07:25.170Z |  |
+| 10 | 04 | stub | internal/paasimport/upsun.go | 12 | MapUpsun emits baseDocument stub without parsing Upsun trees until 04-03 | open |  | 2026-07-29T15:31:04.697Z |  |
 
 ````json
 [
@@ -133,6 +134,18 @@ last_updated: 2026-07-28T15:07:25.170Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-28T15:07:25.170Z",
+    "resolved_at": null
+  },
+  {
+    "id": 10,
+    "kind": "stub",
+    "phase": "04",
+    "file": "internal/paasimport/upsun.go",
+    "line": 12,
+    "description": "MapUpsun emits baseDocument stub without parsing Upsun trees until 04-03",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-29T15:31:04.697Z",
     "resolved_at": null
   }
 ]
