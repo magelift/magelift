@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1: Publishable Baseline & Honest Fallbacks** - Clear the debt that worsens with every later phase, and make every target state its own tier
 - [x] **Phase 2: Tag-Ready Release Surface** - Make `v1.0.0-rc.1` taggable: version story, contract statement, packaging smoke, contributor path
 - [x] **Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering** - One long-lived stack, resumable runs, automatic evidence, and a matrix that never over-claims
-- [ ] **Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity** - A store on Adobe Commerce Cloud or Upsun gets a reviewable `magelift.yaml` and a build system it can trust
+- [x] **Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity** - A store on Adobe Commerce Cloud or Upsun gets a reviewable `magelift.yaml` and a build system it can trust (completed 2026-07-29)
 - [ ] **Phase 5: Data Migration & Cutover** - `seedDump` stops being a status string; a documented cutover moves a live store over
 - [ ] **Phase 6: Shared Kubernetes Day-2** - One `Observe` and one `deploy.Steps` in `internal/cloud/kube`, inherited by all four Kubernetes targets
 - [ ] **Phase 7: GCP Certification** - GKE Autopilot reaches certified tier on real-account evidence, making multi-cloud truthful
@@ -153,7 +153,7 @@ Plans:
   4. `docs/ece-parity.md` enumerates every `ece-tools` build, deploy, and post-deploy hook plus every env-var-driven Magento setting in the ACC/Upsun shape, each marked closed or intentionally-gapped with a reason — no row blank
   5. `make php-test` covers `magento-cloud-patches`-style patch application and static-content-deploy settings (locales, themes, strategy, thread count) for the supported configurations
 
-**Plans:** 6/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -240,7 +240,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | 1. Publishable Baseline & Honest Fallbacks | 10/10 | In Progress|  |
 | 2. Tag-Ready Release Surface | 4/4 | In Progress|  |
 | 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 5/6 | In Progress|  |
-| 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 6/6 | In Progress|  |
+| 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 6/6 | Complete    | 2026-07-29 |
 | 5. Data Migration & Cutover | 0/TBD | Not started | - |
 | 6. Shared Kubernetes Day-2 | 0/TBD | Not started | - |
 | 7. GCP Certification | 0/TBD | Not started | - |
