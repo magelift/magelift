@@ -175,7 +175,12 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			if runErr != nil {
 				return infrastructureResult{}, runErr
 			}
-			return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: result.Preview, Update: result.Update}, nil
+			out := infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: result.Preview, Update: result.Update}
+			// Auto-import after lock release (deployflow.Run completed) — D-01/D-02 once-from-recorded.
+			if err := o.maybeAutoImportSeedDump(ctx, environment); err != nil {
+				return out, err
+			}
+			return out, nil
 		}
 		if stepsErr != nil && !errors.Is(stepsErr, platform.ErrNotSupported) {
 			return infrastructureResult{}, fmt.Errorf("create deployment workflow: %w", stepsErr)
