@@ -32,6 +32,23 @@ is empty of acceptance resources (confirm with `assert_clean` / aws-cli tag scan
 never force-unlock while create is still in flight. Live multi-cell proof remains a
 paid HUMAN_GATE pass; dry-run does not claim that yet.
 
+### Live multi-cell (paid)
+
+When `MAGELIFT_ACCEPTANCE_DRY_RUN` is unset, the same script:
+
+1. Runs one `acceptance create-once` (`preview` → `promote` → `deploy`) unless
+   resume applies (`MAGELIFT_AWS_ACCEPTANCE_RESUME=1`, or checkpoint already has
+   cells / first cell PASS).
+2. Iterates `scripts/acceptance/cells-aws-preview.txt`: for each incomplete cell,
+   logs `acceptance cell-update`, patches `target.aws.catalog.queueMode` (and the
+   active env catalog) on a **temp copy** of `MAGELIFT_CONFIG` with `yq`, then
+   redeploys the same digest — no destroy between cells.
+3. Honors `MAGELIFT_AWS_ACCEPTANCE_KEEP=true` (skip destroy on EXIT) for long-lived
+   matrix / kill+resume; otherwise destroy + `assert_clean` on EXIT.
+
+Broker cells need `queueSecretArn` already present in the acceptance config. Cells
+`amazon-mq` / Aurora / OpenSearch are refused or absent from the catalog.
+
 ### assert_clean dual outcome (offline)
 
 Shared helper: `scripts/acceptance/lib-assert-clean-aws.sh` (sourced by the EXIT
@@ -56,13 +73,20 @@ requires the paid 03-06 HUMAN_GATE — offline stubs do not claim that half clos
 - An existing S3 access-log bucket in the target region
 - Secrets Manager ARNs referenced by config, especially
   `target.aws.encryptionKeySecretArn`
-- A signed immutable image digest and matching Cosign identity
+- A signed immutable image digest and matching Cosign identity — **must** be a
+  MageLift runtime image (`php-runtime` / `frankenphp-classic`) so `GET /health`
+  returns 200 without Magento bootstrap (ALB + ECS container health)
 - A `magelift.yaml` environment named for the profile you will run (`preview`
   recommended)
 
 Unset `MAGELIFT_AWS_ENDPOINT_URL` so clients talk to real AWS, not Floci.
 
-## Efficient credit use
+## Queue modes on acceptance
+
+Default `preview` uses `queueMode: db` (no broker). To exercise self-hosted RabbitMQ
+on free-tier-friendly spend, set `target.aws.catalog.queueMode: ecs-rabbitmq` and
+provide `queueSecretArn`. Amazon MQ (`amazon-mq`) is the expensive cell — avoid it
+on disposable acceptance accounts.
 
 1. Prefer `preview` only. Standard and high-availability create Multi-AZ and
    managed-service spend that burns credits quickly.
@@ -93,10 +117,26 @@ export MAGELIFT_AWS_CERTIFICATE_IDENTITY='…'
 make aws-acceptance-local
 ```
 
-The script runs `config validate`, `doctor`, `login`, `preview`, `promote`,
-`deploy`, `outputs`, and `health --mode runtime`, then **destroys on EXIT** unless
-`MAGELIFT_AWS_ACCEPTANCE_KEEP=true`. Profiles other than `preview` require
-`MAGELIFT_AWS_ACCEPTANCE_ALLOW_COSTLY=true`.
+The script runs `config validate`, `doctor`, `login`, then one create-once
+(`preview` / `promote` / `deploy` / `outputs` / `health`) followed by catalog
+cell-updates (temp YAML `queueMode` patch + redeploy). It **destroys on EXIT**
+unless `MAGELIFT_AWS_ACCEPTANCE_KEEP=true`. Profiles other than `preview` require
+`MAGELIFT_AWS_ACCEPTANCE_ALLOW_COSTLY=true`. Requires `yq` for live cell patches.
+
+**Matrix sessions (recommended on free-tier):**
+
+```sh
+export MAGELIFT_AWS_ACCEPTANCE_KEEP=true
+./scripts/aws-acceptance-local.sh
+# kill mid-matrix, then resume:
+export MAGELIFT_AWS_ACCEPTANCE_RESUME=1
+./scripts/aws-acceptance-local.sh
+# when fully done:
+unset MAGELIFT_AWS_ACCEPTANCE_KEEP
+magelift destroy --env preview --config "$MAGELIFT_CONFIG" --yes
+```
+
+Avoid Amazon MQ, Aurora, NAT Gateway, and OpenSearch on free-tier accounts.
 
 ## aws-cli cleanup
 

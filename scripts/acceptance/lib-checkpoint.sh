@@ -22,11 +22,11 @@ acceptance_checkpoint_load() {
 	fi
 }
 
-# cell_done CELL_ID — exit 0 if cell already recorded.
+# cell_done CELL_ID — exit 0 if cell already recorded as PASS (FAIL is retryable on resume).
 cell_done() {
 	local cell="${1:?cell id required}"
 	acceptance_checkpoint_load
-	jq -e --arg c "$cell" '.cells[$c] != null' "$ACCEPTANCE_CHECKPOINT" >/dev/null 2>&1
+	jq -e --arg c "$cell" '.cells[$c].result == "PASS"' "$ACCEPTANCE_CHECKPOINT" >/dev/null 2>&1
 }
 
 # record_cell CELL_ID RESULT — persist result + UTC timestamp.
