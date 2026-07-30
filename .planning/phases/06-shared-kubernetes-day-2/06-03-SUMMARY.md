@@ -117,7 +117,7 @@ status: complete
 2. **Task 2 RED: CheckRuntime/PrepareExec + type-identity gates** - `264bec3` (test)
 3. **Task 2 GREEN: four-module wire + kubectl exec** - `829b02d` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `edeb474` (docs: complete plan)
 
 ## Files Created/Modified
 
