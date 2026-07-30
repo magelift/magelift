@@ -49,8 +49,8 @@
 - [x] **KUBE-03**: Operator can `magelift exec` into a Magento pod on any Kubernetes target through a single shared `Observe.PrepareExec` implementation
 - [x] **KUBE-04**: Operator can deploy Magento on any Kubernetes target through a single shared `deploy.Steps` implementation in `internal/cloud/kube`
 - [x] **KUBE-05**: Operator gets state lock, backup, and restore on OVH and Scaleway by reusing the S3-compatible state manager with an endpoint override, rather than three separate implementations
-- [ ] **KUBE-06**: `Bootstrap` and `Secrets` stay per-provider, and every path not yet implemented fails loudly with its tier rather than returning nil success
-- [ ] **KUBE-07**: The `unsupported{}` stub shells in `internal/cloud/ovh/stack/ops.go` and `internal/cloud/scaleway/stack/ops.go` are replaced by real implementations where the shared layer provides them, with remaining gaps tier-gated and matrix-recorded
+- [x] **KUBE-06**: `Bootstrap` and `Secrets` stay per-provider, and every path not yet implemented fails loudly with its tier rather than returning nil success
+- [x] **KUBE-07**: The `unsupported{}` stub shells in `internal/cloud/ovh/stack/ops.go` and `internal/cloud/scaleway/stack/ops.go` are replaced by real implementations where the shared layer provides them, with remaining gaps tier-gated and matrix-recorded
 
 ### PaaS Config Import
 
@@ -172,8 +172,8 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | KUBE-03 | Phase 6 | Complete |
 | KUBE-04 | Phase 6 | Complete |
 | KUBE-05 | Phase 6 | Complete |
-| KUBE-06 | Phase 6 | Pending |
-| KUBE-07 | Phase 6 | Pending |
+| KUBE-06 | Phase 6 | Complete |
+| KUBE-07 | Phase 6 | Complete |
 | IMPORT-01 | Phase 4 | Complete |
 | IMPORT-02 | Phase 4 | Complete |
 | IMPORT-03 | Phase 4 | Complete |

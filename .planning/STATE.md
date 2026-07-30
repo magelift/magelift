@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 6
 current_phase_name: Shared Kubernetes Day-2
 status: executing
-stopped_at: Completed 06-04-PLAN.md
-last_updated: "2026-07-30T11:08:14.621Z"
+stopped_at: Completed 06-05-PLAN.md
+last_updated: "2026-07-30T11:12:32.715Z"
 last_activity: 2026-07-30
 last_activity_desc: 06-02 SUMMARY complete (OutputKubeconfig + ClientFrom* + four stack exports)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 41
-  completed_plans: 36
+  completed_plans: 37
   percent: 38
 ---
 
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 6 of 8 (Shared Kubernetes Day-2)
-Plan: 5 of 6 (06-02 complete; next 06-03)
+Plan: 6 of 6 (06-02 complete; next 06-03)
 Status: Ready to execute
 Last activity: 2026-07-30 — 06-02 SUMMARY complete (OutputKubeconfig + ClientFrom* + four stack exports)
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 90%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T11:08:14.613Z
-**Stopped at:** Completed 06-04-PLAN.md
+**Last session:** 2026-07-30T11:12:32.707Z
+**Stopped at:** Completed 06-05-PLAN.md
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
@@ -58,6 +58,7 @@ Progress: [█████████░] 88%
 | Phase 06 P02 | 5min | 2 tasks | 12 files |
 | Phase 06 P03 | 7min | 2 tasks | 13 files |
 | Phase 06 P04 | 6min | 2 tasks | 13 files |
+| Phase 06 P05 | 4min | 2 tasks | 11 files |
 
 ## Decisions
 
@@ -69,3 +70,6 @@ Progress: [█████████░] 88%
 - [Phase ?]: Shared *kube.Observe for all four K8s modules (D-01); kubectl PrepareExec; CLI launcher=binary
 - [Phase ?]: Shared *kube.Steps for all four K8s modules (D-03); portable DeploySpec
 - [Phase ?]: Default Steps Job/Runtime via ClientFromOutputs, not GKE ADC
+- [Phase ?]: Remove State methods from unsupported{}; type system proves State is not the shell
+- [Phase ?]: Delete diyLockWarnOut on OVH/SCW/EKS; AcquireLock uses State.Lock
+- [Phase ?]: Skip release-readiness.md — no Phase 6 gate row (D-06)
