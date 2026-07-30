@@ -89,7 +89,7 @@ status: complete
 1. **Task 1: End-to-end Cloudflare DNS upsert + cleanup script** - `dd447b2` (feat)
 2. **Task 2: Offline shell self-test with mocked curl** - `1a78bd1` (test)
 
-**Plan metadata:** `19121bc` (docs: complete plan)
+**Plan metadata:** `19121bc` + `e0c064c` (docs: complete plan + MIGRATE-04 honesty note)
 
 ## Files Created/Modified
 
