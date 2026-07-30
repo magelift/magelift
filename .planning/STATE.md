@@ -2,19 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-current_phase: 7
-current_phase_name: GCP Certification
-status: planning
-stopped_at: Phase 7 plans created (07-01..07-07 + 07-VALIDATION.md) — ready to execute
-last_updated: "2026-07-30T13:30:00.000Z"
-last_activity: 2026-07-30
-last_activity_desc: Phase 7 PLAN.md set written (7 plans, 5 waves)
+status: executing
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-07-30T11:40:19.981Z"
+last_activity: 2026-07-30 — completed 07-01 WIF + Composer SM offline foundations
 progress:
   total_phases: 8
-  completed_phases: 3
-  total_plans: 41
-  completed_plans: 38
-  percent: 38
+  completed_phases: 6
+  total_plans: 45
+  completed_plans: 39
+  percent: 87
 ---
 
 # Project State
@@ -25,27 +22,27 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 7 GCP Certification — plans ready; execute offline waves first
+**Current focus:** Phase 7 GCP Certification — executing plans (07-01 complete)
 
 ## Current Position
 
 Phase: 7 of 8 (GCP Certification)
-Plan: Not started
-Status: Ready to execute (7 plans)
-Last activity: 2026-07-30 — 07-01..07-07 PLAN.md + 07-VALIDATION.md
+Plan: 2 of 7
+Status: executing
+Last activity: 2026-07-30 — completed 07-01 WIF + Composer SM offline foundations
 
-Progress: [█████████░] 93%
+Progress: [█████████░] 87%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T11:18:56Z
-**Stopped at:** Phase 6 verification passed (06-VERIFICATION.md)
+**Last session:** 2026-07-30T11:40:19.975Z
+**Stopped at:** Completed 07-01-PLAN.md
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
 - Phase 5: verified 5/5 — seedDump real, media-sync, cutover runbook (DNS/live → Phase 7)
 - Phase 6: verified 5/5 — shared `*kube.Observe`/`*kube.Steps`, OVH/SCW AES256 State, honesty matrix; Floci AES256 optional; DNS/live → Phase 7 HUMAN_GATE
-- Next: Phase 7 discuss/plan — live GKE Autopilot + MIGRATE-04 Cloudflare DNS (`06-PHASE7-HANDOFF.md`)
+- Phase 7: 07-01 complete (WIF + Composer SM offline); 6 plans remaining
 
 ## Performance Metrics
 
@@ -57,6 +54,7 @@ Progress: [█████████░] 93%
 | Phase 06 P04 | 6min | 2 tasks | 13 files |
 | Phase 06 P05 | 4min | 2 tasks | 11 files |
 | Phase 06 P06 | 5min | 2 tasks | 4 files |
+| Phase 07-gcp-certification P01 | 5min | 2 tasks | 13 files |
 
 ## Decisions
 
@@ -74,3 +72,5 @@ Progress: [█████████░] 93%
 - [Phase ?]: identity_test.go uses package kube_test to import four providers without cycles
 - [Phase ?]: Floci AES256 skipped this session (docker ps failed); unit AES256 is offline floor
 - [Phase ?]: Phase 7 DNS: magelift-preview.alexandrecourtiol.com needs Zone.DNS Edit; Wrangler OAuth insufficient
+- [Phase ?]: WIF attribute condition locked to assertion.repository == 'acourtiol/magelift'
+- [Phase ?]: Bootstrap Details.wif is structured map never deferred; CI proof Act-only until minutes return

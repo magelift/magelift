@@ -33,8 +33,8 @@
 
 <!-- ADR 0007 blocks any multi-cloud claim until a second first-party target is certified. -->
 
-- [ ] **GCP-01**: Operator can bootstrap GCP with Workload Identity Federation so CI authenticates without long-lived service-account keys
-- [ ] **GCP-02**: Operator can store and retrieve Composer credentials from GCP Secret Manager during build and deploy, with no unimplemented path returning success
+- [x] **GCP-01**: Operator can bootstrap GCP with Workload Identity Federation so CI authenticates without long-lived service-account keys
+- [x] **GCP-02**: Operator can store and retrieve Composer credentials from GCP Secret Manager during build and deploy, with no unimplemented path returning success
 - [ ] **GCP-03**: Operator can run the full day-2 command set (logs, exec, secrets, state, health) against a GKE Autopilot target
 - [ ] **GCP-04**: Operator can deploy Magento to GKE Autopilot through the standard candidate-deploy sequence (migrate → cutover → health → record)
 - [ ] **GCP-05**: Operator can run `magelift cost` against a GCP target and get a per-cell estimate
@@ -161,8 +161,8 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | TRUST-02 | Phase 1 | Complete |
 | TRUST-03 | Phase 3 | Complete |
 | TRUST-04 | Phase 3 | Complete |
-| GCP-01 | Phase 7 | Pending |
-| GCP-02 | Phase 7 | Pending |
+| GCP-01 | Phase 7 | Complete |
+| GCP-02 | Phase 7 | Complete |
 | GCP-03 | Phase 7 | Pending |
 | GCP-04 | Phase 7 | Pending |
 | GCP-05 | Phase 7 | Pending |
