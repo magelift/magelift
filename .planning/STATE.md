@@ -5,14 +5,14 @@ milestone_name: milestone
 current_phase: 8
 current_phase_name: Brownfield Attach & Tag Day
 status: executing
-stopped_at: Completed 08-04-PLAN.md
-last_updated: "2026-07-30T12:21:12.120Z"
+stopped_at: Completed 08-05-PLAN.md
+last_updated: "2026-07-30T12:23:19.505Z"
 progress:
   total_phases: 8
-  completed_phases: 6
-  total_plans: 51
-  completed_plans: 47
-  percent: 75
+  completed_phases: 3
+  total_plans: 56
+  completed_plans: 48
+  percent: 38
 ---
 
 # Project State
@@ -26,13 +26,13 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 8 of 8 (Brownfield Attach & Tag Day)
-Plan: 5 of 06
+Plan: 6 of 06
 Status: Ready to execute
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T12:21:12.112Z
-**Stopped at:** Completed 08-04-PLAN.md
+**Last session:** 2026-07-30T12:23:19.497Z
+**Stopped at:** Completed 08-05-PLAN.md
 **Resume file:** None
 
 - Phase 6: verified 5/5 offline
@@ -48,6 +48,7 @@ Status: Ready to execute
 | Phase 08 P02 | 8min | 2 tasks | 9 files |
 | Phase 08 P03 | 5min | 2 tasks | 4 files |
 | Phase 08 P04 | 3min | 2 tasks | 5 files |
+| Phase 08 P05 | 2min | 2 tasks | 8 files |
 
 ## Decisions
 
@@ -59,3 +60,6 @@ Status: Ready to execute
 - [Phase 08]: AdoptReport emits network and database independently (one or both)
 - [Phase 08]: Refuse lists every adopted resource in a single error when both are set
 - [Phase 08]: ATTACH-04 offline half via mock state exclusion + refuse; live describe-after-destroy deferred to 08-06
+- [Phase ?]: No magelift detach CLI — documented manual un-adopt only
+- [Phase ?]: ADR 0010 dump-seed unchanged; attach-out-of-scope superseded by Phase 8 / ATTACH-02
+- [Phase ?]: Live describe-after-destroy deferred to 08-06; offline proof cited in brownfield-attach.md

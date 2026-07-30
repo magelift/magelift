@@ -89,7 +89,7 @@
 - [x] **ATTACH-01**: Operator can adopt an existing VPC into a MageLift stack instead of having one created
 - [x] **ATTACH-02**: Operator can adopt an existing managed database instance (RDS/Cloud SQL) into a MageLift stack
 - [x] **ATTACH-03**: Adoption runs through `preview` first and shows exactly what will be imported versus created, and refuses to mutate or destroy adopted resources it does not own
-- [ ] **ATTACH-04**: Documented limits of adoption — what can be attached, what cannot, and how to detach without losing the resource
+- [x] **ATTACH-04**: Documented limits of adoption — what can be attached, what cannot, and how to detach without losing the resource
 
 ### Internal Quality
 
@@ -192,7 +192,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | ATTACH-01 | Phase 8 | Complete |
 | ATTACH-02 | Phase 8 | Complete |
 | ATTACH-03 | Phase 8 | Complete |
-| ATTACH-04 | Phase 8 | Pending |
+| ATTACH-04 | Phase 8 | Complete |
 | QUALITY-01 | Phase 1 | Complete |
 | QUALITY-02 | Phase 1 | Complete |
 | QUALITY-03 | Phase 1 | Complete |
