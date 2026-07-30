@@ -44,6 +44,17 @@ func TestSpecValidateRejectsGuessedOrUnsafeInputs(t *testing.T) {
 		}},
 		{name: "missing certificate", edit: func(spec *Spec) { spec.Existing.Certificate = nil }},
 		{name: "invalid subnet policy", edit: func(spec *Spec) { spec.Policy.VPCCIDR = netip.MustParsePrefix("10.42.1.1/16") }},
+		{name: "incomplete existing database", edit: func(spec *Spec) {
+			ref := sdk.ExistingResourceRef{ID: "database", Provider: "aws", Kind: sdk.ExistingDatabase, ExternalID: "db-magento"}
+			spec.Existing.Database = &ref
+			spec.Existing.DatabaseEndpoint = "magento.xxxxx.eu-west-3.rds.amazonaws.com"
+		}},
+		{name: "wrong existing database kind", edit: func(spec *Spec) {
+			ref := sdk.ExistingResourceRef{ID: "database", Provider: "aws", Kind: sdk.ExistingNetwork, ExternalID: "db-magento"}
+			spec.Existing.Database = &ref
+			spec.Existing.DatabaseSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master"
+			spec.Existing.DatabaseEndpoint = "magento.xxxxx.eu-west-3.rds.amazonaws.com"
+		}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -53,6 +64,17 @@ func TestSpecValidateRejectsGuessedOrUnsafeInputs(t *testing.T) {
 				t.Fatal("invalid stack plan was accepted")
 			}
 		})
+	}
+}
+
+func TestSpecValidateAcceptsExistingDatabase(t *testing.T) {
+	spec := validSpec()
+	ref := sdk.ExistingResourceRef{ID: "database", Provider: "aws", Kind: sdk.ExistingDatabase, ExternalID: "db-magento"}
+	spec.Existing.Database = &ref
+	spec.Existing.DatabaseSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master"
+	spec.Existing.DatabaseEndpoint = "magento.xxxxx.eu-west-3.rds.amazonaws.com"
+	if err := spec.Validate(); err != nil {
+		t.Fatal(err)
 	}
 }
 

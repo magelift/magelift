@@ -69,14 +69,17 @@ type Lifecycle struct {
 }
 
 type ExistingResources struct {
-	Network          *sdk.ExistingResourceRef
-	PublicSubnetIDs  []string
-	PrivateSubnetIDs []string
-	DataSubnetIDs    []string
-	HostedZone       *sdk.ExistingResourceRef
-	Certificate      *sdk.ExistingResourceRef
-	ALBCertificate   *sdk.ExistingResourceRef
-	SNSTopicARN      string
+	Network             *sdk.ExistingResourceRef
+	PublicSubnetIDs     []string
+	PrivateSubnetIDs    []string
+	DataSubnetIDs       []string
+	Database            *sdk.ExistingResourceRef
+	DatabaseSecretARN   string
+	DatabaseEndpoint    string
+	HostedZone          *sdk.ExistingResourceRef
+	Certificate         *sdk.ExistingResourceRef
+	ALBCertificate      *sdk.ExistingResourceRef
+	SNSTopicARN         string
 }
 
 type Dependencies struct {

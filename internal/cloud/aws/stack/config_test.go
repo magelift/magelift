@@ -63,6 +63,99 @@ func TestPlanFromConfigRejectsIncompleteExistingNetwork(t *testing.T) {
 	}
 }
 
+func TestPlanFromConfigMapsExistingDatabaseInputs(t *testing.T) {
+	cfg := deploymentConfig()
+	cfg.Target.AWS.Existing = config.AWSExistingResources{
+		Database: &config.AWSExistingDatabase{
+			Provider:   "aws",
+			Kind:       "database",
+			ExternalID: "db-magento-prod",
+			SecretARN:  "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master",
+			Endpoint:   "magento.xxxxx.eu-west-3.rds.amazonaws.com",
+		},
+	}
+	spec, err := PlanFromConfig(cfg, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Existing.Database == nil {
+		t.Fatal("existing database was not mapped")
+	}
+	if spec.Existing.Database.Kind != v1.ExistingDatabase || spec.Existing.Database.Provider != "aws" {
+		t.Fatalf("database ref kind/provider = %#v", spec.Existing.Database)
+	}
+	if spec.Existing.Database.ExternalID != "db-magento-prod" {
+		t.Fatalf("database external ID = %q", spec.Existing.Database.ExternalID)
+	}
+	if spec.Existing.DatabaseSecretARN != cfg.Target.AWS.Existing.Database.SecretARN {
+		t.Fatalf("database secret ARN = %q", spec.Existing.DatabaseSecretARN)
+	}
+	if spec.Existing.DatabaseEndpoint != cfg.Target.AWS.Existing.Database.Endpoint {
+		t.Fatalf("database endpoint = %q", spec.Existing.DatabaseEndpoint)
+	}
+}
+
+func TestPlanFromConfigRejectsIncompleteExistingDatabase(t *testing.T) {
+	cfg := deploymentConfig()
+	cfg.Target.AWS.Existing = config.AWSExistingResources{
+		Database: &config.AWSExistingDatabase{
+			Provider:   "aws",
+			Kind:       "database",
+			ExternalID: "db-magento-prod",
+			Endpoint:   "magento.xxxxx.eu-west-3.rds.amazonaws.com",
+		},
+	}
+	if _, err := PlanFromConfig(cfg, "staging"); err == nil || !strings.Contains(err.Error(), "existing database requires") {
+		t.Fatalf("incomplete existing database was accepted: %v", err)
+	}
+
+	cfg = deploymentConfig()
+	cfg.Target.AWS.Existing = config.AWSExistingResources{
+		Database: &config.AWSExistingDatabase{
+			Provider:   "aws",
+			Kind:       "database",
+			ExternalID: "db-magento-prod",
+			SecretARN:  "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master",
+		},
+	}
+	if _, err := PlanFromConfig(cfg, "staging"); err == nil || !strings.Contains(err.Error(), "existing database requires") {
+		t.Fatalf("incomplete existing database was accepted: %v", err)
+	}
+}
+
+func TestPlanFromConfigRejectsWrongExistingDatabaseKind(t *testing.T) {
+	cfg := deploymentConfig()
+	cfg.Target.AWS.Existing = config.AWSExistingResources{
+		Database: &config.AWSExistingDatabase{
+			Provider:   "aws",
+			Kind:       "network",
+			ExternalID: "db-magento-prod",
+			SecretARN:  "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master",
+			Endpoint:   "magento.xxxxx.eu-west-3.rds.amazonaws.com",
+		},
+	}
+	if _, err := PlanFromConfig(cfg, "staging"); err == nil || !strings.Contains(err.Error(), "existing database must be an AWS database reference") {
+		t.Fatalf("wrong database kind was accepted: %v", err)
+	}
+}
+
+func TestPlanFromConfigKeepsExistingNetworkOnly(t *testing.T) {
+	cfg := deploymentConfig()
+	cfg.Target.AWS.Existing = config.AWSExistingResources{
+		Network:          &config.AWSExistingResource{Provider: "aws", Kind: "network", ExternalID: "vpc-existing"},
+		PublicSubnetIDs:  []string{"subnet-public-a", "subnet-public-b"},
+		PrivateSubnetIDs: []string{"subnet-private-a", "subnet-private-b"},
+		DataSubnetIDs:    []string{"subnet-data-a", "subnet-data-b"},
+	}
+	spec, err := PlanFromConfig(cfg, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Existing.Network == nil || spec.Existing.Database != nil {
+		t.Fatalf("network-only existing plan drifted: %#v", spec.Existing)
+	}
+}
+
 func TestPlanFromConfigRejectsGuessedDeploymentInputs(t *testing.T) {
 	cfg := deploymentConfig()
 	cfg.Target.Provider = "gcp"
