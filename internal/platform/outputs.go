@@ -23,6 +23,11 @@ const (
 	// Not in RequiredOutputKeys yet — AWS historically exported mediaURL only; adapters
 	// that support media-sync must export this key (GCP already does; AWS added in 05-05).
 	OutputMediaBucket = "mediaBucket"
+	// OutputKubeconfig is the cluster kubeconfig for shared Kubernetes day-2
+	// (Observe/Steps). Optional Magento-facing key — not in RequiredOutputKeys so
+	// ECS and other non-K8s stacks stay free of it. K8s adapters export it as a
+	// Pulumi secret.
+	OutputKubeconfig = "kubeconfig"
 )
 
 // RequiredOutputKeys are the Magento-facing exports every StackModule must
