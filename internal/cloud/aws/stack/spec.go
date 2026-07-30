@@ -324,6 +324,24 @@ func (e ExistingResources) validate() error {
 	} else if len(e.PublicSubnetIDs) != 0 || len(e.PrivateSubnetIDs) != 0 || len(e.DataSubnetIDs) != 0 {
 		problems = append(problems, errors.New("existing subnet IDs require an existing network reference"))
 	}
+	if e.Database != nil {
+		if e.Database.Provider != "aws" || e.Database.Kind != sdk.ExistingDatabase {
+			problems = append(problems, errors.New("existing database must be an AWS database reference"))
+		} else if err := sdk.ValidateExistingResourceRef(*e.Database); err != nil {
+			problems = append(problems, err)
+		}
+		if strings.TrimSpace(e.Database.ExternalID) == "" {
+			problems = append(problems, errors.New("existing database requires an external ID"))
+		}
+		if !secretARN.MatchString(e.DatabaseSecretARN) {
+			problems = append(problems, errors.New("existing database requires a Secrets Manager secretArn"))
+		}
+		if err := validateDatabaseEndpoint(e.DatabaseEndpoint); err != nil {
+			problems = append(problems, err)
+		}
+	} else if e.DatabaseSecretARN != "" || e.DatabaseEndpoint != "" {
+		problems = append(problems, errors.New("existing database secretArn and endpoint require an existing database reference"))
+	}
 	if e.HostedZone == nil || e.HostedZone.Provider != "aws" || e.HostedZone.Kind != sdk.ExistingDNSZone {
 		problems = append(problems, errors.New("stack requires an explicit AWS hosted-zone reference"))
 	} else if err := sdk.ValidateExistingResourceRef(*e.HostedZone); err != nil {
@@ -355,6 +373,17 @@ func validateSubnetIDs(name string, values []string) error {
 			return fmt.Errorf("%s IDs must be unique", name)
 		}
 		seen[value] = struct{}{}
+	}
+	return nil
+}
+
+func validateDatabaseEndpoint(endpoint string) error {
+	value := strings.TrimSpace(endpoint)
+	if value == "" {
+		return errors.New("existing database requires a writer endpoint hostname")
+	}
+	if strings.ContainsAny(value, " \t\r\n") || strings.Contains(value, "://") || strings.Contains(value, "@") {
+		return errors.New("existing database endpoint must be a hostname")
 	}
 	return nil
 }

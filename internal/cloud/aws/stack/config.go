@@ -77,12 +77,21 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	cloudFrontCertificate := sdk.ExistingResourceRef{ID: sdk.ResourceID(cfg.Project.Name + "-" + environment + "-cloudfront-certificate"), Provider: sdk.ProviderID("aws"), Kind: certificate, ExternalID: aws.CloudFrontCertificateARN}
 	albCertificate := sdk.ExistingResourceRef{ID: sdk.ResourceID(cfg.Project.Name + "-" + environment + "-alb-certificate"), Provider: sdk.ProviderID("aws"), Kind: certificate, ExternalID: aws.ALBCertificateARN}
 	var existingNetwork *sdk.ExistingResourceRef
+	var existingDatabase *sdk.ExistingResourceRef
 	existingPublicSubnets := append([]string(nil), aws.Existing.PublicSubnetIDs...)
 	existingPrivateSubnets := append([]string(nil), aws.Existing.PrivateSubnetIDs...)
 	existingDataSubnets := append([]string(nil), aws.Existing.DataSubnetIDs...)
+	existingDatabaseSecretARN := ""
+	existingDatabaseEndpoint := ""
 	if aws.Existing.Network != nil {
 		ref := sdk.ExistingResourceRef{ID: sdk.ResourceID(cfg.Project.Name + "-" + environment + "-network"), Provider: sdk.ProviderID(aws.Existing.Network.Provider), Kind: sdk.ExistingResourceKind(aws.Existing.Network.Kind), ExternalID: aws.Existing.Network.ExternalID}
 		existingNetwork = &ref
+	}
+	if aws.Existing.Database != nil {
+		ref := sdk.ExistingResourceRef{ID: sdk.ResourceID(cfg.Project.Name + "-" + environment + "-database"), Provider: sdk.ProviderID(aws.Existing.Database.Provider), Kind: sdk.ExistingResourceKind(aws.Existing.Database.Kind), ExternalID: aws.Existing.Database.ExternalID}
+		existingDatabase = &ref
+		existingDatabaseSecretARN = aws.Existing.Database.SecretARN
+		existingDatabaseEndpoint = aws.Existing.Database.Endpoint
 	}
 	status := "compatible"
 	if cfg.Compatibility.AllowUnsupported {
@@ -100,7 +109,11 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		Application:  Application{Edition: cfg.Application.Edition, Version: cfg.Application.Version, Mode: cfg.Application.Mode, WebRuntime: cfg.Application.WebRuntime},
 		Artifact:     Artifact{ImageDigest: aws.ImageDigest, CompatibilityStatus: status},
 		Lifecycle:    Lifecycle{ExpiresAt: expiresAt, MonthlyBudgetCents: cfg.MonthlyBudgetCents, Protection: cfg.Protection},
-		Existing:     ExistingResources{Network: existingNetwork, PublicSubnetIDs: existingPublicSubnets, PrivateSubnetIDs: existingPrivateSubnets, DataSubnetIDs: existingDataSubnets, HostedZone: &hostedZone, Certificate: &cloudFrontCertificate, ALBCertificate: &albCertificate, SNSTopicARN: aws.SNSTopicARN},
+		Existing: ExistingResources{
+			Network: existingNetwork, PublicSubnetIDs: existingPublicSubnets, PrivateSubnetIDs: existingPrivateSubnets, DataSubnetIDs: existingDataSubnets,
+			Database: existingDatabase, DatabaseSecretARN: existingDatabaseSecretARN, DatabaseEndpoint: existingDatabaseEndpoint,
+			HostedZone: &hostedZone, Certificate: &cloudFrontCertificate, ALBCertificate: &albCertificate, SNSTopicARN: aws.SNSTopicARN,
+		},
 		Dependencies: Dependencies{KMSKeyARN: aws.KMSKeyARN, CacheSecretARN: aws.CacheSecretARN, SessionSecretARN: aws.SessionSecretARN, QueueSecretARN: aws.QueueSecretARN, EncryptionKeyARN: aws.EncryptionKeySecretARN, DatabaseName: aws.DatabaseName, MasterUsername: aws.MasterUsername},
 		Policy:       NetworkPolicy{VPCCIDR: cidr, AvailabilityZones: append([]string(nil), aws.AvailabilityZones...), MediaDomain: aws.MediaDomain, ApplicationDomain: cfg.Domain, NatMode: resolveNatMode(aws.NatMode)},
 		Catalog:      catalogFromConfig(aws.Catalog, preset),
