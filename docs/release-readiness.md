@@ -70,6 +70,8 @@ If clearance fails, rename every identifier before the first public tag.
 | NOTICE + license review | **Closed** | `NOTICE`, `LICENSE`, `make license-check` (recorded below) |
 | First ship path | GitHub Release archives | Homebrew cask optional post-tag; Windows = archive until winget/Scoop owned |
 | Packaging smoke | **Closed** | 2026-07-28T15:11:04Z — `release smoke ok binary=dist/magelift_darwin_arm64_v8.0/magelift (serial single-target)` via `make release-smoke` (`GOMAXPROCS=1`, `--parallelism=1`) |
+| Shared Kubernetes day-2 (Phase 6) | **Offline closed** | Unit/fake-clientset: `*kube.Observe` + `*kube.Steps` type-identity across gcp/eksops/ovh/scaleway; AES256 DIY state unit proof. **Not** live GKE/OVH/SCW Magento acceptance. Handoff: `.planning/phases/06-shared-kubernetes-day-2/06-PHASE7-HANDOFF.md` |
+| Cloudflare DNS cutover (MIGRATE-04) | **Deferred → Phase 7** | Preferred host `magelift-preview.alexandrecourtiol.com` (fallback `magelift-preview.acourtiol.com`). Needs Cloudflare API token with **Zone.DNS Edit** — Wrangler OAuth (`zone:read`) is insufficient for cutover writes |
 
 ### Time-to-preview
 
