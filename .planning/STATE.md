@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 7
 current_phase_name: GCP Certification
 status: executing
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-07-30T11:47:46.243Z"
+stopped_at: Completed 07-03-PLAN.md
+last_updated: "2026-07-30T11:51:57.737Z"
 last_activity: 2026-07-30
 last_activity_desc: completed 07-04 kube-adjacent dumpimport runner (offline)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 49
-  completed_plans: 42
+  completed_plans: 43
   percent: 38
 ---
 
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 7 of 8 (GCP Certification)
-Plan: 5 of 7 (next incomplete: 07-02; 07-04 + 07-05 done out of wave order)
+Plan: 6 of 7 (next incomplete: 07-02; 07-04 + 07-05 done out of wave order)
 Status: Ready to execute
 Last activity: 2026-07-30 — completed 07-04 kube-adjacent dumpimport runner (offline)
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 88%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T11:47:46.236Z
-**Stopped at:** Completed 07-02-PLAN.md
+**Last session:** 2026-07-30T11:51:57.729Z
+**Stopped at:** Completed 07-03-PLAN.md
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
@@ -61,6 +61,7 @@ Progress: [█████████░] 86%
 | Phase 07 P05 | 3min | 2 tasks | 4 files |
 | Phase 07 P04 | 4min | 2 tasks | 6 files |
 | Phase 07 P02 | 3min | 2 tasks | 5 files |
+| Phase 07 P03 | 4min | 2 tasks | 6 files |
 
 ## Decisions
 
@@ -87,3 +88,6 @@ Progress: [█████████░] 86%
 - [Phase ?]: Do not mark MIGRATE-04 Complete — live evidence is 07-07
 - [Phase ?]: Account-free GCP cost derives capacity from target.gcp + preset defaults; no Catalog client
 - [Phase ?]: GCP cost --live returns not-wired error (not ErrNotSupported)
+- [Phase ?]: Explicit composer:sm-write/sm-read cells for SC2 (not folded into day2:secrets alone)
+- [Phase ?]: bootstrap:wif refuses Ensure-only; needs Act log/flag or gcloud impersonation STS exchange
+- [Phase ?]: Placeholder DIGEST → create-once --infra-only; Magento cells require pullable digest
