@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 11
+open_count: 14
 waived_count: 0
 fixed_count: 0
-total_count: 11
-last_updated: 2026-07-29T16:22:38.617Z
+total_count: 14
+last_updated: 2026-07-30T11:08:14.200Z
 ---
 
 # Broken Windows Ledger
@@ -26,6 +26,9 @@ last_updated: 2026-07-29T16:22:38.617Z
 | 9 | 02 | stub | examples/custom-cli/stub_module.go |  | Intentional stubModule Plan/Program refuse deploy — registration demo only | open |  | 2026-07-28T15:07:25.170Z |  |
 | 10 | 04 | stub | internal/paasimport/upsun.go | 12 | MapUpsun emits baseDocument stub without parsing Upsun trees until 04-03 | open |  | 2026-07-29T15:31:04.697Z |  |
 | 11 | 05 | deviation | internal/cloud/aws/stack/component.go |  | Rule 2: exported AWS mediaBucket output so media-sync can resolve target bucket | open |  | 2026-07-29T16:22:38.617Z |  |
+| 12 | 06 | deviation | internal/cloud/gcp/runtime/runtime.go |  | Rule 2: plumbed Runtime.Kubeconfig on four runtimes so stack Outputs can export secret kubeconfig | open |  | 2026-07-30T10:53:25.510Z |  |
+| 13 | 06 | deviation | internal/cloud/gcp/operations |  | Orphaned GKE ADC operations package after kube.Steps lift; deferred cleanup | open |  | 2026-07-30T11:08:14.142Z |  |
+| 14 | 06 | deviation | internal/cloud/aws/eksops/ops.go |  | Task 2 TDD RED gate skipped; type-identity tests added as GREEN only | open |  | 2026-07-30T11:08:14.200Z |  |
 
 ````json
 [
@@ -159,6 +162,42 @@ last_updated: 2026-07-29T16:22:38.617Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-29T16:22:38.617Z",
+    "resolved_at": null
+  },
+  {
+    "id": 12,
+    "kind": "deviation",
+    "phase": "06",
+    "file": "internal/cloud/gcp/runtime/runtime.go",
+    "line": null,
+    "description": "Rule 2: plumbed Runtime.Kubeconfig on four runtimes so stack Outputs can export secret kubeconfig",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-30T10:53:25.510Z",
+    "resolved_at": null
+  },
+  {
+    "id": 13,
+    "kind": "deviation",
+    "phase": "06",
+    "file": "internal/cloud/gcp/operations",
+    "line": null,
+    "description": "Orphaned GKE ADC operations package after kube.Steps lift; deferred cleanup",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-30T11:08:14.142Z",
+    "resolved_at": null
+  },
+  {
+    "id": 14,
+    "kind": "deviation",
+    "phase": "06",
+    "file": "internal/cloud/aws/eksops/ops.go",
+    "line": null,
+    "description": "Task 2 TDD RED gate skipped; type-identity tests added as GREEN only",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-30T11:08:14.200Z",
     "resolved_at": null
   }
 ]
