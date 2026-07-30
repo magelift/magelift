@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 6
 current_phase_name: Shared Kubernetes Day-2
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-07-30T10:46:54.807Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-07-30T10:53:18.800Z"
 last_activity: 2026-07-30
-last_activity_desc: Completed 06-01 ObjectEncryption + OVH/SCW State (KUBE-05 foundation)
+last_activity_desc: 06-01 SUMMARY complete (ObjectEncryption + OVH/SCW State)
 progress:
   total_phases: 8
-  completed_phases: 5
-  total_plans: 50
-  completed_plans: 39
-  percent: 78
+  completed_phases: 3
+  total_plans: 41
+  completed_plans: 34
+  percent: 38
 ---
 
 # Project State
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 6 of 8 (Shared Kubernetes Day-2)
-Plan: 2 of 6 (06-01 complete; next 06-02)
-Status: executing
+Plan: 3 of 6 (06-01 complete; next 06-02)
+Status: Ready to execute
 Last activity: 2026-07-30 — 06-01 SUMMARY complete (ObjectEncryption + OVH/SCW State)
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 83%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T10:46:54.799Z
-**Stopped at:** Completed 06-01-PLAN.md
+**Last session:** 2026-07-30T10:53:18.793Z
+**Stopped at:** Completed 06-02-PLAN.md
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
@@ -55,8 +55,12 @@ Progress: [████████░░] 80%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 06 P01 | 6min | 2 tasks | 26 files |
+| Phase 06 P02 | 5min | 2 tasks | 12 files |
 
 ## Decisions
 
 - [Phase 6]: ObjectEncryption modes: KMS for AWS, AES256 for OVH/SCW/Floci, None only as Floci SSE-reject fallback
 - [Phase 6]: OVH/SCW State requires stateBucket; endpoint via stateEndpoint or MAGELIFT_AWS_ENDPOINT_URL with Parse loopback gate
+- [Phase ?]: OutputKubeconfig = kubeconfig; optional, not in RequiredOutputKeys (ECS free)
+- [Phase ?]: Plumb Runtime.Kubeconfig as Pulumi ToSecret then export via stack Outputs
+- [Phase ?]: EKS exports existing exec-plugin kubeconfig as-is (D-02 escape hatch deferred)
