@@ -359,8 +359,8 @@ func announceAdoptedResources(stderr io.Writer, planned platform.PlannedStack) [
 // refuseAdoptedMutationForOperation consults the brownfield refuse gate on
 // Update (deploy) and Destroy paths. Stack-scoped ops pass an empty intent so
 // Magento deploy/destroy remain allowed while AdoptReport still surfaces ADOPT
-// lines; callers that pass destroy/replace intent against an adopted network
-// fail closed with a named ownership error (D-02).
+// lines; callers that pass destroy/replace intent against an adopted network or
+// database fail closed with a named ownership error (D-02).
 func refuseAdoptedMutationForOperation(planned platform.PlannedStack, operation string) error {
 	if operation != "deploy" && operation != "destroy" {
 		return nil

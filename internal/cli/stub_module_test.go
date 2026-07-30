@@ -37,29 +37,36 @@ func (stubAWSModule) Plan(cfg config.Config, environment string, _ platform.Plan
 	}
 	digest := ""
 	var adopted []string
-	var networkExternalID, networkLabel string
+	var networkExternalID, networkLabel, databaseExternalID, databaseLabel string
 	if cfg.Target.AWS != nil {
 		digest = cfg.Target.AWS.ImageDigest
 		if net := cfg.Target.AWS.Existing.Network; net != nil && strings.TrimSpace(net.ExternalID) != "" {
 			networkExternalID = strings.TrimSpace(net.ExternalID)
 			networkLabel = cfg.Project.Name + "-" + environment + "-network"
-			adopted = []string{"ADOPT network " + networkExternalID}
+			adopted = append(adopted, "ADOPT network "+networkExternalID)
+		}
+		if db := cfg.Target.AWS.Existing.Database; db != nil && strings.TrimSpace(db.ExternalID) != "" {
+			databaseExternalID = strings.TrimSpace(db.ExternalID)
+			databaseLabel = cfg.Project.Name + "-" + environment + "-database"
+			adopted = append(adopted, "ADOPT database "+databaseExternalID)
 		}
 	}
 	return stubPlanned{
-		stackName:          cfg.Project.Name + "-" + environment,
-		provider:           "aws",
-		runtime:            "ecs-fargate",
-		project:            cfg.Project.Name,
-		environment:        environment,
-		region:             cfg.Defaults.Region,
-		envClass:           cfg.Class,
-		protected:          cfg.Protection,
-		digest:             digest,
-		tier:               platform.TierCertified,
-		adopted:            adopted,
-		networkExternalID:  networkExternalID,
-		networkLabel:       networkLabel,
+		stackName:           cfg.Project.Name + "-" + environment,
+		provider:            "aws",
+		runtime:             "ecs-fargate",
+		project:             cfg.Project.Name,
+		environment:         environment,
+		region:              cfg.Defaults.Region,
+		envClass:            cfg.Class,
+		protected:           cfg.Protection,
+		digest:              digest,
+		tier:                platform.TierCertified,
+		adopted:             adopted,
+		networkExternalID:   networkExternalID,
+		networkLabel:        networkLabel,
+		databaseExternalID:  databaseExternalID,
+		databaseLabel:       databaseLabel,
 	}, nil
 }
 
@@ -157,6 +164,7 @@ type stubPlanned struct {
 	tier                                                                         platform.CertificationTier
 	adopted                                                                      []string
 	networkExternalID, networkLabel                                              string
+	databaseExternalID, databaseLabel                                            string
 }
 
 func (p stubPlanned) StackName() string        { return p.stackName }
@@ -200,14 +208,21 @@ func (p stubPlanned) RefuseAdoptedMutation(intent platform.AdoptMutationIntent) 
 	if intent != platform.AdoptIntentDestroy && intent != platform.AdoptIntentReplace {
 		return nil
 	}
-	if p.networkExternalID == "" {
-		return nil
+	if p.networkExternalID != "" {
+		label := p.networkLabel
+		if label == "" {
+			label = "network"
+		}
+		return fmt.Errorf("adopted resource %s (%s): MageLift does not own this resource", label, p.networkExternalID)
 	}
-	label := p.networkLabel
-	if label == "" {
-		label = "network"
+	if p.databaseExternalID != "" {
+		label := p.databaseLabel
+		if label == "" {
+			label = "database"
+		}
+		return fmt.Errorf("adopted resource %s (%s): MageLift does not own this resource", label, p.databaseExternalID)
 	}
-	return fmt.Errorf("adopted resource %s (%s): MageLift does not own this resource", label, p.networkExternalID)
+	return nil
 }
 
 func registerTestModules(modules *platform.ModuleRegistry) {

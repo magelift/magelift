@@ -19,22 +19,33 @@ func (e AdoptEntry) Line() string {
 	return fmt.Sprintf("ADOPT %s %s", e.Kind, e.ExternalID)
 }
 
-// AdoptReport lists existing resources MageLift references without owning.
-// Database adopt fields are out of scope for the network slice (08-02/03).
+// AdoptReport lists existing resources MageLift references without owning
+// (D-01 / ATTACH-03). Network and database entries are independent.
 func AdoptReport(spec Spec) []AdoptEntry {
-	if spec.Existing.Network == nil {
-		return nil
+	var entries []AdoptEntry
+	if ref := spec.Existing.Network; ref != nil {
+		label := string(ref.ID)
+		if label == "" {
+			label = "network"
+		}
+		entries = append(entries, AdoptEntry{
+			Kind:       string(sdk.ExistingNetwork),
+			ExternalID: ref.ExternalID,
+			Label:      label,
+		})
 	}
-	ref := *spec.Existing.Network
-	label := string(ref.ID)
-	if label == "" {
-		label = "network"
+	if ref := spec.Existing.Database; ref != nil {
+		label := string(ref.ID)
+		if label == "" {
+			label = "database"
+		}
+		entries = append(entries, AdoptEntry{
+			Kind:       string(sdk.ExistingDatabase),
+			ExternalID: ref.ExternalID,
+			Label:      label,
+		})
 	}
-	return []AdoptEntry{{
-		Kind:       string(sdk.ExistingNetwork),
-		ExternalID: ref.ExternalID,
-		Label:      label,
-	}}
+	return entries
 }
 
 // RefuseAdoptedMutation fails closed when intent is destroy or replace of an
