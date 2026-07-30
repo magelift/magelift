@@ -254,7 +254,7 @@ Plans:
   4. Documented adoption limits state what can be attached, what cannot, and a detach path — verified by detaching an adopted resource and confirming it still exists in the account afterwards
   5. Every row in `docs/release-readiness.md` is Closed with named evidence or Deferred with a reason, and every unchecked requirement in `.planning/REQUIREMENTS.md` has a recorded deferral — no row and no requirement left in an undetermined state on tag day
 
-**Plans**: 5/6 plans executed
+**Plans**: 6/6 plans executed
 
 Plans:
 
@@ -263,7 +263,7 @@ Plans:
 - [x] 08-03-PLAN.md — database.Existing component + stack wiring (ATTACH-02 apply)
 - [x] 08-04-PLAN.md — Unified ADOPT report + refuse for network+DB (ATTACH-03)
 - [x] 08-05-PLAN.md — Attach limits/detach docs + ADR 0010 supersede (ATTACH-04)
-- [ ] 08-06-PLAN.md — Offline/Floci evidence, AWS HUMAN_GATE, RELEASE-05 tag board
+- [x] 08-06-PLAN.md — Offline/Floci evidence, AWS HUMAN_GATE, RELEASE-05 tag board
 
 ## Progress
 
@@ -281,7 +281,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | 5. Data Migration & Cutover | 6/6 | Complete    | 2026-07-29 |
 | 6. Shared Kubernetes Day-2 | 6/6 | Complete    | 2026-07-30 |
 | 7. GCP Certification | 5/7 | In Progress|  |
-| 8. Brownfield Attach & Tag Day | 5/6 | In Progress|  |
+| 8. Brownfield Attach & Tag Day | 6/6 | In Progress|  |
 
 ## Requirement Coverage
 

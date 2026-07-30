@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 14
+open_count: 15
 waived_count: 0
 fixed_count: 0
-total_count: 14
-last_updated: 2026-07-30T11:08:14.200Z
+total_count: 15
+last_updated: 2026-07-30T12:26:19.918Z
 ---
 
 # Broken Windows Ledger
@@ -29,6 +29,7 @@ last_updated: 2026-07-30T11:08:14.200Z
 | 12 | 06 | deviation | internal/cloud/gcp/runtime/runtime.go |  | Rule 2: plumbed Runtime.Kubeconfig on four runtimes so stack Outputs can export secret kubeconfig | open |  | 2026-07-30T10:53:25.510Z |  |
 | 13 | 06 | deviation | internal/cloud/gcp/operations |  | Orphaned GKE ADC operations package after kube.Steps lift; deferred cleanup | open |  | 2026-07-30T11:08:14.142Z |  |
 | 14 | 06 | deviation | internal/cloud/aws/eksops/ops.go |  | Task 2 TDD RED gate skipped; type-identity tests added as GREEN only | open |  | 2026-07-30T11:08:14.200Z |  |
+| 15 | 08 | deviation | .planning/phases/08-brownfield-attach-tag-day/scratch/08-06-aws-adopt-confirm.md |  | Free-tier AWS adopt confirm Deferred — ADC session expired HUMAN_GATE | open |  | 2026-07-30T12:26:19.918Z |  |
 
 ````json
 [
@@ -198,6 +199,18 @@ last_updated: 2026-07-30T11:08:14.200Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-07-30T11:08:14.200Z",
+    "resolved_at": null
+  },
+  {
+    "id": 15,
+    "kind": "deviation",
+    "phase": "08",
+    "file": ".planning/phases/08-brownfield-attach-tag-day/scratch/08-06-aws-adopt-confirm.md",
+    "line": null,
+    "description": "Free-tier AWS adopt confirm Deferred — ADC session expired HUMAN_GATE",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-07-30T12:26:19.918Z",
     "resolved_at": null
   }
 ]
