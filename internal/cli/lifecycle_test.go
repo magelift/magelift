@@ -955,3 +955,25 @@ func TestInfrastructureRefuseAdoptedNetworkMutation(t *testing.T) {
 		t.Fatalf("refuse error = %v", err)
 	}
 }
+
+func TestInfrastructureRefuseAdoptedDatabaseMutation(t *testing.T) {
+	path := writeLifecycleConfigWithExistingDatabase(t)
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.environment = "staging"
+	_, planned, err := o.planStack(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attach, ok := planned.(platform.BrownfieldAttach)
+	if !ok {
+		t.Fatal("planned stack must implement BrownfieldAttach for existing database")
+	}
+	err = attach.RefuseAdoptedMutation(platform.AdoptIntentDestroy)
+	if err == nil {
+		t.Fatal("expected refuse-before-mutate error for adopted database")
+	}
+	if !strings.Contains(err.Error(), "db-magento-prod") || !strings.Contains(err.Error(), "MageLift does not own this resource") {
+		t.Fatalf("refuse error = %v", err)
+	}
+}
