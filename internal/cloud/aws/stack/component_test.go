@@ -191,6 +191,56 @@ func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
 	}
 }
 
+func TestNewComposesExistingDatabaseWithoutRDSCreates(t *testing.T) {
+	t.Parallel()
+	const (
+		identifier = "db-magento-prod"
+		endpoint   = "magento.xxxxx.eu-west-3.rds.amazonaws.com"
+		secretARN  = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master"
+	)
+	spec := validSpec()
+	ref := sdk.ExistingResourceRef{ID: "database", Provider: "aws", Kind: sdk.ExistingDatabase, ExternalID: identifier}
+	spec.Existing.Database = &ref
+	spec.Existing.DatabaseSecretARN = secretARN
+	spec.Existing.DatabaseEndpoint = endpoint
+
+	m := &stackMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		providers, err := NewProviders(ctx, "shop", "eu-west-3")
+		if err != nil {
+			return err
+		}
+		_, err = New(ctx, "shop-preview-1", spec, providers)
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if componentCount(m, "aws:rds/cluster:Cluster")+componentCount(m, "aws:rds/instance:Instance")+componentCount(m, "aws:rds/subnetGroup:SubnetGroup") != 0 {
+		t.Fatal("existing database adopt created managed RDS resources")
+	}
+	if componentCount(m, "magelift:aws:AuroraMysql") != 1 {
+		t.Fatal("existing database component was not registered")
+	}
+	dbComp := resourceInput(m, "magelift:aws:AuroraMysql", "shop-preview-1-database")
+	if dbComp == nil || dbComp["existingEndpoint"].StringValue() != endpoint || dbComp["existingSecretArn"].StringValue() != secretARN || dbComp["existingIdentifier"].StringValue() != identifier {
+		t.Fatalf("database Existing refs not wired into database.New: %#v", dbComp)
+	}
+	executionDatabasePolicy := resourceInput(m, "aws:iam/rolePolicy:RolePolicy", "shop-preview-1-execution-database-policy")
+	if executionDatabasePolicy == nil || !strings.Contains(executionDatabasePolicy["policy"].StringValue(), secretARN) {
+		t.Fatalf("ECS execution role must scope GetSecretValue to the adopted secret ARN: %#v", executionDatabasePolicy)
+	}
+	policyText := executionDatabasePolicy["policy"].StringValue()
+	if strings.Contains(policyText, "arn:aws:secretsmanager:*") || strings.Contains(policyText, `"Resource":"*"`) {
+		t.Fatalf("execution database policy broadened beyond single adopted ARN: %s", policyText)
+	}
+	webTask := resourceInput(m, "aws:ecs/taskDefinition:TaskDefinition", "shop-preview-1-runtime-web-task")
+	definitions := webTask["containerDefinitions"].StringValue()
+	if !strings.Contains(definitions, endpoint) || !strings.Contains(definitions, secretARN) {
+		t.Fatalf("runtime must receive adopted endpoint and secret ARN: %s", definitions)
+	}
+}
+
 func TestNewComposesStandardThreeZoneStack(t *testing.T) {
 	t.Parallel()
 	m := &stackMocks{}
