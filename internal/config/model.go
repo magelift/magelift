@@ -190,12 +190,24 @@ type AWSExistingResources struct {
 	PublicSubnetIDs  []string             `yaml:"publicSubnetIds,omitempty" json:"publicSubnetIds,omitempty" config:"Existing public subnet IDs" schema:"nullable"`
 	PrivateSubnetIDs []string             `yaml:"privateSubnetIds,omitempty" json:"privateSubnetIds,omitempty" config:"Existing private subnet IDs" schema:"nullable"`
 	DataSubnetIDs    []string             `yaml:"dataSubnetIds,omitempty" json:"dataSubnetIds,omitempty" config:"Existing data subnet IDs" schema:"nullable"`
+	Database         *AWSExistingDatabase `yaml:"database,omitempty" json:"database,omitempty" config:"Existing RDS MySQL reference" schema:"nullable"`
 }
 
 type AWSExistingResource struct {
 	Provider   string `yaml:"provider" json:"provider" config:"Resource provider" schema:"const=aws"`
 	Kind       string `yaml:"kind" json:"kind" config:"Resource kind"`
 	ExternalID string `yaml:"externalId" json:"externalId" config:"Provider resource identifier"`
+}
+
+// AWSExistingDatabase adopts an existing AWS RDS MySQL instance by identifier.
+// SecretARN and Endpoint are required so MageLift can inject credentials without
+// creating or looking up the database at plan time.
+type AWSExistingDatabase struct {
+	Provider   string `yaml:"provider" json:"provider" config:"Resource provider" schema:"const=aws"`
+	Kind       string `yaml:"kind" json:"kind" config:"Resource kind"`
+	ExternalID string `yaml:"externalId" json:"externalId" config:"RDS instance identifier or ARN"`
+	SecretARN  string `yaml:"secretArn" json:"secretArn" config:"Secrets Manager master-user secret ARN"`
+	Endpoint   string `yaml:"endpoint" json:"endpoint" config:"RDS writer endpoint hostname"`
 }
 
 type AWSCatalog struct {

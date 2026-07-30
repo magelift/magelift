@@ -624,6 +624,67 @@
       },
       "type": "object"
     },
+    "aWSExistingDatabase": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "description": "RDS writer endpoint hostname",
+          "type": "string"
+        },
+        "externalId": {
+          "description": "RDS instance identifier or ARN",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Resource kind",
+          "type": "string"
+        },
+        "provider": {
+          "const": "aws",
+          "description": "Resource provider",
+          "type": "string"
+        },
+        "secretArn": {
+          "description": "Secrets Manager master-user secret ARN",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "kind",
+        "externalId",
+        "secretArn",
+        "endpoint"
+      ],
+      "type": "object"
+    },
+    "aWSExistingDatabaseOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "endpoint": {
+          "description": "RDS writer endpoint hostname",
+          "type": "string"
+        },
+        "externalId": {
+          "description": "RDS instance identifier or ARN",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Resource kind",
+          "type": "string"
+        },
+        "provider": {
+          "const": "aws",
+          "description": "Resource provider",
+          "type": "string"
+        },
+        "secretArn": {
+          "description": "Secrets Manager master-user secret ARN",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "aWSExistingResource": {
       "additionalProperties": false,
       "properties": {
@@ -684,6 +745,17 @@
             }
           ]
         },
+        "database": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSExistingDatabase",
+              "description": "Existing RDS MySQL reference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "network": {
           "anyOf": [
             {
@@ -737,6 +809,17 @@
                 "type": "string"
               },
               "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "database": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSExistingDatabaseOverlay",
+              "description": "Existing RDS MySQL reference"
             },
             {
               "type": "null"

@@ -27,6 +27,12 @@ does not create NAT gateways, route tables, or VPC endpoints in this mode, so th
 imported network must already provide the required egress and private AWS service
 access. The VPC CIDR is still required for security-group rules.
 
+`target.aws.existing.database` adopts an existing AWS RDS MySQL instance. When it is
+set, provide `provider: aws`, `kind: database`, `externalId` (instance ID or ARN),
+`secretArn` (Secrets Manager master-user secret ARN — never an inline password),
+and `endpoint` (writer hostname). MageLift does not create RDS when this block is
+set. Cloud SQL is not a configuration key in this milestone.
+
 `build.staticContent.strategy` and `build.staticContent.threads` map PaaS
 `SCD_STRATEGY` / `SCD_THREADS` on import and become Magento SCD `-s` / `-j`.
 See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
@@ -93,6 +99,12 @@ See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
 | `target.aws.existing.publicSubnetIds` | array or null | no |  | Existing public subnet IDs |
 | `target.aws.existing.privateSubnetIds` | array or null | no |  | Existing private subnet IDs |
 | `target.aws.existing.dataSubnetIds` | array or null | no |  | Existing data subnet IDs |
+| `target.aws.existing.database` | object or null | no |  | Existing RDS MySQL reference |
+| `target.aws.existing.database.provider` | string | yes | aws | Resource provider |
+| `target.aws.existing.database.kind` | string | yes |  | Resource kind |
+| `target.aws.existing.database.externalId` | string | yes |  | RDS instance identifier or ARN |
+| `target.aws.existing.database.secretArn` | string | yes |  | Secrets Manager master-user secret ARN |
+| `target.aws.existing.database.endpoint` | string | yes |  | RDS writer endpoint hostname |
 | `target.aws.catalog` | object | no |  | Benchmark-selected service catalog |
 | `target.aws.catalog.version` | string or null | no |  | Benchmark catalog version |
 | `target.aws.catalog.databaseEngine` | string or null | no | aurora-mysql, rds-mysql | MySQL engine shape |
@@ -277,6 +289,12 @@ See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
 | `environments.*.target.aws.existing.publicSubnetIds` | array or null | no |  | Existing public subnet IDs |
 | `environments.*.target.aws.existing.privateSubnetIds` | array or null | no |  | Existing private subnet IDs |
 | `environments.*.target.aws.existing.dataSubnetIds` | array or null | no |  | Existing data subnet IDs |
+| `environments.*.target.aws.existing.database` | object or null | no |  | Existing RDS MySQL reference |
+| `environments.*.target.aws.existing.database.provider` | string | no | aws | Resource provider |
+| `environments.*.target.aws.existing.database.kind` | string | no |  | Resource kind |
+| `environments.*.target.aws.existing.database.externalId` | string | no |  | RDS instance identifier or ARN |
+| `environments.*.target.aws.existing.database.secretArn` | string | no |  | Secrets Manager master-user secret ARN |
+| `environments.*.target.aws.existing.database.endpoint` | string | no |  | RDS writer endpoint hostname |
 | `environments.*.target.aws.catalog` | object | no |  | Benchmark-selected service catalog |
 | `environments.*.target.aws.catalog.version` | string or null | no |  | Benchmark catalog version |
 | `environments.*.target.aws.catalog.databaseEngine` | string or null | no | aurora-mysql, rds-mysql | MySQL engine shape |
