@@ -183,7 +183,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | MIGRATE-01 | Phase 5 | Complete |
 | MIGRATE-02 | Phase 5 | Complete |
 | MIGRATE-03 | Phase 5 | Complete |
-| MIGRATE-04 | Phase 5 (local) + Phase 7 HUMAN_GATE (DNS/live/managed dump) | Pending (local runbook+scratch done 05-06; live DNS not claimed) |
+| MIGRATE-04 | Phase 5 (local) + Phase 7 HUMAN_GATE (DNS/live/managed dump) | Pending (local runbook+scratch done 05-06; DNS tooling offline in 07-05; live DNS not claimed) |
 | MIGRATE-05 | Phase 5 | Complete |
 | ECE-01 | Phase 4 | Complete |
 | ECE-02 | Phase 4 | Complete |

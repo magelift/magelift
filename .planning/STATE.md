@@ -25,14 +25,14 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 7 GCP Certification — executing plans (07-01 complete)
+**Current focus:** Phase 7 GCP Certification — executing plans (07-01 + 07-05 complete)
 
 ## Current Position
 
 Phase: 7 of 8 (GCP Certification)
-Plan: 3 of 7
-Status: Ready to execute
-Last activity: 2026-07-30 — completed 07-01 WIF + Composer SM offline foundations
+Plan: 3 of 7 (next incomplete: 07-02; 07-05 done out of wave order)
+Status: executing
+Last activity: 2026-07-30 — completed 07-05 Cloudflare DNS cutover script (offline)
 
 Progress: [████████░░] 82%
 
@@ -45,7 +45,7 @@ Progress: [████████░░] 82%
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
 - Phase 5: verified 5/5 — seedDump real, media-sync, cutover runbook (DNS/live → Phase 7)
 - Phase 6: verified 5/5 — shared `*kube.Observe`/`*kube.Steps`, OVH/SCW AES256 State, honesty matrix; Floci AES256 optional; DNS/live → Phase 7 HUMAN_GATE
-- Phase 7: 07-01 complete (WIF + Composer SM offline); 6 plans remaining
+- Phase 7: 07-01 (WIF + Composer SM) + 07-05 (DNS cutover script offline) complete; MIGRATE-04 live rehearsal still HUMAN_GATE
 
 ## Performance Metrics
 
