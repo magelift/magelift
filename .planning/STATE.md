@@ -2,16 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
+current_phase: 7
+current_phase_name: GCP Certification
 status: executing
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-07-30T11:40:19.981Z"
-last_activity: 2026-07-30 — completed 07-01 WIF + Composer SM offline foundations
+stopped_at: Completed 07-05-PLAN.md
+last_updated: "2026-07-30T11:43:58.526Z"
+last_activity: 2026-07-30
+last_activity_desc: completed 07-01 WIF + Composer SM offline foundations
 progress:
   total_phases: 8
-  completed_phases: 6
-  total_plans: 45
-  completed_plans: 39
-  percent: 87
+  completed_phases: 3
+  total_plans: 49
+  completed_plans: 40
+  percent: 38
 ---
 
 # Project State
@@ -27,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 7 of 8 (GCP Certification)
-Plan: 2 of 7
-Status: executing
+Plan: 3 of 7
+Status: Ready to execute
 Last activity: 2026-07-30 — completed 07-01 WIF + Composer SM offline foundations
 
-Progress: [█████████░] 87%
+Progress: [████████░░] 82%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T11:40:19.975Z
-**Stopped at:** Completed 07-01-PLAN.md
+**Last session:** 2026-07-30T11:43:58.518Z
+**Stopped at:** Completed 07-05-PLAN.md
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
@@ -55,6 +58,7 @@ Progress: [█████████░] 87%
 | Phase 06 P05 | 4min | 2 tasks | 11 files |
 | Phase 06 P06 | 5min | 2 tasks | 4 files |
 | Phase 07-gcp-certification P01 | 5min | 2 tasks | 13 files |
+| Phase 07 P05 | 3min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -74,3 +78,5 @@ Progress: [█████████░] 87%
 - [Phase ?]: Phase 7 DNS: magelift-preview.alexandrecourtiol.com needs Zone.DNS Edit; Wrangler OAuth insufficient
 - [Phase ?]: WIF attribute condition locked to assertion.repository == 'acourtiol/magelift'
 - [Phase ?]: Bootstrap Details.wif is structured map never deferred; CI proof Act-only until minutes return
+- [Phase ?]: DNS cutover: CLOUDFLARE_API_TOKEN/CF_API_TOKEN Bearer; dry-run skips token; CURL_BIN mock offline
+- [Phase ?]: Cutover record type: hostname→CNAME, IPv4→A; TTL 120; proxied false unless --proxied

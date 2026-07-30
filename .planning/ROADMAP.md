@@ -228,14 +228,15 @@ Plans:
   4. `magelift deploy` completes migrate → cutover → health → record on GKE Autopilot and the resulting release is readable from the releases journal
   5. `magelift cost` returns a per-cell estimate for the GCP target, and both `docs/capability-matrix.md` and the `docs/release-readiness.md` gate board record `gcp` / `gke-autopilot` as certified, citing this acceptance pass as evidence
 
-**Plans:** 1/7 plans executed
+**Plans:** 2/7 plans executed
 
 Plans:
+
 - [x] 07-01-PLAN.md — Offline WIF bootstrap + Composer Secret Manager Get (GCP-01, GCP-02)
 - [ ] 07-02-PLAN.md — GCP account-free CostEstimator (GCP-05)
 - [ ] 07-03-PLAN.md — Harness cell catalog + live_cell_loop dry-run (GCP-03..05 wiring)
 - [ ] 07-04-PLAN.md — Kube-adjacent managed dumpimport runner (MIGRATE-04 dump)
-- [ ] 07-05-PLAN.md — Cloudflare DNS cutover script offline (MIGRATE-04 DNS, D-04)
+- [x] 07-05-PLAN.md — Cloudflare DNS cutover script offline (MIGRATE-04 DNS, D-04)
 - [ ] 07-06-PLAN.md — Live paid create-once pass + force_clean/PSA + DNS cleanup
 - [ ] 07-07-PLAN.md — Certify capability-matrix + release-readiness (GCP-06, MIGRATE-04 close)
 
@@ -270,7 +271,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 6/6 | Complete    | 2026-07-29 |
 | 5. Data Migration & Cutover | 6/6 | Complete    | 2026-07-29 |
 | 6. Shared Kubernetes Day-2 | 6/6 | Complete    | 2026-07-30 |
-| 7. GCP Certification | 0/7 | Planned | - |
+| 7. GCP Certification | 2/7 | In Progress|  |
 | 8. Brownfield Attach & Tag Day | 0/TBD | Not started | - |
 
 ## Requirement Coverage
