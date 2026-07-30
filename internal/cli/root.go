@@ -167,7 +167,7 @@ func newCommand(stdout, stderr io.Writer, modules *platform.ModuleRegistry) *cob
 			}
 			return ops.AcquireLock(ctx, planned)
 		},
-		runCommand: runAWSCommand,
+		runCommand: runRemoteCommand,
 		runCompose: runDockerCompose,
 		newReleaseStore: func(root, environment string) (releaseStore, error) {
 			return releasejournal.New(root, environment)

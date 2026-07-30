@@ -11,6 +11,7 @@ import (
 	awsbootstrap "github.com/acourtiol/magelift/internal/cloud/aws/bootstrap"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
 	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/config"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/platform"
@@ -22,9 +23,11 @@ var diyLockWarnOut io.Writer = os.Stderr
 func (Module) Bootstrap() platform.Bootstrap           { return Bootstrap{} }
 func (Module) State() platform.State                   { return State{} }
 func (Module) Secrets() platform.Secrets               { return Secrets{} }
-func (Module) RuntimeObserve() platform.RuntimeObserve { return unsupported{} }
-func (Module) CostEstimator() platform.CostEstimator   { return unsupportedCost{} }
-func (Module) Ops() platform.Ops                       { return Ops{} }
+func (Module) RuntimeObserve() platform.RuntimeObserve {
+	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
+}
+func (Module) CostEstimator() platform.CostEstimator { return unsupportedCost{} }
+func (Module) Ops() platform.Ops                     { return Ops{} }
 
 // Bootstrap reuses the certified AWS account DIY bootstrap packages.
 type Bootstrap struct{}
@@ -193,18 +196,6 @@ func (Secrets) Remove(ctx context.Context, planned platform.PlannedStack, name s
 		return err
 	}
 	return store.Remove(ctx, name)
-}
-
-type unsupported struct{}
-
-func (unsupported) TailLogs(context.Context, platform.PlannedStack, platform.LogQuery) ([]platform.LogEvent, error) {
-	return nil, platform.ErrNotSupported
-}
-func (unsupported) CheckRuntime(context.Context, platform.PlannedStack, map[string]any) ([]platform.RuntimeHealth, error) {
-	return nil, platform.ErrNotSupported
-}
-func (unsupported) PrepareExec(context.Context, platform.PlannedStack, map[string]any, platform.ExecQuery) (platform.ExecTarget, error) {
-	return platform.ExecTarget{}, platform.ErrNotSupported
 }
 
 type unsupportedCost struct{}

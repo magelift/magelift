@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/config"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/platform"
@@ -16,11 +17,13 @@ var diyLockWarnOut io.Writer = os.Stderr
 // unsupported implements optional day-2 ports for experimental Scaleway.
 type unsupported struct{}
 
-func (Module) Bootstrap() platform.Bootstrap           { return unsupported{} }
-func (Module) State() platform.State                   { return State{} }
-func (Module) Secrets() platform.Secrets               { return unsupported{} }
-func (Module) RuntimeObserve() platform.RuntimeObserve { return unsupported{} }
-func (Module) CostEstimator() platform.CostEstimator   { return unsupported{} }
+func (Module) Bootstrap() platform.Bootstrap { return unsupported{} }
+func (Module) State() platform.State         { return State{} }
+func (Module) Secrets() platform.Secrets     { return unsupported{} }
+func (Module) RuntimeObserve() platform.RuntimeObserve {
+	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
+}
+func (Module) CostEstimator() platform.CostEstimator { return unsupported{} }
 
 func (unsupported) VerifyAccount(context.Context, platform.PlannedStack) error {
 	return platform.ErrNotSupported
@@ -51,15 +54,6 @@ func (unsupported) Set(context.Context, platform.PlannedStack, string, []byte) e
 }
 func (unsupported) Remove(context.Context, platform.PlannedStack, string) error {
 	return platform.ErrNotSupported
-}
-func (unsupported) TailLogs(context.Context, platform.PlannedStack, platform.LogQuery) ([]platform.LogEvent, error) {
-	return nil, platform.ErrNotSupported
-}
-func (unsupported) CheckRuntime(context.Context, platform.PlannedStack, map[string]any) ([]platform.RuntimeHealth, error) {
-	return nil, platform.ErrNotSupported
-}
-func (unsupported) PrepareExec(context.Context, platform.PlannedStack, map[string]any, platform.ExecQuery) (platform.ExecTarget, error) {
-	return platform.ExecTarget{}, platform.ErrNotSupported
 }
 func (unsupported) Estimate(context.Context, platform.PlannedStack, config.Config, platform.CostOptions) (platform.CostReport, error) {
 	return platform.CostReport{}, platform.ErrNotSupported

@@ -110,8 +110,8 @@ func (o *options) runExecTarget(ctx context.Context, target platform.ExecTarget)
 		launcher = "aws"
 	}
 	args := append([]string{}, target.Args...)
-	// runCommand historically received argv without the launcher binary name.
-	if err := o.runCommand(ctx, "", args, o.stdout, o.stderr); err != nil {
+	// Args are the argv after the launcher binary (AWS CLI and kubectl share this shape).
+	if err := o.runCommand(ctx, launcher, args, o.stdout, o.stderr); err != nil {
 		return &exitError{code: 3, err: fmt.Errorf("run remote command (%s): %w", launcher, err)}
 	}
 	return nil
@@ -183,9 +183,11 @@ func (o *options) plannedOutputs(ctx context.Context) (string, platform.PlannedS
 	return environment, planned, outputs, nil
 }
 
-func runAWSCommand(ctx context.Context, directory string, args []string, stdout, stderr io.Writer) error {
-	command := osExec.CommandContext(ctx, "aws", args...)
-	command.Dir = directory
+func runRemoteCommand(ctx context.Context, binary string, args []string, stdout, stderr io.Writer) error {
+	if binary == "" {
+		binary = "aws"
+	}
+	command := osExec.CommandContext(ctx, binary, args...)
 	command.Stdin = os.Stdin
 	command.Stdout = stdout
 	command.Stderr = stderr
