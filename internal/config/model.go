@@ -112,6 +112,9 @@ type OVHTarget struct {
 	MemoryRequest       string            `yaml:"memoryRequest,omitempty" json:"memoryRequest,omitempty" config:"Kubernetes memory request" schema:"nullable"`
 	DesiredWebReplicas  int               `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
 	QueueConsumerCount  int               `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
+	StateBucket         string            `yaml:"stateBucket,omitempty" json:"stateBucket,omitempty" config:"S3-compatible DIY state bucket name" schema:"nullable"`
+	StateEndpoint       string            `yaml:"stateEndpoint,omitempty" json:"stateEndpoint,omitempty" config:"Loopback S3-compatible endpoint override (Floci)" schema:"nullable"`
+	StateRegion         string            `yaml:"stateRegion,omitempty" json:"stateRegion,omitempty" config:"S3-compatible region code for DIY state" schema:"nullable"`
 	Labels              map[string]string `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
 }
 
@@ -136,6 +139,9 @@ type ScalewayTarget struct {
 	KapsuleVersion      string            `yaml:"kapsuleVersion,omitempty" json:"kapsuleVersion,omitempty" config:"Kapsule Kubernetes version" schema:"nullable"`
 	NodeType            string            `yaml:"nodeType,omitempty" json:"nodeType,omitempty" config:"Kapsule pool node type" schema:"nullable"`
 	NodeCount           int               `yaml:"nodeCount,omitempty" json:"nodeCount,omitempty" config:"Kapsule pool size" schema:"nullable"`
+	StateBucket         string            `yaml:"stateBucket,omitempty" json:"stateBucket,omitempty" config:"S3-compatible DIY state bucket name" schema:"nullable"`
+	StateEndpoint       string            `yaml:"stateEndpoint,omitempty" json:"stateEndpoint,omitempty" config:"Loopback S3-compatible endpoint override (Floci)" schema:"nullable"`
+	StateRegion         string            `yaml:"stateRegion,omitempty" json:"stateRegion,omitempty" config:"S3-compatible region code for DIY state" schema:"nullable"`
 	Labels              map[string]string `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
 }
 

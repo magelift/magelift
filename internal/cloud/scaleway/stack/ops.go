@@ -17,7 +17,7 @@ var diyLockWarnOut io.Writer = os.Stderr
 type unsupported struct{}
 
 func (Module) Bootstrap() platform.Bootstrap           { return unsupported{} }
-func (Module) State() platform.State                   { return unsupported{} }
+func (Module) State() platform.State                   { return State{} }
 func (Module) Secrets() platform.Secrets               { return unsupported{} }
 func (Module) RuntimeObserve() platform.RuntimeObserve { return unsupported{} }
 func (Module) CostEstimator() platform.CostEstimator   { return unsupported{} }

@@ -160,7 +160,7 @@ func TestModuleAccessorsReturnNonNilUnsupportedShells(t *testing.T) {
 		t.Fatal("Bootstrap must return the unsupported shell, not nil")
 	}
 	if m.State() == nil {
-		t.Fatal("State must return the unsupported shell, not nil")
+		t.Fatal("State must return a non-nil adapter, not nil")
 	}
 	if m.Secrets() == nil {
 		t.Fatal("Secrets must return the unsupported shell, not nil")

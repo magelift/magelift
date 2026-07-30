@@ -153,6 +153,7 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		},
 		Dependencies: Dependencies{
 			DatabaseName: databaseName, MasterUsername: masterUsername, EncryptionKeySecret: ovh.EncryptionKeySecret,
+			StateBucket: ovh.StateBucket, StateEndpoint: ovh.StateEndpoint, StateRegion: ovh.StateRegion,
 		},
 	}
 	if err := spec.Validate(); err != nil {

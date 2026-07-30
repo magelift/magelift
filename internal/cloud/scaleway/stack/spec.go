@@ -80,6 +80,9 @@ type Dependencies struct {
 	DatabaseName        string
 	MasterUsername      string
 	EncryptionKeySecret string
+	StateBucket         string
+	StateEndpoint       string
+	StateRegion         string
 }
 
 func (s Spec) Validate() error {

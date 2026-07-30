@@ -161,6 +161,7 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		},
 		Dependencies: Dependencies{
 			DatabaseName: databaseName, MasterUsername: masterUsername, EncryptionKeySecret: scw.EncryptionKeySecret,
+			StateBucket: scw.StateBucket, StateEndpoint: scw.StateEndpoint, StateRegion: scw.StateRegion,
 		},
 	}
 	if err := spec.Validate(); err != nil {

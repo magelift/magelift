@@ -2363,6 +2363,39 @@
           "minLength": 1,
           "type": "string"
         },
+        "stateBucket": {
+          "anyOf": [
+            {
+              "description": "S3-compatible DIY state bucket name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateEndpoint": {
+          "anyOf": [
+            {
+              "description": "Loopback S3-compatible endpoint override (Floci)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateRegion": {
+          "anyOf": [
+            {
+              "description": "S3-compatible region code for DIY state",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "valkeyFlavor": {
           "anyOf": [
             {
@@ -2580,6 +2613,39 @@
           "description": "OVH Public Cloud project service name",
           "minLength": 1,
           "type": "string"
+        },
+        "stateBucket": {
+          "anyOf": [
+            {
+              "description": "S3-compatible DIY state bucket name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateEndpoint": {
+          "anyOf": [
+            {
+              "description": "Loopback S3-compatible endpoint override (Floci)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateRegion": {
+          "anyOf": [
+            {
+              "description": "S3-compatible region code for DIY state",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "valkeyFlavor": {
           "anyOf": [
@@ -2846,6 +2912,39 @@
             }
           ]
         },
+        "stateBucket": {
+          "anyOf": [
+            {
+              "description": "S3-compatible DIY state bucket name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateEndpoint": {
+          "anyOf": [
+            {
+              "description": "Loopback S3-compatible endpoint override (Floci)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateRegion": {
+          "anyOf": [
+            {
+              "description": "S3-compatible region code for DIY state",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "zone": {
           "anyOf": [
             {
@@ -3071,6 +3170,39 @@
           "anyOf": [
             {
               "description": "Scaleway region (e.g. fr-par)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateBucket": {
+          "anyOf": [
+            {
+              "description": "S3-compatible DIY state bucket name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateEndpoint": {
+          "anyOf": [
+            {
+              "description": "Loopback S3-compatible endpoint override (Floci)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stateRegion": {
+          "anyOf": [
+            {
+              "description": "S3-compatible region code for DIY state",
               "type": "string"
             },
             {

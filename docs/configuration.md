@@ -174,6 +174,9 @@ See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
 | `target.ovh.memoryRequest` | string or null | no |  | Kubernetes memory request |
 | `target.ovh.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
 | `target.ovh.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
+| `target.ovh.stateBucket` | string or null | no |  | S3-compatible DIY state bucket name |
+| `target.ovh.stateEndpoint` | string or null | no |  | Loopback S3-compatible endpoint override (Floci) |
+| `target.ovh.stateRegion` | string or null | no |  | S3-compatible region code for DIY state |
 | `target.ovh.labels` | object or null | no |  | Resource labels |
 | `target.scaleway` | object or null | no |  | Scaleway deployment inputs (experimental) |
 | `target.scaleway.projectId` | string | yes |  | Scaleway project ID |
@@ -195,6 +198,9 @@ See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
 | `target.scaleway.kapsuleVersion` | string or null | no |  | Kapsule Kubernetes version |
 | `target.scaleway.nodeType` | string or null | no |  | Kapsule pool node type |
 | `target.scaleway.nodeCount` | integer or null | no |  | Kapsule pool size |
+| `target.scaleway.stateBucket` | string or null | no |  | S3-compatible DIY state bucket name |
+| `target.scaleway.stateEndpoint` | string or null | no |  | Loopback S3-compatible endpoint override (Floci) |
+| `target.scaleway.stateRegion` | string or null | no |  | S3-compatible region code for DIY state |
 | `target.scaleway.labels` | object or null | no |  | Resource labels |
 | `defaults` | object | yes |  | Project defaults |
 | `defaults.region` | string | no |  | Default AWS region |
@@ -352,6 +358,9 @@ See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
 | `environments.*.target.ovh.memoryRequest` | string or null | no |  | Kubernetes memory request |
 | `environments.*.target.ovh.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
 | `environments.*.target.ovh.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
+| `environments.*.target.ovh.stateBucket` | string or null | no |  | S3-compatible DIY state bucket name |
+| `environments.*.target.ovh.stateEndpoint` | string or null | no |  | Loopback S3-compatible endpoint override (Floci) |
+| `environments.*.target.ovh.stateRegion` | string or null | no |  | S3-compatible region code for DIY state |
 | `environments.*.target.ovh.labels` | object or null | no |  | Resource labels |
 | `environments.*.target.scaleway` | object or null | no |  | Scaleway deployment inputs (experimental) |
 | `environments.*.target.scaleway.projectId` | string | no |  | Scaleway project ID |
@@ -373,6 +382,9 @@ See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
 | `environments.*.target.scaleway.kapsuleVersion` | string or null | no |  | Kapsule Kubernetes version |
 | `environments.*.target.scaleway.nodeType` | string or null | no |  | Kapsule pool node type |
 | `environments.*.target.scaleway.nodeCount` | integer or null | no |  | Kapsule pool size |
+| `environments.*.target.scaleway.stateBucket` | string or null | no |  | S3-compatible DIY state bucket name |
+| `environments.*.target.scaleway.stateEndpoint` | string or null | no |  | Loopback S3-compatible endpoint override (Floci) |
+| `environments.*.target.scaleway.stateRegion` | string or null | no |  | S3-compatible region code for DIY state |
 | `environments.*.target.scaleway.labels` | object or null | no |  | Resource labels |
 | `environments.*.defaults` | object or null | no |  |  |
 | `environments.*.defaults.region` | string | no |  | Default AWS region |
