@@ -255,7 +255,8 @@ func TestWaitForHealthyService(t *testing.T) {
 }
 
 func TestFourModuleNewDeployStepsTypeIdentity(t *testing.T) {
-	// Cross-package type-identity is asserted in each module's *TypeIdentity tests;
-	// this gate documents SC2: the concrete type living here is *Steps.
+	// SC2 concrete type in this package is *Steps. Cross-module registration
+	// (gcp/eksops/ovh/scaleway → *kube.Steps) is asserted in identity_test.go
+	// (package kube_test) to avoid provider→kube import cycles.
 	var _ deployflow.Steps = (*Steps)(nil)
 }
