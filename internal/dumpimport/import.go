@@ -33,8 +33,25 @@ type Options struct {
 	User     string
 	Password string
 	// Host / Port for host mysql client (defaults 127.0.0.1:3306).
+	// In kube mode, Host is the Cloud SQL private IP reachable from the pod VPC.
 	Host string
 	Port int
+
+	// Runner selects transport. Empty uses host mysql or compose fallback.
+	// RunnerKube pipes SQL via kubectl exec into a VPC-adjacent pod.
+	Runner string
+
+	// Namespace / Pod / PodSelector / Container configure the kube runner.
+	// Pod may be a pod name or a resource such as "deploy/web". PodSelector is
+	// used only when Pod is empty (resolved via kubectl get pods -l …).
+	Namespace   string
+	Pod         string
+	PodSelector string
+	Container   string
+	// Kubeconfig is an optional path passed as kubectl --kubeconfig.
+	Kubeconfig string
+	// KubeExec overrides kubectl execution (unit tests). Production leaves nil.
+	KubeExec KubeExec
 
 	// ComposeFile is relative to WorkDir (default .magelift/compose.local.yml).
 	ComposeFile string
@@ -54,7 +71,7 @@ func (o Options) withDefaults() Options {
 	if o.Password == "" && o.User == "root" {
 		o.Password = "root"
 	}
-	if strings.TrimSpace(o.Host) == "" {
+	if strings.TrimSpace(o.Host) == "" && !isKubeRunner(o.Runner) {
 		o.Host = "127.0.0.1"
 	}
 	if o.Port == 0 {
@@ -67,6 +84,10 @@ func (o Options) withDefaults() Options {
 		o.WorkDir = "."
 	}
 	return o
+}
+
+func isKubeRunner(runner string) bool {
+	return strings.EqualFold(strings.TrimSpace(runner), RunnerKube)
 }
 
 // Import pipes DumpPath into MySQL. Refuses non-empty targets without Yes;
@@ -153,6 +174,9 @@ type mysqlRunner interface {
 }
 
 func resolveRunner(opts Options) (mysqlRunner, error) {
+	if isKubeRunner(opts.Runner) {
+		return newKubeRunner(opts)
+	}
 	if _, err := exec.LookPath("mysql"); err == nil {
 		return &hostMySQL{
 			user:     opts.User,
@@ -178,6 +202,17 @@ func resolveRunner(opts Options) (mysqlRunner, error) {
 		user:        opts.User,
 		password:    opts.Password,
 	}, nil
+}
+
+// Query runs sql against the target schema via the resolved runner (host, compose, or kube).
+// Harness cells use this to assert fixture tables after a managed dump import.
+func Query(ctx context.Context, opts Options, sql string) (string, error) {
+	opts = opts.withDefaults()
+	runner, err := resolveRunner(opts)
+	if err != nil {
+		return "", err
+	}
+	return runner.Query(ctx, opts.Database, sql)
 }
 
 type hostMySQL struct {

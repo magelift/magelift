@@ -6,6 +6,8 @@
 //
 // Transport: host `mysql` when on PATH, otherwise
 // `docker compose -f .magelift/compose.local.yml exec -T database mysql …`
-// using localdev credentials. Dumps are piped (including .sql.gz); there is no
-// Go SQL parser. Callers map errors onto seeddump journal MarkFailed.
+// using localdev credentials. Set Options.Runner to RunnerKube to pipe SQL via
+// kubectl exec into a VPC-adjacent pod (private-IP Cloud SQL). Dumps are piped
+// (including .sql.gz); there is no Go SQL parser. Callers map errors onto
+// seeddump journal MarkFailed.
 package dumpimport
