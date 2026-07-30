@@ -42,7 +42,7 @@ patterns-established:
   - "existing.database mirrors existing.network: config → PlanFromConfig → Spec.Existing → later component Existing branch"
   - "Incomplete adopt refs fail with 'existing database requires …' at Validate/PlanFromConfig"
 
-requirements-completed: [ATTACH-02]
+requirements-completed: [] # ATTACH-02 surface only; apply closes in 08-03
 
 coverage:
   - id: D1
