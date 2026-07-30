@@ -8,13 +8,13 @@ status: executing
 stopped_at: Completed 06-02-PLAN.md
 last_updated: "2026-07-30T10:53:18.800Z"
 last_activity: 2026-07-30
-last_activity_desc: 06-01 SUMMARY complete (ObjectEncryption + OVH/SCW State)
+last_activity_desc: Completed 06-02 kubeconfig export + client factory
 progress:
   total_phases: 8
-  completed_phases: 3
-  total_plans: 41
-  completed_plans: 34
-  percent: 38
+  completed_phases: 5
+  total_plans: 50
+  completed_plans: 40
+  percent: 80
 ---
 
 # Project State
@@ -25,14 +25,14 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 6 execute — next 06-02 kubeconfig (wave 1 parallel remaining)
+**Current focus:** Phase 6 execute — next 06-03 shared kube.Observe
 
 ## Current Position
 
 Phase: 6 of 8 (Shared Kubernetes Day-2)
-Plan: 3 of 6 (06-01 complete; next 06-02)
-Status: Ready to execute
-Last activity: 2026-07-30 — 06-01 SUMMARY complete (ObjectEncryption + OVH/SCW State)
+Plan: 3 of 6 (06-02 complete; next 06-03)
+Status: executing
+Last activity: 2026-07-30 — 06-02 SUMMARY complete (OutputKubeconfig + ClientFrom* + four stack exports)
 
 Progress: [████████░░] 83%
 
@@ -47,8 +47,8 @@ Progress: [████████░░] 83%
 - Phase 6 locked: `kube.Observe` + `kube.Steps` shared; S3-compatible state endpoint; thin unsupported for Bootstrap/Secrets only; zero cloud spend
 - Phase 6 planned: 06-01 SSE/State ‖ 06-02 kubeconfig → 06-03 Observe → 06-04 Steps → 06-05 honesty → 06-06 gates + Cloudflare DNS handoff
 - Phase 6 plan-check: PASSED — KUBE-01..07 + D-01..D-06 covered; VALIDATION present; Open Questions RESOLVED; offline only
-- Phase 6 execute: 06-01 complete — ObjectEncryption + OVH/SCW State via NewAWSWithEndpoint (AES256 unit proof); AcquireLock flip still 06-05
-- Next: execute 06-02 (wave 1) then 06-03+ (serial GOMAXPROCS=1; fake clientset + Floci; no live GCP)
+- Phase 6 execute: 06-01 complete — ObjectEncryption + OVH/SCW State; 06-02 complete — OutputKubeconfig + ClientFrom* + secret exports on four K8s stacks
+- Next: execute 06-03 Observe (serial GOMAXPROCS=1; fake clientset; no live GCP)
 
 ## Performance Metrics
 
@@ -61,6 +61,6 @@ Progress: [████████░░] 83%
 
 - [Phase 6]: ObjectEncryption modes: KMS for AWS, AES256 for OVH/SCW/Floci, None only as Floci SSE-reject fallback
 - [Phase 6]: OVH/SCW State requires stateBucket; endpoint via stateEndpoint or MAGELIFT_AWS_ENDPOINT_URL with Parse loopback gate
-- [Phase ?]: OutputKubeconfig = kubeconfig; optional, not in RequiredOutputKeys (ECS free)
-- [Phase ?]: Plumb Runtime.Kubeconfig as Pulumi ToSecret then export via stack Outputs
-- [Phase ?]: EKS exports existing exec-plugin kubeconfig as-is (D-02 escape hatch deferred)
+- [Phase 6]: OutputKubeconfig = kubeconfig; optional, not in RequiredOutputKeys (ECS free)
+- [Phase 6]: Plumb Runtime.Kubeconfig as Pulumi ToSecret then export via stack Outputs
+- [Phase 6]: EKS exports existing exec-plugin kubeconfig as-is (D-02 escape hatch deferred)
