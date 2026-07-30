@@ -87,7 +87,7 @@ status: complete
 1. **Task 1: End-to-end kube-adjacent dumpimport runner** - `703798c` (feat)
 2. **Task 2: Assert tables + failed-loud runner errors** - `7126309` (test)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `ba08a5e` (docs: complete plan)
 
 ## Files Created/Modified
 
