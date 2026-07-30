@@ -254,7 +254,15 @@ Plans:
   4. Documented adoption limits state what can be attached, what cannot, and a detach path — verified by detaching an adopted resource and confirming it still exists in the account afterwards
   5. Every row in `docs/release-readiness.md` is Closed with named evidence or Deferred with a reason, and every unchecked requirement in `.planning/REQUIREMENTS.md` has a recorded deferral — no row and no requirement left in an undetermined state on tag day
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — VPC ADOPT preview + refuse-before-mutate (ATTACH-01/03 network)
+- [ ] 08-02-PLAN.md — existing.database config/schema/Spec surface (ATTACH-02)
+- [ ] 08-03-PLAN.md — database.Existing component + stack wiring (ATTACH-02 apply)
+- [ ] 08-04-PLAN.md — Unified ADOPT report + refuse for network+DB (ATTACH-03)
+- [ ] 08-05-PLAN.md — Attach limits/detach docs + ADR 0010 supersede (ATTACH-04)
+- [ ] 08-06-PLAN.md — Offline/Floci evidence, AWS HUMAN_GATE, RELEASE-05 tag board
 
 ## Progress
 

@@ -6,13 +6,13 @@ current_phase: 7
 current_phase_name: GCP Certification
 status: blocked_on_operator_auth
 stopped_at: Phase 7 offline 01-05 done; 07-06 live needs gcloud ADC + Cloudflare Zone.DNS Edit token
-last_updated: "2026-07-30T12:00:00.000Z"
+last_updated: "2026-07-30T14:00:00.000Z"
 last_activity: 2026-07-30
-last_activity_desc: Phase 6 verified; Phase 7 offline plans complete; live pass blocked on auth
+last_activity_desc: Phase 8 plans 08-01..06 + VALIDATION created; Phase 7 live still blocked on auth
 progress:
   total_phases: 8
   completed_phases: 6
-  total_plans: 51
+  total_plans: 57
   completed_plans: 43
   percent: 75
 ---
@@ -23,7 +23,7 @@ progress:
 
 See: .planning/PROJECT.md
 
-**Current focus:** Unblock Phase 7 live pass (gcloud + Cloudflare DNS token), then 07-06/07 + Phase 8
+**Current focus:** Unblock Phase 7 live pass (gcloud + Cloudflare DNS token), then 07-06/07; Phase 8 plans ready
 
 ## Current Position
 
@@ -39,4 +39,4 @@ Status: blocked_on_operator_auth
 - Wrangler OAuth insufficient for DNS write (zone:read only)
 - Preferred DNS: magelift-preview.alexandrecourtiol.com
 - Phase 1 CI: Act-only until GH minutes
-- Phase 8 CONTEXT + RESEARCH complete (6 plans recommended); planning next
+- Phase 8: 6 plans planned (waves 1–5); Floci/mocks first; paid AWS adopt HUMAN_GATE; GCP board Pending→07
