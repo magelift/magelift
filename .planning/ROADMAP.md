@@ -203,10 +203,11 @@ Plans:
   4. `internal/cloud/ovh/stack/ops.go` and `internal/cloud/scaleway/stack/ops.go` hold no `unsupported{}` stub for any capability the shared layer now provides (a grep gate over the 15 `ErrNotSupported` sites each carries today), and every remaining gap returns a tier-named error
   5. `docs/capability-matrix.md` rows for `eks-autopilot`, `mks`, and `kapsule` state the day-2 surface that now works with its evidence tier, while `Bootstrap` and `Secrets` remain per-provider with a test asserting no nil-success path in either
 
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 
 Plans:
-- [ ] 06-01-PLAN.md — SSE ObjectEncryption + OVH/SCW State via NewAWSWithEndpoint (KUBE-05)
+
+- [x] 06-01-PLAN.md — SSE ObjectEncryption + OVH/SCW State via NewAWSWithEndpoint (KUBE-05)
 - [ ] 06-02-PLAN.md — OutputKubeconfig + kube client factory + four stack exports
 - [ ] 06-03-PLAN.md — Shared kube.Observe + collapse GCP + four RuntimeObserve (KUBE-01..03)
 - [ ] 06-04-PLAN.md — Shared kube.Steps + four NewDeploySteps + fake sequence (KUBE-04)
@@ -259,7 +260,7 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 5/6 | In Progress|  |
 | 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 6/6 | Complete    | 2026-07-29 |
 | 5. Data Migration & Cutover | 6/6 | Complete    | 2026-07-29 |
-| 6. Shared Kubernetes Day-2 | 0/TBD | Not started | - |
+| 6. Shared Kubernetes Day-2 | 1/6 | In Progress|  |
 | 7. GCP Certification | 0/TBD | Not started | - |
 | 8. Brownfield Attach & Tag Day | 0/TBD | Not started | - |
 
