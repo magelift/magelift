@@ -23,6 +23,7 @@ const (
 )
 
 var kmsARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):kms:[a-z0-9-]+:[0-9]{12}:key/[0-9a-fA-F-]+$`)
+var secretARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$`)
 var databaseName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 var username = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,15}$`)
 
@@ -73,6 +74,9 @@ type Component struct {
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
+	if args.Existing != nil {
+		return newExistingDatabase(ctx, name, args, opts...)
+	}
 	if strings.TrimSpace(args.Engine) == "" {
 		args.Engine = EngineAuroraMySQL
 	}
@@ -83,6 +87,54 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return newRDSInstance(ctx, name, args, opts...)
 	}
 	return newAuroraCluster(ctx, name, args, opts...)
+}
+
+func newExistingDatabase(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
+	if strings.TrimSpace(name) == "" {
+		return nil, errors.New("database name is required")
+	}
+	if err := validateExistingDatabase(args.Existing); err != nil {
+		return nil, err
+	}
+	component := &Component{}
+	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{
+		"existingIdentifier": pulumi.String(args.Existing.Identifier),
+		"existingEndpoint":   pulumi.String(args.Existing.Endpoint),
+		"existingSecretArn":  pulumi.String(args.Existing.SecretARN),
+	}, component, opts...); err != nil {
+		return nil, err
+	}
+	// ATTACH-02 / D-01: reference-without-own — outputs from operator refs, zero rds.New* children.
+	component.ClusterARN = pulumi.String(args.Existing.Identifier).ToStringOutput()
+	component.WriterEndpoint = pulumi.String(args.Existing.Endpoint).ToStringOutput()
+	component.ReaderEndpoint = pulumi.String(args.Existing.Endpoint).ToStringOutput()
+	component.MasterSecretARN = pulumi.StringPtr(args.Existing.SecretARN).ToStringPtrOutput()
+	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
+		"clusterArn":      component.ClusterARN,
+		"writerEndpoint":  component.WriterEndpoint,
+		"readerEndpoint":  component.ReaderEndpoint,
+		"masterSecretArn": component.MasterSecretARN,
+		"instanceIds":     pulumi.Array{},
+	}); err != nil {
+		return nil, err
+	}
+	return component, nil
+}
+
+func validateExistingDatabase(existing *ExistingDatabase) error {
+	if existing == nil {
+		return errors.New("existing database reference is required")
+	}
+	if strings.TrimSpace(existing.Identifier) == "" {
+		return errors.New("existing database identifier is required")
+	}
+	if strings.TrimSpace(existing.Endpoint) == "" {
+		return errors.New("existing database endpoint is required")
+	}
+	if !secretARN.MatchString(existing.SecretARN) {
+		return errors.New("existing database requires a Secrets Manager secretArn")
+	}
+	return nil
 }
 
 func newAuroraCluster(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {

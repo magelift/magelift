@@ -134,38 +134,9 @@ func TestExistingDatabaseUsesRefsWithoutCreatingRDSResources(t *testing.T) {
 		endpoint   = "magento.xxxxx.eu-west-3.rds.amazonaws.com"
 		secretARN  = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master"
 	)
-	m := &mocks{}
-	var gotWriter, gotReader, gotSecret, gotCluster string
-	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
-		args := previewArgs()
-		args.Existing = &ExistingDatabase{Identifier: identifier, Endpoint: endpoint, SecretARN: secretARN}
-		component, err := New(ctx, "shop", args)
-		if err != nil {
-			return err
-		}
-		component.WriterEndpoint.ApplyT(func(value string) error {
-			gotWriter = value
-			return nil
-		})
-		component.ReaderEndpoint.ApplyT(func(value string) error {
-			gotReader = value
-			return nil
-		})
-		component.ClusterARN.ApplyT(func(value string) error {
-			gotCluster = value
-			return nil
-		})
-		component.MasterSecretARN.ApplyT(func(value *string) error {
-			if value != nil {
-				gotSecret = *value
-			}
-			return nil
-		})
-		return nil
-	}, pulumi.WithMocks("project", "stack", m))
-	if err != nil {
-		t.Fatal(err)
-	}
+	args := previewArgs()
+	args.Existing = &ExistingDatabase{Identifier: identifier, Endpoint: endpoint, SecretARN: secretARN}
+	m := deploy(t, args)
 	// ATTACH-02 / D-01: existing database is reference-without-own — zero managed RDS children.
 	if got := m.count("aws:rds/instance:Instance") + m.count("aws:rds/cluster:Cluster") + m.count("aws:rds/subnetGroup:SubnetGroup"); got != 0 {
 		t.Fatalf("existing database created managed RDS resources: %v", m.snapshot())
@@ -173,14 +144,15 @@ func TestExistingDatabaseUsesRefsWithoutCreatingRDSResources(t *testing.T) {
 	if !contains(m.snapshot(), TypeToken+":shop") {
 		t.Fatal("existing database component was not registered")
 	}
-	if gotWriter != endpoint || gotReader != endpoint {
-		t.Fatalf("endpoints = writer=%q reader=%q, want %q", gotWriter, gotReader, endpoint)
+	comp := m.one(t, TypeToken)
+	if comp.inputs["existingIdentifier"].StringValue() != identifier {
+		t.Fatalf("existing identifier = %q, want %q", comp.inputs["existingIdentifier"].StringValue(), identifier)
 	}
-	if gotSecret != secretARN {
-		t.Fatalf("master secret ARN = %q, want %q", gotSecret, secretARN)
+	if comp.inputs["existingEndpoint"].StringValue() != endpoint {
+		t.Fatalf("existing endpoint = %q, want %q", comp.inputs["existingEndpoint"].StringValue(), endpoint)
 	}
-	if gotCluster != identifier {
-		t.Fatalf("cluster ARN equivalent = %q, want identifier %q", gotCluster, identifier)
+	if comp.inputs["existingSecretArn"].StringValue() != secretARN {
+		t.Fatalf("existing secret ARN = %q, want %q", comp.inputs["existingSecretArn"].StringValue(), secretARN)
 	}
 }
 
