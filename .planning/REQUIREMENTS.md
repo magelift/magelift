@@ -44,10 +44,10 @@
 
 <!-- Split by port nature: k8s-shaped ports shared once, cloud-shaped ports per-provider (ADR 0008). -->
 
-- [x] **KUBE-01**: Operator can tail Magento logs on any Kubernetes target (GKE, EKS Autopilot, OVH MKS, Scaleway Kapsule) through a single shared `Observe.TailLogs` implementation
-- [x] **KUBE-02**: Operator can check Magento runtime health on any Kubernetes target through a single shared `Observe.CheckRuntime` implementation
-- [x] **KUBE-03**: Operator can `magelift exec` into a Magento pod on any Kubernetes target through a single shared `Observe.PrepareExec` implementation
-- [x] **KUBE-04**: Operator can deploy Magento on any Kubernetes target through a single shared `deploy.Steps` implementation in `internal/cloud/kube`
+- [ ] **KUBE-01**: Operator can tail Magento logs on any Kubernetes target (GKE, EKS Autopilot, OVH MKS, Scaleway Kapsule) through a single shared `Observe.TailLogs` implementation
+- [ ] **KUBE-02**: Operator can check Magento runtime health on any Kubernetes target through a single shared `Observe.CheckRuntime` implementation
+- [ ] **KUBE-03**: Operator can `magelift exec` into a Magento pod on any Kubernetes target through a single shared `Observe.PrepareExec` implementation
+- [ ] **KUBE-04**: Operator can deploy Magento on any Kubernetes target through a single shared `deploy.Steps` implementation in `internal/cloud/kube`
 - [x] **KUBE-05**: Operator gets state lock, backup, and restore on OVH and Scaleway by reusing the S3-compatible state manager with an endpoint override, rather than three separate implementations
 - [ ] **KUBE-06**: `Bootstrap` and `Secrets` stay per-provider, and every path not yet implemented fails loudly with its tier rather than returning nil success
 - [ ] **KUBE-07**: The `unsupported{}` stub shells in `internal/cloud/ovh/stack/ops.go` and `internal/cloud/scaleway/stack/ops.go` are replaced by real implementations where the shared layer provides them, with remaining gaps tier-gated and matrix-recorded
@@ -167,10 +167,10 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | GCP-04 | Phase 7 | Pending |
 | GCP-05 | Phase 7 | Pending |
 | GCP-06 | Phase 7 | Pending |
-| KUBE-01 | Phase 6 | Complete |
-| KUBE-02 | Phase 6 | Complete |
-| KUBE-03 | Phase 6 | Complete |
-| KUBE-04 | Phase 6 | Complete |
+| KUBE-01 | Phase 6 | Pending |
+| KUBE-02 | Phase 6 | Pending |
+| KUBE-03 | Phase 6 | Pending |
+| KUBE-04 | Phase 6 | Pending |
 | KUBE-05 | Phase 6 | Complete |
 | KUBE-06 | Phase 6 | Pending |
 | KUBE-07 | Phase 6 | Pending |

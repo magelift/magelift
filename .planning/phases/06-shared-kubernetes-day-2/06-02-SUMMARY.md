@@ -47,12 +47,11 @@ patterns-established:
   - "Observe/Steps get kubernetes.Interface from stack outputs, never GKE ADC"
   - "Tests inject kubernetes.Interface or use BuildStaticTokenKubeconfig + valid CA PEM"
 
-requirements-completed: [KUBE-01, KUBE-02, KUBE-03, KUBE-04]
+requirements-completed: []  # KUBE-01..04 listed on PLAN frontmatter as phase IDs enabled by this seam; Observe/Steps land in 06-03/06-04 — do not mark complete here
 
 coverage:
   - id: D1
     description: OutputKubeconfig constant exists and is excluded from RequiredOutputKeys
-    requirement: KUBE-01
     verification:
       - kind: unit
         ref: GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/platform/ -count=1 -run 'OutputKubeconfig'
@@ -60,7 +59,6 @@ coverage:
     human_judgment: false
   - id: D2
     description: ClientFromKubeconfig / ClientFromOutputs build kubernetes.Interface offline from static-token kubeconfig; fail closed on missing/empty/invalid
-    requirement: KUBE-02
     verification:
       - kind: unit
         ref: GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/kube/ -count=1 -run 'ClientFrom|Kubeconfig'
@@ -68,7 +66,6 @@ coverage:
     human_judgment: false
   - id: D3
     description: All four K8s stack Outputs export secret kubeconfig under OutputKubeconfig
-    requirement: KUBE-03
     verification:
       - kind: unit
         ref: GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/gcp/stack/ ./internal/cloud/aws/eksops/ ./internal/cloud/ovh/stack/ ./internal/cloud/scaleway/stack/ -count=1 -run 'ProgramBuilds|Output|Component|Kubeconfig'
@@ -103,7 +100,7 @@ status: complete
 1. **Task 1: End-to-end kubeconfig bytes → ClientFromKubeconfig** - `4c2af70` (feat)
 2. **Task 2: Export secret kubeconfig from four K8s stack Outputs** - `7adcd17` (feat)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `148d809` (docs: complete plan)
 
 ## Files Created/Modified
 
