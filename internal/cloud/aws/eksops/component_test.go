@@ -1,11 +1,14 @@
 package eksops
 
 import (
+	"context"
+	"io"
 	"net/netip"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/acourtiol/magelift/internal/automation"
 	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
@@ -56,15 +59,57 @@ func TestProgramBuildsMockGraph(t *testing.T) {
 	}
 }
 
-func TestOpsDeployStepsUnsupportedAndObserveShared(t *testing.T) {
-	ops := Module{}.Ops()
-	if _, err := ops.NewDeploySteps(t.Context(), nil, Planned{Spec: validSpec()}, nil); err == nil || !strings.Contains(err.Error(), "not supported") {
-		t.Fatalf("deploy steps should be unsupported: %v", err)
+func TestOpsDeployStepsTypeIdentityAndObserveShared(t *testing.T) {
+	ops := Ops{
+		NewCandidate: func(context.Context, kube.Backend) (kube.CandidateRunner, error) {
+			return stubCandidate{}, nil
+		},
+		NewRuntime: func(context.Context, kube.Backend) (kube.RuntimeChecker, error) {
+			return stubRuntime{}, nil
+		},
+	}
+	backend := &stubBackend{outputs: map[string]any{}}
+	steps, err := ops.NewDeploySteps(t.Context(), backend, Planned{Spec: validSpec()}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := steps.(*kube.Steps); !ok {
+		t.Fatalf("want *kube.Steps, got %T", steps)
+	}
+	if _, err := (Ops{}).NewDeploySteps(t.Context(), struct{}{}, Planned{Spec: validSpec()}, io.Discard); err == nil || !strings.Contains(err.Error(), "backend with outputs") {
+		t.Fatalf("expected wrong-backend error, got %v", err)
 	}
 	observe := Module{}.RuntimeObserve()
 	if _, ok := observe.(*kube.Observe); !ok {
 		t.Fatalf("want *kube.Observe, got %T", observe)
 	}
+}
+
+type stubCandidate struct{}
+
+func (stubCandidate) RegisterCandidate(context.Context, kube.CandidateRequest) (kube.Candidate, error) {
+	return kube.Candidate{}, nil
+}
+func (stubCandidate) RunMigrations(context.Context, kube.Candidate) error { return nil }
+func (stubCandidate) Cleanup(context.Context, kube.Candidate) error       { return nil }
+
+type stubRuntime struct{}
+
+func (stubRuntime) Check(context.Context, string, string) (kube.ServiceHealth, error) {
+	return kube.ServiceHealth{DesiredReplicas: 1, ReadyReplicas: 1, Available: true}, nil
+}
+
+type stubBackend struct{ outputs map[string]any }
+
+func (b *stubBackend) Outputs(context.Context) (map[string]any, error) { return b.outputs, nil }
+func (*stubBackend) Preview(context.Context, automation.Request, io.Writer) (map[string]int, error) {
+	return map[string]int{}, nil
+}
+func (*stubBackend) Update(context.Context, automation.Request, io.Writer) (map[string]int, error) {
+	return map[string]int{}, nil
+}
+func (*stubBackend) Destroy(context.Context, automation.Request, io.Writer) (map[string]int, error) {
+	return map[string]int{}, nil
 }
 
 func validSpec() Spec {

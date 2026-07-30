@@ -13,18 +13,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/acourtiol/magelift/internal/automation"
 	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
-// Twelve unsupported day-2 methods on the experimental Scaleway shell after shared
-// Observe moved to kube. Parallel to the OVH table — duplicated deliberately to
-// avoid a cross-adapter helper.
+// Eleven unsupported day-2 methods on the experimental Scaleway shell after shared
+// Observe + Steps moved to kube. Parallel to the OVH table — duplicated deliberately
+// to avoid a cross-adapter helper.
 func TestUnsupportedMethodsReturnSentinelAndZeroValues(t *testing.T) {
 	ctx := context.Background()
 	u := unsupported{}
-	ops := Ops{}
 
 	type caseResult struct {
 		err  error
@@ -109,17 +109,10 @@ func TestUnsupportedMethodsReturnSentinelAndZeroValues(t *testing.T) {
 				return caseResult{err: err, zero: reflect.ValueOf(got).IsZero()}
 			},
 		},
-		{
-			name: "NewDeploySteps",
-			call: func() caseResult {
-				got, err := ops.NewDeploySteps(ctx, nil, nil, io.Discard)
-				return caseResult{err: err, zero: got == nil}
-			},
-		},
 	}
 
-	if len(cases) != 12 {
-		t.Fatalf("unsupported shell requires exactly 12 methods after Observe moved to kube; got %d", len(cases))
+	if len(cases) != 11 {
+		t.Fatalf("unsupported shell requires exactly 11 methods after Observe+Steps moved to kube; got %d", len(cases))
 	}
 
 	for _, tc := range cases {
@@ -257,5 +250,72 @@ func TestAcquireLockWarnsNoDIYLockTaken(t *testing.T) {
 	}
 	if !strings.Contains(msg, "scaleway") && !strings.Contains(msg, "kapsule") {
 		t.Fatalf("expected provider/runtime context in warning, got %q", msg)
+	}
+}
+
+func TestNewDeployStepsTypeIdentity(t *testing.T) {
+	ops := Ops{
+		NewCandidate: func(context.Context, kube.Backend) (kube.CandidateRunner, error) {
+			return stubCandidate{}, nil
+		},
+		NewRuntime: func(context.Context, kube.Backend) (kube.RuntimeChecker, error) {
+			return stubRuntime{}, nil
+		},
+	}
+	steps, err := ops.NewDeploySteps(context.Background(), &stubBackend{}, Planned{Spec: scwDeploySpec()}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := steps.(*kube.Steps); !ok {
+		t.Fatalf("want *kube.Steps, got %T", steps)
+	}
+	if _, err := (Ops{}).NewDeploySteps(context.Background(), struct{}{}, Planned{Spec: scwDeploySpec()}, io.Discard); err == nil || !strings.Contains(err.Error(), "backend with outputs") {
+		t.Fatalf("expected wrong-backend error, got %v", err)
+	}
+}
+
+type stubCandidate struct{}
+
+func (stubCandidate) RegisterCandidate(context.Context, kube.CandidateRequest) (kube.Candidate, error) {
+	return kube.Candidate{}, nil
+}
+func (stubCandidate) RunMigrations(context.Context, kube.Candidate) error { return nil }
+func (stubCandidate) Cleanup(context.Context, kube.Candidate) error       { return nil }
+
+type stubRuntime struct{}
+
+func (stubRuntime) Check(context.Context, string, string) (kube.ServiceHealth, error) {
+	return kube.ServiceHealth{DesiredReplicas: 1, ReadyReplicas: 1, Available: true}, nil
+}
+
+type stubBackend struct{}
+
+func (*stubBackend) Outputs(context.Context) (map[string]any, error) { return map[string]any{}, nil }
+func (*stubBackend) Preview(context.Context, automation.Request, io.Writer) (map[string]int, error) {
+	return map[string]int{}, nil
+}
+func (*stubBackend) Update(context.Context, automation.Request, io.Writer) (map[string]int, error) {
+	return map[string]int{}, nil
+}
+func (*stubBackend) Destroy(context.Context, automation.Request, io.Writer) (map[string]int, error) {
+	return map[string]int{}, nil
+}
+
+func scwDeploySpec() Spec {
+	return Spec{
+		Identity: Identity{
+			Project: "shop", ScalewayProject: "11111111-1111-1111-1111-111111111111", Environment: "preview",
+			Region: "fr-par", Zone: "fr-par-1", EnvironmentClass: "preview", Preset: "preview",
+			Labels: map[string]string{"magelift-managed-by": "magelift"},
+		},
+		Application: Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		Artifact:    Artifact{ImageDigest: "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Policy:      NetworkPolicy{NetworkCIDR: "172.16.0.0/22", Zones: []string{"fr-par-1"}},
+		Catalog: CatalogSelection{
+			DatabaseNodeType: "DB-DEV-S", RedisNodeType: "RED1-MICRO", CacheMode: "redis",
+			KapsuleVersion: "1.29.1", NodeType: "DEV1-M", NodeCount: 2,
+			CPURequest: "500m", MemoryRequest: "1Gi", DesiredWebReplicas: 1,
+		},
+		Dependencies: Dependencies{DatabaseName: "magento", MasterUsername: "magento"},
 	}
 }

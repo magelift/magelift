@@ -204,15 +204,57 @@ func (unsupportedCost) Estimate(context.Context, platform.PlannedStack, config.C
 	return platform.CostReport{}, platform.ErrNotSupported
 }
 
-type Ops struct{}
+type Ops struct {
+	NewCandidate  func(context.Context, kube.Backend) (kube.CandidateRunner, error)
+	NewRuntime    func(context.Context, kube.Backend) (kube.RuntimeChecker, error)
+	RecordRelease func(context.Context, deployflow.Request, deployflow.Result) error
+}
 
 func (Ops) AcquireLock(_ context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
 	platform.WarnNoDIYLock(diyLockWarnOut, planned)
 	return func(context.Context) error { return nil }, nil
 }
 
-func (Ops) NewDeploySteps(context.Context, any, platform.PlannedStack, io.Writer) (deployflow.Steps, error) {
-	return nil, platform.ErrNotSupported
+func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
+	eksPlanned, ok := AsEKSPlanned(planned)
+	if !ok {
+		return nil, fmt.Errorf("EKS ops received unexpected planned type %T", planned)
+	}
+	typed, ok := backend.(kube.Backend)
+	if !ok {
+		return nil, fmt.Errorf("EKS deploy steps require an infrastructure backend with outputs, got %T", backend)
+	}
+	spec := eksPlanned.Spec
+	deploySpec := kube.DeploySpec{
+		ImageDigest:     spec.Artifact.ImageDigest,
+		DatabaseName:    spec.Dependencies.DatabaseName,
+		ApplicationMode: spec.Application.Mode,
+		WebRuntime:      spec.Application.WebRuntime,
+		CPURequest:      spec.Catalog.CPURequest,
+		MemoryRequest:   spec.Catalog.MemoryRequest,
+		Region:          spec.Identity.Region,
+	}
+	newCandidate := o.NewCandidate
+	if newCandidate == nil {
+		newCandidate = func(context.Context, kube.Backend) (kube.CandidateRunner, error) {
+			return kube.NewCandidateFromFactory(kube.ClientFromOutputs), nil
+		}
+	}
+	newRuntime := o.NewRuntime
+	if newRuntime == nil {
+		newRuntime = func(_ context.Context, b kube.Backend) (kube.RuntimeChecker, error) {
+			return kube.NewRuntimeFromFactory(b, kube.ClientFromOutputs)
+		}
+	}
+	candidate, err := newCandidate(ctx, typed)
+	if err != nil {
+		return nil, err
+	}
+	runtime, err := newRuntime(ctx, typed)
+	if err != nil {
+		return nil, err
+	}
+	return kube.New(typed, deploySpec, candidate, runtime, diagnostics, o.RecordRelease)
 }
 
 func stateManager(ctx context.Context, planned platform.PlannedStack) (*awsstate.Manager, string, error) {

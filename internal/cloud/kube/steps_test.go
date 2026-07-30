@@ -241,3 +241,21 @@ func deployRequest(digest string) deployflow.Request {
 		ImageDigest: digest,
 	}
 }
+
+func TestWaitForHealthyService(t *testing.T) {
+	steps := &Steps{
+		backend: &stepsBackend{outputs: map[string]any{
+			platform.OutputClusterName: "c", platform.OutputServiceName: "s",
+		}},
+		runtime: stepsRuntime{}, waitInterval: time.Millisecond, waitTimeout: time.Second,
+	}
+	if err := steps.waitForHealthyService(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFourModuleNewDeployStepsTypeIdentity(t *testing.T) {
+	// Cross-package type-identity is asserted in each module's *TypeIdentity tests;
+	// this gate documents SC2: the concrete type living here is *Steps.
+	var _ deployflow.Steps = (*Steps)(nil)
+}
