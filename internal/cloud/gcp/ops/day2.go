@@ -7,11 +7,11 @@ import (
 	"strings"
 
 	gcpbootstrap "github.com/acourtiol/magelift/internal/cloud/gcp/bootstrap"
+	gcpcost "github.com/acourtiol/magelift/internal/cloud/gcp/cost"
 	gcpsecrets "github.com/acourtiol/magelift/internal/cloud/gcp/secrets"
 	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
 	gcpstate "github.com/acourtiol/magelift/internal/cloud/gcp/state"
 	"github.com/acourtiol/magelift/internal/cloud/kube"
-	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
@@ -21,7 +21,7 @@ func (Module) Secrets() platform.Secrets               { return Secrets{} }
 func (Module) RuntimeObserve() platform.RuntimeObserve {
 	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
 }
-func (Module) CostEstimator() platform.CostEstimator   { return unsupportedCost{} }
+func (Module) CostEstimator() platform.CostEstimator { return gcpcost.Estimator{} }
 
 // Bootstrap implements platform.Bootstrap for GCS DIY state + GitHub WIF identity.
 type Bootstrap struct{}
@@ -246,10 +246,4 @@ func toLockInfo(info gcpstate.Info) platform.LockInfo {
 		Project: info.Project, Environment: info.Environment,
 		Owner: info.Owner, AcquiredAt: info.AcquiredAt,
 	}
-}
-
-type unsupportedCost struct{}
-
-func (unsupportedCost) Estimate(context.Context, platform.PlannedStack, config.Config, platform.CostOptions) (platform.CostReport, error) {
-	return platform.CostReport{}, platform.ErrNotSupported
 }
