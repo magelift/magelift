@@ -355,7 +355,7 @@ MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/gcp_harness_shape_test.sh
 
 ## Open Questions
 
-> All product/scope questions from discuss are **RESOLVED** by D-01..D-06. Remaining items are **execute prerequisites**, not open research questions.
+> **ALL RESOLVED for planning (2026-07-30).** Product/scope questions closed by D-01..D-06. Remaining E1–E3 are **execute prerequisites** gated in `07-06-PLAN.md` checkpoints — not open research questions.
 
 | # | Status | Item |
 |---|--------|------|
@@ -365,9 +365,9 @@ MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash tests/acceptance/gcp_harness_shape_test.sh
 | Q4 | **RESOLVED (D-04)** | Host `magelift-preview.alexandrecourtiol.com`; Cloudflare API token Zone.DNS Edit |
 | Q5 | **RESOLVED (D-05)** | WIF + Act-only CI proof until hosted minutes return |
 | Q6 | **RESOLVED (D-06)** | Certify only after SC1–SC5 evidence rows |
-| E1 | **Execute prerequisite** | Refresh `gcloud auth login` + ADC (`ADC_FAIL` observed 2026-07-30) before live create |
-| E2 | **Execute prerequisite** | Export `CLOUDFLARE_API_TOKEN` with Zone.DNS Edit on both zones |
-| E3 | **Execute prerequisite** | Pullable `MAGELIFT_GCP_ACCEPTANCE_DIGEST`; spend approved; destroy-when-done |
+| E1 | **RESOLVED → execute prereq (07-06 checkpoint)** | Refresh `gcloud auth login` + ADC (`ADC_FAIL` observed 2026-07-30) before live create |
+| E2 | **RESOLVED → execute prereq (07-06 checkpoint)** | Export `CLOUDFLARE_API_TOKEN` with Zone.DNS Edit on both zones |
+| E3 | **RESOLVED → execute prereq (07-06 checkpoint)** | Pullable `MAGELIFT_GCP_ACCEPTANCE_DIGEST`; spend approved; destroy-when-done |
 
 ## Environment Availability
 

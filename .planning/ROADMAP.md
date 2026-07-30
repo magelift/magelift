@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering** - One long-lived stack, resumable runs, automatic evidence, and a matrix that never over-claims
 - [x] **Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity** - A store on Adobe Commerce Cloud or Upsun gets a reviewable `magelift.yaml` and a build system it can trust (completed 2026-07-29)
 - [x] **Phase 5: Data Migration & Cutover** - `seedDump` stops being a status string; a documented cutover moves a live store over (completed 2026-07-29)
-- [ ] **Phase 6: Shared Kubernetes Day-2** - One `Observe` and one `deploy.Steps` in `internal/cloud/kube`, inherited by all four Kubernetes targets
+- [x] **Phase 6: Shared Kubernetes Day-2** - One `Observe` and one `deploy.Steps` in `internal/cloud/kube`, inherited by all four Kubernetes targets (completed 2026-07-30)
 - [ ] **Phase 7: GCP Certification** - GKE Autopilot reaches certified tier on real-account evidence, making multi-cloud truthful
 - [ ] **Phase 8: Brownfield Attach & Tag Day** - Adopt existing VPC and database safely, then close or defer every gate-board row
 
@@ -203,7 +203,7 @@ Plans:
   4. `internal/cloud/ovh/stack/ops.go` and `internal/cloud/scaleway/stack/ops.go` hold no `unsupported{}` stub for any capability the shared layer now provides (a grep gate over the 15 `ErrNotSupported` sites each carries today), and every remaining gap returns a tier-named error
   5. `docs/capability-matrix.md` rows for `eks-autopilot`, `mks`, and `kapsule` state the day-2 surface that now works with its evidence tier, while `Bootstrap` and `Secrets` remain per-provider with a test asserting no nil-success path in either
 
-**Plans:** 6/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -228,7 +228,16 @@ Plans:
   4. `magelift deploy` completes migrate → cutover → health → record on GKE Autopilot and the resulting release is readable from the releases journal
   5. `magelift cost` returns a per-cell estimate for the GCP target, and both `docs/capability-matrix.md` and the `docs/release-readiness.md` gate board record `gcp` / `gke-autopilot` as certified, citing this acceptance pass as evidence
 
-**Plans**: TBD
+**Plans:** 7 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Offline WIF bootstrap + Composer Secret Manager Get (GCP-01, GCP-02)
+- [ ] 07-02-PLAN.md — GCP account-free CostEstimator (GCP-05)
+- [ ] 07-03-PLAN.md — Harness cell catalog + live_cell_loop dry-run (GCP-03..05 wiring)
+- [ ] 07-04-PLAN.md — Kube-adjacent managed dumpimport runner (MIGRATE-04 dump)
+- [ ] 07-05-PLAN.md — Cloudflare DNS cutover script offline (MIGRATE-04 DNS, D-04)
+- [ ] 07-06-PLAN.md — Live paid create-once pass + force_clean/PSA + DNS cleanup
+- [ ] 07-07-PLAN.md — Certify capability-matrix + release-readiness (GCP-06, MIGRATE-04 close)
 
 ### Phase 8: Brownfield Attach & Tag Day
 
@@ -260,8 +269,8 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 | 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 5/6 | In Progress|  |
 | 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 6/6 | Complete    | 2026-07-29 |
 | 5. Data Migration & Cutover | 6/6 | Complete    | 2026-07-29 |
-| 6. Shared Kubernetes Day-2 | 6/6 | In Progress|  |
-| 7. GCP Certification | 0/TBD | Not started | - |
+| 6. Shared Kubernetes Day-2 | 6/6 | Complete    | 2026-07-30 |
+| 7. GCP Certification | 0/7 | Planned | - |
 | 8. Brownfield Attach & Tag Day | 0/TBD | Not started | - |
 
 ## Requirement Coverage

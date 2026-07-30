@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 7
 current_phase_name: GCP Certification
 status: planning
-stopped_at: Phase 7 research complete (07-RESEARCH.md) — ready to plan
+stopped_at: Phase 7 plans created (07-01..07-07 + 07-VALIDATION.md) — ready to execute
 last_updated: "2026-07-30T13:30:00.000Z"
 last_activity: 2026-07-30
-last_activity_desc: Phase 7 RESEARCH.md written (recommend 7 plans)
+last_activity_desc: Phase 7 PLAN.md set written (7 plans, 5 waves)
 progress:
   total_phases: 8
   completed_phases: 3
@@ -25,14 +25,14 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 7 GCP Certification — research done, plan next (7 plans recommended)
+**Current focus:** Phase 7 GCP Certification — plans ready; execute offline waves first
 
 ## Current Position
 
 Phase: 7 of 8 (GCP Certification)
 Plan: Not started
-Status: Ready to plan (research complete)
-Last activity: 2026-07-30 — 07-RESEARCH.md (7-plan wave; live prereqs ADC + CF token)
+Status: Ready to execute (7 plans)
+Last activity: 2026-07-30 — 07-01..07-07 PLAN.md + 07-VALIDATION.md
 
 Progress: [█████████░] 93%
 
