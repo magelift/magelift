@@ -1,34 +1,19 @@
 package eksops
 
 import (
-	"bytes"
 	"context"
-	"strings"
+	"errors"
 	"testing"
+
+	"github.com/acourtiol/magelift/internal/platform"
 )
 
-func TestAcquireLockWarnsNoDIYLockTaken(t *testing.T) {
-	var buf bytes.Buffer
-	prev := diyLockWarnOut
-	diyLockWarnOut = &buf
-	t.Cleanup(func() { diyLockWarnOut = prev })
-
-	release, err := Ops{}.AcquireLock(context.Background(), Planned{Spec: validSpec()})
-	if err != nil {
-		t.Fatalf("AcquireLock error: %v", err)
+func TestAcquireLockDelegatesToState(t *testing.T) {
+	_, err := Ops{}.AcquireLock(context.Background(), nil)
+	if err == nil {
+		t.Fatal("AcquireLock must not silently succeed — must call State.Lock")
 	}
-	if release == nil {
-		t.Fatal("AcquireLock must return a noop release")
-	}
-	if err := release(context.Background()); err != nil {
-		t.Fatalf("noop release: %v", err)
-	}
-	msg := buf.String()
-	lower := strings.ToLower(msg)
-	if !strings.Contains(lower, "lock") || !strings.Contains(msg, "DIY") || !strings.Contains(lower, "not taken") {
-		t.Fatalf("expected warning that no DIY lock was taken, got %q", msg)
-	}
-	if !strings.Contains(msg, "aws") && !strings.Contains(msg, "eks") {
-		t.Fatalf("expected provider/runtime context in warning, got %q", msg)
+	if errors.Is(err, platform.ErrNotSupported) {
+		t.Fatal("AcquireLock must not return ErrNotSupported once State is wired")
 	}
 }

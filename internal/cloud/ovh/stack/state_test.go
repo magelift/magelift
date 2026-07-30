@@ -18,9 +18,6 @@ func TestModuleStateReturnsConcreteAdapter(t *testing.T) {
 	if _, ok := got.(State); !ok {
 		t.Fatalf("State() type = %T, want stack.State", got)
 	}
-	if _, ok := got.(unsupported); ok {
-		t.Fatal("State() must not return unsupported{} after KUBE-05")
-	}
 }
 
 func TestDIYStateUsesAES256Encryption(t *testing.T) {

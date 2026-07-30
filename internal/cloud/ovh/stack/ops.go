@@ -12,10 +12,8 @@ import (
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
-// diyLockWarnOut is the sink for AcquireLock honesty warnings; tests redirect it.
-var diyLockWarnOut io.Writer = os.Stderr
-
-// unsupported implements optional day-2 ports for experimental OVH.
+// unsupported covers remaining experimental gaps: Bootstrap, Secrets, Cost only.
+// Observe/Steps/State live on shared kube / concrete State adapters (D-05).
 type unsupported struct{}
 
 func (Module) Bootstrap() platform.Bootstrap { return unsupported{} }
@@ -31,21 +29,6 @@ func (unsupported) VerifyAccount(context.Context, platform.PlannedStack) error {
 }
 func (unsupported) Ensure(context.Context, platform.PlannedStack, platform.BootstrapRequest) (platform.BootstrapResult, error) {
 	return platform.BootstrapResult{}, platform.ErrNotSupported
-}
-func (unsupported) Status(context.Context, platform.PlannedStack) (bool, *platform.LockInfo, string, error) {
-	return false, nil, "", platform.ErrNotSupported
-}
-func (unsupported) Lock(context.Context, platform.PlannedStack, string) (func(context.Context) error, error) {
-	return nil, platform.ErrNotSupported
-}
-func (unsupported) Unlock(context.Context, platform.PlannedStack) (*platform.LockInfo, error) {
-	return nil, platform.ErrNotSupported
-}
-func (unsupported) Backup(context.Context, platform.PlannedStack) (platform.BackupResult, error) {
-	return platform.BackupResult{}, platform.ErrNotSupported
-}
-func (unsupported) Restore(context.Context, platform.PlannedStack, string) (platform.RestoreResult, error) {
-	return platform.RestoreResult{}, platform.ErrNotSupported
 }
 func (unsupported) List(context.Context, platform.PlannedStack) ([]platform.SecretMeta, error) {
 	return nil, platform.ErrNotSupported
@@ -68,9 +51,10 @@ type Ops struct {
 
 func (Module) Ops() platform.Ops { return Ops{} }
 
-func (Ops) AcquireLock(_ context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
-	platform.WarnNoDIYLock(diyLockWarnOut, planned)
-	return func(context.Context) error { return nil }, nil
+func (Ops) AcquireLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
+	host, _ := os.Hostname()
+	owner := fmt.Sprintf("magelift-cli-%s-%d", host, os.Getpid())
+	return (State{}).Lock(ctx, planned, owner)
 }
 
 func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {

@@ -1,7 +1,6 @@
 package stack
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -19,16 +18,15 @@ import (
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
-// Eleven unsupported day-2 methods on the experimental Scaleway shell after shared
-// Observe + Steps moved to kube. Parallel to the OVH table — duplicated deliberately
-// to avoid a cross-adapter helper.
-func TestUnsupportedMethodsReturnSentinelAndZeroValues(t *testing.T) {
+// Remaining unsupported allowlist after Observe+Steps+State moved off the shell
+// (D-05): Bootstrap VerifyAccount/Ensure, Secrets List/Set/Remove, Cost Estimate.
+func TestUnsupportedAllowlistMethodsReturnSentinelAndZeroValues(t *testing.T) {
 	ctx := context.Background()
 	u := unsupported{}
 
 	type caseResult struct {
 		err  error
-		zero bool
+		zero bool // true when all non-error returns are zero values
 	}
 
 	cases := []struct {
@@ -46,41 +44,6 @@ func TestUnsupportedMethodsReturnSentinelAndZeroValues(t *testing.T) {
 			call: func() caseResult {
 				got, err := u.Ensure(ctx, nil, platform.BootstrapRequest{})
 				return caseResult{err: err, zero: reflect.ValueOf(got).IsZero()}
-			},
-		},
-		{
-			name: "Status",
-			call: func() caseResult {
-				locked, info, backend, err := u.Status(ctx, nil)
-				return caseResult{err: err, zero: !locked && info == nil && backend == ""}
-			},
-		},
-		{
-			name: "Lock",
-			call: func() caseResult {
-				release, err := u.Lock(ctx, nil, "owner")
-				return caseResult{err: err, zero: release == nil}
-			},
-		},
-		{
-			name: "Unlock",
-			call: func() caseResult {
-				info, err := u.Unlock(ctx, nil)
-				return caseResult{err: err, zero: info == nil}
-			},
-		},
-		{
-			name: "Backup",
-			call: func() caseResult {
-				got, err := u.Backup(ctx, nil)
-				return caseResult{err: err, zero: got == (platform.BackupResult{})}
-			},
-		},
-		{
-			name: "Restore",
-			call: func() caseResult {
-				got, err := u.Restore(ctx, nil, "loc")
-				return caseResult{err: err, zero: got == (platform.RestoreResult{})}
 			},
 		},
 		{
@@ -111,8 +74,8 @@ func TestUnsupportedMethodsReturnSentinelAndZeroValues(t *testing.T) {
 		},
 	}
 
-	if len(cases) != 11 {
-		t.Fatalf("unsupported shell requires exactly 11 methods after Observe+Steps moved to kube; got %d", len(cases))
+	if len(cases) != 6 {
+		t.Fatalf("unsupported allowlist requires exactly 6 methods (Bootstrap/Secrets/Cost); got %d", len(cases))
 	}
 
 	for _, tc := range cases {
@@ -125,6 +88,49 @@ func TestUnsupportedMethodsReturnSentinelAndZeroValues(t *testing.T) {
 				t.Fatalf("%s returned a non-zero value alongside ErrNotSupported", tc.name)
 			}
 		})
+	}
+}
+
+func TestSharedDay2PortsAreNotErrNotSupported(t *testing.T) {
+	m := Module{}
+	if _, ok := m.State().(State); !ok {
+		t.Fatalf("State type = %T, want stack.State", m.State())
+	}
+	obs := m.RuntimeObserve()
+	if obs == nil {
+		t.Fatal("RuntimeObserve must return shared kube.Observe, not nil")
+	}
+	if _, ok := obs.(*kube.Observe); !ok {
+		t.Fatalf("RuntimeObserve type identity: want *kube.Observe, got %T", obs)
+	}
+	if _, err := obs.TailLogs(context.Background(), nil, platform.LogQuery{}); errors.Is(err, platform.ErrNotSupported) {
+		t.Fatal("RuntimeObserve must not return ErrNotSupported from TailLogs")
+	}
+}
+
+func TestBootstrapSecretsNilSuccessGuards(t *testing.T) {
+	m := Module{}
+	boot := m.Bootstrap()
+	if boot == nil {
+		t.Fatal("Bootstrap must not be nil")
+	}
+	got, err := boot.Ensure(context.Background(), nil, platform.BootstrapRequest{})
+	if !errors.Is(err, platform.ErrNotSupported) {
+		t.Fatalf("Bootstrap.Ensure err = %v, want ErrNotSupported", err)
+	}
+	if !reflect.ValueOf(got).IsZero() {
+		t.Fatal("Bootstrap.Ensure must not nil-succeed with a non-zero result")
+	}
+	sec := m.Secrets()
+	if sec == nil {
+		t.Fatal("Secrets must not be nil")
+	}
+	list, err := sec.List(context.Background(), nil)
+	if !errors.Is(err, platform.ErrNotSupported) {
+		t.Fatalf("Secrets.List err = %v, want ErrNotSupported", err)
+	}
+	if list != nil {
+		t.Fatal("Secrets.List must not nil-succeed with a non-nil slice")
 	}
 }
 
@@ -152,8 +158,7 @@ func TestModuleAccessorsReturnNonNilUnsupportedShells(t *testing.T) {
 
 // TestUnsupportedSourceGuardSentinelReturns parses ops.go and requires every
 // method on unsupported to return platform.ErrNotSupported in the error
-// position. Ops.AcquireLock is covered by TestAcquireLockWarnsNoDIYLockTaken
-// (warn-then-noop), not by this ErrNotSupported walk.
+// position. Ops.AcquireLock delegates to State.Lock (not this shell).
 func TestUnsupportedSourceGuardSentinelReturns(t *testing.T) {
 	guardUnsupportedSentinelReturns(t, "ops.go")
 }
@@ -227,29 +232,15 @@ func isPlatformErrNotSupported(expr ast.Expr) bool {
 	return ok && pkg.Name == "platform"
 }
 
-func TestAcquireLockWarnsNoDIYLockTaken(t *testing.T) {
-	var buf bytes.Buffer
-	prev := diyLockWarnOut
-	diyLockWarnOut = &buf
-	t.Cleanup(func() { diyLockWarnOut = prev })
-
-	release, err := Ops{}.AcquireLock(context.Background(), Planned{})
-	if err != nil {
-		t.Fatalf("AcquireLock error: %v", err)
+func TestAcquireLockDelegatesToState(t *testing.T) {
+	_, err := Ops{}.AcquireLock(context.Background(), Planned{Spec: Spec{
+		Identity: Identity{Project: "shop", Environment: "staging", Region: "fr-par"},
+	}})
+	if err == nil {
+		t.Fatal("AcquireLock succeeded without state bucket — must call State.Lock")
 	}
-	if release == nil {
-		t.Fatal("AcquireLock must return a noop release")
-	}
-	if err := release(context.Background()); err != nil {
-		t.Fatalf("noop release: %v", err)
-	}
-	msg := buf.String()
-	lower := strings.ToLower(msg)
-	if !strings.Contains(lower, "lock") || !strings.Contains(msg, "DIY") || !strings.Contains(lower, "not taken") {
-		t.Fatalf("expected warning that no DIY lock was taken, got %q", msg)
-	}
-	if !strings.Contains(msg, "scaleway") && !strings.Contains(msg, "kapsule") {
-		t.Fatalf("expected provider/runtime context in warning, got %q", msg)
+	if errors.Is(err, platform.ErrNotSupported) {
+		t.Fatal("AcquireLock must not return ErrNotSupported once State is wired")
 	}
 }
 
@@ -268,6 +259,9 @@ func TestNewDeployStepsTypeIdentity(t *testing.T) {
 	}
 	if _, ok := steps.(*kube.Steps); !ok {
 		t.Fatalf("want *kube.Steps, got %T", steps)
+	}
+	if errors.Is(err, platform.ErrNotSupported) {
+		t.Fatal("NewDeploySteps must not return ErrNotSupported")
 	}
 	if _, err := (Ops{}).NewDeploySteps(context.Background(), struct{}{}, Planned{Spec: scwDeploySpec()}, io.Discard); err == nil || !strings.Contains(err.Error(), "backend with outputs") {
 		t.Fatalf("expected wrong-backend error, got %v", err)
