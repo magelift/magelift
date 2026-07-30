@@ -129,12 +129,18 @@ func TestStandardAddsPrivateInterfaceEndpointsForRuntimeDependencies(t *testing.
 
 func TestExistingNetworkUsesImportedSubnetsWithoutCreatingVPCResources(t *testing.T) {
 	t.Parallel()
+	const vpcID = "vpc-existing"
 	mocks := deploy(t, Args{
 		Preset: sdk.PresetStandard, Region: "eu-west-3", VPCCIDR: "10.0.0.0/16", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"},
-		Existing: &ExistingNetwork{VPCID: "vpc-existing", PublicSubnetIDs: []string{"subnet-public-a", "subnet-public-b"}, PrivateSubnetIDs: []string{"subnet-private-a", "subnet-private-b"}, DataSubnetIDs: []string{"subnet-data-a", "subnet-data-b"}},
+		Existing: &ExistingNetwork{VPCID: vpcID, PublicSubnetIDs: []string{"subnet-public-a", "subnet-public-b"}, PrivateSubnetIDs: []string{"subnet-private-a", "subnet-private-b"}, DataSubnetIDs: []string{"subnet-data-a", "subnet-data-b"}},
 	})
+	// ATTACH-01 / D-01: existing network is reference-without-own — zero managed VPC/subnet/NAT children.
+	// Preview ADOPT lines for this externalId are covered by stack.AdoptReport (08-01).
 	if got := mocks.count("aws:ec2/vpc:Vpc") + mocks.count("aws:ec2/subnet:Subnet") + mocks.count("aws:ec2/natGateway:NatGateway"); got != 0 {
 		t.Fatalf("existing network created managed network resources: %v", mocks.snapshot())
+	}
+	if !strings.HasPrefix(vpcID, "vpc-") {
+		t.Fatalf("existing VPC id %q is not AdoptReport-compatible", vpcID)
 	}
 	if !contains(mocks.snapshot(), TypeToken+":shop") {
 		t.Fatal("existing network component was not registered")
