@@ -27,6 +27,7 @@ type infrastructureResult struct {
 	Stack       string                   `json:"stack" yaml:"stack"`
 	Preview     automation.ChangeSummary `json:"preview,omitempty" yaml:"preview,omitempty"`
 	Update      automation.ChangeSummary `json:"update,omitempty" yaml:"update,omitempty"`
+	Adopted     []string                 `json:"adopted,omitempty" yaml:"adopted,omitempty"`
 }
 
 func infrastructureCommands(o *options) []*cobra.Command {
@@ -115,6 +116,10 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 			return infrastructureResult{}, err
 		}
 	}
+	if err := refuseAdoptedMutationForOperation(planned, name); err != nil {
+		return infrastructureResult{}, err
+	}
+	adopted := announceAdoptedResources(o.stderr, planned)
 	request := automation.Request{Target: requestTarget}
 	result, err := operation(ctx, backend, request)
 	if release != nil {
@@ -132,6 +137,7 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 	}
 	result.Environment = environment
 	result.Stack = planned.StackName()
+	result.Adopted = adopted
 	return result, nil
 }
 
@@ -168,6 +174,10 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			if o.newLock == nil {
 				return infrastructureResult{}, errors.New("deployment lock factory is required")
 			}
+			if refuseErr := refuseAdoptedMutationForOperation(planned, "deploy"); refuseErr != nil {
+				return infrastructureResult{}, refuseErr
+			}
+			adopted := announceAdoptedResources(o.stderr, planned)
 			result, runErr := deployflow.New(cliDeploymentLock{factory: o.newLock, planned: planned}, steps).Run(ctx, deployflow.Request{
 				Target: requestTarget, ImageDigest: digest, Production: planned.EnvironmentClass() == "production", Approved: o.yes,
 				Rollback: deployOptions.rollback, AcknowledgeForwardOnlyDB: deployOptions.acknowledgeForwardOnlyDB,
@@ -175,7 +185,7 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			if runErr != nil {
 				return infrastructureResult{}, runErr
 			}
-			out := infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: result.Preview, Update: result.Update}
+			out := infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: result.Preview, Update: result.Update, Adopted: adopted}
 			// Auto-import after lock release (deployflow.Run completed) — D-01/D-02 once-from-recorded.
 			if err := o.maybeAutoImportSeedDump(ctx, environment); err != nil {
 				return out, err
@@ -196,20 +206,24 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 		return infrastructureResult{}, fmt.Errorf("acquire deployment lock: %w", err)
 	}
 	result, err := func() (infrastructureResult, error) {
+		if refuseErr := refuseAdoptedMutationForOperation(planned, "deploy"); refuseErr != nil {
+			return infrastructureResult{}, refuseErr
+		}
+		adopted := announceAdoptedResources(o.stderr, planned)
 		preview, previewErr := automation.NewRunner(backend, o.stderr).Preview(ctx, automation.Request{Target: requestTarget})
 		if previewErr != nil {
 			return infrastructureResult{}, previewErr
 		}
 		update, updateErr := automation.NewRunner(backend, o.stderr).Update(ctx, automation.Request{Target: requestTarget})
 		if updateErr != nil {
-			return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview}, updateErr
+			return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Adopted: adopted}, updateErr
 		}
 		if outputs, outErr := backend.Outputs(ctx); outErr == nil && len(outputs) > 0 {
 			if reqErr := platform.RequireOutputs(outputs, platform.RequiredOutputKeys()); reqErr != nil {
-				return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update}, reqErr
+				return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update, Adopted: adopted}, reqErr
 			}
 		}
-		return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update}, nil
+		return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update, Adopted: adopted}, nil
 	}()
 	if releaseErr := release(ctx); releaseErr != nil {
 		if err != nil {
@@ -323,6 +337,42 @@ func refuseInfraOnlyDeploy(planned platform.PlannedStack) error {
 		"Re-run with --infra-only to update the infrastructure graph only.",
 		"docs/capability-matrix.md",
 	))
+}
+
+func announceAdoptedResources(stderr io.Writer, planned platform.PlannedStack) []string {
+	attach, ok := planned.(platform.BrownfieldAttach)
+	if !ok {
+		return nil
+	}
+	lines := attach.AdoptedResourceLines()
+	if len(lines) == 0 {
+		return nil
+	}
+	if stderr != nil {
+		for _, line := range lines {
+			_, _ = fmt.Fprintln(stderr, line)
+		}
+	}
+	return append([]string(nil), lines...)
+}
+
+// refuseAdoptedMutationForOperation consults the brownfield refuse gate on
+// Update (deploy) and Destroy paths. Stack-scoped ops pass an empty intent so
+// Magento deploy/destroy remain allowed while AdoptReport still surfaces ADOPT
+// lines; callers that pass destroy/replace intent against an adopted network
+// fail closed with a named ownership error (D-02).
+func refuseAdoptedMutationForOperation(planned platform.PlannedStack, operation string) error {
+	if operation != "deploy" && operation != "destroy" {
+		return nil
+	}
+	attach, ok := planned.(platform.BrownfieldAttach)
+	if !ok {
+		return nil
+	}
+	if err := attach.RefuseAdoptedMutation(platform.AdoptMutationIntent("")); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (o *options) acquireProviderLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {

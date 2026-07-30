@@ -36,20 +36,30 @@ func (stubAWSModule) Plan(cfg config.Config, environment string, _ platform.Plan
 		return nil, fmt.Errorf("environment is required")
 	}
 	digest := ""
+	var adopted []string
+	var networkExternalID, networkLabel string
 	if cfg.Target.AWS != nil {
 		digest = cfg.Target.AWS.ImageDigest
+		if net := cfg.Target.AWS.Existing.Network; net != nil && strings.TrimSpace(net.ExternalID) != "" {
+			networkExternalID = strings.TrimSpace(net.ExternalID)
+			networkLabel = cfg.Project.Name + "-" + environment + "-network"
+			adopted = []string{"ADOPT network " + networkExternalID}
+		}
 	}
 	return stubPlanned{
-		stackName:   cfg.Project.Name + "-" + environment,
-		provider:    "aws",
-		runtime:     "ecs-fargate",
-		project:     cfg.Project.Name,
-		environment: environment,
-		region:      cfg.Defaults.Region,
-		envClass:    cfg.Class,
-		protected:   cfg.Protection,
-		digest:      digest,
-		tier:        platform.TierCertified,
+		stackName:          cfg.Project.Name + "-" + environment,
+		provider:           "aws",
+		runtime:            "ecs-fargate",
+		project:            cfg.Project.Name,
+		environment:        environment,
+		region:             cfg.Defaults.Region,
+		envClass:           cfg.Class,
+		protected:          cfg.Protection,
+		digest:             digest,
+		tier:               platform.TierCertified,
+		adopted:            adopted,
+		networkExternalID:  networkExternalID,
+		networkLabel:       networkLabel,
 	}, nil
 }
 
@@ -145,6 +155,8 @@ type stubPlanned struct {
 	stackName, provider, runtime, project, environment, region, envClass, digest string
 	protected                                                                    bool
 	tier                                                                         platform.CertificationTier
+	adopted                                                                      []string
+	networkExternalID, networkLabel                                              string
 }
 
 func (p stubPlanned) StackName() string        { return p.stackName }
@@ -175,6 +187,27 @@ func (p stubPlanned) TargetDescriptor() sdk.TargetDescriptor {
 	default:
 		return stubAWSModule{}.Descriptor()
 	}
+}
+
+func (p stubPlanned) AdoptedResourceLines() []string {
+	if len(p.adopted) == 0 {
+		return nil
+	}
+	return append([]string(nil), p.adopted...)
+}
+
+func (p stubPlanned) RefuseAdoptedMutation(intent platform.AdoptMutationIntent) error {
+	if intent != platform.AdoptIntentDestroy && intent != platform.AdoptIntentReplace {
+		return nil
+	}
+	if p.networkExternalID == "" {
+		return nil
+	}
+	label := p.networkLabel
+	if label == "" {
+		label = "network"
+	}
+	return fmt.Errorf("adopted resource %s (%s): MageLift does not own this resource", label, p.networkExternalID)
 }
 
 func registerTestModules(modules *platform.ModuleRegistry) {
