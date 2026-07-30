@@ -48,6 +48,7 @@ type Component struct {
 	ClusterName    pulumi.StringOutput
 	ServiceName    pulumi.StringOutput
 	ApplicationURL pulumi.StringOutput
+	Kubeconfig     pulumi.StringOutput
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
@@ -119,8 +120,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	// Workloads depend on the pool, not just the cluster: MKS schedules pods and
 	// runs the LB controller on pool nodes, so the pool must exist first (mirrors
 	// the Scaleway Kapsule adapter). skipAwait keeps Pulumi from blocking on readiness.
+	kubeconfig := pulumi.ToSecret(cluster.Kubeconfig).(pulumi.StringOutput)
 	k8sProvider, err := kubernetes.NewProvider(ctx, name+"-k8s", &kubernetes.ProviderArgs{
-		Kubeconfig:        pulumi.ToSecret(cluster.Kubeconfig).(pulumi.StringOutput),
+		Kubeconfig:        kubeconfig,
 		ClusterIdentifier: cluster.ID().ToStringOutput(),
 	}, parent, pulumi.DependsOn([]pulumi.Resource{cluster, pool}))
 	if err != nil {
@@ -252,6 +254,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	component.ClusterName = cluster.Name
 	component.ServiceName = pulumi.String(name + "-web").ToStringOutput()
+	component.Kubeconfig = kubeconfig
 	component.ApplicationURL = service.Status.ApplyT(func(status *corev1.ServiceStatus) string {
 		if status == nil || len(status.LoadBalancer.Ingress) == 0 {
 			return ""
@@ -268,6 +271,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
 		"clusterName": component.ClusterName, "serviceName": component.ServiceName, "applicationURL": component.ApplicationURL,
+		"kubeconfig": component.Kubeconfig,
 	}); err != nil {
 		return nil, err
 	}

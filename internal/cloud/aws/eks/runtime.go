@@ -44,6 +44,7 @@ type Component struct {
 	ServiceName    pulumi.StringOutput
 	ApplicationURL pulumi.StringOutput
 	ClusterARN     pulumi.StringOutput
+	Kubeconfig     pulumi.StringOutput
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
@@ -154,9 +155,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("create EKS Auto Mode cluster: %w", err)
 	}
 
-	kubeconfig := generateKubeconfig(cluster.Name, cluster.Endpoint, cluster.CertificateAuthority, args.Region)
+	kubeconfig := pulumi.ToSecret(generateKubeconfig(cluster.Name, cluster.Endpoint, cluster.CertificateAuthority, args.Region)).(pulumi.StringOutput)
 	k8sProvider, err := kubernetes.NewProvider(ctx, name+"-k8s", &kubernetes.ProviderArgs{
-		Kubeconfig:        pulumi.ToSecret(kubeconfig).(pulumi.StringOutput),
+		Kubeconfig:        kubeconfig,
 		ClusterIdentifier: cluster.Arn,
 	}, parent, pulumi.DependsOn([]pulumi.Resource{cluster}))
 	if err != nil {
@@ -287,6 +288,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.ClusterName = cluster.Name
 	component.ClusterARN = cluster.Arn
 	component.ServiceName = pulumi.String(name + "-web").ToStringOutput()
+	component.Kubeconfig = kubeconfig
 	component.ApplicationURL = service.Status.ApplyT(func(status *corev1.ServiceStatus) string {
 		if status == nil || len(status.LoadBalancer.Ingress) == 0 {
 			return ""
@@ -304,6 +306,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
 		"clusterName": component.ClusterName, "serviceName": component.ServiceName,
 		"applicationURL": component.ApplicationURL, "clusterArn": component.ClusterARN,
+		"kubeconfig": component.Kubeconfig,
 	}); err != nil {
 		return nil, err
 	}

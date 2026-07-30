@@ -50,6 +50,7 @@ type Component struct {
 	ServiceName     pulumi.StringOutput
 	ApplicationURL  pulumi.StringOutput
 	ClusterEndpoint pulumi.StringOutput
+	Kubeconfig      pulumi.StringOutput
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
@@ -122,9 +123,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("create Scaleway Kapsule pool: %w", err)
 	}
 
-	kubeconfig := generateKubeconfig(clusterName, cluster.Kubeconfigs)
+	kubeconfig := pulumi.ToSecret(generateKubeconfig(clusterName, cluster.Kubeconfigs)).(pulumi.StringOutput)
 	k8sProvider, err := kubernetes.NewProvider(ctx, name+"-k8s", &kubernetes.ProviderArgs{
-		Kubeconfig:        pulumi.ToSecret(kubeconfig).(pulumi.StringOutput),
+		Kubeconfig:        kubeconfig,
 		ClusterIdentifier: cluster.ID().ToStringOutput(),
 	}, parent, pulumi.DependsOn([]pulumi.Resource{cluster, pool}))
 	if err != nil {
@@ -257,6 +258,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.ClusterName = cluster.Name
 	component.ServiceName = pulumi.String(name + "-web").ToStringOutput()
 	component.ClusterEndpoint = cluster.ApiserverUrl
+	component.Kubeconfig = kubeconfig
 	component.ApplicationURL = service.Status.ApplyT(func(status *corev1.ServiceStatus) string {
 		if status == nil || len(status.LoadBalancer.Ingress) == 0 {
 			return ""
@@ -273,6 +275,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
 		"clusterName": component.ClusterName, "serviceName": component.ServiceName, "applicationURL": component.ApplicationURL,
+		"kubeconfig": component.Kubeconfig,
 	}); err != nil {
 		return nil, err
 	}

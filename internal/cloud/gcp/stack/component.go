@@ -121,6 +121,7 @@ func (c *Component) Outputs() pulumi.Map {
 		platform.OutputClusterName:      c.Runtime.ClusterName,
 		platform.OutputServiceName:      c.Runtime.ServiceName,
 		platform.OutputPrivateSubnetIDs: c.Network.PrivateSubnetIDs,
+		platform.OutputKubeconfig:       c.Runtime.Kubeconfig,
 		"mediaURL":                      c.Storage.MediaURL,
 		"mediaBucket":                   c.Storage.BucketName,
 		"searchEndpoint":                c.Runtime.SearchEndpoint,

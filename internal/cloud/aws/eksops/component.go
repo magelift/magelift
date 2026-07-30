@@ -127,6 +127,7 @@ func (c *Component) Outputs() pulumi.Map {
 		platform.OutputClusterName:      c.Runtime.ClusterName,
 		platform.OutputServiceName:      c.Runtime.ServiceName,
 		platform.OutputPrivateSubnetIDs: stringInputs(c.Network.PrivateSubnetIDs),
+		platform.OutputKubeconfig:       c.Runtime.Kubeconfig,
 	}
 }
 
