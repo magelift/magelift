@@ -2,6 +2,10 @@
 # Evidence append helpers for capability-matrix SC#2 columns (ACCEPT-03).
 # Columns: cell | result | duration | provider | account | date
 # Do not write secrets or digests into evidence columns.
+# Certification (GCP 07-07 / AWS certify) requires append_row provenance only —
+# hand-typed or hand-edited matrix rows are not valid SC1–SC5 evidence (T-07-12).
+# GCP harness defaults ACCEPTANCE_EVIDENCE to
+# .magelift/gcp-matrix/matrix-results.md (six-column table).
 # shellcheck shell=bash
 
 : "${ACCEPTANCE_EVIDENCE:=${MAGELIFT_ACCEPTANCE_EVIDENCE:-.magelift/matrix-results.md}}"

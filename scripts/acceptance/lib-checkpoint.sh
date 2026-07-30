@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Checkpoint helpers for credit-efficient multi-cell acceptance (ACCEPT-02).
 # Schema: {"cells":{"cell-id":{"result":"PASS|FAIL","at":"ISO8601"}}}
+# Resume: killing mid-matrix re-enters at the first cell that is not PASS.
+# GCP harness defaults ACCEPTANCE_CHECKPOINT to
+# .magelift/gcp-matrix/acceptance-checkpoint.json (see gcp-acceptance-local.sh).
 # shellcheck shell=bash
 
 : "${ACCEPTANCE_CHECKPOINT:=${MAGELIFT_ACCEPTANCE_CHECKPOINT:-.magelift/acceptance-checkpoint.json}}"
