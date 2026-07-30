@@ -217,8 +217,9 @@ func TestAdoptedRefuseNamesNetworkAndDatabase(t *testing.T) {
 // TestAdoptedDetachDestroyRecordsNoDeleteForAdoptedIDs is the ATTACH-04 offline
 // half: reference-without-own keeps VPC/RDS out of Pulumi state, so a destroy of
 // MageLift-owned children never emits Delete for adopted external IDs. Explicit
-// destroy/replace intent against adopted refs is refused by name. Live
-// describe-after-destroy remains 08-06 HUMAN_GATE.
+// destroy/replace intent against adopted refs is refused by name. Operator docs:
+// docs/brownfield-attach.md (Detach path). Live describe-after-destroy remains
+// 08-06 HUMAN_GATE.
 func TestAdoptedDetachDestroyRecordsNoDeleteForAdoptedIDs(t *testing.T) {
 	t.Parallel()
 	const (
