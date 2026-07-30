@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Local, credit-efficient GCP acceptance: preview by default, destroy on EXIT.
 # Experimental target only (ADR 0007/0008). Never leave Autopilot/SQL/Valkey running.
-# Phase 3: MAGELIFT_ACCEPTANCE_DRY_RUN=1 exercises harness shape without spending.
+# Dry-run (MAGELIFT_ACCEPTANCE_DRY_RUN=1): fixture path — no Pulumi/gcloud create.
+# Live up: one create-once, then live_cell_loop catalog updates; never recreate between cells.
+# Evidence: .magelift/gcp-matrix/matrix-results.md (six-column append_row only — no hand edits).
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,16 +14,17 @@ source "$ROOT/scripts/acceptance/lib-evidence.sh"
 
 CELL_CATALOG="${MAGELIFT_ACCEPTANCE_CELL_CATALOG:-$ROOT/scripts/acceptance/cells-gcp-preview.txt}"
 DRY_RUN="${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}"
+CELLS=()
 
-gcp_dry_run_cell_loop() {
-	# GCP-scoped paths so AWS/GCP evidence do not clobber (ACCEPT-05).
+# GCP-scoped paths so AWS/GCP evidence do not clobber (ACCEPT-05).
+gcp_acceptance_paths() {
 	export ACCEPTANCE_CHECKPOINT="${ACCEPTANCE_CHECKPOINT:-.magelift/gcp-matrix/acceptance-checkpoint.json}"
 	export ACCEPTANCE_EVIDENCE="${ACCEPTANCE_EVIDENCE:-.magelift/gcp-matrix/matrix-results.md}"
-	local cell provider account date_s duration started created_once=0
-	local CELLS=()
+}
+
+load_cells() {
 	local line
-	provider="${MAGELIFT_ACCEPTANCE_PROVIDER:-gcp}"
-	account="${MAGELIFT_ACCEPTANCE_ACCOUNT:-dry-run}"
+	CELLS=()
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		[[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
 		CELLS+=("$line")
@@ -30,11 +33,19 @@ gcp_dry_run_cell_loop() {
 		printf 'no cells in catalog: %s\n' "$CELL_CATALOG" >&2
 		exit 2
 	fi
+}
+
+gcp_dry_run_cell_loop() {
+	gcp_acceptance_paths
+	local cell provider account date_s duration started created_once=0
+	provider="${MAGELIFT_ACCEPTANCE_PROVIDER:-gcp}"
+	account="${MAGELIFT_ACCEPTANCE_ACCOUNT:-dry-run}"
+	load_cells
 	acceptance_checkpoint_load
 	acceptance_evidence_ensure
 	printf 'gcp acceptance dry-run start cells=%d catalog=%s\n' "${#CELLS[@]}" "$CELL_CATALOG" >&2
 	# Structural markers: EXIT contract symbols remain defined in live path below.
-	printf 'gcp harness shape: force_clean_orphans + assert_clean + PSA soak (live Phase 7)\n' >&2
+	printf 'gcp harness shape: live_cell_loop + force_clean_orphans + assert_clean + PSA soak (live Phase 7)\n' >&2
 	for cell in "${CELLS[@]}"; do
 		if cell_done "$cell"; then
 			printf 'acceptance skip cell=%s (checkpoint)\n' "$cell" >&2
@@ -52,7 +63,7 @@ gcp_dry_run_cell_loop() {
 		record_cell "$cell" "PASS"
 		printf 'acceptance cell-done cell=%s result=PASS\n' "$cell" >&2
 	done
-	# Dry-run never sets created=1 / never calls up.
+	# Dry-run never sets created=1 / never calls up / never invokes gcloud mutate.
 	printf 'gcp acceptance dry-run ok; created=0; no GCP up invoked\n' >&2
 }
 
@@ -71,7 +82,14 @@ PROJECT="${MAGELIFT_GCP_PROJECT:-digital-lab-341608}"
 REGION="${MAGELIFT_GCP_REGION:-europe-west1}"
 MODE="${1:-preview}"
 PROFILE="${MAGELIFT_GCP_ACCEPTANCE_PROFILE:-preview}"
+# Must be a pullable OCI digest for Magento day-2 / deploy:candidate / health cells.
+# Placeholder sha256:0123… fails ImagePull — set MAGELIFT_GCP_ACCEPTANCE_DIGEST before live up.
 DIGEST="${MAGELIFT_GCP_ACCEPTANCE_DIGEST:-ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}"
+GITHUB_OWNER="${MAGELIFT_GCP_ACCEPTANCE_GITHUB_OWNER:-acourtiol}"
+GITHUB_REPO="${MAGELIFT_GCP_ACCEPTANCE_GITHUB_REPO:-magelift}"
+COMPOSER_SECRET_ID="${MAGELIFT_GCP_COMPOSER_SECRET_ID:-magelift-composer-auth}"
+SEED_DUMP="${MAGELIFT_GCP_ACCEPTANCE_SEED_DUMP:-$ROOT/testdata/fixtures/migrate/tiny.sql}"
+CUTOVER_HOST="${MAGELIFT_CUTOVER_HOST:-magelift-preview.alexandrecourtiol.com}"
 # Isolation prefix for this worktree — do not reuse mlacc (other agents / prior orphans).
 NAME="${MAGELIFT_GCP_ACCEPTANCE_NAME:-mlgcpwt}"
 # Magelift DIY stack identity is project-env-provider-runtime (see platform.FormatStackName).
@@ -80,6 +98,7 @@ PULUMI_PROJECT="magelift"
 LOG_DIR="${WORKDIR}/logs"
 BIN="${WORKDIR}/magelift"
 CONFIG="${WORKDIR}/magelift.yaml"
+COMPOSER_SM_URI="gcp-secret-manager://projects/${PROJECT}/secrets/${COMPOSER_SECRET_ID}/versions/latest"
 
 case "$MODE" in
 preview|up) ;;
@@ -205,8 +224,12 @@ for api in "${APIS[@]}"; do
 	gcloud services enable "$api" --project="$PROJECT" >/dev/null
 done
 
-printf '+ building magelift -> %s\n' "$BIN"
-(cd "$ROOT" && go build -o "$BIN" ./cmd/magelift)
+printf '+ building magelift -> %s (serial GOMAXPROCS=1)\n' "$BIN"
+(cd "$ROOT" && GOMAXPROCS=1 GOFLAGS=-p=1 go build -o "$BIN" ./cmd/magelift)
+
+digest_is_placeholder() {
+	[[ "$DIGEST" == *sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef* ]]
+}
 
 EXPIRES="$(date -u -d '+6 hours' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+6H +%Y-%m-%dT%H:%M:%SZ)"
 cat >"$CONFIG" <<EOF
@@ -220,6 +243,8 @@ application:
   webRuntime: nginx-fpm
 build:
   php: "8.3"
+  composer:
+    credentials: ${COMPOSER_SM_URI}
 target:
   provider: gcp
   runtime: gke-autopilot
@@ -243,6 +268,7 @@ environments:
     class: preview
     expiresAt: "${EXPIRES}"
     monthlyBudgetCents: 50000
+    seedDump: ${SEED_DUMP}
 extensions: {}
 EOF
 
@@ -595,6 +621,218 @@ force_clean_orphans() {
 	gcloud compute networks delete "$net" --project="$PROJECT" --quiet 2>/dev/null || true
 }
 
+# --- live cell helpers (create-once then updates; never recreate) -----------------
+
+checkpoint_has_cells() {
+	acceptance_checkpoint_load
+	local n
+	n=$(jq '.cells | length' "$ACCEPTANCE_CHECKPOINT")
+	[[ "${n:-0}" -gt 0 ]]
+}
+
+should_skip_create_once() {
+	local resume="${MAGELIFT_GCP_ACCEPTANCE_RESUME:-0}"
+	if [[ "$resume" == "1" || "$resume" == "true" ]]; then
+		return 0
+	fi
+	load_cells
+	if [[ ${#CELLS[@]} -gt 0 ]] && cell_done "${CELLS[0]}"; then
+		return 0
+	fi
+	if checkpoint_has_cells; then
+		return 0
+	fi
+	return 1
+}
+
+acceptance_account_id() {
+	if [[ -n "${MAGELIFT_ACCEPTANCE_ACCOUNT:-}" ]]; then
+		printf '%s' "$MAGELIFT_ACCEPTANCE_ACCOUNT"
+		return 0
+	fi
+	printf '%s' "$PROJECT"
+}
+
+application_url_from_outputs() {
+	local raw json url
+	raw="$(run outputs 2>/dev/null)" || return 1
+	json="$(magelift_json_from_output "$raw")"
+	if ! command -v jq >/dev/null 2>&1; then
+		return 1
+	fi
+	url="$(printf '%s' "$json" | jq -r '
+		.outputs.applicationURL // .outputs.applicationUrl // .applicationURL // .applicationUrl //
+		.outputs.ingressHostname // .outputs.loadBalancerIP // empty
+	' 2>/dev/null | head -n 1)"
+	[[ -n "$url" && "$url" != "null" ]] || return 1
+	# Strip scheme for DNS TARGET when present.
+	url="${url#https://}"
+	url="${url#http://}"
+	url="${url%%/*}"
+	printf '%s' "$url"
+}
+
+# bootstrap:wif — Ensure WIF on the project PLUS Act or gcloud STS/WIF exchange proof.
+# Ensure-only is forbidden (D-05 / GCP-01).
+prove_wif_token_exchange() {
+	local ci_sa pool_hint proof_log
+	if [[ "${MAGELIFT_GCP_WIF_ENSURE_ONLY:-}" == "1" || "${MAGELIFT_GCP_WIF_ENSURE_ONLY:-}" == "true" ]]; then
+		printf 'bootstrap:wif refused: MAGELIFT_GCP_WIF_ENSURE_ONLY forbids Ensure-only (need Act or STS exchange)\n' >&2
+		return 1
+	fi
+	proof_log="${MAGELIFT_GCP_WIF_ACT_LOG:-}"
+	if [[ -n "$proof_log" && -f "$proof_log" ]] && grep -Eqi 'WIF token exchange succeeded|token exchange' "$proof_log"; then
+		printf '+ bootstrap:wif Act proof accepted from %s\n' "$proof_log"
+		return 0
+	fi
+	if [[ "${MAGELIFT_GCP_WIF_ACT_PROOF:-}" == "1" || "${MAGELIFT_GCP_WIF_ACT_PROOF:-}" == "true" ]]; then
+		printf '+ bootstrap:wif Act proof flag MAGELIFT_GCP_WIF_ACT_PROOF=1 (operator attested Act smoke)\n'
+		return 0
+	fi
+	ci_sa="${MAGELIFT_GCP_WIF_SERVICE_ACCOUNT:-${NAME}-${PROFILE}-ci@${PROJECT}.iam.gserviceaccount.com}"
+	pool_hint="${MAGELIFT_GCP_WIF_PROVIDER:-}"
+	printf '+ bootstrap:wif attempting gcloud STS/impersonation token exchange for %s\n' "$ci_sa"
+	if [[ -n "$pool_hint" ]]; then
+		printf '+ bootstrap:wif provider=%s\n' "$pool_hint"
+	fi
+	if TOKEN="$(gcloud auth print-access-token --impersonate-service-account="$ci_sa" --project="$PROJECT" 2>/dev/null)" \
+		&& [[ -n "$TOKEN" ]]; then
+		printf '+ bootstrap:wif STS/impersonation token exchange ok (token not logged)\n'
+		return 0
+	fi
+	printf 'bootstrap:wif FAILED: need Act proof (MAGELIFT_GCP_WIF_ACT_LOG or MAGELIFT_GCP_WIF_ACT_PROOF=1) or gcloud STS/WIF exchange — Ensure-only is not enough\n' >&2
+	return 1
+}
+
+run_gcp_cell() {
+	local cell="${1:?cell id required}"
+	local url composer_val
+	case "$cell" in
+	bootstrap:wif)
+		printf '+ cell bootstrap:wif Ensure + Act/STS proof\n'
+		run bootstrap --yes --github-owner "$GITHUB_OWNER" --github-repo "$GITHUB_REPO" \
+			| tee "${LOG_DIR}/cell-bootstrap-wif.json"
+		prove_wif_token_exchange
+		;;
+	composer:sm-write)
+		printf '+ cell composer:sm-write Secret Manager write\n'
+		composer_val="${MAGELIFT_GCP_COMPOSER_AUTH_FIXTURE:-{\"http-basic\":{\"repo.magento.com\":{\"username\":\"acceptance\",\"password\":\"acceptance\"}}}}"
+		printf '%s' "$composer_val" | run secret set "$COMPOSER_SECRET_ID" --value-stdin \
+			| tee "${LOG_DIR}/cell-composer-sm-write.json"
+		;;
+	composer:sm-read)
+		printf '+ cell composer:sm-read gcp-secret-manager:// AccessSecretVersion\n'
+		# Loud failure if SM cannot resolve — value never logged (T-07-12 / T-07-16).
+		run secret list | tee "${LOG_DIR}/cell-composer-sm-read-list.json"
+		gcloud secrets versions access latest --secret="$COMPOSER_SECRET_ID" --project="$PROJECT" >/dev/null
+		printf '+ composer:sm-read ok uri=%s (value not logged)\n' "$COMPOSER_SM_URI"
+		;;
+	day2:secrets)
+		run secret list | tee "${LOG_DIR}/cell-day2-secrets.json"
+		;;
+	day2:state)
+		run state status | tee "${LOG_DIR}/cell-day2-state.json"
+		;;
+	day2:logs)
+		if digest_is_placeholder; then
+			printf 'day2:logs requires pullable MAGELIFT_GCP_ACCEPTANCE_DIGEST\n' >&2
+			return 1
+		fi
+		run logs --service web | tee "${LOG_DIR}/cell-day2-logs.json"
+		;;
+	day2:exec)
+		if digest_is_placeholder; then
+			printf 'day2:exec requires pullable MAGELIFT_GCP_ACCEPTANCE_DIGEST\n' >&2
+			return 1
+		fi
+		run exec --service web -- true | tee "${LOG_DIR}/cell-day2-exec.json"
+		;;
+	day2:health)
+		if digest_is_placeholder; then
+			printf 'day2:health requires pullable MAGELIFT_GCP_ACCEPTANCE_DIGEST\n' >&2
+			return 1
+		fi
+		run health --mode runtime | tee "${LOG_DIR}/cell-day2-health.json"
+		;;
+	deploy:candidate)
+		if digest_is_placeholder; then
+			printf 'deploy:candidate requires pullable MAGELIFT_GCP_ACCEPTANCE_DIGEST (migrate→cutover→health→record)\n' >&2
+			return 1
+		fi
+		# kube.Steps: migrate → cutover → health → record (shared Steps from Phase 6).
+		"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json \
+			deploy --yes --digest "$DIGEST" | tee "${LOG_DIR}/cell-deploy-candidate.json"
+		run health --mode runtime | tee "${LOG_DIR}/cell-deploy-health.json"
+		;;
+	migrate:dump)
+		# D-03: after first successful deploy; kube dumpimport runner (07-04) for private SQL.
+		printf '+ cell migrate:dump via env import-dump (MAGELIFT_DUMPIMPORT_RUNNER=kube)\n'
+		MAGELIFT_DUMPIMPORT_RUNNER=kube \
+			"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json \
+			env import-dump "$PROFILE" | tee "${LOG_DIR}/cell-migrate-dump.json"
+		;;
+	cost:estimate)
+		run cost | tee "${LOG_DIR}/cell-cost-estimate.json"
+		;;
+	cutover:dns)
+		# D-04: DNS after applicationURL exists; Cloudflare Zone.DNS Edit token required.
+		url="$(application_url_from_outputs)" || {
+			printf 'cutover:dns requires applicationURL/ingress from stack outputs\n' >&2
+			return 1
+		}
+		printf '+ cell cutover:dns host=%s target=%s\n' "$CUTOVER_HOST" "$url"
+		TARGET="$url" MAGELIFT_CUTOVER_HOST="$CUTOVER_HOST" \
+			"$ROOT/scripts/cutover-dns-cloudflare.sh" | tee "${LOG_DIR}/cell-cutover-dns.log"
+		;;
+	*)
+		printf 'unsupported gcp acceptance cell: %s\n' "$cell" >&2
+		return 2
+		;;
+	esac
+}
+
+live_cell_loop() {
+	local cell provider account date_s duration started result rc
+	gcp_acceptance_paths
+	provider="${MAGELIFT_ACCEPTANCE_PROVIDER:-gcp}"
+	account="$(acceptance_account_id)"
+	load_cells
+	acceptance_checkpoint_load
+	acceptance_evidence_ensure
+
+	printf 'gcp acceptance live_cell_loop cells=%d catalog=%s\n' "${#CELLS[@]}" "$CELL_CATALOG" >&2
+
+	for cell in "${CELLS[@]}"; do
+		if cell_done "$cell"; then
+			printf 'acceptance skip cell=%s (checkpoint)\n' "$cell" >&2
+			continue
+		fi
+
+		printf 'acceptance cell-update cell=%s\n' "$cell" >&2
+		started=$(date +%s)
+		result=PASS
+		rc=0
+		# Stack update / day-2 only — never destroy+recreate between cells (D-02).
+		if ! run_gcp_cell "$cell"; then
+			result=FAIL
+			rc=1
+		fi
+
+		duration="$(( $(date +%s) - started ))s"
+		date_s=$(date -u +%Y-%m-%d)
+		append_row "$cell" "$result" "$duration" "$provider" "$account" "$date_s"
+		record_cell "$cell" "$result"
+		printf 'acceptance cell-done cell=%s result=%s\n' "$cell" "$result" >&2
+		if [[ "$rc" -ne 0 ]]; then
+			printf 'acceptance cell failed; recorded FAIL for resume (re-run with KEEP/RESUME)\n' >&2
+			return 1
+		fi
+	done
+}
+
+# --- live main -------------------------------------------------------------------
+
+gcp_acceptance_paths
 run config validate | tee "${LOG_DIR}/validate.json"
 reconcile_stale_pulumi_state 2>&1 | tee "${LOG_DIR}/reconcile.log"
 reconcile_ec="${PIPESTATUS[0]}"
@@ -604,16 +842,32 @@ fi
 run preview | tee "${LOG_DIR}/preview.json"
 created=1
 
-	if [[ "$MODE" == up ]]; then
-	printf 'WARNING: up creates GKE Autopilot + Cloud SQL + Memorystore; destroy runs on EXIT\n'
+if [[ "$MODE" == up ]]; then
+	printf 'WARNING: up creates GKE Autopilot + Cloud SQL + Memorystore; destroy + force_clean run on EXIT\n'
+	printf 'WARNING: MAGELIFT_GCP_ACCEPTANCE_DIGEST must be pullable for Magento cells (placeholder fails ImagePull)\n'
 	ensure_gcp_adc || refresh_gcp_access_token || true
-	printf '+ magelift bootstrap (GCS DIY state bucket)\n'
-	run bootstrap --yes 2>&1 | tee "${LOG_DIR}/bootstrap.json" || true
-	# Placeholder digests cannot run Magento migrate; validate the production-shaped
-	# infrastructure graph + outputs, then destroy. Full Magento suite needs a pullable digest.
-	printf '+ magelift deploy --yes --infra-only\n'
-	"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json deploy --yes --infra-only | tee "${LOG_DIR}/deploy.json"
-	run outputs | tee "${LOG_DIR}/outputs.json"
+
+	if should_skip_create_once; then
+		printf 'acceptance resume: skipping create-once (stack assumed present; KEEP/RESUME/checkpoint)\n'
+	else
+		printf 'acceptance create-once\n'
+		printf '+ magelift bootstrap (GCS DIY state bucket)\n'
+		run bootstrap --yes 2>&1 | tee "${LOG_DIR}/bootstrap.json" || true
+		if digest_is_placeholder; then
+			# Placeholder digests cannot run Magento migrate; validate infra graph + outputs.
+			# Full Magento cells need a pullable digest — set MAGELIFT_GCP_ACCEPTANCE_DIGEST.
+			printf '+ magelift deploy --yes --infra-only (placeholder digest)\n'
+			"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json \
+				deploy --yes --infra-only | tee "${LOG_DIR}/deploy.json"
+		else
+			printf '+ magelift deploy --yes (create-once with pullable digest)\n'
+			"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json \
+				deploy --yes --digest "$DIGEST" | tee "${LOG_DIR}/deploy.json"
+		fi
+		run outputs | tee "${LOG_DIR}/outputs.json"
+	fi
+
+	live_cell_loop
 fi
 
-printf 'gcp acceptance ok mode=%s; destroy + assert_clean run on EXIT unless MAGELIFT_GCP_ACCEPTANCE_KEEP=true\n' "$MODE"
+printf 'gcp acceptance ok mode=%s; destroy + force_clean + assert_clean on EXIT unless MAGELIFT_GCP_ACCEPTANCE_KEEP=true\n' "$MODE"

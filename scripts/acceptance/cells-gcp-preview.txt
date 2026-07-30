@@ -1,3 +1,19 @@
-# Ordered GCP preview cells for offline harness shape (Phase 3 — no up).
-# Live create + PSA soak timing = Phase 7.
-preset:preview
+# Ordered GCP create-once harness cells (D-02 / Phase 7).
+# Offline dry-run loops all with append_row; live iterates after one create (never recreate).
+# Teardown is EXIT destroy + force_clean_orphans + PSA soak — not a cell.
+#
+# bootstrap:wif requires Ensure PLUS Act or gcloud STS/WIF token-exchange proof (not Ensure-only).
+# composer:sm-* are explicit SC2 write/read cells (gcp-secret-manager://).
+# migrate:dump runs after deploy:candidate (D-03). cutover:dns needs applicationURL (D-04).
+bootstrap:wif
+composer:sm-write
+composer:sm-read
+day2:secrets
+day2:state
+day2:logs
+day2:exec
+day2:health
+deploy:candidate
+migrate:dump
+cost:estimate
+cutover:dns
