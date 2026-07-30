@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 8
 current_phase_name: Brownfield Attach & Tag Day
 status: in_progress
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-07-30T12:07:20.167Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-07-30T12:11:10.042Z"
 progress:
   total_phases: 8
-  completed_phases: 6
-  total_plans: 57
-  completed_plans: 44
-  percent: 77
+  completed_phases: 3
+  total_plans: 56
+  completed_plans: 45
+  percent: 38
 last_activity: 2026-07-30
-last_activity_desc: "08-01 COMPLETE — VPC ADOPT report + refuse-before-mutate (network)"
+last_activity_desc: 08-01 COMPLETE — VPC ADOPT report + refuse-before-mutate (network)
 ---
 
 # Project State
@@ -28,13 +28,13 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 8 of 8 (Brownfield Attach & Tag Day)
-Plan: 02 of 06
+Plan: 3 of 06
 Status: in_progress
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T12:07:20.159Z
-**Stopped at:** Completed 08-01-PLAN.md
+**Last session:** 2026-07-30T12:11:10.034Z
+**Stopped at:** Completed 08-02-PLAN.md
 **Resume file:** None
 
 - Phase 6: verified 5/5 offline
@@ -47,8 +47,10 @@ Status: in_progress
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 08 P01 | 6min | 2 tasks | 7 files |
+| Phase 08 P02 | 8min | 2 tasks | 9 files |
 
 ## Decisions
 
 - [Phase 08]: BrownfieldAttach port for ADOPT/refuse without CLI→pulumi-aws import
 - [Phase 08]: Stack-scoped deploy/destroy use empty refuse intent; destroy/replace of adopted VPC fails closed
+- [Phase ?]: AWSExistingDatabase nested secretArn/endpoint (D-01); Spec DatabaseSecretARN/Endpoint for 08-03
