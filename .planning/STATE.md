@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 6
 current_phase_name: Shared Kubernetes Day-2
 status: executing
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-07-30T10:53:18.800Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-07-30T11:01:52.296Z"
 last_activity: 2026-07-30
-last_activity_desc: Completed 06-02 kubeconfig export + client factory
+last_activity_desc: 06-02 SUMMARY complete (OutputKubeconfig + ClientFrom* + four stack exports)
 progress:
   total_phases: 8
-  completed_phases: 5
-  total_plans: 50
-  completed_plans: 40
-  percent: 80
+  completed_phases: 3
+  total_plans: 41
+  completed_plans: 35
+  percent: 38
 ---
 
 # Project State
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 6 of 8 (Shared Kubernetes Day-2)
-Plan: 3 of 6 (06-02 complete; next 06-03)
-Status: executing
+Plan: 4 of 6 (06-02 complete; next 06-03)
+Status: Ready to execute
 Last activity: 2026-07-30 — 06-02 SUMMARY complete (OutputKubeconfig + ClientFrom* + four stack exports)
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 85%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T10:53:18.793Z
-**Stopped at:** Completed 06-02-PLAN.md
+**Last session:** 2026-07-30T11:01:52.289Z
+**Stopped at:** Completed 06-03-PLAN.md
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
@@ -56,6 +56,7 @@ Progress: [████████░░] 83%
 |------|----------|-------|-------|
 | Phase 06 P01 | 6min | 2 tasks | 26 files |
 | Phase 06 P02 | 5min | 2 tasks | 12 files |
+| Phase 06 P03 | 7min | 2 tasks | 13 files |
 
 ## Decisions
 
@@ -64,3 +65,4 @@ Progress: [████████░░] 83%
 - [Phase 6]: OutputKubeconfig = kubeconfig; optional, not in RequiredOutputKeys (ECS free)
 - [Phase 6]: Plumb Runtime.Kubeconfig as Pulumi ToSecret then export via stack Outputs
 - [Phase 6]: EKS exports existing exec-plugin kubeconfig as-is (D-02 escape hatch deferred)
+- [Phase ?]: Shared *kube.Observe for all four K8s modules (D-01); kubectl PrepareExec; CLI launcher=binary
