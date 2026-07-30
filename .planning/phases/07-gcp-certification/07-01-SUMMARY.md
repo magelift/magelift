@@ -104,7 +104,7 @@ status: complete
 1. **Task 1: End-to-end WIF plan+Ensure + Composer SM Get** - `a08d7ea` (feat)
 2. **Task 2: Act-only WIF smoke workflow + docs exchange path** - `4810f84` (docs)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `e8c638f` (docs: complete plan)
 
 ## Files Created/Modified
 
