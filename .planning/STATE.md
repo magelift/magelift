@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 7
 current_phase_name: GCP Certification
 status: executing
-stopped_at: Completed 07-04-PLAN.md
-last_updated: "2026-07-30T11:44:35.805Z"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-07-30T11:47:46.243Z"
 last_activity: 2026-07-30
-last_activity_desc: completed 07-05 Cloudflare DNS cutover script (offline)
+last_activity_desc: completed 07-04 kube-adjacent dumpimport runner (offline)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 49
-  completed_plans: 41
+  completed_plans: 42
   percent: 38
 ---
 
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 7 of 8 (GCP Certification)
-Plan: 4 of 7 (next incomplete: 07-02; 07-04 + 07-05 done out of wave order)
+Plan: 5 of 7 (next incomplete: 07-02; 07-04 + 07-05 done out of wave order)
 Status: Ready to execute
 Last activity: 2026-07-30 — completed 07-04 kube-adjacent dumpimport runner (offline)
 
-Progress: [████████░░] 84%
+Progress: [█████████░] 86%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T11:44:35.797Z
-**Stopped at:** Completed 07-04-PLAN.md
+**Last session:** 2026-07-30T11:47:46.236Z
+**Stopped at:** Completed 07-02-PLAN.md
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
@@ -60,6 +60,7 @@ Progress: [████████░░] 84%
 | Phase 07-gcp-certification P01 | 5min | 2 tasks | 13 files |
 | Phase 07 P05 | 3min | 2 tasks | 4 files |
 | Phase 07 P04 | 4min | 2 tasks | 6 files |
+| Phase 07 P02 | 3min | 2 tasks | 5 files |
 
 ## Decisions
 
@@ -84,3 +85,5 @@ Progress: [████████░░] 84%
 - [Phase ?]: Prefer kubectl exec piping SQL over Cloud SQL Auth Proxy+IAP for managed dump connectivity
 - [Phase ?]: Password via MYSQL_PWD env arg to in-pod mysql — never -pPASSWORD (T-07-08)
 - [Phase ?]: Do not mark MIGRATE-04 Complete — live evidence is 07-07
+- [Phase ?]: Account-free GCP cost derives capacity from target.gcp + preset defaults; no Catalog client
+- [Phase ?]: GCP cost --live returns not-wired error (not ErrNotSupported)

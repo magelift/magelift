@@ -37,7 +37,7 @@
 - [x] **GCP-02**: Operator can store and retrieve Composer credentials from GCP Secret Manager during build and deploy, with no unimplemented path returning success
 - [ ] **GCP-03**: Operator can run the full day-2 command set (logs, exec, secrets, state, health) against a GKE Autopilot target
 - [ ] **GCP-04**: Operator can deploy Magento to GKE Autopilot through the standard candidate-deploy sequence (migrate → cutover → health → record)
-- [ ] **GCP-05**: Operator can run `magelift cost` against a GCP target and get a per-cell estimate
+- [x] **GCP-05**: Operator can run `magelift cost` against a GCP target and get a per-cell estimate
 - [ ] **GCP-06**: GCP GKE Autopilot is recorded as certified tier, backed by a real-account acceptance pass, making the multi-cloud claim truthful
 
 ### Shared Kubernetes Day-2
@@ -165,7 +165,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | GCP-02 | Phase 7 | Complete |
 | GCP-03 | Phase 7 | Pending |
 | GCP-04 | Phase 7 | Pending |
-| GCP-05 | Phase 7 | Pending |
+| GCP-05 | Phase 7 | Complete |
 | GCP-06 | Phase 7 | Pending |
 | KUBE-01 | Phase 6 | Complete |
 | KUBE-02 | Phase 6 | Complete |
