@@ -113,7 +113,7 @@ Each task was committed atomically:
    - `aa9f167` (test) — AdoptedRefuse + detach offline proofs
    - `ff7af3e` (feat) — multi-resource RefuseAdoptedMutation
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `a15420a` (docs: complete plan)
 
 ## Files Created/Modified
 - `internal/cloud/aws/stack/adopt.go` — unified AdoptReport + multi-resource refuse
