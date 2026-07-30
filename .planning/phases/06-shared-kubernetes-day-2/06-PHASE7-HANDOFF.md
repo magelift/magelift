@@ -28,9 +28,11 @@ Do **not** claim live GKE/OVH/SCW Magento acceptance from Phase 6 evidence.
 ```bash
 export CLOUDFLARE_API_TOKEN=...   # or CF_API_TOKEN — Zone.DNS Edit
 export MAGELIFT_CUTOVER_HOST=magelift-preview.alexandrecourtiol.com
+TARGET=<applicationURL-or-LB> ./scripts/cutover-dns-cloudflare.sh
+./scripts/cutover-dns-cloudflare.sh --cleanup
 ```
 
-Do not commit tokens. Cleanup: delete the cutover CNAME/A after rehearsal.
+Script: `scripts/cutover-dns-cloudflare.sh` (offline `--dry-run` + `scripts/acceptance/cutover-dns-cloudflare_test.sh`). Do not commit tokens. Cleanup: delete the cutover CNAME/A after rehearsal.
 
 Scratch notes from Phase 6 discuss: `.planning/phases/06-shared-kubernetes-day-2/scratch/cloudflare-dns-auth.md`.
 

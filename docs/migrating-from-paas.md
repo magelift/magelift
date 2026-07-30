@@ -233,6 +233,27 @@ edge for that environment. DNS TTL, Route53/ACM wiring, and live non-prod rehear
 evidence are **Phase 7 HUMAN_GATE** — document the planned records here operationally,
 but do not treat Phase 5 docs or local scratch as SC5 live proof.
 
+#### Cloudflare preview rehearsal (MIGRATE-04 / Phase 7)
+
+Preferred non-prod host: `magelift-preview.alexandrecourtiol.com` (fallback
+`magelift-preview.acourtiol.com`). Use an API token with **Zone.DNS Edit** (and
+Zone.Zone Read) via `CLOUDFLARE_API_TOKEN` or `CF_API_TOKEN`. **Do not use Wrangler
+OAuth** for DNS writes — Wrangler OAuth is zone:read only and cannot create/update
+records.
+
+```sh
+export CLOUDFLARE_API_TOKEN=...   # Zone.DNS Edit — not Wrangler OAuth
+export MAGELIFT_CUTOVER_HOST=magelift-preview.alexandrecourtiol.com
+# Point at stack applicationURL / LB hostname or IPv4 from the paid pass:
+TARGET=<ingress-or-lb> ./scripts/cutover-dns-cloudflare.sh
+# Rehearse without mutating:
+TARGET=example.invalid ./scripts/cutover-dns-cloudflare.sh --dry-run
+# Harness EXIT / teardown:
+./scripts/cutover-dns-cloudflare.sh --cleanup
+```
+
+Auth and zone notes: [Phase 7 Cloudflare handoff](../.planning/phases/06-shared-kubernetes-day-2/06-PHASE7-HANDOFF.md).
+
 ### 7. Rollback
 
 If verification fails after traffic shift:
