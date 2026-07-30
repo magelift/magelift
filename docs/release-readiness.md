@@ -15,11 +15,9 @@ Managed OpenSearch remains **certified intent** (native Magento client + pinned
 `aws-sigv4-proxy` sidecar). The **public-tag** gate no longer requires a paid
 MageLift OpenSearch acceptance account. It closes with three substitutes:
 
-| Evidence | What it proves |
-| --- | --- |
-| MageLift offline wiring | Pulumi/unit mocks for SigV4 sidecar + Magento env (`TestRuntimeAddsSigV4ProxyForMagentoOpenSearch` and related); proxy absent when `searchMode: disabled` |
-| Free-tier AWS matrix | Applied `searchMode: disabled` + queue cells; preview-only OpenSearch serverless plan (2026-07-21). Re-proven create-once + `db`/`ecs-rabbitmq`/`ecs-artemis` + kill/resume + dual assert_clean (2026-07-29). Evidence: `.magelift/matrix-results.md`; proof note `scratch/03-06-paid-proof.md` |
-| Chantelle external ops | Prior Terraform Magento+OpenSearch work at Chantelle (ElasticSuite, no SigV4) — see [sources/chantelle-opensearch.md](sources/chantelle-opensearch.md); private repos not named |
+- **MageLift offline wiring** — Pulumi/unit mocks for SigV4 sidecar + Magento env (`TestRuntimeAddsSigV4ProxyForMagentoOpenSearch` and related); proxy absent when `searchMode: disabled`
+- **Free-tier AWS matrix** — Applied `searchMode: disabled` + queue cells; preview-only OpenSearch serverless plan (2026-07-21). Re-proven create-once + `db`/`ecs-rabbitmq`/`ecs-artemis` + kill/resume + dual assert_clean (2026-07-29). Evidence: `.magelift/matrix-results.md`; proof note `scratch/03-06-paid-proof.md`
+- **Chantelle external ops** — Prior Terraform Magento+OpenSearch work at Chantelle (ElasticSuite, no SigV4) — see [sources/chantelle-opensearch.md](sources/chantelle-opensearch.md); private repos not named
 
 **Honesty:** Chantelle proves Magento + AWS OpenSearch *ops*, not MageLift’s
 SigV4 data plane. Do **not** claim “live Magento search on MageLift acceptance is
@@ -55,10 +53,12 @@ fine-grained token so release tags can trigger the artifact workflow; the defaul
 
 If clearance fails, rename every identifier before the first public tag.
 
-## Gate board (2026-07-22)
+## Gate board (2026-07-30 — RELEASE-05 / D-05)
+
+Every public-tag gate is **Closed**, **Deferred**, **Pending→07**, or **Offline closed** with a named reason. No undetermined rows.
 
 | Gate | Status | Evidence |
-| --- | --- | --- |
+| --- | Closed / Deferred / Pending | --- |
 | Trademark / package-name clearance | **Closed** | MageLift / magelift.com |
 | Contract freeze (`v1.0.0-rc.1`) | **Closed** | [versioning.md](versioning.md); CHANGELOG `[Unreleased]` baseline |
 | OpenSearch public-tag substitute | **Closed** | Offline SigV4 wiring + free-tier matrix + [prior Chantelle Terraform ops](sources/chantelle-opensearch.md) (repos not named) |
@@ -66,12 +66,16 @@ If clearance fails, rename every identifier before the first public tag.
 | Queue matrix (`ecs-rabbitmq` + experimental Artemis) | **Closed** | Free-tier infra 2026-07-21; harness cell PASS 2026-07-29 |
 | Measured time-to-preview | **Closed** | ~631s / 10m31s eu-north-1 |
 | `/health` on MageLift runtime images | **Closed** | nginx + FrankenPHP short-circuit; `curl` in image; `scripts/image-health-test.sh`; Varnish pass-through |
-| GCP Magento deploy Ops | **Deferred** | Experimental — no multi-cloud claim |
+| GCP Magento deploy Ops | **Pending→07** | Phase 7 live Magento deploy Ops not claimed; wait for 07-06/07 evidence — never fake-certified |
+| GCP certify (GCP-06 / multi-cloud claim) | **Pending→07** | No `.magelift/gcp-matrix` live PASS rows yet; gcloud ADC + Cloudflare DNS token still HUMAN_GATE in Phase 7 |
 | NOTICE + license review | **Closed** | `NOTICE`, `LICENSE`, `make license-check` (recorded below) |
-| First ship path | GitHub Release archives | Homebrew cask optional post-tag; Windows = archive until winget/Scoop owned |
+| First ship path | **Closed** | GitHub Release archives first; Homebrew cask optional post-tag; Windows = archive until winget/Scoop owned |
 | Packaging smoke | **Closed** | 2026-07-28T15:11:04Z — `release smoke ok binary=dist/magelift_darwin_arm64_v8.0/magelift (serial single-target)` via `make release-smoke` (`GOMAXPROCS=1`, `--parallelism=1`) |
 | Shared Kubernetes day-2 (Phase 6) | **Offline closed** | Unit/fake-clientset: `*kube.Observe` + `*kube.Steps` type-identity across gcp/eksops/ovh/scaleway; AES256 DIY state unit proof. **Not** live GKE/OVH/SCW Magento acceptance. Handoff: `.planning/phases/06-shared-kubernetes-day-2/06-PHASE7-HANDOFF.md` |
 | Cloudflare DNS cutover (MIGRATE-04) | **Deferred → Phase 7** | Preferred host `magelift-preview.alexandrecourtiol.com` (fallback `magelift-preview.acourtiol.com`). Needs Cloudflare API token with **Zone.DNS Edit** — Wrangler OAuth (`zone:read`) is insufficient for cutover writes |
+| Hosted CI / GitHub Actions minutes | **Deferred** (Act-only) | Maintainer lock (D-05): hosted Actions minutes exhausted; local `make verify` + Act until minutes return — do not claim hosted CI green |
+| Brownfield attach (ATTACH-01..04) | **Closed** | Phase 8 plans 08-01..05 + offline evidence `.planning/phases/08-brownfield-attach-tag-day/scratch/08-06-offline-evidence.md` (Existing\|Adopt\|Refuse\|Detach PASS). Docs: [brownfield-attach.md](brownfield-attach.md) |
+| Free-tier AWS VPC+RDS adopt confirm (spend 3/3) | **Deferred** | HUMAN_GATE — ADC/AWS session expired (`aws sts get-caller-identity` exit 255). Record: `.planning/phases/08-brownfield-attach-tag-day/scratch/08-06-aws-adopt-confirm.md`. Offline mechanics Closed above; no live describe-after-destroy claimed |
 
 ### Time-to-preview
 

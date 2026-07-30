@@ -86,10 +86,10 @@
 
 <!-- Supersedes ADR 0010's "attach existing DB remains out of scope". -->
 
-- [x] **ATTACH-01**: Operator can adopt an existing VPC into a MageLift stack instead of having one created
-- [x] **ATTACH-02**: Operator can adopt an existing managed database instance (RDS/Cloud SQL) into a MageLift stack
-- [x] **ATTACH-03**: Adoption runs through `preview` first and shows exactly what will be imported versus created, and refuses to mutate or destroy adopted resources it does not own
-- [x] **ATTACH-04**: Documented limits of adoption — what can be attached, what cannot, and how to detach without losing the resource
+- [x] **ATTACH-01**: Operator can adopt an existing VPC into a MageLift stack instead of having one created — **Complete** (offline mocks 08-01..06; live free-tier confirm **Deferred** ADC HUMAN_GATE — `scratch/08-06-aws-adopt-confirm.md`)
+- [x] **ATTACH-02**: Operator can adopt an existing managed database instance (RDS) into a MageLift stack — **Complete** for AWS RDS offline+docs. **Deferred:** Cloud SQL / multi-cloud attach (explicitly out of this milestone; see `docs/brownfield-attach.md`)
+- [x] **ATTACH-03**: Adoption runs through `preview` first and shows exactly what will be imported versus created, and refuses to mutate or destroy adopted resources it does not own — **Complete** (offline ADOPT + Refuse tests PASS)
+- [x] **ATTACH-04**: Documented limits of adoption — what can be attached, what cannot, and how to detach without losing the resource — **Complete** (`docs/brownfield-attach.md`; offline detach proof; live describe-after-destroy **Deferred** ADC HUMAN_GATE)
 
 ### Internal Quality
 
@@ -110,7 +110,7 @@
 - [x] **RELEASE-02**: `sdk/v1` and `platform.StackModule` are documented as a compatibility contract with an explicit stability statement covering what may change during the RC series
 - [x] **RELEASE-03**: A third party can follow `docs/adding-a-provider.md` plus `examples/custom-cli` to register an out-of-tree provider without reading core source
 - [x] **RELEASE-04**: `make release-smoke` completes on the maintainer's machine (serial, single-target, outside Cursor), closing the Partial packaging gate
-- [ ] **RELEASE-05**: Every release-readiness gate board row is Closed or explicitly Deferred with a reason, and the board reflects reality on tag day
+- [x] **RELEASE-05**: Every release-readiness gate board row is Closed or explicitly Deferred with a reason, and the board reflects reality on tag day — **Complete** 2026-07-30: board settled in `docs/release-readiness.md` (GCP certify/Ops **Pending→07**; hosted CI **Deferred** Act-only; AWS paid adopt confirm **Deferred** ADC HUMAN_GATE; ATTACH offline **Closed**)
 - [x] **RELEASE-06**: A new contributor can go from `git clone` to a green `make verify` following `CONTRIBUTING.md` alone
 
 ## v2 Requirements
@@ -189,10 +189,10 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | ECE-02 | Phase 4 | Complete |
 | ECE-03 | Phase 4 | Complete |
 | ECE-04 | Phase 4 | Complete |
-| ATTACH-01 | Phase 8 | Complete |
-| ATTACH-02 | Phase 8 | Complete |
+| ATTACH-01 | Phase 8 | Complete (offline; live AWS confirm Deferred ADC HUMAN_GATE) |
+| ATTACH-02 | Phase 8 | Complete (AWS RDS; Cloud SQL / multi-cloud attach Deferred) |
 | ATTACH-03 | Phase 8 | Complete |
-| ATTACH-04 | Phase 8 | Complete |
+| ATTACH-04 | Phase 8 | Complete (docs + offline detach; live describe-after-destroy Deferred ADC) |
 | QUALITY-01 | Phase 1 | Complete |
 | QUALITY-02 | Phase 1 | Complete |
 | QUALITY-03 | Phase 1 | Complete |
@@ -205,7 +205,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | RELEASE-02 | Phase 2 | Complete |
 | RELEASE-03 | Phase 2 | Complete |
 | RELEASE-04 | Phase 2 | Complete |
-| RELEASE-05 | Phase 8 | Pending |
+| RELEASE-05 | Phase 8 | Complete |
 | RELEASE-06 | Phase 2 | Complete |
 
 **Coverage:**
@@ -229,4 +229,4 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 
 ---
 *Requirements defined: 2026-07-27*
-*Last updated: 2026-07-29 — MIGRATE-04 honesty split (Phase 5 local / Phase 7 HUMAN_GATE)*
+*Last updated: 2026-07-30 — RELEASE-05 board settled (08-06); ATTACH offline Complete; Cloud SQL + AWS paid adopt Deferred; GCP Pending→07*
