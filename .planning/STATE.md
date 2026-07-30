@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 7
 current_phase_name: GCP Certification
 status: executing
-stopped_at: Completed 07-05-PLAN.md
-last_updated: "2026-07-30T11:43:58.526Z"
+stopped_at: Completed 07-04-PLAN.md
+last_updated: "2026-07-30T11:44:35.805Z"
 last_activity: 2026-07-30
-last_activity_desc: completed 07-01 WIF + Composer SM offline foundations
+last_activity_desc: completed 07-05 Cloudflare DNS cutover script (offline)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 49
-  completed_plans: 40
+  completed_plans: 41
   percent: 38
 ---
 
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 ## Current Position
 
 Phase: 7 of 8 (GCP Certification)
-Plan: 3 of 7 (next incomplete: 07-02; 07-05 done out of wave order)
-Status: executing
+Plan: 4 of 7 (next incomplete: 07-02; 07-05 done out of wave order)
+Status: Ready to execute
 Last activity: 2026-07-30 — completed 07-05 Cloudflare DNS cutover script (offline)
 
-Progress: [████████░░] 82%
+Progress: [████████░░] 84%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T11:43:58.518Z
-**Stopped at:** Completed 07-05-PLAN.md
+**Last session:** 2026-07-30T11:44:35.797Z
+**Stopped at:** Completed 07-04-PLAN.md
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
@@ -59,6 +59,7 @@ Progress: [████████░░] 82%
 | Phase 06 P06 | 5min | 2 tasks | 4 files |
 | Phase 07-gcp-certification P01 | 5min | 2 tasks | 13 files |
 | Phase 07 P05 | 3min | 2 tasks | 4 files |
+| Phase 07 P04 | 4min | 2 tasks | 6 files |
 
 ## Decisions
 
@@ -80,3 +81,6 @@ Progress: [████████░░] 82%
 - [Phase ?]: Bootstrap Details.wif is structured map never deferred; CI proof Act-only until minutes return
 - [Phase ?]: DNS cutover: CLOUDFLARE_API_TOKEN/CF_API_TOKEN Bearer; dry-run skips token; CURL_BIN mock offline
 - [Phase ?]: Cutover record type: hostname→CNAME, IPv4→A; TTL 120; proxied false unless --proxied
+- [Phase ?]: Prefer kubectl exec piping SQL over Cloud SQL Auth Proxy+IAP for managed dump connectivity
+- [Phase ?]: Password via MYSQL_PWD env arg to in-pod mysql — never -pPASSWORD (T-07-08)
+- [Phase ?]: Do not mark MIGRATE-04 Complete — live evidence is 07-07
