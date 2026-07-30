@@ -1,0 +1,36 @@
+# Act-only WIF smoke — not a required hosted check.
+# Hosted GitHub Actions minutes are exhausted; prove keyless federation locally:
+#   act -W .github/workflows/gcp-wif-act-smoke.yml workflow_dispatch \
+#     -s GCP_WORKLOAD_IDENTITY_PROVIDER='projects/NUM/locations/global/workloadIdentityPools/POOL/providers/github' \
+#     -s GCP_SERVICE_ACCOUNT='ml-shop-preview-ci@PROJECT.iam.gserviceaccount.com'
+#
+# Secrets are WIF resource names / SA emails only — never JSON key material.
+name: GCP WIF Act Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  wif-exchange:
+    name: Exchange GitHub OIDC for GCP access token
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF)
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Prove token exchange without SA keys
+        run: |
+          test -n "${{ steps.auth.outputs.access_token }}"
+          echo "WIF token exchange succeeded (Act-only evidence path)"

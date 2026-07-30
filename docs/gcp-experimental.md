@@ -3,6 +3,24 @@
 Status: **experimental** (ADR 0007 / ADR 0008). Not Magento-acceptance certified.
 AWS ECS Fargate remains the only certified v1 path.
 
+**Certification track:** GCP is the intended second certified provider (maintainer
+GCP project). Until Magento Ops, Secret Manager Composer credentials, and a green
+`scripts/gcp-acceptance-local.sh` pass land, do not claim multi-cloud. CLI and docs
+must keep the experimental label.
+
+## Day-2 honesty
+
+| Surface | Status |
+| --- | --- |
+| Infra preview/deploy | experimental graph |
+| Magento candidate migrate | partial (GKE Jobs) |
+| Bootstrap | state bucket + GitHub WIF (pool/provider/CI SA) |
+| Secrets / Composer SM | `gcp-secret-manager://` via AccessSecretVersion |
+| logs / exec | partial |
+
+See [capability matrix](capability-matrix.md).
+
+
 ## Target
 
 ```yaml
@@ -35,11 +53,56 @@ target:
 Magento env contracts (`platform.CoreEnvBindings`, migration shell) stay in core.
 GCP only adapts products.
 
+## GitHub WIF (Act-only until minutes return)
+
+Bootstrap `Ensure` provisions a workload identity pool, GitHub OIDC provider
+(`https://token.actions.githubusercontent.com`), attribute condition
+`assertion.repository == 'acourtiol/magelift'`, and a CI service account with
+`roles/iam.workloadIdentityUser`. Details expose `wif.provider` / `wif.serviceAccount`
+(never `"deferred"`).
+
+Hosted Actions minutes are exhausted — matrix evidence stays **Act-only** until
+minutes return. Do not enable this workflow as a required hosted check.
+
+### Run via Act
+
+After bootstrap, pass the provider resource name and SA email (WIF names only —
+never `credentials_json` or SA JSON keys):
+
+```bash
+act -W .github/workflows/gcp-wif-act-smoke.yml workflow_dispatch \
+  -s GCP_WORKLOAD_IDENTITY_PROVIDER='projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/github' \
+  -s GCP_SERVICE_ACCOUNT='ml-PROJECT-ENV-ci@GCP_PROJECT.iam.gserviceaccount.com'
+```
+
+Workflow: [`.github/workflows/gcp-wif-act-smoke.yml`](../.github/workflows/gcp-wif-act-smoke.yml)
+(`google-github-actions/auth@v3`, `permissions.id-token: write`).
+
+### Fallback: documented gcloud STS exchange
+
+Without Act, prove federation with ADC + IAM Credentials / STS (no SA key file):
+
+```bash
+# 1) Obtain a GitHub OIDC-shaped subject is CI-only; locally use gcloud print-identity-token
+#    against a workload that already federates, or exchange after Act once.
+# 2) Generate an access token for the CI SA via WIF (example shape):
+gcloud iam service-accounts get-iam-policy \
+  "ml-shop-preview-ci@${GCP_PROJECT}.iam.gserviceaccount.com"
+# Confirm principalSet member for attribute.repository/acourtiol/magelift exists.
+# 3) Token mint (when a valid federated credential is available):
+gcloud auth print-access-token --impersonate-service-account \
+  "ml-shop-preview-ci@${GCP_PROJECT}.iam.gserviceaccount.com"
+```
+
+Record the matrix row as Act-only (or `gcloud` STS dry-run) until hosted minutes return.
+
 ## Offline verification
 
 - Pulumi mocks: `go test ./internal/cloud/gcp/...` (preview / standard / HA graphs)
 - Floci is **AWS-only** today — there is no floci-gcp. Do not invent GCP emulator coverage;
   use mocks + short-lived real GCP acceptance.
+- WIF unit proof: `GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/gcp/bootstrap/ -count=1 -run 'WIF|Identity'`
+- Composer SM: `GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/gcp/secrets/ ./internal/cli/ -count=1 -run 'Secret|Composer|GCP'`
 
 ## Real cloud
 

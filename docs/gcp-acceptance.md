@@ -107,4 +107,7 @@ gcloud compute networks delete mlgcpwt-preview-net --project=digital-lab-341608
   (`serviceClass=gcp-memorystore`) — created by the GCP cache component.
 - Magento Ops and day-2 ports are implemented; full Magento acceptance with a
   real digest is still required before `TierCertified`.
-- GitHub WIF identity on bootstrap is deferred (GCS DIY state bucket only).
+- GitHub WIF bootstrap is implemented offline (pool/provider/CI SA). CI proof is
+  **Act-only** until hosted Actions minutes return — see
+  [gcp-experimental.md](gcp-experimental.md#github-wif-act-only-until-minutes-return)
+  and `.github/workflows/gcp-wif-act-smoke.yml`. Do not commit SA keys.
