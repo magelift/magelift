@@ -260,7 +260,7 @@ Plans:
 
 - [x] 08-01-PLAN.md — VPC ADOPT preview + refuse-before-mutate (ATTACH-01/03 network)
 - [x] 08-02-PLAN.md — existing.database config/schema/Spec surface (ATTACH-02)
-- [ ] 08-03-PLAN.md — database.Existing component + stack wiring (ATTACH-02 apply)
+- [x] 08-03-PLAN.md — database.Existing component + stack wiring (ATTACH-02 apply)
 - [ ] 08-04-PLAN.md — Unified ADOPT report + refuse for network+DB (ATTACH-03)
 - [ ] 08-05-PLAN.md — Attach limits/detach docs + ADR 0010 supersede (ATTACH-04)
 - [ ] 08-06-PLAN.md — Offline/Floci evidence, AWS HUMAN_GATE, RELEASE-05 tag board
