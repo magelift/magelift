@@ -115,7 +115,7 @@ status: complete
 1. **Task 1: End-to-end remaining-unsupported allowlist + AcquireLock flip** - `4d71b5e` (feat)
 2. **Task 2: Matrix + experimental docs honesty for day-2 surface** - `8fcc607` (docs)
 
-**Plan metadata:** (pending final docs commit)
+**Plan metadata:** `aa34ab5` (docs: complete plan)
 
 ## Files Created/Modified
 
