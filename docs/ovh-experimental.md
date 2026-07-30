@@ -29,8 +29,15 @@ target:
 | Compute | Managed Kubernetes (MKS) + node pool |
 | Ingress | Kubernetes Service `LoadBalancer` |
 
-Deferred: search, RabbitMQ, media/CDN, bootstrap/state/secrets day-2, Magento
-candidate deploy orchestration.
+Deferred: search, RabbitMQ, media/CDN, Bootstrap/Secrets/Cost day-2, DNS/managed
+dump (Phase 7). Magento deploy Steps exist offline via shared `kube.Steps` — not
+live-acceptance certified.
+
+**Day-2:** Observe (logs/exec/health), Magento deploy Steps, and DIY State /
+`AcquireLock` work offline (unit/Floci). Bootstrap, Secrets, and Cost remain
+`ErrNotSupported` (tier-named). Experimental shared kube surface — not certified.
+See [capability matrix](capability-matrix.md).
+
 
 ## Verification
 

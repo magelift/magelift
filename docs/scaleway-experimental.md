@@ -37,8 +37,15 @@ exists. Wire-compatible for older Magento lines; reassess when Scaleway ships Va
 **Provider caveat:** Pulumi package is community `pulumiverse/pulumi-scaleway` (pinned
 in `go.mod`), not an official Scaleway-owned provider.
 
-Deferred: search, RabbitMQ, Edge Services/CDN, bootstrap/state/secrets day-2, Magento
-candidate deploy orchestration.
+Deferred: search, RabbitMQ, Edge Services/CDN, Bootstrap/Secrets/Cost day-2,
+DNS/managed dump (Phase 7). Magento deploy Steps exist offline via shared
+`kube.Steps` — not live-acceptance certified.
+
+**Day-2:** Observe (logs/exec/health), Magento deploy Steps, and DIY State /
+`AcquireLock` work offline (unit/Floci). Bootstrap, Secrets, and Cost remain
+`ErrNotSupported` (tier-named). Experimental shared kube surface — not certified.
+See [capability matrix](capability-matrix.md).
+
 
 ## Verification
 

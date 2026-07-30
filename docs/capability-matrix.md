@@ -15,10 +15,10 @@ the CLI; wire them with Magento outputs and your usual frontend deploy tool.
 | Provider | Runtime | Tier | Magento deploy Ops | Day-2 (logs/exec/secrets/state) |
 | --- | --- | --- | --- | --- |
 | `aws` | `ecs-fargate` | **certified** | full | full |
-| `aws` | `eks-autopilot` | experimental | infra-only / partial | mostly unsupported |
+| `aws` | `eks-autopilot` | experimental | shared kube.Steps offline (unit) | Observe+Steps+State offline (unit/Floci); Bootstrap/Secrets AWS-wired; Cost unsupported |
 | `gcp` | `gke-autopilot` | experimental | partial | partial (bootstrap = state bucket; WIF deferred) |
-| `ovh` | `mks` | experimental | infra graph | unsupported |
-| `scaleway` | `kapsule` | experimental | infra graph | unsupported |
+| `ovh` | `mks` | experimental | shared kube.Steps offline (unit) | Observe+Steps+State offline (unit/Floci); Bootstrap/Secrets/Cost `ErrNotSupported` |
+| `scaleway` | `kapsule` | experimental | shared kube.Steps offline (unit) | Observe+Steps+State offline (unit/Floci); Bootstrap/Secrets/Cost `ErrNotSupported` |
 
 On targets without Magento deploy Ops, `magelift deploy` refuses unless you pass
 `--infra-only` (infrastructure graph update only). With the flag, Magento migrate,
@@ -129,6 +129,11 @@ Floci gap closure is a later plan). Prefer under-claim.
 | Ops.NewDeploySteps | unit-fake / paid-only | `TestNewDeployStepsRejectsWrongBackend`; live Magento cutover paid |
 | Media / storage (S3 paths exercised by Floci) | Floci | `tests/floci/storage_test.go` (`TestVersionedMediaRestoreAgainstFloci`); `env media-sync` listing-diff: unit (`internal/mediasync`) + `tests/floci/media_sync_test.go` (`TestMediaSyncListingDiffAgainstFloci`). Live paid-account media cutover remains unpaid-proof (Phase 7 HUMAN_GATE with DNS). |
 | SelectTask (PrepareExec helper) | unit-fake | `TestSelectTaskSortsRunningTaskARNs` in `internal/cloud/aws/operations` |
+
+Shared Kubernetes day-2 (`eks-autopilot` / `mks` / `kapsule`, experimental): `kube.Observe` +
+`kube.Steps` + S3-compatible DIY State/AcquireLock are proven offline (unit + Floci AES256
+where applicable). Do not claim live GKE/OVH/SCW Magento acceptance. DNS and managed dump
+cutover stay Phase 7.
 
 ## GCP GKE Autopilot cells (experimental)
 
