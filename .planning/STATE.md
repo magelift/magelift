@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-current_phase: 7
-current_phase_name: GCP Certification
-status: blocked_on_operator_auth
-stopped_at: Phase 7 offline 01-05 done; 07-06 live needs gcloud ADC + Cloudflare Zone.DNS Edit token
-last_updated: "2026-07-30T14:00:00.000Z"
-last_activity: 2026-07-30
-last_activity_desc: Phase 8 plans 08-01..06 + VALIDATION created; Phase 7 live still blocked on auth
+current_phase: 8
+current_phase_name: Brownfield Attach & Tag Day
+status: in_progress
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-07-30T12:07:20.167Z"
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 57
-  completed_plans: 43
-  percent: 75
+  completed_plans: 44
+  percent: 77
+last_activity: 2026-07-30
+last_activity_desc: "08-01 COMPLETE — VPC ADOPT report + refuse-before-mutate (network)"
 ---
 
 # Project State
@@ -23,20 +23,32 @@ progress:
 
 See: .planning/PROJECT.md
 
-**Current focus:** Unblock Phase 7 live pass (gcloud + Cloudflare DNS token), then 07-06/07; Phase 8 plans ready
+**Current focus:** Execute Phase 8 (08-02 database adopt next); Phase 7 live still blocked on gcloud ADC + Cloudflare DNS token
 
 ## Current Position
 
-Phase: 7 of 8 (GCP Certification)
-Plan: 07-06 of 07-07 (live paid pass)
-Status: blocked_on_operator_auth
+Phase: 8 of 8 (Brownfield Attach & Tag Day)
+Plan: 02 of 06
+Status: in_progress
 
 ## Session Continuity
 
+**Last session:** 2026-07-30T12:07:20.159Z
+**Stopped at:** Completed 08-01-PLAN.md
+**Resume file:** None
+
 - Phase 6: verified 5/5 offline
-- Phase 7 offline: 07-01..05 COMPLETE (WIF/SM, cost, harness, dump runner, CF DNS script)
-- Phase 7 live: needs (1) `gcloud auth login` + ADC (2) `CLOUDFLARE_API_TOKEN` with Zone.DNS Edit
-- Wrangler OAuth insufficient for DNS write (zone:read only)
-- Preferred DNS: magelift-preview.alexandrecourtiol.com
+- Phase 7 offline: 07-01..05 COMPLETE; live 07-06 blocked on gcloud ADC + CLOUDFLARE_API_TOKEN
+- Phase 8: 08-01 COMPLETE (ADOPT network + refuse gate); next 08-02
 - Phase 1 CI: Act-only until GH minutes
-- Phase 8: 6 plans planned (waves 1–5); Floci/mocks first; paid AWS adopt HUMAN_GATE; GCP board Pending→07
+
+## Performance Metrics
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 08 P01 | 6min | 2 tasks | 7 files |
+
+## Decisions
+
+- [Phase 08]: BrownfieldAttach port for ADOPT/refuse without CLI→pulumi-aws import
+- [Phase 08]: Stack-scoped deploy/destroy use empty refuse intent; destroy/replace of adopted VPC fails closed
