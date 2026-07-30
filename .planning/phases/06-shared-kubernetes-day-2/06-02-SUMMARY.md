@@ -140,9 +140,15 @@ status: complete
 - **Verification:** ClientFrom* tests pass
 - **Committed in:** `4c2af70`
 
+**3. [Rule 2 - Correctness] Did not mark KUBE-01..04 complete**
+- **Found during:** State updates after SUMMARY
+- **Issue:** PLAN frontmatter listed KUBE-01..04, but those require Observe/Steps (06-03/06-04). Auto-mark would falsely complete them.
+- **Fix:** Left REQUIREMENTS checkboxes Pending; SUMMARY `requirements-completed: []`.
+- **Committed in:** `a1227b7`
+
 ---
 
-**Total deviations:** 2 auto-fixed (1× Rule 1, 1× Rule 2)
+**Total deviations:** 3 auto-fixed (1× Rule 1, 2× Rule 2)
 **Impact on plan:** Required for correctness; no scope creep beyond exporting kubeconfig.
 
 ## Issues Encountered
