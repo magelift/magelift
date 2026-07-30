@@ -203,7 +203,15 @@ Plans:
   4. `internal/cloud/ovh/stack/ops.go` and `internal/cloud/scaleway/stack/ops.go` hold no `unsupported{}` stub for any capability the shared layer now provides (a grep gate over the 15 `ErrNotSupported` sites each carries today), and every remaining gap returns a tier-named error
   5. `docs/capability-matrix.md` rows for `eks-autopilot`, `mks`, and `kapsule` state the day-2 surface that now works with its evidence tier, while `Bootstrap` and `Secrets` remain per-provider with a test asserting no nil-success path in either
 
-**Plans**: TBD
+**Plans:** 6 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — SSE ObjectEncryption + OVH/SCW State via NewAWSWithEndpoint (KUBE-05)
+- [ ] 06-02-PLAN.md — OutputKubeconfig + kube client factory + four stack exports
+- [ ] 06-03-PLAN.md — Shared kube.Observe + collapse GCP + four RuntimeObserve (KUBE-01..03)
+- [ ] 06-04-PLAN.md — Shared kube.Steps + four NewDeploySteps + fake sequence (KUBE-04)
+- [ ] 06-05-PLAN.md — Unsupported honesty, AcquireLock flip, matrix/docs (KUBE-06..07)
+- [ ] 06-06-PLAN.md — Offline integration gates + Phase 7 Cloudflare DNS handoff
 
 ### Phase 7: GCP Certification
 
