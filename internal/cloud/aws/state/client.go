@@ -8,17 +8,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-func NewAWS(ctx context.Context, region, bucket, project, environment, kmsARN string) (*Manager, error) {
+func NewAWS(ctx context.Context, region, bucket, project, environment string, encryption ObjectEncryption) (*Manager, error) {
 	endpoint, err := awsendpoint.FromEnv()
 	if err != nil {
 		return nil, err
 	}
-	return NewAWSWithEndpoint(ctx, region, bucket, project, environment, kmsARN, endpoint)
+	return NewAWSWithEndpoint(ctx, region, bucket, project, environment, encryption, endpoint)
 }
 
 // NewAWSWithEndpoint is used by local AWS-compatible emulators such as Floci.
 // Production callers should leave endpoint empty so the SDK uses AWS defaults.
-func NewAWSWithEndpoint(ctx context.Context, region, bucket, project, environment, kmsARN, endpoint string) (*Manager, error) {
+func NewAWSWithEndpoint(ctx context.Context, region, bucket, project, environment string, encryption ObjectEncryption, endpoint string) (*Manager, error) {
 	validatedEndpoint, err := awsendpoint.Parse(endpoint)
 	if err != nil {
 		return nil, err
@@ -33,5 +33,5 @@ func NewAWSWithEndpoint(ctx context.Context, region, bucket, project, environmen
 			options.UsePathStyle = true
 		}
 	})
-	return NewManager(client, bucket, project, environment, kmsARN)
+	return NewManager(client, bucket, project, environment, encryption)
 }

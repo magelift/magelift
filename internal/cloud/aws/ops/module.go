@@ -99,7 +99,7 @@ func acquireDeploymentLock(ctx context.Context, spec awsstack.Spec) (func(contex
 	if err != nil {
 		return nil, err
 	}
-	manager, err := awsstate.NewAWS(ctx, spec.Identity.Region, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment, spec.Dependencies.KMSKeyARN)
+	manager, err := awsstate.NewAWS(ctx, spec.Identity.Region, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment, awsstate.ObjectEncryption{Mode: awsstate.EncryptionKMS, KMSKeyARN: spec.Dependencies.KMSKeyARN})
 	if err != nil {
 		return nil, err
 	}

@@ -72,7 +72,7 @@ func TestBootstrapStateAndLockAgainstFloci(t *testing.T) {
 	t.Setenv("AWS_ACCESS_KEY_ID", "test")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
 	t.Setenv("MAGELIFT_AWS_ENDPOINT_URL", endpoint)
-	manager, err := state.NewAWS(ctx, "us-east-1", plan.StateBucket, "shop", "staging", result.KeyARN)
+	manager, err := state.NewAWS(ctx, "us-east-1", plan.StateBucket, "shop", "staging", state.ObjectEncryption{Mode: state.EncryptionKMS, KMSKeyARN: result.KeyARN})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestBootstrapStateAndLockAgainstFloci(t *testing.T) {
 	if _, err := s3Client.PutObject(ctx, &s3.PutObjectInput{Bucket: awssdk.String(plan.StateBucket), Key: awssdk.String("stacks/shop.json"), Body: strings.NewReader("state-v1")}); err != nil {
 		t.Fatal(err)
 	}
-	archive, err := state.NewAWSArchive(ctx, "us-east-1", plan.StateBucket, result.KeyARN)
+	archive, err := state.NewAWSArchive(ctx, "us-east-1", plan.StateBucket, state.ObjectEncryption{Mode: state.EncryptionKMS, KMSKeyARN: result.KeyARN})
 	if err != nil {
 		t.Fatal(err)
 	}

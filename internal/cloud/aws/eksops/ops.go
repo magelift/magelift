@@ -238,7 +238,7 @@ func stateManager(ctx context.Context, planned platform.PlannedStack) (*awsstate
 	if err != nil {
 		return nil, "", err
 	}
-	manager, err := awsstate.NewAWS(ctx, spec.Identity.Region, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment, spec.Dependencies.KMSKeyARN)
+	manager, err := awsstate.NewAWS(ctx, spec.Identity.Region, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment, awsstate.ObjectEncryption{Mode: awsstate.EncryptionKMS, KMSKeyARN: spec.Dependencies.KMSKeyARN})
 	if err != nil {
 		return nil, "", err
 	}
@@ -259,5 +259,5 @@ func stateArchive(ctx context.Context, planned platform.PlannedStack) (*awsstate
 	if err != nil {
 		return nil, err
 	}
-	return awsstate.NewAWSArchive(ctx, spec.Identity.Region, plan.StateBucket, spec.Dependencies.KMSKeyARN)
+	return awsstate.NewAWSArchive(ctx, spec.Identity.Region, plan.StateBucket, awsstate.ObjectEncryption{Mode: awsstate.EncryptionKMS, KMSKeyARN: spec.Dependencies.KMSKeyARN})
 }

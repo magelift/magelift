@@ -12,7 +12,6 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 )
 
@@ -35,7 +34,7 @@ type Manager struct {
 	key         string
 	project     string
 	environment string
-	kmsARN      string
+	encryption  ObjectEncryption
 	now         func() time.Time
 }
 
@@ -52,11 +51,17 @@ type Handle struct {
 	info    Info
 }
 
-func NewManager(client S3API, bucket, project, environment, kmsARN string) (*Manager, error) {
-	if client == nil || !bucketName.MatchString(bucket) || !stableName.MatchString(project) || !stableName.MatchString(environment) || !kmsKeyARN.MatchString(kmsARN) {
-		return nil, errors.New("state lock requires an S3 client, stable names, a state bucket, and a KMS key ARN")
+func NewManager(client S3API, bucket, project, environment string, encryption ObjectEncryption) (*Manager, error) {
+	if client == nil || !bucketName.MatchString(bucket) || !stableName.MatchString(project) || !stableName.MatchString(environment) {
+		return nil, errors.New("state lock requires an S3 client, stable names, and a state bucket")
 	}
-	return &Manager{client: client, bucket: bucket, key: "locks/" + project + "/" + environment + ".json", project: project, environment: environment, kmsARN: kmsARN, now: time.Now}, nil
+	if err := encryption.validate(); err != nil {
+		return nil, err
+	}
+	return &Manager{
+		client: client, bucket: bucket, key: "locks/" + project + "/" + environment + ".json",
+		project: project, environment: environment, encryption: encryption, now: time.Now,
+	}, nil
 }
 
 func (m *Manager) Acquire(ctx context.Context, project, environment, owner string) (*Handle, error) {
@@ -75,10 +80,12 @@ func (m *Manager) Acquire(ctx context.Context, project, environment, owner strin
 	if err != nil {
 		return nil, fmt.Errorf("encode deployment lock: %w", err)
 	}
-	result, err := m.client.PutObject(ctx, &s3.PutObjectInput{
+	putInput := &s3.PutObjectInput{
 		Bucket: awssdk.String(m.bucket), Key: awssdk.String(m.key), Body: bytes.NewReader(data), ContentType: awssdk.String("application/json"),
-		IfNoneMatch: awssdk.String("*"), ServerSideEncryption: s3types.ServerSideEncryptionAwsKms, SSEKMSKeyId: awssdk.String(m.kmsARN),
-	})
+		IfNoneMatch: awssdk.String("*"),
+	}
+	m.encryption.applyPut(putInput)
+	result, err := m.client.PutObject(ctx, putInput)
 	if err != nil {
 		if isPreconditionFailed(err) {
 			current, inspectErr := m.inspect(ctx)

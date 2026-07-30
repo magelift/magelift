@@ -16,6 +16,8 @@ import (
 type fakeArchiveS3 struct {
 	objects      map[string]string
 	failCopyFrom string
+	lastPut      *s3.PutObjectInput
+	lastCopy     *s3.CopyObjectInput
 }
 
 func (f *fakeArchiveS3) ListObjectsV2(_ context.Context, input *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
@@ -36,6 +38,7 @@ func (f *fakeArchiveS3) ListObjectsV2(_ context.Context, input *s3.ListObjectsV2
 }
 
 func (f *fakeArchiveS3) CopyObject(_ context.Context, input *s3.CopyObjectInput, _ ...func(*s3.Options)) (*s3.CopyObjectOutput, error) {
+	f.lastCopy = input
 	source, err := url.PathUnescape(awssdk.ToString(input.CopySource))
 	if err != nil {
 		return nil, err
@@ -56,6 +59,7 @@ func (f *fakeArchiveS3) CopyObject(_ context.Context, input *s3.CopyObjectInput,
 }
 
 func (f *fakeArchiveS3) PutObject(_ context.Context, input *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+	f.lastPut = input
 	f.objects[awssdk.ToString(input.Key)] = ""
 	return &s3.PutObjectOutput{}, nil
 }
@@ -73,7 +77,7 @@ func TestArchiveBackupExcludesLocksAndPreviousBackups(t *testing.T) {
 		"locks/shop/staging.json":      "lock",
 		"backups/old/stacks/shop.json": "old",
 	}}
-	archive, err := NewArchiveFromClient(fake, "state-bucket", "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000")
+	archive, err := NewArchiveFromClient(fake, "state-bucket", ObjectEncryption{Mode: EncryptionKMS, KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +96,7 @@ func TestArchiveBackupExcludesLocksAndPreviousBackups(t *testing.T) {
 
 func TestArchiveRestoreDeletesStaleObjectsAndCopiesSnapshot(t *testing.T) {
 	fake := &fakeArchiveS3{objects: map[string]string{"stacks/shop.json": "state", "stacks/old.json": "old"}}
-	archive, err := NewArchiveFromClient(fake, "state-bucket", "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000")
+	archive, err := NewArchiveFromClient(fake, "state-bucket", ObjectEncryption{Mode: EncryptionKMS, KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +126,7 @@ func TestArchiveRestoreRejectsPartialBackupBeforeMutation(t *testing.T) {
 		"stacks/shop.json":          "current",
 		prefix + "stacks/shop.json": "partial",
 	}}
-	archive, err := NewArchiveFromClient(fake, "state-bucket", "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000")
+	archive, err := NewArchiveFromClient(fake, "state-bucket", ObjectEncryption{Mode: EncryptionKMS, KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +143,7 @@ func TestArchiveRestoreCopiesBeforeDeletingStaleObjects(t *testing.T) {
 		"stacks/shop.json":  "current",
 		"stacks/stale.json": "stale",
 	}}
-	archive, err := NewArchiveFromClient(fake, "state-bucket", "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000")
+	archive, err := NewArchiveFromClient(fake, "state-bucket", ObjectEncryption{Mode: EncryptionKMS, KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +168,7 @@ func TestArchiveFailedBackupCannotBeRestored(t *testing.T) {
 		"stacks/shop.json": "state",
 		"stacks/next.json": "next",
 	}, failCopyFrom: "stacks/next.json"}
-	archive, err := NewArchiveFromClient(fake, "state-bucket", "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000")
+	archive, err := NewArchiveFromClient(fake, "state-bucket", ObjectEncryption{Mode: EncryptionKMS, KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,3 +181,22 @@ func TestArchiveFailedBackupCannotBeRestored(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestArchiveAES256SetsServerSideEncryption(t *testing.T) {
+	fake := &fakeArchiveS3{objects: map[string]string{"stacks/shop.json": "state"}}
+	archive, err := NewArchiveFromClient(fake, "state-bucket", ObjectEncryption{Mode: EncryptionAES256})
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive.now = func() time.Time { return time.Date(2026, time.July, 18, 12, 0, 0, 0, time.UTC) }
+	if _, err := archive.Backup(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if fake.lastPut == nil || fake.lastPut.ServerSideEncryption != "AES256" {
+		t.Fatalf("complete marker SSE = %#v", fake.lastPut)
+	}
+	if fake.lastCopy == nil || fake.lastCopy.ServerSideEncryption != "AES256" {
+		t.Fatalf("copy SSE = %#v", fake.lastCopy)
+	}
+}
+

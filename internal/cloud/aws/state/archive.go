@@ -30,10 +30,10 @@ type ArchiveAPI interface {
 }
 
 type Archive struct {
-	client ArchiveAPI
-	bucket string
-	kmsARN string
-	now    func() time.Time
+	client     ArchiveAPI
+	bucket     string
+	encryption ObjectEncryption
+	now        func() time.Time
 }
 
 type BackupResult struct {
@@ -48,8 +48,18 @@ type RestoreResult struct {
 	Objects int    `json:"objects" yaml:"objects"`
 }
 
-func NewAWSArchive(ctx context.Context, region, bucket, kmsARN string) (*Archive, error) {
+func NewAWSArchive(ctx context.Context, region, bucket string, encryption ObjectEncryption) (*Archive, error) {
 	endpoint, err := awsendpoint.FromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return NewAWSArchiveWithEndpoint(ctx, region, bucket, encryption, endpoint)
+}
+
+// NewAWSArchiveWithEndpoint mirrors NewAWSWithEndpoint for backup/restore against
+// AWS-compatible emulators (Floci) and S3-compatible providers.
+func NewAWSArchiveWithEndpoint(ctx context.Context, region, bucket string, encryption ObjectEncryption, endpoint string) (*Archive, error) {
+	validatedEndpoint, err := awsendpoint.Parse(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -58,19 +68,22 @@ func NewAWSArchive(ctx context.Context, region, bucket, kmsARN string) (*Archive
 		return nil, err
 	}
 	client := s3.NewFromConfig(config, func(options *s3.Options) {
-		if endpoint != "" {
-			options.BaseEndpoint = awssdk.String(endpoint)
+		if validatedEndpoint != "" {
+			options.BaseEndpoint = awssdk.String(validatedEndpoint)
 			options.UsePathStyle = true
 		}
 	})
-	return NewArchiveFromClient(client, bucket, kmsARN)
+	return NewArchiveFromClient(client, bucket, encryption)
 }
 
-func NewArchiveFromClient(client ArchiveAPI, bucket, kmsARN string) (*Archive, error) {
-	if client == nil || !bucketName.MatchString(bucket) || !kmsKeyARN.MatchString(kmsARN) {
-		return nil, errors.New("state archive requires an S3 client, a state bucket, and a KMS key ARN")
+func NewArchiveFromClient(client ArchiveAPI, bucket string, encryption ObjectEncryption) (*Archive, error) {
+	if client == nil || !bucketName.MatchString(bucket) {
+		return nil, errors.New("state archive requires an S3 client and a state bucket")
 	}
-	return &Archive{client: client, bucket: bucket, kmsARN: kmsARN, now: time.Now}, nil
+	if err := encryption.validate(); err != nil {
+		return nil, err
+	}
+	return &Archive{client: client, bucket: bucket, encryption: encryption, now: time.Now}, nil
 }
 
 func (a *Archive) Backup(ctx context.Context) (BackupResult, error) {
@@ -169,10 +182,11 @@ func (a *Archive) Restore(ctx context.Context, id string) (RestoreResult, error)
 }
 
 func (a *Archive) complete(ctx context.Context, prefix string) error {
-	_, err := a.client.PutObject(ctx, &s3.PutObjectInput{
+	putInput := &s3.PutObjectInput{
 		Bucket: awssdk.String(a.bucket), Key: awssdk.String(prefix + backupCompleteObject), Body: bytes.NewReader(nil),
-		ServerSideEncryption: s3types.ServerSideEncryptionAwsKms, SSEKMSKeyId: awssdk.String(a.kmsARN),
-	})
+	}
+	a.encryption.applyPut(putInput)
+	_, err := a.client.PutObject(ctx, putInput)
 	if err != nil {
 		return fmt.Errorf("complete state backup: %w", err)
 	}
@@ -206,10 +220,11 @@ func (a *Archive) list(ctx context.Context, prefix string) ([]string, error) {
 }
 
 func (a *Archive) copy(ctx context.Context, source, target string) error {
-	_, err := a.client.CopyObject(ctx, &s3.CopyObjectInput{
+	copyInput := &s3.CopyObjectInput{
 		Bucket: awssdk.String(a.bucket), Key: awssdk.String(target), CopySource: awssdk.String(url.PathEscape(a.bucket + "/" + source)),
-		ServerSideEncryption: s3types.ServerSideEncryptionAwsKms, SSEKMSKeyId: awssdk.String(a.kmsARN),
-	})
+	}
+	a.encryption.applyCopy(copyInput)
+	_, err := a.client.CopyObject(ctx, copyInput)
 	if err != nil {
 		return fmt.Errorf("copy state object: %w", err)
 	}

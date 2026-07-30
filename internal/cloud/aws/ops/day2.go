@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	awsbootstrap "github.com/acourtiol/magelift/internal/cloud/aws/bootstrap"
+	awscost "github.com/acourtiol/magelift/internal/cloud/aws/cost"
 	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
 	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
@@ -18,6 +19,9 @@ func (Module) Bootstrap() platform.Bootstrap           { return Bootstrap{} }
 func (Module) State() platform.State                   { return State{} }
 func (Module) Secrets() platform.Secrets               { return Secrets{} }
 func (Module) RuntimeObserve() platform.RuntimeObserve { return Observe{} }
+func (Module) CostEstimator() platform.CostEstimator {
+	return awscost.Estimator{}
+}
 
 // Bootstrap implements platform.Bootstrap for AWS.
 type Bootstrap struct{}
@@ -329,7 +333,7 @@ func stateManager(ctx context.Context, planned platform.PlannedStack) (*awsstate
 	if err != nil {
 		return nil, "", err
 	}
-	manager, err := awsstate.NewAWS(ctx, spec.Identity.Region, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment, spec.Dependencies.KMSKeyARN)
+	manager, err := awsstate.NewAWS(ctx, spec.Identity.Region, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment, awsstate.ObjectEncryption{Mode: awsstate.EncryptionKMS, KMSKeyARN: spec.Dependencies.KMSKeyARN})
 	if err != nil {
 		return nil, "", err
 	}
@@ -350,7 +354,7 @@ func stateArchive(ctx context.Context, planned platform.PlannedStack) (*awsstate
 	if err != nil {
 		return nil, err
 	}
-	return awsstate.NewAWSArchive(ctx, spec.Identity.Region, plan.StateBucket, spec.Dependencies.KMSKeyARN)
+	return awsstate.NewAWSArchive(ctx, spec.Identity.Region, plan.StateBucket, awsstate.ObjectEncryption{Mode: awsstate.EncryptionKMS, KMSKeyARN: spec.Dependencies.KMSKeyARN})
 }
 
 func toLockInfo(info awsstate.Info) platform.LockInfo {
