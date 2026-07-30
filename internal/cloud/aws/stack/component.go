@@ -130,12 +130,20 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	if spec.Catalog.DatabaseEngine == DatabaseEngineRDSMySQL {
 		engineVersion = spec.Catalog.Versions.MySQL
 	}
-	component.Database, err = database.New(ctx, name+"-database", database.Args{
+	databaseArgs := database.Args{
 		Preset: spec.Identity.Preset, EnvironmentClass: spec.Identity.EnvironmentClass, Region: spec.Identity.Region, AvailabilityZones: databaseZones, DataSubnetIDs: databaseSubnets,
 		VpcSecurityGroupIDs: pulumi.StringArray{component.Security.DataSecurityGroupID}, Engine: spec.Catalog.DatabaseEngine, EngineVersion: engineVersion, DatabaseName: spec.Dependencies.DatabaseName, MasterUsername: spec.Dependencies.MasterUsername,
 		KMSKeyARN: spec.Dependencies.KMSKeyARN, BackupRetentionDays: spec.Catalog.Retention.BackupDays, FinalSnapshotIdentifier: name + "-final", ProvisionedInstanceClass: spec.Catalog.AuroraProvisioned.InstanceClass, InstanceCount: spec.Catalog.AuroraProvisioned.InstanceCount,
 		ServerlessV2: serverlessDatabase(spec), Tags: tags,
-	}, regional...)
+	}
+	if spec.Existing.Database != nil {
+		databaseArgs.Existing = &database.ExistingDatabase{
+			Identifier: spec.Existing.Database.ExternalID,
+			Endpoint:   spec.Existing.DatabaseEndpoint,
+			SecretARN:  spec.Existing.DatabaseSecretARN,
+		}
+	}
+	component.Database, err = database.New(ctx, name+"-database", databaseArgs, regional...)
 	if err != nil {
 		return nil, fmt.Errorf("create AWS database: %w", err)
 	}
