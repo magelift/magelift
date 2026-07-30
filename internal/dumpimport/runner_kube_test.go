@@ -126,65 +126,101 @@ func kubeOpts(t *testing.T, fake *fakeKubeMySQL) dumpimport.Options {
 	}
 }
 
-func TestKubeRunnerImportTinySQL(t *testing.T) {
-	fake := &fakeKubeMySQL{}
-	opts := kubeOpts(t, fake)
-
-	if err := dumpimport.Import(context.Background(), opts); err != nil {
-		t.Fatalf("Import tiny.sql via kube: %v", err)
+func TestKubeRunnerTableDriven(t *testing.T) {
+	tests := []struct {
+		name       string
+		failExec   bool
+		preTables  int
+		yes        bool
+		wantErr    error
+		wantProbe  string
+		wantTables bool
+	}{
+		{
+			name:       "tiny.sql succeeds and tables queryable",
+			wantProbe:  "tiny-fixture",
+			wantTables: true,
+		},
+		{
+			name:     "exec failure is loud not silent",
+			failExec: true,
+		},
+		{
+			name:      "nonempty without yes refuses",
+			preTables: 2,
+			yes:       false,
+			wantErr:   dumpimport.ErrNonEmptyRequiresYes,
+		},
 	}
 
-	nonEmpty, err := dumpimport.NonEmpty(context.Background(), opts)
-	if err != nil {
-		t.Fatalf("NonEmpty: %v", err)
-	}
-	if !nonEmpty {
-		t.Fatal("expected tables after kube Import of tiny.sql")
-	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := &fakeKubeMySQL{failExec: tc.failExec, tables: tc.preTables}
+			if tc.preTables > 0 {
+				fake.probe = "existing"
+			}
+			opts := kubeOpts(t, fake)
+			opts.Yes = tc.yes
 
-	label, err := dumpimport.Query(context.Background(), opts, "SELECT label FROM magelift_seed_probe WHERE id = 1")
-	if err != nil {
-		t.Fatalf("verification query: %v", err)
-	}
-	if label != "tiny-fixture" {
-		t.Fatalf("probe label = %q, want tiny-fixture", label)
-	}
+			err := dumpimport.Import(context.Background(), opts)
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("error = %v, want %v", err, tc.wantErr)
+				}
+				return
+			}
+			if tc.failExec {
+				if err == nil {
+					t.Fatal("expected kube exec failure to surface")
+				}
+				msg := strings.ToLower(err.Error())
+				if strings.Contains(msg, "not implemented") {
+					t.Fatalf("must not stub: %v", err)
+				}
+				if !strings.Contains(msg, "import") && !strings.Contains(msg, "mysql") {
+					t.Fatalf("failure should mention import/mysql for journal mapping, got: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Import: %v", err)
+			}
 
-	// Password must travel via MYSQL_PWD env arg, never -pPASSWORD (T-07-08).
-	sawPWD := false
-	for _, call := range fake.calls {
-		mysqlArgs := afterDoubleDash(call)
-		if len(mysqlArgs) == 0 {
-			continue
-		}
-		joined := strings.Join(mysqlArgs, " ")
-		if strings.Contains(joined, "-p"+opts.Password) {
-			t.Fatalf("password leaked into mysql argv: %v", mysqlArgs)
-		}
-		if containsArg(mysqlArgs, "MYSQL_PWD="+opts.Password) {
-			sawPWD = true
-		}
-	}
-	if !sawPWD {
-		t.Fatal("expected MYSQL_PWD via env in at least one kubectl exec")
-	}
-}
+			nonEmpty, err := dumpimport.NonEmpty(context.Background(), opts)
+			if err != nil {
+				t.Fatalf("NonEmpty: %v", err)
+			}
+			if nonEmpty != tc.wantTables {
+				t.Fatalf("NonEmpty = %v, want %v", nonEmpty, tc.wantTables)
+			}
+			if tc.wantProbe == "" {
+				return
+			}
+			label, err := dumpimport.Query(context.Background(), opts, "SELECT label FROM magelift_seed_probe WHERE id = 1")
+			if err != nil {
+				t.Fatalf("verification query: %v", err)
+			}
+			if label != tc.wantProbe {
+				t.Fatalf("probe label = %q, want %q", label, tc.wantProbe)
+			}
 
-func TestKubeRunnerExecFailureLoud(t *testing.T) {
-	fake := &fakeKubeMySQL{failExec: true}
-	opts := kubeOpts(t, fake)
-
-	err := dumpimport.Import(context.Background(), opts)
-	if err == nil {
-		t.Fatal("expected kube exec failure to surface")
-	}
-	msg := err.Error()
-	if strings.Contains(msg, "not implemented") {
-		t.Fatalf("must not stub: %v", err)
-	}
-	lower := strings.ToLower(msg)
-	if !strings.Contains(lower, "import") && !strings.Contains(lower, "mysql") {
-		t.Fatalf("failure should mention import/mysql for journal mapping, got: %v", err)
+			sawPWD := false
+			for _, call := range fake.calls {
+				mysqlArgs := afterDoubleDash(call)
+				if len(mysqlArgs) == 0 {
+					continue
+				}
+				if strings.Contains(strings.Join(mysqlArgs, " "), "-p"+opts.Password) {
+					t.Fatalf("password leaked into mysql argv: %v", mysqlArgs)
+				}
+				if containsArg(mysqlArgs, "MYSQL_PWD="+opts.Password) {
+					sawPWD = true
+				}
+			}
+			if !sawPWD {
+				t.Fatal("expected MYSQL_PWD via env in at least one kubectl exec")
+			}
+		})
 	}
 }
 
@@ -238,15 +274,5 @@ func TestKubeRunnerSelectorResolvesPod(t *testing.T) {
 	}
 	if !foundGet {
 		t.Fatal("expected kubectl get pods for selector resolution")
-	}
-}
-
-func TestKubeRunnerNonEmptyRequiresYes(t *testing.T) {
-	fake := &fakeKubeMySQL{tables: 2, probe: "tiny-fixture"}
-	opts := kubeOpts(t, fake)
-	opts.Yes = false
-	err := dumpimport.Import(context.Background(), opts)
-	if !errors.Is(err, dumpimport.ErrNonEmptyRequiresYes) {
-		t.Fatalf("error = %v, want ErrNonEmptyRequiresYes", err)
 	}
 }

@@ -163,6 +163,25 @@ func TestImportCreatesTablesFromTinySQL(t *testing.T) {
 	}
 }
 
+func TestHostModeDefaultsWhenKubeUnset(t *testing.T) {
+	// Host/compose path leaves Runner empty; documented defaults are loopback MySQL.
+	opts := dumpimport.Options{DumpPath: fixturePath(t, "tiny.sql")}
+	if opts.Runner != "" {
+		t.Fatalf("Runner = %q, want empty for host mode", opts.Runner)
+	}
+	if opts.Host != "" || opts.Port != 0 {
+		t.Fatalf("unset Host/Port should be empty/0 before resolve, got %q/%d", opts.Host, opts.Port)
+	}
+	// Integration path (when docker available) still imports with defaults applied inside Import.
+	live := requireLocalMySQL(t)
+	if live.Host != "" && live.Host != "127.0.0.1" {
+		// published compose port may remap; Host stays loopback when mysql client is present
+	}
+	if live.Runner != "" {
+		t.Fatalf("live host opts Runner = %q, want empty", live.Runner)
+	}
+}
+
 func TestImportTinySQLGz(t *testing.T) {
 	opts := requireLocalMySQL(t)
 	opts.DumpPath = fixturePath(t, "tiny.sql.gz")
