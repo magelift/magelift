@@ -42,6 +42,67 @@ func TestAdoptReportEmptyWithoutExistingNetwork(t *testing.T) {
 	}
 }
 
+func TestAdoptReportExistingDatabase(t *testing.T) {
+	t.Parallel()
+	spec := Spec{
+		Existing: ExistingResources{
+			Database: &sdk.ExistingResourceRef{
+				ID:         "shop-staging-database",
+				Provider:   "aws",
+				Kind:       sdk.ExistingDatabase,
+				ExternalID: "db-magento-prod",
+			},
+			DatabaseSecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master",
+			DatabaseEndpoint:  "magento.xxxxx.eu-west-3.rds.amazonaws.com",
+		},
+	}
+	entries := AdoptReport(spec)
+	if len(entries) != 1 {
+		t.Fatalf("AdoptReport len = %d, want 1", len(entries))
+	}
+	if entries[0].Kind != "database" || entries[0].ExternalID != "db-magento-prod" {
+		t.Fatalf("entry = %#v", entries[0])
+	}
+	if entries[0].Label != "shop-staging-database" {
+		t.Fatalf("label = %q", entries[0].Label)
+	}
+	if got := entries[0].Line(); got != "ADOPT database db-magento-prod" {
+		t.Fatalf("Line() = %q", got)
+	}
+}
+
+func TestAdoptReportNetworkAndDatabase(t *testing.T) {
+	t.Parallel()
+	spec := Spec{
+		Existing: ExistingResources{
+			Network: &sdk.ExistingResourceRef{
+				ID:         "shop-staging-network",
+				Provider:   "aws",
+				Kind:       sdk.ExistingNetwork,
+				ExternalID: "vpc-0123456789abcdef0",
+			},
+			Database: &sdk.ExistingResourceRef{
+				ID:         "shop-staging-database",
+				Provider:   "aws",
+				Kind:       sdk.ExistingDatabase,
+				ExternalID: "db-magento-prod",
+			},
+			DatabaseSecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master",
+			DatabaseEndpoint:  "magento.xxxxx.eu-west-3.rds.amazonaws.com",
+		},
+	}
+	entries := AdoptReport(spec)
+	if len(entries) != 2 {
+		t.Fatalf("AdoptReport len = %d, want 2", len(entries))
+	}
+	if entries[0].Line() != "ADOPT network vpc-0123456789abcdef0" {
+		t.Fatalf("network entry = %#v", entries[0])
+	}
+	if entries[1].Line() != "ADOPT database db-magento-prod" {
+		t.Fatalf("database entry = %#v", entries[1])
+	}
+}
+
 func TestRefuseAdoptedMutationNamesNetworkExternalID(t *testing.T) {
 	t.Parallel()
 	spec := Spec{

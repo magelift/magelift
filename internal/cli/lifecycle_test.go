@@ -719,6 +719,136 @@ func writeLifecycleConfigWithExistingNetwork(t *testing.T) string {
 	return path
 }
 
+func writeLifecycleConfigWithExistingNetworkAndDatabase(t *testing.T) string {
+	t.Helper()
+	aws := config.AWSTarget{
+		KMSKeyARN:                "arn:aws:kms:eu-west-3:123456789012:key/01234567-89ab-cdef-0123-456789abcdef",
+		HostedZoneID:             "Z123456789",
+		CloudFrontCertificateARN: "arn:aws:acm:us-east-1:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef",
+		ALBCertificateARN:        "arn:aws:acm:eu-west-3:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789",
+		ImageDigest:              "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		CacheSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:cache-token",
+		SessionSecretARN:         "arn:aws:secretsmanager:eu-west-3:123456789012:secret:session-token",
+		QueueSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:queue-token",
+		EncryptionKeySecretARN:   "arn:aws:secretsmanager:eu-west-3:123456789012:secret:encryption-key",
+		DatabaseName:             "magento",
+		MasterUsername:           "magento_admin",
+		VPCCIDR:                  "10.20.0.0/16",
+		AvailabilityZones:        []string{"eu-west-3a", "eu-west-3b"},
+		MediaDomain:              "media.shop.example",
+		Existing: config.AWSExistingResources{
+			Network:          &config.AWSExistingResource{Provider: "aws", Kind: "network", ExternalID: "vpc-0adoptpreview01"},
+			PublicSubnetIDs:  []string{"subnet-public-a", "subnet-public-b"},
+			PrivateSubnetIDs: []string{"subnet-private-a", "subnet-private-b"},
+			DataSubnetIDs:    []string{"subnet-data-a", "subnet-data-b"},
+			Database: &config.AWSExistingDatabase{
+				Provider:   "aws",
+				Kind:       "database",
+				ExternalID: "db-magento-prod",
+				SecretARN:  "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master",
+				Endpoint:   "magento.xxxxx.eu-west-3.rds.amazonaws.com",
+			},
+		},
+		Catalog: config.AWSCatalog{
+			Version:   "catalog-2026-07-01",
+			Aurora:    config.AWSCatalogAurora{InstanceClass: "db.r7g.large", InstanceCount: 2},
+			Valkey:    config.AWSCatalogValkey{NodeType: "cache.r7g.large", ReplicaCount: 1},
+			Search:    config.AWSCatalogSearch{InstanceType: "r7g.large.search", InstanceCount: 2, EBSVolumeType: "gp3", EBSVolumeSizeGiB: 100},
+			RabbitMQ:  config.AWSCatalogRabbitMQ{InstanceType: "mq.m7g.large"},
+			Fargate:   config.AWSCatalogFargate{CPU: 1024, MemoryMiB: 2048, DesiredCount: 2},
+			Retention: config.AWSCatalogRetention{LogDays: 30, BackupDays: 7, ArtifactDays: 30},
+			Versions:  config.AWSCatalogVersions{AuroraMySQL: "8.0.mysql_aurora.3.12", Valkey: "8.1", OpenSearch: "OpenSearch_3.1", RabbitMQ: "3.13"},
+		},
+	}
+	document := map[string]any{
+		"schemaVersion": 1,
+		"project":       config.Project{Name: "shop"},
+		"application":   config.Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		"build":         config.Build{PHP: "8.3"},
+		"target":        config.Target{Provider: "aws", Runtime: "ecs-fargate", AWS: &aws},
+		"defaults":      config.Defaults{Region: "eu-west-3", Preset: "standard"},
+		"environments": map[string]any{"staging": map[string]any{
+			"account":            "123456789012",
+			"class":              "staging",
+			"domain":             "shop.example",
+			"protection":         false,
+			"monthlyBudgetCents": int64(250000),
+		}},
+	}
+	data, err := yaml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "magelift.yaml")
+	if err := writeFile(path, data); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeLifecycleConfigWithExistingDatabase(t *testing.T) string {
+	t.Helper()
+	aws := config.AWSTarget{
+		KMSKeyARN:                "arn:aws:kms:eu-west-3:123456789012:key/01234567-89ab-cdef-0123-456789abcdef",
+		HostedZoneID:             "Z123456789",
+		CloudFrontCertificateARN: "arn:aws:acm:us-east-1:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef",
+		ALBCertificateARN:        "arn:aws:acm:eu-west-3:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789",
+		ImageDigest:              "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		CacheSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:cache-token",
+		SessionSecretARN:         "arn:aws:secretsmanager:eu-west-3:123456789012:secret:session-token",
+		QueueSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:queue-token",
+		EncryptionKeySecretARN:   "arn:aws:secretsmanager:eu-west-3:123456789012:secret:encryption-key",
+		DatabaseName:             "magento",
+		MasterUsername:           "magento_admin",
+		VPCCIDR:                  "10.20.0.0/16",
+		AvailabilityZones:        []string{"eu-west-3a", "eu-west-3b"},
+		MediaDomain:              "media.shop.example",
+		Existing: config.AWSExistingResources{
+			Database: &config.AWSExistingDatabase{
+				Provider:   "aws",
+				Kind:       "database",
+				ExternalID: "db-magento-prod",
+				SecretARN:  "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master",
+				Endpoint:   "magento.xxxxx.eu-west-3.rds.amazonaws.com",
+			},
+		},
+		Catalog: config.AWSCatalog{
+			Version:   "catalog-2026-07-01",
+			Aurora:    config.AWSCatalogAurora{InstanceClass: "db.r7g.large", InstanceCount: 2},
+			Valkey:    config.AWSCatalogValkey{NodeType: "cache.r7g.large", ReplicaCount: 1},
+			Search:    config.AWSCatalogSearch{InstanceType: "r7g.large.search", InstanceCount: 2, EBSVolumeType: "gp3", EBSVolumeSizeGiB: 100},
+			RabbitMQ:  config.AWSCatalogRabbitMQ{InstanceType: "mq.m7g.large"},
+			Fargate:   config.AWSCatalogFargate{CPU: 1024, MemoryMiB: 2048, DesiredCount: 2},
+			Retention: config.AWSCatalogRetention{LogDays: 30, BackupDays: 7, ArtifactDays: 30},
+			Versions:  config.AWSCatalogVersions{AuroraMySQL: "8.0.mysql_aurora.3.12", Valkey: "8.1", OpenSearch: "OpenSearch_3.1", RabbitMQ: "3.13"},
+		},
+	}
+	document := map[string]any{
+		"schemaVersion": 1,
+		"project":       config.Project{Name: "shop"},
+		"application":   config.Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		"build":         config.Build{PHP: "8.3"},
+		"target":        config.Target{Provider: "aws", Runtime: "ecs-fargate", AWS: &aws},
+		"defaults":      config.Defaults{Region: "eu-west-3", Preset: "standard"},
+		"environments": map[string]any{"staging": map[string]any{
+			"account":            "123456789012",
+			"class":              "staging",
+			"domain":             "shop.example",
+			"protection":         false,
+			"monthlyBudgetCents": int64(250000),
+		}},
+	}
+	data, err := yaml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "magelift.yaml")
+	if err := writeFile(path, data); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func TestPreviewReportsAdoptNetwork(t *testing.T) {
 	path := writeLifecycleConfigWithExistingNetwork(t)
 	backend := &fakeInfrastructureBackend{}
@@ -743,6 +873,64 @@ func TestPreviewReportsAdoptNetwork(t *testing.T) {
 	}
 	if !reflect.DeepEqual(backend.calls, []string{"preview"}) {
 		t.Fatalf("backend calls = %v", backend.calls)
+	}
+}
+
+func TestPreviewReportsAdoptNetworkAndDatabase(t *testing.T) {
+	path := writeLifecycleConfigWithExistingNetworkAndDatabase(t)
+	backend := &fakeInfrastructureBackend{}
+	var stdout, stderr bytes.Buffer
+	o := testOptions(&stdout, &fakeTerminal{interactive: false})
+	o.stderr = &stderr
+	o.configPath = path
+	o.environment = "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "preview"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stderr.String(), "ADOPT network vpc-0adoptpreview01") {
+		t.Fatalf("stderr missing network ADOPT line: %q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "ADOPT database db-magento-prod") {
+		t.Fatalf("stderr missing database ADOPT line: %q", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "ADOPT network vpc-0adoptpreview01") ||
+		!strings.Contains(stdout.String(), "ADOPT database db-magento-prod") {
+		t.Fatalf("preview JSON missing adopted entries: %s", stdout.String())
+	}
+	if !reflect.DeepEqual(backend.calls, []string{"preview"}) {
+		t.Fatalf("backend calls = %v", backend.calls)
+	}
+}
+
+func TestPreviewReportsAdoptDatabaseOnly(t *testing.T) {
+	path := writeLifecycleConfigWithExistingDatabase(t)
+	backend := &fakeInfrastructureBackend{}
+	var stdout, stderr bytes.Buffer
+	o := testOptions(&stdout, &fakeTerminal{interactive: false})
+	o.stderr = &stderr
+	o.configPath = path
+	o.environment = "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "preview"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stderr.String(), "ADOPT network") {
+		t.Fatalf("stderr unexpectedly includes network ADOPT: %q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "ADOPT database db-magento-prod") {
+		t.Fatalf("stderr missing database ADOPT line: %q", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "ADOPT database db-magento-prod") {
+		t.Fatalf("preview JSON missing database adopted entry: %s", stdout.String())
 	}
 }
 
