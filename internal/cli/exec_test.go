@@ -218,6 +218,44 @@ func TestSSHUsesECSExecAsTheSupportedPath(t *testing.T) {
 	}
 }
 
+func TestExecRunsKubectlLauncherBinary(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	backend := &fakeInfrastructureBackend{outputs: map[string]any{
+		"clusterName": "shop-cluster",
+		"serviceName": "shop-web",
+		"kubeconfig":  "apiVersion: v1\nkind: Config\n",
+	}}
+	var capturedBinary string
+	var capturedArgs []string
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.configPath, o.environment = path, "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.testRuntimeObserve = &recordingExecObserve{target: platform.ExecTarget{
+		Launcher: "kubectl",
+		Args:     []string{"exec", "-n", "default", "-it", "deploy/shop-web", "--", "/bin/sh"},
+		Cluster:  "shop-cluster", Task: "shop-web",
+	}}
+	o.runCommand = func(_ context.Context, binary string, args []string, _, _ io.Writer) error {
+		capturedBinary = binary
+		capturedArgs = append([]string(nil), args...)
+		return nil
+	}
+	command := newCommandWithOptions(o)
+	command.SetArgs([]string{"--config", path, "--env", "staging", "exec", "--service", "web", "--", "/bin/sh"})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if capturedBinary != "kubectl" {
+		t.Fatalf("binary = %q, want kubectl (empty-binary path breaks kubectl)", capturedBinary)
+	}
+	want := []string{"exec", "-n", "default", "-it", "deploy/shop-web", "--", "/bin/sh"}
+	if !reflect.DeepEqual(capturedArgs, want) {
+		t.Fatalf("args = %#v, want %#v", capturedArgs, want)
+	}
+}
+
 func TestTunnelExplainsTheFargateBoundary(t *testing.T) {
 	err := tunnelCommand().Execute()
 	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "Fargate-only") {

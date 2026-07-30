@@ -13,12 +13,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
-// Fifteen unsupported day-2 methods on the experimental OVH shell (criterion 5).
-// Explicit table — not reflection — so the surface is documented and countable.
+// Twelve unsupported day-2 methods on the experimental OVH shell after shared
+// Observe moved to kube (Bootstrap/Secrets/Cost + State stubs on unsupported;
+// NewDeploySteps on Ops until 06-04).
 func TestUnsupportedMethodsReturnSentinelAndZeroValues(t *testing.T) {
 	ctx := context.Background()
 	u := unsupported{}
@@ -101,27 +103,6 @@ func TestUnsupportedMethodsReturnSentinelAndZeroValues(t *testing.T) {
 			},
 		},
 		{
-			name: "TailLogs",
-			call: func() caseResult {
-				got, err := u.TailLogs(ctx, nil, platform.LogQuery{})
-				return caseResult{err: err, zero: got == nil}
-			},
-		},
-		{
-			name: "CheckRuntime",
-			call: func() caseResult {
-				got, err := u.CheckRuntime(ctx, nil, nil)
-				return caseResult{err: err, zero: got == nil}
-			},
-		},
-		{
-			name: "PrepareExec",
-			call: func() caseResult {
-				got, err := u.PrepareExec(ctx, nil, nil, platform.ExecQuery{})
-				return caseResult{err: err, zero: reflect.ValueOf(got).IsZero()}
-			},
-		},
-		{
 			name: "Estimate",
 			call: func() caseResult {
 				got, err := u.Estimate(ctx, nil, config.Config{}, platform.CostOptions{})
@@ -137,8 +118,8 @@ func TestUnsupportedMethodsReturnSentinelAndZeroValues(t *testing.T) {
 		},
 	}
 
-	if len(cases) != 15 {
-		t.Fatalf("criterion 5 requires exactly 15 unsupported methods; got %d", len(cases))
+	if len(cases) != 12 {
+		t.Fatalf("unsupported shell requires exactly 12 methods after Observe moved to kube; got %d", len(cases))
 	}
 
 	for _, tc := range cases {
@@ -166,7 +147,10 @@ func TestModuleAccessorsReturnNonNilUnsupportedShells(t *testing.T) {
 		t.Fatal("Secrets must return the unsupported shell, not nil")
 	}
 	if m.RuntimeObserve() == nil {
-		t.Fatal("RuntimeObserve must return the unsupported shell, not nil")
+		t.Fatal("RuntimeObserve must return shared kube.Observe, not nil")
+	}
+	if _, ok := m.RuntimeObserve().(*kube.Observe); !ok {
+		t.Fatalf("RuntimeObserve type identity: want *kube.Observe, got %T", m.RuntimeObserve())
 	}
 	if m.CostEstimator() == nil {
 		t.Fatal("CostEstimator must return the unsupported shell, not nil")

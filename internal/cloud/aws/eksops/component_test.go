@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
 	sdk "github.com/acourtiol/magelift/sdk/v1"
@@ -55,14 +56,14 @@ func TestProgramBuildsMockGraph(t *testing.T) {
 	}
 }
 
-func TestOpsAndObserveAreUnsupported(t *testing.T) {
+func TestOpsDeployStepsUnsupportedAndObserveShared(t *testing.T) {
 	ops := Module{}.Ops()
 	if _, err := ops.NewDeploySteps(t.Context(), nil, Planned{Spec: validSpec()}, nil); err == nil || !strings.Contains(err.Error(), "not supported") {
 		t.Fatalf("deploy steps should be unsupported: %v", err)
 	}
 	observe := Module{}.RuntimeObserve()
-	if _, err := observe.TailLogs(t.Context(), Planned{Spec: validSpec()}, platform.LogQuery{}); err == nil || !strings.Contains(err.Error(), "not supported") {
-		t.Fatalf("observe should be unsupported: %v", err)
+	if _, ok := observe.(*kube.Observe); !ok {
+		t.Fatalf("want *kube.Observe, got %T", observe)
 	}
 }
 

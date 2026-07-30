@@ -7,6 +7,7 @@ import (
 
 	"github.com/acourtiol/magelift/internal/platform"
 	sdk "github.com/acourtiol/magelift/sdk/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -70,8 +71,96 @@ func TestObserveTailLogsEmptyPods(t *testing.T) {
 	}
 }
 
+func TestObserveCheckRuntimeHealthy(t *testing.T) {
+	replicas := int32(2)
+	cs := fake.NewClientset(&appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default"},
+		Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
+		Status: appsv1.DeploymentStatus{
+			ReadyReplicas: 2,
+			Conditions: []appsv1.DeploymentCondition{{
+				Type:   appsv1.DeploymentAvailable,
+				Status: corev1.ConditionTrue,
+			}},
+		},
+	})
+	obs := NewObserve(cs)
+	health, err := obs.CheckRuntime(context.Background(), observePlanned{project: "shop", env: "preview"}, map[string]any{
+		platform.OutputServiceName: "shop-web",
+	})
+	if err != nil {
+		t.Fatalf("CheckRuntime: %v", err)
+	}
+	if len(health) != 1 || health[0].Status != "healthy" {
+		t.Fatalf("health = %#v", health)
+	}
+	if health[0].ID != "runtime.kube.deployment" {
+		t.Fatalf("id = %q", health[0].ID)
+	}
+}
+
+func TestObserveCheckRuntimeUnhealthy(t *testing.T) {
+	replicas := int32(2)
+	cs := fake.NewClientset(&appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default"},
+		Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
+		Status: appsv1.DeploymentStatus{
+			ReadyReplicas: 0,
+			Conditions: []appsv1.DeploymentCondition{{
+				Type:   appsv1.DeploymentAvailable,
+				Status: corev1.ConditionFalse,
+			}},
+		},
+	})
+	obs := NewObserve(cs)
+	health, err := obs.CheckRuntime(context.Background(), observePlanned{project: "shop", env: "preview"}, map[string]any{
+		platform.OutputServiceName: "shop-web",
+	})
+	if err != nil {
+		t.Fatalf("CheckRuntime: %v", err)
+	}
+	if len(health) != 1 || health[0].Status != "unhealthy" {
+		t.Fatalf("health = %#v", health)
+	}
+}
+
+func TestObservePrepareExecKubectl(t *testing.T) {
+	obs := NewObserve(fake.NewClientset())
+	target, err := obs.PrepareExec(context.Background(), observePlanned{project: "shop", env: "preview"}, map[string]any{
+		platform.OutputClusterName: "shop-cluster",
+		platform.OutputServiceName: "shop-web",
+		platform.OutputKubeconfig:  BuildStaticTokenKubeconfig("c", "https://1.2.3.4", testCAData, "tok"),
+	}, platform.ExecQuery{
+		Workload: "web",
+		Command:  []string{"bin/magento", "cache:flush"},
+	})
+	if err != nil {
+		t.Fatalf("PrepareExec: %v", err)
+	}
+	if target.Launcher != "kubectl" {
+		t.Fatalf("launcher = %q, want kubectl", target.Launcher)
+	}
+	if target.Launcher == "gke-job" {
+		t.Fatal("gke-job launcher debt must be removed")
+	}
+	want := []string{"exec", "-n", "default", "-it", "deploy/shop-web", "--", "bin/magento", "cache:flush"}
+	if strings.Join(target.Args, " ") != strings.Join(want, " ") {
+		t.Fatalf("args = %#v, want %#v", target.Args, want)
+	}
+}
+
+func TestObservePrepareExecRequiresKubeconfig(t *testing.T) {
+	obs := NewObserve(fake.NewClientset())
+	_, err := obs.PrepareExec(context.Background(), observePlanned{project: "shop", env: "preview"}, map[string]any{
+		platform.OutputClusterName: "shop-cluster",
+		platform.OutputServiceName: "shop-web",
+	}, platform.ExecQuery{Command: []string{"/bin/sh"}})
+	if err == nil || !strings.Contains(err.Error(), platform.OutputKubeconfig) {
+		t.Fatalf("expected kubeconfig required error, got %v", err)
+	}
+}
+
 func TestGCPRuntimeObserveTypeIdentity(t *testing.T) {
-	// Imported via blank? Avoid cycle: assert NewObserveWithFactory shape used by GCP collapse.
 	obs := NewObserveWithFactory(ClientFromOutputs)
 	if _, ok := any(obs).(platform.RuntimeObserve); !ok {
 		t.Fatal("Observe must implement platform.RuntimeObserve")
