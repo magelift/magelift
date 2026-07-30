@@ -26,6 +26,20 @@ type composerSecretProvider interface {
 	secretref.ParameterStoreProvider
 }
 
+type gcpComposerSecretAdapter struct {
+	store interface {
+		GetSecretValue(context.Context, string) ([]byte, error)
+	}
+}
+
+func (a gcpComposerSecretAdapter) GetSecretValue(ctx context.Context, id string) ([]byte, error) {
+	return a.store.GetSecretValue(ctx, id)
+}
+
+func (a gcpComposerSecretAdapter) GetParameter(context.Context, string) ([]byte, error) {
+	return nil, errors.New("GCP Secret Manager does not resolve Parameter Store references")
+}
+
 func buildCommand(o *options) *cobra.Command {
 	var push bool
 	var imageReference string
@@ -242,7 +256,14 @@ func (o *options) loadComposerCredentials(ctx context.Context, rawReference, reg
 		}
 		return resolveComposerCredentials(ctx, reference, provider)
 	case secretref.GCPSecretManager:
-		return nil, errors.New("gcp-secret-manager Composer credentials resolution is not implemented yet; use a custom build path or contribute the GCP Secret Manager adapter")
+		if o == nil || o.newComposerGCPSecrets == nil {
+			return nil, errors.New("Composer credentials resolution is not configured for this CLI")
+		}
+		provider, err := o.newComposerGCPSecrets(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("initialize GCP secret provider: %w", err)
+		}
+		return resolveComposerCredentials(ctx, reference, provider)
 	default:
 		return nil, fmt.Errorf("unsupported Composer credentials scheme %q", reference.Kind)
 	}
@@ -270,7 +291,17 @@ func secretRegion(reference secretref.Reference, defaultRegion string) (string, 
 }
 
 func resolveComposerCredentials(ctx context.Context, reference secretref.Reference, provider composerSecretProvider) ([]byte, error) {
-	value, err := (secretref.Resolver{SecretsManager: provider, ParameterStore: provider}).Resolve(ctx, reference)
+	resolver := secretref.Resolver{}
+	switch reference.Kind {
+	case secretref.GCPSecretManager:
+		resolver.GCPSecretManager = provider
+	case secretref.ParameterStore:
+		resolver.ParameterStore = provider
+	default:
+		resolver.SecretsManager = provider
+		resolver.ParameterStore = provider
+	}
+	value, err := resolver.Resolve(ctx, reference)
 	if err != nil {
 		return nil, fmt.Errorf("resolve Composer credentials: %w", err)
 	}

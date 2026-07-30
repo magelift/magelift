@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	gcpbootstrap "github.com/acourtiol/magelift/internal/cloud/gcp/bootstrap"
-	"github.com/acourtiol/magelift/internal/cloud/kube"
 	gcpsecrets "github.com/acourtiol/magelift/internal/cloud/gcp/secrets"
 	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
 	gcpstate "github.com/acourtiol/magelift/internal/cloud/gcp/state"
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
 )
@@ -22,7 +23,7 @@ func (Module) RuntimeObserve() platform.RuntimeObserve {
 }
 func (Module) CostEstimator() platform.CostEstimator   { return unsupportedCost{} }
 
-// Bootstrap implements platform.Bootstrap for GCS DIY (WIF deferred).
+// Bootstrap implements platform.Bootstrap for GCS DIY state + GitHub WIF identity.
 type Bootstrap struct{}
 
 func (Bootstrap) VerifyAccount(ctx context.Context, planned platform.PlannedStack) error {
@@ -33,7 +34,10 @@ func (Bootstrap) VerifyAccount(ctx context.Context, planned platform.PlannedStac
 	return gcpbootstrap.VerifyAccount(ctx, gcpPlanned.GCPSpec().Identity.GCPProject)
 }
 
-func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, _ platform.BootstrapRequest) (platform.BootstrapResult, error) {
+func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, req platform.BootstrapRequest) (platform.BootstrapResult, error) {
+	if strings.TrimSpace(req.GitHubOwner) == "" || strings.TrimSpace(req.GitHubRepo) == "" {
+		return platform.BootstrapResult{}, fmt.Errorf("--github-owner and --github-repo are required")
+	}
 	gcpPlanned, ok := gcpstack.AsGCPPlanned(planned)
 	if !ok {
 		return platform.BootstrapResult{}, fmt.Errorf("GCP bootstrap received unexpected planned type %T", planned)
@@ -54,9 +58,32 @@ func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, _ pl
 	if err != nil {
 		return platform.BootstrapResult{}, err
 	}
+	identityPlan, err := gcpbootstrap.BuildIdentityPlan(gcpbootstrap.IdentitySpec{
+		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+		GCPProject: spec.Identity.GCPProject,
+		GitHubOwner: req.GitHubOwner, GitHubRepo: req.GitHubRepo,
+	})
+	if err != nil {
+		return platform.BootstrapResult{}, err
+	}
+	identity, err := gcpbootstrap.NewIdentity(ctx)
+	if err != nil {
+		return platform.BootstrapResult{}, err
+	}
+	wif, err := identity.Ensure(ctx, identityPlan)
+	if err != nil {
+		return platform.BootstrapResult{}, err
+	}
 	return platform.BootstrapResult{
 		BackendURL: gcpbootstrap.BackendURL(result.Plan),
-		Details:    map[string]any{"state": result, "wif": "deferred"},
+		Details: map[string]any{
+			"state": result,
+			"wif": map[string]any{
+				"pool":           wif.PoolResource,
+				"provider":       wif.ProviderResource,
+				"serviceAccount": wif.ServiceAccountEmail,
+			},
+		},
 	}, nil
 }
 

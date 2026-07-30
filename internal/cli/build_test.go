@@ -129,6 +129,12 @@ func TestResolveComposerCredentialsFromSupportedProviders(t *testing.T) {
 			provider:  &fakeComposerSecretProvider{parameterValue: []byte(`{"bearer":{"example.invalid":"token"}}`)},
 			wantID:    "/shop/composer",
 		},
+		{
+			name:      "GCP Secret Manager",
+			reference: secretref.Reference{Kind: secretref.GCPSecretManager, ID: "projects/p/secrets/composer/versions/latest"},
+			provider:  &fakeComposerSecretProvider{secretValue: []byte(`{"http-basic":{"repo.magento.com":{"username":"public","password":"private"}}}`)},
+			wantID:    "projects/p/secrets/composer/versions/latest",
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			value, err := resolveComposerCredentials(context.Background(), test.reference, test.provider)
@@ -139,6 +145,47 @@ func TestResolveComposerCredentialsFromSupportedProviders(t *testing.T) {
 				t.Fatalf("value length=%d secret=%q parameter=%q", len(value), test.provider.secretID, test.provider.parameterID)
 			}
 		})
+	}
+}
+
+func TestLoadComposerCredentialsGCPUsesProvider(t *testing.T) {
+	provider := &fakeComposerSecretProvider{secretValue: []byte(`{"http-basic":{"repo.magento.com":{"username":"public","password":"private"}}}`)}
+	o := &options{
+		newComposerGCPSecrets: func(context.Context) (composerSecretProvider, error) {
+			return provider, nil
+		},
+	}
+	value, err := o.loadComposerCredentials(context.Background(), "gcp-secret-manager://projects/p/secrets/composer/versions/latest", "europe-west1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(value) == 0 || provider.secretID != "projects/p/secrets/composer/versions/latest" {
+		t.Fatalf("value length=%d secret=%q", len(value), provider.secretID)
+	}
+	if strings.Contains(strings.ToLower(errString(err)), "not implemented") {
+		t.Fatal("GCP path still reports not implemented")
+	}
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func TestLoadComposerCredentialsGCPPropagatesProviderErrors(t *testing.T) {
+	o := &options{
+		newComposerGCPSecrets: func(context.Context) (composerSecretProvider, error) {
+			return &fakeComposerSecretProvider{err: errors.New("missing secret")}, nil
+		},
+	}
+	_, err := o.loadComposerCredentials(context.Background(), "gcp-secret-manager://projects/p/secrets/missing/versions/latest", "europe-west1")
+	if err == nil || !strings.Contains(err.Error(), "secret provider failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(err.Error(), "not implemented") || strings.Contains(err.Error(), "missing secret") {
+		t.Fatalf("error must stay loud without leaking provider detail: %v", err)
 	}
 }
 

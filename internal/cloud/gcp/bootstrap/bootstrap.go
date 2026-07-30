@@ -1,5 +1,5 @@
-// Package bootstrap prepares the GCS DIY Pulumi backend for a Magento environment.
-// GitHub WIF identity is deferred (experimental); Ensure creates the state bucket only.
+// Package bootstrap prepares the GCS DIY Pulumi backend and GitHub WIF identity
+// for a Magento environment on GCP.
 package bootstrap
 
 import (

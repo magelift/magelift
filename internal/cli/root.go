@@ -15,6 +15,7 @@ import (
 
 	"github.com/acourtiol/magelift/internal/automation"
 	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
+	gcpsecrets "github.com/acourtiol/magelift/internal/cloud/gcp/secrets"
 	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/cosign"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
@@ -70,6 +71,7 @@ type options struct {
 	newReleaseStore    func(string, string) (releaseStore, error)
 	verifyRelease      func(context.Context, string, cosign.VerifyOptions) error
 	newComposerSecrets func(context.Context, string) (composerSecretProvider, error)
+	newComposerGCPSecrets func(context.Context) (composerSecretProvider, error)
 	newUpgrade         func() upgradeClient
 	executable         func() (string, error)
 	// Test doubles for day-2 ports (override Module* resolution).
@@ -175,6 +177,13 @@ func newCommand(stdout, stderr io.Writer, modules *platform.ModuleRegistry) *cob
 		verifyRelease: cosign.New().Verify,
 		newComposerSecrets: func(ctx context.Context, region string) (composerSecretProvider, error) {
 			return awssecrets.New(ctx, region)
+		},
+		newComposerGCPSecrets: func(ctx context.Context) (composerSecretProvider, error) {
+			store, err := gcpsecrets.NewStore(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return gcpComposerSecretAdapter{store: store}, nil
 		},
 		newUpgrade: func() upgradeClient { return mageliftupgrade.New(nil) },
 		executable: os.Executable,

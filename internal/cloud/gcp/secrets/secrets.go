@@ -16,7 +16,13 @@ type API interface {
 	List(ctx context.Context, project string) ([]Meta, error)
 	Set(ctx context.Context, project, name string, value []byte) error
 	Remove(ctx context.Context, project, name string) error
+	GetSecretValue(ctx context.Context, name string) ([]byte, error)
 }
+
+var (
+	ErrSecretNameRequired = errors.New("secret name is required")
+	ErrSecretValueMissing = errors.New("secret has no value")
+)
 
 type Meta struct {
 	Name string
@@ -63,6 +69,18 @@ func (s *Store) Remove(ctx context.Context, project, name string) error {
 		return errors.New("secret name is required")
 	}
 	return s.client.Remove(ctx, project, name)
+}
+
+// GetSecretValue implements secretref.GCPSecretManagerProvider via AccessSecretVersion.
+// name must be a full version resource name (projects/.../secrets/.../versions/...).
+func (s *Store) GetSecretValue(ctx context.Context, name string) ([]byte, error) {
+	if s == nil || s.client == nil {
+		return nil, errors.New("secret store is required")
+	}
+	if strings.TrimSpace(name) == "" {
+		return nil, ErrSecretNameRequired
+	}
+	return s.client.GetSecretValue(ctx, name)
 }
 
 type smClient struct {
@@ -129,4 +147,19 @@ func (s smClient) Remove(ctx context.Context, project, name string) error {
 		return fmt.Errorf("delete secret: %w", err)
 	}
 	return nil
+}
+
+func (s smClient) GetSecretValue(ctx context.Context, name string) ([]byte, error) {
+	resp, err := s.client.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{
+		Name: name,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("access secret version: %w", err)
+	}
+	if resp == nil || resp.Payload == nil || len(resp.Payload.Data) == 0 {
+		return nil, ErrSecretValueMissing
+	}
+	out := make([]byte, len(resp.Payload.Data))
+	copy(out, resp.Payload.Data)
+	return out, nil
 }
