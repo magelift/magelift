@@ -4,16 +4,16 @@ milestone: v1.0.0
 milestone_name: milestone
 current_phase: 6
 current_phase_name: Shared Kubernetes Day-2
-status: executing
-stopped_at: Completed 06-05-PLAN.md
-last_updated: "2026-07-30T11:12:32.715Z"
+status: verifying
+stopped_at: Completed 06-06-PLAN.md
+last_updated: "2026-07-30T11:16:01.429Z"
 last_activity: 2026-07-30
 last_activity_desc: 06-02 SUMMARY complete (OutputKubeconfig + ClientFrom* + four stack exports)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 41
-  completed_plans: 37
+  completed_plans: 38
   percent: 38
 ---
 
@@ -31,15 +31,15 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 Phase: 6 of 8 (Shared Kubernetes Day-2)
 Plan: 6 of 6 (06-02 complete; next 06-03)
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-30 — 06-02 SUMMARY complete (OutputKubeconfig + ClientFrom* + four stack exports)
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 93%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T11:12:32.707Z
-**Stopped at:** Completed 06-05-PLAN.md
+**Last session:** 2026-07-30T11:16:01.421Z
+**Stopped at:** Completed 06-06-PLAN.md
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
@@ -59,6 +59,7 @@ Progress: [█████████░] 90%
 | Phase 06 P03 | 7min | 2 tasks | 13 files |
 | Phase 06 P04 | 6min | 2 tasks | 13 files |
 | Phase 06 P05 | 4min | 2 tasks | 11 files |
+| Phase 06 P06 | 5min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -73,3 +74,6 @@ Progress: [█████████░] 90%
 - [Phase ?]: Remove State methods from unsupported{}; type system proves State is not the shell
 - [Phase ?]: Delete diyLockWarnOut on OVH/SCW/EKS; AcquireLock uses State.Lock
 - [Phase ?]: Skip release-readiness.md — no Phase 6 gate row (D-06)
+- [Phase ?]: identity_test.go uses package kube_test to import four providers without cycles
+- [Phase ?]: Floci AES256 skipped this session (docker ps failed); unit AES256 is offline floor
+- [Phase ?]: Phase 7 DNS: magelift-preview.alexandrecourtiol.com needs Zone.DNS Edit; Wrangler OAuth insufficient
