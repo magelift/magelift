@@ -208,21 +208,29 @@ func (p stubPlanned) RefuseAdoptedMutation(intent platform.AdoptMutationIntent) 
 	if intent != platform.AdoptIntentDestroy && intent != platform.AdoptIntentReplace {
 		return nil
 	}
+	var parts []string
 	if p.networkExternalID != "" {
 		label := p.networkLabel
 		if label == "" {
 			label = "network"
 		}
-		return fmt.Errorf("adopted resource %s (%s): MageLift does not own this resource", label, p.networkExternalID)
+		parts = append(parts, fmt.Sprintf("%s (%s)", label, p.networkExternalID))
 	}
 	if p.databaseExternalID != "" {
 		label := p.databaseLabel
 		if label == "" {
 			label = "database"
 		}
-		return fmt.Errorf("adopted resource %s (%s): MageLift does not own this resource", label, p.databaseExternalID)
+		parts = append(parts, fmt.Sprintf("%s (%s)", label, p.databaseExternalID))
 	}
-	return nil
+	if len(parts) == 0 {
+		return nil
+	}
+	noun := "resource"
+	if len(parts) > 1 {
+		noun = "resources"
+	}
+	return fmt.Errorf("adopted %s %s: MageLift does not own this resource", noun, strings.Join(parts, ", "))
 }
 
 func registerTestModules(modules *platform.ModuleRegistry) {

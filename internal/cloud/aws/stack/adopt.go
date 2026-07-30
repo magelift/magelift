@@ -2,6 +2,7 @@ package stack
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/acourtiol/magelift/internal/platform"
 	sdk "github.com/acourtiol/magelift/sdk/v1"
@@ -49,8 +50,8 @@ func AdoptReport(spec Spec) []AdoptEntry {
 }
 
 // RefuseAdoptedMutation fails closed when intent is destroy or replace of an
-// adopted network MageLift does not own (D-02 / ATTACH-03). Preview and
-// Magento-scoped update/destroy of MageLift-owned children pass Intent "".
+// adopted network or database MageLift does not own (D-02 / ATTACH-03). Preview
+// and Magento-scoped update/destroy of MageLift-owned children pass Intent "".
 func RefuseAdoptedMutation(spec Spec, intent platform.AdoptMutationIntent) error {
 	return refuseAdoptedMutation(spec, intent)
 }
@@ -59,15 +60,23 @@ func refuseAdoptedMutation(spec Spec, intent platform.AdoptMutationIntent) error
 	if intent != platform.AdoptIntentDestroy && intent != platform.AdoptIntentReplace {
 		return nil
 	}
-	ref := spec.Existing.Network
-	if ref == nil {
+	entries := AdoptReport(spec)
+	if len(entries) == 0 {
 		return nil
 	}
-	label := string(ref.ID)
-	if label == "" {
-		label = "network"
+	parts := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		label := entry.Label
+		if label == "" {
+			label = entry.Kind
+		}
+		parts = append(parts, fmt.Sprintf("%s (%s)", label, entry.ExternalID))
 	}
-	return fmt.Errorf("adopted resource %s (%s): MageLift does not own this resource", label, ref.ExternalID)
+	noun := "resource"
+	if len(parts) > 1 {
+		noun = "resources"
+	}
+	return fmt.Errorf("adopted %s %s: MageLift does not own this resource", noun, strings.Join(parts, ", "))
 }
 
 // AdoptedResourceLines implements platform.BrownfieldAttach.
