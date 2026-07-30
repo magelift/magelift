@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-current_phase: 6
-current_phase_name: Shared Kubernetes Day-2
-status: verifying
-stopped_at: Completed 06-06-PLAN.md
-last_updated: "2026-07-30T11:16:01.429Z"
+current_phase: 7
+current_phase_name: GCP Certification
+status: planning
+stopped_at: Phase 7 research complete (07-RESEARCH.md) — ready to plan
+last_updated: "2026-07-30T13:30:00.000Z"
 last_activity: 2026-07-30
-last_activity_desc: 06-02 SUMMARY complete (OutputKubeconfig + ClientFrom* + four stack exports)
+last_activity_desc: Phase 7 RESEARCH.md written (recommend 7 plans)
 progress:
   total_phases: 8
   completed_phases: 3
@@ -25,30 +25,27 @@ See: .planning/PROJECT.md (updated 2026-07-27)
 
 **Core value:** A Magento team with no dedicated devops resource can deploy and operate production Magento on their own cloud account, at a cost they control, using a CLI and YAML that already feel familiar.
 
-**Current focus:** Phase 6 execute — next 06-03 shared kube.Observe
+**Current focus:** Phase 7 GCP Certification — research done, plan next (7 plans recommended)
 
 ## Current Position
 
-Phase: 6 of 8 (Shared Kubernetes Day-2)
-Plan: 6 of 6 (06-02 complete; next 06-03)
-Status: Phase complete — ready for verification
-Last activity: 2026-07-30 — 06-02 SUMMARY complete (OutputKubeconfig + ClientFrom* + four stack exports)
+Phase: 7 of 8 (GCP Certification)
+Plan: Not started
+Status: Ready to plan (research complete)
+Last activity: 2026-07-30 — 07-RESEARCH.md (7-plan wave; live prereqs ADC + CF token)
 
 Progress: [█████████░] 93%
 
 ## Session Continuity
 
-**Last session:** 2026-07-30T11:16:01.421Z
-**Stopped at:** Completed 06-06-PLAN.md
+**Last session:** 2026-07-30T11:18:56Z
+**Stopped at:** Phase 6 verification passed (06-VERIFICATION.md)
 **Resume file:** None
 
 - Phase 4: verified 5/5 — ACC/Upsun import + ece-parity
 - Phase 5: verified 5/5 — seedDump real, media-sync, cutover runbook (DNS/live → Phase 7)
-- Phase 6 locked: `kube.Observe` + `kube.Steps` shared; S3-compatible state endpoint; thin unsupported for Bootstrap/Secrets only; zero cloud spend
-- Phase 6 planned: 06-01 SSE/State ‖ 06-02 kubeconfig → 06-03 Observe → 06-04 Steps → 06-05 honesty → 06-06 gates + Cloudflare DNS handoff
-- Phase 6 plan-check: PASSED — KUBE-01..07 + D-01..D-06 covered; VALIDATION present; Open Questions RESOLVED; offline only
-- Phase 6 execute: 06-01 complete — ObjectEncryption + OVH/SCW State; 06-02 complete — OutputKubeconfig + ClientFrom* + secret exports on four K8s stacks
-- Next: execute 06-03 Observe (serial GOMAXPROCS=1; fake clientset; no live GCP)
+- Phase 6: verified 5/5 — shared `*kube.Observe`/`*kube.Steps`, OVH/SCW AES256 State, honesty matrix; Floci AES256 optional; DNS/live → Phase 7 HUMAN_GATE
+- Next: Phase 7 discuss/plan — live GKE Autopilot + MIGRATE-04 Cloudflare DNS (`06-PHASE7-HANDOFF.md`)
 
 ## Performance Metrics
 
