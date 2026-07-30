@@ -100,7 +100,7 @@ status: complete
 1. **Task 1: End-to-end dry-run cell loop with full catalog** - `ad00269` (feat)
 2. **Task 2: Checkpoint resume + evidence column contract** - `ab7ce6c` (docs)
 
-**Plan metadata:** (pending docs commit)
+**Plan metadata:** `e673fd8` (docs: complete plan)
 
 ## Files Created/Modified
 
