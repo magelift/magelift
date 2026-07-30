@@ -4,20 +4,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	gcpbootstrap "github.com/acourtiol/magelift/internal/cloud/gcp/bootstrap"
-	gcpoperations "github.com/acourtiol/magelift/internal/cloud/gcp/operations"
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	gcpsecrets "github.com/acourtiol/magelift/internal/cloud/gcp/secrets"
 	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
 	gcpstate "github.com/acourtiol/magelift/internal/cloud/gcp/state"
+	"github.com/acourtiol/magelift/internal/config"
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
 func (Module) Bootstrap() platform.Bootstrap           { return Bootstrap{} }
 func (Module) State() platform.State                   { return State{} }
 func (Module) Secrets() platform.Secrets               { return Secrets{} }
-func (Module) RuntimeObserve() platform.RuntimeObserve { return Observe{} }
+func (Module) RuntimeObserve() platform.RuntimeObserve {
+	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
+}
+func (Module) CostEstimator() platform.CostEstimator   { return unsupportedCost{} }
 
 // Bootstrap implements platform.Bootstrap for GCS DIY (WIF deferred).
 type Bootstrap struct{}
@@ -175,109 +178,6 @@ func (Secrets) Remove(ctx context.Context, planned platform.PlannedStack, name s
 	return store.Remove(ctx, gcpPlanned.GCPSpec().Identity.GCPProject, name)
 }
 
-// Observe implements platform.RuntimeObserve for GKE.
-type Observe struct{}
-
-func (Observe) TailLogs(ctx context.Context, planned platform.PlannedStack, query platform.LogQuery) ([]platform.LogEvent, error) {
-	gcpPlanned, ok := gcpstack.AsGCPPlanned(planned)
-	if !ok {
-		return nil, fmt.Errorf("GCP observe received unexpected planned type %T", planned)
-	}
-	spec := gcpPlanned.GCPSpec()
-	store, err := gcpoperations.NewObserve(ctx, spec.Identity.GCPProject, spec.Identity.Region)
-	if err != nil {
-		return nil, err
-	}
-	cluster := gcpstack.ClusterHint(spec)
-	workload := string(query.Workload)
-	if workload == "" {
-		workload = planned.Project() + "-" + planned.Environment() + "-app-web"
-	}
-	limit := query.Limit
-	if limit <= 0 {
-		limit = platform.DefaultLogLimit
-	}
-	events, err := store.TailLogs(ctx, cluster, workload, query.Since, limit)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]platform.LogEvent, 0, len(events))
-	for _, event := range events {
-		out = append(out, platform.LogEvent{Timestamp: event.Timestamp, Message: event.Message})
-	}
-	return out, nil
-}
-
-func (Observe) CheckRuntime(ctx context.Context, planned platform.PlannedStack, outputs map[string]any) ([]platform.RuntimeHealth, error) {
-	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
-	if err != nil {
-		return nil, err
-	}
-	service, err := platform.RequireStringOutput(outputs, platform.OutputServiceName)
-	if err != nil {
-		return nil, err
-	}
-	gcpPlanned, ok := gcpstack.AsGCPPlanned(planned)
-	if !ok {
-		return nil, fmt.Errorf("GCP observe received unexpected planned type %T", planned)
-	}
-	spec := gcpPlanned.GCPSpec()
-	runtime, err := gcpoperations.NewRuntime(ctx, spec.Identity.GCPProject, spec.Identity.Region)
-	if err != nil {
-		return nil, err
-	}
-	health, err := runtime.Check(ctx, cluster, service)
-	if err != nil {
-		return nil, err
-	}
-	status, detail := "healthy", fmt.Sprintf("GKE deployment has %d ready of %d desired replicas", health.ReadyReplicas, health.DesiredReplicas)
-	if !health.Available || health.DesiredReplicas <= 0 || health.ReadyReplicas < health.DesiredReplicas {
-		status = "unhealthy"
-	}
-	return []platform.RuntimeHealth{{
-		ID: "runtime.gke.deployment", Service: service, Status: status, Detail: detail,
-	}}, nil
-}
-
-func (Observe) PrepareExec(_ context.Context, planned platform.PlannedStack, outputs map[string]any, query platform.ExecQuery) (platform.ExecTarget, error) {
-	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
-	if err != nil {
-		return platform.ExecTarget{}, err
-	}
-	service, err := platform.RequireStringOutput(outputs, platform.OutputServiceName)
-	if err != nil {
-		return platform.ExecTarget{}, err
-	}
-	gcpPlanned, ok := gcpstack.AsGCPPlanned(planned)
-	if !ok {
-		return platform.ExecTarget{}, fmt.Errorf("GCP observe received unexpected planned type %T", planned)
-	}
-	spec := gcpPlanned.GCPSpec()
-	command := query.Command
-	if len(command) == 0 {
-		command = []string{"/bin/sh"}
-	}
-	selector := "app=" + service
-	if query.Workload != "" && string(query.Workload) != "web" {
-		selector = "app=" + strings.TrimSuffix(service, "-web") + "-" + string(query.Workload)
-	}
-	args := []string{
-		"--context", fmt.Sprintf("gke_%s_%s_%s", spec.Identity.GCPProject, spec.Identity.Region, cluster),
-		"exec", "-it", "deploy/" + service, "--",
-	}
-	if query.Workload != "" && string(query.Workload) != "web" {
-		args[len(args)-2] = "deploy/" + strings.TrimSuffix(service, "-web") + "-" + string(query.Workload)
-	}
-	_ = selector
-	args = append(args, command...)
-	return platform.ExecTarget{
-		Launcher: "gke-job",
-		Args:     args,
-		Cluster:  cluster,
-		Task:     service,
-	}, nil
-}
-
 func stateManager(ctx context.Context, planned platform.PlannedStack) (*gcpstate.Manager, string, error) {
 	gcpPlanned, ok := gcpstack.AsGCPPlanned(planned)
 	if !ok {
@@ -319,4 +219,10 @@ func toLockInfo(info gcpstate.Info) platform.LockInfo {
 		Project: info.Project, Environment: info.Environment,
 		Owner: info.Owner, AcquiredAt: info.AcquiredAt,
 	}
+}
+
+type unsupportedCost struct{}
+
+func (unsupportedCost) Estimate(context.Context, platform.PlannedStack, config.Config, platform.CostOptions) (platform.CostReport, error) {
+	return platform.CostReport{}, platform.ErrNotSupported
 }
