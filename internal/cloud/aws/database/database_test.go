@@ -127,6 +127,111 @@ func TestDatabaseRejectsUnsafePolicyBeforeRegistration(t *testing.T) {
 	}
 }
 
+func TestExistingDatabaseUsesRefsWithoutCreatingRDSResources(t *testing.T) {
+	t.Parallel()
+	const (
+		identifier = "db-magento-prod"
+		endpoint   = "magento.xxxxx.eu-west-3.rds.amazonaws.com"
+		secretARN  = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master"
+	)
+	m := &mocks{}
+	var gotWriter, gotReader, gotSecret, gotCluster string
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		args := previewArgs()
+		args.Existing = &ExistingDatabase{Identifier: identifier, Endpoint: endpoint, SecretARN: secretARN}
+		component, err := New(ctx, "shop", args)
+		if err != nil {
+			return err
+		}
+		component.WriterEndpoint.ApplyT(func(value string) error {
+			gotWriter = value
+			return nil
+		})
+		component.ReaderEndpoint.ApplyT(func(value string) error {
+			gotReader = value
+			return nil
+		})
+		component.ClusterARN.ApplyT(func(value string) error {
+			gotCluster = value
+			return nil
+		})
+		component.MasterSecretARN.ApplyT(func(value *string) error {
+			if value != nil {
+				gotSecret = *value
+			}
+			return nil
+		})
+		return nil
+	}, pulumi.WithMocks("project", "stack", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// ATTACH-02 / D-01: existing database is reference-without-own — zero managed RDS children.
+	if got := m.count("aws:rds/instance:Instance") + m.count("aws:rds/cluster:Cluster") + m.count("aws:rds/subnetGroup:SubnetGroup"); got != 0 {
+		t.Fatalf("existing database created managed RDS resources: %v", m.snapshot())
+	}
+	if !contains(m.snapshot(), TypeToken+":shop") {
+		t.Fatal("existing database component was not registered")
+	}
+	if gotWriter != endpoint || gotReader != endpoint {
+		t.Fatalf("endpoints = writer=%q reader=%q, want %q", gotWriter, gotReader, endpoint)
+	}
+	if gotSecret != secretARN {
+		t.Fatalf("master secret ARN = %q, want %q", gotSecret, secretARN)
+	}
+	if gotCluster != identifier {
+		t.Fatalf("cluster ARN equivalent = %q, want identifier %q", gotCluster, identifier)
+	}
+}
+
+func TestExistingDatabaseRejectsInvalidRefsBeforeRegistration(t *testing.T) {
+	t.Parallel()
+	valid := ExistingDatabase{
+		Identifier: "db-magento-prod",
+		Endpoint:   "magento.xxxxx.eu-west-3.rds.amazonaws.com",
+		SecretARN:  "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master",
+	}
+	tests := []struct {
+		name string
+		mutate func(*ExistingDatabase)
+	}{
+		{name: "empty identifier", mutate: func(e *ExistingDatabase) { e.Identifier = "" }},
+		{name: "empty endpoint", mutate: func(e *ExistingDatabase) { e.Endpoint = "" }},
+		{name: "empty secret", mutate: func(e *ExistingDatabase) { e.SecretARN = "" }},
+		{name: "invalid secret ARN", mutate: func(e *ExistingDatabase) { e.SecretARN = "not-an-arn" }},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			existing := valid
+			test.mutate(&existing)
+			args := previewArgs()
+			args.Existing = &existing
+			m := &mocks{}
+			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+				_, err := New(ctx, "shop", args)
+				return err
+			}, pulumi.WithMocks("project", "stack", m))
+			if err == nil {
+				t.Fatal("invalid existing database was accepted")
+			}
+			if len(m.snapshot()) != 0 {
+				t.Fatalf("invalid existing registered resources: %v", m.snapshot())
+			}
+		})
+	}
+}
+
+func contains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
 func previewArgs() Args {
 	return Args{Preset: sdk.PresetPreview, Region: "eu-west-3", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, DataSubnetIDs: pulumi.StringArray{pulumi.String("data-a"), pulumi.String("data-b")}, VpcSecurityGroupIDs: pulumi.StringArray{pulumi.String("sg-db")}, EngineVersion: "8.0.mysql_aurora.3.10.0", DatabaseName: "magento", MasterUsername: "magelift", KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/11111111-2222-3333-4444-555555555555", BackupRetentionDays: 1, ServerlessV2: &ServerlessV2{MinimumACU: 0, MaximumACU: 4, AutoPauseSeconds: 600, EngineSupportsAutoPause: true}}
 }

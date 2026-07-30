@@ -33,6 +33,14 @@ type ServerlessV2 struct {
 	EngineSupportsAutoPause bool
 }
 
+// ExistingDatabase is an operator-supplied RDS adopt reference (ATTACH-02 / D-01).
+// When set on Args, New registers outputs from these refs and creates no RDS children.
+type ExistingDatabase struct {
+	Identifier string
+	Endpoint   string
+	SecretARN  string
+}
+
 type Args struct {
 	Preset                   sdk.PresetID
 	EnvironmentClass         string
@@ -51,6 +59,7 @@ type Args struct {
 	InstanceCount            int
 	AllocatedStorageGiB      int
 	ServerlessV2             *ServerlessV2
+	Existing                 *ExistingDatabase
 	Tags                     map[string]string
 }
 
