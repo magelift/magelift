@@ -4,7 +4,7 @@ Explicitly **after** public beta. Do not block the certified AWS path on these.
 
 | Track | Intent |
 | --- | --- |
-| Brownfield attach | Bring an existing VPC/DB into MageLift gradually; greenfield stays default |
+| Brownfield attach (multi-cloud / Cloud SQL) | AWS VPC + RDS MySQL adopt shipped in Phase 8 — [brownfield-attach.md](brownfield-attach.md). Remaining: Cloud SQL, non-AWS VPC/DB, multi-cloud attach. Greenfield stays default. |
 | Dump / media cutover | Seed DB and media from PaaS dumps (Phase 5); config importers already ship as `magelift init --from-acc` / `--from-upsun` — see [migrating-from-paas.md](migrating-from-paas.md) |
 | Pulumi Cloud / ESC | Optional hosted state + OIDC for agencies; DIY S3/GCS remains the OSS default |
 | FinOps SaaS | Multi-project cost anomaly, rightsizing, drift — CLI keeps full power |

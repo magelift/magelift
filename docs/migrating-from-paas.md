@@ -131,8 +131,9 @@ sidecar next to the output path (`magelift.unmapped.md`, or
 the residuals by hand before deploy.
 
 Phase 4 ships the config onramp above. Database dump import, media sync, and the
-cutover runbook below ship in Phase 5. Brownfield attach of an existing VPC/DB
-remains Phase 8 (see [post-beta roadmap](post-beta-roadmap.md)).
+cutover runbook below ship in Phase 5. Brownfield attach of an existing AWS VPC /
+RDS MySQL is Phase 8 — see [brownfield-attach.md](brownfield-attach.md) (limits,
+egress ownership, detach). Multi-cloud / Cloud SQL attach remains later.
 
 1. Run `magelift init --from-acc` or `--from-upsun`; review YAML + any unmapped sidecar.
 2. Replace encryption / Composer secret placeholders with real Secrets Manager (or SSM) refs.
@@ -278,6 +279,7 @@ If verification fails after traffic shift:
 
 - [Architecture](architecture.md) — product matrix and ports/adapters boundary
 - [Configuration](configuration.md) — field reference for `magelift.yaml`
+- [Brownfield attach](brownfield-attach.md) — existing AWS VPC/RDS adopt + detach
 - [ece-tools parity](ece-parity.md) — closed vs intentional-gap matrix (D-06 / D-07)
 - [Operations](operations.md) — logs, exec, CI generate, local `dev`
 - [Local AWS acceptance](aws-acceptance.md) — free-tier-friendly real AWS loop
