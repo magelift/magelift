@@ -101,7 +101,7 @@ status: complete
 1. **Task 1: Write brownfield-attach runbook + ADR 0010 supersede** - `a8fefa3` (docs)
 2. **Task 2: Keep offline detach proof aligned with docs** - `6e193a8` (docs)
 
-**Plan metadata:** (pending final docs commit)
+**Plan metadata:** `f3e99e4` (docs: complete plan)
 
 ## Files Created/Modified
 

@@ -21,7 +21,7 @@ progress:
 
 See: .planning/PROJECT.md
 
-**Current focus:** Execute Phase 8 (08-05 next); Phase 7 live still blocked on gcloud ADC + Cloudflare DNS token
+**Current focus:** Execute Phase 8 (08-06 next); Phase 7 live still blocked on gcloud ADC + Cloudflare DNS token
 
 ## Current Position
 
@@ -37,7 +37,7 @@ Status: Ready to execute
 
 - Phase 6: verified 5/5 offline
 - Phase 7 offline: 07-01..05 COMPLETE; live 07-06 blocked on gcloud ADC + CLOUDFLARE_API_TOKEN
-- Phase 8: 08-01..04 COMPLETE (unified ADOPT + refuse for network+DB); next 08-05
+- Phase 8: 08-01..05 COMPLETE (attach docs + ADR 0010 supersede); next 08-06
 - Phase 1 CI: Act-only until GH minutes
 
 ## Performance Metrics
@@ -60,6 +60,6 @@ Status: Ready to execute
 - [Phase 08]: AdoptReport emits network and database independently (one or both)
 - [Phase 08]: Refuse lists every adopted resource in a single error when both are set
 - [Phase 08]: ATTACH-04 offline half via mock state exclusion + refuse; live describe-after-destroy deferred to 08-06
-- [Phase ?]: No magelift detach CLI — documented manual un-adopt only
-- [Phase ?]: ADR 0010 dump-seed unchanged; attach-out-of-scope superseded by Phase 8 / ATTACH-02
-- [Phase ?]: Live describe-after-destroy deferred to 08-06; offline proof cited in brownfield-attach.md
+- [Phase 08]: No magelift detach CLI — documented manual un-adopt only
+- [Phase 08]: ADR 0010 dump-seed unchanged; attach-out-of-scope superseded by Phase 8 / ATTACH-02
+- [Phase 08]: Live describe-after-destroy deferred to 08-06; offline proof cited in brownfield-attach.md
