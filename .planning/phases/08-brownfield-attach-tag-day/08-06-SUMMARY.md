@@ -109,7 +109,7 @@ status: complete
 2. **Task 2: Free-tier AWS VPC+RDS adopt confirm when ADC available** - `b06d467` (docs / HUMAN_GATE)
 3. **Task 3: RELEASE-05 gate board + REQUIREMENTS settlement** - `314e0e4` (docs)
 
-**Plan metadata:** (pending final docs commit)
+**Plan metadata:** `4283208` (docs: complete plan)
 
 ## Files Created/Modified
 
