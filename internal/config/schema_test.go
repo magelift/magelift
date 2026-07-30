@@ -42,6 +42,30 @@ func TestReferenceMarkdownIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestExistingDatabaseAppearsInSchemaAndReference(t *testing.T) {
+	data, err := SchemaJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := string(data)
+	for _, field := range []string{`"secretArn"`, `"endpoint"`, `"database"`} {
+		if !strings.Contains(schema, field) {
+			t.Fatalf("schema field %s is missing for existing.database", field)
+		}
+	}
+	reference := string(ReferenceMarkdown())
+	for _, needle := range []string{
+		"`target.aws.existing.database`",
+		"`target.aws.existing.database.secretArn`",
+		"`target.aws.existing.database.endpoint`",
+		"does not create RDS",
+	} {
+		if !strings.Contains(reference, needle) {
+			t.Fatalf("configuration reference missing %s", needle)
+		}
+	}
+}
+
 func TestEnvironmentSchemaUsesPartialOverlays(t *testing.T) {
 	file, err := Load([]byte(`schemaVersion: 1
 project: {name: shop}
