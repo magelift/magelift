@@ -1,64 +1,98 @@
-// Package deployment adapts GKE Autopilot to the provider-neutral Magento
-// deployflow.Steps port. Magento sequencing stays in internal/deploy;
-// Magento CLI contracts stay in internal/platform.
-package deployment
+package kube
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/acourtiol/magelift/internal/automation"
-	gcpoperations "github.com/acourtiol/magelift/internal/cloud/gcp/operations"
-	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/platform"
 	sdk "github.com/acourtiol/magelift/sdk/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
+// Backend is the Pulumi automation + stack Outputs surface Steps needs.
 type Backend interface {
 	automation.Backend
 	Outputs(context.Context) (map[string]any, error)
 }
 
+// CandidateRunner registers and cleans Magento migrate Jobs.
 type CandidateRunner interface {
-	RegisterCandidate(context.Context, gcpoperations.CandidateRequest) (gcpoperations.Candidate, error)
-	RunMigrations(context.Context, gcpoperations.Candidate) error
-	Cleanup(context.Context, gcpoperations.Candidate) error
+	RegisterCandidate(context.Context, CandidateRequest) (Candidate, error)
+	RunMigrations(context.Context, Candidate) error
+	Cleanup(context.Context, Candidate) error
 }
 
+// ServiceHealth is a Deployment readiness snapshot for Stabilize/Health.
+type ServiceHealth struct {
+	DesiredReplicas int
+	ReadyReplicas   int
+	Available       bool
+}
+
+// RuntimeChecker reports Magento web Deployment health.
 type RuntimeChecker interface {
-	Check(context.Context, string, string) (gcpoperations.ServiceHealth, error)
+	Check(context.Context, string, string) (ServiceHealth, error)
 }
 
+// DeploySpec holds provider-portable Magento deploy knobs for kube.Steps.
+type DeploySpec struct {
+	ImageDigest     string
+	DatabaseName    string
+	ApplicationMode string
+	WebRuntime      string
+	CPURequest      string
+	MemoryRequest   string
+	CloudProject    string
+	Region          string
+}
+
+func (s DeploySpec) Validate() error {
+	var problems []error
+	if !candidateDigest.MatchString(s.ImageDigest) {
+		problems = append(problems, errors.New("image digest must be repository@sha256:..."))
+	}
+	if strings.TrimSpace(s.DatabaseName) == "" {
+		problems = append(problems, errors.New("database name is required"))
+	}
+	return errors.Join(problems...)
+}
+
+// Steps implements deployflow.Steps for Magento on Kubernetes (D-03, KUBE-04).
 type Steps struct {
 	backend       Backend
-	spec          gcpstack.Spec
+	spec          DeploySpec
 	candidate     CandidateRunner
 	runtime       RuntimeChecker
 	diagnostics   io.Writer
 	waitInterval  time.Duration
 	waitTimeout   time.Duration
-	registered    gcpoperations.Candidate
+	registered    Candidate
 	registeredSet bool
 	record        func(context.Context, deployflow.Request, deployflow.Result) error
 }
 
+// New constructs shared Kubernetes Magento deploy Steps.
 func New(
 	backend Backend,
-	spec gcpstack.Spec,
+	spec DeploySpec,
 	candidate CandidateRunner,
 	runtime RuntimeChecker,
 	diagnostics io.Writer,
 	record func(context.Context, deployflow.Request, deployflow.Result) error,
 ) (*Steps, error) {
 	if backend == nil || candidate == nil || runtime == nil || diagnostics == nil {
-		return nil, errors.New("GCP deployment backend, candidate runner, runtime checker, and diagnostics are required")
+		return nil, errors.New("kube deployment backend, candidate runner, runtime checker, and diagnostics are required")
 	}
 	if err := spec.Validate(); err != nil {
-		return nil, fmt.Errorf("validate GCP deployment spec: %w", err)
+		return nil, fmt.Errorf("validate kube deployment spec: %w", err)
 	}
 	return &Steps{
 		backend: backend, spec: spec, candidate: candidate, runtime: runtime,
@@ -69,12 +103,12 @@ func New(
 
 func (s *Steps) Validate(_ context.Context, request deployflow.Request) error {
 	if s == nil || s.backend == nil {
-		return errors.New("GCP deployment steps are required")
+		return errors.New("kube deployment steps are required")
 	}
 	if err := sdk.ValidateTargetDescriptor(request.Target); err != nil {
 		return err
 	}
-	if request.ImageDigest != s.spec.Artifact.ImageDigest {
+	if request.ImageDigest != s.spec.ImageDigest {
 		return fmt.Errorf("deployment digest %q does not match the planned artifact", request.ImageDigest)
 	}
 	return nil
@@ -87,7 +121,7 @@ func (s *Steps) Preview(ctx context.Context, request deployflow.Request) (automa
 func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Request) error {
 	outputs, err := s.backend.Outputs(ctx)
 	if err != nil {
-		return fmt.Errorf("read GKE deployment outputs: %w", err)
+		return fmt.Errorf("read kubernetes deployment outputs: %w", err)
 	}
 	// Greenfield stacks have no cluster yet. Create infrastructure first.
 	if _, err := platform.RequireStringOutput(outputs, platform.OutputClusterName); err != nil {
@@ -96,7 +130,7 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 		}
 		outputs, err = s.backend.Outputs(ctx)
 		if err != nil {
-			return fmt.Errorf("read GKE deployment outputs after initial create: %w", err)
+			return fmt.Errorf("read kubernetes deployment outputs after initial create: %w", err)
 		}
 	}
 	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
@@ -115,20 +149,21 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 	if err != nil {
 		return err
 	}
-	s.registered, err = s.candidate.RegisterCandidate(ctx, gcpoperations.CandidateRequest{
-		Project:         s.spec.Identity.GCPProject,
-		Region:          s.spec.Identity.Region,
+	s.registered, err = s.candidate.RegisterCandidate(ctx, CandidateRequest{
+		Project:         s.spec.CloudProject,
+		Region:          s.spec.Region,
 		Cluster:         cluster,
-		Namespace:       "default",
+		Namespace:       defaultNamespace,
 		ServiceName:     service,
 		ImageDigest:     request.ImageDigest,
 		DatabaseWriter:  databaseWriter,
-		DatabaseName:    s.spec.Dependencies.DatabaseName,
+		DatabaseName:    s.spec.DatabaseName,
 		CacheEndpoint:   cacheEndpoint,
-		ApplicationMode: s.spec.Application.Mode,
-		WebRuntime:      s.spec.Application.WebRuntime,
-		CPURequest:      s.spec.Catalog.AutopilotCPURequest,
-		MemoryRequest:   s.spec.Catalog.AutopilotMemoryRequest,
+		ApplicationMode: s.spec.ApplicationMode,
+		WebRuntime:      s.spec.WebRuntime,
+		CPURequest:      s.spec.CPURequest,
+		MemoryRequest:   s.spec.MemoryRequest,
+		Outputs:         outputs,
 	})
 	s.registeredSet = err == nil
 	return err
@@ -186,7 +221,7 @@ func (s *Steps) Record(ctx context.Context, request deployflow.Request, result d
 func (s *Steps) waitForHealthyService(ctx context.Context) error {
 	outputs, err := s.backend.Outputs(ctx)
 	if err != nil {
-		return fmt.Errorf("read GKE runtime outputs: %w", err)
+		return fmt.Errorf("read kubernetes runtime outputs: %w", err)
 	}
 	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
 	if err != nil {
@@ -215,13 +250,107 @@ func (s *Steps) waitForHealthyService(ctx context.Context) error {
 		select {
 		case <-waitContext.Done():
 			if checkErr != nil {
-				return fmt.Errorf("wait for GKE deployment stabilization: %w", checkErr)
+				return fmt.Errorf("wait for kubernetes deployment stabilization: %w", checkErr)
 			}
 			return fmt.Errorf(
-				"wait for GKE deployment stabilization: desired=%d ready=%d available=%v",
+				"wait for kubernetes deployment stabilization: desired=%d ready=%d available=%v",
 				health.DesiredReplicas, health.ReadyReplicas, health.Available,
 			)
 		case <-ticker.C:
 		}
 	}
+}
+
+// DeploymentRuntime checks Magento web Deployment readiness via client-go.
+type DeploymentRuntime struct {
+	client  kubernetes.Interface
+	factory ClientFactory
+	backend Backend
+}
+
+// NewRuntimeFromClient injects a clientset (tests / pre-built clients).
+func NewRuntimeFromClient(client kubernetes.Interface) (*DeploymentRuntime, error) {
+	if client == nil {
+		return nil, errors.New("kubernetes client is required")
+	}
+	return &DeploymentRuntime{client: client}, nil
+}
+
+// NewRuntimeFromFactory builds a client from stack outputs on each Check.
+func NewRuntimeFromFactory(backend Backend, factory ClientFactory) (*DeploymentRuntime, error) {
+	if backend == nil {
+		return nil, errors.New("kubernetes deployment backend is required")
+	}
+	if factory == nil {
+		factory = ClientFromOutputs
+	}
+	return &DeploymentRuntime{backend: backend, factory: factory}, nil
+}
+
+func (r *DeploymentRuntime) Check(ctx context.Context, _, serviceName string) (ServiceHealth, error) {
+	if r == nil {
+		return ServiceHealth{}, errors.New("kubernetes runtime checker is required")
+	}
+	if strings.TrimSpace(serviceName) == "" {
+		return ServiceHealth{}, errors.New("service name is required")
+	}
+	client, err := r.clientFor(ctx)
+	if err != nil {
+		return ServiceHealth{}, err
+	}
+	return deploymentHealth(ctx, client, defaultNamespace, serviceName)
+}
+
+func (r *DeploymentRuntime) clientFor(ctx context.Context) (kubernetes.Interface, error) {
+	if r.client != nil {
+		return r.client, nil
+	}
+	if r.backend == nil {
+		return nil, errors.New("kubernetes client or backend is required")
+	}
+	factory := r.factory
+	if factory == nil {
+		factory = ClientFromOutputs
+	}
+	outputs, err := r.backend.Outputs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read kubernetes runtime outputs: %w", err)
+	}
+	client, err := factory(outputs)
+	if err != nil {
+		return nil, err
+	}
+	if client == nil {
+		return nil, fmt.Errorf("kubernetes client factory returned nil")
+	}
+	return client, nil
+}
+
+func deploymentHealth(ctx context.Context, client kubernetes.Interface, namespace, deployment string) (ServiceHealth, error) {
+	if client == nil {
+		return ServiceHealth{}, errors.New("kubernetes client is required")
+	}
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
+	dep, err := client.AppsV1().Deployments(namespace).Get(ctx, deployment, metav1.GetOptions{})
+	if err != nil {
+		return ServiceHealth{}, fmt.Errorf("get deployment %s: %w", deployment, err)
+	}
+	desired := 0
+	if dep.Spec.Replicas != nil {
+		desired = int(*dep.Spec.Replicas)
+	}
+	available := false
+	for _, condition := range dep.Status.Conditions {
+		if condition.Type == "Available" && condition.Status == corev1.ConditionTrue {
+			available = true
+			break
+		}
+	}
+	return ServiceHealth{
+		DesiredReplicas: desired,
+		ReadyReplicas:   int(dep.Status.ReadyReplicas),
+		Available:       available,
+	}, nil
 }

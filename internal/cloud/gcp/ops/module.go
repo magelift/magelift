@@ -10,10 +10,9 @@ import (
 	"strings"
 
 	gcpbootstrap "github.com/acourtiol/magelift/internal/cloud/gcp/bootstrap"
-	gcpdeployment "github.com/acourtiol/magelift/internal/cloud/gcp/deployment"
-	gcpoperations "github.com/acourtiol/magelift/internal/cloud/gcp/operations"
 	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
 	gcpstate "github.com/acourtiol/magelift/internal/cloud/gcp/state"
+	"github.com/acourtiol/magelift/internal/cloud/kube"
 	"github.com/acourtiol/magelift/internal/config"
 	deployflow "github.com/acourtiol/magelift/internal/deploy"
 	"github.com/acourtiol/magelift/internal/platform"
@@ -39,8 +38,8 @@ func (Module) Ops() platform.Ops    { return Ops{} }
 
 // Ops implements platform.Ops for GCP GKE Autopilot.
 type Ops struct {
-	NewDeployment func(context.Context, string, string, string) (gcpdeployment.CandidateRunner, error)
-	NewRuntime    func(context.Context, string, string) (gcpdeployment.RuntimeChecker, error)
+	NewCandidate  func(context.Context, kube.Backend) (kube.CandidateRunner, error)
+	NewRuntime    func(context.Context, kube.Backend) (kube.RuntimeChecker, error)
 	RecordRelease func(context.Context, deployflow.Request, deployflow.Result) error
 }
 
@@ -63,33 +62,42 @@ func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.P
 	if !ok {
 		return nil, fmt.Errorf("GCP ops received unexpected planned type %T", planned)
 	}
-	typed, ok := backend.(gcpdeployment.Backend)
+	typed, ok := backend.(kube.Backend)
 	if !ok {
 		return nil, fmt.Errorf("GCP deploy steps require an infrastructure backend with outputs, got %T", backend)
 	}
 	spec := gcpPlanned.GCPSpec()
-	newDeployment := o.NewDeployment
-	if newDeployment == nil {
-		newDeployment = func(ctx context.Context, project, region, _ string) (gcpdeployment.CandidateRunner, error) {
-			return gcpoperations.NewDeployment(ctx, project, region)
+	deploySpec := kube.DeploySpec{
+		ImageDigest:     spec.Artifact.ImageDigest,
+		DatabaseName:    spec.Dependencies.DatabaseName,
+		ApplicationMode: spec.Application.Mode,
+		WebRuntime:      spec.Application.WebRuntime,
+		CPURequest:      spec.Catalog.AutopilotCPURequest,
+		MemoryRequest:   spec.Catalog.AutopilotMemoryRequest,
+		CloudProject:    spec.Identity.GCPProject,
+		Region:          spec.Identity.Region,
+	}
+	newCandidate := o.NewCandidate
+	if newCandidate == nil {
+		newCandidate = func(context.Context, kube.Backend) (kube.CandidateRunner, error) {
+			return kube.NewCandidateFromFactory(kube.ClientFromOutputs), nil
 		}
 	}
 	newRuntime := o.NewRuntime
 	if newRuntime == nil {
-		newRuntime = func(ctx context.Context, project, region string) (gcpdeployment.RuntimeChecker, error) {
-			return gcpoperations.NewRuntime(ctx, project, region)
+		newRuntime = func(_ context.Context, b kube.Backend) (kube.RuntimeChecker, error) {
+			return kube.NewRuntimeFromFactory(b, kube.ClientFromOutputs)
 		}
 	}
-	clusterHint := gcpstack.ClusterHint(spec)
-	candidate, err := newDeployment(ctx, spec.Identity.GCPProject, spec.Identity.Region, clusterHint)
+	candidate, err := newCandidate(ctx, typed)
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := newRuntime(ctx, spec.Identity.GCPProject, spec.Identity.Region)
+	runtime, err := newRuntime(ctx, typed)
 	if err != nil {
 		return nil, err
 	}
-	return gcpdeployment.New(typed, spec, candidate, runtime, diagnostics, o.RecordRelease)
+	return kube.New(typed, deploySpec, candidate, runtime, diagnostics, o.RecordRelease)
 }
 
 func acquireDeploymentLock(ctx context.Context, spec gcpstack.Spec) (func(context.Context) error, error) {
