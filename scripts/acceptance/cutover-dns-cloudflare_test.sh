@@ -49,10 +49,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- missing token (not dry-run) must fail ---
+# --- missing token (not dry-run) must fail on curl path (force-curl skips live `cf` CLI) ---
 unset CLOUDFLARE_API_TOKEN CF_API_TOKEN || true
 assert_exit "missing-token-fails" 1 env -u CLOUDFLARE_API_TOKEN -u CF_API_TOKEN \
-	TARGET=example.invalid "$SCRIPT"
+	MAGELIFT_CUTOVER_FORCE_CURL=1 TARGET=example.invalid "$SCRIPT"
 
 # --- dry-run works without token ---
 assert_exit "dry-run-no-token" 0 env -u CLOUDFLARE_API_TOKEN -u CF_API_TOKEN \
