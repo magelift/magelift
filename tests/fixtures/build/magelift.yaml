@@ -1,0 +1,26 @@
+schemaVersion: 1
+
+project:
+  name: build-fixture
+
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+
+build:
+  php: "8.5"
+
+target:
+  provider: aws
+  runtime: ecs-fargate
+
+defaults:
+  region: eu-west-3
+  preset: preview
+
+environments:
+  test:
+    account: "123456789012"
+
+extensions: {}

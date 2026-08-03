@@ -1,0 +1,15 @@
+.git
+.codebase-memory
+.env
+.env.*
+.idea
+.vscode
+auth.json
+*.key
+*.pem
+build/.phpunit.cache
+build/vendor
+coverage
+dist
+site
+tasks

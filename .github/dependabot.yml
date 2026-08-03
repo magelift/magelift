@@ -1,0 +1,107 @@
+version: 2
+updates:
+  # Pulumi provider SDKs live in go.mod (no Dependabot "pulumi" ecosystem).
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    labels: [dependencies, go]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      pulumi:
+        patterns:
+          - "github.com/pulumi/*"
+          - "github.com/pulumiverse/*"
+          - "github.com/ovh/pulumi-*"
+      aws-sdk:
+        patterns:
+          - "github.com/aws/*"
+      google-cloud:
+        patterns:
+          - "cloud.google.com/*"
+          - "google.golang.org/*"
+      go-dependencies:
+        patterns: ["*"]
+  - package-ecosystem: composer
+    directory: /build
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    labels: [dependencies, php]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      composer-dependencies:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      github-actions:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: [dependencies, docs]
+    commit-message:
+      prefix: chore
+      include: scope
+  - package-ecosystem: npm
+    directory: /websites/marketing
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: [dependencies, docs]
+    commit-message:
+      prefix: chore
+      include: scope
+  - package-ecosystem: docker
+    directory: /images/php-runtime
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      docker-base-images:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /images/frankenphp-classic
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      frankenphp-base-image:
+        patterns: ["*"]

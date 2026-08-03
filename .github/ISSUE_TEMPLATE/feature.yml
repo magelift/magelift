@@ -1,0 +1,50 @@
+name: Feature request
+description: Propose a capability, provider improvement, or CLI change
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Substantial design changes should be discussed here before a large PR.
+        Provider work should follow [Adding a provider](https://github.com/magelift/magelift/blob/main/docs/adding-a-provider.md)
+        and the ADRs under `docs/adr/`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or operator problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Concrete behavior change. Prefer provider-specific adapters over shared cloud abstractions.
+    validations:
+      required: true
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Target certification impact
+      options:
+        - Docs / DX only
+        - Certified AWS path
+        - Experimental provider (e.g. GCP)
+        - Community / custom binary
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Escape hatches, existing config fields, or why a new API is needed.
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints you accept
+      options:
+        - label: Keep normal projects YAML-only (no required Pulumi/Go edits)
+        - label: Do not introduce shared Pulumi components that switch on provider
+        - label: Do not weaken compatibility, protection, or secret-handling rules

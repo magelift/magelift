@@ -1,0 +1,118 @@
+version: "2"
+
+run:
+  # Job-level timeout-minutes on CI lint partitions replaces run.timeout (QUALITY-06).
+  tests: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 50
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - ineffassign
+    - misspell
+    - unused
+    - errcheck
+    - revive
+    - gocritic
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - "-ST1000"
+        - "-ST1003"
+        - "-ST1005"
+        - "-QF1001"
+        - "-QF1008"
+        - "-S1002"
+        - "-SA1019"
+    revive:
+      # Narrow subset; avoid capitalisation / exported / naming churn across Pulumi graphs.
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: error-return
+        - name: errorf
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: increment-decrement
+        - name: if-return
+          disabled: true
+        - name: error-strings
+          disabled: true
+        - name: error-naming
+          disabled: true
+        - name: exported
+          disabled: true
+        - name: var-naming
+          disabled: true
+        - name: package-comments
+          disabled: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+        - sloppyReassign
+        - appendAssign
+        - dupImport
+        - ifElseChain
+        - elseif
+        - unlambda
+        - assignOp
+    errcheck:
+      check-blank: false
+      exclude-functions:
+        - (*github.com/spf13/cobra.Command).Help
+        - (*github.com/spf13/cobra.Command).MarkFlagRequired
+        - (*go.yaml.in/yaml/v4.Encoder).Close
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*os.File).Close
+        - io.Closer.Close
+        - (*os.File).Sync
+        - os.Remove
+        - (*compress/gzip.Reader).Close
+        - (*archive/zip.ReadCloser).Close
+        - (*net/http.Response).Body.Close
+        - (io.ReadCloser).Close
+        - (*google.golang.org/api/option).Close
+  exclusions:
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gocritic
+          - revive
+      - text: "Error return value of `.+\\.Close` is not checked"
+        linters:
+          - errcheck
+      - text: "Error return value of `os\\.Remove` is not checked"
+        linters:
+          - errcheck
+      - text: "Error return value of `os\\.RemoveAll` is not checked"
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

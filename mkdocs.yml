@@ -1,0 +1,118 @@
+site_name: MageLift
+site_description: Open-source Magento CLI for your AWS or GCP account. ACC/Upsun-shaped YAML, certified on ECS Fargate and GKE Autopilot.
+site_url: https://magelift.dev/docs/
+repo_url: https://github.com/magelift/magelift
+repo_name: magelift/magelift
+docs_dir: docs
+strict: true
+exclude_docs: |
+  knowledge/**
+theme:
+  name: material
+  custom_dir: docs/overrides
+  logo: assets/logo.png
+  favicon: assets/favicon.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: green
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: green
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+  font:
+    text: Source Sans 3
+    code: IBM Plex Mono
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/magelift/magelift
+    - icon: fontawesome/solid/globe
+      link: https://magelift.dev/
+nav:
+  - Home: index.md
+  - Start:
+      - Getting started: getting-started.md
+      - Install: install.md
+      - Local vs cloud: local-vs-cloud.md
+      - Compare to PaaS: compare-paas.md
+      - FAQ: faq.md
+      - Leave PaaS in a weekend: weekend-migrate.md
+  - Guides:
+      - Configuration: configuration.md
+      - CLI reference: cli-reference.md
+      - Secrets: secrets.md
+      - Day-2 operations: operations.md
+      - Application builds: builds.md
+      - Storefront recipes: storefront-recipes.md
+      - Compatibility: compatibility.md
+      - Benchmarking: benchmarks.md
+  - Cloud:
+      - Capability matrix: capability-matrix.md
+      - AWS bootstrap: bootstrap.md
+      - AWS acceptance: aws-acceptance.md
+      - Migrate from ACC / Platform.sh: migrating-from-paas.md
+      - Brownfield attach: brownfield-attach.md
+      - ece-tools parity: ece-parity.md
+      - GCP acceptance: gcp-acceptance.md
+      - Experimental:
+          - AWS EKS: aws-eks-experimental.md
+          - GCP notes: gcp-experimental.md
+          - OVH MKS: ovh-experimental.md
+          - Scaleway Kapsule: scaleway-experimental.md
+  - Develop:
+      - Architecture: architecture.md
+      - Adding a provider: adding-a-provider.md
+      - Provenance: provenance.md
+      - ADRs:
+          - Process: adr/README.md
+          - "0001 AWS ECS Fargate": adr/0001-aws-ecs-fargate-v1.md
+          - "0002 Provider extensions": adr/0002-provider-runtime-extension-boundary.md
+          - "0003 Artifact manifest": adr/0003-external-final-artifact-manifest.md
+          - "0004 Provider layout": adr/0004-provider-package-layout.md
+          - "0005 Local Compose": adr/0005-local-development-compose.md
+          - "0006 GitHub OIDC roles": adr/0006-github-oidc-role-separation.md
+          - "0007 Multi-provider targets": adr/0007-multi-provider-community-targets.md
+          - "0008 Ports and adapters": adr/0008-ports-and-adapters-multi-provider.md
+          - "0009 Day-2 Magento ports": adr/0009-day2-magento-ports.md
+          - "0010 Database dump seed": adr/0010-database-dump-seed.md
+  - Project:
+      - Versioning: versioning.md
+      - Release readiness: release-readiness.md
+      - Publishing: publishing.md
+      - Roadmap: post-beta-roadmap.md
+      - Evidence: evidence/README.md
+      - Lint policy: lint-policy.md
+      - Dependency policy: dependency-policy.md
+      - GitHub labels: github-labels.md
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - toc:
+      permalink: true

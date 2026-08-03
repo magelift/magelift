@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  <link rel="alternate" type="text/plain" title="Plain-text site summary" href="https://magelift.dev/llms.txt" />
+  <link rel="alternate" type="text/plain" title="Extended plain-text summary" href="https://magelift.dev/llms-full.txt" />
+  <meta name="author" content="MageLift contributors" />
+  <meta property="og:site_name" content="MageLift" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:image" content="https://magelift.dev/media/logo.png" />
+  {% if page %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://magelift.dev/#org",
+        "name": "MageLift",
+        "url": "https://magelift.dev/",
+        "logo": "https://magelift.dev/media/logo.png",
+        "sameAs": ["https://github.com/magelift/magelift"]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://magelift.dev/#website",
+        "url": "https://magelift.dev/",
+        "name": "MageLift",
+        "publisher": { "@id": "https://magelift.dev/#org" }
+      },
+      {
+        "@type": "TechArticle",
+        "headline": {{ page.title | tojson }},
+        "description": {{ (page.meta.description if page.meta and page.meta.description else config.site_description) | tojson }},
+        "url": {{ page.canonical_url | tojson }},
+        "isPartOf": { "@id": "https://magelift.dev/#website" },
+        "publisher": { "@id": "https://magelift.dev/#org" },
+        "inLanguage": "en"
+      }
+    ]
+  }
+  </script>
+  {% endif %}
+{% endblock %}

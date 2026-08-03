@@ -1,0 +1,42 @@
+name: Docs site
+
+# Builds MkDocs on docs changes. GitHub Pages is unavailable on the current
+# private plan; deploy `site/` via Cloudflare Pages (or enable Pages after the
+# repo is public / plan supports it). CI also runs `mkdocs build --strict`.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'docs/requirements.txt'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: docs-site
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install MkDocs
+        run: pip install --disable-pip-version-check -r docs/requirements.txt
+      - name: Build
+        run: mkdocs build --strict --site-dir site
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mkdocs-site
+          path: site
+          retention-days: 14

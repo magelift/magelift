@@ -1,0 +1,47 @@
+# Generated documentation
+/site/
+
+# Build and test output
+/bin/
+/dist/
+/coverage/
+*.out
+/build/vendor/
+/build/.phpunit.cache/
+/build/.phpstan/
+
+# Marketing site deps / build
+/websites/**/node_modules/
+/websites/**/dist/
+/websites/**/.astro/
+/websites/marketing/public/docs/
+
+# Local state and credentials
+.env
+.env.*
+!.env.example
+.magelift/
+.pulumi/
+.codebase-memory/
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+
+# AI agent local caches and user-installed third-party skills (not audited for
+# this repository's Apache-2.0 license surface). First-party skills live in
+# agents/skills/ and are tracked.
+.claude/
+.agents/
+.cursor/
+.serena/
+skills-lock.json
+
+# Local planning / agent scratch (never commit to the public remote)
+.planning/
+.wrangler/
+.venv/
+
+# Maintainer OKF / session notes (not public product docs)
+/docs/knowledge/

@@ -1,0 +1,5 @@
+# Synthetic ACC services (unmapped variant).
+mysql:
+  type: mysql:10.6
+redis:
+  type: redis:7.0

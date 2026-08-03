@@ -1,0 +1,55 @@
+name: CodeQL
+
+# PR (Go-touching only) + weekly. Skip Dependabot — CI go-verify/govulncheck
+# is the dep-bump gate; weekly schedule covers baseline. No main-push re-run.
+on:
+  pull_request:
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/codeql.yml'
+  schedule:
+    - cron: '23 3 * * 1'
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    # Dependabot PRs still match go.mod paths; skip hosted CodeQL minutes there.
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # CodeQL does not treat PHP as a first-class language here; Go needs a real build.
+        include:
+          - language: go
+            build-mode: autobuild
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+        if: matrix.language == 'go'
+      - uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+      - uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          category: /language:${{ matrix.language }}
+          # Repo does not have Code scanning enabled → SARIF upload fails and
+          # emails weekly. Keep analysis; skip upload until GHAS is turned on.
+          upload: never
+        continue-on-error: false

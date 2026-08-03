@@ -1,0 +1,3 @@
+"https://unmapped.example.com/":
+  type: upstream
+  upstream: "upsun-unmapped-shop:http"
