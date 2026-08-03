@@ -4,6 +4,13 @@ All notable changes will be documented here. This project follows Semantic Versi
 after its first public release and uses Conventional Commits with automated release
 PRs. The format is based on Keep a Changelog.
 
+## [1.0.1-rc.1](https://github.com/acourtiol/magelift/compare/v1.0.0-rc.1...v1.0.1-rc.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* sample-shop onboarding docs, usererr tests, and v* tags ([94028cf](https://github.com/acourtiol/magelift/commit/94028cf48fad84d6ba88a80c4787af6ec4a6d58c))
+
 ## 1.0.0-rc.1 (2026-08-03)
 
 
