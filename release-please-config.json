@@ -4,7 +4,9 @@
   "packages": {
     ".": {
       "package-name": "magelift",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "release-as": "1.0.0-rc.1",
+      "prerelease": true
     }
   }
 }
