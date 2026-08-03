@@ -32,3 +32,10 @@
 .cursor/
 .serena/
 skills-lock.json
+
+# GSD loop runtime (pids, heartbeats — not planning artifacts)
+.planning/loop/*.pid
+.planning/loop/*.id
+.planning/loop/last_progress
+.planning/loop/heartbeat*
+.planning/loop/milestone-prompt.json
