@@ -245,6 +245,30 @@ func TestRejectsGCPSecretSchemeOnAWSTarget(t *testing.T) {
 	}
 }
 
+func TestAcceptsGCPSecretSchemeOnGCPTarget(t *testing.T) {
+	input := strings.Replace(base, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: gcp, runtime: gke-autopilot, gcp: {project: p, region: europe-west1}}", 1)
+	input = strings.Replace(input, "aws-secrets-manager://composer/auth", "gcp-secret-manager://projects/p/secrets/s/versions/latest", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Resolve("staging", ResolveOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRejectsAWSSecretSchemeOnGCPTarget(t *testing.T) {
+	input := strings.Replace(base, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: gcp, runtime: gke-autopilot, gcp: {project: p, region: europe-west1}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "gcp-secret-manager://") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestEnvironmentNamesSorted(t *testing.T) {
 	f, _ := Load([]byte(base))
 	got := strings.Join(f.Environments(), ",")

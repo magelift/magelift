@@ -400,8 +400,6 @@ func validate(c Config) (CompatibilityAssessment, error) {
 				}
 			case "gcp":
 				if ref.Kind != secretref.GCPSecretManager {
-					// Accepted at config time; build resolution wires the GCP provider later.
-				} else {
 					problems = append(problems, "build.composer.credentials for gcp must use gcp-secret-manager://")
 				}
 			}
