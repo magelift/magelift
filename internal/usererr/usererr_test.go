@@ -27,14 +27,14 @@ func TestWrapPreservesCauseChain(t *testing.T) {
 func TestFormatAndAs(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name       string
-		err        error
-		wantCause  string
-		wantNext   string
-		wantDoc    string
-		asOK       bool
-		omitNext   bool
-		omitDocs   bool
+		name      string
+		err       error
+		wantCause string
+		wantNext  string
+		wantDoc   string
+		asOK      bool
+		omitNext  bool
+		omitDocs  bool
 	}{
 		{
 			name:      "format with docs",

@@ -9,10 +9,10 @@ import (
 func TestMapStackOutputsKeepsSecretValues(t *testing.T) {
 	t.Parallel()
 	got := mapStackOutputs(auto.OutputMap{
-		"kubeconfig":      {Value: "apiVersion: v1\n", Secret: true},
-		"clusterName":     {Value: "mlgcpwt-preview-gke", Secret: false},
-		"applicationURL":  {Value: "http://1.2.3.4", Secret: false},
-		"emptySecret":     {Value: "", Secret: true},
+		"kubeconfig":     {Value: "apiVersion: v1\n", Secret: true},
+		"clusterName":    {Value: "mlgcpwt-preview-gke", Secret: false},
+		"applicationURL": {Value: "http://1.2.3.4", Secret: false},
+		"emptySecret":    {Value: "", Secret: true},
 	})
 	if got["kubeconfig"] != "apiVersion: v1\n" {
 		t.Fatalf("kubeconfig = %#v; secret outputs must remain usable for day-2", got["kubeconfig"])

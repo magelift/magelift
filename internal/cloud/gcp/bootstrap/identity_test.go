@@ -108,7 +108,7 @@ func TestBuildIdentityPlanWIF(t *testing.T) {
 	t.Parallel()
 	plan, err := BuildIdentityPlan(IdentitySpec{
 		Project: "shop", Environment: "preview",
-		GCPProject: "example-gcp-project",
+		GCPProject:  "example-gcp-project",
 		GitHubOwner: "acourtiol", GitHubRepo: "magelift",
 	})
 	if err != nil {
@@ -138,7 +138,7 @@ func TestEnsureIdentityCreatesPoolProviderAndBinding(t *testing.T) {
 	t.Parallel()
 	plan, err := BuildIdentityPlan(IdentitySpec{
 		Project: "shop", Environment: "preview",
-		GCPProject: "example-gcp-project",
+		GCPProject:  "example-gcp-project",
 		GitHubOwner: "acourtiol", GitHubRepo: "magelift",
 	})
 	if err != nil {
@@ -182,7 +182,7 @@ func TestEnsureIdentityPropagatesLoudFailures(t *testing.T) {
 	t.Parallel()
 	plan, err := BuildIdentityPlan(IdentitySpec{
 		Project: "shop", Environment: "preview",
-		GCPProject: "example-gcp-project",
+		GCPProject:  "example-gcp-project",
 		GitHubOwner: "acourtiol", GitHubRepo: "magelift",
 	})
 	if err != nil {
@@ -204,7 +204,7 @@ func TestBuildIdentityPlanRejectsWildcardRepo(t *testing.T) {
 	t.Parallel()
 	_, err := BuildIdentityPlan(IdentitySpec{
 		Project: "shop", Environment: "preview",
-		GCPProject: "example-gcp-project",
+		GCPProject:  "example-gcp-project",
 		GitHubOwner: "acourtiol", GitHubRepo: "*",
 	})
 	if err == nil {

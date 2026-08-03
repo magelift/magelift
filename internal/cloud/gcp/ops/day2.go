@@ -15,9 +15,9 @@ import (
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
-func (Module) Bootstrap() platform.Bootstrap           { return Bootstrap{} }
-func (Module) State() platform.State                   { return State{} }
-func (Module) Secrets() platform.Secrets               { return Secrets{} }
+func (Module) Bootstrap() platform.Bootstrap { return Bootstrap{} }
+func (Module) State() platform.State         { return State{} }
+func (Module) Secrets() platform.Secrets     { return Secrets{} }
 func (Module) RuntimeObserve() platform.RuntimeObserve {
 	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
 }
@@ -60,7 +60,7 @@ func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, req 
 	}
 	identityPlan, err := gcpbootstrap.BuildIdentityPlan(gcpbootstrap.IdentitySpec{
 		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
-		GCPProject: spec.Identity.GCPProject,
+		GCPProject:  spec.Identity.GCPProject,
 		GitHubOwner: req.GitHubOwner, GitHubRepo: req.GitHubRepo,
 	})
 	if err != nil {

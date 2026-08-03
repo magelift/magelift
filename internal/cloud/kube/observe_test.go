@@ -17,18 +17,18 @@ type observePlanned struct {
 	project, env string
 }
 
-func (p observePlanned) StackName() string                          { return p.project + "-" + p.env }
-func (p observePlanned) Provider() sdk.ProviderID                   { return "gcp" }
-func (p observePlanned) Runtime() sdk.RuntimeID                     { return "gke-autopilot" }
-func (p observePlanned) Project() string                            { return p.project }
-func (p observePlanned) Environment() string                        { return p.env }
-func (p observePlanned) Region() string                             { return "europe-west9" }
+func (p observePlanned) StackName() string        { return p.project + "-" + p.env }
+func (p observePlanned) Provider() sdk.ProviderID { return "gcp" }
+func (p observePlanned) Runtime() sdk.RuntimeID   { return "gke-autopilot" }
+func (p observePlanned) Project() string          { return p.project }
+func (p observePlanned) Environment() string      { return p.env }
+func (p observePlanned) Region() string           { return "europe-west9" }
 func (p observePlanned) CertificationTier() platform.CertificationTier {
 	return platform.TierCertified
 }
-func (p observePlanned) EnvironmentClass() string                   { return "preview" }
-func (p observePlanned) Protected() bool                            { return false }
-func (p observePlanned) ImageDigest() string                        { return "" }
+func (p observePlanned) EnvironmentClass() string { return "preview" }
+func (p observePlanned) Protected() bool          { return false }
+func (p observePlanned) ImageDigest() string      { return "" }
 func (p observePlanned) WithImageDigest(string) (platform.PlannedStack, error) {
 	return p, nil
 }

@@ -106,9 +106,9 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 			EnvironmentClass: class, Preset: preset,
 			Tags: map[string]string{"magelift:managed-by": "magelift", "magelift:project": cfg.Project.Name, "magelift:environment": environment},
 		},
-		Application:  Application{Edition: cfg.Application.Edition, Version: cfg.Application.Version, Mode: cfg.Application.Mode, WebRuntime: cfg.Application.WebRuntime},
-		Artifact:     Artifact{ImageDigest: aws.ImageDigest, CompatibilityStatus: status},
-		Lifecycle:    Lifecycle{ExpiresAt: expiresAt, MonthlyBudgetCents: cfg.MonthlyBudgetCents, Protection: cfg.Protection},
+		Application: Application{Edition: cfg.Application.Edition, Version: cfg.Application.Version, Mode: cfg.Application.Mode, WebRuntime: cfg.Application.WebRuntime},
+		Artifact:    Artifact{ImageDigest: aws.ImageDigest, CompatibilityStatus: status},
+		Lifecycle:   Lifecycle{ExpiresAt: expiresAt, MonthlyBudgetCents: cfg.MonthlyBudgetCents, Protection: cfg.Protection},
 		Existing: ExistingResources{
 			Network: existingNetwork, PublicSubnetIDs: existingPublicSubnets, PrivateSubnetIDs: existingPrivateSubnets, DataSubnetIDs: existingDataSubnets,
 			Database: existingDatabase, DatabaseSecretARN: existingDatabaseSecretARN, DatabaseEndpoint: existingDatabaseEndpoint,

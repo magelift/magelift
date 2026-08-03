@@ -199,4 +199,3 @@ func TestArchiveAES256SetsServerSideEncryption(t *testing.T) {
 		t.Fatalf("copy SSE = %#v", fake.lastCopy)
 	}
 }
-

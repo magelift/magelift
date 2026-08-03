@@ -49,31 +49,31 @@ func ExitCode(err error) int {
 }
 
 type options struct {
-	configPath         string
-	environment        string
-	output             string
-	noInteraction      bool
-	yes                bool
-	verbose            int
-	stdout             io.Writer
-	stderr             io.Writer
-	getenv             func(string) string
-	currentBranch      func(string) (string, error)
-	terminal           environmentTerminal
-	modules            *platform.ModuleRegistry
-	newBackend         func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error)
-	newDeploySteps     func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error)
-	importSeedDump     func(context.Context, dumpimport.Options) error
-	mediaSync          func(context.Context, mediasync.Options) (mediasync.Result, error)
-	newLock            func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
-	runCommand         func(context.Context, string, []string, io.Writer, io.Writer) error
-	runCompose         func(context.Context, string, []string, []string, io.Writer, io.Writer) error
-	newReleaseStore    func(string, string) (releaseStore, error)
-	verifyRelease      func(context.Context, string, cosign.VerifyOptions) error
-	newComposerSecrets func(context.Context, string) (composerSecretProvider, error)
+	configPath            string
+	environment           string
+	output                string
+	noInteraction         bool
+	yes                   bool
+	verbose               int
+	stdout                io.Writer
+	stderr                io.Writer
+	getenv                func(string) string
+	currentBranch         func(string) (string, error)
+	terminal              environmentTerminal
+	modules               *platform.ModuleRegistry
+	newBackend            func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error)
+	newDeploySteps        func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error)
+	importSeedDump        func(context.Context, dumpimport.Options) error
+	mediaSync             func(context.Context, mediasync.Options) (mediasync.Result, error)
+	newLock               func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
+	runCommand            func(context.Context, string, []string, io.Writer, io.Writer) error
+	runCompose            func(context.Context, string, []string, []string, io.Writer, io.Writer) error
+	newReleaseStore       func(string, string) (releaseStore, error)
+	verifyRelease         func(context.Context, string, cosign.VerifyOptions) error
+	newComposerSecrets    func(context.Context, string) (composerSecretProvider, error)
 	newComposerGCPSecrets func(context.Context) (composerSecretProvider, error)
-	newUpgrade         func() upgradeClient
-	executable         func() (string, error)
+	newUpgrade            func() upgradeClient
+	executable            func() (string, error)
 	// Test doubles for day-2 ports (override Module* resolution).
 	testBootstrap      platform.Bootstrap
 	testState          platform.State

@@ -164,7 +164,7 @@ func TestExistingDatabaseRejectsInvalidRefsBeforeRegistration(t *testing.T) {
 		SecretARN:  "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-db-master",
 	}
 	tests := []struct {
-		name string
+		name   string
 		mutate func(*ExistingDatabase)
 	}{
 		{name: "empty identifier", mutate: func(e *ExistingDatabase) { e.Identifier = "" }},

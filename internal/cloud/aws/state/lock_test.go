@@ -197,4 +197,3 @@ func TestEncryptionKMSPutObjectSetsAwsKms(t *testing.T) {
 		t.Fatalf("SSEKMSKeyId = %q", got)
 	}
 }
-

@@ -48,16 +48,16 @@ func DefaultKubeExec(ctx context.Context, stdin io.Reader, name string, args []s
 // pod, then exec into that Job pod with the same argv shape below. Unit tests inject
 // KubeExec to capture argv without a live cluster — do not require kubectl here.
 type kubeMySQL struct {
-	namespace string
-	pod       string // pod name or "deploy/<name>" resource
-	selector  string // label selector when pod empty
-	container string
-	user      string
-	password  string
-	host      string
-	port      int
+	namespace  string
+	pod        string // pod name or "deploy/<name>" resource
+	selector   string // label selector when pod empty
+	container  string
+	user       string
+	password   string
+	host       string
+	port       int
 	kubeconfig string
-	exec      KubeExec
+	exec       KubeExec
 }
 
 func (k *kubeMySQL) ExecSQL(ctx context.Context, database string, stdin io.Reader) (string, error) {

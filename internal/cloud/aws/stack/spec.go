@@ -69,17 +69,17 @@ type Lifecycle struct {
 }
 
 type ExistingResources struct {
-	Network             *sdk.ExistingResourceRef
-	PublicSubnetIDs     []string
-	PrivateSubnetIDs    []string
-	DataSubnetIDs       []string
-	Database            *sdk.ExistingResourceRef
-	DatabaseSecretARN   string
-	DatabaseEndpoint    string
-	HostedZone          *sdk.ExistingResourceRef
-	Certificate         *sdk.ExistingResourceRef
-	ALBCertificate      *sdk.ExistingResourceRef
-	SNSTopicARN         string
+	Network           *sdk.ExistingResourceRef
+	PublicSubnetIDs   []string
+	PrivateSubnetIDs  []string
+	DataSubnetIDs     []string
+	Database          *sdk.ExistingResourceRef
+	DatabaseSecretARN string
+	DatabaseEndpoint  string
+	HostedZone        *sdk.ExistingResourceRef
+	Certificate       *sdk.ExistingResourceRef
+	ALBCertificate    *sdk.ExistingResourceRef
+	SNSTopicARN       string
 }
 
 type Dependencies struct {
@@ -554,9 +554,9 @@ func halfStep(value float64) bool {
 }
 
 var (
-	kmsARN       = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):kms:[a-z0-9-]+:[0-9]{12}:key/[A-Za-z0-9-]+$`)
+	kmsARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):kms:[a-z0-9-]+:[0-9]{12}:key/[A-Za-z0-9-]+$`)
 	// Secret name may include "!" (RDS/Aurora ManageMasterUserPassword: rds!db-… / rds!cluster-…).
-	secretARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@!-]+$`)
+	secretARN    = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@!-]+$`)
 	databaseName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 	username     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,15}$`)
 )

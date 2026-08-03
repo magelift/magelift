@@ -13,16 +13,16 @@ import (
 
 type costPlanned struct{}
 
-func (costPlanned) StackName() string                                 { return "test" }
-func (costPlanned) Provider() sdk.ProviderID                          { return "gcp" }
-func (costPlanned) Runtime() sdk.RuntimeID                            { return "gke-autopilot" }
-func (costPlanned) Project() string                                   { return "shop" }
-func (costPlanned) Environment() string                               { return "staging" }
-func (costPlanned) Region() string                                    { return "europe-west1" }
-func (costPlanned) CertificationTier() platform.CertificationTier     { return platform.TierExperimental }
-func (costPlanned) EnvironmentClass() string                          { return "staging" }
-func (costPlanned) Protected() bool                                   { return false }
-func (costPlanned) ImageDigest() string                               { return "" }
+func (costPlanned) StackName() string                             { return "test" }
+func (costPlanned) Provider() sdk.ProviderID                      { return "gcp" }
+func (costPlanned) Runtime() sdk.RuntimeID                        { return "gke-autopilot" }
+func (costPlanned) Project() string                               { return "shop" }
+func (costPlanned) Environment() string                           { return "staging" }
+func (costPlanned) Region() string                                { return "europe-west1" }
+func (costPlanned) CertificationTier() platform.CertificationTier { return platform.TierExperimental }
+func (costPlanned) EnvironmentClass() string                      { return "staging" }
+func (costPlanned) Protected() bool                               { return false }
+func (costPlanned) ImageDigest() string                           { return "" }
 func (costPlanned) WithImageDigest(string) (platform.PlannedStack, error) {
 	return costPlanned{}, nil
 }

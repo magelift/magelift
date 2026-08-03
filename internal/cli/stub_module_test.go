@@ -52,21 +52,21 @@ func (stubAWSModule) Plan(cfg config.Config, environment string, _ platform.Plan
 		}
 	}
 	return stubPlanned{
-		stackName:           cfg.Project.Name + "-" + environment,
-		provider:            "aws",
-		runtime:             "ecs-fargate",
-		project:             cfg.Project.Name,
-		environment:         environment,
-		region:              cfg.Defaults.Region,
-		envClass:            cfg.Class,
-		protected:           cfg.Protection,
-		digest:              digest,
-		tier:                platform.TierCertified,
-		adopted:             adopted,
-		networkExternalID:   networkExternalID,
-		networkLabel:        networkLabel,
-		databaseExternalID:  databaseExternalID,
-		databaseLabel:       databaseLabel,
+		stackName:          cfg.Project.Name + "-" + environment,
+		provider:           "aws",
+		runtime:            "ecs-fargate",
+		project:            cfg.Project.Name,
+		environment:        environment,
+		region:             cfg.Defaults.Region,
+		envClass:           cfg.Class,
+		protected:          cfg.Protection,
+		digest:             digest,
+		tier:               platform.TierCertified,
+		adopted:            adopted,
+		networkExternalID:  networkExternalID,
+		networkLabel:       networkLabel,
+		databaseExternalID: databaseExternalID,
+		databaseLabel:      databaseLabel,
 	}, nil
 }
 

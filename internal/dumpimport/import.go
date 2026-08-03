@@ -263,7 +263,7 @@ func (h *hostMySQL) Query(ctx context.Context, database, sql string) (string, er
 
 type composeMySQL struct {
 	workDir, composeFile, project string
-	user, password              string
+	user, password                string
 }
 
 func (c *composeMySQL) mysqlCmd(ctx context.Context, database string, extra ...string) *exec.Cmd {

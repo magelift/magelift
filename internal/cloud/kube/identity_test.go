@@ -118,7 +118,9 @@ func TestFourModuleTypeIdentity(t *testing.T) {
 
 type identityBackend struct{}
 
-func (*identityBackend) Outputs(context.Context) (map[string]any, error) { return map[string]any{}, nil }
+func (*identityBackend) Outputs(context.Context) (map[string]any, error) {
+	return map[string]any{}, nil
+}
 func (*identityBackend) Preview(context.Context, automation.Request, io.Writer) (map[string]int, error) {
 	return map[string]int{}, nil
 }

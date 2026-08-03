@@ -17,9 +17,9 @@ import (
 	"github.com/acourtiol/magelift/internal/platform"
 )
 
-func (Module) Bootstrap() platform.Bootstrap           { return Bootstrap{} }
-func (Module) State() platform.State                   { return State{} }
-func (Module) Secrets() platform.Secrets               { return Secrets{} }
+func (Module) Bootstrap() platform.Bootstrap { return Bootstrap{} }
+func (Module) State() platform.State         { return State{} }
+func (Module) Secrets() platform.Secrets     { return Secrets{} }
 func (Module) RuntimeObserve() platform.RuntimeObserve {
 	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
 }

@@ -12,12 +12,12 @@ import (
 
 func TestAccountFreePresetTable(t *testing.T) {
 	tests := []struct {
-		name            string
-		preset          string
-		gcp             *config.GCPTarget
+		name             string
+		preset           string
+		gcp              *config.GCPTarget
 		wantMinEstimated int
-		wantContains    string
-		wantNotice      bool
+		wantContains     string
+		wantNotice       bool
 	}{
 		{
 			name:             "configured standard catalog",
