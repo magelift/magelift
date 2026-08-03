@@ -236,15 +236,16 @@ but do not treat Phase 5 docs or local scratch as SC5 live proof.
 
 #### Cloudflare preview rehearsal (MIGRATE-04 / Phase 7)
 
-Preferred non-prod host: `magelift-preview.alexandrecourtiol.com` (fallback
-`magelift-preview.acourtiol.com`). Use an API token with **Zone.DNS Edit** (and
-Zone.Zone Read) via `CLOUDFLARE_API_TOKEN` or `CF_API_TOKEN`. **Do not use Wrangler
-OAuth** for DNS writes — Wrangler OAuth is zone:read only and cannot create/update
-records.
+Preferred non-prod host: set `MAGELIFT_CUTOVER_HOST` to an operator-owned
+FQDN you control (docs/examples use `magelift-preview.example.com`). Use an API
+token with **Zone.DNS Edit** (and Zone.Zone Read) via `CLOUDFLARE_API_TOKEN` or
+`CF_API_TOKEN`. **Do not use Wrangler OAuth** for DNS writes — Wrangler OAuth is
+zone:read only and cannot create/update records.
 
 ```sh
 export CLOUDFLARE_API_TOKEN=...   # Zone.DNS Edit — not Wrangler OAuth
-export MAGELIFT_CUTOVER_HOST=magelift-preview.alexandrecourtiol.com
+export MAGELIFT_CUTOVER_HOST=magelift-preview.example.com  # your zone
+# Optional: MAGELIFT_CUTOVER_ZONE=example.com when auto-derive is wrong
 # Point at stack applicationURL / LB hostname or IPv4 from the paid pass:
 TARGET=<ingress-or-lb> ./scripts/cutover-dns-cloudflare.sh
 # Rehearse without mutating:

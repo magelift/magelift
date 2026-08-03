@@ -140,10 +140,10 @@ cutover stay Phase 7.
 ## GCP GKE Autopilot cells (**certified** path)
 
 Cells are **preset-derived** (no AWS-style YAML catalog toggles for queue/search).
-Certified tier (GCP-06): real-account acceptance pass 2026-08-02 on
-`digital-lab-341608` / `europe-west1` / prefix `mlgcpwt` — harness PASS rows in
-`.magelift/gcp-matrix/matrix-results.md` (WIF, Composer SM, day-2, deploy,
-migrate dump, cost, DNS cutover). See [gcp-acceptance.md](gcp-acceptance.md).
+Certified tier (GCP-06): real-account acceptance pass 2026-08-02 on a
+disposable maintainer GCP project / `europe-west1` (IDs redacted in public docs)
+— harness PASS rows cited in [evidence/](evidence/README.md) (WIF, Composer SM,
+day-2, deploy, migrate dump, cost, DNS cutover). See [gcp-acceptance.md](gcp-acceptance.md).
 
 | Preset | Queue | Search | SQL | Memorystore | Apply on credits? |
 | --- | --- | --- | --- | --- | --- |
@@ -151,9 +151,9 @@ migrate dump, cost, DNS cutover). See [gcp-acceptance.md](gcp-acceptance.md).
 | `standard` | `rabbitmq` on GKE | OpenSearch (1) | REGIONAL | `STANDARD_SMALL` +1 replica | **preview-only** unless budgeted |
 | `high-availability` | `rabbitmq`×2 | OpenSearch×3 | REGIONAL | 2 replicas | **preview-only** |
 
-Measured preview create (2026-07-21, `digital-lab-341608` / europe-west1, prefix `mlgcpmx`):
-**~19m21s** Pulumi Duration for infra-only. Certified cell matrix (2026-08-02,
-prefix `mlgcpwt`): create-once + cells then destroy/`force_clean`/`assert_clean`.
+Measured preview create (2026-07-21, disposable GCP project / europe-west1):
+**~19m21s** Pulumi Duration for infra-only. Certified cell matrix (2026-08-02):
+create-once + cells then destroy/`force_clean`/`assert_clean`.
 Destroy often needs PSA soak + `force_clean` after Cloud SQL (see gcp-acceptance.md).
 
 ## Community / out-of-tree modules

@@ -72,7 +72,7 @@ Every public-tag gate is **Closed**, **Deferred**, or **Offline closed** with a 
 | First ship path | **Closed** | GitHub Release archives first; Homebrew cask optional post-tag; Windows = archive until winget/Scoop owned |
 | Packaging smoke | **Closed** | 2026-07-28T15:11:04Z — `release smoke ok binary=dist/magelift_darwin_arm64_v8.0/magelift (serial single-target)` via `make release-smoke` (`GOMAXPROCS=1`, `--parallelism=1`) |
 | Shared Kubernetes day-2 | **Offline closed** | Unit/fake-clientset: `*kube.Observe` + `*kube.Steps` type-identity across gcp/eksops/ovh/scaleway; AES256 DIY state unit proof. **Not** live GKE/OVH/SCW Magento acceptance beyond the GCP certified create-once path. |
-| Cloudflare DNS cutover (MIGRATE-04) | **Closed** | Live `cutover:dns` PASS + `--cleanup` on `magelift-preview.alexandrecourtiol.com` (2026-08-02); script + Zone.DNS Edit via `cf` CLI. Preview-host rehearsal — not a production storefront cutover. See [gcp-certified-pass](evidence/gcp-certified-pass-2026-08-02.md). |
+| Cloudflare DNS cutover (MIGRATE-04) | **Closed** | Live `cutover:dns` PASS + `--cleanup` on an operator-owned preview host (2026-08-02); script + Zone.DNS Edit via `cf` CLI. Preview-host rehearsal — not a production storefront cutover. See [gcp-certified-pass](evidence/gcp-certified-pass-2026-08-02.md). |
 | Hosted CI / GitHub Actions minutes | **Deferred** (Act-only) | Maintainer lock: hosted Actions minutes exhausted; local `make verify` + Act until minutes return — do not claim hosted CI green. See [lint-policy.md](lint-policy.md). |
 | Brownfield attach (ATTACH-01..04) | **Closed** | Existing\|Adopt\|Refuse\|Detach covered offline + live AWS VPC+RDS adopt. Docs: [brownfield-attach.md](brownfield-attach.md) |
 | Free-tier AWS VPC+RDS adopt confirm | **Closed** | Live PASS 2026-08-02 — preview ADOPT VPC+RDS, apply +74, destroy −74, describe-after-destroy VPC/RDS intact, then external cleanup. Evidence: [aws-brownfield-adopt](evidence/aws-brownfield-adopt-2026-08-02.md) |
@@ -82,7 +82,7 @@ Every public-tag gate is **Closed**, **Deferred**, or **Offline closed** with a 
 ```text
 elapsed_seconds: 631
 date: 2026-07-21T19:51Z (Pulumi create Duration 10m31s)
-account: free-tier 669890779205 / eu-north-1
+account: free-tier <redacted> / eu-north-1
 shape: preview + rds-mysql + fck-nat + searchMode=disabled + queueMode=db (then ecs-rabbitmq / ecs-artemis on same stack)
 ```
 

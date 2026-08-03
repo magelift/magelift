@@ -230,7 +230,7 @@ func testDeploySpec(digest string) DeploySpec {
 		WebRuntime:      "nginx-fpm",
 		CPURequest:      "500m",
 		MemoryRequest:   "1Gi",
-		CloudProject:    "digital-lab-341608",
+		CloudProject:    "example-gcp-project",
 		Region:          "europe-west1",
 	}
 }

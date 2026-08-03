@@ -25,7 +25,7 @@ func TestBuildPlanAndEnsure(t *testing.T) {
 	t.Parallel()
 	plan, err := BuildPlan(Spec{
 		Project: "shop", Environment: "preview",
-		GCPProject: "digital-lab-341608", Region: "europe-west1",
+		GCPProject: "example-gcp-project", Region: "europe-west1",
 	})
 	if err != nil {
 		t.Fatal(err)

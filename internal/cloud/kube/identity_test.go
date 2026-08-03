@@ -154,7 +154,7 @@ func identityRuntimeFactory(context.Context, kube.Backend) (kube.RuntimeChecker,
 func gcpIdentitySpec(digest string) gcpstack.Spec {
 	return gcpstack.Spec{
 		Identity: gcpstack.Identity{
-			Project: "shop", GCPProject: "digital-lab-341608", Environment: "preview",
+			Project: "shop", GCPProject: "example-gcp-project", Environment: "preview",
 			Region: "europe-west1", EnvironmentClass: "preview", Preset: sdk.PresetPreview,
 		},
 		Application:  gcpstack.Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},

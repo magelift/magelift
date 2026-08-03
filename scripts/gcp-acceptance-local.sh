@@ -94,20 +94,30 @@ if [[ "${MAGELIFT_GCP_ACCEPTANCE:-}" != "1" ]]; then
 fi
 
 WORKDIR="${MAGELIFT_GCP_ACCEPTANCE_DIR:-/tmp/magelift-gcp-wt}"
-PROJECT="${MAGELIFT_GCP_PROJECT:-digital-lab-341608}"
+# Live runs require an operator-owned disposable project — never commit real IDs.
+if [[ -z "${MAGELIFT_GCP_PROJECT:-}" ]]; then
+	if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-}" == "1" ]]; then
+		PROJECT="example-gcp-project"
+	else
+		printf 'set MAGELIFT_GCP_PROJECT to your disposable GCP project (no default for live runs)\n' >&2
+		exit 2
+	fi
+else
+	PROJECT="${MAGELIFT_GCP_PROJECT}"
+fi
 REGION="${MAGELIFT_GCP_REGION:-europe-west1}"
 MODE="${1:-preview}"
 PROFILE="${MAGELIFT_GCP_ACCEPTANCE_PROFILE:-preview}"
 # Must be a pullable OCI digest for Magento day-2 / deploy:candidate / health cells.
 # Placeholder sha256:0123… fails ImagePull — set MAGELIFT_GCP_ACCEPTANCE_DIGEST before live up.
-DIGEST="${MAGELIFT_GCP_ACCEPTANCE_DIGEST:-ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}"
-GITHUB_OWNER="${MAGELIFT_GCP_ACCEPTANCE_GITHUB_OWNER:-acourtiol}"
+DIGEST="${MAGELIFT_GCP_ACCEPTANCE_DIGEST:-ghcr.io/example/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}"
+GITHUB_OWNER="${MAGELIFT_GCP_ACCEPTANCE_GITHUB_OWNER:-${GITHUB_REPOSITORY_OWNER:-example}}"
 GITHUB_REPO="${MAGELIFT_GCP_ACCEPTANCE_GITHUB_REPO:-magelift}"
 COMPOSER_SECRET_ID="${MAGELIFT_GCP_COMPOSER_SECRET_ID:-magelift-composer-auth}"
 SEED_DUMP="${MAGELIFT_GCP_ACCEPTANCE_SEED_DUMP:-$ROOT/testdata/fixtures/migrate/tiny.sql}"
-CUTOVER_HOST="${MAGELIFT_CUTOVER_HOST:-magelift-preview.alexandrecourtiol.com}"
-# Isolation prefix for this worktree — do not reuse mlacc (other agents / prior orphans).
-NAME="${MAGELIFT_GCP_ACCEPTANCE_NAME:-mlgcpwt}"
+CUTOVER_HOST="${MAGELIFT_CUTOVER_HOST:-magelift-preview.example.com}"
+# Isolation prefix for this worktree — override per operator; do not reuse shared prefixes.
+NAME="${MAGELIFT_GCP_ACCEPTANCE_NAME:-mlacc}"
 # Magelift DIY stack identity is project-env-provider-runtime (see platform.FormatStackName).
 STACK_NAME="${NAME}-${PROFILE}-gcp-gke-autopilot"
 PULUMI_PROJECT="magelift"

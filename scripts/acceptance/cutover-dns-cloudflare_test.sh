@@ -56,7 +56,7 @@ assert_exit "missing-token-fails" 1 env -u CLOUDFLARE_API_TOKEN -u CF_API_TOKEN 
 
 # --- dry-run works without token ---
 assert_exit "dry-run-no-token" 0 env -u CLOUDFLARE_API_TOKEN -u CF_API_TOKEN \
-	MAGELIFT_CUTOVER_HOST=magelift-preview.alexandrecourtiol.com \
+	MAGELIFT_CUTOVER_HOST=magelift-preview.example.com \
 	TARGET=example.invalid "$SCRIPT" --dry-run
 
 # --- fake curl stub: zone resolve + create + update + cleanup ---
@@ -100,20 +100,20 @@ fi
 printf '\n' >>"$LOG"
 
 case "$method $url" in
-"GET https://api.cloudflare.com/client/v4/zones?name=alexandrecourtiol.com")
-	printf '{"success":true,"result":[{"id":"zone-abc","name":"alexandrecourtiol.com"}]}\n'
+"GET https://api.cloudflare.com/client/v4/zones?name=example.com")
+	printf '{"success":true,"result":[{"id":"zone-abc","name":"example.com"}]}\n'
 	;;
-"GET https://api.cloudflare.com/client/v4/zones/zone-abc/dns_records?name=magelift-preview.alexandrecourtiol.com")
+"GET https://api.cloudflare.com/client/v4/zones/zone-abc/dns_records?name=magelift-preview.example.com")
 	# First list: empty (create path). Later calls: existing record (update/cleanup).
 	count="$(grep -c 'dns_records?name=magelift-preview' "$LOG" || true)"
 	if [[ "$count" -le 1 ]]; then
 		printf '{"success":true,"result":[]}\n'
 	else
-		printf '{"success":true,"result":[{"id":"rec-1","name":"magelift-preview.alexandrecourtiol.com","type":"CNAME"}]}\n'
+		printf '{"success":true,"result":[{"id":"rec-1","name":"magelift-preview.example.com","type":"CNAME"}]}\n'
 	fi
 	;;
 "POST https://api.cloudflare.com/client/v4/zones/zone-abc/dns_records")
-	printf '{"success":true,"result":{"id":"rec-1","name":"magelift-preview.alexandrecourtiol.com"}}\n'
+	printf '{"success":true,"result":{"id":"rec-1","name":"magelift-preview.example.com"}}\n'
 	;;
 "PUT https://api.cloudflare.com/client/v4/zones/zone-abc/dns_records/rec-1")
 	printf '{"success":true,"result":{"id":"rec-1"}}\n'
@@ -134,17 +134,17 @@ export CLOUDFLARE_API_TOKEN="test-token-not-real"
 export CF_API_TOKEN=""
 export CURL_BIN="$FAKE_CURL"
 export CUTOVER_DNS_MOCK_LOG="$MOCK_LOG"
-export MAGELIFT_CUTOVER_HOST=magelift-preview.alexandrecourtiol.com
+export MAGELIFT_CUTOVER_HOST=magelift-preview.example.com
 
 : >"$MOCK_LOG"
 out="$(TARGET=lb.example.invalid "$SCRIPT" 2>&1)"
-assert_contains "create-log-zone" "$(cat "$MOCK_LOG")" "GET https://api.cloudflare.com/client/v4/zones?name=alexandrecourtiol.com"
-assert_contains "create-log-post" "$(cat "$MOCK_LOG")" 'POST https://api.cloudflare.com/client/v4/zones/zone-abc/dns_records body={"type":"CNAME","name":"magelift-preview.alexandrecourtiol.com","content":"lb.example.invalid","ttl":120,"proxied":false}'
+assert_contains "create-log-zone" "$(cat "$MOCK_LOG")" "GET https://api.cloudflare.com/client/v4/zones?name=example.com"
+assert_contains "create-log-post" "$(cat "$MOCK_LOG")" 'POST https://api.cloudflare.com/client/v4/zones/zone-abc/dns_records body={"type":"CNAME","name":"magelift-preview.example.com","content":"lb.example.invalid","ttl":120,"proxied":false}'
 assert_contains "create-ok" "$out" "upsert ok"
 
 # Second upsert → update existing
 out="$(TARGET=203.0.113.50 "$SCRIPT" 2>&1)"
-assert_contains "update-log-put" "$(cat "$MOCK_LOG")" 'PUT https://api.cloudflare.com/client/v4/zones/zone-abc/dns_records/rec-1 body={"type":"A","name":"magelift-preview.alexandrecourtiol.com","content":"203.0.113.50","ttl":120,"proxied":false}'
+assert_contains "update-log-put" "$(cat "$MOCK_LOG")" 'PUT https://api.cloudflare.com/client/v4/zones/zone-abc/dns_records/rec-1 body={"type":"A","name":"magelift-preview.example.com","content":"203.0.113.50","ttl":120,"proxied":false}'
 assert_contains "update-ok" "$out" "upsert ok"
 
 # Cleanup deletes by name
@@ -158,9 +158,9 @@ unset CLOUDFLARE_API_TOKEN
 export CF_API_TOKEN="alt-token-not-real"
 assert_exit "cf-api-token-alias" 0 env -u CLOUDFLARE_API_TOKEN CF_API_TOKEN=alt-token-not-real \
 	CURL_BIN="$FAKE_CURL" CUTOVER_DNS_MOCK_LOG="$MOCK_LOG" \
-	MAGELIFT_CUTOVER_HOST=magelift-preview.alexandrecourtiol.com \
+	MAGELIFT_CUTOVER_HOST=magelift-preview.example.com \
 	TARGET=cname.example.invalid "$SCRIPT"
-assert_contains "cf-api-token-zone" "$(cat "$MOCK_LOG")" "zones?name=alexandrecourtiol.com"
+assert_contains "cf-api-token-zone" "$(cat "$MOCK_LOG")" "zones?name=example.com"
 
 if [[ "$FAIL" -ne 0 ]]; then
 	printf 'cutover-dns-cloudflare_test: FAILED\n' >&2

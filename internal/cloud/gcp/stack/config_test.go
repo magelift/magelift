@@ -103,7 +103,7 @@ func gcpDeploymentConfig() config.Config {
 			Provider: "gcp",
 			Runtime:  "gke-autopilot",
 			GCP: &config.GCPTarget{
-				Project:     "digital-lab-341608",
+				Project:     "example-gcp-project",
 				Region:      "europe-west1",
 				NetworkCIDR: "10.20.0.0/16",
 				ImageDigest: "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

@@ -88,7 +88,7 @@ func TestRegisterCandidateBootstrapsGreenfieldStack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest := "669890779205.dkr.ecr.eu-north-1.amazonaws.com/magelift-acceptance@sha256:" + strings.Repeat("a", 64)
+	digest := "111122223333.dkr.ecr.eu-north-1.amazonaws.com/magelift-acceptance@sha256:" + strings.Repeat("a", 64)
 	if err := steps.RegisterCandidate(context.Background(), deployRequest(digest)); err != nil {
 		t.Fatal(err)
 	}

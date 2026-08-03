@@ -4,6 +4,10 @@ Local harness runs write full matrices under gitignored `.magelift/`. The files
 here are **committed samples** so release claims stay auditable without private
 scratch directories.
 
+**Privacy:** AWS account IDs, GCP project IDs, personal domains, VPC/RDS/NAT IDs,
+and registry hostnames from maintainer certification runs are **redacted or
+replaced with placeholders**. Operators keep real evidence offline.
+
 | File | What it proves |
 | --- | --- |
 | [aws-matrix-results-sample-2026-07-29.md](aws-matrix-results-sample-2026-07-29.md) | Free-tier AWS queue-mode cells PASS |

@@ -42,7 +42,7 @@ func TestRegisterCandidateUsesPlatformMigrationContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	candidate, err := store.RegisterCandidate(context.Background(), CandidateRequest{
-		Project: "digital-lab-341608", Region: "europe-west1", Cluster: "shop-gke",
+		Project: "example-gcp-project", Region: "europe-west1", Cluster: "shop-gke",
 		ImageDigest:    "ghcr.io/acourtiol/magento@sha256:" + strings.Repeat("a", 64),
 		DatabaseWriter: "10.0.0.1", DatabaseName: "magento", CacheEndpoint: "10.0.0.2",
 		ApplicationMode: "integrated", WebRuntime: "nginx-fpm",

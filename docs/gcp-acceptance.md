@@ -1,8 +1,8 @@
 # GCP acceptance (local, destroy-on-exit)
 
 Status: **certified** for the maintainer create-once path (GCP-06). Live pass
-2026-08-02 on `digital-lab-341608` / `europe-west1` / prefix `mlgcpwt` recorded
-harness PASS rows (committed sample:
+2026-08-02 on a disposable maintainer project (IDs redacted in public docs;
+placeholders below) recorded harness PASS rows (committed sample:
 [gcp-matrix-results-2026-08-02.md](evidence/gcp-matrix-results-2026-08-02.md);
 local re-runs under `.magelift/gcp-matrix/`). Sibling certified path:
 [aws-acceptance.md](aws-acceptance.md).
@@ -64,12 +64,12 @@ short-circuits soaks and never enters that path.
   (day2 logs/exec/health, `deploy:candidate`). The default placeholder digest
   fails ImagePull; create-once falls back to `--infra-only` only for that case.
 - After destroy, the script asserts zero leftovers matching the acceptance name
-  prefix (`mlgcpwt` by default) for VPC, GKE, Cloud SQL, Memorystore, and secrets.
+  prefix (`mlacc` by default; override with `MAGELIFT_GCP_ACCEPTANCE_NAME`) for VPC, GKE, Cloud SQL, Memorystore, and secrets.
 - Never interrupt mid-create/destroy.
 - Serial builds only (`GOMAXPROCS=1`) — do not spawn parallel `go build` from the
   harness (see `AGENTS.md`).
 - When another agent works on AWS in the main checkout, run this from the GCP
-  worktree (`magelift-gcp`) and keep the `mlgcpwt` prefix so resource names and
+  worktree (`magelift-gcp`) and keep a unique acceptance prefix so resource names and
   `/tmp` workdirs do not collide.
 
 ## Invoke
@@ -101,9 +101,9 @@ Optional env:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `MAGELIFT_GCP_PROJECT` | `digital-lab-341608` | GCP project |
+| `MAGELIFT_GCP_PROJECT` | **required** (live); dry-run uses `example-gcp-project` | Your disposable GCP project — never commit real IDs |
 | `MAGELIFT_GCP_REGION` | `europe-west1` | Region |
-| `MAGELIFT_GCP_ACCEPTANCE_NAME` | `mlgcpwt` | Magento project name / resource prefix |
+| `MAGELIFT_GCP_ACCEPTANCE_NAME` | `mlacc` | Magento project name / resource prefix |
 | `MAGELIFT_GCP_ACCEPTANCE_DIGEST` | placeholder digest | **Must be pullable** for Magento cells |
 | `MAGELIFT_GCP_ACCEPTANCE_DIR` | `/tmp/magelift-gcp-wt` | Work dir + logs |
 | `MAGELIFT_GCP_ACCEPTANCE_RESUME` | unset | Skip create-once when stack already up |
@@ -132,12 +132,13 @@ the VPC. If assert_clean still fails, wait and retry:
 
 ```bash
 # Prefer Compute removePeering when services vpc-peerings delete races soft-delete
+# Substitute YOUR_PROJECT and PREFIX from the failed run.
 TOKEN=$(gcloud auth print-access-token)
 curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  "https://compute.googleapis.com/compute/v1/projects/digital-lab-341608/global/networks/mlgcpwt-preview-net/removePeering" \
+  "https://compute.googleapis.com/compute/v1/projects/YOUR_PROJECT/global/networks/PREFIX-preview-net/removePeering" \
   -d '{"name":"servicenetworking-googleapis-com"}'
-gcloud compute addresses delete mlgcpwt-preview-sql-psa --global --project=digital-lab-341608
-gcloud compute networks delete mlgcpwt-preview-net --project=digital-lab-341608
+gcloud compute addresses delete PREFIX-preview-sql-psa --global --project=YOUR_PROJECT
+gcloud compute networks delete PREFIX-preview-net --project=YOUR_PROJECT
 ```
 
 ## Credentials
@@ -165,7 +166,7 @@ gcloud compute networks delete mlgcpwt-preview-net --project=digital-lab-341608
 
 | Item | Value |
 |------|--------|
-| Project / region / prefix | `digital-lab-341608` / `europe-west1` / `mlgcpwt` |
+| Project / region / prefix | redacted disposable project / `europe-west1` / operator prefix |
 | Evidence | [gcp-matrix-results-2026-08-02.md](evidence/gcp-matrix-results-2026-08-02.md) |
 | Narrative | [gcp-certified-pass-2026-08-02.md](evidence/gcp-certified-pass-2026-08-02.md) |
 | Teardown | `assert_clean ok`, DNS cleanup, state bucket deleted |

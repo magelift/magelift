@@ -106,7 +106,7 @@ aws ec2 describe-vpcs --vpc-ids <vpc-id>
 aws rds describe-db-instances --db-instance-identifier <db-id>
 ```
 
-Maintainer free-tier confirm (2026-08-02, account `669890779205` / `eu-north-1`):
+Maintainer free-tier confirm (2026-08-02, disposable AWS account / `eu-north-1`):
 preview reported `ADOPT network` + `ADOPT database`; apply created MageLift-owned
 children only; destroy removed those children; describe-after-destroy showed VPC
 and RDS still `available`. Evidence:

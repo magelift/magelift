@@ -34,7 +34,7 @@ func TestModuleRegistersRequiredOutputs(t *testing.T) {
 func TestProgramBuildsMockGraph(t *testing.T) {
 	spec := Spec{
 		Identity: Identity{
-			Project: "shop", GCPProject: "digital-lab-341608", Environment: "preview",
+			Project: "shop", GCPProject: "example-gcp-project", Environment: "preview",
 			Region: "europe-west1", EnvironmentClass: "preview", Preset: "preview",
 			Labels: map[string]string{"magelift-managed-by": "magelift"},
 		},
@@ -64,7 +64,7 @@ func TestProgramBuildsMockGraph(t *testing.T) {
 func TestProgramBuildsStandardPresetGraph(t *testing.T) {
 	spec := Spec{
 		Identity: Identity{
-			Project: "shop", GCPProject: "digital-lab-341608", Environment: "staging",
+			Project: "shop", GCPProject: "example-gcp-project", Environment: "staging",
 			Region: "europe-west1", EnvironmentClass: "staging", Preset: "standard",
 			Labels: map[string]string{"magelift-managed-by": "magelift"},
 		},
@@ -109,7 +109,7 @@ func TestProgramBuildsStandardPresetGraph(t *testing.T) {
 func TestProgramBuildsHighAvailabilityPresetGraph(t *testing.T) {
 	spec := Spec{
 		Identity: Identity{
-			Project: "shop", GCPProject: "digital-lab-341608", Environment: "prod",
+			Project: "shop", GCPProject: "example-gcp-project", Environment: "prod",
 			Region: "europe-west1", EnvironmentClass: "production", Preset: "high-availability",
 			Labels: map[string]string{"magelift-managed-by": "magelift"},
 		},
@@ -208,7 +208,7 @@ func (m *stackMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error
 	case "gcp:organizations/getClientConfig:getClientConfig":
 		return resource.PropertyMap{
 			"accessToken": resource.MakeSecret(resource.NewStringProperty("mock-gcp-access-token")),
-			"project":     resource.NewStringProperty("digital-lab-341608"),
+			"project":     resource.NewStringProperty("example-gcp-project"),
 		}, nil
 	default:
 		return resource.PropertyMap{}, nil

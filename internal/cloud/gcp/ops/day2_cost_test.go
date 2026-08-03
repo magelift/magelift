@@ -33,7 +33,7 @@ func (costPlanned) TargetDescriptor() sdk.TargetDescriptor {
 func TestModuleCostEstimatorAccountFree(t *testing.T) {
 	cfg := config.Config{
 		Target: config.Target{Provider: "gcp", Runtime: "gke-autopilot", GCP: &config.GCPTarget{
-			Project: "digital-lab-341608", DesiredWebReplicas: 2,
+			Project: "example-gcp-project", DesiredWebReplicas: 2,
 		}},
 		Defaults: config.Defaults{Region: "europe-west1"},
 		Preset:   "standard",

@@ -1,10 +1,10 @@
 # GCP GKE Autopilot certified live pass
 
 Date: 2026-08-02  
-Project: `digital-lab-341608` / `europe-west1` / prefix `mlgcpwt`  
-Digest: `europe-west1-docker.pkg.dev/digital-lab-341608/magelift/acceptance@sha256:df04554d1bde2f7b754360fa2f70bb3e7cf8a13ffbf429e5891937e6e3b7e5e4`  
-Backend: `gs://magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state` (deleted after teardown)  
-DNS host: `magelift-preview.alexandrecourtiol.com` (cf CLI `dns_records:edit`)
+Project / region / prefix: **redacted** disposable maintainer project / `europe-west1` / operator prefix  
+Digest: private Artifact Registry acceptance image (digest retained offline)  
+Backend: ephemeral GCS DIY state bucket (deleted after teardown)  
+DNS host: operator-owned preview FQDN (redacted; Cloudflare Zone.DNS Edit)
 
 ## Cell results (checkpoint final)
 
@@ -26,6 +26,7 @@ DNS host: `magelift-preview.alexandrecourtiol.com` (cf CLI `dns_records:edit`)
 Evidence: committed sample [gcp-matrix-results-2026-08-02.md](gcp-matrix-results-2026-08-02.md)
 (harness `append_row`; FAIL rows are mid-pass resumes, final PASS present for each
 required cell). Local re-runs also write under gitignored `.magelift/gcp-matrix/`.
+Cloud project IDs in the sample matrix are **placeholders**, not real accounts.
 
 ## Fixes landed during live pass
 
@@ -46,9 +47,9 @@ required cell). Local re-runs also write under gitignored `.magelift/gcp-matrix/
 | EXIT destroy + PSA lag | destroy stalled on producer services; force_clean continued |
 | `force_clean_orphans` + PSA soak | producers gone; network deleted |
 | `assert_clean` | **ok** (exit 0) |
-| DNS `--cleanup` | `magelift-preview.alexandrecourtiol.com` deleted via cf |
-| Pulumi stack rm | `mlgcpwt-preview-gcp-gke-autopilot` removed |
-| State bucket | `gs://…-mlgcpwt-preview-state` emptied and deleted |
-| Post-check | zero `mlgcpwt` VPC/GKE/SQL/Valkey leftovers |
+| DNS `--cleanup` | preview host record deleted via cf |
+| Pulumi stack rm | stack removed |
+| State bucket | emptied and deleted |
+| Post-check | zero leftover VPC/GKE/SQL/Valkey for the run prefix |
 
 Teardown completed with `TEARDOWN_DONE` on the maintainer machine (local log retained offline).

@@ -30,7 +30,7 @@ Re-invoking with an existing checkpoint skips recorded cell IDs (ACCEPT-02).
 locks or `pending_operations` may block the next run. Unlock only when no deploy is
 in flight (confirm with `magelift state status` / aws-cli) — never force-unlock while
 create is still running. Live multi-cell proof (create-once, ≥3 cells, kill+resume,
-dual `assert_clean`) closed 2026-07-29 on free-tier account `669890779205` /
+dual `assert_clean`) closed 2026-07-29 on a disposable free-tier AWS account /
 `eu-north-1`. Committed matrix sample:
 [aws-matrix-results-sample-2026-07-29.md](evidence/aws-matrix-results-sample-2026-07-29.md)
 (full local matrices stay gitignored under `.magelift/matrix-results.md`).

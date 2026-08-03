@@ -108,7 +108,7 @@ func TestBuildIdentityPlanWIF(t *testing.T) {
 	t.Parallel()
 	plan, err := BuildIdentityPlan(IdentitySpec{
 		Project: "shop", Environment: "preview",
-		GCPProject: "digital-lab-341608",
+		GCPProject: "example-gcp-project",
 		GitHubOwner: "acourtiol", GitHubRepo: "magelift",
 	})
 	if err != nil {
@@ -129,7 +129,7 @@ func TestBuildIdentityPlanWIF(t *testing.T) {
 	if !strings.HasSuffix(plan.ProviderName, "/providers/github") {
 		t.Fatalf("provider=%q", plan.ProviderName)
 	}
-	if plan.ServiceAccountEmail != "ml-shop-preview-ci@digital-lab-341608.iam.gserviceaccount.com" {
+	if plan.ServiceAccountEmail != "ml-shop-preview-ci@example-gcp-project.iam.gserviceaccount.com" {
 		t.Fatalf("sa=%q", plan.ServiceAccountEmail)
 	}
 }
@@ -138,7 +138,7 @@ func TestEnsureIdentityCreatesPoolProviderAndBinding(t *testing.T) {
 	t.Parallel()
 	plan, err := BuildIdentityPlan(IdentitySpec{
 		Project: "shop", Environment: "preview",
-		GCPProject: "digital-lab-341608",
+		GCPProject: "example-gcp-project",
 		GitHubOwner: "acourtiol", GitHubRepo: "magelift",
 	})
 	if err != nil {
@@ -182,7 +182,7 @@ func TestEnsureIdentityPropagatesLoudFailures(t *testing.T) {
 	t.Parallel()
 	plan, err := BuildIdentityPlan(IdentitySpec{
 		Project: "shop", Environment: "preview",
-		GCPProject: "digital-lab-341608",
+		GCPProject: "example-gcp-project",
 		GitHubOwner: "acourtiol", GitHubRepo: "magelift",
 	})
 	if err != nil {
@@ -204,7 +204,7 @@ func TestBuildIdentityPlanRejectsWildcardRepo(t *testing.T) {
 	t.Parallel()
 	_, err := BuildIdentityPlan(IdentitySpec{
 		Project: "shop", Environment: "preview",
-		GCPProject: "digital-lab-341608",
+		GCPProject: "example-gcp-project",
 		GitHubOwner: "acourtiol", GitHubRepo: "*",
 	})
 	if err == nil {

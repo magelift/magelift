@@ -46,7 +46,7 @@ func (f fakePlanned) TargetDescriptor() sdk.TargetDescriptor {
 func TestAccountFreeCostReportClassifiesInputs(t *testing.T) {
 	cfg := config.Config{
 		Target: config.Target{Provider: "gcp", Runtime: "gke-autopilot", GCP: &config.GCPTarget{
-			Project:                "digital-lab-341608",
+			Project:                "example-gcp-project",
 			Region:                 "europe-west1",
 			CloudSQLTier:           "db-custom-2-7680",
 			MemorystoreNodeType:    "STANDARD_SMALL",

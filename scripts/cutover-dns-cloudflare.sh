@@ -12,7 +12,8 @@
 #   ./scripts/cutover-dns-cloudflare.sh --cleanup [--dry-run]
 #
 # Env:
-#   MAGELIFT_CUTOVER_HOST  default magelift-preview.alexandrecourtiol.com
+#   MAGELIFT_CUTOVER_HOST  required for live; dry-run default magelift-preview.example.com
+#   MAGELIFT_CUTOVER_ZONE  optional Cloudflare zone name (else parent of HOST)
 #   CURL_BIN               curl binary override (acceptance mocks → forces token/curl path)
 #   CF_API_BASE            API base (default https://api.cloudflare.com/client/v4)
 #   MAGELIFT_CUTOVER_FORCE_CURL=1  skip cf CLI even if installed
@@ -20,7 +21,7 @@ set -Eeuo pipefail
 
 CF_API_BASE="${CF_API_BASE:-https://api.cloudflare.com/client/v4}"
 CURL_BIN="${CURL_BIN:-curl}"
-HOST="${MAGELIFT_CUTOVER_HOST:-magelift-preview.alexandrecourtiol.com}"
+HOST="${MAGELIFT_CUTOVER_HOST:-magelift-preview.example.com}"
 TTL="${MAGELIFT_CUTOVER_TTL:-120}"
 DRY_RUN=0
 CLEANUP=0
@@ -90,11 +91,16 @@ fi
 
 zone_for_host() {
 	local h="$1"
-	case "$h" in
-	*.alexandrecourtiol.com | alexandrecourtiol.com) printf '%s' alexandrecourtiol.com ;;
-	*.acourtiol.com | acourtiol.com) printf '%s' acourtiol.com ;;
-	*) printf '%s' alexandrecourtiol.com ;;
-	esac
+	if [[ -n "${MAGELIFT_CUTOVER_ZONE:-}" ]]; then
+		printf '%s' "$MAGELIFT_CUTOVER_ZONE"
+		return 0
+	fi
+	# Strip leftmost label: preview.example.com → example.com
+	if [[ "$h" == *.* ]]; then
+		printf '%s' "${h#*.}"
+	else
+		printf '%s' "$h"
+	fi
 }
 
 record_type_for_target() {
@@ -166,17 +172,13 @@ cleanup_via_cf() {
 
 zone_candidates_for_host() {
 	local h="$1"
-	case "$h" in
-	*.alexandrecourtiol.com | alexandrecourtiol.com)
-		printf '%s\n' alexandrecourtiol.com
-		;;
-	*.acourtiol.com | acourtiol.com)
-		printf '%s\n' acourtiol.com alexandrecourtiol.com
-		;;
-	*)
-		printf '%s\n' alexandrecourtiol.com acourtiol.com
-		;;
-	esac
+	local zone
+	zone="$(zone_for_host "$h")"
+	printf '%s\n' "$zone"
+	# Also try one more parent when HOST has ≥3 labels (a.b.example.com → b.example.com, example.com).
+	if [[ "$zone" == *.*.* ]]; then
+		printf '%s\n' "${zone#*.}"
+	fi
 }
 
 cf_curl() {
@@ -192,7 +194,7 @@ cf_curl() {
 			printf 'DRY-RUN %s %s\n' "$method" "$url" >&2
 		fi
 		if [[ "$path" == "/zones" || "$path" == /zones\?* ]]; then
-			printf '{"success":true,"result":[{"id":"dry-run-zone","name":"alexandrecourtiol.com"}]}\n'
+			printf '{"success":true,"result":[{"id":"dry-run-zone","name":"example.com"}]}\n'
 		elif [[ "$path" == */dns_records/* ]]; then
 			printf '{"success":true,"result":{"id":"dry-run-record"}}\n'
 		elif [[ "$path" == */dns_records || "$path" == */dns_records\?* ]]; then
