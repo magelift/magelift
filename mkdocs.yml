@@ -1,0 +1,56 @@
+site_name: MageLift
+site_description: Open-source Magento application platform (AWS certified, multi-provider ports)
+repo_url: https://github.com/acourtiol/magelift
+repo_name: acourtiol/magelift
+docs_dir: docs
+strict: true
+theme:
+  name: mkdocs
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Capability matrix: capability-matrix.md
+  - Local vs cloud: local-vs-cloud.md
+  - Getting started: getting-started.md
+  - Adding a provider: adding-a-provider.md
+  - Configuration: configuration.md
+  - Compatibility: compatibility.md
+  - Application builds: builds.md
+  - Benchmarking: benchmarks.md
+  - AWS bootstrap: bootstrap.md
+  - Local AWS acceptance: aws-acceptance.md
+  - Migrating from ACC / Platform.sh: migrating-from-paas.md
+  - ece-tools parity: ece-parity.md
+  - AWS EKS experimental: aws-eks-experimental.md
+  - GCP experimental: gcp-experimental.md
+  - Local GCP acceptance: gcp-acceptance.md
+  - OVH experimental: ovh-experimental.md
+  - Scaleway experimental: scaleway-experimental.md
+  - Post-beta roadmap: post-beta-roadmap.md
+  - Publishing / Community Launch: publishing.md
+  - Acceptance evidence: evidence/README.md
+  - Deployment operations: operations.md
+  - CLI reference: cli-reference.md
+  - Secret references: secrets.md
+  - Lint policy: lint-policy.md
+  - Dependency policy: dependency-policy.md
+  - GitHub labels: github-labels.md
+  - Decisions:
+      - ADR process: adr/README.md
+      - "0001: AWS ECS Fargate v1": adr/0001-aws-ecs-fargate-v1.md
+      - "0002: Provider and runtime extensions": adr/0002-provider-runtime-extension-boundary.md
+      - "0003: External artifact manifest": adr/0003-external-final-artifact-manifest.md
+      - "0004: Provider package layout": adr/0004-provider-package-layout.md
+      - "0005: Local development Compose": adr/0005-local-development-compose.md
+      - "0006: GitHub OIDC role separation": adr/0006-github-oidc-role-separation.md
+      - "0007: Multi-provider and community targets": adr/0007-multi-provider-community-targets.md
+      - "0008: Ports and adapters": adr/0008-ports-and-adapters-multi-provider.md
+      - "0009: Day-2 Magento ports": adr/0009-day2-magento-ports.md
+      - "0010: Database dump seed": adr/0010-database-dump-seed.md
+  - Clean-room provenance: provenance.md
+  - Release readiness: release-readiness.md
+markdown_extensions:
+  - admonition
+  - attr_list
+  - toc:
+      permalink: true

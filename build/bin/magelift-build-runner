@@ -1,0 +1,26 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use MageLift\Build\Process\NativeProcessRunner;
+use MageLift\Build\Runner\ConsoleApplication;
+use MageLift\Build\Runner\GitRevisionVerifier;
+use MageLift\Build\Runner\ConfigModuleReader;
+use MageLift\Build\Runner\MagentoCapabilityProvider;
+use MageLift\Build\Runner\NativePreparation;
+use MageLift\Build\Runner\NativeRunnerFilesystem;
+use MageLift\Build\Runner\RunnerService;
+
+require dirname(__DIR__).'/vendor/autoload.php';
+
+$workspace = '/output';
+$service = new RunnerService(
+    new NativeRunnerFilesystem(),
+    new GitRevisionVerifier(),
+    new NativePreparation(new NativeProcessRunner(), $workspace, new MagentoCapabilityProvider(), new ConfigModuleReader()),
+    $workspace,
+    '0.1.0',
+    '0.1.0',
+);
+exit((new ConsoleApplication($service))->run(STDIN, STDOUT, STDERR));

@@ -1,0 +1,62 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/goreleaser/goreleaser/v2.17.0/www/docs/static/schema.json
+version: 2
+
+# Local Macs: never run a full multi-target goreleaser release/build with default
+# parallelism — use scripts/release-smoke-local.sh (--single-target --parallelism=1).
+# Parallel cross-compiles have exhausted RAM/SWAP and caused kernel panics.
+
+project_name: magelift
+
+builds:
+  - id: magelift
+    main: ./cmd/magelift
+    binary: magelift
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
+      - -X github.com/acourtiol/magelift/internal/cli.Version={{ .Version }}
+
+archives:
+  - id: cli
+    ids: [magelift]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+sboms:
+  - artifacts: archive
+
+signs:
+  - id: checksum
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+
+homebrew_casks:
+  - name: magelift
+    repository:
+      owner: acourtiol
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/acourtiol/magelift
+    description: Deploy Magento applications to AWS
+    binaries: [magelift]
+
+changelog:
+  use: github-native
