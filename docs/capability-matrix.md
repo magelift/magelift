@@ -16,7 +16,7 @@ the CLI; wire them with Magento outputs and your usual frontend deploy tool.
 | --- | --- | --- | --- | --- |
 | `aws` | `ecs-fargate` | **certified** | full | full |
 | `aws` | `eks-autopilot` | experimental | shared kube.Steps offline (unit) | Observe+Steps+State offline (unit/Floci); Bootstrap/Secrets AWS-wired; Cost unsupported |
-| `gcp` | `gke-autopilot` | experimental | partial | partial (bootstrap = state bucket; WIF deferred) |
+| `gcp` | `gke-autopilot` | **certified** | full (preview create-once 2026-08-02) | full (WIF + Secret Manager Composer + logs/exec/secrets/state/health) |
 | `ovh` | `mks` | experimental | shared kube.Steps offline (unit) | Observe+Steps+State offline (unit/Floci); Bootstrap/Secrets/Cost `ErrNotSupported` |
 | `scaleway` | `kapsule` | experimental | shared kube.Steps offline (unit) | Observe+Steps+State offline (unit/Floci); Bootstrap/Secrets/Cost `ErrNotSupported` |
 
@@ -24,8 +24,10 @@ On targets without Magento deploy Ops, `magelift deploy` refuses unless you pass
 `--infra-only` (infrastructure graph update only). With the flag, Magento migrate,
 cutover, and health are skipped and announced on stderr.
 
-Multi-cloud is not claimed until two first-party targets are **certified**
-([ADR 0007](adr/0007-multi-provider-community-targets.md)).
+Multi-cloud is claimed for the two certified first-party targets
+(`aws`/`ecs-fargate` and `gcp`/`gke-autopilot`) per
+([ADR 0007](adr/0007-multi-provider-community-targets.md)). Community providers
+remain experimental.
 
 ## AWS ECS Fargate catalog cells
 
@@ -135,9 +137,13 @@ Shared Kubernetes day-2 (`eks-autopilot` / `mks` / `kapsule`, experimental): `ku
 where applicable). Do not claim live GKE/OVH/SCW Magento acceptance. DNS and managed dump
 cutover stay Phase 7.
 
-## GCP GKE Autopilot cells (experimental)
+## GCP GKE Autopilot cells (**certified** path)
 
-Cells are **preset-derived** (no AWS-style YAML catalog toggles for queue/search):
+Cells are **preset-derived** (no AWS-style YAML catalog toggles for queue/search).
+Certified tier (GCP-06): real-account acceptance pass 2026-08-02 on
+`digital-lab-341608` / `europe-west1` / prefix `mlgcpwt` — harness PASS rows in
+`.magelift/gcp-matrix/matrix-results.md` (WIF, Composer SM, day-2, deploy,
+migrate dump, cost, DNS cutover). See [gcp-acceptance.md](gcp-acceptance.md).
 
 | Preset | Queue | Search | SQL | Memorystore | Apply on credits? |
 | --- | --- | --- | --- | --- | --- |
@@ -146,7 +152,8 @@ Cells are **preset-derived** (no AWS-style YAML catalog toggles for queue/search
 | `high-availability` | `rabbitmq`×2 | OpenSearch×3 | REGIONAL | 2 replicas | **preview-only** |
 
 Measured preview create (2026-07-21, `digital-lab-341608` / europe-west1, prefix `mlgcpmx`):
-**~19m21s** Pulumi Duration for infra-only. Evidence: `.magelift/gcp-matrix/matrix-results.md`.
+**~19m21s** Pulumi Duration for infra-only. Certified cell matrix (2026-08-02,
+prefix `mlgcpwt`): create-once + cells then destroy/`force_clean`/`assert_clean`.
 Destroy often needs PSA soak + `force_clean` after Cloud SQL (see gcp-acceptance.md).
 
 ## Community / out-of-tree modules

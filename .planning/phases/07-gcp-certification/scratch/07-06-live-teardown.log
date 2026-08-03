@@ -1,0 +1,187 @@
+Teardown start 2026-08-02T13:31:47Z
++ magelift destroy --yes
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+Previewing update (mlgcpwt-preview-gcp-gke-autopilot):
+
+@ previewing update.....
+    pulumi:providers:gcp default_9_30_0  warning: unable to detect a global setting for GCP Project.
+ ~  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s update 
+@ previewing update....
+    pulumi:providers:gcp default_9_30_0  1 warning
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot  
+Diagnostics:
+  pulumi:providers:gcp (default_9_30_0):
+    warning: unable to detect a global setting for GCP Project.
+    Pulumi will rely on per-resource settings for this operation.
+    Set the GCP Project by using:
+        `pulumi config set gcp:project <project>`
+    If you would like to disable this warning use:
+        `pulumi config set gcp:disableGlobalProjectWarning true`
+
+Resources:
+    ~ 1 to update
+    34 unchanged
+
+Destroying (mlgcpwt-preview-gcp-gke-autopilot):
+
+ -  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc deleting (0s) 
+@ destroying....
+ -  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc deleting (0s) Resource scheduled for deletion
+@ destroying...........
+ -  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc deleting (9s) warning: SyncLoadBalancerFailed: Error syncing load balancer: failed to delete load balancer: googleapi: Error 400: The resource 'projects/digital-lab-341608/regions/europe-west1/forwardingRules/a1c5ed5ad80a54f5dbcd48dbced1c635' is not ready, resourceNotReady
+@ destroying.................................
+ -  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc deleting (38s) warning: SyncLoadBalancerFailed: Error syncing load balancer: failed to delete load balancer: [googleapi: Error 400: The resource 'projects/digital-lab-341608/global/firewalls/k8s-fw-a1c5ed5ad80a54f5dbcd48dbced1c635' is not ready, resourceNotReady, googleapi: Error 400: The resource 'projects/digital-lab-341608/global/firewalls/k8s-fw-a1c5ed5ad80a54f5dbcd48dbced1c635-deny' is not ready, resourceNotReady]
+@ destroying....
+ -  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc deleting (39s) 
+ -  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc deleted (39s) 
+@ destroying....
+ -  kubernetes:core/v1:Service mlgcpwt-preview-search-svc deleting (0s) 
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-search deleting (0s) 
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web deleting (0s) 
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron deleting (0s) 
+ -  kubernetes:core/v1:Service mlgcpwt-preview-search-svc deleting (0s) Service is ready
+ -  kubernetes:core/v1:Service mlgcpwt-preview-search-svc deleting (0s) Resource scheduled for deletion
+ -  kubernetes:core/v1:Service mlgcpwt-preview-search-svc deleting (0s) 
+ -  kubernetes:core/v1:Service mlgcpwt-preview-search-svc deleted (0.63s) 
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron deleting (0s) Skipping await logic
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron deleting (0s) 
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron deleted (0.84s) 
+@ destroying....
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-search deleting (1s) Skipping await logic
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-search deleting (1s) 
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-search deleted (1s) 
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web deleting (1s) Skipping await logic
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web deleting (1s) 
+ -  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web deleted (1s) 
+@ destroying.....
+ -  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s deleting (0s) 
+ -  magelift:gcp:OpenSearch mlgcpwt-preview-search deleting (0s) 
+ -  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s deleted (0.36s) 
+@ destroying....
+ -  gcp:container:Cluster mlgcpwt-preview-app-cluster deleting (0s) 
+@ destroying...............................................................................................................................................................................................................................................................................................
+ -  gcp:container:Cluster mlgcpwt-preview-app-cluster deleted (284s) 
+@ destroying....
+ -  magelift:gcp:GKERuntime mlgcpwt-preview-app deleting (0s) 
+@ destroying....
+ -  gcp:memorystore:Instance mlgcpwt-preview-valkey deleting (0s) 
+@ destroying.....................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+ -  gcp:memorystore:Instance mlgcpwt-preview-valkey deleted (594s) 
+@ destroying....
+ -  gcp:networkconnectivity:ServiceConnectionPolicy mlgcpwt-preview-valkey-scp deleting (0s) 
+@ destroying..............
+ -  gcp:networkconnectivity:ServiceConnectionPolicy mlgcpwt-preview-valkey-scp deleted (10s) 
+ -  magelift:gcp:MemorystoreValkey mlgcpwt-preview-valkey deleting (0s) 
+@ destroying....
+ -  gcp:sql:User mlgcpwt-preview-sql-user deleting (0s) 
+ -  gcp:sql:Database mlgcpwt-preview-sql-db deleting (0s) 
+@ destroying....
+ -  gcp:sql:User mlgcpwt-preview-sql-user deleted (0.77s) 
+ -  gcp:sql:Database mlgcpwt-preview-sql-db deleted (1s) 
+ -  gcp:sql:DatabaseInstance mlgcpwt-preview-sql deleting (0s) 
+@ destroying....................................................................................................................
+ -  gcp:sql:DatabaseInstance mlgcpwt-preview-sql deleted (112s) 
+ -  gcp:secretmanager:SecretVersion mlgcpwt-preview-sql-db-secret-version deleting (0s) 
+ -  gcp:servicenetworking:Connection mlgcpwt-preview-sql-psa deleting (0s) 
+@ destroying....
+ -  gcp:secretmanager:SecretVersion mlgcpwt-preview-sql-db-secret-version deleted (0.90s) 
+@ destroying..........................
+ -  gcp:servicenetworking:Connection mlgcpwt-preview-sql-psa deleting (23s) error:   sdk-v2/provider2.go:572: sdk.helper_schema: Unable to remove Service Networking Connection, err: Error waiting for Delete Service Networking Connection: Error code 9, message: Failed to delete connection; Producer services (e.g. CloudSQL, Cloud Memstore, etc.) are still using this connection.
+ -  gcp:servicenetworking:Connection mlgcpwt-preview-sql-psa deleting (23s) error: deleting urn:pulumi:mlgcpwt-preview-gcp-gke-autopilot::magelift::magelift:gcp:Stack$magelift:gcp:CloudSQL$gcp:servicenetworking/connection:Connection::mlgcpwt-preview-sql-psa: 1 error occurred:
+ -  gcp:servicenetworking:Connection mlgcpwt-preview-sql-psa **deleting failed** error: deleting urn:pulumi:mlgcpwt-preview-gcp-gke-autopilot::magelift::magelift:gcp:Stack$magelift:gcp:CloudSQL$gcp:servicenetworking/connection:Connection::mlgcpwt-preview-sql-psa: 1 error occurred:
+@ destroying....
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot  error: update failed
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot **failed** 1 error
+Diagnostics:
+  pulumi:pulumi:Stack (magelift-mlgcpwt-preview-gcp-gke-autopilot):
+    error: update failed
+
+  gcp:servicenetworking:Connection (mlgcpwt-preview-sql-psa):
+    error:   sdk-v2/provider2.go:572: sdk.helper_schema: Unable to remove Service Networking Connection, err: Error waiting for Delete Service Networking Connection: Error code 9, message: Failed to delete connection; Producer services (e.g. CloudSQL, Cloud Memstore, etc.) are still using this connection.
+    Help Token: AdZh9Ge_VlfIbU6qDYLZiQ42cF_8l-SMnLVVnNBnHWPD-NChedHTaKsqttLACmMK3ymkwtARyaMhMsxY7tiWoYz7TC0Sik_91M67IQMeBG4SjzbY: provider=google-beta@9.30.0
+    error: deleting urn:pulumi:mlgcpwt-preview-gcp-gke-autopilot::magelift::magelift:gcp:Stack$magelift:gcp:CloudSQL$gcp:servicenetworking/connection:Connection::mlgcpwt-preview-sql-psa: 1 error occurred:
+    	* Unable to remove Service Networking Connection, err: Error waiting for Delete Service Networking Connection: Error code 9, message: Failed to delete connection; Producer services (e.g. CloudSQL, Cloud Memstore, etc.) are still using this connection.
+    Help Token: AdZh9Ge_VlfIbU6qDYLZiQ42cF_8l-SMnLVVnNBnHWPD-NChedHTaKsqttLACmMK3ymkwtARyaMhMsxY7tiWoYz7TC0Sik_91M67IQMeBG4SjzbY
+
+Resources:
+    - 16 deleted
+    2 errored
+
+Duration: 17m58s
+
+infrastructure destroy failed
+destroy failed; force_clean next
++ force_clean producers 2026-08-02T13:51:23Z
+ERROR: (gcloud.container.clusters.delete) Some requests did not succeed:
+ - args: ["ResponseError: code=404, message=Not found: projects/digital-lab-341608/locations/europe-west1/clusters/mlgcpwt-preview-gke. This command is authenticated as alexandre.courtiol@groupechantelle.com which is the active account specified by the [core/account] property.\nNo cluster named 'mlgcpwt-preview-gke' in digital-lab-341608."]
+   exit_code: 1
+
+ERROR: (gcloud.sql.instances.delete) PERMISSION_DENIED: The caller does not have permission. This command is authenticated as alexandre.courtiol@groupechantelle.com which is the active account specified by the [core/account] property
+ERROR: (gcloud.memorystore.instances.delete) NOT_FOUND: Resource 'projects/digital-lab-341608/locations/europe-west1/instances/mlgcpwt-preview-valkey' was not found. This command is authenticated as alexandre.courtiol@groupechantelle.com which is the active account specified by the [core/account] property
+- '@type': type.googleapis.com/google.rpc.ResourceInfo
+  resourceName: projects/digital-lab-341608/locations/europe-west1/instances/mlgcpwt-preview-valkey
+Deleted secret [mlgcpwt-preview-sql-db].
+Removing objects:
+  
+..
+Removing buckets:
+  
+Removing gs://mlgcpwt-preview-media-media/...
+.......
++ wait producers gone
+t=1 sql=0 gke=0 val=0
++ PSA soak 180s
+ERROR: (gcloud.services.vpc-peerings.delete) The operation "operations/dcf.p40-397359300925-90dd7837-1870-4bbb-9421-a2ef8cdea833" resulted in a failure "Failed to delete connection; Producer services (e.g. CloudSQL, Cloud Memstore, etc.) are still using this connection.
+Help Token: AdZh9Gdih8Ll5jSyECJYON8Wc2ffWSD-hNPJYgqfxmeg0jYSDP7CesaqdqV7s3cSl1pPOIcaWEpNxpsd6vEltHWfP3mRW1r6koaMlLpytxpMEzp7".
+Details: "[<DetailsValueListEntry
+ additionalProperties: [<AdditionalProperty
+ key: '@type'
+ value: <JsonValue
+ string_value: 'type.googleapis.com/google.rpc.PreconditionFailure'>>, <AdditionalProperty
+ key: 'violations'
+ value: <JsonValue
+ array_value: <JsonArray
+ entries: [<JsonValue
+ object_value: <JsonObject
+ properties: [<Property
+ key: 'type'
+ value: <JsonValue
+ string_value: 'googleapis.com'>>, <Property
+ key: 'subject'
+ value: <JsonValue
+ string_value: '171113'>>]>>]>>>]>, <DetailsValueListEntry
+ additionalProperties: [<AdditionalProperty
+ key: '@type'
+ value: <JsonValue
+ string_value: 'type.googleapis.com/google.rpc.ErrorInfo'>>, <AdditionalProperty
+ key: 'reason'
+ value: <JsonValue
+ string_value: 'FLOW_SN_DC_RESOURCE_PREVENTING_DELETE_CONNECTION'>>, <AdditionalProperty
+ key: 'domain'
+ value: <JsonValue
+ string_value: 'servicenetworking.googleapis.com'>>]>]".
+Deleted [https://www.googleapis.com/compute/v1/projects/digital-lab-341608/global/addresses/mlgcpwt-preview-sql-psa].
+Updated [https://www.googleapis.com/compute/v1/projects/digital-lab-341608/regions/europe-west1/routers/mlgcpwt-preview-net-router].
+Deleted [https://www.googleapis.com/compute/v1/projects/digital-lab-341608/regions/europe-west1/routers/mlgcpwt-preview-net-router].
+Deleted [https://www.googleapis.com/compute/v1/projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-private-0].
+Deleted [https://www.googleapis.com/compute/v1/projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-private-1].
+Deleted [https://www.googleapis.com/compute/v1/projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-public-0].
+Deleted [https://www.googleapis.com/compute/v1/projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-public-1].
+Deleted [https://www.googleapis.com/compute/v1/projects/digital-lab-341608/global/networks/mlgcpwt-preview-net].
++ assert_clean
+assert_clean ok
++ DNS cleanup
+cutover-dns-cloudflare: cf delete magelift-preview.alexandrecourtiol.com (id=8a5ad23d1d394cd866f64ed9a6ed3dfa)
+cutover-dns-cloudflare: cleanup ok host=magelift-preview.alexandrecourtiol.com (via cf)
+Removing objects:
+  
+Removing gs://magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state/.pulumi/locks/organization/magelift/mlgcpwt-preview-gcp-gke-autopilot/11d01efe-5b37-41b8-b1a5-ee21f786ce4d.json#1785675549937106...
+Removing gs://magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state/.pulumi/locks/organization/magelift/mlgcpwt-preview-gcp-gke-autopilot/394f3d31-049b-4a10-a809-82dc5f7bdb00.json#1785675481762804...
+Removing gs://magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state/.pulumi/locks/organization/magelift/mlgcpwt-preview-gcp-gke-autopilot/c3316636-8cb6-497f-92da-7095bfe946a1.json#1785677513291986...
+Removing gs://magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state/.pulumi/locks/organization/magelift/mlgcpwt-preview-gcp-gke-autopilot/adf2b044-5647-40c4-a9ad-43e978156d77.json#1785675574292169...
+Removing gs://magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state/.pulumi/locks/organization/magelift/mlgcpwt-preview-gcp-gke-autopilot/200f1a6f-0782-4dcd-b5b1-1c9c1b44e69a.json#1785677096181168...
+Removing gs://magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state/.pulumi/locks/organization/magelift/mlgcpwt-preview-gcp-gke-autopilot/43c9eb04-069c-4cf2-b435-687eaae36a29.json#1785675542883059...
+.......
+The currently running update for 'mlgcpwt-preview-gcp-gke-autopilot' has been canceled!
+Stack 'organization/magelift/mlgcpwt-preview-gcp-gke-autopilot' has been removed!
+TEARDOWN_DONE

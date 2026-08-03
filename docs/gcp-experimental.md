@@ -1,22 +1,24 @@
-# Experimental GCP target (GKE Autopilot)
+# GCP target (GKE Autopilot)
 
-Status: **experimental** (ADR 0007 / ADR 0008). Not Magento-acceptance certified.
-AWS ECS Fargate remains the only certified v1 path.
+Status: **certified** for `gcp` / `gke-autopilot` on the maintainer acceptance path
+(2026-08-02 create-once — evidence `.magelift/gcp-matrix/matrix-results.md`;
+see [gcp-acceptance.md](gcp-acceptance.md) and [capability-matrix.md](capability-matrix.md)).
+AWS ECS Fargate and GCP GKE Autopilot are the two certified first-party targets
+(ADR 0007 multi-cloud gate).
 
-**Certification track:** GCP is the intended second certified provider (maintainer
-GCP project). Until Magento Ops, Secret Manager Composer credentials, and a green
-`scripts/gcp-acceptance-local.sh` pass land, do not claim multi-cloud. CLI and docs
-must keep the experimental label.
+**Still experimental / not certified:** non-preview presets (`standard` /
+`high-availability` apply spend), hosted GitHub Actions WIF (Act-only until
+minutes return), and community providers.
 
 ## Day-2 honesty
 
 | Surface | Status |
 | --- | --- |
-| Infra preview/deploy | experimental graph |
-| Magento candidate migrate | partial (GKE Jobs) |
-| Bootstrap | state bucket + GitHub WIF (pool/provider/CI SA) |
-| Secrets / Composer SM | `gcp-secret-manager://` via AccessSecretVersion |
-| logs / exec | partial |
+| Infra preview/deploy | **certified** (preview create-once) |
+| Magento candidate migrate | **certified** (`deploy:candidate` cell) |
+| Bootstrap | state bucket + WIF (pool/provider/CI SA; live STS/impersonation evidenced) |
+| Secrets / Composer SM | `gcp-secret-manager://` via AccessSecretVersion (**certified**) |
+| logs / exec / health | **certified** on Autopilot (kubectl + BindOutputs) |
 
 See [capability matrix](capability-matrix.md).
 

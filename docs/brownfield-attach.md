@@ -46,8 +46,9 @@ target:
 
 ## What cannot be attached (this milestone)
 
-- **Cloud SQL** (or any GCP managed DB) — not a configuration key; Phase 7 GCP
-  remains experimental and does not ship brownfield DB adopt.
+- **Cloud SQL** (or any GCP managed DB) — not a configuration key; GCP GKE
+  Autopilot is certified for greenfield Magento deploy, but brownfield DB
+  adopt remains AWS-only this milestone.
 - **Non-AWS VPC / DB** — OVH, Scaleway, and multi-cloud attach are out of scope.
 - **Import into Pulumi state for destroy ownership** — MageLift references
   existing IDs; it does not claim the cloud resource so that `destroy` would
@@ -95,7 +96,7 @@ GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/aws/stack/ -count=1 \
   -run 'Adopt|Refuse|Adopted|Detach'
 ```
 
-### Live confirm (deferred)
+### Live confirm
 
 After a live destroy of an attach stack, operators can confirm the VPC and RDS
 still exist:
@@ -105,8 +106,14 @@ aws ec2 describe-vpcs --vpc-ids <vpc-id>
 aws rds describe-db-instances --db-instance-identifier <db-id>
 ```
 
-Live describe-after-destroy evidence is Phase 8 plan 08-06 (HUMAN_GATE when AWS
-credentials are available). Do not treat docs alone as live proof.
+Maintainer free-tier confirm (2026-08-02, account `669890779205` / `eu-north-1`):
+preview reported `ADOPT network` + `ADOPT database`; apply created MageLift-owned
+children only; destroy removed those children; describe-after-destroy showed VPC
+and RDS still `available`. Evidence:
+`.planning/phases/08-brownfield-attach-tag-day/scratch/08-06-aws-adopt-confirm.md`.
+
+**Note:** RDS ManageMasterUserPassword secret ARNs contain `!` (`rds!db-…`);
+MageLift validators accept that form.
 
 ## Related
 

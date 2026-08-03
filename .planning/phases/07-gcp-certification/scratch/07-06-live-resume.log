@@ -1,0 +1,565 @@
+Resume cells 2026-08-02T13:21:36Z KEEP+RESUME serviceName fix
+gcp acceptance start mode=up profile=preview project=digital-lab-341608 region=europe-west1 at=2026-08-02T13:21:36Z
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
++ building magelift -> /tmp/magelift-gcp-wt/magelift (serial GOMAXPROCS=1)
++ magelift config validate
+{
+  "environments": [
+    "preview"
+  ],
+  "valid": true
+}
++ assert_clean project=digital-lab-341608
+leftover network: mlgcpwt-preview-net
+leftover gke: mlgcpwt-preview-gke
+leftover sql: mlgcpwt-preview-sql
+leftover memorystore: projects/digital-lab-341608/locations/europe-west1/instances/mlgcpwt-preview-valkey
+leftover scp: projects/digital-lab-341608/locations/europe-west1/serviceConnectionPolicies/mlgcpwt-preview-valkey-memorystore
+leftover secret: mlgcpwt-preview-sql-db
+leftover address: mlgcpwt-preview-sql-psa
+leftover bucket: mlgcpwt-preview-media-media
+assert_clean FAILED: leftovers remain in digital-lab-341608
++ reconcile_stale_pulumi_state skipped (GCP leftovers remain)
++ magelift preview
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+Previewing update (mlgcpwt-preview-gcp-gke-autopilot):
+
+@ previewing update......
+ ~  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s update 
+@ previewing update.....
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot  
+Resources:
+    ~ 1 to update
+    34 unchanged
+
+{
+  "environment": "preview",
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot",
+  "preview": {
+    "changes": [
+      {
+        "operation": "same",
+        "count": 34
+      },
+      {
+        "operation": "update",
+        "count": 1
+      }
+    ],
+    "total": 35
+  },
+  "update": {
+    "changes": null,
+    "total": 0
+  }
+}
+WARNING: up creates GKE Autopilot + Cloud SQL + Memorystore; destroy + force_clean run on EXIT
+WARNING: MAGELIFT_GCP_ACCEPTANCE_DIGEST must be pullable for Magento cells (placeholder fails ImagePull)
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
+acceptance resume: skipping create-once (stack assumed present; KEEP/RESUME/checkpoint)
+gcp acceptance live_cell_loop cells=12 catalog=/Users/alex/workspace/magelift/scripts/acceptance/cells-gcp-preview.txt
+acceptance skip cell=bootstrap:wif (checkpoint)
+acceptance skip cell=composer:sm-write (checkpoint)
+acceptance skip cell=composer:sm-read (checkpoint)
+acceptance skip cell=day2:secrets (checkpoint)
+acceptance skip cell=day2:state (checkpoint)
+acceptance cell-update cell=day2:logs
++ magelift logs --service web
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+{
+  "environment": "preview",
+  "group": "/magelift/mlgcpwt/preview/web",
+  "events": [
+    {
+      "timestamp": "2026-08-02T13:22:07.489659Z",
+      "message": "[02-Aug-2026 13:21:38] NOTICE: [pool www] 'user' directive is ignored when FPM is not running as root"
+    },
+    {
+      "timestamp": "2026-08-02T13:22:07.489659Z",
+      "message": "[02-Aug-2026 13:21:38] NOTICE: [pool www] 'group' directive is ignored when FPM is not running as root"
+    },
+    {
+      "timestamp": "2026-08-02T13:22:07.489659Z",
+      "message": "[02-Aug-2026 13:21:38] NOTICE: fpm is running, pid 1"
+    },
+    {
+      "timestamp": "2026-08-02T13:22:07.489659Z",
+      "message": "[02-Aug-2026 13:21:38] NOTICE: ready to handle connections"
+    }
+  ]
+}
+acceptance cell-done cell=day2:logs result=PASS
+acceptance cell-update cell=day2:exec
++ magelift exec --service web -- true
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+run remote command (kubectl): exec: "kubectl": executable file not found in $PATH
+acceptance cell-done cell=day2:exec result=FAIL
+acceptance cell failed; KEEP=true — re-run with MAGELIFT_GCP_ACCEPTANCE_RESUME=1 (no destroy)
++ KEEP=true; skipping destroy/force_clean/assert_clean (stack retained for resume)
+Resume #2 2026-08-02T13:24:06Z kubectl+PrepareExec
+gcp acceptance start mode=up profile=preview project=digital-lab-341608 region=europe-west1 at=2026-08-02T13:24:06Z
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
++ building magelift -> /tmp/magelift-gcp-wt/magelift (serial GOMAXPROCS=1)
++ magelift config validate
+{
+  "environments": [
+    "preview"
+  ],
+  "valid": true
+}
++ assert_clean project=digital-lab-341608
+leftover network: mlgcpwt-preview-net
+leftover gke: mlgcpwt-preview-gke
+leftover sql: mlgcpwt-preview-sql
+leftover memorystore: projects/digital-lab-341608/locations/europe-west1/instances/mlgcpwt-preview-valkey
+leftover scp: projects/digital-lab-341608/locations/europe-west1/serviceConnectionPolicies/mlgcpwt-preview-valkey-memorystore
+leftover secret: mlgcpwt-preview-sql-db
+leftover address: mlgcpwt-preview-sql-psa
+leftover bucket: mlgcpwt-preview-media-media
+assert_clean FAILED: leftovers remain in digital-lab-341608
++ reconcile_stale_pulumi_state skipped (GCP leftovers remain)
++ magelift preview
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+Previewing update (mlgcpwt-preview-gcp-gke-autopilot):
+
+@ previewing update.......
+ ~  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s update 
+@ previewing update.....
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot  
+Resources:
+    ~ 1 to update
+    34 unchanged
+
+{
+  "environment": "preview",
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot",
+  "preview": {
+    "changes": [
+      {
+        "operation": "same",
+        "count": 34
+      },
+      {
+        "operation": "update",
+        "count": 1
+      }
+    ],
+    "total": 35
+  },
+  "update": {
+    "changes": null,
+    "total": 0
+  }
+}
+WARNING: up creates GKE Autopilot + Cloud SQL + Memorystore; destroy + force_clean run on EXIT
+WARNING: MAGELIFT_GCP_ACCEPTANCE_DIGEST must be pullable for Magento cells (placeholder fails ImagePull)
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
+acceptance resume: skipping create-once (stack assumed present; KEEP/RESUME/checkpoint)
+gcp acceptance live_cell_loop cells=12 catalog=/Users/alex/workspace/magelift/scripts/acceptance/cells-gcp-preview.txt
+acceptance skip cell=bootstrap:wif (checkpoint)
+acceptance skip cell=composer:sm-write (checkpoint)
+acceptance skip cell=composer:sm-read (checkpoint)
+acceptance skip cell=day2:secrets (checkpoint)
+acceptance skip cell=day2:state (checkpoint)
+acceptance skip cell=day2:logs (checkpoint)
+acceptance cell-update cell=day2:exec
++ magelift exec --service web -- true
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+acceptance cell-done cell=day2:exec result=PASS
+acceptance cell-update cell=day2:health
++ magelift health --mode runtime
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+{
+  "environment": "preview",
+  "target": "gcp.gke-autopilot",
+  "mode": "runtime",
+  "status": "healthy",
+  "checks": [
+    {
+      "id": "runtime.kube.deployment",
+      "status": "healthy",
+      "message": "deployment has 1 ready of 1 desired replicas"
+    }
+  ]
+}
+acceptance cell-done cell=day2:health result=PASS
+acceptance cell-update cell=deploy:candidate
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+Previewing update (mlgcpwt-preview-gcp-gke-autopilot):
+
+@ previewing update.....
+ ~  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s update 
+@ previewing update....
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot  
+Resources:
+    ~ 1 to update
+    34 unchanged
+
+Updating (mlgcpwt-preview-gcp-gke-autopilot):
+
+@ updating.....
+ ~  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s updating (0s) 
+@ updating....
+ ~  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s updated (0.38s) 
+@ updating.....
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot  
+Outputs:
+    cacheEndpoint     : "10.40.0.2"
+    clusterName       : "mlgcpwt-preview-gke"
+    databaseWriter    : "10.17.0.3"
+    kubeconfig        : [secret]
+    mediaBucket       : "mlgcpwt-preview-media-media"
+    mediaURL          : "https://storage.googleapis.com/mlgcpwt-preview-media-media"
+    networkVpcId      : "projects/digital-lab-341608/global/networks/mlgcpwt-preview-net"
+    privateSubnetIds  : [
+        [0]: "projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-private-0"
+        [1]: "projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-private-1"
+    ]
+    queueMode         : "database"
+    searchEndpoint    : "mlgcpwt-preview-search"
+    serviceName       : "mlgcpwt-preview-app-web"
+
+Resources:
+    ~ 1 updated
+    34 unchanged
+
+Duration: 6s
+
+{
+  "environment": "preview",
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot",
+  "preview": {
+    "changes": [
+      {
+        "operation": "same",
+        "count": 34
+      },
+      {
+        "operation": "update",
+        "count": 1
+      }
+    ],
+    "total": 35
+  },
+  "update": {
+    "changes": [
+      {
+        "operation": "same",
+        "count": 34
+      },
+      {
+        "operation": "update",
+        "count": 1
+      }
+    ],
+    "total": 35
+  }
+}
++ magelift health --mode runtime
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+{
+  "environment": "preview",
+  "target": "gcp.gke-autopilot",
+  "mode": "runtime",
+  "status": "healthy",
+  "checks": [
+    {
+      "id": "runtime.kube.deployment",
+      "status": "healthy",
+      "message": "deployment has 1 ready of 1 desired replicas"
+    }
+  ]
+}
+acceptance cell-done cell=deploy:candidate result=PASS
+acceptance cell-update cell=migrate:dump
++ cell migrate:dump via env import-dump (MAGELIFT_DUMPIMPORT_RUNNER=kube)
+seed dump journal is missing; run env create --dump first
+acceptance cell-done cell=migrate:dump result=FAIL
+acceptance cell failed; KEEP=true — re-run with MAGELIFT_GCP_ACCEPTANCE_RESUME=1 (no destroy)
++ KEEP=true; skipping destroy/force_clean/assert_clean (stack retained for resume)
+Resume #3 2026-08-02T13:26:01Z migrate:dump journal init
+gcp acceptance start mode=up profile=preview project=digital-lab-341608 region=europe-west1 at=2026-08-02T13:26:01Z
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
++ building magelift -> /tmp/magelift-gcp-wt/magelift (serial GOMAXPROCS=1)
++ magelift config validate
+{
+  "environments": [
+    "preview"
+  ],
+  "valid": true
+}
++ assert_clean project=digital-lab-341608
+leftover network: mlgcpwt-preview-net
+leftover gke: mlgcpwt-preview-gke
+leftover sql: mlgcpwt-preview-sql
+leftover memorystore: projects/digital-lab-341608/locations/europe-west1/instances/mlgcpwt-preview-valkey
+leftover scp: projects/digital-lab-341608/locations/europe-west1/serviceConnectionPolicies/mlgcpwt-preview-valkey-memorystore
+leftover secret: mlgcpwt-preview-sql-db
+leftover address: mlgcpwt-preview-sql-psa
+leftover bucket: mlgcpwt-preview-media-media
+assert_clean FAILED: leftovers remain in digital-lab-341608
++ reconcile_stale_pulumi_state skipped (GCP leftovers remain)
++ magelift preview
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+Previewing update (mlgcpwt-preview-gcp-gke-autopilot):
+
+@ previewing update......
+ ~  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s update 
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot  
+Resources:
+    ~ 1 to update
+    34 unchanged
+
+{
+  "environment": "preview",
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot",
+  "preview": {
+    "changes": [
+      {
+        "operation": "same",
+        "count": 34
+      },
+      {
+        "operation": "update",
+        "count": 1
+      }
+    ],
+    "total": 35
+  },
+  "update": {
+    "changes": null,
+    "total": 0
+  }
+}
+WARNING: up creates GKE Autopilot + Cloud SQL + Memorystore; destroy + force_clean run on EXIT
+WARNING: MAGELIFT_GCP_ACCEPTANCE_DIGEST must be pullable for Magento cells (placeholder fails ImagePull)
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
+acceptance resume: skipping create-once (stack assumed present; KEEP/RESUME/checkpoint)
+gcp acceptance live_cell_loop cells=12 catalog=/Users/alex/workspace/magelift/scripts/acceptance/cells-gcp-preview.txt
+acceptance skip cell=bootstrap:wif (checkpoint)
+acceptance skip cell=composer:sm-write (checkpoint)
+acceptance skip cell=composer:sm-read (checkpoint)
+acceptance skip cell=day2:secrets (checkpoint)
+acceptance skip cell=day2:state (checkpoint)
+acceptance skip cell=day2:logs (checkpoint)
+acceptance skip cell=day2:exec (checkpoint)
+acceptance skip cell=day2:health (checkpoint)
+acceptance skip cell=deploy:candidate (checkpoint)
+acceptance cell-update cell=migrate:dump
++ cell migrate:dump init journal + env import-dump (MAGELIFT_DUMPIMPORT_RUNNER=kube)
+seed dump journal recorded at /tmp/magelift-gcp-wt/.magelift/seed-dumps/preview.json
+dumpimport: compose file: stat /tmp/magelift-gcp-wt/.magelift/compose.local.yml: no such file or directory
+acceptance cell-done cell=migrate:dump result=FAIL
+acceptance cell failed; KEEP=true — re-run with MAGELIFT_GCP_ACCEPTANCE_RESUME=1 (no destroy)
++ KEEP=true; skipping destroy/force_clean/assert_clean (stack retained for resume)
+Resume #4 2026-08-02T13:29:03Z dumpimport kube+mysql pod
+gcp acceptance start mode=up profile=preview project=digital-lab-341608 region=europe-west1 at=2026-08-02T13:29:03Z
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
++ building magelift -> /tmp/magelift-gcp-wt/magelift (serial GOMAXPROCS=1)
++ magelift config validate
+{
+  "environments": [
+    "preview"
+  ],
+  "valid": true
+}
++ assert_clean project=digital-lab-341608
+leftover network: mlgcpwt-preview-net
+leftover gke: mlgcpwt-preview-gke
+leftover sql: mlgcpwt-preview-sql
+leftover memorystore: projects/digital-lab-341608/locations/europe-west1/instances/mlgcpwt-preview-valkey
+leftover scp: projects/digital-lab-341608/locations/europe-west1/serviceConnectionPolicies/mlgcpwt-preview-valkey-memorystore
+leftover secret: mlgcpwt-preview-sql-db
+leftover address: mlgcpwt-preview-sql-psa
+leftover bucket: mlgcpwt-preview-media-media
+assert_clean FAILED: leftovers remain in digital-lab-341608
++ reconcile_stale_pulumi_state skipped (GCP leftovers remain)
++ magelift preview
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+Previewing update (mlgcpwt-preview-gcp-gke-autopilot):
+
+@ previewing update......
+ ~  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s update 
+@ previewing update....
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot  
+Resources:
+    ~ 1 to update
+    34 unchanged
+
+{
+  "environment": "preview",
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot",
+  "preview": {
+    "changes": [
+      {
+        "operation": "same",
+        "count": 34
+      },
+      {
+        "operation": "update",
+        "count": 1
+      }
+    ],
+    "total": 35
+  },
+  "update": {
+    "changes": null,
+    "total": 0
+  }
+}
+WARNING: up creates GKE Autopilot + Cloud SQL + Memorystore; destroy + force_clean run on EXIT
+WARNING: MAGELIFT_GCP_ACCEPTANCE_DIGEST must be pullable for Magento cells (placeholder fails ImagePull)
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
+acceptance resume: skipping create-once (stack assumed present; KEEP/RESUME/checkpoint)
+gcp acceptance live_cell_loop cells=12 catalog=/Users/alex/workspace/magelift/scripts/acceptance/cells-gcp-preview.txt
+acceptance skip cell=bootstrap:wif (checkpoint)
+acceptance skip cell=composer:sm-write (checkpoint)
+acceptance skip cell=composer:sm-read (checkpoint)
+acceptance skip cell=day2:secrets (checkpoint)
+acceptance skip cell=day2:state (checkpoint)
+acceptance skip cell=day2:logs (checkpoint)
+acceptance skip cell=day2:exec (checkpoint)
+acceptance skip cell=day2:health (checkpoint)
+acceptance skip cell=deploy:candidate (checkpoint)
+acceptance cell-update cell=migrate:dump
++ cell migrate:dump init journal + kube mysql-client pod + env import-dump
+seed dump journal recorded at /tmp/magelift-gcp-wt/.magelift/seed-dumps/preview.json
+Warning: autopilot-default-resources-mutator:Autopilot updated Pod default/mlgcpwt-dumpimport-mysql: defaulted unspecified 'cpu' resource for containers [mlgcpwt-dumpimport-mysql] (see http://g.co/gke/autopilot-defaults).
+pod/mlgcpwt-dumpimport-mysql created
+pod/mlgcpwt-dumpimport-mysql condition met
+{
+  "environment": "preview",
+  "seedDump": "/Users/alex/workspace/magelift/testdata/fixtures/migrate/tiny.sql",
+  "seedDumpStatus": "imported"
+}
+acceptance cell-done cell=migrate:dump result=PASS
+acceptance cell-update cell=cost:estimate
++ magelift cost
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+{
+  "environment": "preview",
+  "provider": "gcp",
+  "region": "europe-west1",
+  "preset": "preview",
+  "mode": "account-free",
+  "currency": "USD",
+  "monthlyBudgetCents": 50000,
+  "priced": [],
+  "estimated": [
+    {
+      "resource": "GKE Autopilot web",
+      "configuration": "1 replicas, 500m CPU, 1Gi memory each"
+    },
+    {
+      "resource": "Cloud SQL MySQL",
+      "configuration": "db-custom-1-3840, ZONAL"
+    },
+    {
+      "resource": "Memorystore for Valkey",
+      "configuration": "SHARED_CORE_NANO, 0 replicas"
+    },
+    {
+      "resource": "Edge / load balancer",
+      "configuration": "Cloud Load Balancing HTTPS frontend"
+    },
+    {
+      "resource": "Magento queue",
+      "configuration": "database-backed; no broker"
+    }
+  ],
+  "unsupported": [
+    {
+      "resource": "GCP unit prices",
+      "reason": "current regional prices require live Cloud Billing Catalog data"
+    },
+    {
+      "resource": "usage-based services",
+      "reason": "egress, requests, storage growth, logging, and Cloud Armor request volume depend on workload measurements"
+    }
+  ],
+  "monthlyTotalCents": null,
+  "notice": "Account-free mode does not call the GCP Catalog API or claim current Google list prices. Capacity is derived from magelift.yaml; Catalog live pricing is optional and not wired yet."
+}
+acceptance cell-done cell=cost:estimate result=PASS
+acceptance cell-update cell=cutover:dns
+cutover:dns requires applicationURL/ingress from stack outputs
+acceptance cell-done cell=cutover:dns result=FAIL
+acceptance cell failed; KEEP=true — re-run with MAGELIFT_GCP_ACCEPTANCE_RESUME=1 (no destroy)
++ KEEP=true; skipping destroy/force_clean/assert_clean (stack retained for resume)
+Resume #5 2026-08-02T13:30:48Z cutover:dns LB IP fallback
+gcp acceptance start mode=up profile=preview project=digital-lab-341608 region=europe-west1 at=2026-08-02T13:30:48Z
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
++ building magelift -> /tmp/magelift-gcp-wt/magelift (serial GOMAXPROCS=1)
++ magelift config validate
+{
+  "environments": [
+    "preview"
+  ],
+  "valid": true
+}
++ assert_clean project=digital-lab-341608
+leftover network: mlgcpwt-preview-net
+leftover gke: mlgcpwt-preview-gke
+leftover sql: mlgcpwt-preview-sql
+leftover memorystore: projects/digital-lab-341608/locations/europe-west1/instances/mlgcpwt-preview-valkey
+leftover scp: projects/digital-lab-341608/locations/europe-west1/serviceConnectionPolicies/mlgcpwt-preview-valkey-memorystore
+leftover secret: mlgcpwt-preview-sql-db
+leftover address: mlgcpwt-preview-sql-psa
+leftover bucket: mlgcpwt-preview-media-media
+assert_clean FAILED: leftovers remain in digital-lab-341608
++ reconcile_stale_pulumi_state skipped (GCP leftovers remain)
++ magelift preview
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+Previewing update (mlgcpwt-preview-gcp-gke-autopilot):
+
+@ previewing update.......
+ ~  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s update 
+    pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot  
+Resources:
+    ~ 1 to update
+    34 unchanged
+
+{
+  "environment": "preview",
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot",
+  "preview": {
+    "changes": [
+      {
+        "operation": "same",
+        "count": 34
+      },
+      {
+        "operation": "update",
+        "count": 1
+      }
+    ],
+    "total": 35
+  },
+  "update": {
+    "changes": null,
+    "total": 0
+  }
+}
+WARNING: up creates GKE Autopilot + Cloud SQL + Memorystore; destroy + force_clean run on EXIT
+WARNING: MAGELIFT_GCP_ACCEPTANCE_DIGEST must be pullable for Magento cells (placeholder fails ImagePull)
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
+acceptance resume: skipping create-once (stack assumed present; KEEP/RESUME/checkpoint)
+gcp acceptance live_cell_loop cells=12 catalog=/Users/alex/workspace/magelift/scripts/acceptance/cells-gcp-preview.txt
+acceptance skip cell=bootstrap:wif (checkpoint)
+acceptance skip cell=composer:sm-write (checkpoint)
+acceptance skip cell=composer:sm-read (checkpoint)
+acceptance skip cell=day2:secrets (checkpoint)
+acceptance skip cell=day2:state (checkpoint)
+acceptance skip cell=day2:logs (checkpoint)
+acceptance skip cell=day2:exec (checkpoint)
+acceptance skip cell=day2:health (checkpoint)
+acceptance skip cell=deploy:candidate (checkpoint)
+acceptance skip cell=migrate:dump (checkpoint)
+acceptance skip cell=cost:estimate (checkpoint)
+acceptance cell-update cell=cutover:dns
++ cell cutover:dns host=magelift-preview.alexandrecourtiol.com target=34.52.232.165
+cutover-dns-cloudflare: cf create A magelift-preview.alexandrecourtiol.com -> 34.52.232.165
+cutover-dns-cloudflare: upsert ok host=magelift-preview.alexandrecourtiol.com type=A target=34.52.232.165 (via cf)
+acceptance cell-done cell=cutover:dns result=PASS
+gcp acceptance ok mode=up; destroy + force_clean + assert_clean on EXIT unless MAGELIFT_GCP_ACCEPTANCE_KEEP=true
++ KEEP=true; skipping destroy/force_clean/assert_clean (stack retained for resume)

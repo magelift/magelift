@@ -1,0 +1,478 @@
+Live create-once #3 2026-08-02T12:58:39Z TailLogs-BindOutputs KEEP-on-fail
+gcp acceptance start mode=up profile=preview project=digital-lab-341608 region=europe-west1 at=2026-08-02T12:58:39Z
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
++ building magelift -> /tmp/magelift-gcp-wt/magelift (serial GOMAXPROCS=1)
++ magelift config validate
+{
+  "environments": [
+    "preview"
+  ],
+  "valid": true
+}
++ assert_clean project=digital-lab-341608
+assert_clean ok
++ reconcile_stale_pulumi_state: GCP clean; resetting Pulumi stack alex/magelift/mlgcpwt-preview-gcp-gke-autopilot
++ magelift destroy --yes
+{
+  "environment": "preview",
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot",
+  "preview": {
+    "changes": [
+      {
+        "operation": "create",
+        "count": 35
+      }
+    ],
+    "total": 35
+  },
+  "update": {
+    "changes": [],
+    "total": 0
+  }
+}
+magelift destroy ok
++ reconcile_stale_pulumi_state ok
++ magelift preview
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+Previewing update (mlgcpwt-preview-gcp-gke-autopilot):
+
+ +  pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot create 
+ +  magelift:gcp:Stack mlgcpwt-preview create 
+@ previewing update....
+ +  pulumi:providers:gcp mlgcpwt-preview-gcp create 
+ +  magelift:gcp:Network mlgcpwt-preview-net create 
+ +  gcp:compute:Network mlgcpwt-preview-net create 
+ +  gcp:compute:Router mlgcpwt-preview-net-router create 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-private-0 create 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-public-0 create 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-private-1 create 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-public-1 create 
+ +  gcp:compute:RouterNat mlgcpwt-preview-net-nat create 
+ +  magelift:gcp:CloudSQL mlgcpwt-preview-sql create 
+ +  gcp:secretmanager:Secret mlgcpwt-preview-sql-db-secret create 
+ +  gcp:compute:GlobalAddress mlgcpwt-preview-sql-psa create 
+ +  gcp:servicenetworking:Connection mlgcpwt-preview-sql-psa create 
+ +  random:index:RandomPassword mlgcpwt-preview-sql-password create 
+ +  gcp:sql:DatabaseInstance mlgcpwt-preview-sql create 
+ +  gcp:secretmanager:SecretVersion mlgcpwt-preview-sql-db-secret-version create 
+ +  gcp:sql:User mlgcpwt-preview-sql-user create 
+ +  gcp:sql:Database mlgcpwt-preview-sql-db create 
+ +  magelift:gcp:MemorystoreValkey mlgcpwt-preview-valkey create 
+ +  magelift:gcp:MediaStorage mlgcpwt-preview-media create 
+ +  gcp:networkconnectivity:ServiceConnectionPolicy mlgcpwt-preview-valkey-scp create 
+ +  magelift:gcp:Edge mlgcpwt-preview-edge create 
+ +  gcp:storage:Bucket mlgcpwt-preview-media create 
+ +  gcp:memorystore:Instance mlgcpwt-preview-valkey create 
+@ previewing update....
+ +  magelift:gcp:GKERuntime mlgcpwt-preview-app create 
+ +  gcp:container:Cluster mlgcpwt-preview-app-cluster create 
+ +  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s create 
+ +  magelift:gcp:OpenSearch mlgcpwt-preview-search create 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-search-svc create 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-search create 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron create 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web create 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc create 
+ +  pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot create 
+Outputs:
+    applicationURL    : [unknown]
+    cacheEndpoint     : [unknown]
+    clusterName       : "mlgcpwt-preview-gke"
+    databaseWriter    : [unknown]
+    kubeconfig        : [secret]
+    mediaBucket       : "mlgcpwt-preview-media-media"
+    mediaURL          : "https://storage.googleapis.com/mlgcpwt-preview-media-media"
+    networkVpcId      : [unknown]
+    privateSubnetIds  : [unknown]
+    queueMode         : "database"
+    searchEndpoint    : "mlgcpwt-preview-search"
+    serviceName       : "mlgcpwt-preview-app-web"
+
+Resources:
+    + 35 to create
+
+{
+  "environment": "preview",
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot",
+  "preview": {
+    "changes": [
+      {
+        "operation": "create",
+        "count": 35
+      }
+    ],
+    "total": 35
+  },
+  "update": {
+    "changes": null,
+    "total": 0
+  }
+}
+WARNING: up creates GKE Autopilot + Cloud SQL + Memorystore; destroy + force_clean run on EXIT
+WARNING: MAGELIFT_GCP_ACCEPTANCE_DIGEST must be pullable for Magento cells (placeholder fails ImagePull)
++ using existing ADC at /Users/alex/.config/gcloud/application_default_credentials.json
+acceptance create-once
++ magelift bootstrap (GCS DIY state bucket + WIF)
++ magelift bootstrap --yes --github-owner acourtiol --github-repo magelift
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+{
+  "backendURL": "gs://magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state",
+  "details": {
+    "state": {
+      "plan": {
+        "stateBucket": "magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state",
+        "gcpProject": "digital-lab-341608",
+        "region": "europe-west1",
+        "labels": {
+          "magelift-environment": "preview",
+          "magelift-managed-by": "magelift",
+          "magelift-project": "mlgcpwt",
+          "magelift-purpose": "pulumi-state"
+        }
+      }
+    },
+    "wif": {
+      "pool": "projects/397359300925/locations/global/workloadIdentityPools/ml-mlgcpwt-preview",
+      "provider": "projects/397359300925/locations/global/workloadIdentityPools/ml-mlgcpwt-preview/providers/github",
+      "serviceAccount": "ml-mlgcpwt-preview-ci@digital-lab-341608.iam.gserviceaccount.com"
+    }
+  }
+}
++ magelift deploy --yes --infra-only (create-once; Magento via deploy:candidate cell)
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+notice: --infra-only: Magento migrate, cutover, and health were skipped
+Previewing update (mlgcpwt-preview-gcp-gke-autopilot):
+
+ +  pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot create 
+ +  magelift:gcp:Stack mlgcpwt-preview create 
+@ previewing update....
+ +  pulumi:providers:gcp mlgcpwt-preview-gcp create 
+ +  magelift:gcp:Network mlgcpwt-preview-net create 
+ +  gcp:compute:Network mlgcpwt-preview-net create 
+ +  gcp:compute:Router mlgcpwt-preview-net-router create 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-private-0 create 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-public-0 create 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-private-1 create 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-public-1 create 
+ +  gcp:compute:RouterNat mlgcpwt-preview-net-nat create 
+ +  magelift:gcp:CloudSQL mlgcpwt-preview-sql create 
+ +  gcp:secretmanager:Secret mlgcpwt-preview-sql-db-secret create 
+ +  gcp:compute:GlobalAddress mlgcpwt-preview-sql-psa create 
+ +  gcp:servicenetworking:Connection mlgcpwt-preview-sql-psa create 
+ +  random:index:RandomPassword mlgcpwt-preview-sql-password create 
+ +  gcp:sql:DatabaseInstance mlgcpwt-preview-sql create 
+ +  gcp:secretmanager:SecretVersion mlgcpwt-preview-sql-db-secret-version create 
+ +  gcp:sql:User mlgcpwt-preview-sql-user create 
+ +  gcp:sql:Database mlgcpwt-preview-sql-db create 
+ +  magelift:gcp:MemorystoreValkey mlgcpwt-preview-valkey create 
+ +  magelift:gcp:MediaStorage mlgcpwt-preview-media create 
+ +  gcp:networkconnectivity:ServiceConnectionPolicy mlgcpwt-preview-valkey-scp create 
+ +  magelift:gcp:Edge mlgcpwt-preview-edge create 
+ +  gcp:storage:Bucket mlgcpwt-preview-media create 
+ +  gcp:memorystore:Instance mlgcpwt-preview-valkey create 
+@ previewing update....
+ +  magelift:gcp:GKERuntime mlgcpwt-preview-app create 
+ +  gcp:container:Cluster mlgcpwt-preview-app-cluster create 
+ +  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s create 
+ +  magelift:gcp:OpenSearch mlgcpwt-preview-search create 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-search-svc create 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-search create 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron create 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web create 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc create 
+ +  pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot create 
+Outputs:
+    applicationURL    : [unknown]
+    cacheEndpoint     : [unknown]
+    clusterName       : "mlgcpwt-preview-gke"
+    databaseWriter    : [unknown]
+    kubeconfig        : [secret]
+    mediaBucket       : "mlgcpwt-preview-media-media"
+    mediaURL          : "https://storage.googleapis.com/mlgcpwt-preview-media-media"
+    networkVpcId      : [unknown]
+    privateSubnetIds  : [unknown]
+    queueMode         : "database"
+    searchEndpoint    : "mlgcpwt-preview-search"
+    serviceName       : "mlgcpwt-preview-app-web"
+
+Resources:
+    + 35 to create
+
+Updating (mlgcpwt-preview-gcp-gke-autopilot):
+
+ +  pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot creating (0s) 
+@ updating.....
+ +  magelift:gcp:Stack mlgcpwt-preview creating (0s) 
+ +  pulumi:providers:gcp mlgcpwt-preview-gcp creating (0s) 
+ +  pulumi:providers:gcp mlgcpwt-preview-gcp created (0.61s) 
+@ updating....
+ +  magelift:gcp:Network mlgcpwt-preview-net creating (0s) 
+@ updating....
+ +  gcp:compute:Network mlgcpwt-preview-net creating (0s) 
+@ updating.........................
+ +  gcp:compute:Network mlgcpwt-preview-net created (22s) 
+ +  gcp:compute:Router mlgcpwt-preview-net-router creating (0s) 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-private-0 creating (0s) 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-public-0 creating (0s) 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-private-1 creating (0s) 
+@ updating...............
+ +  gcp:compute:Router mlgcpwt-preview-net-router created (11s) 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-public-1 creating (0s) 
+@ updating.............
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-private-0 created (21s) 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-public-0 created (21s) 
+@ updating....
+ +  gcp:compute:RouterNat mlgcpwt-preview-net-nat creating (0s) 
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-private-1 created (22s) 
+@ updating.............
+ +  gcp:compute:Subnetwork mlgcpwt-preview-net-public-1 created (21s) 
+@ updating....
+ +  gcp:compute:RouterNat mlgcpwt-preview-net-nat created (11s) 
+ +  magelift:gcp:CloudSQL mlgcpwt-preview-sql creating (0s) 
+@ updating....
+ +  gcp:secretmanager:Secret mlgcpwt-preview-sql-db-secret creating (0s) 
+ +  gcp:compute:GlobalAddress mlgcpwt-preview-sql-psa creating (0s) 
+@ updating....
+ +  gcp:secretmanager:Secret mlgcpwt-preview-sql-db-secret created (1s) 
+ +  random:index:RandomPassword mlgcpwt-preview-sql-password creating (0s) 
+@ updating....
+ +  random:index:RandomPassword mlgcpwt-preview-sql-password created (0.62s) 
+@ updating....
+ +  gcp:secretmanager:SecretVersion mlgcpwt-preview-sql-db-secret-version creating (0s) 
+@ updating......
+ +  gcp:secretmanager:SecretVersion mlgcpwt-preview-sql-db-secret-version created (3s) 
+@ updating...........
+ +  gcp:compute:GlobalAddress mlgcpwt-preview-sql-psa created (13s) 
+ +  gcp:servicenetworking:Connection mlgcpwt-preview-sql-psa creating (0s) 
+@ updating.....................................
+ +  gcp:servicenetworking:Connection mlgcpwt-preview-sql-psa created (33s) 
+ +  gcp:sql:DatabaseInstance mlgcpwt-preview-sql creating (0s) 
+@ updating.....................................................................................................................................................................................................................................................................
+ +  gcp:sql:DatabaseInstance mlgcpwt-preview-sql created (258s) 
+@ updating....
+ +  gcp:sql:User mlgcpwt-preview-sql-user creating (0s) 
+ +  gcp:sql:Database mlgcpwt-preview-sql-db creating (0s) 
+@ updating....
+ +  gcp:sql:User mlgcpwt-preview-sql-user created (1s) 
+ +  gcp:sql:Database mlgcpwt-preview-sql-db created (1s) 
+@ updating....
+ +  magelift:gcp:MemorystoreValkey mlgcpwt-preview-valkey creating (0s) 
+ +  magelift:gcp:MediaStorage mlgcpwt-preview-media creating (0s) 
+ +  gcp:networkconnectivity:ServiceConnectionPolicy mlgcpwt-preview-valkey-scp creating (0s) 
+@ updating.....
+ +  magelift:gcp:Edge mlgcpwt-preview-edge creating (0s) 
+ +  gcp:storage:Bucket mlgcpwt-preview-media creating (0s) 
+@ updating.....
+ +  gcp:storage:Bucket mlgcpwt-preview-media created (2s) 
+@ updating...........
+ +  gcp:networkconnectivity:ServiceConnectionPolicy mlgcpwt-preview-valkey-scp created (11s) 
+@ updating....
+ +  gcp:memorystore:Instance mlgcpwt-preview-valkey creating (0s) 
+@ updating..........................................................................................................................................................................................................................................................................................................................................................
+ +  gcp:memorystore:Instance mlgcpwt-preview-valkey created (343s) 
+@ updating....
+ +  magelift:gcp:GKERuntime mlgcpwt-preview-app creating (0s) 
+@ updating....
+ +  gcp:container:Cluster mlgcpwt-preview-app-cluster creating (0s) 
+@ updating.............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+ +  gcp:container:Cluster mlgcpwt-preview-app-cluster created (474s) 
+ +  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s creating (0s) 
+@ updating....
+ +  pulumi:providers:kubernetes mlgcpwt-preview-app-k8s created (0.38s) 
+ +  magelift:gcp:OpenSearch mlgcpwt-preview-search creating (0s) 
+@ updating......
+ +  kubernetes:core/v1:Service mlgcpwt-preview-search-svc creating (0s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-search creating (0s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron creating (0s) 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-search-svc creating (0s) 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-search-svc creating (0s) Skipping await logic
+ +  kubernetes:core/v1:Service mlgcpwt-preview-search-svc creating (0s) 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-search-svc created (0.60s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-search creating (0s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-search creating (0s) Skipping await logic
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-search creating (0s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-search created (0.86s) 
+@ updating....
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web creating (0s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron creating (1s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron creating (1s) Skipping await logic
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron creating (1s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-cron created (1s) 
+@ updating....
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web creating (1s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web creating (1s) Skipping await logic
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web creating (1s) 
+ +  kubernetes:apps/v1:Deployment mlgcpwt-preview-app-web created (1s) 
+@ updating....
+ +  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc creating (0s) 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc creating (0s) 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc creating (0s) Skipping await logic
+ +  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc creating (0s) 
+ +  kubernetes:core/v1:Service mlgcpwt-preview-app-web-svc created (0.40s) 
+@ updating.....
+ +  pulumi:pulumi:Stack magelift-mlgcpwt-preview-gcp-gke-autopilot created (1210s) 
+Outputs:
+    cacheEndpoint     : "10.40.0.2"
+    clusterName       : "mlgcpwt-preview-gke"
+    databaseWriter    : "10.17.0.3"
+    kubeconfig        : [secret]
+    mediaBucket       : "mlgcpwt-preview-media-media"
+    mediaURL          : "https://storage.googleapis.com/mlgcpwt-preview-media-media"
+    networkVpcId      : "projects/digital-lab-341608/global/networks/mlgcpwt-preview-net"
+    privateSubnetIds  : [
+        [0]: "projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-private-0"
+        [1]: "projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-private-1"
+    ]
+    queueMode         : "database"
+    searchEndpoint    : "mlgcpwt-preview-search"
+    serviceName       : "mlgcpwt-preview-app-web"
+
+Resources:
+    + 35 created
+
+Duration: 20m12s
+
+{
+  "environment": "preview",
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot",
+  "preview": {
+    "changes": [
+      {
+        "operation": "create",
+        "count": 35
+      }
+    ],
+    "total": 35
+  },
+  "update": {
+    "changes": [
+      {
+        "operation": "create",
+        "count": 35
+      }
+    ],
+    "total": 35
+  }
+}
++ magelift outputs
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+{
+  "environment": "preview",
+  "outputs": {
+    "applicationURL": "",
+    "cacheEndpoint": "10.40.0.2",
+    "clusterName": "mlgcpwt-preview-gke",
+    "databaseWriter": "10.17.0.3",
+    "kubeconfig": {
+      "secret": true
+    },
+    "mediaBucket": "mlgcpwt-preview-media-media",
+    "mediaURL": "https://storage.googleapis.com/mlgcpwt-preview-media-media",
+    "networkVpcId": "projects/digital-lab-341608/global/networks/mlgcpwt-preview-net",
+    "privateSubnetIds": [
+      "projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-private-0",
+      "projects/digital-lab-341608/regions/europe-west1/subnetworks/mlgcpwt-preview-net-private-1"
+    ],
+    "queueHost": "",
+    "queueMode": "database",
+    "searchEndpoint": "mlgcpwt-preview-search",
+    "securityPolicyName": "",
+    "serviceName": "mlgcpwt-preview-app-web"
+  },
+  "stack": "mlgcpwt-preview-gcp-gke-autopilot"
+}
+gcp acceptance live_cell_loop cells=12 catalog=/Users/alex/workspace/magelift/scripts/acceptance/cells-gcp-preview.txt
+acceptance cell-update cell=bootstrap:wif
++ cell bootstrap:wif Ensure + Act/STS proof
++ magelift bootstrap --yes --github-owner acourtiol --github-repo magelift
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+{
+  "backendURL": "gs://magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state",
+  "details": {
+    "state": {
+      "plan": {
+        "stateBucket": "magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state",
+        "gcpProject": "digital-lab-341608",
+        "region": "europe-west1",
+        "labels": {
+          "magelift-environment": "preview",
+          "magelift-managed-by": "magelift",
+          "magelift-project": "mlgcpwt",
+          "magelift-purpose": "pulumi-state"
+        }
+      }
+    },
+    "wif": {
+      "pool": "projects/397359300925/locations/global/workloadIdentityPools/ml-mlgcpwt-preview",
+      "provider": "projects/397359300925/locations/global/workloadIdentityPools/ml-mlgcpwt-preview/providers/github",
+      "serviceAccount": "ml-mlgcpwt-preview-ci@digital-lab-341608.iam.gserviceaccount.com"
+    }
+  }
+}
++ bootstrap:wif attempting gcloud STS/impersonation token exchange for ml-mlgcpwt-preview-ci@digital-lab-341608.iam.gserviceaccount.com
++ bootstrap:wif STS/impersonation token exchange ok (token not logged)
+acceptance cell-done cell=bootstrap:wif result=PASS
+acceptance cell-update cell=composer:sm-write
++ cell composer:sm-write Secret Manager write
++ magelift secret set magelift-composer-auth --value-stdin
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+{
+  "name": "magelift-composer-auth",
+  "updated": true
+}
+acceptance cell-done cell=composer:sm-write result=PASS
+acceptance cell-update cell=composer:sm-read
++ cell composer:sm-read gcp-secret-manager:// AccessSecretVersion
++ magelift secret list
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+[
+  {
+    "name": "magelift-composer-auth",
+    "updatedAt": "0001-01-01T00:00:00Z"
+  },
+  {
+    "name": "mlgcpwt-preview-sql-db",
+    "updatedAt": "0001-01-01T00:00:00Z"
+  }
+]
++ composer:sm-read ok uri=gcp-secret-manager://projects/digital-lab-341608/secrets/magelift-composer-auth/versions/latest (value not logged)
+acceptance cell-done cell=composer:sm-read result=PASS
+acceptance cell-update cell=day2:secrets
++ magelift secret list
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+[
+  {
+    "name": "magelift-composer-auth",
+    "updatedAt": "0001-01-01T00:00:00Z"
+  },
+  {
+    "name": "mlgcpwt-preview-sql-db",
+    "updatedAt": "0001-01-01T00:00:00Z"
+  }
+]
+acceptance cell-done cell=day2:secrets result=PASS
+acceptance cell-update cell=day2:state
++ magelift state status
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+{
+  "environment": "preview",
+  "backend": "magelift-digital-lab-341608-europe-west1-mlgcpwt-preview-state",
+  "locked": false
+}
+acceptance cell-done cell=day2:state result=PASS
+acceptance cell-update cell=day2:logs
++ magelift logs --service web
+warning: target gcp/gke-autopilot is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md
+no pods found for app=web in namespace default
+acceptance cell-done cell=day2:logs result=FAIL
+acceptance cell failed; KEEP=true — re-run with MAGELIFT_GCP_ACCEPTANCE_RESUME=1 (no destroy)
++ assert_clean project=digital-lab-341608
+leftover network: mlgcpwt-preview-net
+leftover gke: mlgcpwt-preview-gke
+leftover sql: mlgcpwt-preview-sql
+leftover memorystore: projects/digital-lab-341608/locations/europe-west1/instances/mlgcpwt-preview-valkey
+leftover scp: projects/digital-lab-341608/locations/europe-west1/serviceConnectionPolicies/mlgcpwt-preview-valkey-memorystore
+leftover secret: mlgcpwt-preview-sql-db
+leftover address: mlgcpwt-preview-sql-psa
+leftover bucket: mlgcpwt-preview-media-media
+assert_clean FAILED: leftovers remain in digital-lab-341608

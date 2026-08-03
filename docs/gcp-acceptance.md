@@ -1,7 +1,10 @@
-# Experimental GCP acceptance (local, destroy-on-exit)
+# GCP acceptance (local, destroy-on-exit)
 
-Status: **experimental**. Not Magento-certified. Prefer
-[aws-acceptance.md](aws-acceptance.md) for the certified path.
+Status: **certified** for the maintainer create-once path (GCP-06). Live pass
+2026-08-02 on `digital-lab-341608` / `europe-west1` / prefix `mlgcpwt` recorded
+harness PASS rows in `.magelift/gcp-matrix/matrix-results.md` (SC1–SC5 +
+`migrate:dump` + `cutover:dns`). Sibling certified path:
+[aws-acceptance.md](aws-acceptance.md).
 
 ## Offline harness shape (Phase 7 catalog)
 
@@ -146,15 +149,22 @@ gcloud compute networks delete mlgcpwt-preview-net --project=digital-lab-341608
 - Cloudflare DNS cell needs `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN` with
   Zone.DNS Edit (Wrangler OAuth is insufficient).
 
-## Known gaps (experimental)
+## Known gaps (post-certify honesty)
 
 - Memorystore Valkey needs a regional Service Connection Policy
   (`serviceClass=gcp-memorystore`) — created by the GCP cache component.
-- Magento Ops cells need a pullable digest before `TierCertified`.
-- GitHub WIF bootstrap is implemented offline (pool/provider/CI SA). CI proof is
-  **Act-only** until hosted Actions minutes return — see
+- Non-preview presets remain spend-gated (not free-tier certified).
+- GitHub WIF CI proof is **Act-only** until hosted Actions minutes return — see
   [gcp-experimental.md](gcp-experimental.md#github-wif-act-only-until-minutes-return)
   and `.github/workflows/gcp-wif-act-smoke.yml`. Do not commit SA keys.
-- `env import-dump` still defaults to host/compose unless
-  `MAGELIFT_DUMPIMPORT_RUNNER=kube` is honored by the CLI for private Cloud SQL
-  (07-04 runner exists; live wiring exercised in 07-06).
+- Live dump cell requires `MAGELIFT_DUMPIMPORT_RUNNER=kube` (+ mysql client pod
+  when the Magento image lacks `mysql`); evidenced in 07-06.
+
+## Certified pass citation (2026-08-02)
+
+| Item | Value |
+|------|--------|
+| Project / region / prefix | `digital-lab-341608` / `europe-west1` / `mlgcpwt` |
+| Evidence | `.magelift/gcp-matrix/matrix-results.md` |
+| Scratch | `.planning/phases/07-gcp-certification/scratch/07-06-live-pass.md` |
+| Teardown | `assert_clean ok`, DNS cleanup, state bucket deleted |
