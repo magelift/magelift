@@ -78,6 +78,17 @@ func TestSpecValidateAcceptsExistingDatabase(t *testing.T) {
 	}
 }
 
+func TestSpecValidateAcceptsRDSManagedMasterUserSecretARN(t *testing.T) {
+	spec := validSpec()
+	ref := sdk.ExistingResourceRef{ID: "database", Provider: "aws", Kind: sdk.ExistingDatabase, ExternalID: "mladopt-mysql"}
+	spec.Existing.Database = &ref
+	spec.Existing.DatabaseSecretARN = "arn:aws:secretsmanager:eu-north-1:669890779205:secret:rds!db-52cbf59c-d97d-4fe3-aa28-700f40fbf95e-9LmiAZ"
+	spec.Existing.DatabaseEndpoint = "mladopt-mysql.cdwockum4edo.eu-north-1.rds.amazonaws.com"
+	if err := spec.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSpecValidateAllowsThreeZoneStandardQueueLayout(t *testing.T) {
 	spec := validSpec()
 	spec.Identity.EnvironmentClass = "staging"

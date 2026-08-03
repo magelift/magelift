@@ -23,7 +23,8 @@ const (
 )
 
 var kmsARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):kms:[a-z0-9-]+:[0-9]{12}:key/[0-9a-fA-F-]+$`)
-var secretARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$`)
+// Secret name may include "!" (RDS/Aurora ManageMasterUserPassword: rds!db-… / rds!cluster-…).
+var secretARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@!-]+$`)
 var databaseName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 var username = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,15}$`)
 

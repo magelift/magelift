@@ -555,7 +555,8 @@ func halfStep(value float64) bool {
 
 var (
 	kmsARN       = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):kms:[a-z0-9-]+:[0-9]{12}:key/[A-Za-z0-9-]+$`)
-	secretARN    = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$`)
+	// Secret name may include "!" (RDS/Aurora ManageMasterUserPassword: rds!db-… / rds!cluster-…).
+	secretARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@!-]+$`)
 	databaseName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 	username     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,15}$`)
 )
