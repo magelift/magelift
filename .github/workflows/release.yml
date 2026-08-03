@@ -26,7 +26,8 @@ jobs:
         with:
           distribution: goreleaser
           version: v2.17.0
-          args: release --clean
+          # Cap parallelism: full matrix + Pulumi graph OOMs/kills ubuntu-latest mid-build.
+          args: release --clean --parallelism 2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

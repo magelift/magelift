@@ -50,6 +50,8 @@ signs:
 
 homebrew_casks:
   - name: magelift
+    # Skip until HOMEBREW_TAP_GITHUB_TOKEN is set and acourtiol/homebrew-tap exists.
+    skip: '{{ eq (print .Env.HOMEBREW_TAP_GITHUB_TOKEN) "" }}'
     repository:
       owner: acourtiol
       name: homebrew-tap
