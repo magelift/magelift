@@ -39,3 +39,6 @@ skills-lock.json
 .planning/loop/last_progress
 .planning/loop/heartbeat*
 .planning/loop/milestone-prompt.json
+
+# GSD research tool cache
+.planning/research/.cache/
