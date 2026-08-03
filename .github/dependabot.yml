@@ -5,6 +5,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 15
     labels: [dependencies, go]
     commit-message:
@@ -29,6 +31,8 @@ updates:
     directory: /build
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     labels: [dependencies, php]
     commit-message:
@@ -41,6 +45,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 15
     labels: [dependencies, ci]
     commit-message:
@@ -53,6 +59,8 @@ updates:
     directory: /docs
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     labels: [dependencies, docs]
     commit-message:
@@ -62,6 +70,8 @@ updates:
     directory: /websites/marketing
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     labels: [dependencies, docs]
     commit-message:
@@ -71,6 +81,8 @@ updates:
     directory: /images/php-runtime
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     labels: [dependencies, docker]
     commit-message:
@@ -83,6 +95,8 @@ updates:
     directory: /images/frankenphp-classic
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     labels: [dependencies, docker]
     commit-message:
