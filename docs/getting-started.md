@@ -29,13 +29,17 @@ magelift dev up
 ## 3. Sample shop config
 
 Copy `examples/sample-shop/magelift.yaml` from the repository into your Magento
-repo root. Replace accounts, domains, and secret ARNs.
+repo root. Complete the “What to replace” table in
+`examples/sample-shop/README.md` (accounts, domains, secret refs — no plaintext
+secrets).
 
 ```sh
 magelift doctor
 magelift config validate --env preview
 ```
 
+Then continue with [local vs cloud](local-vs-cloud.md) if you are still offline,
+or jump to AWS preview below.
 ## 4. AWS preview (certified)
 
 Requires AWS credentials and an access-log bucket.

@@ -62,6 +62,7 @@ final class PatchApplierTest extends TestCase
 @@ -1 +1 @@
 -hello world
 +hello patched
+
 PATCH);
 
         (new PatchApplier(new NativeProcessRunner()))->apply($root);
