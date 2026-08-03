@@ -27,7 +27,9 @@ Dependabot opens the dependency update pull requests. Go modules, Composer packa
 
 CI also runs Go vulnerability and license checks, CodeQL for Go, and Trivy
 against every published Debian PHP runtime, builder, and FrankenPHP classic image
-for each supported PHP branch. Shellcheck validates repository shell scripts, and
+for each supported PHP branch. `go-licenses` ignores `github.com/ovh/pulumi-ovh`
+because the Apache-2.0 LICENSE sits at the module root while nested Go packages
+are not classified; that license is recorded in `NOTICE`. Shellcheck validates repository shell scripts, and
 actionlint validates workflow syntax and expressions;
 Zizmor audits GitHub Actions workflows for unsafe
 permissions, unpinned actions, and injection paths. A finding blocks the relevant job until it is fixed,

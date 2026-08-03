@@ -6,6 +6,11 @@ A Magento developer adds `magelift.yaml` to an existing repository and uses one 
 CLI to deploy and operate a production-grade environment in their own cloud account,
 without editing Pulumi or Go for the supported path.
 
+Presets keep YAML small for agencies and small e-merchants coming from Adobe Commerce
+Cloud or Upsun. Power users open catalog escape hatches
+([capability matrix](capability-matrix.md)). Headless means Magento
+`application.mode: headless|integrated`; storefront frameworks stay external.
+
 ## Boundaries
 
 - V1 certifies AWS ECS Fargate. GCP (`gcp` / `gke-autopilot`), AWS EKS
@@ -80,7 +85,7 @@ escape hatches — not every AWS SKU.
 | `natMode` | `nat-gateway` (default), `fck-nat` (cost/preview) | — |
 | `databaseEngine` | `aurora-mysql`, `rds-mysql` | — |
 | `searchMode` | `serverless`, `provisioned`, `disabled` | OpenSearch deferred on EKS |
-| Queue | Amazon MQ (non-preview) or DB-backed (preview) | deferred on EKS |
+| Queue (`catalog.queueMode`) | `db`, `amazon-mq`, `ecs-rabbitmq` | `ecs-artemis` (experimental); deferred on EKS |
 | Edge | CloudFront + WAF | deferred on EKS |
 | Day-2 ops | deploy/logs/exec via AWS adapters | `ErrNotSupported` on EKS until phase 3 |
 

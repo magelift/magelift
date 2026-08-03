@@ -96,13 +96,15 @@ service workflow with that digest, and records a new release that points to it. 
 does not delete history or reverse database migrations. Promote and rollback both
 require `--yes` when the selected environment has `class: production`.
 
-`magelift cost` is account-free by default. It reports the selected preset's capacity
-inputs, the configured monthly budget, and the items that still need live regional
-pricing or workload measurements. `magelift cost --live` queries the AWS Price List
-API for on-demand capacity in the selected region and separates priced resources
-from capacity that remains an estimate and products AWS could not match. Data transfer, requests, storage growth, logs,
-WAF, CloudFront, and NAT processing remain unsupported because they depend on real
-workload measurements. A budget is never presented as a forecast.
+`magelift cost` is account-free by default and is routed through the selected
+provider's `CostEstimator` adapter (same boundary as logs/ops — ADR 0002). AWS ECS
+Fargate reports catalog capacity and budget inputs; `magelift cost --live` queries
+the AWS Price List API for on-demand capacity in the selected region and separates
+priced resources from capacity that remains an estimate and products AWS could not
+match. Experimental targets return “not supported yet” until they ship an adapter.
+Data transfer, requests, storage growth, logs, WAF, CloudFront, and NAT processing
+remain unsupported because they depend on real workload measurements. A budget is
+never presented as a forecast.
 
 Standard and high-availability presets include private interface endpoints for the
 runtime's AWS control-plane traffic. Preview uses the S3 gateway endpoint only; its
@@ -187,11 +189,13 @@ through Secrets Manager references, then exposes Adobe's `MAGENTO_DC_*` environm
 configuration before the application starts. Configure
 `target.aws.encryptionKeySecretArn` with a stable secret and never commit its value.
 
-OpenSearch requires a separate acceptance gate. The AWS policy model authorizes
-the ECS task role, so requests use the pinned AWS SigV4 proxy sidecar and the
-Magento container targets its loopback listener. A live AWS matrix must still
-prove index creation, catalog indexing, queries, reconnects, and least-privilege
-behavior. Floci and Pulumi mocks do not prove this managed data-plane behavior.
+OpenSearch wiring (task role + pinned AWS SigV4 proxy sidecar + Magento loopback
+listener) is covered by Pulumi/unit mocks. The public-tag gate uses that offline
+proof plus free-tier `searchMode: disabled` acceptance and prior Chantelle Terraform
+OpenSearch ops ([sources/chantelle-opensearch.md](sources/chantelle-opensearch.md)).
+That path used ElasticSuite without SigV4 — do not equate it with MageLift’s proxy.
+Live MageLift Magento search (index/query/reconnect/IAM) remains a post-tag paid
+acceptance checklist; Floci does not prove that data-plane.
 
 Use `make floci-test` for account-free bootstrap, state, lock, versioned-media
 restore, ECS runtime health, ephemeral candidate registration, Secrets Manager, and
