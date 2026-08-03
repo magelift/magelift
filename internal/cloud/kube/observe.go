@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -22,9 +23,10 @@ type ClientFactory func(outputs map[string]any) (kubernetes.Interface, error)
 // Observe implements platform.RuntimeObserve against a Kubernetes API
 // (GKE Autopilot, EKS Autopilot, OVH MKS, Scaleway Kapsule).
 type Observe struct {
-	client    kubernetes.Interface
-	factory   ClientFactory
-	namespace string
+	client      kubernetes.Interface
+	factory     ClientFactory
+	namespace   string
+	serviceName string // OutputServiceName cached by BindOutputs for TailLogs
 }
 
 // NewObserve returns Observe backed by an injected clientset (tests / pre-built clients).
@@ -71,14 +73,33 @@ func (o *Observe) ns() string {
 	return defaultNamespace
 }
 
+// BindOutputs builds and caches a kubernetes client from stack outputs so
+// TailLogs (which has no outputs argument on platform.RuntimeObserve) can
+// work with factory-backed Observe used by GKE/EKS/OVH/Scaleway adapters.
+// Also caches OutputServiceName so TailLogs selects app=<service> (not bare "web").
+func (o *Observe) BindOutputs(outputs map[string]any) error {
+	client, err := o.clientFor(outputs)
+	if err != nil {
+		return err
+	}
+	svc, err := platform.RequireStringOutput(outputs, platform.OutputServiceName)
+	if err != nil {
+		return err
+	}
+	o.client = client
+	o.serviceName = svc
+	return nil
+}
+
 // TailLogs streams recent pod logs for the Magento workload (KUBE-01).
 // Label selector is app=<deployment>, matching the Magento Deployment name.
+// Factory-only Observe must BindOutputs first (CLI logs wires this).
 func (o *Observe) TailLogs(ctx context.Context, planned platform.PlannedStack, query platform.LogQuery) ([]platform.LogEvent, error) {
 	client, err := o.clientFor(nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("tail logs: bind stack outputs first (missing kubeconfig): %w", err)
 	}
-	deployment := resolveDeployment(planned, string(query.Workload), "")
+	deployment := resolveDeployment(planned, string(query.Workload), o.serviceName)
 	limit := query.Limit
 	if limit <= 0 {
 		limit = platform.DefaultLogLimit
@@ -166,6 +187,8 @@ func (o *Observe) CheckRuntime(ctx context.Context, _ platform.PlannedStack, out
 
 // PrepareExec returns a portable kubectl ExecTarget (KUBE-03). Args are the
 // argv after the binary name (matching the AWS CLI Args shape).
+// Writes kubeconfig to a temp file and passes --kubeconfig (T-06-08 fail-closed
+// on missing output). Omits -t so scripted acceptance exec works without a TTY.
 func (o *Observe) PrepareExec(_ context.Context, _ platform.PlannedStack, outputs map[string]any, query platform.ExecQuery) (platform.ExecTarget, error) {
 	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
 	if err != nil {
@@ -177,7 +200,12 @@ func (o *Observe) PrepareExec(_ context.Context, _ platform.PlannedStack, output
 	}
 	// Fail closed on missing kubeconfig so callers cannot silently fall back to
 	// provider ADC (T-06-08). Value is not logged (T-06-07).
-	if _, err := platform.RequireStringOutput(outputs, platform.OutputKubeconfig); err != nil {
+	kubeconfig, err := platform.RequireStringOutput(outputs, platform.OutputKubeconfig)
+	if err != nil {
+		return platform.ExecTarget{}, err
+	}
+	kubePath, err := writeKubeconfigTemp(kubeconfig)
+	if err != nil {
 		return platform.ExecTarget{}, err
 	}
 	deploy := resolveDeployment(nil, string(query.Workload), service)
@@ -186,16 +214,52 @@ func (o *Observe) PrepareExec(_ context.Context, _ platform.PlannedStack, output
 		command = []string{"/bin/sh"}
 	}
 	args := []string{
-		"exec", "-n", o.ns(), "-it", "deploy/" + deploy, "--",
+		"--kubeconfig", kubePath,
+		"exec", "-n", o.ns(), "-i",
 	}
+	if stdoutIsTerminal() {
+		args = append(args, "-t")
+	}
+	args = append(args, "deploy/"+deploy, "--")
 	args = append(args, command...)
 	return platform.ExecTarget{
-		Launcher:  "kubectl",
-		Args:      args,
-		Cluster:   cluster,
-		Task:      deploy,
-		Container: strings.TrimSpace(query.Container),
+		Launcher:     "kubectl",
+		Args:         args,
+		Cluster:      cluster,
+		Task:         deploy,
+		Container:    strings.TrimSpace(query.Container),
+		CleanupPaths: []string{kubePath},
 	}, nil
+}
+
+func stdoutIsTerminal() bool {
+	fi, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
+}
+
+func writeKubeconfigTemp(kubeconfig string) (string, error) {
+	f, err := os.CreateTemp("", "magelift-kubeconfig-*.yaml")
+	if err != nil {
+		return "", fmt.Errorf("create kubeconfig temp file: %w", err)
+	}
+	path := f.Name()
+	if _, err := f.WriteString(kubeconfig); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return "", fmt.Errorf("write kubeconfig temp file: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", fmt.Errorf("close kubeconfig temp file: %w", err)
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		_ = os.Remove(path)
+		return "", fmt.Errorf("chmod kubeconfig temp file: %w", err)
+	}
+	return path, nil
 }
 
 func resolveDeployment(planned platform.PlannedStack, workload, service string) string {

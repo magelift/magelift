@@ -40,12 +40,15 @@ type RuntimeHealth struct {
 // ExecTarget is an opaque handle the CLI uses to launch a remote Magento shell.
 // Launcher and Args are the portable contract; Cluster/Task/Container are
 // optional display labels for session-only output.
+// CleanupPaths are temp files the CLI must remove after the remote command ends
+// (success or failure) — e.g. kubeconfig written for kubectl --kubeconfig.
 type ExecTarget struct {
-	Launcher  string
-	Args      []string
-	Cluster   string // optional display
-	Task      string // optional display
-	Container string // optional display
+	Launcher     string
+	Args         []string
+	Cluster      string   // optional display
+	Task         string   // optional display
+	Container    string   // optional display
+	CleanupPaths []string // optional temp files owned by PrepareExec
 }
 
 // ExecQuery selects which Magento workload to exec into.

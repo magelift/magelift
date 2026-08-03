@@ -28,10 +28,6 @@ func logsCommand(o *options) *cobra.Command {
 		Short: "Read recent Magento application logs",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, planned, err := o.planStack(false)
-			if err != nil {
-				return invalid(err)
-			}
 			if !logServiceName.MatchString(service) {
 				return invalid(errors.New("--service must be web, deploy, or cron"))
 			}
@@ -42,9 +38,19 @@ func logsCommand(o *options) *cobra.Command {
 			if limit <= 0 || limit > platform.MaxLogLimit {
 				return invalid(fmt.Errorf("--limit must be between 1 and %d", platform.MaxLogLimit))
 			}
+			_, planned, outputs, err := o.plannedOutputs(cmd.Context())
+			if err != nil {
+				return err
+			}
 			observe, err := o.runtimeObserve()
 			if err != nil {
 				return err
+			}
+			// Kube factory Observe needs outputs before TailLogs (interface has no outputs arg).
+			if binder, ok := observe.(interface{ BindOutputs(map[string]any) error }); ok {
+				if bindErr := binder.BindOutputs(outputs); bindErr != nil {
+					return &exitError{code: 3, err: bindErr}
+				}
 			}
 			events, err := observe.TailLogs(cmd.Context(), planned, platform.LogQuery{
 				Workload: sdk.WorkloadID(service),

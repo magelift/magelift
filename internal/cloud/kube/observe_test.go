@@ -143,9 +143,16 @@ func TestObservePrepareExecKubectl(t *testing.T) {
 	if target.Launcher == "gke-job" {
 		t.Fatal("gke-job launcher debt must be removed")
 	}
-	want := []string{"exec", "-n", "default", "-it", "deploy/shop-web", "--", "bin/magento", "cache:flush"}
-	if strings.Join(target.Args, " ") != strings.Join(want, " ") {
-		t.Fatalf("args = %#v, want %#v", target.Args, want)
+	if len(target.Args) < 8 || target.Args[0] != "--kubeconfig" {
+		t.Fatalf("args = %#v; want --kubeconfig <path> exec ...", target.Args)
+	}
+	if len(target.CleanupPaths) != 1 || target.CleanupPaths[0] != target.Args[1] {
+		t.Fatalf("CleanupPaths = %#v; want kubeconfig path %q", target.CleanupPaths, target.Args[1])
+	}
+	joined := strings.Join(target.Args[2:], " ")
+	want := "exec -n default -i deploy/shop-web -- bin/magento cache:flush"
+	if joined != want {
+		t.Fatalf("args after kubeconfig = %q, want %q", joined, want)
 	}
 }
 
@@ -167,5 +174,25 @@ func TestGCPRuntimeObserveTypeIdentity(t *testing.T) {
 	}
 	if _, ok := any(obs).(*Observe); !ok {
 		t.Fatalf("want *Observe, got %T", obs)
+	}
+}
+
+func TestObserveBindOutputsCachesServiceName(t *testing.T) {
+	kubeconfig := BuildStaticTokenKubeconfig("c", "https://1.2.3.4", testCAData, "tok")
+	obs := NewObserveWithFactory(ClientFromOutputs)
+	if err := obs.BindOutputs(map[string]any{
+		platform.OutputKubeconfig:  kubeconfig,
+		platform.OutputServiceName: "mlgcpwt-preview-app-web",
+	}); err != nil {
+		t.Fatalf("BindOutputs: %v", err)
+	}
+	if obs.client == nil {
+		t.Fatal("BindOutputs did not cache client")
+	}
+	if obs.serviceName != "mlgcpwt-preview-app-web" {
+		t.Fatalf("serviceName = %q", obs.serviceName)
+	}
+	if got := resolveDeployment(nil, "web", obs.serviceName); got != "mlgcpwt-preview-app-web" {
+		t.Fatalf("resolveDeployment = %q, want mlgcpwt-preview-app-web", got)
 	}
 }

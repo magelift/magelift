@@ -105,6 +105,7 @@ func (o *options) runExecTarget(ctx context.Context, target platform.ExecTarget)
 	if o.runCommand == nil {
 		return &exitError{code: 3, err: errors.New("remote command runner is unavailable")}
 	}
+	defer cleanupExecTempFiles(target.CleanupPaths)
 	launcher := target.Launcher
 	if launcher == "" {
 		launcher = "aws"
@@ -115,6 +116,16 @@ func (o *options) runExecTarget(ctx context.Context, target platform.ExecTarget)
 		return &exitError{code: 3, err: fmt.Errorf("run remote command (%s): %w", launcher, err)}
 	}
 	return nil
+}
+
+func cleanupExecTempFiles(paths []string) {
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		_ = os.Remove(path)
+	}
 }
 
 func (o *options) prepareRemoteCommand(ctx context.Context, service, container string, command []string) (remoteCommandResult, platform.ExecTarget, error) {
