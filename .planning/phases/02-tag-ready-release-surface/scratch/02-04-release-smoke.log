@@ -1,0 +1,31 @@
+./scripts/release-smoke-local.sh
++ goreleaser check
+  • checking                                  path=.goreleaser.yaml
+  • 1 configuration file(s) validated
+  • thanks for using GoReleaser!
++ goreleaser build --snapshot --single-target --parallelism=1 GOMAXPROCS=1 GOFLAGS=-p=1 (host only)
+  • skipping validate...
+  • cleaning distribution directory
+  • loading environment variables
+  • getting and validating git state
+    • ignoring errors because this is a snapshot     error=git doesn't contain any tags - either add a tag or use --snapshot
+    • git state                                      commit=46c90689ea14cf20ee42043f899cb3399c3e4427 branch=main current_tag=v0.0.0 previous_tag=<unknown> dirty=false
+    • pipe skipped or partially skipped              reason=disabled during snapshot mode
+  • parsing tag
+  • setting defaults
+  • partial
+  • snapshotting
+    • building snapshot...                           version=0.0.0-SNAPSHOT-46c9068
+  • ensuring distribution directory
+  • setting up metadata
+  • writing release metadata
+  • loading go mod information
+  • build prerequisites
+  • building binaries
+    • partial build                                  match=target=darwin_arm64_v8.0
+    • building                                       binary=dist/magelift_darwin_arm64_v8.0/magelift
+      • took: 27s
+  • writing artifacts metadata
+  • build succeeded after 26s
+  • thanks for using GoReleaser!
+release smoke ok binary=dist/magelift_darwin_arm64_v8.0/magelift (serial single-target)

@@ -1,0 +1,72 @@
+=== RUN   TestRuntimeResourceGraphAndSecurityContract
+=== PAUSE TestRuntimeResourceGraphAndSecurityContract
+=== RUN   TestRuntimeAddsSigV4ProxyForMagentoOpenSearch
+=== PAUSE TestRuntimeAddsSigV4ProxyForMagentoOpenSearch
+=== RUN   TestRuntimeOmitsSigV4ProxyWhenSearchDisabled
+=== PAUSE TestRuntimeOmitsSigV4ProxyWhenSearchDisabled
+=== RUN   TestRuntimeSigV4ProxySignsAOSSServiceName
+=== PAUSE TestRuntimeSigV4ProxySignsAOSSServiceName
+=== RUN   TestSearchProxyTargetServiceName
+=== PAUSE TestSearchProxyTargetServiceName
+=== RUN   TestRuntimeCreatesQueueConsumerServiceWhenRequested
+=== PAUSE TestRuntimeCreatesQueueConsumerServiceWhenRequested
+=== RUN   TestRuntimeFrankenPHPClassicUsesSingleHTTPContainer
+=== PAUSE TestRuntimeFrankenPHPClassicUsesSingleHTTPContainer
+=== RUN   TestRuntimeInjectsNonSecretCapabilityReferences
+=== PAUSE TestRuntimeInjectsNonSecretCapabilityReferences
+=== RUN   TestExecutionPolicyScopesSecretReadsToARNs
+=== PAUSE TestExecutionPolicyScopesSecretReadsToARNs
+=== RUN   TestRuntimeAttachesExistingSecurityGroupAndTargetGroup
+=== PAUSE TestRuntimeAttachesExistingSecurityGroupAndTargetGroup
+=== RUN   TestRuntimeRejectsUnsafeInputsBeforeRegistration
+=== PAUSE TestRuntimeRejectsUnsafeInputsBeforeRegistration
+=== RUN   TestRuntimeRequiresStableEncryptionSecretReference
+--- PASS: TestRuntimeRequiresStableEncryptionSecretReference (0.00s)
+=== RUN   TestAMQPSettingsNormalizeBrokerEndpoint
+--- PASS: TestAMQPSettingsNormalizeBrokerEndpoint (0.00s)
+=== RUN   TestFrontendPortSelectsIntegratedVarnishBoundary
+--- PASS: TestFrontendPortSelectsIntegratedVarnishBoundary (0.00s)
+=== CONT  TestRuntimeResourceGraphAndSecurityContract
+--- PASS: TestRuntimeResourceGraphAndSecurityContract (0.01s)
+=== CONT  TestRuntimeRejectsUnsafeInputsBeforeRegistration
+--- PASS: TestRuntimeRejectsUnsafeInputsBeforeRegistration (0.01s)
+=== CONT  TestRuntimeAttachesExistingSecurityGroupAndTargetGroup
+--- PASS: TestRuntimeAttachesExistingSecurityGroupAndTargetGroup (0.00s)
+=== CONT  TestExecutionPolicyScopesSecretReadsToARNs
+--- PASS: TestExecutionPolicyScopesSecretReadsToARNs (0.00s)
+=== CONT  TestRuntimeFrankenPHPClassicUsesSingleHTTPContainer
+--- PASS: TestRuntimeFrankenPHPClassicUsesSingleHTTPContainer (0.01s)
+=== CONT  TestRuntimeCreatesQueueConsumerServiceWhenRequested
+--- PASS: TestRuntimeCreatesQueueConsumerServiceWhenRequested (0.01s)
+=== CONT  TestSearchProxyTargetServiceName
+=== RUN   TestSearchProxyTargetServiceName/provisioned_domain
+=== PAUSE TestSearchProxyTargetServiceName/provisioned_domain
+=== RUN   TestSearchProxyTargetServiceName/serverless_aoss
+=== PAUSE TestSearchProxyTargetServiceName/serverless_aoss
+=== RUN   TestSearchProxyTargetServiceName/bare_host
+=== PAUSE TestSearchProxyTargetServiceName/bare_host
+=== CONT  TestRuntimeInjectsNonSecretCapabilityReferences
+=== RUN   TestRuntimeInjectsNonSecretCapabilityReferences/nginx-fpm
+=== PAUSE TestRuntimeInjectsNonSecretCapabilityReferences/nginx-fpm
+=== RUN   TestRuntimeInjectsNonSecretCapabilityReferences/frankenphp-classic
+=== PAUSE TestRuntimeInjectsNonSecretCapabilityReferences/frankenphp-classic
+=== CONT  TestRuntimeSigV4ProxySignsAOSSServiceName
+--- PASS: TestRuntimeSigV4ProxySignsAOSSServiceName (0.01s)
+=== CONT  TestRuntimeOmitsSigV4ProxyWhenSearchDisabled
+--- PASS: TestRuntimeOmitsSigV4ProxyWhenSearchDisabled (0.01s)
+=== CONT  TestRuntimeAddsSigV4ProxyForMagentoOpenSearch
+--- PASS: TestRuntimeAddsSigV4ProxyForMagentoOpenSearch (0.01s)
+=== CONT  TestSearchProxyTargetServiceName/serverless_aoss
+=== CONT  TestSearchProxyTargetServiceName/bare_host
+=== CONT  TestSearchProxyTargetServiceName/provisioned_domain
+--- PASS: TestSearchProxyTargetServiceName (0.00s)
+    --- PASS: TestSearchProxyTargetServiceName/serverless_aoss (0.00s)
+    --- PASS: TestSearchProxyTargetServiceName/bare_host (0.00s)
+    --- PASS: TestSearchProxyTargetServiceName/provisioned_domain (0.00s)
+=== CONT  TestRuntimeInjectsNonSecretCapabilityReferences/frankenphp-classic
+=== CONT  TestRuntimeInjectsNonSecretCapabilityReferences/nginx-fpm
+--- PASS: TestRuntimeInjectsNonSecretCapabilityReferences (0.00s)
+    --- PASS: TestRuntimeInjectsNonSecretCapabilityReferences/frankenphp-classic (0.00s)
+    --- PASS: TestRuntimeInjectsNonSecretCapabilityReferences/nginx-fpm (0.01s)
+PASS
+ok  	github.com/acourtiol/magelift/internal/cloud/aws/runtime	1.874s

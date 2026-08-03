@@ -56,8 +56,12 @@ One Kubernetes day-2 implementation in `internal/cloud/kube` serves GKE Autopilo
 - AWS state manager + Floci / `NewAWSWithEndpoint` — S3-compatible endpoint path
 
 ### Deferred
-- Phase 7 — live GKE Autopilot certification + MIGRATE-04 DNS HUMAN_GATE + managed dump cell
+- Phase 7 — live GKE Autopilot certification + MIGRATE-04 DNS (Cloudflare via API/Wrangler on `*.alexandrecourtiol.com` / `*.acourtiol.com`) + managed dump cell
 - Phase 8 — brownfield attach
+
+### Operator DNS authorization (2026-07-30)
+- Maintainer authorized any subdomain of `alexandrecourtiol.com` or `acourtiol.com` on Cloudflare for MageLift non-prod cutover.
+- Preferred preview host: `magelift-preview.alexandrecourtiol.com` (fallback `magelift-preview.acourtiol.com`).
 
 </canonical_refs>
 

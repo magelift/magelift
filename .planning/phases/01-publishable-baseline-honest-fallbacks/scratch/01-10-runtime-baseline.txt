@@ -1,0 +1,120 @@
+=== RUN   TestRuntimeResourceGraphAndSecurityContract
+=== PAUSE TestRuntimeResourceGraphAndSecurityContract
+=== RUN   TestRuntimeAddsSigV4ProxyForMagentoOpenSearch
+=== PAUSE TestRuntimeAddsSigV4ProxyForMagentoOpenSearch
+=== RUN   TestRuntimeOmitsSigV4ProxyWhenSearchDisabled
+=== PAUSE TestRuntimeOmitsSigV4ProxyWhenSearchDisabled
+=== RUN   TestRuntimeSigV4ProxySignsAOSSServiceName
+=== PAUSE TestRuntimeSigV4ProxySignsAOSSServiceName
+=== RUN   TestSearchProxyTargetServiceName
+=== PAUSE TestSearchProxyTargetServiceName
+=== RUN   TestRuntimeCreatesQueueConsumerServiceWhenRequested
+=== PAUSE TestRuntimeCreatesQueueConsumerServiceWhenRequested
+=== RUN   TestRuntimeFrankenPHPClassicUsesSingleHTTPContainer
+=== PAUSE TestRuntimeFrankenPHPClassicUsesSingleHTTPContainer
+=== RUN   TestRuntimeInjectsNonSecretCapabilityReferences
+=== PAUSE TestRuntimeInjectsNonSecretCapabilityReferences
+=== RUN   TestExecutionPolicyScopesSecretReadsToARNs
+=== PAUSE TestExecutionPolicyScopesSecretReadsToARNs
+=== RUN   TestRuntimeAttachesExistingSecurityGroupAndTargetGroup
+=== PAUSE TestRuntimeAttachesExistingSecurityGroupAndTargetGroup
+=== RUN   TestRuntimeRejectsUnsafeInputsBeforeRegistration
+=== PAUSE TestRuntimeRejectsUnsafeInputsBeforeRegistration
+=== RUN   TestRuntimeRequiresStableEncryptionSecretReference
+--- PASS: TestRuntimeRequiresStableEncryptionSecretReference (0.00s)
+=== RUN   TestAMQPSettingsNormalizeBrokerEndpoint
+--- PASS: TestAMQPSettingsNormalizeBrokerEndpoint (0.00s)
+=== RUN   TestFrontendPortSelectsIntegratedVarnishBoundary
+--- PASS: TestFrontendPortSelectsIntegratedVarnishBoundary (0.00s)
+=== RUN   TestRuntimeContainerGraphInteractions
+=== PAUSE TestRuntimeContainerGraphInteractions
+=== RUN   TestAMQPSettingsBrokerEndpointShapes
+=== PAUSE TestAMQPSettingsBrokerEndpointShapes
+=== CONT  TestRuntimeAddsSigV4ProxyForMagentoOpenSearch
+--- PASS: TestRuntimeAddsSigV4ProxyForMagentoOpenSearch (0.01s)
+=== CONT  TestRuntimeContainerGraphInteractions
+=== RUN   TestRuntimeContainerGraphInteractions/U1_frankenphp_search_proxy_depends_on_web
+=== PAUSE TestRuntimeContainerGraphInteractions/U1_frankenphp_search_proxy_depends_on_web
+=== RUN   TestRuntimeContainerGraphInteractions/U2_frankenphp_integrated_appends_varnish
+=== PAUSE TestRuntimeContainerGraphInteractions/U2_frankenphp_integrated_appends_varnish
+=== RUN   TestRuntimeContainerGraphInteractions/U3_queue_consumers_carry_search_proxy
+=== PAUSE TestRuntimeContainerGraphInteractions/U3_queue_consumers_carry_search_proxy
+=== RUN   TestRuntimeContainerGraphInteractions/U4_deploy_and_cron_carry_search_proxy
+=== PAUSE TestRuntimeContainerGraphInteractions/U4_deploy_and_cron_carry_search_proxy
+=== RUN   TestRuntimeContainerGraphInteractions/U5_queue_mode_db_sets_magento_connection
+=== PAUSE TestRuntimeContainerGraphInteractions/U5_queue_mode_db_sets_magento_connection
+=== CONT  TestRuntimeRejectsUnsafeInputsBeforeRegistration
+--- PASS: TestRuntimeRejectsUnsafeInputsBeforeRegistration (0.01s)
+=== CONT  TestAMQPSettingsBrokerEndpointShapes
+=== RUN   TestAMQPSettingsBrokerEndpointShapes/amqps_explicit_port
+=== PAUSE TestAMQPSettingsBrokerEndpointShapes/amqps_explicit_port
+=== RUN   TestAMQPSettingsBrokerEndpointShapes/amqp_explicit_port
+=== PAUSE TestAMQPSettingsBrokerEndpointShapes/amqp_explicit_port
+=== RUN   TestAMQPSettingsBrokerEndpointShapes/amqp_default_port
+=== PAUSE TestAMQPSettingsBrokerEndpointShapes/amqp_default_port
+=== RUN   TestAMQPSettingsBrokerEndpointShapes/amqps_default_port
+=== PAUSE TestAMQPSettingsBrokerEndpointShapes/amqps_default_port
+=== RUN   TestAMQPSettingsBrokerEndpointShapes/artemis_custom_port
+=== PAUSE TestAMQPSettingsBrokerEndpointShapes/artemis_custom_port
+=== CONT  TestExecutionPolicyScopesSecretReadsToARNs
+--- PASS: TestExecutionPolicyScopesSecretReadsToARNs (0.00s)
+=== CONT  TestRuntimeInjectsNonSecretCapabilityReferences
+=== RUN   TestRuntimeInjectsNonSecretCapabilityReferences/nginx-fpm
+=== PAUSE TestRuntimeInjectsNonSecretCapabilityReferences/nginx-fpm
+=== RUN   TestRuntimeInjectsNonSecretCapabilityReferences/frankenphp-classic
+=== PAUSE TestRuntimeInjectsNonSecretCapabilityReferences/frankenphp-classic
+=== CONT  TestRuntimeFrankenPHPClassicUsesSingleHTTPContainer
+--- PASS: TestRuntimeFrankenPHPClassicUsesSingleHTTPContainer (0.00s)
+=== CONT  TestRuntimeCreatesQueueConsumerServiceWhenRequested
+--- PASS: TestRuntimeCreatesQueueConsumerServiceWhenRequested (0.01s)
+=== CONT  TestRuntimeAttachesExistingSecurityGroupAndTargetGroup
+--- PASS: TestRuntimeAttachesExistingSecurityGroupAndTargetGroup (0.00s)
+=== CONT  TestRuntimeSigV4ProxySignsAOSSServiceName
+--- PASS: TestRuntimeSigV4ProxySignsAOSSServiceName (0.00s)
+=== CONT  TestSearchProxyTargetServiceName
+=== RUN   TestSearchProxyTargetServiceName/provisioned_domain
+=== PAUSE TestSearchProxyTargetServiceName/provisioned_domain
+=== RUN   TestSearchProxyTargetServiceName/serverless_aoss
+=== PAUSE TestSearchProxyTargetServiceName/serverless_aoss
+=== RUN   TestSearchProxyTargetServiceName/bare_host
+=== PAUSE TestSearchProxyTargetServiceName/bare_host
+=== CONT  TestRuntimeOmitsSigV4ProxyWhenSearchDisabled
+--- PASS: TestRuntimeOmitsSigV4ProxyWhenSearchDisabled (0.01s)
+=== CONT  TestRuntimeResourceGraphAndSecurityContract
+--- PASS: TestRuntimeResourceGraphAndSecurityContract (0.01s)
+=== CONT  TestRuntimeContainerGraphInteractions/U2_frankenphp_integrated_appends_varnish
+=== CONT  TestRuntimeContainerGraphInteractions/U5_queue_mode_db_sets_magento_connection
+=== CONT  TestRuntimeContainerGraphInteractions/U4_deploy_and_cron_carry_search_proxy
+=== CONT  TestRuntimeContainerGraphInteractions/U3_queue_consumers_carry_search_proxy
+=== CONT  TestRuntimeContainerGraphInteractions/U1_frankenphp_search_proxy_depends_on_web
+=== CONT  TestAMQPSettingsBrokerEndpointShapes/amqps_explicit_port
+--- PASS: TestRuntimeContainerGraphInteractions (0.00s)
+    --- PASS: TestRuntimeContainerGraphInteractions/U2_frankenphp_integrated_appends_varnish (0.00s)
+    --- PASS: TestRuntimeContainerGraphInteractions/U5_queue_mode_db_sets_magento_connection (0.01s)
+    --- PASS: TestRuntimeContainerGraphInteractions/U4_deploy_and_cron_carry_search_proxy (0.01s)
+    --- PASS: TestRuntimeContainerGraphInteractions/U3_queue_consumers_carry_search_proxy (0.01s)
+    --- PASS: TestRuntimeContainerGraphInteractions/U1_frankenphp_search_proxy_depends_on_web (0.01s)
+=== CONT  TestAMQPSettingsBrokerEndpointShapes/artemis_custom_port
+=== CONT  TestAMQPSettingsBrokerEndpointShapes/amqps_default_port
+=== CONT  TestAMQPSettingsBrokerEndpointShapes/amqp_explicit_port
+=== CONT  TestAMQPSettingsBrokerEndpointShapes/amqp_default_port
+=== CONT  TestRuntimeInjectsNonSecretCapabilityReferences/frankenphp-classic
+--- PASS: TestAMQPSettingsBrokerEndpointShapes (0.00s)
+    --- PASS: TestAMQPSettingsBrokerEndpointShapes/amqps_explicit_port (0.00s)
+    --- PASS: TestAMQPSettingsBrokerEndpointShapes/artemis_custom_port (0.00s)
+    --- PASS: TestAMQPSettingsBrokerEndpointShapes/amqps_default_port (0.00s)
+    --- PASS: TestAMQPSettingsBrokerEndpointShapes/amqp_explicit_port (0.00s)
+    --- PASS: TestAMQPSettingsBrokerEndpointShapes/amqp_default_port (0.00s)
+=== CONT  TestRuntimeInjectsNonSecretCapabilityReferences/nginx-fpm
+--- PASS: TestRuntimeInjectsNonSecretCapabilityReferences (0.00s)
+    --- PASS: TestRuntimeInjectsNonSecretCapabilityReferences/frankenphp-classic (0.01s)
+    --- PASS: TestRuntimeInjectsNonSecretCapabilityReferences/nginx-fpm (0.00s)
+=== CONT  TestSearchProxyTargetServiceName/provisioned_domain
+=== CONT  TestSearchProxyTargetServiceName/serverless_aoss
+=== CONT  TestSearchProxyTargetServiceName/bare_host
+--- PASS: TestSearchProxyTargetServiceName (0.00s)
+    --- PASS: TestSearchProxyTargetServiceName/provisioned_domain (0.00s)
+    --- PASS: TestSearchProxyTargetServiceName/serverless_aoss (0.00s)
+    --- PASS: TestSearchProxyTargetServiceName/bare_host (0.00s)
+PASS
+ok  	github.com/acourtiol/magelift/internal/cloud/aws/runtime	1.891s

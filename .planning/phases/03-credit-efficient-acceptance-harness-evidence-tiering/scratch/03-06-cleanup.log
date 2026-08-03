@@ -1,0 +1,386 @@
+delete service acceptance-preview-runtime-web-service-ca74234 in acceptance-preview-runtime-cluster-335b63d
+
+aws: [ERROR]: An error occurred (ClusterNotFoundException) when calling the UpdateService operation: The referenced cluster was inactive.
+{
+    "service": {
+        "serviceArn": "arn:aws:ecs:eu-north-1:669890779205:service/acceptance-preview-runtime-cluster-335b63d/acceptance-preview-runtime-web-service-ca74234",
+        "serviceName": "acceptance-preview-runtime-web-service-ca74234",
+        "clusterArn": "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-335b63d",
+        "loadBalancers": [
+            {
+                "targetGroupArn": "arn:aws:elasticloadbalancing:eu-north-1:669890779205:targetgroup/acceptance-preview-ingress-web/8e205358139fa2f7",
+                "containerName": "web",
+                "containerPort": 8080
+            }
+        ],
+        "serviceRegistries": [],
+        "status": "INACTIVE",
+        "desiredCount": 0,
+        "runningCount": 0,
+        "pendingCount": 0,
+        "launchType": "FARGATE",
+        "platformVersion": "LATEST",
+        "platformFamily": "Linux",
+        "taskDefinition": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:27",
+        "deploymentConfiguration": {
+            "deploymentCircuitBreaker": {
+                "enable": true,
+                "rollback": true
+            },
+            "maximumPercent": 200,
+            "minimumHealthyPercent": 100,
+            "strategy": "ROLLING"
+        },
+        "deployments": [
+            {
+                "id": "ecs-svc/6247528810683197102",
+                "status": "PRIMARY",
+                "taskDefinition": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:27",
+                "desiredCount": 0,
+                "pendingCount": 0,
+                "runningCount": 0,
+                "failedTasks": 0,
+                "createdAt": "2026-07-29T12:46:31.605000+02:00",
+                "updatedAt": "2026-07-29T13:06:37.827000+02:00",
+                "launchType": "FARGATE",
+                "platformVersion": "1.4.0",
+                "platformFamily": "Linux",
+                "networkConfiguration": {
+                    "awsvpcConfiguration": {
+                        "subnets": [
+                            "subnet-075d3643c7c520802",
+                            "subnet-03470c5acbecf749c"
+                        ],
+                        "securityGroups": [
+                            "sg-0dfabafcb08ea72f6"
+                        ],
+                        "assignPublicIp": "DISABLED"
+                    }
+                },
+                "rolloutState": "COMPLETED",
+                "rolloutStateReason": "ECS deployment ecs-svc/6247528810683197102 completed."
+            }
+        ],
+        "roleArn": "arn:aws:iam::669890779205:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS",
+        "events": [],
+        "createdAt": "2026-07-29T12:45:26.374000+02:00",
+        "placementConstraints": [],
+        "placementStrategy": [],
+        "networkConfiguration": {
+            "awsvpcConfiguration": {
+                "subnets": [
+                    "subnet-075d3643c7c520802",
+                    "subnet-03470c5acbecf749c"
+                ],
+                "securityGroups": [
+                    "sg-0dfabafcb08ea72f6"
+                ],
+                "assignPublicIp": "DISABLED"
+            }
+        },
+        "healthCheckGracePeriodSeconds": 0,
+        "schedulingStrategy": "REPLICA",
+        "deploymentController": {
+            "type": "ECS"
+        },
+        "createdBy": "arn:aws:iam::669890779205:root",
+        "enableECSManagedTags": true,
+        "propagateTags": "TASK_DEFINITION",
+        "enableExecuteCommand": true,
+        "availabilityZoneRebalancing": "ENABLED",
+        "resourceManagementType": "CUSTOMER"
+    }
+}
+delete service acceptance-preview-runtime-cron-service-6d60b30 in acceptance-preview-runtime-cluster-335b63d
+
+aws: [ERROR]: An error occurred (ClusterNotFoundException) when calling the UpdateService operation: The referenced cluster was inactive.
+{
+    "service": {
+        "serviceArn": "arn:aws:ecs:eu-north-1:669890779205:service/acceptance-preview-runtime-cluster-335b63d/acceptance-preview-runtime-cron-service-6d60b30",
+        "serviceName": "acceptance-preview-runtime-cron-service-6d60b30",
+        "clusterArn": "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-335b63d",
+        "loadBalancers": [],
+        "serviceRegistries": [],
+        "status": "INACTIVE",
+        "desiredCount": 0,
+        "runningCount": 0,
+        "pendingCount": 0,
+        "launchType": "FARGATE",
+        "platformVersion": "LATEST",
+        "platformFamily": "Linux",
+        "taskDefinition": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:25",
+        "deploymentConfiguration": {
+            "deploymentCircuitBreaker": {
+                "enable": true,
+                "rollback": true
+            },
+            "maximumPercent": 200,
+            "minimumHealthyPercent": 100,
+            "strategy": "ROLLING"
+        },
+        "deployments": [
+            {
+                "id": "ecs-svc/8022259095669039934",
+                "status": "PRIMARY",
+                "taskDefinition": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:25",
+                "desiredCount": 0,
+                "pendingCount": 0,
+                "runningCount": 0,
+                "failedTasks": 0,
+                "createdAt": "2026-07-29T12:46:31.849000+02:00",
+                "updatedAt": "2026-07-29T13:06:39.862000+02:00",
+                "launchType": "FARGATE",
+                "platformVersion": "1.4.0",
+                "platformFamily": "Linux",
+                "networkConfiguration": {
+                    "awsvpcConfiguration": {
+                        "subnets": [
+                            "subnet-075d3643c7c520802",
+                            "subnet-03470c5acbecf749c"
+                        ],
+                        "securityGroups": [
+                            "sg-0dfabafcb08ea72f6"
+                        ],
+                        "assignPublicIp": "DISABLED"
+                    }
+                },
+                "rolloutState": "COMPLETED",
+                "rolloutStateReason": "ECS deployment ecs-svc/8022259095669039934 completed."
+            }
+        ],
+        "roleArn": "arn:aws:iam::669890779205:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS",
+        "events": [],
+        "createdAt": "2026-07-29T12:45:26.040000+02:00",
+        "placementConstraints": [],
+        "placementStrategy": [],
+        "networkConfiguration": {
+            "awsvpcConfiguration": {
+                "subnets": [
+                    "subnet-075d3643c7c520802",
+                    "subnet-03470c5acbecf749c"
+                ],
+                "securityGroups": [
+                    "sg-0dfabafcb08ea72f6"
+                ],
+                "assignPublicIp": "DISABLED"
+            }
+        },
+        "healthCheckGracePeriodSeconds": 0,
+        "schedulingStrategy": "REPLICA",
+        "deploymentController": {
+            "type": "ECS"
+        },
+        "createdBy": "arn:aws:iam::669890779205:root",
+        "enableECSManagedTags": true,
+        "propagateTags": "TASK_DEFINITION",
+        "enableExecuteCommand": true,
+        "availabilityZoneRebalancing": "ENABLED",
+        "resourceManagementType": "CUSTOMER"
+    }
+}
+delete service acceptance-preview-runtime-queue-service-bfb2a7d in acceptance-preview-runtime-cluster-335b63d
+
+aws: [ERROR]: An error occurred (ClusterNotFoundException) when calling the UpdateService operation: The referenced cluster was inactive.
+{
+    "service": {
+        "serviceArn": "arn:aws:ecs:eu-north-1:669890779205:service/acceptance-preview-runtime-cluster-335b63d/acceptance-preview-runtime-queue-service-bfb2a7d",
+        "serviceName": "acceptance-preview-runtime-queue-service-bfb2a7d",
+        "clusterArn": "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-335b63d",
+        "loadBalancers": [],
+        "serviceRegistries": [],
+        "status": "INACTIVE",
+        "desiredCount": 0,
+        "runningCount": 0,
+        "pendingCount": 0,
+        "launchType": "FARGATE",
+        "platformVersion": "LATEST",
+        "platformFamily": "Linux",
+        "taskDefinition": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:11",
+        "deploymentConfiguration": {
+            "deploymentCircuitBreaker": {
+                "enable": true,
+                "rollback": true
+            },
+            "maximumPercent": 200,
+            "minimumHealthyPercent": 100,
+            "strategy": "ROLLING"
+        },
+        "deployments": [
+            {
+                "id": "ecs-svc/9005304745636552045",
+                "status": "PRIMARY",
+                "taskDefinition": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:11",
+                "desiredCount": 0,
+                "pendingCount": 0,
+                "runningCount": 0,
+                "failedTasks": 0,
+                "createdAt": "2026-07-29T12:46:31.042000+02:00",
+                "updatedAt": "2026-07-29T13:06:25.759000+02:00",
+                "launchType": "FARGATE",
+                "platformVersion": "1.4.0",
+                "platformFamily": "Linux",
+                "networkConfiguration": {
+                    "awsvpcConfiguration": {
+                        "subnets": [
+                            "subnet-075d3643c7c520802",
+                            "subnet-03470c5acbecf749c"
+                        ],
+                        "securityGroups": [
+                            "sg-0dfabafcb08ea72f6"
+                        ],
+                        "assignPublicIp": "DISABLED"
+                    }
+                },
+                "rolloutState": "COMPLETED",
+                "rolloutStateReason": "ECS deployment ecs-svc/9005304745636552045 completed."
+            }
+        ],
+        "roleArn": "arn:aws:iam::669890779205:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS",
+        "events": [],
+        "createdAt": "2026-07-29T12:45:26.539000+02:00",
+        "placementConstraints": [],
+        "placementStrategy": [],
+        "networkConfiguration": {
+            "awsvpcConfiguration": {
+                "subnets": [
+                    "subnet-075d3643c7c520802",
+                    "subnet-03470c5acbecf749c"
+                ],
+                "securityGroups": [
+                    "sg-0dfabafcb08ea72f6"
+                ],
+                "assignPublicIp": "DISABLED"
+            }
+        },
+        "healthCheckGracePeriodSeconds": 0,
+        "schedulingStrategy": "REPLICA",
+        "deploymentController": {
+            "type": "ECS"
+        },
+        "createdBy": "arn:aws:iam::669890779205:root",
+        "enableECSManagedTags": true,
+        "propagateTags": "TASK_DEFINITION",
+        "enableExecuteCommand": true,
+        "availabilityZoneRebalancing": "ENABLED",
+        "resourceManagementType": "CUSTOMER"
+    }
+}
+delete service acceptance-preview-queue-broker in acceptance-preview-queue-broker-cluster-743fcdc
+
+aws: [ERROR]: An error occurred (ClusterNotFoundException) when calling the UpdateService operation: The referenced cluster was inactive.
+{
+    "service": {
+        "serviceArn": "arn:aws:ecs:eu-north-1:669890779205:service/acceptance-preview-queue-broker-cluster-743fcdc/acceptance-preview-queue-broker",
+        "serviceName": "acceptance-preview-queue-broker",
+        "clusterArn": "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-queue-broker-cluster-743fcdc",
+        "loadBalancers": [],
+        "serviceRegistries": [
+            {
+                "registryArn": "arn:aws:servicediscovery:eu-north-1:669890779205:service/srv-ens4ihmdculjx5kh",
+                "containerName": "broker",
+                "containerPort": 5672
+            }
+        ],
+        "status": "INACTIVE",
+        "desiredCount": 0,
+        "runningCount": 0,
+        "pendingCount": 0,
+        "launchType": "FARGATE",
+        "platformVersion": "LATEST",
+        "platformFamily": "Linux",
+        "taskDefinition": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-queue-broker:8",
+        "deploymentConfiguration": {
+            "deploymentCircuitBreaker": {
+                "enable": false,
+                "rollback": false
+            },
+            "maximumPercent": 200,
+            "minimumHealthyPercent": 100,
+            "strategy": "ROLLING"
+        },
+        "deployments": [
+            {
+                "id": "ecs-svc/8373228497328019585",
+                "status": "PRIMARY",
+                "taskDefinition": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-queue-broker:8",
+                "desiredCount": 0,
+                "pendingCount": 0,
+                "runningCount": 0,
+                "failedTasks": 0,
+                "createdAt": "2026-07-29T12:35:24.771000+02:00",
+                "updatedAt": "2026-07-29T13:17:46.968000+02:00",
+                "launchType": "FARGATE",
+                "platformVersion": "1.4.0",
+                "platformFamily": "Linux",
+                "networkConfiguration": {
+                    "awsvpcConfiguration": {
+                        "subnets": [
+                            "subnet-075d3643c7c520802",
+                            "subnet-03470c5acbecf749c"
+                        ],
+                        "securityGroups": [
+                            "sg-068f9ca3901885274"
+                        ],
+                        "assignPublicIp": "DISABLED"
+                    }
+                },
+                "rolloutState": "COMPLETED",
+                "rolloutStateReason": "ECS deployment ecs-svc/8373228497328019585 completed."
+            }
+        ],
+        "roleArn": "arn:aws:iam::669890779205:role/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS",
+        "events": [],
+        "createdAt": "2026-07-29T12:35:24.771000+02:00",
+        "placementConstraints": [],
+        "placementStrategy": [],
+        "networkConfiguration": {
+            "awsvpcConfiguration": {
+                "subnets": [
+                    "subnet-075d3643c7c520802",
+                    "subnet-03470c5acbecf749c"
+                ],
+                "securityGroups": [
+                    "sg-068f9ca3901885274"
+                ],
+                "assignPublicIp": "DISABLED"
+            }
+        },
+        "healthCheckGracePeriodSeconds": 0,
+        "schedulingStrategy": "REPLICA",
+        "deploymentController": {
+            "type": "ECS"
+        },
+        "createdBy": "arn:aws:iam::669890779205:root",
+        "enableECSManagedTags": false,
+        "propagateTags": "NONE",
+        "enableExecuteCommand": false,
+        "availabilityZoneRebalancing": "ENABLED",
+        "resourceManagementType": "CUSTOMER"
+    }
+}
+terminate i-0e0d384320658a372
+{
+    "TerminatingInstances": [
+        {
+            "InstanceId": "i-0e0d384320658a372",
+            "CurrentState": {
+                "Code": 48,
+                "Name": "terminated"
+            },
+            "PreviousState": {
+                "Code": 48,
+                "Name": "terminated"
+            }
+        }
+    ]
+}
+{
+  "class": "preview",
+  "domain": "preview.magelift.alexandrecourtiol.com",
+  "environment": "preview",
+  "preset": "preview",
+  "project": "acceptance",
+  "protected": false,
+  "provider": "aws",
+  "runtime": "ecs-fargate"
+}

@@ -1,0 +1,2006 @@
+START 2026-07-29T13:51:03Z
+aws acceptance start profile=preview at=2026-07-29T13:51:03Z
++ magelift config validate
+{
+  "environments": [
+    "preview"
+  ],
+  "valid": true
+}
++ magelift doctor
+{
+  "config": "/var/folders/j7/7phb53pd3zb3t66640gthst00000gn/T//magelift-aws-acceptance.kOcm6G/magelift.yaml",
+  "status": "ok",
+  "environments": [
+    "preview"
+  ],
+  "checks": [
+    {
+      "id": "build",
+      "status": "ok",
+      "message": "valid"
+    },
+    {
+      "id": "environment.preview",
+      "status": "ok",
+      "message": "valid"
+    }
+  ]
+}
++ magelift login
+{
+  "authenticated": true,
+  "environment": "preview",
+  "provider": "aws",
+  "region": "eu-north-1"
+}
+acceptance create-once
++ magelift preview
+Previewing update (acceptance-preview-aws-ecs-fargate):
+
+ +  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate create 
+@ previewing update.........
+ +  pulumi:providers:aws acceptance-preview-global create 
+ +  magelift:aws:Stack acceptance-preview create 
+ +  pulumi:providers:aws acceptance-preview-regional create 
+@ previewing update....
+ +  magelift:aws:Network acceptance-preview-network create 
+ +  aws:ec2:Vpc acceptance-preview-network-vpc create 
+ +  aws:ec2:Subnet acceptance-preview-network-private-subnet-02 create 
+ +  aws:ec2:RouteTable acceptance-preview-network-public-routes-02 create 
+ +  aws:ec2:RouteTable acceptance-preview-network-private-routes-02 create 
+ +  aws:ec2:RouteTable acceptance-preview-network-private-routes-01 create 
+ +  aws:ec2:InternetGateway acceptance-preview-network-igw create 
+ +  aws:ec2:Subnet acceptance-preview-network-private-subnet-01 create 
+ +  aws:ec2:RouteTable acceptance-preview-network-data-routes-02 create 
+ +  aws:ec2:RouteTable acceptance-preview-network-public-routes-01 create 
+ +  aws:ec2:Subnet acceptance-preview-network-data-subnet-02 create 
+ +  aws:ec2:Subnet acceptance-preview-network-data-subnet-01 create 
+ +  aws:ec2:Subnet acceptance-preview-network-public-subnet-02 create 
+ +  aws:ec2:RouteTable acceptance-preview-network-data-routes-01 create 
+ +  aws:ec2:Subnet acceptance-preview-network-public-subnet-01 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-02 create 
+ +  aws:ec2:Route acceptance-preview-network-public-default-02 create 
+ +  aws:ec2:Route acceptance-preview-network-public-default-01 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-01 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-02 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-02 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-01 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-01 create 
+@ previewing update....
+ +  aws:ec2:SecurityGroup acceptance-preview-network-fck-nat-sg create 
+ +  aws:ec2:Eip acceptance-preview-network-fck-nat-eip-01 create 
+ +  aws:ec2:VpcEndpoint acceptance-preview-network-endpoint-s3 create 
+ +  magelift:aws:SecurityGroups acceptance-preview-security create 
+ +  aws:ec2:Instance acceptance-preview-network-fck-nat-01 create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-data create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-edge create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-web create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-queue create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-cache create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-search create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-https create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-data-mysql create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-queue create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-data create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-queue-https create 
+ +  magelift:aws:Ingress acceptance-preview-ingress create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-web-target create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-edge-https create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-edge-target create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-queue-amqps create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-search-https create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-search create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-cache create 
+ +  aws:ec2:EipAssociation acceptance-preview-network-fck-nat-eip-assoc-01 create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-cache-valkey create 
+ +  aws:ec2:Route acceptance-preview-network-private-default-01 create 
+ +  aws:ec2:Route acceptance-preview-network-private-default-02 create 
+ +  aws:lb:LoadBalancer acceptance-preview-ingress-alb create 
+ +  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime create 
+ +  aws:lb:TargetGroup acceptance-preview-ingress-web create 
+ +  aws:iam:Role acceptance-preview-runtime-execution-role create 
+ +  aws:iam:Role acceptance-preview-runtime-deployment-role create 
+ +  aws:iam:Role acceptance-preview-runtime-task-role create 
+ +  magelift:aws:RdsMysql acceptance-preview-database create 
+ +  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy create 
+ +  aws:lb:Listener acceptance-preview-ingress-https create 
+ +  magelift:aws:Valkey acceptance-preview-cache create 
+ +  aws:rds:SubnetGroup acceptance-preview-database-subnets create 
+ +  aws:elasticache:SubnetGroup acceptance-preview-cache create 
+ +  magelift:aws:RabbitMqQueue acceptance-preview-queue create 
+ +  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns create 
+ +  aws:ecs:Cluster acceptance-preview-queue-broker-cluster create 
+ +  aws:rds:Instance acceptance-preview-database-instance create 
+ +  magelift:aws:MediaStorage acceptance-preview-storage create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs create 
+ +  magelift:aws:ObservabilityLogGroups acceptance-preview-observability create 
+ +  aws:servicediscovery:Service acceptance-preview-queue-discovery create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-web-logs create 
+ +  aws:cloudfront:OriginAccessControl acceptance-preview-storage-oac create 
+ +  aws:s3:Bucket acceptance-preview-storage-bucket create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-deploy-logs create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-cron-logs create 
+ +  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task create 
+ +  aws:iam:RolePolicy acceptance-preview-execution-database-policy create 
+ +  magelift:aws:EcsRuntime acceptance-preview-runtime create 
+ +  aws:ecs:Cluster acceptance-preview-runtime-cluster create 
+ +  magelift:aws:Edge acceptance-preview-edge create 
+ +  aws:iam:RolePolicy acceptance-preview-runtime-execution-logs-policy create 
+ +  aws:s3:BucketPublicAccessBlock acceptance-preview-storage-public-access create 
+ +  aws:s3:BucketServerSideEncryptionConfiguration acceptance-preview-storage-encryption create 
+ +  aws:s3:BucketOwnershipControls acceptance-preview-storage-ownership create 
+ +  aws:cloudfront:Distribution acceptance-preview-storage-cdn create 
+ +  aws:s3:BucketVersioning acceptance-preview-storage-versioning create 
+ +  aws:s3:BucketLifecycleConfiguration acceptance-preview-storage-lifecycle create 
+ +  magelift:aws:Observability acceptance-preview-observability create 
+ +  aws:cloudfront:OriginRequestPolicy acceptance-preview-edge-origin create 
+ +  aws:ecs:Service acceptance-preview-queue-broker-service create 
+ +  aws:wafv2:WebAcl acceptance-preview-edge create 
+ +  aws:iam:RolePolicy acceptance-preview-deployment-policy create 
+ +  aws:iam:RolePolicy acceptance-preview-task-policy create 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx create 
+ +  aws:s3:BucketPolicy acceptance-preview-storage-policy create 
+ +  aws:elasticache:ReplicationGroup acceptance-preview-cache-cache create 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task create 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task create 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task create 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task create 
+ +  aws:ecs:Service acceptance-preview-runtime-web-service create 
+ +  aws:ecs:Service acceptance-preview-runtime-queue-service create 
+ +  aws:ecs:Service acceptance-preview-runtime-cron-service create 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running create 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu create 
+ +  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard create 
+ +  aws:cloudfront:Distribution acceptance-preview-edge create 
+ +  aws:route53:Record acceptance-preview-edge create 
+ +  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate create 
+Outputs:
+    applicationURL         : [unknown]
+    cacheEndpoint          : [unknown]
+    clusterArn             : [unknown]
+    clusterName            : "acceptance-preview-runtime-cluster-3476c70"
+    cronServiceName        : "acceptance-preview-runtime-cron-service-ee0c47c"
+    cronTaskDefinitionArn  : [unknown]
+    databaseWriter         : [unknown]
+    deployTaskDefinitionArn: [unknown]
+    deploymentRoleArn      : [unknown]
+    edgeDistributionId     : [unknown]
+    mediaURL               : [unknown]
+    networkVpcId           : [unknown]
+    privateSubnetIds       : [
+        [0]: [unknown]
+        [1]: [unknown]
+    ]
+    queueMode              : "ecs-artemis"
+    queueServiceName       : "acceptance-preview-runtime-queue-service-6c6553c"
+    queueTaskDefinitionArn : [unknown]
+    securityGroupId        : [unknown]
+    serviceName            : "acceptance-preview-runtime-web-service-0a667e1"
+    taskDefinitionArn      : [unknown]
+    taskRoleArn            : [unknown]
+
+Resources:
+    + 113 to create
+
+{
+  "environment": "preview",
+  "stack": "acceptance-preview-aws-ecs-fargate",
+  "preview": {
+    "changes": [
+      {
+        "operation": "create",
+        "count": 113
+      }
+    ],
+    "total": 113
+  },
+  "update": {
+    "changes": null,
+    "total": 0
+  }
+}
++ magelift promote --digest 669890779205.dkr.ecr.eu-north-1.amazonaws.com/magelift-acceptance@sha256:df04554d1bde2f7b754360fa2f70bb3e7cf8a13ffbf429e5891937e6e3b7e5e4 --certificate-identity alex.courtiol@gmail.com --certificate-oidc-issuer https://github.com/login/oauth
+{
+  "sequence": 1,
+  "recordedAt": "2026-07-29T13:51:15.977389Z",
+  "action": "promote",
+  "environment": "preview",
+  "digestReference": "669890779205.dkr.ecr.eu-north-1.amazonaws.com/magelift-acceptance@sha256:df04554d1bde2f7b754360fa2f70bb3e7cf8a13ffbf429e5891937e6e3b7e5e4",
+  "signatureIdentity": "alex.courtiol@gmail.com",
+  "signatureIssuer": "https://github.com/login/oauth",
+  "forwardOnly": true,
+  "databaseMigrationsReversed": false
+}
++ magelift deploy --digest 669890779205.dkr.ecr.eu-north-1.amazonaws.com/magelift-acceptance@sha256:df04554d1bde2f7b754360fa2f70bb3e7cf8a13ffbf429e5891937e6e3b7e5e4 --yes
+Previewing update (acceptance-preview-aws-ecs-fargate):
+
+ +  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate create 
+ +  magelift:aws:Stack acceptance-preview create 
+@ previewing update....
+ +  pulumi:providers:aws acceptance-preview-regional create 
+ +  magelift:aws:Network acceptance-preview-network create 
+ +  pulumi:providers:aws acceptance-preview-global create 
+ +  aws:ec2:Vpc acceptance-preview-network-vpc create 
+ +  aws:ec2:RouteTable acceptance-preview-network-private-routes-01 create 
+ +  aws:ec2:RouteTable acceptance-preview-network-public-routes-01 create 
+ +  aws:ec2:Subnet acceptance-preview-network-private-subnet-01 create 
+ +  magelift:aws:SecurityGroups acceptance-preview-security create 
+ +  aws:ec2:RouteTable acceptance-preview-network-public-routes-02 create 
+ +  aws:ec2:Subnet acceptance-preview-network-public-subnet-01 create 
+ +  aws:ec2:Subnet acceptance-preview-network-public-subnet-02 create 
+ +  aws:ec2:RouteTable acceptance-preview-network-private-routes-02 create 
+ +  aws:ec2:Subnet acceptance-preview-network-private-subnet-02 create 
+ +  aws:ec2:RouteTable acceptance-preview-network-data-routes-02 create 
+ +  aws:ec2:InternetGateway acceptance-preview-network-igw create 
+ +  aws:ec2:RouteTable acceptance-preview-network-data-routes-01 create 
+ +  aws:ec2:SecurityGroup acceptance-preview-network-fck-nat-sg create 
+ +  aws:ec2:Subnet acceptance-preview-network-data-subnet-01 create 
+ +  aws:ec2:Subnet acceptance-preview-network-data-subnet-02 create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-queue create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-cache create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-web create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-data create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-edge create 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-search create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-01 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-01 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-02 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-02 create 
+ +  aws:ec2:Route acceptance-preview-network-public-default-02 create 
+ +  aws:ec2:Route acceptance-preview-network-public-default-01 create 
+ +  aws:ec2:Eip acceptance-preview-network-fck-nat-eip-01 create 
+ +  aws:ec2:VpcEndpoint acceptance-preview-network-endpoint-s3 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-01 create 
+ +  aws:ec2:Instance acceptance-preview-network-fck-nat-01 create 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-02 create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-queue-https create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-queue create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-https create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-queue-amqps create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-cache create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-data create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-cache-valkey create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-data-mysql create 
+ +  magelift:aws:Ingress acceptance-preview-ingress create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-web-target create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-edge-target create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-search-https create 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-search create 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-edge-https create 
+ +  aws:ec2:Route acceptance-preview-network-private-default-01 create 
+ +  aws:ec2:EipAssociation acceptance-preview-network-fck-nat-eip-assoc-01 create 
+ +  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime create 
+ +  aws:ec2:Route acceptance-preview-network-private-default-02 create 
+ +  aws:lb:TargetGroup acceptance-preview-ingress-web create 
+ +  aws:lb:LoadBalancer acceptance-preview-ingress-alb create 
+ +  aws:iam:Role acceptance-preview-runtime-task-role create 
+ +  aws:iam:Role acceptance-preview-runtime-deployment-role create 
+ +  aws:iam:Role acceptance-preview-runtime-execution-role create 
+ +  magelift:aws:RdsMysql acceptance-preview-database create 
+ +  magelift:aws:Valkey acceptance-preview-cache create 
+ +  aws:rds:SubnetGroup acceptance-preview-database-subnets create 
+ +  magelift:aws:RabbitMqQueue acceptance-preview-queue create 
+ +  aws:lb:Listener acceptance-preview-ingress-https create 
+ +  aws:elasticache:SubnetGroup acceptance-preview-cache create 
+ +  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy create 
+ +  magelift:aws:MediaStorage acceptance-preview-storage create 
+ +  aws:rds:Instance acceptance-preview-database-instance create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs create 
+ +  aws:ecs:Cluster acceptance-preview-queue-broker-cluster create 
+ +  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns create 
+@ previewing update....
+ +  magelift:aws:ObservabilityLogGroups acceptance-preview-observability create 
+ +  aws:cloudfront:OriginAccessControl acceptance-preview-storage-oac create 
+ +  aws:s3:Bucket acceptance-preview-storage-bucket create 
+ +  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task create 
+ +  aws:servicediscovery:Service acceptance-preview-queue-discovery create 
+ +  aws:iam:RolePolicy acceptance-preview-execution-database-policy create 
+ +  aws:elasticache:ReplicationGroup acceptance-preview-cache-cache create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-web-logs create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-deploy-logs create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-cron-logs create 
+ +  aws:cloudfront:Distribution acceptance-preview-storage-cdn create 
+ +  aws:s3:BucketPublicAccessBlock acceptance-preview-storage-public-access create 
+ +  aws:s3:BucketLifecycleConfiguration acceptance-preview-storage-lifecycle create 
+ +  aws:s3:BucketOwnershipControls acceptance-preview-storage-ownership create 
+ +  aws:s3:BucketServerSideEncryptionConfiguration acceptance-preview-storage-encryption create 
+ +  aws:s3:BucketVersioning acceptance-preview-storage-versioning create 
+ +  magelift:aws:EcsRuntime acceptance-preview-runtime create 
+ +  aws:ecs:Service acceptance-preview-queue-broker-service create 
+ +  aws:iam:RolePolicy acceptance-preview-runtime-execution-logs-policy create 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task create 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task create 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task create 
+ +  magelift:aws:Edge acceptance-preview-edge create 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task create 
+ +  aws:ecs:Cluster acceptance-preview-runtime-cluster create 
+ +  magelift:aws:Observability acceptance-preview-observability create 
+ +  aws:s3:BucketPolicy acceptance-preview-storage-policy create 
+ +  aws:cloudfront:OriginRequestPolicy acceptance-preview-edge-origin create 
+ +  aws:wafv2:WebAcl acceptance-preview-edge create 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx create 
+ +  aws:iam:RolePolicy acceptance-preview-task-policy create 
+ +  aws:iam:RolePolicy acceptance-preview-deployment-policy create 
+ +  aws:ecs:Service acceptance-preview-runtime-cron-service create 
+ +  aws:ecs:Service acceptance-preview-runtime-web-service create 
+ +  aws:ecs:Service acceptance-preview-runtime-queue-service create 
+ +  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard create 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu create 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running create 
+ +  aws:cloudfront:Distribution acceptance-preview-edge create 
+ +  aws:route53:Record acceptance-preview-edge create 
+ +  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate create 
+Outputs:
+    applicationURL         : [unknown]
+    cacheEndpoint          : [unknown]
+    clusterArn             : [unknown]
+    clusterName            : "acceptance-preview-runtime-cluster-8763f32"
+    cronServiceName        : "acceptance-preview-runtime-cron-service-48c5bfc"
+    cronTaskDefinitionArn  : [unknown]
+    databaseWriter         : [unknown]
+    deployTaskDefinitionArn: [unknown]
+    deploymentRoleArn      : [unknown]
+    edgeDistributionId     : [unknown]
+    mediaURL               : [unknown]
+    networkVpcId           : [unknown]
+    privateSubnetIds       : [
+        [0]: [unknown]
+        [1]: [unknown]
+    ]
+    queueMode              : "ecs-artemis"
+    queueServiceName       : "acceptance-preview-runtime-queue-service-6cb02b4"
+    queueTaskDefinitionArn : [unknown]
+    securityGroupId        : [unknown]
+    serviceName            : "acceptance-preview-runtime-web-service-acaef4a"
+    taskDefinitionArn      : [unknown]
+    taskRoleArn            : [unknown]
+
+Resources:
+    + 113 to create
+
+Updating (acceptance-preview-aws-ecs-fargate):
+
+ +  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate creating (0s) 
+@ updating....
+ +  pulumi:providers:aws acceptance-preview-global creating (0s) 
+ +  pulumi:providers:aws acceptance-preview-global created (0.36s) 
+@ updating....
+ +  pulumi:providers:aws acceptance-preview-regional creating (0s) 
+ +  magelift:aws:Stack acceptance-preview creating (0s) 
+ +  pulumi:providers:aws acceptance-preview-regional created (0.43s) 
+@ updating....
+ +  magelift:aws:Network acceptance-preview-network creating (0s) 
+@ updating....
+ +  aws:ec2:Vpc acceptance-preview-network-vpc creating (0s) 
+@ updating.....
+ +  aws:ec2:Vpc acceptance-preview-network-vpc created (2s) 
+ +  magelift:aws:SecurityGroups acceptance-preview-security creating (0s) 
+ +  aws:ec2:Subnet acceptance-preview-network-data-subnet-01 creating (0s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-public-routes-02 creating (0s) 
+ +  aws:ec2:Subnet acceptance-preview-network-private-subnet-02 creating (0s) 
+ +  aws:ec2:Subnet acceptance-preview-network-public-subnet-02 creating (0s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-network-fck-nat-sg creating (0s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-data-routes-02 creating (0s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-data-routes-01 creating (0s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-private-routes-02 creating (0s) 
+ +  aws:ec2:Subnet acceptance-preview-network-private-subnet-01 creating (0s) 
+ +  aws:ec2:Subnet acceptance-preview-network-public-subnet-01 creating (0s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-public-routes-01 creating (0s) 
+ +  aws:ec2:InternetGateway acceptance-preview-network-igw creating (0s) 
+ +  aws:ec2:Subnet acceptance-preview-network-data-subnet-02 creating (0s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-private-routes-01 creating (0s) 
+@ updating.....
+ +  aws:ec2:Subnet acceptance-preview-network-data-subnet-01 created (1s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-public-routes-02 created (1s) 
+ +  aws:ec2:Subnet acceptance-preview-network-private-subnet-02 created (1s) 
+@ updating....
+ +  aws:ec2:Subnet acceptance-preview-network-public-subnet-02 created (2s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-data-routes-02 created (3s) 
+@ updating....
+ +  aws:ec2:RouteTable acceptance-preview-network-data-routes-01 created (3s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-private-routes-02 created (4s) 
+@ updating....
+ +  aws:ec2:Subnet acceptance-preview-network-private-subnet-01 created (4s) 
+@ updating....
+ +  aws:ec2:SecurityGroup acceptance-preview-network-fck-nat-sg created (5s) 
+ +  aws:ec2:Subnet acceptance-preview-network-public-subnet-01 created (5s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-public-routes-01 created (5s) 
+ +  aws:ec2:InternetGateway acceptance-preview-network-igw created (5s) 
+@ updating....
+ +  aws:ec2:Subnet acceptance-preview-network-data-subnet-02 created (6s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-queue creating (0s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-edge creating (0s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-search creating (0s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-cache creating (0s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-data creating (0s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-web creating (0s) 
+ +  aws:ec2:RouteTable acceptance-preview-network-private-routes-01 created (6s) 
+@ updating....
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-02 creating (0s) 
+@ updating....
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-01 creating (0s) 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-02 creating (0s) 
+@ updating.....
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-01 creating (0s) 
+ +  aws:ec2:Route acceptance-preview-network-public-default-02 creating (0s) 
+ +  aws:ec2:Eip acceptance-preview-network-fck-nat-eip-01 creating (0s) 
+ +  aws:ec2:Route acceptance-preview-network-public-default-01 creating (0s) 
+ +  aws:ec2:Instance acceptance-preview-network-fck-nat-01 creating (0s) 
+@ updating......
+ +  aws:ec2:SecurityGroup acceptance-preview-security-queue created (7s) 
+@ updating....
+ +  aws:ec2:SecurityGroup acceptance-preview-security-edge created (8s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-search created (8s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-cache created (8s) 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-02 created (7s) 
+@ updating....
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-01 created (6s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-web created (9s) 
+ +  aws:ec2:SecurityGroup acceptance-preview-security-data created (9s) 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-02 created (6s) 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-01 created (5s) 
+@ updating....
+ +  aws:ec2:Route acceptance-preview-network-public-default-02 created (5s) 
+@ updating....
+ +  aws:ec2:Eip acceptance-preview-network-fck-nat-eip-01 created (6s) 
+ +  aws:ec2:Route acceptance-preview-network-public-default-01 created (6s) 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-02 creating (0s) 
+ +  aws:ec2:VpcEndpoint acceptance-preview-network-endpoint-s3 creating (0s) 
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-01 creating (0s) 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-queue-https creating (0s) 
+@ updating....
+ +  magelift:aws:Ingress acceptance-preview-ingress creating (0s) 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-edge-https creating (0s) 
+@ updating....
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-cache creating (0s) 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-edge-target creating (0s) 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-cache-valkey creating (0s) 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-queue-amqps creating (0s) 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-search-https creating (0s) 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-queue creating (0s) 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-search creating (0s) 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-https creating (0s) 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-web-target creating (0s) 
+@ updating.......
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-02 created (5s) 
+@ updating....
+ +  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-01 created (7s) 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-queue-https created (7s) 
+@ updating....
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-edge-https created (7s) 
+@ updating....
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-cache created (6s) 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-edge-target created (6s) 
+@ updating....
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-cache-valkey created (7s) 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-queue-amqps created (7s) 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-search-https created (7s) 
+@ updating....
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-queue created (8s) 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-search created (8s) 
+@ updating....
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-https created (9s) 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-web-target created (9s) 
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-data-mysql creating (0s) 
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-data creating (0s) 
+ +  aws:ec2:VpcEndpoint acceptance-preview-network-endpoint-s3 created (12s) 
+@ updating....
+ +  aws:ec2:Instance acceptance-preview-network-fck-nat-01 created (19s) 
+@ updating....
+ +  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime creating (0s) 
+ +  aws:lb:TargetGroup acceptance-preview-ingress-web creating (0s) 
+ +  aws:lb:LoadBalancer acceptance-preview-ingress-alb creating (0s) 
+@ updating.......
+ +  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-data-mysql created (6s) 
+@ updating....
+ +  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-data created (6s) 
+ +  aws:ec2:Route acceptance-preview-network-private-default-02 creating (0s) 
+ +  aws:ec2:Route acceptance-preview-network-private-default-01 creating (0s) 
+ +  aws:ec2:EipAssociation acceptance-preview-network-fck-nat-eip-assoc-01 creating (0s) 
+@ updating.....
+ +  aws:lb:TargetGroup acceptance-preview-ingress-web created (7s) 
+@ updating....
+ +  aws:ec2:Route acceptance-preview-network-private-default-02 created (3s) 
+@ updating....
+ +  magelift:aws:RdsMysql acceptance-preview-database creating (0s) 
+ +  aws:iam:Role acceptance-preview-runtime-execution-role creating (0s) 
+ +  aws:iam:Role acceptance-preview-runtime-deployment-role creating (0s) 
+ +  aws:iam:Role acceptance-preview-runtime-task-role creating (0s) 
+ +  aws:ec2:Route acceptance-preview-network-private-default-01 created (3s) 
+@ updating....
+ +  aws:ec2:EipAssociation acceptance-preview-network-fck-nat-eip-assoc-01 created (4s) 
+@ updating....
+ +  aws:iam:Role acceptance-preview-runtime-execution-role created (2s) 
+ +  aws:iam:Role acceptance-preview-runtime-deployment-role created (2s) 
+@ updating....
+ +  aws:iam:Role acceptance-preview-runtime-task-role created (2s) 
+@ updating....
+ +  magelift:aws:Valkey acceptance-preview-cache creating (0s) 
+ +  aws:rds:SubnetGroup acceptance-preview-database-subnets creating (0s) 
+@ updating....
+ +  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy creating (0s) 
+@ updating.....
+ +  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy created (2s) 
+ +  aws:rds:SubnetGroup acceptance-preview-database-subnets created (3s) 
+@ updating....
+ +  magelift:aws:RabbitMqQueue acceptance-preview-queue creating (0s) 
+ +  aws:elasticache:SubnetGroup acceptance-preview-cache creating (0s) 
+ +  aws:rds:Instance acceptance-preview-database-instance creating (0s) 
+@ updating.....
+ +  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns creating (0s) 
+ +  magelift:aws:MediaStorage acceptance-preview-storage creating (0s) 
+ +  aws:ecs:Cluster acceptance-preview-queue-broker-cluster creating (0s) 
+ +  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs creating (0s) 
+ +  aws:elasticache:SubnetGroup acceptance-preview-cache created (2s) 
+@ updating.....
+ +  aws:elasticache:ReplicationGroup acceptance-preview-cache-cache creating (0s) 
+ +  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs created (2s) 
+ +  magelift:aws:ObservabilityLogGroups acceptance-preview-observability creating (0s) 
+ +  aws:s3:Bucket acceptance-preview-storage-bucket creating (0s) 
+ +  aws:cloudfront:OriginAccessControl acceptance-preview-storage-oac creating (0s) 
+@ updating....
+ +  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task creating (0s) 
+@ updating.....
+ +  aws:cloudfront:OriginAccessControl acceptance-preview-storage-oac created (3s) 
+@ updating....
+ +  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task created (2s) 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-deploy-logs creating (0s) 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-web-logs creating (0s) 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-cron-logs creating (0s) 
+ +  aws:s3:Bucket acceptance-preview-storage-bucket created (3s) 
+@ updating....
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-deploy-logs created (1s) 
+@ updating....
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-web-logs created (1s) 
+ +  aws:cloudwatch:LogGroup acceptance-preview-observability-cron-logs created (2s) 
+ +  aws:s3:BucketOwnershipControls acceptance-preview-storage-ownership creating (0s) 
+ +  aws:s3:BucketServerSideEncryptionConfiguration acceptance-preview-storage-encryption creating (0s) 
+ +  aws:s3:BucketPublicAccessBlock acceptance-preview-storage-public-access creating (0s) 
+ +  aws:s3:BucketLifecycleConfiguration acceptance-preview-storage-lifecycle creating (0s) 
+ +  aws:s3:BucketVersioning acceptance-preview-storage-versioning creating (0s) 
+ +  aws:cloudfront:Distribution acceptance-preview-storage-cdn creating (0s) 
+@ updating.....
+ +  aws:s3:BucketOwnershipControls acceptance-preview-storage-ownership created (1s) 
+@ updating....
+ +  aws:s3:BucketServerSideEncryptionConfiguration acceptance-preview-storage-encryption created (2s) 
+ +  aws:s3:BucketPublicAccessBlock acceptance-preview-storage-public-access created (2s) 
+@ updating....
+ +  aws:ecs:Cluster acceptance-preview-queue-broker-cluster created (11s) 
+ +  magelift:aws:EcsRuntime acceptance-preview-runtime creating (0s) 
+@ updating....
+ +  aws:s3:BucketVersioning acceptance-preview-storage-versioning created (4s) 
+@ updating....
+ +  aws:cloudfront:Distribution acceptance-preview-storage-cdn created (5s) 
+@ updating.....
+ +  aws:s3:BucketPolicy acceptance-preview-storage-policy creating (0s) 
+ +  magelift:aws:Edge acceptance-preview-edge creating (0s) 
+ +  aws:iam:RolePolicy acceptance-preview-runtime-execution-logs-policy creating (0s) 
+ +  aws:ecs:Cluster acceptance-preview-runtime-cluster creating (0s) 
+@ updating....
+ +  aws:s3:BucketPolicy acceptance-preview-storage-policy created (0.86s) 
+@ updating....
+ +  aws:iam:RolePolicy acceptance-preview-runtime-execution-logs-policy created (1s) 
+ +  magelift:aws:Observability acceptance-preview-observability creating (0s) 
+ +  aws:cloudfront:OriginRequestPolicy acceptance-preview-edge-origin creating (0s) 
+ +  aws:wafv2:WebAcl acceptance-preview-edge creating (0s) 
+@ updating.....
+ +  aws:cloudfront:OriginRequestPolicy acceptance-preview-edge-origin created (2s) 
+@ updating.....
+ +  aws:wafv2:WebAcl acceptance-preview-edge created (3s) 
+@ updating.........
+ +  aws:ecs:Cluster acceptance-preview-runtime-cluster created (12s) 
+@ updating...................
+ +  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns created (44s) 
+@ updating....
+ +  aws:servicediscovery:Service acceptance-preview-queue-discovery creating (0s) 
+@ updating....
+ +  aws:servicediscovery:Service acceptance-preview-queue-discovery created (0.96s) 
+@ updating....
+ +  aws:ecs:Service acceptance-preview-queue-broker-service creating (0s) 
+@ updating.....
+ +  aws:ecs:Service acceptance-preview-queue-broker-service created (1s) 
+@ updating..........................
+ +  aws:s3:BucketLifecycleConfiguration acceptance-preview-storage-lifecycle created (64s) 
+@ updating..........................................................................................
+ +  aws:lb:LoadBalancer acceptance-preview-ingress-alb created (178s) 
+@ updating....
+ +  aws:lb:Listener acceptance-preview-ingress-https creating (0s) 
+ +  aws:cloudfront:Distribution acceptance-preview-edge creating (0s) 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx creating (0s) 
+@ updating....
+ +  aws:lb:Listener acceptance-preview-ingress-https created (0.96s) 
+@ updating....
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx created (1s) 
+@ updating........................................................................................................................................................................
+ +  aws:cloudfront:Distribution acceptance-preview-edge created (166s) 
+@ updating.....
+ +  aws:route53:Record acceptance-preview-edge creating (0s) 
+@ updating..................................
+ +  aws:route53:Record acceptance-preview-edge created (31s) 
+@ updating..............................................................................................................................................
+ +  aws:rds:Instance acceptance-preview-database-instance created (500s) 
+@ updating.....
+ +  aws:iam:RolePolicy acceptance-preview-execution-database-policy creating (0s) 
+ +  aws:iam:RolePolicy acceptance-preview-deployment-policy creating (0s) 
+ +  aws:iam:RolePolicy acceptance-preview-task-policy creating (0s) 
+@ updating....
+ +  aws:iam:RolePolicy acceptance-preview-execution-database-policy created (1s) 
+@ updating....
+ +  aws:iam:RolePolicy acceptance-preview-deployment-policy created (1s) 
+ +  aws:iam:RolePolicy acceptance-preview-task-policy created (1s) 
+@ updating...........................................
+ +  aws:elasticache:ReplicationGroup acceptance-preview-cache-cache created (540s) 
+@ updating....
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task creating (0s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task creating (0s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task creating (0s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task creating (0s) 
+@ updating....
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task created (0.93s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task created (1s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task created (1s) 
+@ updating....
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task created (2s) 
+ +  aws:ecs:Service acceptance-preview-runtime-web-service creating (0s) 
+@ updating....
+ +  aws:ecs:Service acceptance-preview-runtime-queue-service creating (0s) 
+ +  aws:ecs:Service acceptance-preview-runtime-cron-service creating (0s) 
+@ updating.....
+ +  aws:ecs:Service acceptance-preview-runtime-web-service created (2s) 
+ +  aws:ecs:Service acceptance-preview-runtime-queue-service created (2s) 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running creating (0s) 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu creating (0s) 
+ +  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard creating (0s) 
+ +  aws:ecs:Service acceptance-preview-runtime-cron-service created (2s) 
+@ updating.....
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running created (1s) 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu created (1s) 
+@ updating....
+ +  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard created (2s) 
+@ updating......
+ +  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate created (611s) 
+Outputs:
+    applicationURL         : "https://drhkkyshlnbm7.cloudfront.net"
+    cacheEndpoint          : "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com"
+    clusterArn             : "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-c0fb1ce"
+    clusterName            : "acceptance-preview-runtime-cluster-c0fb1ce"
+    cronServiceName        : "acceptance-preview-runtime-cron-service-7407ede"
+    cronTaskDefinitionArn  : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:26"
+    databaseWriter         : "acceptance-preview-database-instance3437eae.cdwockum4edo.eu-north-1.rds.amazonaws.com"
+    deployTaskDefinitionArn: "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:26"
+    deploymentRoleArn      : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-3b13a64"
+    edgeDistributionId     : "E4V2MR34KC6ZF"
+    mediaURL               : "https://d39q6nmcon8mqt.cloudfront.net"
+    networkVpcId           : "vpc-0705b6ee81bfaa7c7"
+    privateSubnetIds       : [
+        [0]: "subnet-06329bbd701950d59"
+        [1]: "subnet-07452e44cc2f55a37"
+    ]
+    queueMode              : "ecs-artemis"
+    queueServiceName       : "acceptance-preview-runtime-queue-service-3a2204b"
+    queueTaskDefinitionArn : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:12"
+    securityGroupId        : "sg-0bd4c3c41df5b27e2"
+    serviceName            : "acceptance-preview-runtime-web-service-676c858"
+    taskDefinitionArn      : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:28"
+    taskRoleArn            : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-c5c393b"
+
+Resources:
+    + 113 created
+
+Duration: 10m13s
+
+Updating (acceptance-preview-aws-ecs-fargate):
+
+@ updating.......
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task created replacement (0.87s) [diff: ~containerDefinitions]
+@ updating....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task created replacement (1s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task created replacement (1s) [diff: ~containerDefinitions]
+@ updating....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task created replacement (1s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service updating (0s) [diff: ~taskDefinition]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service updating (0s) [diff: ~taskDefinition]
+@ updating....
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replaced (0.00s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-queue-service updating (0s) [diff: ~taskDefinition]
+@ updating....
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service updated (2s) [diff: ~taskDefinition]
+@ updating....
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service updated (2s) [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-queue-service updated (1s) [diff: ~taskDefinition]
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleting original (0s) [diff: ~containerDefinitions]
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleted original (0.48s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleted original (0.88s) [diff: ~containerDefinitions]
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task deleted original (1s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleted original (1s) [diff: ~containerDefinitions]
+@ updating......
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Outputs:
+    applicationURL         : "https://drhkkyshlnbm7.cloudfront.net"
+    cacheEndpoint          : "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com"
+    clusterArn             : "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-c0fb1ce"
+    clusterName            : "acceptance-preview-runtime-cluster-c0fb1ce"
+    cronServiceName        : "acceptance-preview-runtime-cron-service-7407ede"
+  ~ cronTaskDefinitionArn  : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:26" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:27"
+    databaseWriter         : "acceptance-preview-database-instance3437eae.cdwockum4edo.eu-north-1.rds.amazonaws.com"
+  ~ deployTaskDefinitionArn: "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:26" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:27"
+    deploymentRoleArn      : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-3b13a64"
+    edgeDistributionId     : "E4V2MR34KC6ZF"
+    mediaURL               : "https://d39q6nmcon8mqt.cloudfront.net"
+    networkVpcId           : "vpc-0705b6ee81bfaa7c7"
+    privateSubnetIds       : [
+        [0]: "subnet-06329bbd701950d59"
+        [1]: "subnet-07452e44cc2f55a37"
+    ]
+    queueMode              : "ecs-artemis"
+    queueServiceName       : "acceptance-preview-runtime-queue-service-3a2204b"
+  ~ queueTaskDefinitionArn : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:12" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:13"
+    securityGroupId        : "sg-0bd4c3c41df5b27e2"
+    serviceName            : "acceptance-preview-runtime-web-service-676c858"
+  ~ taskDefinitionArn      : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:28" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:29"
+    taskRoleArn            : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-c5c393b"
+
+Resources:
+    ~ 3 updated
+    +-4 replaced
+    7 changes. 106 unchanged
+
+Duration: 16s
+
+{
+  "environment": "preview",
+  "stack": "acceptance-preview-aws-ecs-fargate",
+  "preview": {
+    "changes": [
+      {
+        "operation": "create",
+        "count": 113
+      }
+    ],
+    "total": 113
+  },
+  "update": {
+    "changes": [
+      {
+        "operation": "replace",
+        "count": 4
+      },
+      {
+        "operation": "same",
+        "count": 106
+      },
+      {
+        "operation": "update",
+        "count": 3
+      }
+    ],
+    "total": 113
+  }
+}
++ magelift outputs
+{
+  "environment": "preview",
+  "outputs": {
+    "applicationURL": "https://drhkkyshlnbm7.cloudfront.net",
+    "cacheEndpoint": "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com",
+    "clusterArn": "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-c0fb1ce",
+    "clusterName": "acceptance-preview-runtime-cluster-c0fb1ce",
+    "cronServiceName": "acceptance-preview-runtime-cron-service-7407ede",
+    "cronTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:27",
+    "databaseWriter": "acceptance-preview-database-instance3437eae.cdwockum4edo.eu-north-1.rds.amazonaws.com",
+    "deployTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:27",
+    "deploymentRoleArn": "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-3b13a64",
+    "edgeDistributionId": "E4V2MR34KC6ZF",
+    "mediaURL": "https://d39q6nmcon8mqt.cloudfront.net",
+    "networkVpcId": "vpc-0705b6ee81bfaa7c7",
+    "privateSubnetIds": [
+      "subnet-06329bbd701950d59",
+      "subnet-07452e44cc2f55a37"
+    ],
+    "queueMode": "ecs-artemis",
+    "queueServiceName": "acceptance-preview-runtime-queue-service-3a2204b",
+    "queueTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:13",
+    "searchEndpoint": "",
+    "securityGroupId": "sg-0bd4c3c41df5b27e2",
+    "serviceName": "acceptance-preview-runtime-web-service-676c858",
+    "taskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:29",
+    "taskRoleArn": "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-c5c393b"
+  },
+  "stack": "acceptance-preview-aws-ecs-fargate"
+}
++ magelift health --mode runtime
+{
+  "environment": "preview",
+  "target": "aws.ecs-fargate",
+  "mode": "runtime",
+  "status": "healthy",
+  "checks": [
+    {
+      "id": "runtime.ecs.service",
+      "status": "healthy",
+      "message": "ECS service has 1 running of 1 desired tasks"
+    },
+    {
+      "id": "runtime.ecs.rollout",
+      "status": "healthy",
+      "message": "the primary ECS deployment rollout completed"
+    },
+    {
+      "id": "runtime.ecs.task.arn:aws:ecs:eu-north-1:669890779205:task/acceptance-preview-runtime-cluster-c0fb1ce/ddd60665d1fe472dbef787535d15d4c9",
+      "status": "healthy",
+      "message": "ECS task is running and healthy"
+    }
+  ]
+}
+aws acceptance live cell loop cells=3 catalog=/Users/alex/workspace/magelift/scripts/acceptance/cells-aws-preview.txt
+acceptance cell-update cell=queueMode:db
+acceptance patched queueMode=db into temp config
++ magelift deploy --digest 669890779205.dkr.ecr.eu-north-1.amazonaws.com/magelift-acceptance@sha256:df04554d1bde2f7b754360fa2f70bb3e7cf8a13ffbf429e5891937e6e3b7e5e4 --yes
+Previewing update (acceptance-preview-aws-ecs-fargate):
+
+@ previewing update.....
+ ~  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime update [diff: ~secretCount]
+ ~  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy update [diff: ~policy]
+ ~  aws:iam:RolePolicy acceptance-preview-deployment-policy update [diff: ~policy]
+ ~  aws:iam:RolePolicy acceptance-preview-task-policy update [diff: ~policy]
+@ previewing update....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replace [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service update [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service update [diff: ~taskDefinition]
+ -  aws:ecs:Service acceptance-preview-runtime-queue-service delete 
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task delete original [diff: ~containerDefinitions]
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task delete 
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task delete original [diff: ~containerDefinitions]
+ -  aws:ecs:Service acceptance-preview-queue-broker-service delete 
+ -  aws:servicediscovery:Service acceptance-preview-queue-discovery delete 
+ -  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task delete 
+ -  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs delete 
+ -  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns delete 
+ -  aws:ecs:Cluster acceptance-preview-queue-broker-cluster delete 
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Outputs:
+  ~ queueMode         : "ecs-artemis" => "db"
+
+Resources:
+    ~ 6 to update
+    - 8 to delete
+    +-3 to replace
+    17 changes. 96 unchanged
+
+Updating (acceptance-preview-aws-ecs-fargate):
+
+@ updating.....
+ ~  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime updating (0s) [diff: ~secretCount]
+@ updating....
+ ~  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy updating (0s) [diff: ~policy]
+@ updating....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task creating replacement (0s) [diff: ~containerDefinitions]
+ ~  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy updated (0.90s) [diff: ~policy]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task created replacement (0.78s) [diff: ~containerDefinitions]
+@ updating....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task created replacement (1s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task created replacement (1s) [diff: ~containerDefinitions]
+@ updating....
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:iam:RolePolicy acceptance-preview-deployment-policy updating (0s) [diff: ~policy]
+ ~  aws:iam:RolePolicy acceptance-preview-task-policy updating (0s) [diff: ~policy]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service updating (0s) [diff: ~taskDefinition]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replaced (0.00s) [diff: ~containerDefinitions]
+@ updating....
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service updating (0s) [diff: ~taskDefinition]
+ ~  aws:iam:RolePolicy acceptance-preview-deployment-policy updated (1s) [diff: ~policy]
+@ updating....
+ ~  aws:iam:RolePolicy acceptance-preview-task-policy updated (1s) [diff: ~policy]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service updated (2s) [diff: ~taskDefinition]
+@ updating....
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service updated (2s) [diff: ~taskDefinition]
+@ updating.....
+ -  aws:ecs:Service acceptance-preview-runtime-queue-service deleting (0s) 
+@ updating........................................
+ -  aws:ecs:Service acceptance-preview-runtime-queue-service deleted (37s) 
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleting original (0s) [diff: ~containerDefinitions]
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task deleting (0s) 
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleting original (0s) [diff: ~containerDefinitions]
+ -  aws:ecs:Service acceptance-preview-queue-broker-service deleting (0s) 
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleted original (0.55s) [diff: ~containerDefinitions]
+@ updating....
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task deleted (0.96s) 
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleted original (1s) [diff: ~containerDefinitions]
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleted original (1s) [diff: ~containerDefinitions]
+@ updating...........................................................................................
+ -  aws:ecs:Service acceptance-preview-queue-broker-service deleted (89s) 
+@ updating....
+ -  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task deleting (0s) 
+ -  aws:servicediscovery:Service acceptance-preview-queue-discovery deleting (0s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task deleted (0.51s) 
+@ updating....
+ -  aws:servicediscovery:Service acceptance-preview-queue-discovery deleted (1s) 
+ -  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns deleting (0s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs deleting (0s) 
+ -  aws:ecs:Cluster acceptance-preview-queue-broker-cluster deleting (0s) 
+@ updating.....
+ -  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs deleted (1s) 
+ -  aws:ecs:Cluster acceptance-preview-queue-broker-cluster deleted (1s) 
+@ updating.............................................
+ -  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns deleted (43s) 
+@ updating....
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Outputs:
+    applicationURL         : "https://drhkkyshlnbm7.cloudfront.net"
+    cacheEndpoint          : "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com"
+    clusterArn             : "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-c0fb1ce"
+    clusterName            : "acceptance-preview-runtime-cluster-c0fb1ce"
+    cronServiceName        : "acceptance-preview-runtime-cron-service-7407ede"
+  ~ cronTaskDefinitionArn  : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:27" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:28"
+    databaseWriter         : "acceptance-preview-database-instance3437eae.cdwockum4edo.eu-north-1.rds.amazonaws.com"
+  ~ deployTaskDefinitionArn: "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:27" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:28"
+    deploymentRoleArn      : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-3b13a64"
+    edgeDistributionId     : "E4V2MR34KC6ZF"
+    mediaURL               : "https://d39q6nmcon8mqt.cloudfront.net"
+    networkVpcId           : "vpc-0705b6ee81bfaa7c7"
+    privateSubnetIds       : [
+        [0]: "subnet-06329bbd701950d59"
+        [1]: "subnet-07452e44cc2f55a37"
+    ]
+  ~ queueMode              : "ecs-artemis" => "db"
+  ~ queueServiceName       : "acceptance-preview-runtime-queue-service-3a2204b" => [unknown]
+  ~ queueTaskDefinitionArn : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:13" => [unknown]
+    securityGroupId        : "sg-0bd4c3c41df5b27e2"
+    serviceName            : "acceptance-preview-runtime-web-service-676c858"
+  ~ taskDefinitionArn      : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:29" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:30"
+    taskRoleArn            : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-c5c393b"
+
+Resources:
+    ~ 6 updated
+    - 8 deleted
+    +-3 replaced
+    17 changes. 96 unchanged
+
+Duration: 3m7s
+
+{
+  "environment": "preview",
+  "stack": "acceptance-preview-aws-ecs-fargate",
+  "preview": {
+    "changes": [
+      {
+        "operation": "delete",
+        "count": 8
+      },
+      {
+        "operation": "replace",
+        "count": 3
+      },
+      {
+        "operation": "same",
+        "count": 96
+      },
+      {
+        "operation": "update",
+        "count": 6
+      }
+    ],
+    "total": 113
+  },
+  "update": {
+    "changes": [
+      {
+        "operation": "delete",
+        "count": 8
+      },
+      {
+        "operation": "replace",
+        "count": 3
+      },
+      {
+        "operation": "same",
+        "count": 96
+      },
+      {
+        "operation": "update",
+        "count": 6
+      }
+    ],
+    "total": 113
+  }
+}
++ magelift outputs
+{
+  "environment": "preview",
+  "outputs": {
+    "applicationURL": "https://drhkkyshlnbm7.cloudfront.net",
+    "cacheEndpoint": "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com",
+    "clusterArn": "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-c0fb1ce",
+    "clusterName": "acceptance-preview-runtime-cluster-c0fb1ce",
+    "cronServiceName": "acceptance-preview-runtime-cron-service-7407ede",
+    "cronTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:28",
+    "databaseWriter": "acceptance-preview-database-instance3437eae.cdwockum4edo.eu-north-1.rds.amazonaws.com",
+    "deployTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:28",
+    "deploymentRoleArn": "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-3b13a64",
+    "edgeDistributionId": "E4V2MR34KC6ZF",
+    "mediaURL": "https://d39q6nmcon8mqt.cloudfront.net",
+    "networkVpcId": "vpc-0705b6ee81bfaa7c7",
+    "privateSubnetIds": [
+      "subnet-06329bbd701950d59",
+      "subnet-07452e44cc2f55a37"
+    ],
+    "queueMode": "db",
+    "queueServiceName": "04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+    "queueTaskDefinitionArn": "04da6b54-80e4-46f7-96ec-b56ff0331ba9",
+    "searchEndpoint": "",
+    "securityGroupId": "sg-0bd4c3c41df5b27e2",
+    "serviceName": "acceptance-preview-runtime-web-service-676c858",
+    "taskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:30",
+    "taskRoleArn": "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-c5c393b"
+  },
+  "stack": "acceptance-preview-aws-ecs-fargate"
+}
++ magelift health --mode runtime
+{
+  "environment": "preview",
+  "target": "aws.ecs-fargate",
+  "mode": "runtime",
+  "status": "healthy",
+  "checks": [
+    {
+      "id": "runtime.ecs.service",
+      "status": "healthy",
+      "message": "ECS service has 1 running of 1 desired tasks"
+    },
+    {
+      "id": "runtime.ecs.rollout",
+      "status": "healthy",
+      "message": "the primary ECS deployment rollout completed"
+    },
+    {
+      "id": "runtime.ecs.task.arn:aws:ecs:eu-north-1:669890779205:task/acceptance-preview-runtime-cluster-c0fb1ce/bf3340c2137d4a3f8a139178f6cb6fbf",
+      "status": "healthy",
+      "message": "ECS task is running and healthy"
+    }
+  ]
+}
+acceptance cell-done cell=queueMode:db result=PASS
+acceptance cell-update cell=queueMode:ecs-rabbitmq
+acceptance patched queueMode=ecs-rabbitmq into temp config
++ magelift deploy --digest 669890779205.dkr.ecr.eu-north-1.amazonaws.com/magelift-acceptance@sha256:df04554d1bde2f7b754360fa2f70bb3e7cf8a13ffbf429e5891937e6e3b7e5e4 --yes
+Previewing update (acceptance-preview-aws-ecs-fargate):
+
+@ previewing update....
+ ~  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime update [diff: ~secretCount]
+ ~  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy update [diff: ~policy]
+ +  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns create 
+ +  aws:ecs:Cluster acceptance-preview-queue-broker-cluster create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs create 
+@ previewing update....
+ +  aws:servicediscovery:Service acceptance-preview-queue-discovery create 
+ +  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task create 
+ +  aws:ecs:Service acceptance-preview-queue-broker-service create 
+ ~  aws:iam:RolePolicy acceptance-preview-deployment-policy update [diff: ~policy]
+ ~  aws:iam:RolePolicy acceptance-preview-task-policy update [diff: ~policy]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task create replacement [diff: ~containerDefinitions]
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task create 
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replace [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service update [diff: ~taskDefinition]
+ +  aws:ecs:Service acceptance-preview-runtime-queue-service create 
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service update [diff: ~taskDefinition]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task delete original [diff: ~containerDefinitions]
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Outputs:
+  ~ queueMode             : "db" => "ecs-rabbitmq"
+  ~ queueServiceName      : [unknown] => "acceptance-preview-runtime-queue-service-c0c5f35"
+
+Resources:
+    + 8 to create
+    ~ 6 to update
+    +-3 to replace
+    17 changes. 96 unchanged
+
+environment: preview
+backend: ""
+locked: false
+lock:
+    project: acceptance
+    environment: preview
+    owner: magelift-cli-Alexandres-MacBook-Air.local-80978
+    acquiredAt: 2026-07-29T16:09:20.402051+02:00
++ assert_clean tag=magelift:project=acceptance region=eu-north-1
+leftover VPCs: 1
+leftover RDS instances: 1
+leftover ElastiCache groups: 1
+leftover ALBs: 1
+leftover ECS clusters: 1
+leftover log groups: 3
+leftover security groups: 7
+assert_clean FAILED: tagged or acceptance-named leftovers remain
+RESUME_START 2026-07-29T14:10:01Z
+aws acceptance start profile=preview at=2026-07-29T14:10:01Z
++ magelift config validate
+{
+  "environments": [
+    "preview"
+  ],
+  "valid": true
+}
++ magelift doctor
+{
+  "config": "/var/folders/j7/7phb53pd3zb3t66640gthst00000gn/T//magelift-aws-acceptance.0GmN2W/magelift.yaml",
+  "status": "ok",
+  "environments": [
+    "preview"
+  ],
+  "checks": [
+    {
+      "id": "build",
+      "status": "ok",
+      "message": "valid"
+    },
+    {
+      "id": "environment.preview",
+      "status": "ok",
+      "message": "valid"
+    }
+  ]
+}
++ magelift login
+{
+  "authenticated": true,
+  "environment": "preview",
+  "provider": "aws",
+  "region": "eu-north-1"
+}
+acceptance resume: skipping create-once (stack assumed present; KEEP/RESUME/checkpoint)
+aws acceptance live cell loop cells=3 catalog=/Users/alex/workspace/magelift/scripts/acceptance/cells-aws-preview.txt
+acceptance skip cell=queueMode:db (checkpoint)
+acceptance cell-update cell=queueMode:ecs-rabbitmq
+acceptance patched queueMode=ecs-rabbitmq into temp config
++ magelift deploy --digest 669890779205.dkr.ecr.eu-north-1.amazonaws.com/magelift-acceptance@sha256:df04554d1bde2f7b754360fa2f70bb3e7cf8a13ffbf429e5891937e6e3b7e5e4 --yes
+Previewing update (acceptance-preview-aws-ecs-fargate):
+
+@ previewing update.....
+ ~  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime update [diff: ~secretCount]
+ ~  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy update [diff: ~policy]
+ +  aws:ecs:Cluster acceptance-preview-queue-broker-cluster create 
+ +  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs create 
+ +  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns create 
+ +  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task create 
+ +  aws:servicediscovery:Service acceptance-preview-queue-discovery create 
+ +  aws:ecs:Service acceptance-preview-queue-broker-service create 
+@ previewing update....
+ ~  aws:iam:RolePolicy acceptance-preview-task-policy update [diff: ~policy]
+ ~  aws:iam:RolePolicy acceptance-preview-deployment-policy update [diff: ~policy]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task create replacement [diff: ~containerDefinitions]
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task create 
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replace [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service update [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service update [diff: ~taskDefinition]
+ +  aws:ecs:Service acceptance-preview-runtime-queue-service create 
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task delete original [diff: ~containerDefinitions]
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Outputs:
+  ~ queueMode             : "db" => "ecs-rabbitmq"
+  ~ queueServiceName      : [unknown] => "acceptance-preview-runtime-queue-service-c695570"
+
+Resources:
+    + 8 to create
+    ~ 6 to update
+    +-3 to replace
+    17 changes. 96 unchanged
+
+Updating (acceptance-preview-aws-ecs-fargate):
+
+@ updating.....
+ ~  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime updating (0s) [diff: ~secretCount]
+@ updating....
+ ~  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy updating (0s) [diff: ~policy]
+@ updating....
+ +  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns creating (0s) 
+ +  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs creating (0s) 
+ +  aws:ecs:Cluster acceptance-preview-queue-broker-cluster creating (0s) 
+ ~  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy updated (0.91s) [diff: ~policy]
+@ updating....
+ +  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs created (1s) 
+@ updating....
+ +  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task creating (0s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task created (0.64s) 
+@ updating....
+ ~  aws:iam:RolePolicy acceptance-preview-deployment-policy updating (0s) [diff: ~policy]
+ ~  aws:iam:RolePolicy acceptance-preview-task-policy updating (0s) [diff: ~policy]
+ ~  aws:iam:RolePolicy acceptance-preview-deployment-policy updated (0.68s) [diff: ~policy]
+@ updating....
+ ~  aws:iam:RolePolicy acceptance-preview-task-policy updated (1s) [diff: ~policy]
+@ updating..........
+ +  aws:ecs:Cluster acceptance-preview-queue-broker-cluster created (11s) 
+@ updating....................................
+ +  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns created (44s) 
+ +  aws:servicediscovery:Service acceptance-preview-queue-discovery creating (0s) 
+@ updating....
+ +  aws:servicediscovery:Service acceptance-preview-queue-discovery created (0.74s) 
+@ updating....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task creating replacement (0s) [diff: ~containerDefinitions]
+ +  aws:ecs:Service acceptance-preview-queue-broker-service creating (0s) 
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task creating replacement (0s) [diff: ~containerDefinitions]
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task creating (0s) 
+@ updating....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task created replacement (0.74s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task created replacement (1s) [diff: ~containerDefinitions]
+@ updating....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task created replacement (1s) [diff: ~containerDefinitions]
+ +  aws:ecs:Service acceptance-preview-queue-broker-service created (2s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task created (2s) 
+@ updating....
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replaced (0.00s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service updating (0s) [diff: ~taskDefinition]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service updating (0s) [diff: ~taskDefinition]
+@ updating....
+ +  aws:ecs:Service acceptance-preview-runtime-queue-service creating (0s) 
+@ updating....
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service updated (2s) [diff: ~taskDefinition]
+@ updating....
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service updated (2s) [diff: ~taskDefinition]
+ +  aws:ecs:Service acceptance-preview-runtime-queue-service created (2s) 
+@ updating.....
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleted original (0.50s) [diff: ~containerDefinitions]
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleted original (0.92s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleted original (1s) [diff: ~containerDefinitions]
+@ updating......
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Outputs:
+    applicationURL         : "https://drhkkyshlnbm7.cloudfront.net"
+    cacheEndpoint          : "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com"
+    clusterArn             : "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-c0fb1ce"
+    clusterName            : "acceptance-preview-runtime-cluster-c0fb1ce"
+    cronServiceName        : "acceptance-preview-runtime-cron-service-7407ede"
+  ~ cronTaskDefinitionArn  : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:28" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:29"
+    databaseWriter         : "acceptance-preview-database-instance3437eae.cdwockum4edo.eu-north-1.rds.amazonaws.com"
+  ~ deployTaskDefinitionArn: "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:28" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:29"
+    deploymentRoleArn      : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-3b13a64"
+    edgeDistributionId     : "E4V2MR34KC6ZF"
+    mediaURL               : "https://d39q6nmcon8mqt.cloudfront.net"
+    networkVpcId           : "vpc-0705b6ee81bfaa7c7"
+    privateSubnetIds       : [
+        [0]: "subnet-06329bbd701950d59"
+        [1]: "subnet-07452e44cc2f55a37"
+    ]
+  ~ queueMode              : "db" => "ecs-rabbitmq"
+  ~ queueServiceName       : [unknown] => "acceptance-preview-runtime-queue-service-5bc064f"
+  ~ queueTaskDefinitionArn : [unknown] => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:14"
+    securityGroupId        : "sg-0bd4c3c41df5b27e2"
+    serviceName            : "acceptance-preview-runtime-web-service-676c858"
+  ~ taskDefinitionArn      : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:30" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:31"
+    taskRoleArn            : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-c5c393b"
+
+Resources:
+    + 8 created
+    ~ 6 updated
+    +-3 replaced
+    17 changes. 96 unchanged
+
+Duration: 1m3s
+
+{
+  "environment": "preview",
+  "stack": "acceptance-preview-aws-ecs-fargate",
+  "preview": {
+    "changes": [
+      {
+        "operation": "create",
+        "count": 8
+      },
+      {
+        "operation": "replace",
+        "count": 3
+      },
+      {
+        "operation": "same",
+        "count": 96
+      },
+      {
+        "operation": "update",
+        "count": 6
+      }
+    ],
+    "total": 113
+  },
+  "update": {
+    "changes": [
+      {
+        "operation": "create",
+        "count": 8
+      },
+      {
+        "operation": "replace",
+        "count": 3
+      },
+      {
+        "operation": "same",
+        "count": 96
+      },
+      {
+        "operation": "update",
+        "count": 6
+      }
+    ],
+    "total": 113
+  }
+}
++ magelift outputs
+{
+  "environment": "preview",
+  "outputs": {
+    "applicationURL": "https://drhkkyshlnbm7.cloudfront.net",
+    "cacheEndpoint": "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com",
+    "clusterArn": "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-c0fb1ce",
+    "clusterName": "acceptance-preview-runtime-cluster-c0fb1ce",
+    "cronServiceName": "acceptance-preview-runtime-cron-service-7407ede",
+    "cronTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:29",
+    "databaseWriter": "acceptance-preview-database-instance3437eae.cdwockum4edo.eu-north-1.rds.amazonaws.com",
+    "deployTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:29",
+    "deploymentRoleArn": "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-3b13a64",
+    "edgeDistributionId": "E4V2MR34KC6ZF",
+    "mediaURL": "https://d39q6nmcon8mqt.cloudfront.net",
+    "networkVpcId": "vpc-0705b6ee81bfaa7c7",
+    "privateSubnetIds": [
+      "subnet-06329bbd701950d59",
+      "subnet-07452e44cc2f55a37"
+    ],
+    "queueMode": "ecs-rabbitmq",
+    "queueServiceName": "acceptance-preview-runtime-queue-service-5bc064f",
+    "queueTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:14",
+    "searchEndpoint": "",
+    "securityGroupId": "sg-0bd4c3c41df5b27e2",
+    "serviceName": "acceptance-preview-runtime-web-service-676c858",
+    "taskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:31",
+    "taskRoleArn": "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-c5c393b"
+  },
+  "stack": "acceptance-preview-aws-ecs-fargate"
+}
++ magelift health --mode runtime
+{
+  "environment": "preview",
+  "target": "aws.ecs-fargate",
+  "mode": "runtime",
+  "status": "healthy",
+  "checks": [
+    {
+      "id": "runtime.ecs.service",
+      "status": "healthy",
+      "message": "ECS service has 1 running of 1 desired tasks"
+    },
+    {
+      "id": "runtime.ecs.rollout",
+      "status": "healthy",
+      "message": "the primary ECS deployment rollout completed"
+    },
+    {
+      "id": "runtime.ecs.task.arn:aws:ecs:eu-north-1:669890779205:task/acceptance-preview-runtime-cluster-c0fb1ce/f4242d32c057479ca476aff3bf268c4e",
+      "status": "healthy",
+      "message": "ECS task is running and healthy"
+    }
+  ]
+}
+acceptance cell-done cell=queueMode:ecs-rabbitmq result=PASS
+acceptance cell-update cell=queueMode:ecs-artemis
+acceptance patched queueMode=ecs-artemis into temp config
++ magelift deploy --digest 669890779205.dkr.ecr.eu-north-1.amazonaws.com/magelift-acceptance@sha256:df04554d1bde2f7b754360fa2f70bb3e7cf8a13ffbf429e5891937e6e3b7e5e4 --yes
+Previewing update (acceptance-preview-aws-ecs-fargate):
+
+@ previewing update.....
+ ++ aws:ecs:TaskDefinition acceptance-preview-queue-broker-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-queue-broker-task replace [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-queue-broker-service update [diff: ~taskDefinition]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task create replacement [diff: ~containerDefinitions]
+@ previewing update....
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replace [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-queue-service update [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service update [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service update [diff: ~taskDefinition]
+ -- aws:ecs:TaskDefinition acceptance-preview-queue-broker-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task delete original [diff: ~containerDefinitions]
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Outputs:
+  ~ queueMode         : "ecs-rabbitmq" => "ecs-artemis"
+
+Resources:
+    ~ 4 to update
+    +-5 to replace
+    9 changes. 104 unchanged
+
+Updating (acceptance-preview-aws-ecs-fargate):
+
+@ updating.....
+ ++ aws:ecs:TaskDefinition acceptance-preview-queue-broker-task creating replacement (0s) [diff: ~containerDefinitions]
+@ updating....
+ ++ aws:ecs:TaskDefinition acceptance-preview-queue-broker-task created replacement (0.85s) [diff: ~containerDefinitions]
+@ updating....
+ +- aws:ecs:TaskDefinition acceptance-preview-queue-broker-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-queue-broker-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-queue-broker-service updating (0s) [diff: ~taskDefinition]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task creating replacement (0s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task creating replacement (0s) [diff: ~containerDefinitions]
+@ updating....
+ ~  aws:ecs:Service acceptance-preview-queue-broker-service updated (1s) [diff: ~taskDefinition]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task created replacement (0.71s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task created replacement (1s) [diff: ~containerDefinitions]
+@ updating....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task created replacement (1s) [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task created replacement (1s) [diff: ~containerDefinitions]
+@ updating....
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service updating (0s) [diff: ~taskDefinition]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replaced (0.00s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replaced (0.00s) [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service updating (0s) [diff: ~taskDefinition]
+@ updating....
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task replacing (0s) [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task replaced (0.00s) [diff: ~containerDefinitions]
+@ updating....
+ ~  aws:ecs:Service acceptance-preview-runtime-queue-service updating (0s) [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service updated (2s) [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service updated (1s) [diff: ~taskDefinition]
+@ updating....
+ ~  aws:ecs:Service acceptance-preview-runtime-queue-service updated (1.00s) [diff: ~taskDefinition]
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-queue-broker-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleting original (0s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleting original (0s) [diff: ~containerDefinitions]
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-queue-broker-task deleted original (0.57s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task deleted original (1s) [diff: ~containerDefinitions]
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleted original (1s) [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleted original (2s) [diff: ~containerDefinitions]
+@ updating....
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleted original (2s) [diff: ~containerDefinitions]
+@ updating.....
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Outputs:
+    applicationURL         : "https://drhkkyshlnbm7.cloudfront.net"
+    cacheEndpoint          : "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com"
+    clusterArn             : "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-c0fb1ce"
+    clusterName            : "acceptance-preview-runtime-cluster-c0fb1ce"
+    cronServiceName        : "acceptance-preview-runtime-cron-service-7407ede"
+  ~ cronTaskDefinitionArn  : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:29" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:30"
+    databaseWriter         : "acceptance-preview-database-instance3437eae.cdwockum4edo.eu-north-1.rds.amazonaws.com"
+  ~ deployTaskDefinitionArn: "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:29" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:30"
+    deploymentRoleArn      : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-3b13a64"
+    edgeDistributionId     : "E4V2MR34KC6ZF"
+    mediaURL               : "https://d39q6nmcon8mqt.cloudfront.net"
+    networkVpcId           : "vpc-0705b6ee81bfaa7c7"
+    privateSubnetIds       : [
+        [0]: "subnet-06329bbd701950d59"
+        [1]: "subnet-07452e44cc2f55a37"
+    ]
+  ~ queueMode              : "ecs-rabbitmq" => "ecs-artemis"
+    queueServiceName       : "acceptance-preview-runtime-queue-service-5bc064f"
+  ~ queueTaskDefinitionArn : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:14" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:15"
+    securityGroupId        : "sg-0bd4c3c41df5b27e2"
+    serviceName            : "acceptance-preview-runtime-web-service-676c858"
+  ~ taskDefinitionArn      : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:31" => "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:32"
+    taskRoleArn            : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-c5c393b"
+
+Resources:
+    ~ 4 updated
+    +-5 replaced
+    9 changes. 104 unchanged
+
+Duration: 17s
+
+{
+  "environment": "preview",
+  "stack": "acceptance-preview-aws-ecs-fargate",
+  "preview": {
+    "changes": [
+      {
+        "operation": "replace",
+        "count": 5
+      },
+      {
+        "operation": "same",
+        "count": 104
+      },
+      {
+        "operation": "update",
+        "count": 4
+      }
+    ],
+    "total": 113
+  },
+  "update": {
+    "changes": [
+      {
+        "operation": "replace",
+        "count": 5
+      },
+      {
+        "operation": "same",
+        "count": 104
+      },
+      {
+        "operation": "update",
+        "count": 4
+      }
+    ],
+    "total": 113
+  }
+}
++ magelift outputs
+{
+  "environment": "preview",
+  "outputs": {
+    "applicationURL": "https://drhkkyshlnbm7.cloudfront.net",
+    "cacheEndpoint": "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com",
+    "clusterArn": "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-c0fb1ce",
+    "clusterName": "acceptance-preview-runtime-cluster-c0fb1ce",
+    "cronServiceName": "acceptance-preview-runtime-cron-service-7407ede",
+    "cronTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:30",
+    "databaseWriter": "acceptance-preview-database-instance3437eae.cdwockum4edo.eu-north-1.rds.amazonaws.com",
+    "deployTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:30",
+    "deploymentRoleArn": "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-3b13a64",
+    "edgeDistributionId": "E4V2MR34KC6ZF",
+    "mediaURL": "https://d39q6nmcon8mqt.cloudfront.net",
+    "networkVpcId": "vpc-0705b6ee81bfaa7c7",
+    "privateSubnetIds": [
+      "subnet-06329bbd701950d59",
+      "subnet-07452e44cc2f55a37"
+    ],
+    "queueMode": "ecs-artemis",
+    "queueServiceName": "acceptance-preview-runtime-queue-service-5bc064f",
+    "queueTaskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-queue:15",
+    "searchEndpoint": "",
+    "securityGroupId": "sg-0bd4c3c41df5b27e2",
+    "serviceName": "acceptance-preview-runtime-web-service-676c858",
+    "taskDefinitionArn": "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:32",
+    "taskRoleArn": "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-c5c393b"
+  },
+  "stack": "acceptance-preview-aws-ecs-fargate"
+}
++ magelift health --mode runtime
+{
+  "environment": "preview",
+  "target": "aws.ecs-fargate",
+  "mode": "runtime",
+  "status": "healthy",
+  "checks": [
+    {
+      "id": "runtime.ecs.service",
+      "status": "healthy",
+      "message": "ECS service has 1 running of 1 desired tasks"
+    },
+    {
+      "id": "runtime.ecs.rollout",
+      "status": "healthy",
+      "message": "the primary ECS deployment rollout completed"
+    },
+    {
+      "id": "runtime.ecs.task.arn:aws:ecs:eu-north-1:669890779205:task/acceptance-preview-runtime-cluster-c0fb1ce/b16676d7256f4b288695df441d47216c",
+      "status": "healthy",
+      "message": "ECS task is running and healthy"
+    }
+  ]
+}
+acceptance cell-done cell=queueMode:ecs-artemis result=PASS
+aws acceptance ok profile=preview; destroy + assert_clean run on EXIT unless MAGELIFT_AWS_ACCEPTANCE_KEEP=true
+RESUME_END exit=0 2026-07-29T14:17:39Z
+DESTROY_START 2026-07-29T14:17:47Z
+Previewing update (acceptance-preview-aws-ecs-fargate):
+
+@ previewing update......
+ ~  magelift:aws:Stack acceptance-preview update [diff: ~imageDigest]
+ ~  magelift:aws:EcsRuntime acceptance-preview-runtime update [diff: ~image]
+@ previewing update....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replace [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-queue-service update [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service update [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service update [diff: ~taskDefinition]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task delete original [diff: ~containerDefinitions]
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Resources:
+    ~ 5 to update
+    +-4 to replace
+    9 changes. 104 unchanged
+
+Destroying (acceptance-preview-aws-ecs-fargate):
+
+ -  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard deleting (0s) 
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running deleting (0s) 
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu deleting (0s) 
+@ destroying....
+ -  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard deleted (1s) 
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running deleted (1s) 
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu deleted (1s) 
+@ destroying....
+ -  aws:route53:Record acceptance-preview-edge deleting (0s) 
+ -  aws:ecs:Service acceptance-preview-runtime-cron-service deleting (0s) 
+ -  aws:ecs:Service acceptance-preview-runtime-queue-service deleting (0s) 
+ -  aws:ecs:Service acceptance-preview-runtime-web-service deleting (0s) 
+@ destroying...................................
+ -  aws:route53:Record acceptance-preview-edge deleted (31s) 
+@ destroying....................
+ -  aws:ecs:Service acceptance-preview-runtime-cron-service deleted (48s) 
+ -  aws:ecs:Service acceptance-preview-runtime-queue-service deleted (48s) 
+@ destroying........................................................................................................................................................................................................................................................................................................................................................................................................
+ -  aws:ecs:Service acceptance-preview-runtime-web-service deleted (437s) 
+@ destroying....
+ -  aws:iam:RolePolicy acceptance-preview-execution-database-policy deleting (0s) 
+ -  aws:iam:RolePolicy acceptance-preview-deployment-policy deleting (0s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task deleting (0s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleting (0s) 
+ -  aws:iam:RolePolicy acceptance-preview-task-policy deleting (0s) 
+ -  aws:lb:Listener acceptance-preview-ingress-https deleting (0s) 
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx deleting (0s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleting (0s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleting (0s) 
+ -  aws:cloudfront:Distribution acceptance-preview-edge deleting (0s) 
+@ destroying....
+ -  aws:iam:RolePolicy acceptance-preview-execution-database-policy deleted (0.84s) 
+ -  aws:iam:RolePolicy acceptance-preview-deployment-policy deleted (0.99s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-queue-task deleted (1s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleted (1s) 
+@ destroying....
+ -  aws:iam:RolePolicy acceptance-preview-task-policy deleted (2s) 
+ -  aws:lb:Listener acceptance-preview-ingress-https deleted (2s) 
+@ destroying....
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx deleted (3s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleted (3s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleted (3s) 
+@ destroying.....................................................................................................................................................................................
+ -  aws:cloudfront:Distribution acceptance-preview-edge deleted (181s) 
+@ destroying....
+ -  aws:lb:LoadBalancer acceptance-preview-ingress-alb deleting (0s) 
+ -  aws:lb:TargetGroup acceptance-preview-ingress-web deleting (0s) 
+ -  aws:rds:Instance acceptance-preview-database-instance deleting (0s) 
+@ destroying.....
+ -  aws:lb:TargetGroup acceptance-preview-ingress-web deleted (1s) 
+@ destroying...................
+ -  aws:lb:LoadBalancer acceptance-preview-ingress-alb deleted (17s) 
+@ destroying.............................................................................................................................................................................................................................
+ -  aws:rds:Instance acceptance-preview-database-instance deleted (235s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-data-mysql deleting (0s) 
+ -  aws:ec2:EipAssociation acceptance-preview-network-fck-nat-eip-assoc-01 deleting (0s) 
+ -  aws:ec2:Route acceptance-preview-network-private-default-01 deleting (0s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-search-https deleting (0s) 
+ -  aws:ec2:Route acceptance-preview-network-private-default-02 deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-cache deleting (0s) 
+ -  aws:ecs:Cluster acceptance-preview-runtime-cluster deleting (0s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-cache-valkey deleting (0s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-web-target deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-search deleting (0s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-edge-https deleting (0s) 
+ -  magelift:aws:Ingress acceptance-preview-ingress deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-queue-https deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-edge-target deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-data deleting (0s) 
+ -  aws:elasticache:ReplicationGroup acceptance-preview-cache-cache deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-https deleting (0s) 
+ -  aws:rds:SubnetGroup acceptance-preview-database-subnets deleting (0s) 
+ -  aws:iam:RolePolicy acceptance-preview-runtime-execution-logs-policy deleting (0s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-queue-amqps deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-queue deleting (0s) 
+ -  aws:ecs:Service acceptance-preview-queue-broker-service deleting (0s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-data-mysql deleted (1s) 
+@ destroying....
+ -  aws:ec2:Route acceptance-preview-network-private-default-01 deleted (1s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-search-https deleted (3s) 
+ -  aws:ec2:EipAssociation acceptance-preview-network-fck-nat-eip-assoc-01 deleted (3s) 
+@ destroying....
+ -  aws:ec2:Route acceptance-preview-network-private-default-02 deleted (3s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-cache deleted (3s) 
+ -  aws:ecs:Cluster acceptance-preview-runtime-cluster deleted (4s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-cache-valkey deleted (4s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-search deleted (5s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-web-target deleted (5s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-edge-https deleted (5s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-edge-target deleted (6s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-queue-https deleted (7s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-data deleted (7s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-https deleted (8s) 
+ -  aws:rds:SubnetGroup acceptance-preview-database-subnets deleted (8s) 
+@ destroying....
+ -  aws:iam:RolePolicy acceptance-preview-runtime-execution-logs-policy deleted (9s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-queue-amqps deleted (9s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-queue deleted (9s) 
+@ destroying...........................................................................................
+ -  aws:ecs:Service acceptance-preview-queue-broker-service deleted (98s) 
+@ destroying..........................................................................................................................................................................................
+ -  aws:elasticache:ReplicationGroup acceptance-preview-cache-cache deleted (281s) 
+@ destroying....
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-01 deleting (0s) 
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-02 deleting (0s) 
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-01 deleting (0s) 
+ -  magelift:aws:RdsMysql acceptance-preview-database deleting (0s) 
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-02 deleting (0s) 
+ -  aws:ec2:Eip acceptance-preview-network-fck-nat-eip-01 deleting (0s) 
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-01 deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-cache deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-queue deleting (0s) 
+ -  magelift:aws:EcsRuntime acceptance-preview-runtime deleting (0s) 
+ -  aws:s3:BucketPolicy acceptance-preview-storage-policy deleting (0s) 
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-02 deleting (0s) 
+ -  aws:servicediscovery:Service acceptance-preview-queue-discovery deleting (0s) 
+ -  aws:ec2:VpcEndpoint acceptance-preview-network-endpoint-s3 deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-search deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-web deleting (0s) 
+ -  aws:elasticache:SubnetGroup acceptance-preview-cache deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-data deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-edge deleting (0s) 
+ -  aws:ec2:Route acceptance-preview-network-public-default-01 deleting (0s) 
+ -  aws:ec2:Route acceptance-preview-network-public-default-02 deleting (0s) 
+ -  aws:ec2:Instance acceptance-preview-network-fck-nat-01 deleting (0s) 
+@ destroying....
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-01 deleted (1s) 
+@ destroying....
+ -  aws:s3:BucketPolicy acceptance-preview-storage-policy deleted (1s) 
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-02 deleted (1s) 
+@ destroying....
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-public-association-02 deleted (2s) 
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-01 deleted (2s) 
+@ destroying....
+ -  aws:servicediscovery:Service acceptance-preview-queue-discovery deleted (3s) 
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-private-association-01 deleted (3s) 
+@ destroying....
+ -  aws:ec2:Eip acceptance-preview-network-fck-nat-eip-01 deleted (4s) 
+ -  aws:ec2:RouteTableAssociation acceptance-preview-network-data-association-02 deleted (4s) 
+@ destroying....
+ -  aws:ec2:SecurityGroup acceptance-preview-security-cache deleted (5s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-queue deleted (6s) 
+@ destroying.....
+ -  aws:ec2:SecurityGroup acceptance-preview-security-search deleted (7s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-web deleted (7s) 
+ -  aws:elasticache:SubnetGroup acceptance-preview-cache deleted (8s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-edge deleted (8s) 
+@ destroying....
+ -  aws:ec2:SecurityGroup acceptance-preview-security-data deleted (9s) 
+ -  aws:ec2:Route acceptance-preview-network-public-default-01 deleted (9s) 
+@ destroying....
+ -  aws:ec2:Route acceptance-preview-network-public-default-02 deleted (9s) 
+@ destroying..........
+ -  aws:ec2:VpcEndpoint acceptance-preview-network-endpoint-s3 deleted (16s) 
+@ destroying....................................
+ -  aws:ec2:Instance acceptance-preview-network-fck-nat-01 deleted (49s) 
+@ destroying....
+ -  aws:s3:BucketOwnershipControls acceptance-preview-storage-ownership deleting (0s) 
+ -  aws:ec2:RouteTable acceptance-preview-network-data-routes-02 deleting (0s) 
+ -  aws:ec2:RouteTable acceptance-preview-network-public-routes-02 deleting (0s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task deleting (0s) 
+ -  aws:ec2:RouteTable acceptance-preview-network-public-routes-01 deleting (0s) 
+ -  magelift:aws:SecurityGroups acceptance-preview-security deleting (0s) 
+ -  aws:ec2:RouteTable acceptance-preview-network-data-routes-01 deleting (0s) 
+ -  aws:ec2:Subnet acceptance-preview-network-private-subnet-01 deleting (0s) 
+ -  aws:ec2:Subnet acceptance-preview-network-data-subnet-01 deleting (0s) 
+ -  aws:ec2:Subnet acceptance-preview-network-data-subnet-02 deleting (0s) 
+ -  aws:ec2:Subnet acceptance-preview-network-public-subnet-01 deleting (0s) 
+ -  aws:s3:BucketServerSideEncryptionConfiguration acceptance-preview-storage-encryption deleting (0s) 
+ -  aws:s3:BucketPublicAccessBlock acceptance-preview-storage-public-access deleting (0s) 
+ -  aws:ec2:InternetGateway acceptance-preview-network-igw deleting (0s) 
+ -  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns deleting (0s) 
+ -  aws:ec2:Subnet acceptance-preview-network-private-subnet-02 deleting (0s) 
+ -  aws:ec2:RouteTable acceptance-preview-network-private-routes-01 deleting (0s) 
+ -  aws:ec2:RouteTable acceptance-preview-network-private-routes-02 deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-network-fck-nat-sg deleting (0s) 
+ -  aws:s3:BucketVersioning acceptance-preview-storage-versioning deleting (0s) 
+ -  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy deleting (0s) 
+ -  aws:s3:BucketLifecycleConfiguration acceptance-preview-storage-lifecycle deleting (0s) 
+ -  aws:ec2:Subnet acceptance-preview-network-public-subnet-02 deleting (0s) 
+ -  aws:cloudfront:Distribution acceptance-preview-storage-cdn deleting (0s) 
+@ destroying.....
+ -  aws:s3:BucketOwnershipControls acceptance-preview-storage-ownership deleted (1s) 
+ -  aws:ec2:RouteTable acceptance-preview-network-data-routes-01 deleted (2s) 
+@ destroying....
+ -  aws:ec2:Subnet acceptance-preview-network-private-subnet-01 deleted (2s) 
+ -  aws:ec2:Subnet acceptance-preview-network-data-subnet-01 deleted (3s) 
+@ destroying....
+ -  aws:ec2:Subnet acceptance-preview-network-data-subnet-02 deleted (3s) 
+ -  aws:ec2:Subnet acceptance-preview-network-public-subnet-01 deleted (3s) 
+ -  aws:s3:BucketServerSideEncryptionConfiguration acceptance-preview-storage-encryption deleted (4s) 
+@ destroying....
+ -  aws:s3:BucketPublicAccessBlock acceptance-preview-storage-public-access deleted (4s) 
+@ destroying....
+ -  aws:ec2:InternetGateway acceptance-preview-network-igw deleted (5s) 
+@ destroying....
+ -  aws:ec2:Subnet acceptance-preview-network-private-subnet-02 deleted (6s) 
+ -  aws:ec2:RouteTable acceptance-preview-network-private-routes-01 deleted (7s) 
+@ destroying....
+ -  aws:ec2:RouteTable acceptance-preview-network-private-routes-02 deleted (7s) 
+ -  aws:s3:BucketVersioning acceptance-preview-storage-versioning deleted (8s) 
+@ destroying....
+ -  aws:ec2:SecurityGroup acceptance-preview-network-fck-nat-sg deleted (8s) 
+ -  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy deleted (8s) 
+@ destroying....
+ -  aws:s3:BucketLifecycleConfiguration acceptance-preview-storage-lifecycle deleted (9s) 
+@ destroying....
+ -  aws:ec2:RouteTable acceptance-preview-network-public-routes-01 deleted (10s) 
+@ destroying....
+ -  aws:ecs:TaskDefinition acceptance-preview-queue-broker-task deleted (11s) 
+ -  aws:ec2:RouteTable acceptance-preview-network-public-routes-02 deleted (11s) 
+@ destroying....
+ -  aws:ec2:RouteTable acceptance-preview-network-data-routes-02 deleted (12s) 
+ -  aws:ec2:Subnet acceptance-preview-network-public-subnet-02 deleted (13s) 
+@ destroying.......................................
+ -  aws:servicediscovery:PrivateDnsNamespace acceptance-preview-queue-ns deleted (48s) 
+@ destroying...................................................................................................................................................
+ -  aws:cloudfront:Distribution acceptance-preview-storage-cdn deleted (193s) 
+@ destroying....
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-deploy-logs deleting (0s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-web-logs deleting (0s) 
+ -  aws:iam:Role acceptance-preview-runtime-task-role deleting (0s) 
+ -  aws:wafv2:WebAcl acceptance-preview-edge deleting (0s) 
+ -  aws:cloudfront:OriginAccessControl acceptance-preview-storage-oac deleting (0s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-cron-logs deleting (0s) 
+ -  aws:iam:Role acceptance-preview-runtime-execution-role deleting (0s) 
+ -  aws:iam:Role acceptance-preview-runtime-deployment-role deleting (0s) 
+ -  aws:s3:Bucket acceptance-preview-storage-bucket deleting (0s) 
+ -  aws:ec2:Vpc acceptance-preview-network-vpc deleting (0s) 
+ -  aws:cloudfront:OriginRequestPolicy acceptance-preview-edge-origin deleting (0s) 
+@ destroying....
+ -  aws:cloudfront:OriginAccessControl acceptance-preview-storage-oac deleted (0.69s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-cron-logs deleted (1s) 
+@ destroying....
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-deploy-logs deleted (1s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-web-logs deleted (1s) 
+@ destroying....
+ -  aws:iam:Role acceptance-preview-runtime-task-role deleted (2s) 
+@ destroying....
+ -  aws:wafv2:WebAcl acceptance-preview-edge deleted (3s) 
+ -  aws:iam:Role acceptance-preview-runtime-execution-role deleted (3s) 
+ -  aws:iam:Role acceptance-preview-runtime-deployment-role deleted (4s) 
+@ destroying....
+ -  aws:s3:Bucket acceptance-preview-storage-bucket deleted (4s) 
+ -  aws:cloudfront:OriginRequestPolicy acceptance-preview-edge-origin deleted (5s) 
+@ destroying....
+ -  aws:ec2:Vpc acceptance-preview-network-vpc deleted (5s) 
+@ destroying......
+ -  magelift:aws:ObservabilityLogGroups acceptance-preview-observability deleting (0s) 
+ -  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime deleting (0s) 
+ -  magelift:aws:Edge acceptance-preview-edge deleting (0s) 
+ -  magelift:aws:Observability acceptance-preview-observability deleting (0s) 
+ -  magelift:aws:Network acceptance-preview-network deleting (0s) 
+ -  magelift:aws:MediaStorage acceptance-preview-storage deleting (0s) 
+ -  aws:ecs:Cluster acceptance-preview-queue-broker-cluster deleting (0s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs deleting (0s) 
+@ destroying.......
+ -  aws:ecs:Cluster acceptance-preview-queue-broker-cluster deleted (3s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-queue-broker-logs deleted (3s) 
+@ destroying......
+ -  pulumi:providers:aws acceptance-preview-global deleting (0s) 
+ -  magelift:aws:RabbitMqQueue acceptance-preview-queue deleting (0s) 
+ -  magelift:aws:Valkey acceptance-preview-cache deleting (0s) 
+ -  pulumi:providers:aws acceptance-preview-regional deleting (0s) 
+ -  magelift:aws:Stack acceptance-preview deleting (0s) 
+ -  pulumi:providers:aws acceptance-preview-global deleted (0.38s) 
+@ destroying....
+ -  pulumi:providers:aws acceptance-preview-regional deleted (1s) 
+@ destroying.....
+ -  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate deleting (0s) 
+@ destroying.....
+ -  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate deleted (0.89s) 
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Resources:
+    - 113 deleted
+
+Duration: 23m29s
+
+The resources in the stack have been deleted, but the history and configuration associated with the stack are still maintained. 
+If you want to remove the stack completely, run `pulumi stack rm acceptance-preview-aws-ecs-fargate`.
+{
+  "environment": "preview",
+  "stack": "acceptance-preview-aws-ecs-fargate",
+  "preview": {
+    "changes": [
+      {
+        "operation": "replace",
+        "count": 4
+      },
+      {
+        "operation": "same",
+        "count": 104
+      },
+      {
+        "operation": "update",
+        "count": 5
+      }
+    ],
+    "total": 113
+  },
+  "update": {
+    "changes": [
+      {
+        "operation": "delete",
+        "count": 113
+      }
+    ],
+    "total": 113
+  }
+}
+DESTROY_EXIT:0 2026-07-29T14:41:25Z
++ assert_clean tag=magelift:project=acceptance region=eu-north-1
+assert_clean ok
+CLEAN_ASSERT:

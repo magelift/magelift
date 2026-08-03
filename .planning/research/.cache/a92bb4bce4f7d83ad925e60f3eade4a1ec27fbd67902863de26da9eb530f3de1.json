@@ -1,0 +1,1 @@
+{"content":"Magento dump import standard is drop/recreate database then pipe gunzip|sed DEFINER strip|mysql. Offline proof should use mysql client or docker exec into magelift dev MySQL 8.4 (root/magento). Schema-replace converges interrupted re-runs.","source":"web","provider":"websearch","confidence":"MEDIUM","fetched_at":"2026-07-29T15:53:55.357Z","ttl":86400000,"kind":"web"}
