@@ -1,0 +1,6 @@
+# Replace with the confirmed maintainer team before enabling required reviews.
+* @acourtiol
+
+/.github/ @acourtiol
+/docs/ @acourtiol
+/SECURITY.md @acourtiol

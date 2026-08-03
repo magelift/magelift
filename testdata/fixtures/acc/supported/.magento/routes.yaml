@@ -1,0 +1,4 @@
+# Synthetic ACC routes for MageLift import CI.
+"https://staging.example.com/":
+  type: upstream
+  upstream: "sample-shop:http"

@@ -1,0 +1,11 @@
+# Synthetic ACC app config for MageLift import CI (IMPORT-06 clean-room).
+# Config-only — no Magento application source.
+name: sample-shop
+type: php:8.5
+relationships:
+  database: "mysql:mysql"
+  redis: "redis:redis"
+crons:
+  magento:
+    spec: "*/5 * * * *"
+    cmd: "php bin/magento cron:run"

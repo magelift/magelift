@@ -1,0 +1,7 @@
+{
+    "name": "magelift/build-fixture",
+    "description": "Minimal fixture for the isolated Magento build lifecycle",
+    "type": "project",
+    "license": "Apache-2.0",
+    "require": {}
+}

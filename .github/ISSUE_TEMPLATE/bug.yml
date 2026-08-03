@@ -1,0 +1,71 @@
+name: Bug report
+description: Something does not work as documented or expected
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. For security issues, use private reporting in
+        [SECURITY.md](https://github.com/acourtiol/magelift/blob/main/SECURITY.md)
+        instead of a public issue.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong in one or two sentences?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - Configuration / schema
+        - AWS provider
+        - GCP provider (experimental)
+        - Builds / images
+        - Local development
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps, commands, and relevant magelift.yaml snippets (redact secrets).
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages and relevant log excerpts.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: MageLift version / commit
+      description: Output of `magelift version` or the git SHA you built from.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Go version (if building from source), cloud account notes (region only — no credentials).
+      value: |
+        - OS:
+        - Go (if from source):
+        - Target provider/runtime:
+        - Environment class (preview / staging / production):

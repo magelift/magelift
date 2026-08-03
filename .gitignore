@@ -1,0 +1,42 @@
+# Generated documentation
+/site/
+
+# Build and test output
+/bin/
+/dist/
+/coverage/
+*.out
+/build/vendor/
+/build/.phpunit.cache/
+/build/.phpstan/
+
+# Marketing site deps / build
+/websites/**/node_modules/
+/websites/**/dist/
+/websites/**/.astro/
+
+# Local state and credentials
+.env
+.env.*
+!.env.example
+.magelift/
+.pulumi/
+.codebase-memory/
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+
+# AI agent tooling: local caches and vendored third-party skills carry their own
+# licenses and must never enter this repository's audited license surface.
+# The generated project guide is the one tracked exception.
+.claude/*
+!.claude/CLAUDE.md
+.agents/
+.cursor/
+.serena/
+skills-lock.json
+
+# Local planning / agent scratch (never commit to the public remote)
+.planning/

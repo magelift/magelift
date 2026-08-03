@@ -1,0 +1,40 @@
+{
+    "name": "magelift/build",
+    "description": "Lifecycle primitives for MageLift application builds",
+    "type": "library",
+    "bin": [
+        "bin/magelift-build-runner"
+    ],
+    "license": "Apache-2.0",
+    "require": {
+        "php": "^8.2"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.2.5",
+        "phpunit/phpunit": "^11.5.56",
+        "vimeo/psalm": "^6.16.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "MageLift\\Build\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MageLift\\Build\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse --configuration=phpstan.neon --memory-limit=512M",
+        "psalm": "psalm --config=psalm.xml --no-cache --memory-limit=512M"
+    },
+    "config": {
+        "allow-plugins": {},
+        "sort-packages": true,
+        "platform": {
+            "php": "8.2.27"
+        }
+    },
+    "prefer-stable": true
+}
