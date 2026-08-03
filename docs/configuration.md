@@ -33,9 +33,6 @@ set, provide `provider: aws`, `kind: database`, `externalId` (instance ID or ARN
 and `endpoint` (writer hostname). MageLift does not create RDS when this block is
 set. Cloud SQL is not a configuration key in this milestone.
 
-Attach limits, egress ownership, and the manual detach path:
-[brownfield-attach.md](brownfield-attach.md).
-
 `build.staticContent.strategy` and `build.staticContent.threads` map PaaS
 `SCD_STRATEGY` / `SCD_THREADS` on import and become Magento SCD `-s` / `-j`.
 See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
