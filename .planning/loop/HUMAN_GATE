@@ -1,1 +1,1 @@
-Phase 3 offline plans 03-01…03-05 complete. REAL HUMAN_GATE: approve paid AWS free-tier spend before executing 03-06 (pass 1 of 3). Do not create stacks until spend OK.
+Spend APPROVED by maintainer 2026-07-29 for AWS (+GCP tooling available). Running 03-06 live AWS harness; mandatory destroy+assert_clean at end. GCP live cert remains Phase 7 (preview-only already in 03-05).
