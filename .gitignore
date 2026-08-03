@@ -10,6 +10,11 @@
 /build/.phpunit.cache/
 /build/.phpstan/
 
+# Marketing site deps / build
+/websites/**/node_modules/
+/websites/**/dist/
+/websites/**/.astro/
+
 # Local state and credentials
 .env
 .env.*

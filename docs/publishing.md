@@ -31,4 +31,15 @@ brownfield attach ships; Cloud SQL attach does not block v1.0.0.
 ## Evidence
 
 Committed acceptance samples live under [evidence/](evidence/README.md). Do not
-re-introduce private planner directories into this remote.
+re-introduce private planner directories into this public remote. Never commit
+real AWS account IDs, GCP project IDs, or personal domains — use env vars
+(`MAGELIFT_GCP_PROJECT`, `MAGELIFT_CUTOVER_HOST`) locally.
+
+## Launch checklist (remaining ops)
+
+1. Enable GitHub Pages (source: GitHub Actions) so `.github/workflows/docs.yml` deploys
+2. Cut `v1.0.0-rc.1` when [release-readiness](release-readiness.md) gates stay Closed and hosted CI minutes return
+3. Seed ≥3 `good first issue` labels ([github-labels.md](github-labels.md))
+4. Verify private vulnerability reporting is on for the repo
+5. Point `docs.magelift.com` / `www.magelift.com` when DNS is ready
+6. Move to `magelift` GitHub org when the quality bar is met (ORG-01)

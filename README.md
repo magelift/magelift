@@ -6,17 +6,18 @@ production; escape hatches stay explicit.
 
 > **Project status:** first public tag is `v1.0.0-rc.1`. After that tag,
 > [docs/versioning.md](docs/versioning.md) freezes the CLI/YAML contract surface
-> for the RC series. Do not treat untagged `main` as a stable release.
+> for the RC series. Do not treat untagged `main` as a stable release. Gates for
+> cutting the tag live in [docs/release-readiness.md](docs/release-readiness.md).
 
 ## Scope
 
-**Certified:** AWS ECS Fargate. **Experimental:** GCP GKE Autopilot, AWS EKS
-Autopilot, OVH MKS, Scaleway Kapsule. Multi-cloud is not claimed until two
-first-party targets are certified ([ADR 0007](docs/adr/0007-multi-provider-community-targets.md)).
+**Certified:** AWS ECS Fargate and GCP GKE Autopilot.
+**Experimental:** AWS EKS Autopilot, OVH MKS, Scaleway Kapsule.
+See the [capability matrix](docs/capability-matrix.md) and
+[ADR 0007](docs/adr/0007-multi-provider-community-targets.md).
 
-Presets keep YAML small. Power users open a [capability matrix](docs/capability-matrix.md)
-(queue engine, search mode, runtime, and more). Only certified cells are
-production-supported.
+Presets keep YAML small. Power users open the capability matrix (queue engine,
+search mode, runtime, and more). Only certified cells are production-supported.
 
 What it covers today:
 
@@ -29,6 +30,25 @@ What it covers today:
 MageLift is not a hosting service. Each cloud lives under
 `internal/cloud/<provider>/` behind `platform.StackModule`
 ([adding a provider](docs/adding-a-provider.md)).
+
+## Install
+
+Until Homebrew is published for your platform, prefer **GitHub Release archives**
+(checksums + SBOM from GoReleaser on tag). After `v1.0.0-rc.1`:
+
+1. Download the archive for your OS/arch from the Releases page.
+2. Verify the checksum, extract `magelift`, put it on `PATH`.
+3. `magelift version`
+
+Optional later: Homebrew cask from the project tap when the release workflow
+publishes it (`HOMEBREW_TAP_GITHUB_TOKEN`). From source (serial on small machines):
+
+```sh
+GOMAXPROCS=1 GOFLAGS=-p=1 go install github.com/acourtiol/magelift/cmd/magelift@latest
+```
+
+First-hour path: [getting started](docs/getting-started.md) →
+[sample-shop](examples/sample-shop) → [local vs cloud](docs/local-vs-cloud.md).
 
 ## Development
 

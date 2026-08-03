@@ -21,8 +21,8 @@ A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`
 3. Capability packages (`network`, `database`, …) as needed; keep them typed and small.
 4. Optional day-2 ports on the module (`HasOps`, `HasBootstrap`, `HasState`,
    `HasSecrets`, `HasRuntimeObserve`). Return `ErrNotSupported` until ready.
-   See [ADR 0009](adr/0009-day2-magento-ports.md). GCP’s experimental module
-   implements these in `internal/cloud/gcp/ops` (GitHub WIF still deferred).
+   See [ADR 0009](adr/0009-day2-magento-ports.md). GCP’s certified module
+   implements these in `internal/cloud/gcp/ops`.
 5. `internal/config` — provider block, enums, validation, then `make generate` for schema.
 6. `cmd/magelift` — `RegisterModule(...)` in the production binary (keep
    Pulumi SDKs out of `internal/cli` so `gendocs` and CLI unit tests stay
@@ -44,8 +44,8 @@ fine.
 | Experimental | In-tree; may be infra-only; labeled in docs/CLI |
 | Community | Out-of-tree module; custom binary calls `RegisterModule` |
 
-Two certified first-party targets are required before a multi-cloud claim
-([ADR 0007](adr/0007-multi-provider-community-targets.md)).
+Two certified first-party targets (AWS + GCP) already satisfy the multi-cloud
+claim gate ([ADR 0007](adr/0007-multi-provider-community-targets.md)).
 
 For AWS product choices (runtime, natMode, databaseEngine, searchMode), see the
 matrix in [architecture.md](architecture.md#aws-magento-product-matrix). Full Magento
@@ -63,7 +63,8 @@ path cannot import `internal/platform` or `internal/cli`. Community providers
 today live in this repository's module graph (custom `main` under
 `examples/custom-cli`, or a fork). Do not claim publish-to-proxy.golang.org of
 an external module that imports those packages. Exporting a public platform API
-is out of Phase 2 scope.
+is a follow-on public API decision — not required to author an in-tree or
+fork-based custom binary today.
 
 ### Clean-cache verification (RELEASE-03)
 

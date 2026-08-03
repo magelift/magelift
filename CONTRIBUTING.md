@@ -2,6 +2,25 @@
 
 Thanks for helping. Open an issue before a large change.
 
+## 30-minute first PR
+
+Pick a `good first issue`, or:
+
+1. Fix a typo / dead link in `docs/` or `README.md`.
+2. Add a unit test beside an existing `_test.go` that already covers a nearby case.
+3. Extend `examples/custom-cli` comments if a provider-author step confused you.
+
+Then:
+
+```sh
+# After: composer install --working-dir=build  (once)
+make verify   # or at least: make docs && GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/<pkg>/ -count=1
+```
+
+Open a PR with: what changed, how you verified, risk (usually “docs/test only”).
+Maintainers merge Dependabot when CI is green and the bump is patch/minor in an
+already-pinned ecosystem group — major bumps need a human review note.
+
 ## Prerequisites
 
 For a full green `make verify` (the default local gate):
@@ -64,7 +83,7 @@ otherwise.
 | Default local gate | `make verify` |
 | Account-free AWS paths | `make floci-test` |
 | Real AWS (destroy on exit) | `make aws-acceptance-local` — read `docs/aws-acceptance.md` |
-| Real GCP experimental | `make gcp-acceptance-local` — read `docs/gcp-acceptance.md` |
+| Real GCP (certified path; destroy on exit) | `make gcp-acceptance-local` — read `docs/gcp-acceptance.md` |
 
 ### Local verification vs hosted CI
 

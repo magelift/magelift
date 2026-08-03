@@ -1,5 +1,5 @@
 site_name: MageLift
-site_description: Open-source Magento application platform (AWS certified, multi-provider ports)
+site_description: Open-source Magento application platform (AWS + GCP certified)
 repo_url: https://github.com/acourtiol/magelift
 repo_name: acourtiol/magelift
 docs_dir: docs
@@ -8,10 +8,13 @@ theme:
   name: mkdocs
 nav:
   - Home: index.md
+  - Getting started: getting-started.md
+  - Local vs cloud: local-vs-cloud.md
+  - Compare to PaaS: compare-paas.md
+  - Leave PaaS in a weekend: weekend-migrate.md
+  - Storefront recipes: storefront-recipes.md
   - Architecture: architecture.md
   - Capability matrix: capability-matrix.md
-  - Local vs cloud: local-vs-cloud.md
-  - Getting started: getting-started.md
   - Adding a provider: adding-a-provider.md
   - Configuration: configuration.md
   - Compatibility: compatibility.md
@@ -35,6 +38,7 @@ nav:
   - Lint policy: lint-policy.md
   - Dependency policy: dependency-policy.md
   - GitHub labels: github-labels.md
+  - Versioning: versioning.md
   - Decisions:
       - ADR process: adr/README.md
       - "0001: AWS ECS Fargate v1": adr/0001-aws-ecs-fargate-v1.md

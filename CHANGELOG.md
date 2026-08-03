@@ -8,8 +8,10 @@ PRs. The format is based on Keep a Changelog.
 
 ### Added
 
-- Certify `gcp` / `gke-autopilot` after real-account acceptance (2026-08-02 matrix PASS) — multi-cloud claim for two first-party targets.
+- Certify `gcp` / `gke-autopilot` after real-account acceptance — multi-cloud claim for two first-party targets (account IDs redacted in public evidence).
 - Live free-tier AWS brownfield adopt confirm (existing VPC + RDS; describe-after-destroy).
+- Community Launch publishing decisions ([docs/publishing.md](docs/publishing.md)), committed acceptance evidence samples, MkDocs Pages workflow, and marketing site scaffold.
+- Cost vs PaaS comparison page and weekend migration packaging for evaluators.
 - Initial legal, governance, architecture, documentation, and repository baseline.
 - RC contract for first public tag `v1.0.0-rc.1` — see [docs/versioning.md](docs/versioning.md).
 - OpenSearch public-tag gate substitute: offline SigV4 wiring mocks, free-tier
@@ -25,5 +27,7 @@ PRs. The format is based on Keep a Changelog.
 
 ### Changed
 
+- Public git history replaced with a clean import; planner artifacts and personal cloud account identifiers are not published.
 - Release readiness gate board: OpenSearch live acceptance is post-tag / paid,
   not a public-tag blocker.
+- README / docs: GCP GKE Autopilot marked certified beside AWS ECS Fargate.
