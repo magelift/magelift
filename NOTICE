@@ -9,3 +9,8 @@ registered trademarks of Adobe Inc. in the United States and/or other countries.
 
 Third-party dependencies and bundled assets remain subject to their respective
 licenses and notices. Generated distributions must retain applicable notices.
+
+Notable third-party licenses that `go-licenses` cannot classify from nested
+package paths (license file is at the module root):
+
+- github.com/ovh/pulumi-ovh/sdk/v2 — Apache License 2.0 (OVHcloud)

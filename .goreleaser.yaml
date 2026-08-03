@@ -1,6 +1,10 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/goreleaser/goreleaser/v2.17.0/www/docs/static/schema.json
 version: 2
 
+# Local Macs: never run a full multi-target goreleaser release/build with default
+# parallelism — use scripts/release-smoke-local.sh (--single-target --parallelism=1).
+# Parallel cross-compiles have exhausted RAM/SWAP and caused kernel panics.
+
 project_name: magelift
 
 builds:
