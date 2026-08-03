@@ -12,6 +12,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Six cross-compiles of the Pulumi-heavy binary need wall time; keep under
+    # the hosted-runner kill window by serializing (see --parallelism 1).
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -26,10 +29,12 @@ jobs:
         with:
           distribution: goreleaser
           version: v2.17.0
-          # Cap parallelism: full matrix + Pulumi graph OOMs/kills ubuntu-latest mid-build.
-          args: release --clean --parallelism 2
+          # Parallelism 1: private 7 GB runners lose communication under
+          # concurrent Pulumi-graph cross-compiles (seen on v1.0.0-rc.1).
+          args: release --clean --parallelism 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOMAXPROCS: "1"
       - name: Verify signed checksums
         env:
           RELEASE_TAG: ${{ github.ref_name }}
