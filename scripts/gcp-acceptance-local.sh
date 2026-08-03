@@ -17,9 +17,25 @@ DRY_RUN="${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}"
 CELLS=()
 
 # GCP-scoped paths so AWS/GCP evidence do not clobber (ACCEPT-05).
+# lib-checkpoint.sh / lib-evidence.sh assign AWS defaults (.magelift/acceptance-*)
+# at source time; ${VAR:-gcp} would keep those and make should_skip_create_once
+# see AWS PASS cells → skip GCP create-once. Force GCP matrix unless the caller
+# set MAGELIFT_* or an absolute/tmp path (shape test).
 gcp_acceptance_paths() {
-	export ACCEPTANCE_CHECKPOINT="${ACCEPTANCE_CHECKPOINT:-.magelift/gcp-matrix/acceptance-checkpoint.json}"
-	export ACCEPTANCE_EVIDENCE="${ACCEPTANCE_EVIDENCE:-.magelift/gcp-matrix/matrix-results.md}"
+	if [[ -n "${MAGELIFT_ACCEPTANCE_CHECKPOINT:-}" ]]; then
+		export ACCEPTANCE_CHECKPOINT="$MAGELIFT_ACCEPTANCE_CHECKPOINT"
+	elif [[ "${ACCEPTANCE_CHECKPOINT:-}" == /* || "${ACCEPTANCE_CHECKPOINT:-}" == *gcp-matrix* ]]; then
+		export ACCEPTANCE_CHECKPOINT="$ACCEPTANCE_CHECKPOINT"
+	else
+		export ACCEPTANCE_CHECKPOINT=".magelift/gcp-matrix/acceptance-checkpoint.json"
+	fi
+	if [[ -n "${MAGELIFT_ACCEPTANCE_EVIDENCE:-}" ]]; then
+		export ACCEPTANCE_EVIDENCE="$MAGELIFT_ACCEPTANCE_EVIDENCE"
+	elif [[ "${ACCEPTANCE_EVIDENCE:-}" == /* || "${ACCEPTANCE_EVIDENCE:-}" == *gcp-matrix* ]]; then
+		export ACCEPTANCE_EVIDENCE="$ACCEPTANCE_EVIDENCE"
+	else
+		export ACCEPTANCE_EVIDENCE=".magelift/gcp-matrix/matrix-results.md"
+	fi
 }
 
 load_cells() {
@@ -196,6 +212,14 @@ fi
 export CLOUDSDK_CORE_PROJECT="$PROJECT"
 export GOOGLE_PROJECT="$PROJECT"
 
+# Magelift GCP DIY state is GCS. A global `pulumi login` to an AWS acceptance S3
+# bucket (common on this machine) makes destroy/preview fail with S3 301 and
+# falsely blocks create-once. Default to the bootstrap bucket name when unset.
+if [[ -z "${PULUMI_BACKEND_URL:-}" ]]; then
+	export PULUMI_BACKEND_URL="gs://magelift-${PROJECT}-${REGION}-${NAME}-${PROFILE}-state"
+	printf '+ defaulting PULUMI_BACKEND_URL=%s\n' "$PULUMI_BACKEND_URL"
+fi
+
 # Producer deletes (SQL/Memorystore/GKE/SCP) are async; poll before PSA peering/VPC teardown.
 FORCE_CLEAN_POLL_INTERVAL_SECS="${MAGELIFT_GCP_FORCE_CLEAN_POLL_INTERVAL_SECS:-30}"
 FORCE_CLEAN_TIMEOUT_SECS="${MAGELIFT_GCP_FORCE_CLEAN_TIMEOUT_SECS:-1200}"
@@ -280,7 +304,11 @@ run() {
 created=0
 cleanup() {
 	local ec=$?
-	if [[ "$created" == 1 && "${MAGELIFT_GCP_ACCEPTANCE_KEEP:-false}" != true ]]; then
+	if [[ "${MAGELIFT_GCP_ACCEPTANCE_KEEP:-false}" == true ]]; then
+		printf '+ KEEP=true; skipping destroy/force_clean/assert_clean (stack retained for resume)\n'
+		exit "$ec"
+	fi
+	if [[ "$created" == 1 ]]; then
 		printf '+ magelift destroy --yes (EXIT trap)\n'
 		ensure_gcp_adc || refresh_gcp_access_token || true
 		run destroy --yes || printf 'destroy failed; attempting force_clean_orphans\n' >&2
@@ -379,18 +407,20 @@ pulumi_stack_has_managed_resources() {
 
 preview_reports_stale_state() {
 	local preview_raw preview_json stale
+	# Preview failure (wrong backend, missing stack, auth) is not proof of stale
+	# managed resources — pulumi_stack_has_managed_resources already covered export.
 	preview_raw="$(run preview 2>/dev/null)" || {
-		printf 'preview_reports_stale_state: magelift preview failed; treating as stale\n' >&2
-		return 0
+		printf 'preview_reports_stale_state: magelift preview failed; treating as clean (no proof of stale)\n' >&2
+		return 1
 	}
 	if ! command -v jq >/dev/null 2>&1; then
-		printf 'preview_reports_stale_state: jq missing; treating as stale\n' >&2
-		return 0
+		printf 'preview_reports_stale_state: jq missing; treating as clean (no proof of stale)\n' >&2
+		return 1
 	fi
 	preview_json="$(magelift_json_from_output "$preview_raw")"
 	if ! stale="$(printf '%s' "$preview_json" | jq -e '[.preview.changes[]? | select(.operation == "same" or .operation == "update" or .operation == "delete") | .count] | add // 0' 2>/dev/null)"; then
-		printf 'preview_reports_stale_state: jq parse failed; treating as stale state\n' >&2
-		return 0
+		printf 'preview_reports_stale_state: jq parse failed; treating as clean (no proof of stale)\n' >&2
+		return 1
 	fi
 	[[ "${stale:-0}" -gt 0 ]]
 }
@@ -654,16 +684,31 @@ acceptance_account_id() {
 }
 
 application_url_from_outputs() {
-	local raw json url
-	raw="$(run outputs 2>/dev/null)" || return 1
+	local raw json url svc kc_path
+	raw="$(run outputs 2>/dev/null)" || true
 	json="$(magelift_json_from_output "$raw")"
-	if ! command -v jq >/dev/null 2>&1; then
-		return 1
+	if command -v jq >/dev/null 2>&1 && [[ -n "$json" ]]; then
+		url="$(printf '%s' "$json" | jq -r '
+			.outputs.applicationURL // .outputs.applicationUrl // .applicationURL // .applicationUrl //
+			.outputs.ingressHostname // .outputs.loadBalancerIP // empty
+		' 2>/dev/null | head -n 1)"
 	fi
-	url="$(printf '%s' "$json" | jq -r '
-		.outputs.applicationURL // .outputs.applicationUrl // .applicationURL // .applicationUrl //
-		.outputs.ingressHostname // .outputs.loadBalancerIP // empty
-	' 2>/dev/null | head -n 1)"
+	# Autopilot often skips LB await — applicationURL stays empty while the
+	# Service eventually gets an external IP. Fall back to kubectl.
+	if [[ -z "$url" || "$url" == "null" ]] && command -v kubectl >/dev/null 2>&1; then
+		kc_path="${LOG_DIR}/cutover-dns.kubeconfig"
+		if PULUMI_CONFIG_PASSPHRASE_FILE="${PULUMI_CONFIG_PASSPHRASE_FILE:-}" \
+			pulumi_cli stack output kubeconfig --stack "$(pulumi_fq_stack_ref)" --show-secrets >"$kc_path" 2>/dev/null; then
+			chmod 600 "$kc_path"
+			svc="${NAME}-${PROFILE}-app-web"
+			for _ in $(seq 1 30); do
+				url="$(kubectl --kubeconfig="$kc_path" get svc "$svc" -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+				[[ -z "$url" ]] && url="$(kubectl --kubeconfig="$kc_path" get svc "$svc" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)"
+				[[ -n "$url" ]] && break
+				sleep 10
+			done
+		fi
+	fi
 	[[ -n "$url" && "$url" != "null" ]] || return 1
 	# Strip scheme for DNS TARGET when present.
 	url="${url#https://}"
@@ -689,7 +734,8 @@ prove_wif_token_exchange() {
 		printf '+ bootstrap:wif Act proof flag MAGELIFT_GCP_WIF_ACT_PROOF=1 (operator attested Act smoke)\n'
 		return 0
 	fi
-	ci_sa="${MAGELIFT_GCP_WIF_SERVICE_ACCOUNT:-${NAME}-${PROFILE}-ci@${PROJECT}.iam.gserviceaccount.com}"
+	# Bootstrap SA ID is ml-<project>-<env>-ci (internal/cloud/gcp/bootstrap/identity.go).
+	ci_sa="${MAGELIFT_GCP_WIF_SERVICE_ACCOUNT:-ml-${NAME}-${PROFILE}-ci@${PROJECT}.iam.gserviceaccount.com}"
 	pool_hint="${MAGELIFT_GCP_WIF_PROVIDER:-}"
 	printf '+ bootstrap:wif attempting gcloud STS/impersonation token exchange for %s\n' "$ci_sa"
 	if [[ -n "$pool_hint" ]]; then
@@ -766,10 +812,52 @@ run_gcp_cell() {
 		;;
 	migrate:dump)
 		# D-03: after first successful deploy; kube dumpimport runner (07-04) for private SQL.
-		printf '+ cell migrate:dump via env import-dump (MAGELIFT_DUMPIMPORT_RUNNER=kube)\n'
+		# Config already has seedDump, but journal must be StatusRecorded (ADR 0010) —
+		# env create --dump can't re-run when the overlay already exists.
+		# Acceptance health image has no mysql client — schedule a short-lived
+		# mysql:8 client pod on the cluster VPC, then pipe tiny.sql via RunnerKube.
+		printf '+ cell migrate:dump init journal + kube mysql-client pod + env import-dump\n'
+		mkdir -p "${WORKDIR}/.magelift/seed-dumps"
+		python3 - "$WORKDIR" "$PROFILE" "$SEED_DUMP" <<'PY'
+import json, pathlib, sys, datetime
+root, env, dump = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+path = root / ".magelift" / "seed-dumps" / f"{env}.json"
+path.write_text(json.dumps({
+    "status": "recorded",
+    "dumpPath": dump,
+    "updatedAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+}, indent=2) + "\n")
+print(f"seed dump journal recorded at {path}")
+PY
+		local kc_path db_host db_pass dump_pod
+		kc_path="${LOG_DIR}/migrate-dump.kubeconfig"
+		dump_pod="mlgcpwt-dumpimport-mysql"
+		# Pulumi DIY backend holds decrypted secret outputs (CLI outputs redacts).
+		PULUMI_CONFIG_PASSPHRASE_FILE="${PULUMI_CONFIG_PASSPHRASE_FILE:-}" \
+			pulumi_cli stack output kubeconfig --stack "$(pulumi_fq_stack_ref)" --show-secrets >"$kc_path"
+		chmod 600 "$kc_path"
+		db_host="$(pulumi_cli stack output databaseWriter --stack "$(pulumi_fq_stack_ref)")"
+		db_pass="$(gcloud secrets versions access latest --secret="${NAME}-${PROFILE}-sql-db" --project="$PROJECT")"
+		if ! command -v kubectl >/dev/null 2>&1; then
+			printf 'migrate:dump requires kubectl on PATH\n' >&2
+			return 1
+		fi
+		kubectl --kubeconfig="$kc_path" delete pod "$dump_pod" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+		kubectl --kubeconfig="$kc_path" run "$dump_pod" \
+			--image=mysql:8.4 \
+			--restart=Never \
+			--command -- sleep 900
+		kubectl --kubeconfig="$kc_path" wait --for=condition=Ready "pod/$dump_pod" --timeout=180s
 		MAGELIFT_DUMPIMPORT_RUNNER=kube \
-			"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json \
+		MAGELIFT_DUMPIMPORT_HOST="$db_host" \
+		MAGELIFT_DUMPIMPORT_USER=magento \
+		MAGELIFT_DUMPIMPORT_PASSWORD="$db_pass" \
+		MAGELIFT_DUMPIMPORT_DATABASE=magento \
+		MAGELIFT_DUMPIMPORT_POD="$dump_pod" \
+		MAGELIFT_DUMPIMPORT_KUBECONFIG="$kc_path" \
+			"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --yes --output json \
 			env import-dump "$PROFILE" | tee "${LOG_DIR}/cell-migrate-dump.json"
+		kubectl --kubeconfig="$kc_path" delete pod "$dump_pod" --ignore-not-found --wait=false >/dev/null 2>&1 || true
 		;;
 	cost:estimate)
 		run cost | tee "${LOG_DIR}/cell-cost-estimate.json"
@@ -824,7 +912,9 @@ live_cell_loop() {
 		record_cell "$cell" "$result"
 		printf 'acceptance cell-done cell=%s result=%s\n' "$cell" "$result" >&2
 		if [[ "$rc" -ne 0 ]]; then
-			printf 'acceptance cell failed; recorded FAIL for resume (re-run with KEEP/RESUME)\n' >&2
+			# Keep the paid stack so resume can continue cells without a second create.
+			export MAGELIFT_GCP_ACCEPTANCE_KEEP=true
+			printf 'acceptance cell failed; KEEP=true — re-run with MAGELIFT_GCP_ACCEPTANCE_RESUME=1 (no destroy)\n' >&2
 			return 1
 		fi
 	done
@@ -851,19 +941,19 @@ if [[ "$MODE" == up ]]; then
 		printf 'acceptance resume: skipping create-once (stack assumed present; KEEP/RESUME/checkpoint)\n'
 	else
 		printf 'acceptance create-once\n'
-		printf '+ magelift bootstrap (GCS DIY state bucket)\n'
-		run bootstrap --yes 2>&1 | tee "${LOG_DIR}/bootstrap.json" || true
+		printf '+ magelift bootstrap (GCS DIY state bucket + WIF)\n'
+		run bootstrap --yes --github-owner "$GITHUB_OWNER" --github-repo "$GITHUB_REPO" \
+			2>&1 | tee "${LOG_DIR}/bootstrap.json" || true
+		# Infra-only create-once: Magento migrate/cutover live in deploy:candidate (and
+		# day2:*) cells. A full deploy --digest here fails closed on health-image migrate
+		# or redacted kubeconfig and the EXIT trap destroys the paid Autopilot stack.
 		if digest_is_placeholder; then
-			# Placeholder digests cannot run Magento migrate; validate infra graph + outputs.
-			# Full Magento cells need a pullable digest — set MAGELIFT_GCP_ACCEPTANCE_DIGEST.
-			printf '+ magelift deploy --yes --infra-only (placeholder digest)\n'
-			"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json \
-				deploy --yes --infra-only | tee "${LOG_DIR}/deploy.json"
+			printf '+ magelift deploy --yes --infra-only (placeholder digest; Magento cells need pullable DIGEST)\n'
 		else
-			printf '+ magelift deploy --yes (create-once with pullable digest)\n'
-			"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json \
-				deploy --yes --digest "$DIGEST" | tee "${LOG_DIR}/deploy.json"
+			printf '+ magelift deploy --yes --infra-only (create-once; Magento via deploy:candidate cell)\n'
 		fi
+		"$BIN" --config "$CONFIG" --env "$PROFILE" --no-interaction --output json \
+			deploy --yes --infra-only | tee "${LOG_DIR}/deploy.json"
 		run outputs | tee "${LOG_DIR}/outputs.json"
 	fi
 
