@@ -282,9 +282,21 @@ func outputsCommand(o *options) *cobra.Command {
 		if err != nil {
 			return fmt.Errorf("create infrastructure backend: %w", err)
 		}
-		outputs, err := backend.Outputs(cmd.Context())
-		if err != nil {
-			return fmt.Errorf("read infrastructure outputs: %w", err)
+		var outputs map[string]any
+		// Prefer redacted secrets for user-facing JSON (kubeconfig, DB passwords).
+		// Fail closed: never fall through to decrypted Outputs on redaction error.
+		if redactor, ok := backend.(interface {
+			RedactedOutputs(context.Context) (map[string]any, error)
+		}); ok {
+			outputs, err = redactor.RedactedOutputs(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("read redacted infrastructure outputs: %w", err)
+			}
+		} else {
+			outputs, err = backend.Outputs(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("read infrastructure outputs: %w", err)
+			}
 		}
 		return o.write(map[string]any{"environment": environment, "stack": planned.StackName(), "outputs": outputs})
 	}}

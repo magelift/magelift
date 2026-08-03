@@ -69,6 +69,12 @@ func (b *PulumiBackend) Destroy(ctx context.Context, _ Request, diagnostics io.W
 
 // Outputs returns the last successful stack outputs without exposing the
 // Pulumi Automation API to CLI callers.
+//
+// Secret outputs are returned decrypted (Automation API already unwraps them
+// with the stack passphrase). Day-2 kube Steps and ClientFromOutputs need the
+// real kubeconfig string — redacting to {"secret": true} made deploy fail after
+// a successful Up with "Pulumi output \"kubeconfig\" must be a non-empty string".
+// CLI `magelift outputs` must call RedactedOutputs for user-facing JSON.
 func (b *PulumiBackend) Outputs(ctx context.Context) (map[string]any, error) {
 	if b == nil || b.stack == nil {
 		return nil, ErrPulumiStackRequired
@@ -77,6 +83,31 @@ func (b *PulumiBackend) Outputs(ctx context.Context) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	return mapStackOutputs(outputs), nil
+}
+
+// RedactedOutputs is Outputs with secret values replaced by {"secret": true}
+// for CLI display / evidence logs (never print kubeconfig or DB passwords).
+func (b *PulumiBackend) RedactedOutputs(ctx context.Context) (map[string]any, error) {
+	if b == nil || b.stack == nil {
+		return nil, ErrPulumiStackRequired
+	}
+	outputs, err := b.stack.Outputs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return redactSecretOutputs(outputs), nil
+}
+
+func mapStackOutputs(outputs auto.OutputMap) map[string]any {
+	result := make(map[string]any, len(outputs))
+	for name, output := range outputs {
+		result[name] = output.Value
+	}
+	return result
+}
+
+func redactSecretOutputs(outputs auto.OutputMap) map[string]any {
 	result := make(map[string]any, len(outputs))
 	for name, output := range outputs {
 		if output.Secret {
@@ -85,7 +116,7 @@ func (b *PulumiBackend) Outputs(ctx context.Context) (map[string]any, error) {
 		}
 		result[name] = output.Value
 	}
-	return result, nil
+	return result
 }
 
 func resourceChanges(changes *map[string]int) map[string]int {
