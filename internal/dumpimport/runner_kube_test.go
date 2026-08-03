@@ -204,21 +204,28 @@ func TestKubeRunnerTableDriven(t *testing.T) {
 				t.Fatalf("probe label = %q, want %q", label, tc.wantProbe)
 			}
 
-			sawPWD := false
+			sawShell := false
 			for _, call := range fake.calls {
+				joined := strings.Join(call, " ")
+				if strings.Contains(joined, opts.Password) {
+					t.Fatalf("password leaked into kubectl argv: %v", call)
+				}
+				if strings.Contains(joined, "MYSQL_PWD="+opts.Password) {
+					t.Fatalf("MYSQL_PWD=<secret> must not appear on argv: %v", call)
+				}
+				if strings.Contains(joined, "-p"+opts.Password) {
+					t.Fatalf("password leaked into mysql argv: %v", call)
+				}
 				mysqlArgs := afterDoubleDash(call)
 				if len(mysqlArgs) == 0 {
 					continue
 				}
-				if strings.Contains(strings.Join(mysqlArgs, " "), "-p"+opts.Password) {
-					t.Fatalf("password leaked into mysql argv: %v", mysqlArgs)
-				}
-				if containsArg(mysqlArgs, "MYSQL_PWD="+opts.Password) {
-					sawPWD = true
+				if containsArg(mysqlArgs, "sh") && containsArg(mysqlArgs, "-c") {
+					sawShell = true
 				}
 			}
-			if !sawPWD {
-				t.Fatal("expected MYSQL_PWD via env in at least one kubectl exec")
+			if !sawShell {
+				t.Fatal("expected in-pod sh -c password decode before mysql")
 			}
 		})
 	}

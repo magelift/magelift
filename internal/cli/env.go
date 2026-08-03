@@ -659,6 +659,34 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 			opts.ComposeProject = project
 		}
 	}
+	// Private Cloud SQL (GCP/EKS) — harness sets MAGELIFT_DUMPIMPORT_RUNNER=kube.
+	if runner := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_RUNNER")); runner != "" {
+		opts.Runner = runner
+	}
+	if host := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_HOST")); host != "" {
+		opts.Host = host
+	}
+	if user := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_USER")); user != "" {
+		opts.User = user
+	}
+	if pass := o.getenv("MAGELIFT_DUMPIMPORT_PASSWORD"); pass != "" {
+		opts.Password = pass
+	}
+	if ns := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_NAMESPACE")); ns != "" {
+		opts.Namespace = ns
+	}
+	if pod := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_POD")); pod != "" {
+		opts.Pod = pod
+	}
+	if sel := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_POD_SELECTOR")); sel != "" {
+		opts.PodSelector = sel
+	}
+	if kc := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_KUBECONFIG")); kc != "" {
+		opts.Kubeconfig = kc
+	}
+	if db := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_DATABASE")); db != "" {
+		opts.Database = db
+	}
 
 	if err := importFn(ctx, opts); err != nil {
 		reason := strings.TrimSpace(err.Error())

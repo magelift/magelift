@@ -3,6 +3,7 @@ package dumpimport
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -64,7 +65,7 @@ func (k *kubeMySQL) ExecSQL(ctx context.Context, database string, stdin io.Reade
 	if err != nil {
 		return "", err
 	}
-	_, stderr, err := k.run(ctx, stdin, args)
+	_, stderr, err := k.run(ctx, k.withPasswordStdin(stdin), args)
 	return stderr, err
 }
 
@@ -74,7 +75,7 @@ func (k *kubeMySQL) Query(ctx context.Context, database, sql string) (string, er
 	if err != nil {
 		return "", err
 	}
-	stdout, stderr, err := k.run(ctx, nil, args)
+	stdout, stderr, err := k.run(ctx, k.withPasswordStdin(nil), args)
 	if err != nil {
 		msg := strings.TrimSpace(stderr)
 		if msg == "" {
@@ -93,6 +94,16 @@ func (k *kubeMySQL) run(ctx context.Context, stdin io.Reader, args []string) (st
 	return fn(ctx, stdin, "kubectl", args, nil)
 }
 
+// withPasswordStdin prefixes a base64 password line so the in-pod shell can
+// export MYSQL_PWD without putting the secret on kubectl argv (CR-01 / T-07-08).
+func (k *kubeMySQL) withPasswordStdin(sql io.Reader) io.Reader {
+	line := base64.StdEncoding.EncodeToString([]byte(k.password)) + "\n"
+	if sql == nil {
+		return strings.NewReader(line)
+	}
+	return io.MultiReader(strings.NewReader(line), sql)
+}
+
 func (k *kubeMySQL) kubectlArgs(ctx context.Context, database string, mysqlExtra []string) ([]string, error) {
 	target, err := k.resolveTarget(ctx)
 	if err != nil {
@@ -107,19 +118,18 @@ func (k *kubeMySQL) kubectlArgs(ctx context.Context, database string, mysqlExtra
 		args = append(args, "-c", k.container)
 	}
 	args = append(args, "--")
-	// Password via MYSQL_PWD for the in-pod mysql process (T-07-08); never -pPASSWORD.
-	args = append(args, "env")
-	if k.password != "" {
-		args = append(args, "MYSQL_PWD="+k.password)
-	}
-	args = append(args, "mysql",
-		"-h", k.host,
-		"-P", strconv.Itoa(k.port),
-		"-u", k.user,
-	)
-	if database != "" {
-		args = append(args, database)
-	}
+	// Decode password from first stdin line inside the pod — never MYSQL_PWD= on argv.
+	const script = `read -r _ml_b64
+MYSQL_PWD=$(printf '%s' "$_ml_b64" | base64 -d)
+export MYSQL_PWD
+unset _ml_b64
+host=$1; port=$2; user=$3; db=$4
+shift 4
+if [ -n "$db" ]; then
+  exec mysql -h "$host" -P "$port" -u "$user" "$db" "$@"
+fi
+exec mysql -h "$host" -P "$port" -u "$user" "$@"`
+	args = append(args, "sh", "-c", script, "mysql", k.host, strconv.Itoa(k.port), k.user, database)
 	args = append(args, mysqlExtra...)
 	return args, nil
 }
