@@ -4,6 +4,19 @@ All notable changes will be documented here. This project follows Semantic Versi
 after its first public release and uses Conventional Commits with automated release
 PRs. The format is based on Keep a Changelog.
 
+## 1.0.0 (2026-08-03)
+
+
+### Features
+
+* community launch docs, marketing scaffold, and install path ([c1c0df2](https://github.com/acourtiol/magelift/commit/c1c0df2e57cc761659d7c57e970520cb33ad2913))
+
+
+### Bug Fixes
+
+* Dependabot cooldowns and docs workflow Python setup ([a1a61f0](https://github.com/acourtiol/magelift/commit/a1a61f0f138019f96e82f53932e792ad6625a798))
+* green CI paths for docs, zizmor, and marketing lockfile ([8358541](https://github.com/acourtiol/magelift/commit/835854152f12b155132f9a5e848521c17f0f8ba1))
+
 ## [Unreleased]
 
 ### Added
