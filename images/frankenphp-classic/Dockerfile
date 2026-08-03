@@ -17,7 +17,10 @@ RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
     && groupadd --gid "${APP_GID}" magelift \
     && useradd --uid "${APP_UID}" --gid magelift --no-create-home --shell /usr/sbin/nologin magelift \
     && install -d -o magelift -g magelift /app /tmp/magelift \
-    && chown -R magelift:magelift /config /data
+    && chown -R magelift:magelift /config /data \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY images/frankenphp-classic/Caddyfile /etc/frankenphp/Caddyfile
 RUN install -d -o magelift -g magelift /app/app/etc

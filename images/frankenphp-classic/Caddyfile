@@ -4,6 +4,11 @@
 }
 
 :8080 {
+	# ALB/ECS liveness: no Magento bootstrap (static OK).
+	handle /health {
+		header Content-Type text/plain
+		respond "OK\n" 200
+	}
 	root * /app/pub
 	encode gzip
 	php_server
@@ -15,6 +20,10 @@
 
 https://localhost:8443 {
 	tls internal
+	handle /health {
+		header Content-Type text/plain
+		respond "OK\n" 200
+	}
 	root * /app/pub
 	encode gzip
 	php_server

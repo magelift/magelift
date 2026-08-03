@@ -27,7 +27,13 @@ same image: the `php-fpm` process and an nginx HTTP sidecar. They share the task
 network namespace, so nginx proxies to PHP-FPM on localhost without exposing port
 9000. Integrated ECS tasks add the pinned Varnish 8.0.2 sidecar on port 6081 and
 send the load balancer there; headless tasks send traffic directly to nginx on
-port 8080. Varnish keeps its root filesystem read-only and receives only a
+port 8080. Both nginx and FrankenPHP short-circuit `GET /health` with `200 OK`
+(no Magento bootstrap). Integrated ALB health checks hit Varnish, which must
+pass `/health` through to that short-circuit (see `images/varnish/default.vcl`).
+Acceptance digests must be MageLift runtime images (`php-runtime` or
+`frankenphp-classic`) — a bare Magento app image without `/health` will flap ALB
+targets. Runtime images include `curl` for the ECS container health check.
+Varnish keeps its root filesystem read-only and receives only a
 task-scoped executable tmpfs at `/var/lib/varnish` for VSM and transient cache
 data.
 Deployments must mount writable Magento runtime directories and `/tmp` as task-scoped
