@@ -69,8 +69,8 @@ coverage:
       - kind: other
         ref: .planning/phases/08-brownfield-attach-tag-day/scratch/08-06-aws-adopt-confirm.md
         status: pass
-    human_judgment: true
-    rationale: Live AWS adopt requires interactive aws login; session expired — HUMAN_GATE recorded, no invented PASS
+    human_judgment: false
+    rationale: Live AWS adopt PASS 2026-08-02 (describe-after-destroy); see follow-up below
   - id: D3
     description: RELEASE-05 board has no undetermined rows; GCP Pending→07; Act-only CI Deferred
     requirement: RELEASE-05
@@ -171,19 +171,25 @@ status: complete
 2. Follow resume steps in `scratch/08-06-aws-adopt-confirm.md`
 3. Replace HUMAN_GATE note with PASS evidence (serial only)
 
+## Follow-up (2026-08-02) — paid adopt PASS
+
+- `aws sts get-caller-identity` green; free-tier VPC+RDS created outside MageLift; preview ADOPT lines; deploy `--infra-only` +74; destroy −74; describe-after-destroy VPC/RDS intact; external cleanup done
+- Evidence replaced HUMAN_GATE content in `scratch/08-06-aws-adopt-confirm.md`
+- Validators accept RDS managed secret ARNs containing `!` (`internal/cloud/aws/stack/spec.go`, `database/database.go`)
+- Gate board: free-tier adopt row **Closed**; GCP rows Closed via Phase 7; Act-only CI still Deferred
+
 ## Next Phase Readiness
 
-- Phase 8 plans 01–06 complete for offline attach + tag-board honesty
-- Public tag still blocked on honest Deferred/Pending cells: GCP live (07), Cloudflare DNS token, Act-only CI minutes, optional AWS adopt confirm
-- Verifier should treat D2 as human_judgment (ADC) — offline D1/D3 auto-passable
+- Milestone v1.0.0 execution complete; remaining honesty gate is hosted CI minutes (Deferred Act-only)
+- Ready for tag / `$gsd-complete-milestone` archive when maintainer chooses
 
 ## Self-Check: PASSED
 
 - FOUND: `.planning/phases/08-brownfield-attach-tag-day/scratch/08-06-offline-evidence.md`
-- FOUND: `.planning/phases/08-brownfield-attach-tag-day/scratch/08-06-aws-adopt-confirm.md`
+- FOUND: `.planning/phases/08-brownfield-attach-tag-day/scratch/08-06-aws-adopt-confirm.md` (PASS 2026-08-02)
 - FOUND: `docs/release-readiness.md` settled board
-- FOUND commits: `1677da9`, `b06d467`, `314e0e4`
+- FOUND commits: `1677da9`, `b06d467`, `314e0e4` (initial); live follow-up uncommitted until maintainer asks
 
 ---
 *Phase: 08-brownfield-attach-tag-day*
-*Completed: 2026-07-30*
+*Completed: 2026-07-30; live adopt follow-up 2026-08-02*

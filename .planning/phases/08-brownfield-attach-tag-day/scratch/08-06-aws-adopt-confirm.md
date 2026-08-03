@@ -1,40 +1,79 @@
 # 08-06 free-tier AWS VPC+RDS adopt confirm (D-04 paid cell)
 
-**Recorded:** 2026-07-30T12:24:50Z  
-**Result:** HUMAN_GATE — blocked on ADC / AWS session (no live PASS invented)
+**Recorded:** 2026-08-02T14:31:25Z  
+**Result:** **PASS** (spend map pass 3/3)
 
-## Identity check
+## Identity
 
 ```bash
 aws sts get-caller-identity
+# AWS: 669890779205 arn:aws:iam::669890779205:root
 ```
 
-**Exit code:** `255`
+Account `669890779205` / region `eu-north-1`.
 
-**Stderr (verbatim):**
+## Pre-existing resources (created outside MageLift)
+
+| Resource | ID |
+| --- | --- |
+| VPC | `vpc-087507834e37773c7` (`10.55.0.0/16`) |
+| Public / private / data subnets | 2 AZ × 3 tiers (see `08-06-adopt-ids.env`) |
+| NAT Gateway | `nat-077388a59b03a02dc` (operator-owned egress) |
+| RDS MySQL `db.t4g.micro` | `mladopt-mysql` + ManageMasterUserPassword secret |
+
+## MageLift adopt
+
+Config: `.magelift/adopt-confirm.magelift.yaml` (`existing.network` + `existing.database`).
+
+Binary: `/tmp/magelift-adopt` (serial rebuild; includes RDS managed secret ARN `!` fix).
+
+### Preview — ADOPT lines
+
+```json
+"adopted": [
+  "ADOPT network vpc-087507834e37773c7",
+  "ADOPT database mladopt-mysql"
+]
+```
+
+### Apply
+
+```bash
+GOMAXPROCS=1 magelift --config .magelift/adopt-confirm.magelift.yaml \
+  --env preview deploy --infra-only
+```
+
+- Duration ~10m48s; **+74 created**
+- Outputs: `networkVpcId=vpc-087507834e37773c7`, `databaseWriter=mladopt-mysql.…rds.amazonaws.com`
+- Pulumi URNs: **no** `aws:ec2/vpc:Vpc`, `aws:rds/instance`, or NAT Gateway (reference-without-own)
+
+Log: `scratch/08-06-adopt-deploy.log`
+
+### Destroy MageLift stack only
+
+```bash
+GOMAXPROCS=1 magelift --config … --env preview destroy --yes
+```
+
+- **-74 deleted** (~9m15s); ADOPT lines still reported
+- Log: `scratch/08-06-adopt-destroy.log`
+
+### Describe-after-destroy (adopted intact)
 
 ```text
-aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.
-aws: [ERROR]: Your session has expired. Please reauthenticate using 'aws login'.
+vpc-087507834e37773c7	available	10.55.0.0/16
+mladopt-mysql	available	mladopt-mysql.cdwockum4edo.eu-north-1.rds.amazonaws.com
 ```
 
-## Paid confirm status
+## Code fix required for live RDS secrets
 
-| Step | Status |
-| --- | --- |
-| `aws sts get-caller-identity` | FAIL — session expired |
-| Adopt free-tier VPC + RDS via `existing.network` + `existing.database` | NOT RUN |
-| Preview ADOPT lines | NOT RUN |
-| Apply + destroy MageLift stack | NOT RUN |
-| `aws ec2 describe-vpcs` / `aws rds describe-db-instances` after destroy | NOT RUN |
+AWS ManageMasterUserPassword secrets use names like `rds!db-…`. Validators in
+`internal/cloud/aws/stack/spec.go` and `internal/cloud/aws/database/database.go`
+now allow `!` in the secret name. Test:
+`TestSpecValidateAcceptsRDSManagedMasterUserSecretARN`.
 
-## Honesty (D-04 / T-08-17)
+## Cleanup (mandatory)
 
-Offline adopt evidence is recorded in `scratch/08-06-offline-evidence.md` (mocks PASS). This file does **not** claim live AWS adopt or describe-after-destroy. Spend map pass 3/3 remains open until ADC works.
-
-## Resume when ADC available
-
-1. `aws login` / `aws sso login` (or refresh ADC) until `aws sts get-caller-identity` succeeds
-2. Adopt pre-existing free-tier VPC + RDS MySQL; preview → apply → destroy MageLift stack only
-3. Confirm adopted VPC/RDS still exist via describe APIs
-4. Replace this HUMAN_GATE note with commands + outputs (PASS) — serial only; abort if swap climbs (AGENTS.md)
+After evidence: deleted RDS, NAT+EIP, subnets, route tables, IGW, VPC, Pulumi
+stacks `acceptance-preview-aws-ecs-fargate` and empty `adoptconfirm-…`.
+Post-check: VPC/RDS NotFound.

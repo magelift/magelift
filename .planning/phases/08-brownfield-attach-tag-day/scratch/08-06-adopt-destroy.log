@@ -1,0 +1,224 @@
+DESTROY_START 2026-08-02T14:22:03Z
+ADOPT network vpc-087507834e37773c7
+ADOPT database mladopt-mysql
+Previewing update (acceptance-preview-aws-ecs-fargate):
+
+@ previewing update.....
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task replace [diff: ~containerDefinitions]
+ ++ aws:ecs:TaskDefinition acceptance-preview-runtime-web-task create replacement [diff: ~containerDefinitions]
+ +- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task replace [diff: ~containerDefinitions]
+ ~  aws:ecs:Service acceptance-preview-runtime-cron-service update [diff: ~taskDefinition]
+ ~  aws:ecs:Service acceptance-preview-runtime-web-service update [diff: ~taskDefinition]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-web-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task delete original [diff: ~containerDefinitions]
+ -- aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task delete original [diff: ~containerDefinitions]
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Resources:
+    ~ 2 to update
+    +-3 to replace
+    5 changes. 69 unchanged
+
+Destroying (acceptance-preview-aws-ecs-fargate):
+
+ -  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard deleting (0s) 
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running deleting (0s) 
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu deleting (0s) 
+ -  aws:route53:Record acceptance-preview-edge deleting (0s) 
+@ destroying....
+ -  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard deleted (1s) 
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running deleted (1s) 
+@ destroying....
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu deleted (1s) 
+@ destroying................................................
+ -  aws:route53:Record acceptance-preview-edge deleted (47s) 
+@ destroying....
+ -  aws:ecs:Service acceptance-preview-runtime-web-service deleting (0s) 
+ -  aws:lb:Listener acceptance-preview-ingress-https deleting (0s) 
+ -  aws:ecs:Service acceptance-preview-runtime-cron-service deleting (0s) 
+ -  aws:cloudfront:Distribution acceptance-preview-edge deleting (0s) 
+@ destroying....
+ -  aws:lb:Listener acceptance-preview-ingress-https deleted (1s) 
+@ destroying....
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx deleting (0s) 
+@ destroying....
+ -  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx deleted (0.73s) 
+@ destroying..........................................................
+ -  aws:ecs:Service acceptance-preview-runtime-cron-service deleted (58s) 
+@ destroying...................................................................................................................
+ -  aws:ecs:Service acceptance-preview-runtime-web-service deleted (170s) 
+@ destroying...........
+ -  aws:cloudfront:Distribution acceptance-preview-edge deleted (178s) 
+@ destroying....
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleting (0s) 
+ -  aws:lb:TargetGroup acceptance-preview-ingress-web deleting (0s) 
+ -  aws:iam:RolePolicy acceptance-preview-runtime-execution-logs-policy deleting (0s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleting (0s) 
+@ destroying....
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task deleted (0.62s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task deleted (0.93s) 
+@ destroying....
+ -  aws:lb:TargetGroup acceptance-preview-ingress-web deleted (1s) 
+ -  aws:iam:RolePolicy acceptance-preview-runtime-execution-logs-policy deleted (1s) 
+ -  aws:s3:BucketPolicy acceptance-preview-storage-policy deleting (0s) 
+@ destroying....
+ -  aws:lb:LoadBalancer acceptance-preview-ingress-alb deleting (0s) 
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleting (0s) 
+ -  aws:ecs:Cluster acceptance-preview-runtime-cluster deleting (0s) 
+@ destroying....
+ -  aws:s3:BucketPolicy acceptance-preview-storage-policy deleted (2s) 
+@ destroying....
+ -  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task deleted (1s) 
+ -  aws:ecs:Cluster acceptance-preview-runtime-cluster deleted (1s) 
+@ destroying.............................
+ -  aws:lb:LoadBalancer acceptance-preview-ingress-alb deleted (28s) 
+@ destroying....
+ -  aws:s3:BucketOwnershipControls acceptance-preview-storage-ownership deleting (0s) 
+ -  aws:cloudfront:Distribution acceptance-preview-storage-cdn deleting (0s) 
+ -  aws:iam:RolePolicy acceptance-preview-deployment-policy deleting (0s) 
+ -  aws:iam:RolePolicy acceptance-preview-task-policy deleting (0s) 
+@ destroying....
+ -  aws:iam:RolePolicy acceptance-preview-task-policy deleted (0.97s) 
+ -  aws:s3:BucketOwnershipControls acceptance-preview-storage-ownership deleted (0.98s) 
+@ destroying....
+ -  aws:iam:RolePolicy acceptance-preview-deployment-policy deleted (1s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-queue-https deleting (0s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-web-target deleting (0s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-cache-valkey deleting (0s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-queue-https deleted (1s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-web-target deleted (1s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-cache-valkey deleted (1s) 
+ -  magelift:aws:EcsRuntime acceptance-preview-runtime deleting (0s) 
+@ destroying....
+ -  magelift:aws:Ingress acceptance-preview-ingress deleting (0s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-edge-https deleting (0s) 
+@ destroying.....
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-edge-https deleted (1s) 
+ -  aws:s3:BucketServerSideEncryptionConfiguration acceptance-preview-storage-encryption deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-https deleting (0s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-queue-amqps deleting (0s) 
+ -  aws:s3:BucketServerSideEncryptionConfiguration acceptance-preview-storage-encryption deleted (1s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-https deleted (1s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-queue-amqps deleted (1s) 
+ -  aws:s3:BucketPublicAccessBlock acceptance-preview-storage-public-access deleting (0s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-data deleting (0s) 
+ -  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy deleting (0s) 
+@ destroying....
+ -  aws:s3:BucketPublicAccessBlock acceptance-preview-storage-public-access deleted (1s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-data deleted (1s) 
+@ destroying....
+ -  aws:iam:RolePolicy acceptance-preview-runtime-execution-policy deleted (1s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-search deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-edge-target deleting (0s) 
+@ destroying....
+ -  aws:iam:RolePolicy acceptance-preview-execution-database-policy deleting (0s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-search deleted (1s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-edge-target deleted (1s) 
+ -  aws:iam:RolePolicy acceptance-preview-execution-database-policy deleted (1s) 
+ -  aws:s3:BucketVersioning acceptance-preview-storage-versioning deleting (0s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-data-mysql deleting (0s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-queue deleting (0s) 
+ -  aws:s3:BucketVersioning acceptance-preview-storage-versioning deleted (1s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-data-mysql deleted (1s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-queue deleted (1s) 
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-cache deleting (0s) 
+@ destroying....
+ -  aws:elasticache:ReplicationGroup acceptance-preview-cache-cache deleting (0s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-search-https deleting (0s) 
+@ destroying....
+ -  aws:vpc:SecurityGroupEgressRule acceptance-preview-security-egress-web-cache deleted (1s) 
+ -  aws:vpc:SecurityGroupIngressRule acceptance-preview-security-ingress-search-https deleted (1s) 
+ -  aws:s3:BucketLifecycleConfiguration acceptance-preview-storage-lifecycle deleting (0s) 
+@ destroying.....
+ -  aws:s3:BucketLifecycleConfiguration acceptance-preview-storage-lifecycle deleted (1s) 
+@ destroying.............................................................................................................................................................................
+ -  aws:cloudfront:Distribution acceptance-preview-storage-cdn deleted (190s) 
+@ destroying....................................................................................
+ -  aws:elasticache:ReplicationGroup acceptance-preview-cache-cache deleted (254s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-queue deleting (0s) 
+ -  aws:cloudfront:OriginRequestPolicy acceptance-preview-edge-origin deleting (0s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-web-logs deleting (0s) 
+ -  aws:s3:Bucket acceptance-preview-storage-bucket deleting (0s) 
+@ destroying.....
+ -  aws:ec2:SecurityGroup acceptance-preview-security-queue deleted (1s) 
+ -  aws:s3:Bucket acceptance-preview-storage-bucket deleted (1s) 
+ -  aws:cloudfront:OriginRequestPolicy acceptance-preview-edge-origin deleted (1s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-web-logs deleted (1s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-data deleting (0s) 
+@ destroying....
+ -  aws:ec2:SecurityGroup acceptance-preview-security-cache deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-search deleting (0s) 
+ -  aws:cloudfront:OriginAccessControl acceptance-preview-storage-oac deleting (0s) 
+@ destroying.....
+ -  aws:ec2:SecurityGroup acceptance-preview-security-data deleted (2s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-cache deleted (2s) 
+ -  aws:cloudfront:OriginAccessControl acceptance-preview-storage-oac deleted (1s) 
+ -  aws:iam:Role acceptance-preview-runtime-execution-role deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-search deleted (2s) 
+@ destroying....
+ -  aws:iam:Role acceptance-preview-runtime-deployment-role deleting (0s) 
+ -  aws:iam:Role acceptance-preview-runtime-task-role deleting (0s) 
+@ destroying....
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-cron-logs deleting (0s) 
+ -  aws:iam:Role acceptance-preview-runtime-execution-role deleted (1s) 
+ -  aws:iam:Role acceptance-preview-runtime-deployment-role deleted (1s) 
+@ destroying....
+ -  aws:iam:Role acceptance-preview-runtime-task-role deleted (1s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-cron-logs deleted (1s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-edge deleting (0s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-web deleting (0s) 
+@ destroying....
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-deploy-logs deleting (0s) 
+ -  aws:wafv2:WebAcl acceptance-preview-edge deleting (0s) 
+@ destroying.....
+ -  aws:ec2:SecurityGroup acceptance-preview-security-edge deleted (2s) 
+ -  aws:cloudwatch:LogGroup acceptance-preview-observability-deploy-logs deleted (1s) 
+ -  aws:ec2:SecurityGroup acceptance-preview-security-web deleted (2s) 
+@ destroying....
+ -  aws:wafv2:WebAcl acceptance-preview-edge deleted (2s) 
+@ destroying....
+ -  magelift:aws:EcsRuntimeIdentity acceptance-preview-runtime deleting (0s) 
+ -  magelift:aws:Observability acceptance-preview-observability deleting (0s) 
+ -  magelift:aws:ObservabilityLogGroups acceptance-preview-observability deleting (0s) 
+ -  magelift:aws:MediaStorage acceptance-preview-storage deleting (0s) 
+@ destroying.....
+ -  magelift:aws:AuroraMysql acceptance-preview-database deleting (0s) 
+ -  magelift:aws:Edge acceptance-preview-edge deleting (0s) 
+ -  magelift:aws:Network acceptance-preview-network deleting (0s) 
+@ destroying....
+ -  magelift:aws:SecurityGroups acceptance-preview-security deleting (0s) 
+@ destroying....
+ -  aws:elasticache:SubnetGroup acceptance-preview-cache deleting (0s) 
+@ destroying.....
+ -  aws:elasticache:SubnetGroup acceptance-preview-cache deleted (1s) 
+ -  magelift:aws:Valkey acceptance-preview-cache deleting (0s) 
+ -  pulumi:providers:aws acceptance-preview-global deleting (0s) 
+ -  magelift:aws:Stack acceptance-preview deleting (0s) 
+ -  magelift:aws:RabbitMqQueue acceptance-preview-queue deleting (0s) 
+@ destroying....
+ -  pulumi:providers:aws acceptance-preview-global deleted (1s) 
+@ destroying....
+ -  pulumi:providers:aws acceptance-preview-regional deleting (0s) 
+@ destroying.....
+ -  pulumi:providers:aws acceptance-preview-regional deleted (1s) 
+ -  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate deleting (0s) 
+@ destroying....
+ -  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate deleted (0.33s) 
+    pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate  
+Resources:
+    - 74 deleted
+
+Duration: 9m15s
+
+The resources in the stack have been deleted, but the history and configuration associated with the stack are still maintained. 
+If you want to remove the stack completely, run `pulumi stack rm acceptance-preview-aws-ecs-fargate`.

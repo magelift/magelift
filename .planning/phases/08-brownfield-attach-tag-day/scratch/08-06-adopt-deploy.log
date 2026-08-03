@@ -1,0 +1,77 @@
+DEPLOY_START 2026-08-02T14:13:38Z
+.notice: --infra-only: Magento migrate, cutover, and health were skipped
+acquire deployment lock: deployment lock is held: owner "magelift-cli-Alexandres-MacBook-Air.local-60963" acquired at 2026-08-02T14:10:41Z
+.........
+ +  aws:lb:LoadBalancer acceptance-preview-ingress-alb created (163s) 
+ +  aws:cloudfront:Distribution acceptance-preview-edge creating (0s) 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx creating (0s) 
+ +  aws:lb:Listener acceptance-preview-ingress-https creating (0s) 
+@ updating.....
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-alb-5xx created (1s) 
+ +  aws:lb:Listener acceptance-preview-ingress-https created (1s) 
+@ updating..........................................................................................................................................................
+ +  aws:cloudfront:Distribution acceptance-preview-edge created (152s) 
+ +  aws:route53:Record acceptance-preview-edge creating (0s) 
+@ updating....................................
+ +  aws:route53:Record acceptance-preview-edge created (32s) 
+@ updating................................................................................................................................................................................................................................................................................
+ +  aws:elasticache:ReplicationGroup acceptance-preview-cache-cache created (602s) 
+@ updating....
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task creating (0s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task creating (0s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task creating (0s) 
+@ updating....
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-deploy-task created (0.80s) 
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-cron-task created (1s) 
+@ updating....
+ +  aws:ecs:TaskDefinition acceptance-preview-runtime-web-task created (1s) 
+ +  aws:ecs:Service acceptance-preview-runtime-cron-service creating (0s) 
+@ updating....
+ +  aws:ecs:Service acceptance-preview-runtime-web-service creating (0s) 
+@ updating....
+ +  aws:ecs:Service acceptance-preview-runtime-cron-service created (1s) 
+@ updating....
+ +  aws:ecs:Service acceptance-preview-runtime-web-service created (1s) 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu creating (0s) 
+ +  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard creating (0s) 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running creating (0s) 
+@ updating....
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-cpu created (0.91s) 
+@ updating....
+ +  aws:cloudwatch:Dashboard acceptance-preview-observability-dashboard created (1s) 
+ +  aws:cloudwatch:MetricAlarm acceptance-preview-observability-ecs-running created (1s) 
+@ updating.....
+ +  pulumi:pulumi:Stack magelift-acceptance-preview-aws-ecs-fargate created (647s) 
+Outputs:
+    applicationURL         : "https://d35l9vd2bsb7pv.cloudfront.net"
+    cacheEndpoint          : "master.acceptance-preview-cache-cache.pvk7gb.eun1.cache.amazonaws.com"
+    clusterArn             : "arn:aws:ecs:eu-north-1:669890779205:cluster/acceptance-preview-runtime-cluster-fc8dfa9"
+    clusterName            : "acceptance-preview-runtime-cluster-fc8dfa9"
+    cronServiceName        : "acceptance-preview-runtime-cron-service-a1cd9ec"
+    cronTaskDefinitionArn  : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-cron:31"
+    databaseWriter         : "mladopt-mysql.cdwockum4edo.eu-north-1.rds.amazonaws.com"
+    deployTaskDefinitionArn: "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-deploy:31"
+    deploymentRoleArn      : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-deployment-role-9547d1e"
+    edgeDistributionId     : "E2MI8R3N0V72HY"
+    mediaBucket            : "acceptance-preview-media"
+    mediaURL               : "https://d1ick4zz5f0op3.cloudfront.net"
+    networkVpcId           : "vpc-087507834e37773c7"
+    privateSubnetIds       : [
+        [0]: "subnet-0ee79e6cd5b2fea77"
+        [1]: "subnet-0d8a4221ff75c5034"
+    ]
+    queueMode              : "db"
+    queueServiceName       : [unknown]
+    queueTaskDefinitionArn : [unknown]
+    securityGroupId        : "sg-08c7bd51ffca5c03a"
+    serviceName            : "acceptance-preview-runtime-web-service-a33aeab"
+    taskDefinitionArn      : "arn:aws:ecs:eu-north-1:669890779205:task-definition/acceptance-preview-runtime-web:33"
+    taskRoleArn            : "arn:aws:iam::669890779205:role/acceptance-preview-runtime-task-role-e831df6"
+
+Resources:
+    + 74 created
+
+Duration: 10m48s
+
+error: there was a problem deleting the lock at s3://magelift-669890779205-eu-north-1-acceptance-preview-state/.pulumi/locks/organization/magelift/acceptance-preview-aws-ecs-fargate/82cb6a3a-ae8e-4c32-9c4f-97f1e1798121.json, manual clean up may be required: blob (key ".pulumi/locks/organization/magelift/acceptance-preview-aws-ecs-fargate/82cb6a3a-ae8e-4c32-9c4f-97f1e1798121.json") (code=NotFound): operation error S3: HeadObject, https response error StatusCode: 404, RequestID: ASZGEY6JTF7STGYZ, HostID: dOgnLDKt9AhhoIMdKBB8oPo7rgsyTUg3UHl5P8ln7O1fv6N8A4astt658R/ROaKNC0KLEXpu7Cg=, NotFound: 
+release deployment lock: deployment lock is not held
