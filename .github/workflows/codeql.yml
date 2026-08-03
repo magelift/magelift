@@ -38,3 +38,7 @@ jobs:
       - uses: github/codeql-action/analyze@7188fc363630916deb702c7fdcf4e481b751f97a # v4.37.1
         with:
           category: /language:${{ matrix.language }}
+          # Repo does not have Code scanning enabled → SARIF upload fails and
+          # emails weekly. Keep analysis; skip upload until GHAS is turned on.
+          upload: never
+        continue-on-error: false
