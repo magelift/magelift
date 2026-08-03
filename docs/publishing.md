@@ -35,6 +35,19 @@ re-introduce private planner directories into this public remote. Never commit
 real AWS account IDs, GCP project IDs, or personal domains — use env vars
 (`MAGELIFT_GCP_PROJECT`, `MAGELIFT_CUTOVER_HOST`) locally.
 
+## History scrub (account IDs)
+
+`main` was orphan-squashed again (2026-08-03) so maintainer AWS account
+numbers, GCP project IDs, personal domains, and related email addresses are
+**not reachable from `refs/heads/main`**. A private bundle of the pre-scrub
+repo (all refs) lives only on the maintainer machine under
+`~/.agents/archives/` — do not push it.
+
+**Residual:** GitHub keeps `refs/pull/*/head` for closed PRs; those tips can
+still contain pre-scrub blobs for anyone with repo read access. To finish
+purging, ask GitHub Support to clear cached PR refs, or recreate the private
+repo after exporting issues. Default `git clone` does not fetch `refs/pull/*`.
+
 ## Launch checklist (remaining ops)
 
 1. **Docs hosting:** GitHub Pages is unavailable on this private plan — publish MkDocs via **Cloudflare Pages** (or make the repo public, then enable Pages). Workflow `.github/workflows/docs.yml` stays ready for Pages when the plan allows it; until then build with `mkdocs build --strict` in CI and deploy `site/` from Cloudflare connected to `main`.
