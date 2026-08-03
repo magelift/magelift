@@ -58,6 +58,15 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+  - package-ecosystem: npm
+    directory: /websites/marketing
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies, docs]
+    commit-message:
+      prefix: chore
+      include: scope
   - package-ecosystem: docker
     directory: /images/php-runtime
     schedule:

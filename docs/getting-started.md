@@ -28,8 +28,8 @@ magelift dev up
 
 ## 3. Sample shop config
 
-Copy [examples/sample-shop/magelift.yaml](../examples/sample-shop/magelift.yaml)
-into your Magento repo root. Replace accounts, domains, and secret ARNs.
+Copy `examples/sample-shop/magelift.yaml` from the repository into your Magento
+repo root. Replace accounts, domains, and secret ARNs.
 
 ```sh
 magelift doctor

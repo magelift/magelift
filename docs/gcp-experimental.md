@@ -77,8 +77,8 @@ act -W .github/workflows/gcp-wif-act-smoke.yml workflow_dispatch \
   -s GCP_SERVICE_ACCOUNT='ml-PROJECT-ENV-ci@GCP_PROJECT.iam.gserviceaccount.com'
 ```
 
-Workflow: [`.github/workflows/gcp-wif-act-smoke.yml`](../.github/workflows/gcp-wif-act-smoke.yml)
-(`google-github-actions/auth@v3`, `permissions.id-token: write`).
+Workflow: `.github/workflows/gcp-wif-act-smoke.yml` in the repository
+(`google-github-actions/auth`, `permissions.id-token: write`).
 
 ### Fallback: documented gcloud STS exchange
 

@@ -62,5 +62,6 @@ DNS cutover: [migrating-from-paas.md](migrating-from-paas.md) and
 
 ## Next
 
-[Getting started](getting-started.md) → [sample-shop](../examples/sample-shop/) →
-GitHub issues / PRs via [CONTRIBUTING](../CONTRIBUTING.md).
+[Getting started](getting-started.md) → sample-shop YAML under `examples/sample-shop/`
+in the repository → GitHub issues / PRs via
+[CONTRIBUTING](https://github.com/acourtiol/magelift/blob/main/CONTRIBUTING.md).

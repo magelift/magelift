@@ -22,8 +22,8 @@ Details: [migrating-from-paas.md](migrating-from-paas.md).
 4. Optional media sync listing-diff locally; live paid media later if needed.
 5. `magelift health` / smoke the storefront or API.
 
-Use [sample-shop](../examples/sample-shop/) as the YAML sketch. Destroy the
-preview when idle.
+Use the sample-shop YAML under `examples/sample-shop/` in the repository as the
+sketch. Destroy the preview when idle.
 
 ## Sunday — DNS rehearsal (not production)
 
