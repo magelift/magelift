@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 func TestAcquireLockDelegatesToState(t *testing.T) {

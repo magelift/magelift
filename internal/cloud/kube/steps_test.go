@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	deployflow "github.com/acourtiol/magelift/internal/deploy"
-	"github.com/acourtiol/magelift/internal/platform"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/automation"
+	deployflow "github.com/magelift/magelift/internal/deploy"
+	"github.com/magelift/magelift/internal/platform"
+	sdk "github.com/magelift/magelift/sdk/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -83,7 +83,7 @@ func (f *fakeJobs) DeleteJob(_ context.Context, _, name string) error {
 }
 
 func TestStepsSequence(t *testing.T) {
-	digest := "ghcr.io/acourtiol/magento@sha256:" + strings.Repeat("a", 64)
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)
 	jobs := &fakeJobs{}
 	candidate, err := NewCandidateFromClient(jobs)
 	if err != nil {
@@ -161,11 +161,11 @@ func TestStepsSequence(t *testing.T) {
 }
 
 func TestValidateRejectsDigestMismatch(t *testing.T) {
-	steps, err := New(&stepsBackend{outputs: map[string]any{}}, testDeploySpec("ghcr.io/acourtiol/magento@sha256:"+strings.Repeat("a", 64)), &recordingCandidate{}, stepsRuntime{}, io.Discard, nil)
+	steps, err := New(&stepsBackend{outputs: map[string]any{}}, testDeploySpec("ghcr.io/magelift/magento@sha256:"+strings.Repeat("a", 64)), &recordingCandidate{}, stepsRuntime{}, io.Discard, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = steps.Validate(context.Background(), deployRequest("ghcr.io/acourtiol/magento@sha256:"+strings.Repeat("b", 64)))
+	err = steps.Validate(context.Background(), deployRequest("ghcr.io/magelift/magento@sha256:"+strings.Repeat("b", 64)))
 	if err == nil || !strings.Contains(err.Error(), "does not match") {
 		t.Fatalf("expected digest mismatch, got %v", err)
 	}
@@ -182,7 +182,7 @@ func TestRegisterCandidateBootstrapsGreenfieldStack(t *testing.T) {
 		},
 	}
 	candidate := &recordingCandidate{}
-	digest := "ghcr.io/acourtiol/magento@sha256:" + strings.Repeat("a", 64)
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)
 	steps, err := New(backend, testDeploySpec(digest), candidate, stepsRuntime{}, io.Discard, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -200,7 +200,7 @@ func TestRegisterCandidateBootstrapsGreenfieldStack(t *testing.T) {
 
 func TestRunMigrationsCleansUpOnFailure(t *testing.T) {
 	candidate := &recordingCandidate{failRun: true}
-	digest := "ghcr.io/acourtiol/magento@sha256:" + strings.Repeat("a", 64)
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)
 	steps, err := New(&stepsBackend{outputs: map[string]any{
 		platform.OutputClusterName:    "c",
 		platform.OutputServiceName:    "s",

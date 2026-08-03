@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 type recordingLoginBootstrap struct {

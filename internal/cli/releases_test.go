@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/cosign"
-	"github.com/acourtiol/magelift/internal/releasejournal"
+	"github.com/magelift/magelift/internal/cosign"
+	"github.com/magelift/magelift/internal/releasejournal"
 )
 
 const releaseOne = "registry.example.invalid/shop@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

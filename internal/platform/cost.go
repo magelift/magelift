@@ -3,7 +3,7 @@ package platform
 import (
 	"context"
 
-	"github.com/acourtiol/magelift/internal/config"
+	"github.com/magelift/magelift/internal/config"
 )
 
 // CostOptions selects account-free capacity reporting vs live provider prices.

@@ -9,15 +9,15 @@ import (
 	"strings"
 	"testing"
 
-	buildkit "github.com/acourtiol/magelift/internal/build/kit"
-	buildrunner "github.com/acourtiol/magelift/internal/build/runner"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/containerrunner"
-	"github.com/acourtiol/magelift/internal/source"
+	buildkit "github.com/magelift/magelift/internal/build/kit"
+	buildrunner "github.com/magelift/magelift/internal/build/runner"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/containerrunner"
+	"github.com/magelift/magelift/internal/source"
 )
 
 const pipelineDigest = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-const pinnedBuilder = "ghcr.io/acourtiol/magelift-builder@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+const pinnedBuilder = "ghcr.io/magelift/magelift-builder@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 const pinnedRuntime = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 
 func TestPipelineCoordinatesBuildAndPublishesVerifiedManifest(t *testing.T) {
@@ -80,7 +80,7 @@ func TestPipelineRejectsPinsAndArtifactDirectoryInsideSource(t *testing.T) {
 func TestPipelineAcceptsBothImmutableImageReferenceForms(t *testing.T) {
 	request := pipelineRequest(t)
 	request.BuilderImage = "sha256:" + strings.Repeat("d", 64)
-	request.RuntimeImage = "ghcr.io/acourtiol/runtime@sha256:" + strings.Repeat("e", 64)
+	request.RuntimeImage = "ghcr.io/magelift/runtime@sha256:" + strings.Repeat("e", 64)
 	containers := &fakeContainers{t: t}
 	builder := &fakeBuilder{t: t, expectedRuntime: request.RuntimeImage}
 
@@ -108,9 +108,9 @@ func TestPipelineCoordinatesReleaseBuild(t *testing.T) {
 	request.Output = buildkit.OutputPush
 	request.Platform = ""
 	request.Platforms = []string{"linux/amd64", "linux/arm64"}
-	request.BuilderImage = "ghcr.io/acourtiol/magelift-builder@sha256:" + strings.Repeat("d", 64)
-	request.RuntimeImage = "ghcr.io/acourtiol/magelift-runtime@sha256:" + strings.Repeat("e", 64)
-	request.ImageReference = "ghcr.io/acourtiol/shop:revision"
+	request.BuilderImage = "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("d", 64)
+	request.RuntimeImage = "ghcr.io/magelift/magelift-runtime@sha256:" + strings.Repeat("e", 64)
+	request.ImageReference = "ghcr.io/magelift/shop:revision"
 	request.ProvenanceSource = "https://github.com/acourtiol/shop.git?checksum=" + request.Repository.Revision
 	request.MageLiftVersion = "1.2.3"
 	builder := &fakeBuilder{t: t, expectedRuntime: request.RuntimeImage, expectedOutput: buildkit.OutputPush}
@@ -396,9 +396,9 @@ func releaseRequest(t *testing.T) Request {
 	request := pipelineRequest(t)
 	request.Output = buildkit.OutputPush
 	request.Platforms = []string{"linux/amd64", "linux/arm64"}
-	request.BuilderImage = "ghcr.io/acourtiol/magelift-builder@sha256:" + strings.Repeat("d", 64)
-	request.RuntimeImage = "ghcr.io/acourtiol/magelift-runtime@sha256:" + strings.Repeat("e", 64)
-	request.ImageReference = "ghcr.io/acourtiol/shop:revision"
+	request.BuilderImage = "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("d", 64)
+	request.RuntimeImage = "ghcr.io/magelift/magelift-runtime@sha256:" + strings.Repeat("e", 64)
+	request.ImageReference = "ghcr.io/magelift/shop:revision"
 	request.ProvenanceSource = "https://github.com/acourtiol/shop.git?checksum=" + request.Repository.Revision
 	return request
 }

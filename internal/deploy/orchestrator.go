@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/automation"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 var (

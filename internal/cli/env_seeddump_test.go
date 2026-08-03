@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/seeddump"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/seeddump"
 )
 
 func TestEnvCreateDumpPersistsSeedDumpAndJournalRecorded(t *testing.T) {

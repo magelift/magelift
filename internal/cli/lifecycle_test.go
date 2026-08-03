@@ -12,12 +12,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/cosign"
-	deployflow "github.com/acourtiol/magelift/internal/deploy"
-	"github.com/acourtiol/magelift/internal/platform"
-	"github.com/acourtiol/magelift/internal/releasejournal"
+	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/cosign"
+	deployflow "github.com/magelift/magelift/internal/deploy"
+	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/releasejournal"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -121,7 +121,7 @@ func writeLifecycleConfig(t *testing.T, class string, protection bool) string {
 		HostedZoneID:             "Z123456789",
 		CloudFrontCertificateARN: "arn:aws:acm:us-east-1:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef",
 		ALBCertificateARN:        "arn:aws:acm:eu-west-3:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789",
-		ImageDigest:              "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		ImageDigest:              "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		CacheSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:cache-token",
 		SessionSecretARN:         "arn:aws:secretsmanager:eu-west-3:123456789012:secret:session-token",
 		QueueSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:queue-token",
@@ -188,7 +188,7 @@ func TestDeployRunsPreviewAndUpdateThroughBackendBoundary(t *testing.T) {
 		return func(context.Context) error { return nil }, nil
 	}
 	cmd := newCommandWithOptions(o)
-	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "deploy", "--digest", "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"})
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "deploy", "--digest", "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestDeployRunsPreviewAndUpdateThroughBackendBoundary(t *testing.T) {
 	if !bytes.Contains(out.Bytes(), []byte(`"update"`)) {
 		t.Fatalf("deployment summary missing: %s", out.String())
 	}
-	if plannedDigest != "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd" {
+	if plannedDigest != "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd" {
 		t.Fatalf("deployment digest override = %q", plannedDigest)
 	}
 }
@@ -270,7 +270,7 @@ func TestProductionDeploymentRequiresVerifiedReleaseMetadata(t *testing.T) {
 	o.environment = "staging"
 	o.yes = true
 	o.newReleaseStore = func(string, string) (releaseStore, error) { return fakeReleaseStore{}, nil }
-	digest := "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	digest := "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	if err := o.requireSignedRelease(context.Background(), "staging", digest); err == nil || ExitCode(err) != 3 {
 		t.Fatalf("unsigned production release = %v", err)
 	}
@@ -298,10 +298,10 @@ func TestProductionDeploymentRejectsJournalWhenSignatureCannotBeReverified(t *te
 	o.configPath = path
 	o.environment = "staging"
 	o.newReleaseStore = func(string, string) (releaseStore, error) {
-		return fakeReleaseStore{entries: []releasejournal.Entry{{DigestReference: "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", SignatureIdentity: "release@example.invalid", SignatureIssuer: "https://issuer.example.invalid"}}}, nil
+		return fakeReleaseStore{entries: []releasejournal.Entry{{DigestReference: "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", SignatureIdentity: "release@example.invalid", SignatureIssuer: "https://issuer.example.invalid"}}}, nil
 	}
 	o.verifyRelease = func(context.Context, string, cosign.VerifyOptions) error { return errors.New("invalid signature") }
-	if err := o.requireSignedRelease(context.Background(), "staging", "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"); err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "signature verification failed") {
+	if err := o.requireSignedRelease(context.Background(), "staging", "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"); err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "signature verification failed") {
 		t.Fatalf("invalid production signature = %v", err)
 	}
 }
@@ -666,7 +666,7 @@ func writeLifecycleConfigWithExistingNetwork(t *testing.T) string {
 		HostedZoneID:             "Z123456789",
 		CloudFrontCertificateARN: "arn:aws:acm:us-east-1:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef",
 		ALBCertificateARN:        "arn:aws:acm:eu-west-3:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789",
-		ImageDigest:              "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		ImageDigest:              "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		CacheSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:cache-token",
 		SessionSecretARN:         "arn:aws:secretsmanager:eu-west-3:123456789012:secret:session-token",
 		QueueSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:queue-token",
@@ -726,7 +726,7 @@ func writeLifecycleConfigWithExistingNetworkAndDatabase(t *testing.T) string {
 		HostedZoneID:             "Z123456789",
 		CloudFrontCertificateARN: "arn:aws:acm:us-east-1:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef",
 		ALBCertificateARN:        "arn:aws:acm:eu-west-3:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789",
-		ImageDigest:              "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		ImageDigest:              "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		CacheSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:cache-token",
 		SessionSecretARN:         "arn:aws:secretsmanager:eu-west-3:123456789012:secret:session-token",
 		QueueSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:queue-token",
@@ -793,7 +793,7 @@ func writeLifecycleConfigWithExistingDatabase(t *testing.T) string {
 		HostedZoneID:             "Z123456789",
 		CloudFrontCertificateARN: "arn:aws:acm:us-east-1:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef",
 		ALBCertificateARN:        "arn:aws:acm:eu-west-3:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789",
-		ImageDigest:              "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		ImageDigest:              "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		CacheSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:cache-token",
 		SessionSecretARN:         "arn:aws:secretsmanager:eu-west-3:123456789012:secret:session-token",
 		QueueSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:queue-token",

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 // testCAData is base64 PEM for a throwaway self-signed cert so NewForConfig can

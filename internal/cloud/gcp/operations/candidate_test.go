@@ -8,7 +8,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 type fakeJobs struct {
@@ -43,7 +43,7 @@ func TestRegisterCandidateUsesPlatformMigrationContract(t *testing.T) {
 	}
 	candidate, err := store.RegisterCandidate(context.Background(), CandidateRequest{
 		Project: "example-gcp-project", Region: "europe-west1", Cluster: "shop-gke",
-		ImageDigest:    "ghcr.io/acourtiol/magento@sha256:" + strings.Repeat("a", 64),
+		ImageDigest:    "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64),
 		DatabaseWriter: "10.0.0.1", DatabaseName: "magento", CacheEndpoint: "10.0.0.2",
 		ApplicationMode: "integrated", WebRuntime: "nginx-fpm",
 	})

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/health"
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/health"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 type fakeRuntimeObserve struct {

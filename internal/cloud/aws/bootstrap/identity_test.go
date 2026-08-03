@@ -220,7 +220,7 @@ func (f *fakeMetadataSSM) PutParameter(_ context.Context, input *ssm.PutParamete
 
 func TestIdentityPlanIsRepoScopedAndLeastPrivilege(t *testing.T) {
 	plan := testIdentityPlan(t)
-	if !strings.Contains(plan.TrustPolicy, "repo:acourtiol/magelift:environment:production") || !strings.Contains(plan.TrustPolicy, "sts.amazonaws.com") {
+	if !strings.Contains(plan.TrustPolicy, "repo:magelift/magelift:environment:production") || !strings.Contains(plan.TrustPolicy, "sts.amazonaws.com") {
 		t.Fatalf("trust policy is not repository scoped: %s", plan.TrustPolicy)
 	}
 	if strings.Contains(plan.PermissionsPolicy, `"Resource":"*"`) || strings.Contains(plan.PermissionsPolicy, `"Action":"*"`) {
@@ -232,7 +232,7 @@ func TestIdentityPlanIsRepoScopedAndLeastPrivilege(t *testing.T) {
 	if plan.CIRoleARN == plan.StateRoleARN || plan.BuildRoleARN == plan.CIRoleARN || !strings.Contains(plan.CIPermissionsPolicy, "ecs:RegisterTaskDefinition") || !strings.Contains(plan.CIPermissionsPolicy, "iam:PassRole") || !strings.Contains(plan.CIPermissionsPolicy, "role/magelift-*") || !strings.Contains(plan.BuildPermissionsPolicy, "secretsmanager:GetSecretValue") || strings.Contains(plan.BuildPermissionsPolicy, `"Action":"*"`) || strings.Contains(plan.CIPermissionsPolicy, `"Action":"*"`) {
 		t.Fatalf("CI identity is not explicitly scoped: role=%q policy=%s", plan.CIRoleARN, plan.CIPermissionsPolicy)
 	}
-	if !strings.Contains(plan.CITrustPolicy, "repo:acourtiol/magelift:environment:production") {
+	if !strings.Contains(plan.CITrustPolicy, "repo:magelift/magelift:environment:production") {
 		t.Fatal("CI trust policy is not repository scoped")
 	}
 }

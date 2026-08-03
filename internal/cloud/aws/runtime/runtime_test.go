@@ -13,7 +13,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
-const testImage = "ghcr.io/acourtiol/shop@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+const testImage = "ghcr.io/magelift/shop@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 const testVarnishImage = "docker.io/library/varnish:8.0.2@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
 type node struct {
@@ -426,7 +426,7 @@ func TestRuntimeAttachesExistingSecurityGroupAndTargetGroup(t *testing.T) {
 func TestRuntimeRejectsUnsafeInputsBeforeRegistration(t *testing.T) {
 	t.Parallel()
 	tests := []func(*Args){
-		func(args *Args) { args.Image = "ghcr.io/acourtiol/shop:latest" },
+		func(args *Args) { args.Image = "ghcr.io/magelift/shop:latest" },
 		func(args *Args) { args.WebRuntime = "frankenphp-worker" },
 		func(args *Args) { args.PrivateSubnetIDs = nil },
 		func(args *Args) { args.ContainerPort = 22 },

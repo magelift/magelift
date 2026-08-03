@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/seeddump"
+	"github.com/magelift/magelift/internal/seeddump"
 )
 
 func TestEnvStatusMergesSeedDumpPathAndImportedJournal(t *testing.T) {

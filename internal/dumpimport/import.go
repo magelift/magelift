@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/localdev"
+	"github.com/magelift/magelift/internal/localdev"
 )
 
 // ErrNonEmptyRequiresYes is returned when the target schema already has base

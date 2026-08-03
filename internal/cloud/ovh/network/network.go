@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"strings"
 
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/ovh/pulumi-ovh/sdk/v2/go/ovh/cloudproject"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )

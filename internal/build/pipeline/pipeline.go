@@ -14,12 +14,12 @@ import (
 	"regexp"
 	"strings"
 
-	buildkit "github.com/acourtiol/magelift/internal/build/kit"
-	buildplan "github.com/acourtiol/magelift/internal/build/plan"
-	buildrunner "github.com/acourtiol/magelift/internal/build/runner"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/containerrunner"
-	"github.com/acourtiol/magelift/internal/source"
+	buildkit "github.com/magelift/magelift/internal/build/kit"
+	buildplan "github.com/magelift/magelift/internal/build/plan"
+	buildrunner "github.com/magelift/magelift/internal/build/runner"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/containerrunner"
+	"github.com/magelift/magelift/internal/source"
 )
 
 const maxManifestBytes int64 = 4 << 20

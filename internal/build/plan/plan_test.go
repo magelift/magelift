@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	buildrunner "github.com/acourtiol/magelift/internal/build/runner"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/source"
+	buildrunner "github.com/magelift/magelift/internal/build/runner"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/source"
 )
 
 func TestPrepareRequestContainsOnlyImmutableInputs(t *testing.T) {

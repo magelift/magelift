@@ -70,8 +70,8 @@ digest after registry publication. Pull-request jobs neither push nor request an
 token.
 
 Tagged releases publish the supported matrix to GHCR as
-`ghcr.io/acourtiol/magelift-runtime`, `ghcr.io/acourtiol/magelift-builder`, and
-`ghcr.io/acourtiol/magelift-frankenphp-classic`. Each PHP branch receives a stable
+`ghcr.io/magelift/magelift-runtime`, `ghcr.io/magelift/magelift-builder`, and
+`ghcr.io/magelift/magelift-frankenphp-classic`. Each PHP branch receives a stable
 branch tag and a release tag. Deployments should pin the digest printed by the
 release workflow; tags are convenience aliases, not release identity.
 

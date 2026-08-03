@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	awsendpoint "github.com/acourtiol/magelift/internal/cloud/aws/endpoint"
+	awsendpoint "github.com/magelift/magelift/internal/cloud/aws/endpoint"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"

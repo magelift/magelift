@@ -3,8 +3,8 @@ package platform
 import (
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/config"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/config"
+	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

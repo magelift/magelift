@@ -9,14 +9,14 @@ PRs. The format is based on Keep a Changelog.
 
 ### Features
 
-* community launch docs, marketing scaffold, and install path ([c1c0df2](https://github.com/acourtiol/magelift/commit/c1c0df2e57cc761659d7c57e970520cb33ad2913))
+* community launch docs, marketing scaffold, and install path ([c1c0df2](https://github.com/magelift/magelift/commit/c1c0df2e57cc761659d7c57e970520cb33ad2913))
 
 
 ### Bug Fixes
 
-* Dependabot cooldowns and docs workflow Python setup ([a1a61f0](https://github.com/acourtiol/magelift/commit/a1a61f0f138019f96e82f53932e792ad6625a798))
-* drive Release Please from config (RC.1) ([d3a729b](https://github.com/acourtiol/magelift/commit/d3a729b43f1717d432dec1a4d9635a5e080b9d20))
-* green CI paths for docs, zizmor, and marketing lockfile ([8358541](https://github.com/acourtiol/magelift/commit/835854152f12b155132f9a5e848521c17f0f8ba1))
+* Dependabot cooldowns and docs workflow Python setup ([a1a61f0](https://github.com/magelift/magelift/commit/a1a61f0f138019f96e82f53932e792ad6625a798))
+* drive Release Please from config (RC.1) ([d3a729b](https://github.com/magelift/magelift/commit/d3a729b43f1717d432dec1a4d9635a5e080b9d20))
+* green CI paths for docs, zizmor, and marketing lockfile ([8358541](https://github.com/magelift/magelift/commit/835854152f12b155132f9a5e848521c17f0f8ba1))
 
 ## [Unreleased]
 

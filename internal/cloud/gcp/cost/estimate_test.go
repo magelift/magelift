@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	gcpcost "github.com/acourtiol/magelift/internal/cloud/gcp/cost"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/platform"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	gcpcost "github.com/magelift/magelift/internal/cloud/gcp/cost"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 type fakePlanned struct {

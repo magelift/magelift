@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/cloud/kube"
-	"github.com/acourtiol/magelift/internal/cloud/scaleway/naming"
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/cloud/scaleway/naming"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/batch/v1"

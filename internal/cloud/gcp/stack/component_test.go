@@ -5,8 +5,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -39,7 +39,7 @@ func TestProgramBuildsMockGraph(t *testing.T) {
 			Labels: map[string]string{"magelift-managed-by": "magelift"},
 		},
 		Application: Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:    Artifact{ImageDigest: "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Artifact:    Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
 		Policy:      NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c"}},
 		Catalog: CatalogSelection{
 			CloudSQLTier: "db-custom-1-3840", CloudSQLAvailability: "ZONAL",
@@ -69,7 +69,7 @@ func TestProgramBuildsStandardPresetGraph(t *testing.T) {
 			Labels: map[string]string{"magelift-managed-by": "magelift"},
 		},
 		Application: Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:    Artifact{ImageDigest: "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Artifact:    Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
 		Policy:      NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c"}},
 		Catalog: CatalogSelection{
 			CloudSQLTier: "db-custom-2-7680", CloudSQLAvailability: "REGIONAL",
@@ -114,7 +114,7 @@ func TestProgramBuildsHighAvailabilityPresetGraph(t *testing.T) {
 			Labels: map[string]string{"magelift-managed-by": "magelift"},
 		},
 		Application: Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:    Artifact{ImageDigest: "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Artifact:    Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
 		Policy:      NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c", "europe-west1-d"}},
 		Catalog: CatalogSelection{
 			CloudSQLTier: "db-custom-2-7680", CloudSQLAvailability: "REGIONAL",

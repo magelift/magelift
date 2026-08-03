@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# optional: www → apex could be a zone redirect; keep both on Pages for now
+/docs /docs/ 301
+/getting-started /docs/getting-started/ 301

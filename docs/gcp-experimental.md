@@ -59,7 +59,7 @@ GCP only adapts products.
 
 Bootstrap `Ensure` provisions a workload identity pool, GitHub OIDC provider
 (`https://token.actions.githubusercontent.com`), attribute condition
-`assertion.repository == 'acourtiol/magelift'`, and a CI service account with
+`assertion.repository == 'magelift/magelift'`, and a CI service account with
 `roles/iam.workloadIdentityUser`. Details expose `wif.provider` / `wif.serviceAccount`
 (never `"deferred"`).
 
@@ -90,7 +90,7 @@ Without Act, prove federation with ADC + IAM Credentials / STS (no SA key file):
 # 2) Generate an access token for the CI SA via WIF (example shape):
 gcloud iam service-accounts get-iam-policy \
   "ml-shop-preview-ci@${GCP_PROJECT}.iam.gserviceaccount.com"
-# Confirm principalSet member for attribute.repository/acourtiol/magelift exists.
+# Confirm principalSet member for attribute.repository/magelift/magelift exists.
 # 3) Token mint (when a valid federated credential is available):
 gcloud auth print-access-token --impersonate-service-account \
   "ml-shop-preview-ci@${GCP_PROJECT}.iam.gserviceaccount.com"

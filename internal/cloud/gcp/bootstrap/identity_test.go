@@ -123,7 +123,7 @@ func TestBuildIdentityPlanWIF(t *testing.T) {
 	if plan.AttributeMapping["attribute.repository"] != "assertion.repository" {
 		t.Fatalf("mapping=%v", plan.AttributeMapping)
 	}
-	if plan.AttributeCondition != "assertion.repository == 'acourtiol/magelift'" {
+	if plan.AttributeCondition != "assertion.repository == 'magelift/magelift'" {
 		t.Fatalf("condition=%q", plan.AttributeCondition)
 	}
 	if !strings.HasSuffix(plan.ProviderName, "/providers/github") {
@@ -163,7 +163,7 @@ func TestEnsureIdentityCreatesPoolProviderAndBinding(t *testing.T) {
 	if result.ProviderResource == "deferred" || strings.Contains(result.ProviderResource, "deferred") {
 		t.Fatal("provider must not be deferred")
 	}
-	wantMember := "principalSet://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/ml-shop-preview/attribute.repository/acourtiol/magelift"
+	wantMember := "principalSet://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/ml-shop-preview/attribute.repository/magelift/magelift"
 	bindings := fake.policies[result.Plan.ServiceAccountName]
 	if len(bindings) != 1 || bindings[0].Role != workloadIdentityUserRole || !containsString(bindings[0].Members, wantMember) {
 		t.Fatalf("bindings=%#v", bindings)

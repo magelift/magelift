@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	ovhtarget "github.com/acourtiol/magelift/internal/cloud/ovh/target"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/topology"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	ovhtarget "github.com/magelift/magelift/internal/cloud/ovh/target"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/topology"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 type PlanOptions struct {

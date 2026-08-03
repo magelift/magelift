@@ -8,13 +8,13 @@ import (
 	"os"
 	"strings"
 
-	awsbootstrap "github.com/acourtiol/magelift/internal/cloud/aws/bootstrap"
-	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
-	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
-	"github.com/acourtiol/magelift/internal/cloud/kube"
-	"github.com/acourtiol/magelift/internal/config"
-	deployflow "github.com/acourtiol/magelift/internal/deploy"
-	"github.com/acourtiol/magelift/internal/platform"
+	awsbootstrap "github.com/magelift/magelift/internal/cloud/aws/bootstrap"
+	awssecrets "github.com/magelift/magelift/internal/cloud/aws/secrets"
+	awsstate "github.com/magelift/magelift/internal/cloud/aws/state"
+	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/config"
+	deployflow "github.com/magelift/magelift/internal/deploy"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 func (Module) Bootstrap() platform.Bootstrap { return Bootstrap{} }

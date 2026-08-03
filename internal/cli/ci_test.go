@@ -38,7 +38,7 @@ func TestCIGenerateIsDeterministicAndKeepsWorkflowOffStdout(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(workflow)
-	for _, required := range []string{checkoutAction, setupGoAction, setupQemuAction, setupBuildxAction, cosignInstallerAction, "github.com/acourtiol/magelift/cmd/magelift@v1.2.3", "Build and sign immutable image", "environment: staging", "MAGELIFT_BUILD_ROLE_ARN", `- "staging"`, "--env \"${{ matrix.environment }}\"", "deploy --digest"} {
+	for _, required := range []string{checkoutAction, setupGoAction, setupQemuAction, setupBuildxAction, cosignInstallerAction, "github.com/magelift/magelift/cmd/magelift@v1.2.3", "Build and sign immutable image", "environment: staging", "MAGELIFT_BUILD_ROLE_ARN", `- "staging"`, "--env \"${{ matrix.environment }}\"", "deploy --digest"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("workflow lacks %q:\n%s", required, text)
 		}

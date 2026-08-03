@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	buildkit "github.com/acourtiol/magelift/internal/build/kit"
-	"github.com/acourtiol/magelift/internal/secretref"
-	"github.com/acourtiol/magelift/internal/source"
+	buildkit "github.com/magelift/magelift/internal/build/kit"
+	"github.com/magelift/magelift/internal/secretref"
+	"github.com/magelift/magelift/internal/source"
 )
 
 type fakeComposerSecretProvider struct {
@@ -23,9 +23,9 @@ func TestBuildPipelineRequestCreatesReleaseRequest(t *testing.T) {
 	revision := strings.Repeat("a", 40)
 	request, err := buildPipelineRequest(buildRequestOptions{
 		Push:           true,
-		ImageReference: "ghcr.io/acourtiol/shop:revision",
-		BuilderImage:   "ghcr.io/acourtiol/magelift-builder@sha256:" + strings.Repeat("b", 64),
-		RuntimeImage:   "ghcr.io/acourtiol/magelift-runtime@sha256:" + strings.Repeat("c", 64),
+		ImageReference: "ghcr.io/magelift/shop:revision",
+		BuilderImage:   "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("b", 64),
+		RuntimeImage:   "ghcr.io/magelift/magelift-runtime@sha256:" + strings.Repeat("c", 64),
 		Repository: source.Repository{
 			Revision:  revision,
 			OriginURL: "https://github.com/acourtiol/shop.git",
@@ -46,9 +46,9 @@ func TestBuildPipelineRequestRejectsIncompleteOrUnsafeReleaseOptions(t *testing.
 	revision := strings.Repeat("a", 40)
 	base := buildRequestOptions{
 		Push:           true,
-		ImageReference: "ghcr.io/acourtiol/shop:revision",
-		BuilderImage:   "ghcr.io/acourtiol/builder@sha256:" + strings.Repeat("b", 64),
-		RuntimeImage:   "ghcr.io/acourtiol/runtime@sha256:" + strings.Repeat("c", 64),
+		ImageReference: "ghcr.io/magelift/shop:revision",
+		BuilderImage:   "ghcr.io/magelift/builder@sha256:" + strings.Repeat("b", 64),
+		RuntimeImage:   "ghcr.io/magelift/runtime@sha256:" + strings.Repeat("c", 64),
 		Repository:     source.Repository{Revision: revision, OriginURL: "git@github.com:acourtiol/shop.git"},
 	}
 	if _, err := buildPipelineRequest(base); err == nil || !strings.Contains(err.Error(), "HTTPS") {
@@ -71,7 +71,7 @@ func TestBuildPipelineRequestRejectsIncompleteOrUnsafeReleaseOptions(t *testing.
 
 func TestBuildPipelineRequestRejectsReleaseFlagsWithoutPush(t *testing.T) {
 	_, err := buildPipelineRequest(buildRequestOptions{
-		ImageReference: "ghcr.io/acourtiol/shop:revision",
+		ImageReference: "ghcr.io/magelift/shop:revision",
 		Repository:     source.Repository{Revision: strings.Repeat("a", 40)},
 	})
 	if err == nil || !strings.Contains(err.Error(), "require --push") {

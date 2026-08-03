@@ -14,11 +14,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/acourtiol/magelift/internal/cli"
-	awseksops "github.com/acourtiol/magelift/internal/cloud/aws/eksops"
-	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
-	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/cli"
+	awseksops "github.com/magelift/magelift/internal/cloud/aws/eksops"
+	awsops "github.com/magelift/magelift/internal/cloud/aws/ops"
+	gcpops "github.com/magelift/magelift/internal/cloud/gcp/ops"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 func main() {

@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/acourtiol/magelift/internal/config"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/spf13/cobra"
 )
 

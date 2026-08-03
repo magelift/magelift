@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 // FormatStackName builds a DIY-backend-safe stack identity that includes

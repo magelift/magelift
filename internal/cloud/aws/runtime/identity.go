@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )

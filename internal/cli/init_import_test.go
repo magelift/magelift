@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/config"
+	"github.com/magelift/magelift/internal/config"
 )
 
 func TestInitFromAccWritesLoadValidConfig(t *testing.T) {

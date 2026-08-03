@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	mageliftupgrade "github.com/acourtiol/magelift/internal/upgrade"
+	mageliftupgrade "github.com/magelift/magelift/internal/upgrade"
 )
 
 type fakeUpgradeClient struct {

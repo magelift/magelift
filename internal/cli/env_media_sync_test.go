@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/mediasync"
+	"github.com/magelift/magelift/internal/mediasync"
 )
 
 func TestEnvMediaSyncUploadsFixtureListingDiffEmpty(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	deployflow "github.com/acourtiol/magelift/internal/deploy"
+	deployflow "github.com/magelift/magelift/internal/deploy"
 )
 
 // ErrNotSupported means the selected target does not implement an optional Ops

@@ -14,6 +14,7 @@
 /websites/**/node_modules/
 /websites/**/dist/
 /websites/**/.astro/
+/websites/marketing/public/docs/
 
 # Local state and credentials
 .env
@@ -40,3 +41,5 @@ skills-lock.json
 
 # Local planning / agent scratch (never commit to the public remote)
 .planning/
+.wrangler/
+.venv/

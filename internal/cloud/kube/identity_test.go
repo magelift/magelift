@@ -7,22 +7,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	"github.com/acourtiol/magelift/internal/cloud/aws/eksops"
-	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
-	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
-	"github.com/acourtiol/magelift/internal/cloud/kube"
-	ovhstack "github.com/acourtiol/magelift/internal/cloud/ovh/stack"
-	scwstack "github.com/acourtiol/magelift/internal/cloud/scaleway/stack"
-	"github.com/acourtiol/magelift/internal/platform"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/cloud/aws/eksops"
+	gcpops "github.com/magelift/magelift/internal/cloud/gcp/ops"
+	gcpstack "github.com/magelift/magelift/internal/cloud/gcp/stack"
+	"github.com/magelift/magelift/internal/cloud/kube"
+	ovhstack "github.com/magelift/magelift/internal/cloud/ovh/stack"
+	scwstack "github.com/magelift/magelift/internal/cloud/scaleway/stack"
+	"github.com/magelift/magelift/internal/platform"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 // TestFourModuleTypeIdentity is the Phase 6 SC1–SC2 offline gate: gcp ops,
 // eksops, ovh stack, and scaleway stack all return the same concrete
 // *kube.Observe and *kube.Steps types (D-01, D-03).
 func TestFourModuleTypeIdentity(t *testing.T) {
-	digest := "ghcr.io/acourtiol/magento@sha256:" + strings.Repeat("a", 64)
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)
 	backend := &identityBackend{}
 
 	modules := []struct {

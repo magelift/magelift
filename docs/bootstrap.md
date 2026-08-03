@@ -14,7 +14,7 @@ objects are retained by versioning and are not covered by the backup expiry rule
 ```sh
 magelift bootstrap --env staging \
   --access-log-bucket existing-log-bucket \
-  --github-owner acourtiol \
+  --github-owner magelift \
   --github-repo magelift
 ```
 

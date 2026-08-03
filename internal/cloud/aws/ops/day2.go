@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	awsbootstrap "github.com/acourtiol/magelift/internal/cloud/aws/bootstrap"
-	awscost "github.com/acourtiol/magelift/internal/cloud/aws/cost"
-	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
-	awssecrets "github.com/acourtiol/magelift/internal/cloud/aws/secrets"
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
-	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
-	"github.com/acourtiol/magelift/internal/platform"
+	awsbootstrap "github.com/magelift/magelift/internal/cloud/aws/bootstrap"
+	awscost "github.com/magelift/magelift/internal/cloud/aws/cost"
+	awsoperations "github.com/magelift/magelift/internal/cloud/aws/operations"
+	awssecrets "github.com/magelift/magelift/internal/cloud/aws/secrets"
+	awsstack "github.com/magelift/magelift/internal/cloud/aws/stack"
+	awsstate "github.com/magelift/magelift/internal/cloud/aws/state"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 func (Module) Bootstrap() platform.Bootstrap           { return Bootstrap{} }

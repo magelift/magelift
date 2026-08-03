@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	sdk "github.com/magelift/magelift/sdk/v1"
 	awsprovider "github.com/pulumi/pulumi-aws/sdk/v7/go/aws"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"

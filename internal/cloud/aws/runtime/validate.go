@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

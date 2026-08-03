@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/acourtiol/magelift/internal/config"
+	"github.com/magelift/magelift/internal/config"
 )
 
 func main() {

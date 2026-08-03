@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/secretref"
+	"github.com/magelift/magelift/internal/secretref"
 )
 
 type fakeAPI struct {

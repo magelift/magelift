@@ -97,7 +97,7 @@ func validArgs() Args {
 		Region:              "GRA9",
 		ProjectName:         "shop",
 		Environment:         "preview",
-		Image:               "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+		Image:               "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
 		ApplicationMode:     "integrated",
 		WebRuntime:          "nginx-fpm",
 		DatabaseWriter:      pulumi.String("mysql://db.example.ovh.net:3306"),

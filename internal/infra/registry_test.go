@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 type testTarget struct{ descriptor sdk.TargetDescriptor }

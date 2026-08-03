@@ -1,8 +1,15 @@
 name: Release Container Images
 
+# Stable semver tags only (no hyphen prerelease). Four failing v1.0.0-rc.1
+# retries burned ~750 job-minutes on a 12× multi-arch matrix. To publish an
+# RC image matrix, temporarily drop the job `if` or retag without '-'.
 on:
   push:
     tags: ['v*']
+
+concurrency:
+  group: release-images-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -13,6 +20,8 @@ permissions:
 jobs:
   publish:
     name: ${{ matrix.image }} PHP ${{ matrix.php }}
+    # Skip prerelease tags (semver uses '-' for -rc / -alpha / -beta).
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

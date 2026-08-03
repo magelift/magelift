@@ -45,7 +45,7 @@ final class ArtifactManifestTest extends TestCase
     public static function invalidManifests(): iterable
     {
         yield 'mutable revision' => ['sourceRevision', 'main', 'Source revision'];
-        yield 'tag instead of digest' => ['imageDigest', 'ghcr.io/acourtiol/magelift:latest', 'Image digest'];
+        yield 'tag instead of digest' => ['imageDigest', 'ghcr.io/magelift/magelift:latest', 'Image digest'];
         yield 'partial PHP version' => ['phpVersion', '8.4', 'PHP version'];
         yield 'duplicate extensions' => ['phpExtensions', ['intl', 'intl'], 'cannot contain duplicates'];
         yield 'invalid module' => ['enabledModules', ['magento/catalog'], 'Invalid Magento module'];

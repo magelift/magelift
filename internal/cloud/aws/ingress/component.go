@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/cloud/aws/naming"
+	"github.com/magelift/magelift/internal/cloud/aws/naming"
 	awsprovider "github.com/pulumi/pulumi-aws/sdk/v7/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/lb"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"

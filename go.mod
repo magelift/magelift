@@ -1,4 +1,4 @@
-module github.com/acourtiol/magelift
+module github.com/magelift/magelift
 
 go 1.26.0
 

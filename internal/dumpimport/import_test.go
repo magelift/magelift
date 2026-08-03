@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/acourtiol/magelift/internal/dumpimport"
-	"github.com/acourtiol/magelift/internal/localdev"
+	"github.com/magelift/magelift/internal/dumpimport"
+	"github.com/magelift/magelift/internal/localdev"
 )
 
 func fixturePath(t *testing.T, name string) string {

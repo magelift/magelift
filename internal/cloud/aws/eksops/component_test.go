@@ -8,11 +8,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	"github.com/acourtiol/magelift/internal/cloud/kube"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/platform"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
+	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -120,7 +120,7 @@ func validSpec() Spec {
 			Tags: map[string]string{"magelift:managed-by": "magelift"},
 		},
 		Application: Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:    Artifact{ImageDigest: "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Artifact:    Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
 		Policy: NetworkPolicy{
 			VPCCIDR: netip.MustParsePrefix("10.42.0.0/16"), AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, NatMode: NatModeFckNat,
 		},

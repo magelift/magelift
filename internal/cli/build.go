@@ -11,12 +11,12 @@ import (
 	"runtime"
 	"strings"
 
-	buildkit "github.com/acourtiol/magelift/internal/build/kit"
-	buildpipeline "github.com/acourtiol/magelift/internal/build/pipeline"
-	"github.com/acourtiol/magelift/internal/cosign"
-	"github.com/acourtiol/magelift/internal/secretref"
-	"github.com/acourtiol/magelift/internal/source"
-	"github.com/acourtiol/magelift/internal/toolchain"
+	buildkit "github.com/magelift/magelift/internal/build/kit"
+	buildpipeline "github.com/magelift/magelift/internal/build/pipeline"
+	"github.com/magelift/magelift/internal/cosign"
+	"github.com/magelift/magelift/internal/secretref"
+	"github.com/magelift/magelift/internal/source"
+	"github.com/magelift/magelift/internal/toolchain"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/spf13/cobra"
 )

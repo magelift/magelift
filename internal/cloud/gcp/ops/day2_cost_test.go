@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/cloud/gcp/ops"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/platform"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/cloud/gcp/ops"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 type costPlanned struct{}

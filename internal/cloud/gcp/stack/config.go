@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	gcptarget "github.com/acourtiol/magelift/internal/cloud/gcp/target"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/topology"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	gcptarget "github.com/magelift/magelift/internal/cloud/gcp/target"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/topology"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 type PlanOptions struct {

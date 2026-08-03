@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/acourtiol/magelift/internal/infra"
-	"github.com/acourtiol/magelift/internal/topology"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/infra"
+	"github.com/magelift/magelift/internal/topology"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 const (

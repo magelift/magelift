@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/platform"
-	"github.com/acourtiol/magelift/internal/usererr"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/usererr"
 )
 
 // Stable leading portion of the not-supported message. Plan 01-08 appends the

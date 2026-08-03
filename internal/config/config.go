@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/secretref"
+	"github.com/magelift/magelift/internal/secretref"
 	"go.yaml.in/yaml/v4"
 )
 

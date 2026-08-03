@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
-	deployflow "github.com/acourtiol/magelift/internal/deploy"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/automation"
+	awsoperations "github.com/magelift/magelift/internal/cloud/aws/operations"
+	awsstack "github.com/magelift/magelift/internal/cloud/aws/stack"
+	deployflow "github.com/magelift/magelift/internal/deploy"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 type stepsBackend struct {
@@ -108,7 +108,7 @@ func testSpec(t *testing.T) awsstack.Spec {
 	return awsstack.Spec{
 		Identity:     awsstack.Identity{Project: "shop", Environment: "preview-1", AccountID: "123456789012", Region: "eu-west-3", EnvironmentClass: "preview", Preset: sdk.PresetPreview},
 		Application:  awsstack.Application{Edition: "open-source", Version: "2.4.9", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:     awsstack.Artifact{ImageDigest: "ghcr.io/acourtiol/shop@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", CompatibilityStatus: "compatible", RequiredRuntimeCapabilities: []sdk.CapabilityID{sdk.CapabilityDatabaseMySQL, sdk.CapabilityCacheValkey}},
+		Artifact:     awsstack.Artifact{ImageDigest: "ghcr.io/magelift/shop@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", CompatibilityStatus: "compatible", RequiredRuntimeCapabilities: []sdk.CapabilityID{sdk.CapabilityDatabaseMySQL, sdk.CapabilityCacheValkey}},
 		Lifecycle:    awsstack.Lifecycle{ExpiresAt: time.Date(2026, time.December, 31, 0, 0, 0, 0, time.UTC), MonthlyBudgetCents: 25000},
 		Existing:     awsstack.ExistingResources{HostedZone: &hostedZone, Certificate: &certificate, ALBCertificate: &albCertificate},
 		Dependencies: awsstack.Dependencies{KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/11111111-2222-3333-4444-555555555555", CacheSecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-cache-token", EncryptionKeyARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-encryption-key", DatabaseName: "magento", MasterUsername: "magento"},

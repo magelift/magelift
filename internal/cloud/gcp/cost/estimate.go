@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 // Estimator is the GCP cost adapter.

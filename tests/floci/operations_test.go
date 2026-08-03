@@ -16,7 +16,7 @@ import (
 	cloudwatchlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
-	"github.com/acourtiol/magelift/internal/cloud/aws/operations"
+	"github.com/magelift/magelift/internal/cloud/aws/operations"
 )
 
 func TestSecretsManagerAgainstFloci(t *testing.T) {

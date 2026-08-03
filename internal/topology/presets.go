@@ -3,7 +3,7 @@ package topology
 import (
 	"fmt"
 
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 func ForPreset(preset sdk.PresetID) (sdk.DesiredTopology, error) {

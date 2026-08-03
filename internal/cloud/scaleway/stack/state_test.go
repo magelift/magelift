@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
-	"github.com/acourtiol/magelift/internal/platform"
+	awsstate "github.com/magelift/magelift/internal/cloud/aws/state"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 func TestModuleStateReturnsConcreteAdapter(t *testing.T) {

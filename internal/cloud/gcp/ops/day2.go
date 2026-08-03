@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	gcpbootstrap "github.com/acourtiol/magelift/internal/cloud/gcp/bootstrap"
-	gcpcost "github.com/acourtiol/magelift/internal/cloud/gcp/cost"
-	gcpsecrets "github.com/acourtiol/magelift/internal/cloud/gcp/secrets"
-	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
-	gcpstate "github.com/acourtiol/magelift/internal/cloud/gcp/state"
-	"github.com/acourtiol/magelift/internal/cloud/kube"
-	"github.com/acourtiol/magelift/internal/platform"
+	gcpbootstrap "github.com/magelift/magelift/internal/cloud/gcp/bootstrap"
+	gcpcost "github.com/magelift/magelift/internal/cloud/gcp/cost"
+	gcpsecrets "github.com/magelift/magelift/internal/cloud/gcp/secrets"
+	gcpstack "github.com/magelift/magelift/internal/cloud/gcp/stack"
+	gcpstate "github.com/magelift/magelift/internal/cloud/gcp/state"
+	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 func (Module) Bootstrap() platform.Bootstrap { return Bootstrap{} }

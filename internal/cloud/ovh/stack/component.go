@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/acourtiol/magelift/internal/cloud/ovh/cache"
-	"github.com/acourtiol/magelift/internal/cloud/ovh/database"
-	"github.com/acourtiol/magelift/internal/cloud/ovh/naming"
-	"github.com/acourtiol/magelift/internal/cloud/ovh/network"
-	"github.com/acourtiol/magelift/internal/cloud/ovh/runtime"
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/cloud/ovh/cache"
+	"github.com/magelift/magelift/internal/cloud/ovh/database"
+	"github.com/magelift/magelift/internal/cloud/ovh/naming"
+	"github.com/magelift/magelift/internal/cloud/ovh/network"
+	"github.com/magelift/magelift/internal/cloud/ovh/runtime"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/ovh/pulumi-ovh/sdk/v2/go/ovh"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )

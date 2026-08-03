@@ -83,7 +83,7 @@ MAGELIFT_GCP_ACCEPTANCE=1 ./scripts/gcp-acceptance-local.sh preview
 
 # Short-lived real stack + live_cell_loop (destroy on EXIT)
 MAGELIFT_GCP_ACCEPTANCE=1 \
-MAGELIFT_GCP_ACCEPTANCE_DIGEST='ghcr.io/acourtiol/magento@sha256:…' \
+MAGELIFT_GCP_ACCEPTANCE_DIGEST='ghcr.io/magelift/magento@sha256:…' \
 ./scripts/gcp-acceptance-local.sh up
 ```
 

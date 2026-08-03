@@ -1,14 +1,13 @@
+---
+name: Support
+about: How to get help with MageLift
+---
+
 # Support
 
-MageLift is community software and currently has no service-level agreement.
+- **Docs:** https://magelift.dev/docs/
+- **Bugs / features:** GitHub Issues on https://github.com/magelift/magelift
+- **Security:** see [SECURITY.md](SECURITY.md) (private vulnerability reporting)
 
-- Use GitHub Discussions for usage and design questions.
-- Use GitHub Issues for reproducible defects and narrowly scoped feature requests.
-- Use the private process in `SECURITY.md` for vulnerabilities.
-
-Include the MageLift version, operating system, sanitized configuration, command,
-exit code, and relevant logs. Remove account identifiers, domains, credentials,
-tokens, secret values, and customer data before posting.
-
-Community answers are best effort. Production architecture, incident response, and
-AWS cost decisions remain the operator's responsibility.
+There is no paid support channel today. Questions that fit a Magento ops
+discussion belong in Issues (with repro steps) rather than private email.

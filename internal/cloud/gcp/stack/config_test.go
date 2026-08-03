@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/acourtiol/magelift/internal/config"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/config"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 func TestPlanFromConfigMapsExplicitGCPInputs(t *testing.T) {
@@ -106,7 +106,7 @@ func gcpDeploymentConfig() config.Config {
 				Project:     "example-gcp-project",
 				Region:      "europe-west1",
 				NetworkCIDR: "10.20.0.0/16",
-				ImageDigest: "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				ImageDigest: "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			},
 		},
 		Defaults:  config.Defaults{Region: "europe-west1", Preset: "standard"},

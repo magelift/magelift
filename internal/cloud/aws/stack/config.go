@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	awstarget "github.com/acourtiol/magelift/internal/cloud/aws/target"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/topology"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	awstarget "github.com/magelift/magelift/internal/cloud/aws/target"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/topology"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 // PlanOptions controls validation exceptions that are safe only for a specific

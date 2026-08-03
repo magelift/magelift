@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	awsoperations "github.com/acourtiol/magelift/internal/cloud/aws/operations"
-	awsstack "github.com/acourtiol/magelift/internal/cloud/aws/stack"
-	deployflow "github.com/acourtiol/magelift/internal/deploy"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/automation"
+	awsoperations "github.com/magelift/magelift/internal/cloud/aws/operations"
+	awsstack "github.com/magelift/magelift/internal/cloud/aws/stack"
+	deployflow "github.com/magelift/magelift/internal/deploy"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 type Backend interface {

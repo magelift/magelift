@@ -1,0 +1,29 @@
+# MageLift
+
+> Magento in your own AWS or GCP account, with ACC/Upsun-shaped YAML and CLI.
+
+MageLift is an open-source CLI (Apache-2.0). It is not a hosting service. You keep the cloud account and the invoice.
+
+- Site: https://magelift.dev/
+- Docs: https://magelift.dev/docs/
+- Repo: https://github.com/magelift/magelift
+
+## Who it is for
+
+Agency tech leads and SME Magento owners who want production Magento in their cloud without starting from a blank Terraform/Pulumi stack, and without renting a Magento PaaS.
+
+## Certified targets
+
+| Target | Status |
+| --- | --- |
+| AWS ECS Fargate | Certified |
+| GCP GKE Autopilot | Certified |
+| AWS EKS / OVH MKS / Scaleway Kapsule | Experimental (not production-supported) |
+
+Only certified cells are production-supported. See the capability matrix in the docs.
+
+## Optional
+
+- Compare to ACC / Upsun: https://magelift.dev/docs/compare-paas/
+- Leave PaaS in a weekend: https://magelift.dev/docs/weekend-migrate/
+- Getting started: https://magelift.dev/docs/getting-started/

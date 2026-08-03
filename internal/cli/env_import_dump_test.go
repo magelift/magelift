@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/dumpimport"
-	"github.com/acourtiol/magelift/internal/seeddump"
+	"github.com/magelift/magelift/internal/dumpimport"
+	"github.com/magelift/magelift/internal/seeddump"
 )
 
 func TestEnvImportDumpSuccessMovesJournalImported(t *testing.T) {

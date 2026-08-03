@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/acourtiol/magelift/internal/benchmark"
+	"github.com/magelift/magelift/internal/benchmark"
 	"github.com/spf13/cobra"
 )
 

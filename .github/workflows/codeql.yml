@@ -1,11 +1,20 @@
 name: CodeQL
 
-# PR + weekly only: avoid re-running the same analysis on every main push
-# after a green PR, and skip GitHub API flakes on docs-only merges.
+# PR (Go-touching only) + weekly. Skip Dependabot — CI go-verify/govulncheck
+# is the dep-bump gate; weekly schedule covers baseline. No main-push re-run.
 on:
   pull_request:
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/codeql.yml'
   schedule:
     - cron: '23 3 * * 1'
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   actions: read
@@ -15,6 +24,8 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    # Dependabot PRs still match go.mod paths; skip hosted CodeQL minutes there.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

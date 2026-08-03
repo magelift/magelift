@@ -12,7 +12,7 @@ Prefer a GitHub Release archive (checksums + SBOM). Install notes live in the
 repository README. From source on a small machine:
 
 ```sh
-GOMAXPROCS=1 GOFLAGS=-p=1 go install github.com/acourtiol/magelift/cmd/magelift@latest
+GOMAXPROCS=1 GOFLAGS=-p=1 go install github.com/magelift/magelift/cmd/magelift@latest
 magelift version
 ```
 
@@ -30,7 +30,7 @@ magelift dev up
 
 Copy `examples/sample-shop/magelift.yaml` from the repository into your Magento
 repo root. Complete the “What to replace” table in
-`examples/sample-shop/README.md` (accounts, domains, secret refs — no plaintext
+`examples/sample-shop/README.md` (accounts, domains, secret refs  - no plaintext
 secrets).
 
 ```sh
@@ -50,7 +50,7 @@ Requires AWS credentials and an access-log bucket.
 4. `magelift outputs` / `magelift health`
 5. Destroy when done: `magelift destroy --env preview --yes`
 
-GCP GKE Autopilot is also **certified** — see [gcp-acceptance.md](gcp-acceptance.md)
+GCP GKE Autopilot is also **certified**  - see [gcp-acceptance.md](gcp-acceptance.md)
 for the operator harness (your disposable project via `MAGELIFT_GCP_PROJECT`).
 
 ## 5. Leaving PaaS

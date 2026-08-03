@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
-	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/platform"
+	awspricing "github.com/magelift/magelift/internal/cloud/aws/pricing"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 // PricingClient looks up current AWS on-demand prices (live mode only).

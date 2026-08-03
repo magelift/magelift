@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/cloud/kube"
 )
 
 func TestBuildKubeconfigUsesOAuthTokenNotExecPlugin(t *testing.T) {

@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/acourtiol/magelift/internal/cloud/scaleway/cache"
-	"github.com/acourtiol/magelift/internal/cloud/scaleway/database"
-	"github.com/acourtiol/magelift/internal/cloud/scaleway/naming"
-	"github.com/acourtiol/magelift/internal/cloud/scaleway/network"
-	"github.com/acourtiol/magelift/internal/cloud/scaleway/runtime"
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/cloud/scaleway/cache"
+	"github.com/magelift/magelift/internal/cloud/scaleway/database"
+	"github.com/magelift/magelift/internal/cloud/scaleway/naming"
+	"github.com/magelift/magelift/internal/cloud/scaleway/network"
+	"github.com/magelift/magelift/internal/cloud/scaleway/runtime"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumiverse/pulumi-scaleway/sdk/go/scaleway"
 )

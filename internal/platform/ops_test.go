@@ -5,9 +5,9 @@ import (
 	"io"
 	"testing"
 
-	awsops "github.com/acourtiol/magelift/internal/cloud/aws/ops"
-	gcpops "github.com/acourtiol/magelift/internal/cloud/gcp/ops"
-	"github.com/acourtiol/magelift/internal/platform"
+	awsops "github.com/magelift/magelift/internal/cloud/aws/ops"
+	gcpops "github.com/magelift/magelift/internal/cloud/gcp/ops"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 func TestModuleOpsAWSAndGCP(t *testing.T) {

@@ -9,14 +9,14 @@ import (
 	"os"
 	"strings"
 
-	gcpbootstrap "github.com/acourtiol/magelift/internal/cloud/gcp/bootstrap"
-	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
-	gcpstate "github.com/acourtiol/magelift/internal/cloud/gcp/state"
-	"github.com/acourtiol/magelift/internal/cloud/kube"
-	"github.com/acourtiol/magelift/internal/config"
-	deployflow "github.com/acourtiol/magelift/internal/deploy"
-	"github.com/acourtiol/magelift/internal/platform"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	gcpbootstrap "github.com/magelift/magelift/internal/cloud/gcp/bootstrap"
+	gcpstack "github.com/magelift/magelift/internal/cloud/gcp/stack"
+	gcpstate "github.com/magelift/magelift/internal/cloud/gcp/state"
+	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/config"
+	deployflow "github.com/magelift/magelift/internal/deploy"
+	"github.com/magelift/magelift/internal/platform"
+	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

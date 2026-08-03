@@ -1,9 +1,12 @@
-# MageLift marketing site (Astro)
+# MageLift site (Astro + MkDocs)
 
-Static marketing surface for Community Launch. Separate from MkDocs docs
-(`docs.magelift.com`). Default publish target: `www.magelift.com`.
+Public surface for https://magelift.dev/
 
-## Develop
+- Marketing landing: Astro (`src/pages/index.astro`)
+- Docs: MkDocs Material, built into `public/docs/` then shipped in the same
+  Cloudflare Pages deploy
+
+## Develop marketing only
 
 ```sh
 cd websites/marketing
@@ -11,12 +14,17 @@ npm install
 npm run dev
 ```
 
-## Build
+Docs locally: from repo root, `mkdocs serve` (separate from Astro).
+
+## Production build (marketing + docs)
 
 ```sh
-npm run build   # → dist/
+cd websites/marketing
+npm run build:site
+# → dist/  (docs at dist/docs/)
 ```
 
-Deploy `dist/` to Cloudflare Pages / Netlify / GitHub Pages (project site).
-Do not invent certified claims — copy wording from
+Deploy `dist/` to the Cloudflare Pages project `magelift`.
+
+Do not invent certified claims. Copy status wording from
 [docs/capability-matrix.md](../../docs/capability-matrix.md).

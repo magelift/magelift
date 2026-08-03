@@ -59,7 +59,7 @@ Every public-tag gate is **Closed**, **Deferred**, or **Offline closed** with a 
 
 | Gate | Status | Evidence |
 | --- | Closed / Deferred / Pending | --- |
-| Trademark / package-name clearance | **Closed** | MageLift / magelift.com |
+| Trademark / package-name clearance | **Closed** | MageLift / magelift.dev |
 | Contract freeze (`v1.0.0-rc.1`) | **Closed** | [versioning.md](versioning.md); CHANGELOG `[Unreleased]` baseline |
 | OpenSearch public-tag substitute | **Closed** | Offline SigV4 wiring + free-tier matrix + [prior Chantelle Terraform ops](sources/chantelle-opensearch.md) (repos not named) |
 | OpenSearch live SigV4 data-plane | **Deferred** | Post-tag / paid acceptance checklist above |

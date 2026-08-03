@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	gcpstack "github.com/acourtiol/magelift/internal/cloud/gcp/stack"
-	"github.com/acourtiol/magelift/internal/cloud/kube"
-	"github.com/acourtiol/magelift/internal/platform"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/automation"
+	gcpstack "github.com/magelift/magelift/internal/cloud/gcp/stack"
+	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/platform"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 func TestRuntimeObserveTypeIdentity(t *testing.T) {
@@ -86,7 +86,7 @@ func gcpTestSpec() gcpstack.Spec {
 			Region: "europe-west1", EnvironmentClass: "preview", Preset: sdk.PresetPreview,
 		},
 		Application:  gcpstack.Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:     gcpstack.Artifact{ImageDigest: "ghcr.io/acourtiol/magento@sha256:" + strings.Repeat("a", 64)},
+		Artifact:     gcpstack.Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)},
 		Policy:       gcpstack.NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b"}},
 		Catalog:      gcpstack.CatalogSelection{DesiredWebReplicas: 1, AutopilotCPURequest: "500m", AutopilotMemoryRequest: "1Gi"},
 		Dependencies: gcpstack.Dependencies{DatabaseName: "magento", MasterUsername: "magento"},

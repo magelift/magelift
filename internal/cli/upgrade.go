@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	mageliftupgrade "github.com/acourtiol/magelift/internal/upgrade"
+	mageliftupgrade "github.com/magelift/magelift/internal/upgrade"
 	"github.com/spf13/cobra"
 )
 

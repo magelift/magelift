@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/sdk/v1"
 )
 
 func TestPlanFromConfigMapsExplicitAWSInputs(t *testing.T) {
@@ -273,7 +273,7 @@ func deploymentConfig() config.Config {
 			CloudFrontCertificateARN: "arn:aws:acm:us-east-1:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef",
 			ALBCertificateARN:        "arn:aws:acm:eu-west-3:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789",
 			SNSTopicARN:              "arn:aws:sns:eu-west-3:123456789012:deployments",
-			ImageDigest:              "ghcr.io/acourtiol/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			ImageDigest:              "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			CacheSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:cache-token",
 			SessionSecretARN:         "arn:aws:secretsmanager:eu-west-3:123456789012:secret:session-token",
 			QueueSecretARN:           "arn:aws:secretsmanager:eu-west-3:123456789012:secret:queue-token",

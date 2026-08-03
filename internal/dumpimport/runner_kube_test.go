@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/dumpimport"
+	"github.com/magelift/magelift/internal/dumpimport"
 )
 
 // fakeKubeMySQL simulates an in-pod mysql client reached via kubectl exec.

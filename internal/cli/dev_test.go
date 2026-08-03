@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/localdev"
+	"github.com/magelift/magelift/internal/localdev"
 )
 
 func TestDevInitCreatesComposeTemplate(t *testing.T) {

@@ -22,10 +22,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/cosign"
+	"github.com/magelift/magelift/internal/cosign"
 )
 
-const defaultAPI = "https://api.github.com/repos/acourtiol/magelift"
+const defaultAPI = "https://api.github.com/repos/magelift/magelift"
 
 var (
 	ErrNoReleaseAsset   = errors.New("release does not contain a compatible MageLift archive")
@@ -278,7 +278,7 @@ func checksumForArchive(body []byte, archiveName string) (string, error) {
 }
 
 func releaseIdentity(tag string) string {
-	return "https://github.com/acourtiol/magelift/.github/workflows/release.yml@refs/tags/" + tag
+	return "https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/" + tag
 }
 
 func writeTemporaryAsset(pattern string, body []byte) (string, error) {

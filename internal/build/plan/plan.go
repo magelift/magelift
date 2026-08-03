@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"sort"
 
-	buildrunner "github.com/acourtiol/magelift/internal/build/runner"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/source"
+	buildrunner "github.com/magelift/magelift/internal/build/runner"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/source"
 )
 
 var immutableInputs = []string{"composer.lock", "app/etc/config.php"}

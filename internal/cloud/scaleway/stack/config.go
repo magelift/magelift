@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	scwtarget "github.com/acourtiol/magelift/internal/cloud/scaleway/target"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/topology"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	scwtarget "github.com/magelift/magelift/internal/cloud/scaleway/target"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/topology"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 type PlanOptions struct {

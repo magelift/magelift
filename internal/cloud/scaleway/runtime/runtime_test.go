@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/cloud/kube"
-	"github.com/acourtiol/magelift/internal/cloud/scaleway/naming"
+	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/cloud/scaleway/naming"
 )
 
 func TestBuildKubeconfigUsesStaticTokenNotExecPlugin(t *testing.T) {

@@ -7,11 +7,11 @@ import (
 	"io"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	"github.com/acourtiol/magelift/internal/cosign"
-	deployflow "github.com/acourtiol/magelift/internal/deploy"
-	"github.com/acourtiol/magelift/internal/platform"
-	"github.com/acourtiol/magelift/internal/usererr"
+	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/cosign"
+	deployflow "github.com/magelift/magelift/internal/deploy"
+	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/usererr"
 	"github.com/spf13/cobra"
 )
 

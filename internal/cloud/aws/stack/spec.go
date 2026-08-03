@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 var (

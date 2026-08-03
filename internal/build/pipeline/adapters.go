@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/acourtiol/magelift/internal/containerrunner"
+	"github.com/magelift/magelift/internal/containerrunner"
 )
 
 type ContainerAdapter struct {

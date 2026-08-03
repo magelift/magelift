@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/cli"
+	"github.com/magelift/magelift/internal/cli"
 	"github.com/spf13/cobra"
 )
 

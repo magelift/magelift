@@ -45,13 +45,13 @@ cat >"$EVENT_FILE" <<'EOF'
   "repository": {
     "default_branch": "main",
     "name": "magelift",
-    "full_name": "acourtiol/magelift",
+    "full_name": "magelift/magelift",
     "owner": {
-      "login": "acourtiol"
+      "login": "magelift"
     }
   },
   "sender": {
-    "login": "acourtiol"
+    "login": "magelift"
   }
 }
 EOF

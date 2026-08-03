@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/config"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -131,7 +131,7 @@ func renderWorkflow(configFile, version string, environments []string) []byte {
 	workflow.WriteString("    steps:\n")
 	workflow.WriteString("      - uses: " + checkoutAction + "\n")
 	workflow.WriteString("      - uses: " + setupGoAction + "\n        with:\n          go-version: '1.26.5'\n          cache: false\n")
-	workflow.WriteString("      - name: Install MageLift\n        run: go install github.com/acourtiol/magelift/cmd/magelift@" + version + "\n")
+	workflow.WriteString("      - name: Install MageLift\n        run: go install github.com/magelift/magelift/cmd/magelift@" + version + "\n")
 	workflow.WriteString("      - name: Validate configuration\n        run: magelift --config " + shellQuote(configFile) + " --no-interaction config validate\n")
 	workflow.WriteString("      - name: Resolve environment\n        run: magelift --config " + shellQuote(configFile) + " --env \"${{ matrix.environment }}\" --no-interaction --output json config effective > /dev/null\n")
 	workflow.WriteString("\n  build:\n    name: Build and sign immutable image\n    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'\n    needs: validate\n    runs-on: ubuntu-latest\n")
@@ -144,7 +144,7 @@ func renderWorkflow(configFile, version string, environments []string) []byte {
 	workflow.WriteString("      - uses: " + setupQemuAction + "\n      - uses: " + setupBuildxAction + "\n      - uses: " + cosignInstallerAction + "\n")
 	workflow.WriteString("      - uses: " + dockerLoginAction + "\n        with:\n          registry: ghcr.io\n          username: ${{ github.actor }}\n          password: ${{ secrets.GITHUB_TOKEN }}\n")
 	workflow.WriteString("      - name: Configure AWS credentials\n        uses: " + configureAWSAction + "\n        with:\n          role-to-assume: ${{ vars.MAGELIFT_BUILD_ROLE_ARN }}\n          aws-region: ${{ vars.MAGELIFT_AWS_REGION }}\n          mask-aws-account-id: true\n")
-	workflow.WriteString("      - name: Install MageLift\n        run: go install -ldflags=\"-X github.com/acourtiol/magelift/internal/cli.Version=" + version + "\" github.com/acourtiol/magelift/cmd/magelift@" + version + "\n")
+	workflow.WriteString("      - name: Install MageLift\n        run: go install -ldflags=\"-X github.com/magelift/magelift/internal/cli.Version=" + version + "\" github.com/magelift/magelift/cmd/magelift@" + version + "\n")
 	workflow.WriteString("      - name: Build and sign image\n        id: build\n        env:\n          MAGELIFT_RELEASE_IMAGE: ${{ vars.MAGELIFT_RELEASE_IMAGE }}\n          MAGELIFT_BUILDER_IMAGE: ${{ vars.MAGELIFT_BUILDER_IMAGE }}\n          MAGELIFT_RUNTIME_IMAGE: ${{ vars.MAGELIFT_RUNTIME_IMAGE }}\n        run: |\n          set -eu\n          for required in MAGELIFT_RELEASE_IMAGE MAGELIFT_BUILDER_IMAGE MAGELIFT_RUNTIME_IMAGE; do\n            test -n \"${!required}\"\n          done\n          magelift --config " + shellQuote(configFile) + " --no-interaction --output json build --push \\\n            --image \"$MAGELIFT_RELEASE_IMAGE\" \\\n            --builder-image \"$MAGELIFT_BUILDER_IMAGE\" \\\n            --runtime-image \"$MAGELIFT_RUNTIME_IMAGE\" > build-result.json\n          digest=\"$(jq -er '.image.imageReference + \"@\" + .image.digest' build-result.json)\"\n          printf 'digest=%s\\n' \"$digest\" >> \"$GITHUB_OUTPUT\"\n")
 	if containsEnvironment(environments, "preview") {
 		workflow.WriteString("\n  preview:\n    name: Preview infrastructure\n    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'magelift-preview')\n    needs: validate\n    runs-on: ubuntu-latest\n    environment: preview\n    permissions:\n      contents: read\n      id-token: write\n    steps:\n")
@@ -196,7 +196,7 @@ func writeWorkflowAWSSetup(workflow *strings.Builder, checkout, setupGo, configu
 	workflow.WriteString("      - uses: " + checkout + "\n        with:\n          persist-credentials: false\n")
 	workflow.WriteString("      - uses: " + setupGo + "\n        with:\n          go-version-file: go.mod\n          cache: false\n")
 	workflow.WriteString("      - name: Configure AWS credentials\n        uses: " + configureAWS + "\n        with:\n          role-to-assume: ${{ vars." + roleVariable + " }}\n          aws-region: ${{ vars.MAGELIFT_AWS_REGION }}\n          mask-aws-account-id: true\n")
-	workflow.WriteString("      - name: Install MageLift\n        run: go install -ldflags=\"-X github.com/acourtiol/magelift/internal/cli.Version=" + version + "\" github.com/acourtiol/magelift/cmd/magelift@" + version + "\n")
+	workflow.WriteString("      - name: Install MageLift\n        run: go install -ldflags=\"-X github.com/magelift/magelift/internal/cli.Version=" + version + "\" github.com/magelift/magelift/cmd/magelift@" + version + "\n")
 	if environmentVariable != "" {
 		workflow.WriteString("      - name: Validate environment variable\n        env:\n          DEPLOY_ENV: ${{ vars." + environmentVariable + " }}\n        run: test -n \"$DEPLOY_ENV\"\n")
 	}

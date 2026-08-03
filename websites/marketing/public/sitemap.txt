@@ -1,0 +1,8 @@
+https://magelift.dev/
+https://magelift.dev/docs/
+https://magelift.dev/docs/getting-started/
+https://magelift.dev/docs/compare-paas/
+https://magelift.dev/docs/weekend-migrate/
+https://magelift.dev/docs/capability-matrix/
+https://magelift.dev/docs/architecture/
+https://github.com/magelift/magelift

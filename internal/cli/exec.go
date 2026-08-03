@@ -9,8 +9,8 @@ import (
 	osExec "os/exec"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/platform"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/platform"
+	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/spf13/cobra"
 )
 

@@ -55,7 +55,7 @@ func TestVerifyUsesExactIdentityPolicyArgv(t *testing.T) {
 	runner := &recordingRunner{}
 	client := NewWithRunner(runner)
 	options := VerifyOptions{
-		CertificateIdentity: "https://github.com/acourtiol/magelift/.github/workflows/release.yml@refs/heads/main",
+		CertificateIdentity: "https://github.com/magelift/magelift/.github/workflows/release.yml@refs/heads/main",
 		OIDCIssuer:          "https://token.actions.githubusercontent.com",
 	}
 	if err := client.Verify(context.Background(), testReference, options); err != nil {
@@ -72,7 +72,7 @@ func TestVerifyBlobUsesExpectedOptions(t *testing.T) {
 	runner := &recordingRunner{}
 	client := NewWithRunner(runner)
 	options := VerifyOptions{
-		CertificateIdentity: "https://github.com/acourtiol/magelift/.github/workflows/release.yml@refs/tags/v1.2.3",
+		CertificateIdentity: "https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v1.2.3",
 		OIDCIssuer:          "https://token.actions.githubusercontent.com",
 	}
 	if err := client.VerifyBlob(context.Background(), "/tmp/checksums.sigstore.json", "/tmp/checksums.txt", options); err != nil {

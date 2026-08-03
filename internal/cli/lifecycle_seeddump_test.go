@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	deployflow "github.com/acourtiol/magelift/internal/deploy"
-	"github.com/acourtiol/magelift/internal/dumpimport"
-	"github.com/acourtiol/magelift/internal/platform"
-	"github.com/acourtiol/magelift/internal/seeddump"
+	deployflow "github.com/magelift/magelift/internal/deploy"
+	"github.com/magelift/magelift/internal/dumpimport"
+	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/seeddump"
 	"go.yaml.in/yaml/v4"
 )
 

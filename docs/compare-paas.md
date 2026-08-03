@@ -1,11 +1,11 @@
 # Compare MageLift to ACC / Upsun
 
-Honest evaluator page — not a sales sheet. Numbers are **illustrative**; replace
+Honest evaluator page  - not a sales sheet. Numbers are **illustrative**; replace
 with your quotes before a purchase decision.
 
 ## Who this is for
 
-- Agencies running 3–20 Magento shops that already have (or want) their own cloud
+- Agencies running 3-20 Magento shops that already have (or want) their own cloud
   accounts
 - SME Magento owners without a dedicated DevOps hire who can follow YAML/CLI docs
 
@@ -42,7 +42,7 @@ assumptions in docs:
 - Destroy-when-done for spikes
 
 PaaS monthly quotes vary widely by commerce plan. MageLift does **not** claim a
-fixed $/mo savings — publish your own side-by-side with the same traffic and
+fixed $/mo savings  - publish your own side-by-side with the same traffic and
 catalog assumptions.
 
 ## Migration
@@ -64,4 +64,4 @@ DNS cutover: [migrating-from-paas.md](migrating-from-paas.md) and
 
 [Getting started](getting-started.md) → sample-shop YAML under `examples/sample-shop/`
 in the repository → GitHub issues / PRs via
-[CONTRIBUTING](https://github.com/acourtiol/magelift/blob/main/CONTRIBUTING.md).
+[CONTRIBUTING](https://github.com/magelift/magelift/blob/main/CONTRIBUTING.md).

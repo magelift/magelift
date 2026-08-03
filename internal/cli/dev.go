@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/acourtiol/magelift/internal/localdev"
+	"github.com/magelift/magelift/internal/localdev"
 	"github.com/spf13/cobra"
 )
 

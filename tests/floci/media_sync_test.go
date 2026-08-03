@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/acourtiol/magelift/internal/mediasync"
+	"github.com/magelift/magelift/internal/mediasync"
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"

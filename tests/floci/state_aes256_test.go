@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/acourtiol/magelift/internal/cloud/aws/state"
+	"github.com/magelift/magelift/internal/cloud/aws/state"
 )
 
 func TestAES256LockAgainstFloci(t *testing.T) {

@@ -3,7 +3,7 @@ package naming_test
 import (
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/cloud/aws/naming"
+	"github.com/magelift/magelift/internal/cloud/aws/naming"
 )
 
 func TestAWSNameRespectsLimit(t *testing.T) {

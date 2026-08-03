@@ -2,7 +2,7 @@
 
 Decisions for the public v1.0.0 (Community Launch) surface. Capability for AWS
 ECS Fargate + GCP GKE Autopilot is already certified; this milestone is
-distribution, trust, and narrative — not a new cloud-spend era.
+distribution, trust, and narrative - not a new cloud-spend era.
 
 ## Spine
 
@@ -14,12 +14,11 @@ Cloud SQL attach, FinOps SaaS, fifth provider, and signed plugins to
 
 | Surface | Default | Stack |
 | --- | --- | --- |
-| Docs | `docs.magelift.com` | Existing MkDocs (`mkdocs.yml`) → GitHub Pages or Cloudflare Pages |
-| Marketing | `www.magelift.com` (apex → www) | Astro static site (separate from MkDocs) |
-| Repo | GitHub (`magelift` org when quality bar met) | Source of truth for releases |
+| Marketing + docs | `https://magelift.dev/` (docs at `/docs/`) | Astro landing + MkDocs Material → Cloudflare Pages project `magelift` |
+| Optional docs host | `docs.magelift.dev` → redirect or same Pages custom domain | Prefer path `/docs/` as canonical |
+| Repo | `https://github.com/magelift/magelift` | Source of truth for releases |
 
-Exact DNS / CDN cutover is a launch checklist item; content work can start on
-GitHub Pages / preview URLs before custom domains resolve.
+Build locally: `cd websites/marketing && npm run build:site` → deploy `dist/`.
 
 ## Optional paid cells (OpenSearch SigV4 vs Cloud SQL attach)
 
@@ -32,7 +31,7 @@ brownfield attach ships; Cloud SQL attach does not block v1.0.0.
 
 Committed acceptance samples live under [evidence/](evidence/README.md). Do not
 re-introduce private planner directories into this public remote. Never commit
-real AWS account IDs, GCP project IDs, or personal domains — use env vars
+real AWS account IDs, GCP project IDs, or personal domains - use env vars
 (`MAGELIFT_GCP_PROJECT`, `MAGELIFT_CUTOVER_HOST`) locally.
 
 ## History scrub (account IDs)
@@ -41,7 +40,7 @@ real AWS account IDs, GCP project IDs, or personal domains — use env vars
 numbers, GCP project IDs, personal domains, and related email addresses are
 **not reachable from `refs/heads/main`**. A private bundle of the pre-scrub
 repo (all refs) lives only on the maintainer machine under
-`~/.agents/archives/` — do not push it.
+`~/.agents/archives/` - do not push it.
 
 **Residual:** GitHub keeps `refs/pull/*/head` for closed PRs; those tips can
 still contain pre-scrub blobs for anyone with repo read access. To finish
@@ -50,10 +49,10 @@ repo after exporting issues. Default `git clone` does not fetch `refs/pull/*`.
 
 ## Launch checklist (remaining ops)
 
-1. **Docs hosting:** GitHub Pages is unavailable on this private plan — publish MkDocs via **Cloudflare Pages** (or make the repo public, then enable Pages). Workflow `.github/workflows/docs.yml` stays ready for Pages when the plan allows it; until then build with `mkdocs build --strict` in CI and deploy `site/` from Cloudflare connected to `main`.
+1. **Site hosting:** Cloudflare Pages project `magelift` on `magelift.dev` (marketing + `/docs/`). Workflow `.github/workflows/docs.yml` still builds MkDocs artifacts; prefer `websites/marketing` `build:site` for the public deploy.
 2. Cut `v1.0.0-rc.1` when [release-readiness](release-readiness.md) gates stay Closed and hosted CI is green on `main`
-3. Seed ≥3 `good first issue` items ([github-labels.md](github-labels.md)) — labels created; issues opened on GitHub
-4. Verify private vulnerability reporting is on (Security → Reporting) — may require UI if API is blocked
-5. Point `docs.magelift.com` / `www.magelift.com` when DNS is ready (Cloudflare Pages custom domains)
-6. Move to `magelift` GitHub org when the quality bar is met (ORG-01)
-7. Settings → Actions → General: allow workflows to create pull requests (needed for Release Please after history rewrite)
+3. Seed ≥3 `good first issue` items ([github-labels.md](github-labels.md)) - labels created; issues opened on GitHub
+4. Verify private vulnerability reporting is on (Security → Reporting) - may require UI if API is blocked
+5. Keep `magelift.dev` / `www.magelift.dev` on Cloudflare Pages custom domains
+6. Settings → Actions → General: allow workflows to create pull requests (needed for Release Please after history rewrite)
+7. Make the repository public when the quality bar on this checklist holds

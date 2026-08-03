@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"testing"
 
-	awscost "github.com/acourtiol/magelift/internal/cloud/aws/cost"
-	awspricing "github.com/acourtiol/magelift/internal/cloud/aws/pricing"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/platform"
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	awscost "github.com/magelift/magelift/internal/cloud/aws/cost"
+	awspricing "github.com/magelift/magelift/internal/cloud/aws/pricing"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 type fakePlanned struct {

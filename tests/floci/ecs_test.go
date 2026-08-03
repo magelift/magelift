@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
-	"github.com/acourtiol/magelift/internal/cloud/aws/operations"
+	"github.com/magelift/magelift/internal/cloud/aws/operations"
 )
 
 func TestECSRuntimeHealthAgainstFloci(t *testing.T) {

@@ -1,11 +1,45 @@
 site_name: MageLift
 site_description: Open-source Magento application platform (AWS + GCP certified)
-repo_url: https://github.com/acourtiol/magelift
-repo_name: acourtiol/magelift
+site_url: https://magelift.dev/docs/
+repo_url: https://github.com/magelift/magelift
+repo_name: magelift/magelift
 docs_dir: docs
 strict: true
+exclude_docs: |
+  knowledge/**
 theme:
-  name: mkdocs
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: green
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: green
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+    - toc.follow
+  font:
+    text: Source Sans 3
+    code: IBM Plex Mono
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/magelift/magelift
+    - icon: fontawesome/solid/globe
+      link: https://magelift.dev/
 nav:
   - Home: index.md
   - Getting started: getting-started.md
@@ -23,6 +57,7 @@ nav:
   - AWS bootstrap: bootstrap.md
   - Local AWS acceptance: aws-acceptance.md
   - Migrating from ACC / Platform.sh: migrating-from-paas.md
+  - Brownfield attach: brownfield-attach.md
   - ece-tools parity: ece-parity.md
   - AWS EKS experimental: aws-eks-experimental.md
   - GCP experimental: gcp-experimental.md
@@ -56,5 +91,11 @@ nav:
 markdown_extensions:
   - admonition
   - attr_list
+  - def_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
   - toc:
       permalink: true

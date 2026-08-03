@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	awsendpoint "github.com/acourtiol/magelift/internal/cloud/aws/endpoint"
-	awsstate "github.com/acourtiol/magelift/internal/cloud/aws/state"
-	"github.com/acourtiol/magelift/internal/platform"
+	awsendpoint "github.com/magelift/magelift/internal/cloud/aws/endpoint"
+	awsstate "github.com/magelift/magelift/internal/cloud/aws/state"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 // State implements platform.State for OVH via the shared S3-compatible manager.

@@ -116,7 +116,7 @@ export MAGELIFT_AWS_CERTIFICATE_IDENTITY='…'
 # Bootstrap once per account/environment before the first acceptance pass:
 # "$MAGELIFT_BIN" --config "$MAGELIFT_CONFIG" --env preview bootstrap \
 #   --access-log-bucket existing-log-bucket \
-#   --github-owner acourtiol --github-repo magelift
+#   --github-owner magelift --github-repo magelift
 
 make aws-acceptance-local
 ```

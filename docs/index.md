@@ -1,12 +1,14 @@
 # MageLift documentation
 
-Deploy Magento in your own cloud with ACC/Upsun-shaped YAML and CLI — without
+Deploy Magento in your own cloud with ACC/Upsun-shaped YAML and CLI  - without
 renting a PaaS. First public tag target: `v1.0.0-rc.1` (see
 [versioning](versioning.md)).
 
+Marketing site: [magelift.dev](https://magelift.dev/).
+
 ## First hour
 
-1. [Getting started](getting-started.md) — install → sample config → preview
+1. [Getting started](getting-started.md)  - install → sample config → preview
 2. [Local vs cloud](local-vs-cloud.md)
 3. [Sample shop](getting-started.md#3-sample-shop-config) (`examples/sample-shop` in the repo)
 4. [Leave PaaS in a weekend](weekend-migrate.md)
@@ -17,7 +19,7 @@ renting a PaaS. First public tag target: `v1.0.0-rc.1` (see
 | Product shape | [Architecture](architecture.md) |
 | What is certified | [Capability matrix](capability-matrix.md) |
 | Release gates | [Release readiness](release-readiness.md) |
-| Contribute | [CONTRIBUTING](https://github.com/acourtiol/magelift/blob/main/CONTRIBUTING.md) |
+| Contribute | [CONTRIBUTING](https://github.com/magelift/magelift/blob/main/CONTRIBUTING.md) |
 | New cloud adapter | [Adding a provider](adding-a-provider.md) |
 | CLI | [CLI reference](cli-reference.md) |
 | AWS acceptance | [Local AWS acceptance](aws-acceptance.md) |

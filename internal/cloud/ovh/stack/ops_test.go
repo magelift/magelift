@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/automation"
-	"github.com/acourtiol/magelift/internal/cloud/kube"
-	"github.com/acourtiol/magelift/internal/config"
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 // Remaining unsupported allowlist after Observe+Steps+State moved off the shell
@@ -303,7 +303,7 @@ func ovhDeploySpec() Spec {
 			Labels: map[string]string{"magelift-managed-by": "magelift"},
 		},
 		Application:  Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:     Artifact{ImageDigest: "ghcr.io/acourtiol/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Artifact:     Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
 		Policy:       NetworkPolicy{NetworkCIDR: "10.30.0.0/16", Zones: []string{"GRA9"}},
 		Catalog:      CatalogSelection{DatabaseFlavor: "db1-4", DatabasePlan: "essential", ValkeyFlavor: "db1-4", ValkeyPlan: "essential", NodeFlavor: "b3-8", NodeCount: 1, CPURequest: "500m", MemoryRequest: "1Gi", DesiredWebReplicas: 1},
 		Dependencies: Dependencies{DatabaseName: "magento", MasterUsername: "magento"},

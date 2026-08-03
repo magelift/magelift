@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/acourtiol/magelift/sdk/v1"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 func validSpec() Spec {
@@ -15,7 +15,7 @@ func validSpec() Spec {
 	return Spec{
 		Identity:     Identity{Project: "shop", Environment: "preview-1", AccountID: "123456789012", Region: "eu-west-3", EnvironmentClass: "preview", Preset: sdk.PresetPreview},
 		Application:  Application{Edition: "open-source", Version: "2.4.9", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:     Artifact{ImageDigest: "ghcr.io/acourtiol/shop@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", CompatibilityStatus: "compatible", RequiredRuntimeCapabilities: []sdk.CapabilityID{sdk.CapabilityDatabaseMySQL, sdk.CapabilityCacheValkey}},
+		Artifact:     Artifact{ImageDigest: "ghcr.io/magelift/shop@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", CompatibilityStatus: "compatible", RequiredRuntimeCapabilities: []sdk.CapabilityID{sdk.CapabilityDatabaseMySQL, sdk.CapabilityCacheValkey}},
 		Lifecycle:    Lifecycle{ExpiresAt: time.Date(2026, time.December, 31, 0, 0, 0, 0, time.UTC), MonthlyBudgetCents: 25000},
 		Existing:     ExistingResources{HostedZone: &hostedZone, Certificate: &certificate, ALBCertificate: &albCertificate},
 		Dependencies: Dependencies{KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/11111111-2222-3333-4444-555555555555", CacheSecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-cache-token", EncryptionKeyARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-encryption-key", DatabaseName: "magento", MasterUsername: "magento"},
@@ -38,7 +38,7 @@ func TestSpecValidateRejectsGuessedOrUnsafeInputs(t *testing.T) {
 		{name: "missing catalog", edit: func(spec *Spec) { spec.Catalog.Version = "" }},
 		{name: "missing encryption key", edit: func(spec *Spec) { spec.Dependencies.EncryptionKeyARN = "" }},
 		{name: "expired preview", edit: func(spec *Spec) { spec.Lifecycle.ExpiresAt = time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC) }},
-		{name: "mutable image", edit: func(spec *Spec) { spec.Artifact.ImageDigest = "ghcr.io/acourtiol/shop:latest" }},
+		{name: "mutable image", edit: func(spec *Spec) { spec.Artifact.ImageDigest = "ghcr.io/magelift/shop:latest" }},
 		{name: "unsupported artifact capability", edit: func(spec *Spec) {
 			spec.Artifact.RequiredRuntimeCapabilities = []sdk.CapabilityID{sdk.CapabilityQueueRabbitMQ}
 		}},

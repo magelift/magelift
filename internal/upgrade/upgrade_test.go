@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/cosign"
+	"github.com/magelift/magelift/internal/cosign"
 )
 
 type fakeHTTP struct {

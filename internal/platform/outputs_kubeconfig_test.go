@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/acourtiol/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/platform"
 )
 
 func TestOutputKubeconfigOptionalNotRequired(t *testing.T) {
