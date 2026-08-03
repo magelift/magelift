@@ -30,7 +30,6 @@ jobs:
           args: release --clean --parallelism 2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
       - name: Verify signed checksums
         env:
           RELEASE_TAG: ${{ github.ref_name }}

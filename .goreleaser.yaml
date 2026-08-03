@@ -48,17 +48,9 @@ signs:
       - "--yes"
     artifacts: checksum
 
-homebrew_casks:
-  - name: magelift
-    # Skip until HOMEBREW_TAP_GITHUB_TOKEN is set and acourtiol/homebrew-tap exists.
-    skip: '{{ eq (print .Env.HOMEBREW_TAP_GITHUB_TOKEN) "" }}'
-    repository:
-      owner: acourtiol
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: https://github.com/acourtiol/magelift
-    description: Deploy Magento applications to AWS
-    binaries: [magelift]
+# Homebrew cask: re-enable when acourtiol/homebrew-tap exists and
+# HOMEBREW_TAP_GITHUB_TOKEN is configured. GoReleaser v2.17 has no
+# homebrew_casks.skip field — an empty token fails the release.
 
 changelog:
   use: github-native
