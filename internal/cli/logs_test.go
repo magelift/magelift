@@ -31,6 +31,9 @@ func TestLogsCommandUsesResolvedEnvironmentAndStructuredOutput(t *testing.T) {
 	var output bytes.Buffer
 	observe := &recordingObserve{}
 	o := testOptions(&output, &fakeTerminal{interactive: false})
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster"}}, nil
+	}
 	o.testRuntimeObserve = observe
 	command := newCommandWithOptions(o)
 	command.SetArgs([]string{"--config", configPath, "--env", "staging", "--output", "json", "logs", "--service", "deploy", "--since", "30m", "--filter", "ERROR", "--limit", "7"})

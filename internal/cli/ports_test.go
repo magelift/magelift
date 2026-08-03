@@ -134,6 +134,9 @@ func TestLogsErrNotSupportedNamesTier(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster"}}, nil
+	}
 	o.testRuntimeObserve = fakeRuntimeObserve{err: platform.ErrNotSupported}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--env", "staging", "logs"})
