@@ -334,12 +334,32 @@ Destroy an environment and remove its configuration overlay
 ```text
 magelift env destroy <environment>
 ```
+### magelift env import-dump
+
+Import the environment seedDump into the target database
+
+```text
+magelift env import-dump <environment>
+```
 ### magelift env list
 
 List configured environments
 
 ```text
 magelift env list
+```
+### magelift env media-sync
+
+Upload a local media tree into the environment media bucket (merge)
+
+```text
+magelift env media-sync <environment> [flags]
+```
+
+Options:
+
+```text
+      --source string   local media directory to upload (required)
 ```
 ### magelift env protect
 
@@ -354,6 +374,13 @@ Options:
 ```text
       --off   allow destructive operations
       --on    protect destructive operations
+```
+### magelift env status
+
+Show environment overlay status including seed dump journal
+
+```text
+magelift env status <environment>
 ```
 ### magelift env sweep
 
