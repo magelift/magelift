@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Substantial design changes should be discussed here before a large PR.
-        Provider work should follow [Adding a provider](https://github.com/acourtiol/magelift/blob/main/docs/adding-a-provider.md)
+        Provider work should follow [Adding a provider](https://github.com/magelift/magelift/blob/main/docs/adding-a-provider.md)
         and the ADRs under `docs/adr/`.
   - type: textarea
     id: problem

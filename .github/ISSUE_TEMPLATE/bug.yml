@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for reporting a bug. For security issues, use private reporting in
-        [SECURITY.md](https://github.com/acourtiol/magelift/blob/main/SECURITY.md)
+        [SECURITY.md](https://github.com/magelift/magelift/blob/main/SECURITY.md)
         instead of a public issue.
   - type: textarea
     id: summary

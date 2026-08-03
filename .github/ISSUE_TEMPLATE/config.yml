@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Discussions
-    url: https://github.com/acourtiol/magelift/discussions
+    url: https://github.com/magelift/magelift/discussions
     about: Questions, ideas, and support that are not bug reports or feature requests.
   - name: Security vulnerability
-    url: https://github.com/acourtiol/magelift/security/advisories/new
+    url: https://github.com/magelift/magelift/security/advisories/new
     about: Report suspected vulnerabilities privately. Do not open a public issue.

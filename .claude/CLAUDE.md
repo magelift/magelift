@@ -33,7 +33,7 @@ If everything else fails, that must work — for at least one certified provider
 - HCL - Docker Bake build matrix (`docker-bake.hcl`)
 - JSON Schema - `schema/magelift.schema.json` (generated, validates `magelift.yaml`)
 ## Runtime
-- Go module: `github.com/acourtiol/magelift`
+- Go module: `github.com/magelift/magelift`
 - Distributed as a single static CLI binary `magelift` (also `genconfig`, `gendocs` dev tools in `cmd/`)
 - CGO disabled in release builds (`CGO_ENABLED=0`, `.goreleaser.yaml`)
 - Go modules (`go.mod` / `go.sum`) - lockfile present
@@ -61,7 +61,7 @@ If everything else fails, that must work — for at least one certified provider
 - `golang.org/x/oauth2` - GCP/OIDC auth flows
 - `go.yaml.in/yaml/v4` - YAML parsing for `magelift.yaml` and config models (`internal/config/model.go`)
 - `github.com/spf13/cobra` - CLI command framework
-- `sdk/v1` (internal, `github.com/acourtiol/magelift/sdk/v1`) - typed topology/validation contracts shared across providers (`sdk/v1/types.go`, `topology.go`, `validation.go`)
+- `sdk/v1` (internal, `github.com/magelift/magelift/sdk/v1`) - typed topology/validation contracts shared across providers (`sdk/v1/types.go`, `topology.go`, `validation.go`)
 - `internal/platform` - `StackModule` abstraction each cloud provider implements (referenced in `docs/architecture.md`)
 - `cosign` CLI (invoked via `os/exec`, not a Go import) - artifact signing/verification (`internal/cosign/cosign.go`)
 ## Configuration

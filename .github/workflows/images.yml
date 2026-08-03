@@ -89,7 +89,7 @@ jobs:
             base: docker.io/dunglas/frankenphp:1.12.4-php8.5-trixie@sha256:a0ad00db3dd7f61b55a9951c9b6ef73ac8e1dd4c6de36979a0d1651b48da5f43
 
     env:
-      IMAGE: ghcr.io/acourtiol/magelift-${{ matrix.image }}
+      IMAGE: ghcr.io/magelift/magelift-${{ matrix.image }}
       VERSION: ${{ github.ref_name }}
 
     steps:
@@ -121,7 +121,7 @@ jobs:
             ${{ env.IMAGE }}:${{ matrix.php }}
             ${{ env.IMAGE }}:${{ matrix.php }}-${{ env.VERSION }}
           labels: |
-            org.opencontainers.image.source=https://github.com/acourtiol/magelift
+            org.opencontainers.image.source=https://github.com/magelift/magelift
             org.opencontainers.image.version=${{ env.VERSION }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=MageLift ${{ matrix.image }} PHP ${{ matrix.php }}
@@ -133,7 +133,7 @@ jobs:
       - name: Verify published digest
         run: >-
           cosign verify
-          --certificate-identity "https://github.com/acourtiol/magelift/.github/workflows/images.yml@refs/tags/${VERSION}"
+          --certificate-identity "https://github.com/magelift/magelift/.github/workflows/images.yml@refs/tags/${VERSION}"
           --certificate-oidc-issuer https://token.actions.githubusercontent.com
           "${IMAGE}@${{ steps.push.outputs.digest }}"
       - name: Publish registry provenance attestation
