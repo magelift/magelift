@@ -8,6 +8,8 @@ PRs. The format is based on Keep a Changelog.
 
 ### Added
 
+- Certify `gcp` / `gke-autopilot` after real-account acceptance (2026-08-02 matrix PASS) — multi-cloud claim for two first-party targets.
+- Live free-tier AWS brownfield adopt confirm (existing VPC + RDS; describe-after-destroy).
 - Initial legal, governance, architecture, documentation, and repository baseline.
 - RC contract for first public tag `v1.0.0-rc.1` — see [docs/versioning.md](docs/versioning.md).
 - OpenSearch public-tag gate substitute: offline SigV4 wiring mocks, free-tier
@@ -16,6 +18,10 @@ PRs. The format is based on Keep a Changelog.
   private employer repos not named). Live MageLift SigV4 data-plane deferred.
 - Runtime `/health` short-circuit on nginx and FrankenPHP; `curl` in runtime
   images for ECS health checks; Varnish `/health` pass-through test + VCL.
+
+### Fixed
+
+- Accept RDS ManageMasterUserPassword secret ARNs that contain `!` (`rds!db-…`) when adopting an existing database.
 
 ### Changed
 

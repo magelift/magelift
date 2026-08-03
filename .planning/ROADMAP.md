@@ -17,14 +17,14 @@ Phases 4-8 are deliberately droppable in reverse order. A maintainer who wants t
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Publishable Baseline & Honest Fallbacks** - Clear the debt that worsens with every later phase, and make every target state its own tier
+- [x] **Phase 1: Publishable Baseline & Honest Fallbacks** - Clear the debt that worsens with every later phase, and make every target state its own tier (hosted CI green deferred Act-only — Actions minutes)
 - [x] **Phase 2: Tag-Ready Release Surface** - Make `v1.0.0-rc.1` taggable: version story, contract statement, packaging smoke, contributor path
 - [x] **Phase 3: Credit-Efficient Acceptance Harness & Evidence Tiering** - One long-lived stack, resumable runs, automatic evidence, and a matrix that never over-claims
 - [x] **Phase 4: Brownfield Onramp — PaaS Import & ece-tools Parity** - A store on Adobe Commerce Cloud or Upsun gets a reviewable `magelift.yaml` and a build system it can trust (completed 2026-07-29)
 - [x] **Phase 5: Data Migration & Cutover** - `seedDump` stops being a status string; a documented cutover moves a live store over (completed 2026-07-29)
 - [x] **Phase 6: Shared Kubernetes Day-2** - One `Observe` and one `deploy.Steps` in `internal/cloud/kube`, inherited by all four Kubernetes targets (completed 2026-07-30)
-- [ ] **Phase 7: GCP Certification** - GKE Autopilot reaches certified tier on real-account evidence, making multi-cloud truthful
-- [ ] **Phase 8: Brownfield Attach & Tag Day** - Adopt existing VPC and database safely, then close or defer every gate-board row
+- [x] **Phase 7: GCP Certification** - GKE Autopilot reaches certified tier on real-account evidence, making multi-cloud truthful (completed 2026-08-02)
+- [x] **Phase 8: Brownfield Attach & Tag Day** - Adopt existing VPC and database safely, then close or defer every gate-board row (completed 2026-08-02)
 
 ## Cloud Spend Map
 
@@ -228,7 +228,7 @@ Plans:
   4. `magelift deploy` completes migrate → cutover → health → record on GKE Autopilot and the resulting release is readable from the releases journal
   5. `magelift cost` returns a per-cell estimate for the GCP target, and both `docs/capability-matrix.md` and the `docs/release-readiness.md` gate board record `gcp` / `gke-autopilot` as certified, citing this acceptance pass as evidence
 
-**Plans:** 5/7 plans executed
+**Plans:** 7/7 plans executed
 
 Plans:
 
@@ -237,8 +237,8 @@ Plans:
 - [x] 07-03-PLAN.md — Harness cell catalog + live_cell_loop dry-run (GCP-03..05 wiring)
 - [x] 07-04-PLAN.md — Kube-adjacent managed dumpimport runner (MIGRATE-04 dump)
 - [x] 07-05-PLAN.md — Cloudflare DNS cutover script offline (MIGRATE-04 DNS, D-04)
-- [ ] 07-06-PLAN.md — Live paid create-once pass + force_clean/PSA + DNS cleanup
-- [ ] 07-07-PLAN.md — Certify capability-matrix + release-readiness (GCP-06, MIGRATE-04 close)
+- [x] 07-06-PLAN.md — Live paid create-once pass + force_clean/PSA + DNS cleanup
+- [x] 07-07-PLAN.md — Certify capability-matrix + release-readiness (GCP-06, MIGRATE-04 close)
 
 ### Phase 8: Brownfield Attach & Tag Day
 
@@ -263,7 +263,7 @@ Plans:
 - [x] 08-03-PLAN.md — database.Existing component + stack wiring (ATTACH-02 apply)
 - [x] 08-04-PLAN.md — Unified ADOPT report + refuse for network+DB (ATTACH-03)
 - [x] 08-05-PLAN.md — Attach limits/detach docs + ADR 0010 supersede (ATTACH-04)
-- [x] 08-06-PLAN.md — Offline/Floci evidence, AWS HUMAN_GATE, RELEASE-05 tag board
+- [x] 08-06-PLAN.md — Offline/Floci evidence + live AWS adopt confirm + RELEASE-05 tag board
 
 ## Progress
 
@@ -274,14 +274,14 @@ Phases 4-5 (brownfield onramp, fully offline) and Phases 6-7 (shared Kubernetes 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Publishable Baseline & Honest Fallbacks | 10/10 | In Progress|  |
-| 2. Tag-Ready Release Surface | 4/4 | In Progress|  |
-| 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 5/6 | In Progress|  |
-| 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 6/6 | Complete    | 2026-07-29 |
-| 5. Data Migration & Cutover | 6/6 | Complete    | 2026-07-29 |
-| 6. Shared Kubernetes Day-2 | 6/6 | Complete    | 2026-07-30 |
-| 7. GCP Certification | 5/7 | In Progress|  |
-| 8. Brownfield Attach & Tag Day | 6/6 | In Progress|  |
+| 1. Publishable Baseline & Honest Fallbacks | 10/10 | Complete (CI Deferred Act-only) | 2026-07-28 |
+| 2. Tag-Ready Release Surface | 4/4 | Complete | |
+| 3. Credit-Efficient Acceptance Harness & Evidence Tiering | 6/6 | Complete | |
+| 4. Brownfield Onramp — PaaS Import & ece-tools Parity | 6/6 | Complete | 2026-07-29 |
+| 5. Data Migration & Cutover | 6/6 | Complete | 2026-07-29 |
+| 6. Shared Kubernetes Day-2 | 6/6 | Complete | 2026-07-30 |
+| 7. GCP Certification | 7/7 | Complete | 2026-08-02 |
+| 8. Brownfield Attach & Tag Day | 6/6 | Complete | 2026-08-02 |
 
 ## Requirement Coverage
 

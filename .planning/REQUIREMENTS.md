@@ -38,7 +38,7 @@
 - [x] **GCP-03**: Operator can run the full day-2 command set (logs, exec, secrets, state, health) against a GKE Autopilot target
 - [x] **GCP-04**: Operator can deploy Magento to GKE Autopilot through the standard candidate-deploy sequence (migrate → cutover → health → record)
 - [x] **GCP-05**: Operator can run `magelift cost` against a GCP target and get a per-cell estimate
-- [ ] **GCP-06**: GCP GKE Autopilot is recorded as certified tier, backed by a real-account acceptance pass, making the multi-cloud claim truthful
+- [x] **GCP-06**: GCP GKE Autopilot is recorded as certified tier, backed by a real-account acceptance pass, making the multi-cloud claim truthful — **Complete** 2026-08-02: docs flip cites `.magelift/gcp-matrix/matrix-results.md` + `scratch/07-06-live-pass.md`
 
 ### Shared Kubernetes Day-2
 
@@ -70,7 +70,7 @@
 - [x] **MIGRATE-01**: Operator can create an environment with `--dump` and have the dump actually imported into the managed MySQL/Aurora instance after the first successful deploy — `seedDump` is no longer inert
 - [x] **MIGRATE-02**: Operator sees an accurate `seedDumpStatus` progressing through recorded → importing → imported → failed, with the failure reason available
 - [x] **MIGRATE-03**: Operator can sync Magento media from a source location into the target's object storage
-- [x] **MIGRATE-04**: Operator can follow a documented cutover runbook (DNS, maintenance mode, reindex, verification, rollback) to move a live store onto MageLift — **honesty split (D-06):** Phase 5 closes the local half (runbook in `docs/migrating-from-paas.md` + scratch `05-cutover-local-proof.md`). DNS + live non-prod cutover rehearsal + managed-instance dump cell remain **Pending → Phase 7 HUMAN_GATE** (no Phase 5 paid AWS pass). Do not mark Complete until that gate clears.
+- [x] **MIGRATE-04**: Operator can follow a documented cutover runbook (DNS, maintenance mode, reindex, verification, rollback) to move a live store onto MageLift — **Complete** (honesty split closed): Phase 5 local runbook + Phase 7 live `migrate:dump` + `cutover:dns` on preview host `magelift-preview.alexandrecourtiol.com` (2026-08-02 matrix PASS + DNS cleanup). Does **not** claim production storefront cutover beyond non-prod rehearsal.
 - [x] **MIGRATE-05**: Dump import is safe to retry and refuses to overwrite a non-empty production database without explicit confirmation
 
 ### ece-tools Parity
@@ -86,10 +86,10 @@
 
 <!-- Supersedes ADR 0010's "attach existing DB remains out of scope". -->
 
-- [x] **ATTACH-01**: Operator can adopt an existing VPC into a MageLift stack instead of having one created — **Complete** (offline mocks 08-01..06; live free-tier confirm **Deferred** ADC HUMAN_GATE — `scratch/08-06-aws-adopt-confirm.md`)
-- [x] **ATTACH-02**: Operator can adopt an existing managed database instance (RDS) into a MageLift stack — **Complete** for AWS RDS offline+docs. **Deferred:** Cloud SQL / multi-cloud attach (explicitly out of this milestone; see `docs/brownfield-attach.md`)
-- [x] **ATTACH-03**: Adoption runs through `preview` first and shows exactly what will be imported versus created, and refuses to mutate or destroy adopted resources it does not own — **Complete** (offline ADOPT + Refuse tests PASS)
-- [x] **ATTACH-04**: Documented limits of adoption — what can be attached, what cannot, and how to detach without losing the resource — **Complete** (`docs/brownfield-attach.md`; offline detach proof; live describe-after-destroy **Deferred** ADC HUMAN_GATE)
+- [x] **ATTACH-01**: Operator can adopt an existing VPC into a MageLift stack instead of having one created — **Complete** (offline mocks + live free-tier confirm 2026-08-02 — `scratch/08-06-aws-adopt-confirm.md`)
+- [x] **ATTACH-02**: Operator can adopt an existing managed database instance (RDS) into a MageLift stack — **Complete** for AWS RDS (offline+docs+live). **Deferred:** Cloud SQL / multi-cloud attach (explicitly out of this milestone; see `docs/brownfield-attach.md`)
+- [x] **ATTACH-03**: Adoption runs through `preview` first and shows exactly what will be imported versus created, and refuses to mutate or destroy adopted resources it does not own — **Complete** (offline ADOPT + Refuse tests PASS; live preview ADOPT lines 2026-08-02)
+- [x] **ATTACH-04**: Documented limits of adoption — what can be attached, what cannot, and how to detach without losing the resource — **Complete** (`docs/brownfield-attach.md`; offline detach proof; live describe-after-destroy PASS 2026-08-02)
 
 ### Internal Quality
 
@@ -100,7 +100,7 @@
 - [x] **QUALITY-03**: Table-driven tests enumerate the AOSS collection-group OCU values AWS accepts, preventing silent drift
 - [x] **QUALITY-04**: Combination tests cover `queueMode` × `searchMode` × `webRuntime` together, not just each catalog cell in isolation
 - [x] **QUALITY-05**: Every provider's subnet/CIDR carving has explicit boundary tests (min index, max index, max index + 1)
-- [x] **QUALITY-06**: `golangci-lint` completes in CI without OOM or timeout by partitioning work per provider, rather than by serializing one 30-minute job
+- [x] **QUALITY-06**: `golangci-lint` completes in CI without OOM or timeout by partitioning work per provider, rather than by serializing one 30-minute job — **Complete** for partitioned workflow shape; **hosted green outcome Deferred** (Act-only until Actions minutes return — see `01-VERIFICATION.md` HUMAN_GATE / release-readiness)
 - [x] **QUALITY-07**: `internal/cloud/aws/runtime/runtime.go` is split by concern (task definition, service, sidecar injection) so no single 991-line file owns all AWS runtime wiring
 - [x] **QUALITY-08**: The two recently fixed OVH bugs — MKS node-pool dependency ordering and subnet index cap validation — have explicit regression tests
 
@@ -110,7 +110,7 @@
 - [x] **RELEASE-02**: `sdk/v1` and `platform.StackModule` are documented as a compatibility contract with an explicit stability statement covering what may change during the RC series
 - [x] **RELEASE-03**: A third party can follow `docs/adding-a-provider.md` plus `examples/custom-cli` to register an out-of-tree provider without reading core source
 - [x] **RELEASE-04**: `make release-smoke` completes on the maintainer's machine (serial, single-target, outside Cursor), closing the Partial packaging gate
-- [x] **RELEASE-05**: Every release-readiness gate board row is Closed or explicitly Deferred with a reason, and the board reflects reality on tag day — **Complete** 2026-07-30: board settled in `docs/release-readiness.md` (GCP certify/Ops **Pending→07**; hosted CI **Deferred** Act-only; AWS paid adopt confirm **Deferred** ADC HUMAN_GATE; ATTACH offline **Closed**)
+- [x] **RELEASE-05**: Every release-readiness gate board row is Closed or explicitly Deferred with a reason, and the board reflects reality on tag day — **Complete** 2026-08-02: board settled in `docs/release-readiness.md` (GCP certify/Ops **Closed**; AWS adopt confirm **Closed**; hosted CI **Deferred** Act-only; Cloud SQL attach Deferred in REQUIREMENTS)
 - [x] **RELEASE-06**: A new contributor can go from `git clone` to a green `make verify` following `CONTRIBUTING.md` alone
 
 ## v2 Requirements
@@ -166,7 +166,7 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | GCP-03 | Phase 7 | Complete |
 | GCP-04 | Phase 7 | Complete |
 | GCP-05 | Phase 7 | Complete |
-| GCP-06 | Phase 7 | Pending |
+| GCP-06 | Phase 7 | Complete |
 | KUBE-01 | Phase 6 | Complete |
 | KUBE-02 | Phase 6 | Complete |
 | KUBE-03 | Phase 6 | Complete |
@@ -183,22 +183,22 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 | MIGRATE-01 | Phase 5 | Complete |
 | MIGRATE-02 | Phase 5 | Complete |
 | MIGRATE-03 | Phase 5 | Complete |
-| MIGRATE-04 | Phase 5 (local) + Phase 7 HUMAN_GATE (DNS/live/managed dump) | Pending (local runbook+scratch done 05-06; DNS tooling offline in 07-05; live DNS not claimed) |
+| MIGRATE-04 | Phase 5 (local) + Phase 7 (live DNS + managed dump) | Complete (preview-host rehearsal 2026-08-02; not prod storefront cutover) |
 | MIGRATE-05 | Phase 5 | Complete |
 | ECE-01 | Phase 4 | Complete |
 | ECE-02 | Phase 4 | Complete |
 | ECE-03 | Phase 4 | Complete |
 | ECE-04 | Phase 4 | Complete |
-| ATTACH-01 | Phase 8 | Complete (offline; live AWS confirm Deferred ADC HUMAN_GATE) |
-| ATTACH-02 | Phase 8 | Complete (AWS RDS; Cloud SQL / multi-cloud attach Deferred) |
+| ATTACH-01 | Phase 8 | Complete (offline + live free-tier 2026-08-02) |
+| ATTACH-02 | Phase 8 | Complete (AWS RDS offline+live; Cloud SQL / multi-cloud attach Deferred) |
 | ATTACH-03 | Phase 8 | Complete |
-| ATTACH-04 | Phase 8 | Complete (docs + offline detach; live describe-after-destroy Deferred ADC) |
+| ATTACH-04 | Phase 8 | Complete (docs + offline detach + live describe-after-destroy 2026-08-02) |
 | QUALITY-01 | Phase 1 | Complete |
 | QUALITY-02 | Phase 1 | Complete |
 | QUALITY-03 | Phase 1 | Complete |
 | QUALITY-04 | Phase 1 | Complete |
 | QUALITY-05 | Phase 1 | Complete |
-| QUALITY-06 | Phase 1 | Complete |
+| QUALITY-06 | Phase 1 | Complete (partitioning); hosted green Deferred Act-only |
 | QUALITY-07 | Phase 1 | Complete |
 | QUALITY-08 | Phase 1 | Complete |
 | RELEASE-01 | Phase 2 | Complete |
@@ -229,4 +229,4 @@ Populated during roadmap creation (2026-07-27). Every v1 requirement maps to exa
 
 ---
 *Requirements defined: 2026-07-27*
-*Last updated: 2026-07-30 — RELEASE-05 board settled (08-06); ATTACH offline Complete; Cloud SQL + AWS paid adopt Deferred; GCP Pending→07*
+*Last updated: 2026-08-02 — GCP-06 certified; MIGRATE-04 live half Closed; AWS adopt confirm PASS (spend 3/3); Cloud SQL attach still Deferred*
