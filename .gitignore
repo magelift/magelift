@@ -11,10 +11,10 @@
 /build/.phpstan/
 
 # Marketing site deps / build
-/websites/**/node_modules/
-/websites/**/dist/
-/websites/**/.astro/
-/websites/marketing/public/docs/
+/website/node_modules/
+/website/dist/
+/website/.astro/
+/website/public/docs/
 
 # Local state and credentials
 .env

@@ -1,0 +1,129 @@
+---
+import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Hero from "../components/Hero.astro";
+import ProofStrip from "../components/ProofStrip.astro";
+import Personas from "../components/Personas.astro";
+import HowItWorks from "../components/HowItWorks.astro";
+import Targets from "../components/Targets.astro";
+import Trust from "../components/Trust.astro";
+import Faq from "../components/Faq.astro";
+import FinalCta from "../components/FinalCta.astro";
+import Footer from "../components/Footer.astro";
+import { faqs } from "../data/content.js";
+
+const title = "MageLift: Magento on AWS and GCP (open-source CLI)";
+const description =
+  "Open-source Magento CLI with ACC/Upsun-shaped YAML. Run Magento Open Source and Adobe Commerce in your AWS or GCP account. Certified on ECS Fargate and GKE Autopilot. The software is free; you pay the cloud bill.";
+
+const schema = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://magelift.dev/#org",
+      name: "MageLift",
+      url: "https://magelift.dev/",
+      logo: "https://magelift.dev/media/logo.png",
+      sameAs: ["https://github.com/magelift/magelift"],
+      description:
+        "Open-source Magento deployment CLI for AWS and GCP. Not a hosting provider.",
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://magelift.dev/#website",
+      url: "https://magelift.dev/",
+      name: "MageLift",
+      description:
+        "Deploy Magento in your own AWS or GCP account with ACC/Upsun-shaped YAML.",
+      publisher: { "@id": "https://magelift.dev/#org" },
+      inLanguage: "en",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://magelift.dev/#app",
+      name: "MageLift",
+      applicationCategory: "DeveloperApplication",
+      applicationSubCategory: "Magento deployment CLI",
+      operatingSystem: "Linux, macOS, Windows",
+      url: "https://magelift.dev/",
+      downloadUrl: "https://github.com/magelift/magelift/releases",
+      installUrl: "https://magelift.dev/docs/install/",
+      softwareVersion: "main (first public tag target v1.0.0-rc.1)",
+      license: "https://www.apache.org/licenses/LICENSE-2.0",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+        description: "Open-source CLI is free; you pay your AWS or GCP bill.",
+      },
+      featureList: [
+        "ACC/Upsun-shaped magelift.yaml",
+        "Certified AWS ECS Fargate",
+        "Certified GCP GKE Autopilot",
+        "Preview, deploy, destroy day-2 CLI",
+        "Local Compose Magento path",
+        "PaaS config import from ACC and Upsun",
+      ],
+      description:
+        "Open-source CLI and YAML to run Magento Open Source and Adobe Commerce in your own AWS or GCP account.",
+      isAccessibleForFree: true,
+      creator: { "@id": "https://magelift.dev/#org" },
+    },
+    {
+      "@type": "HowTo",
+      name: "Deploy Magento with MageLift on a certified cloud target",
+      description:
+        "Install the MageLift CLI, validate sample YAML, then preview Magento on AWS ECS Fargate or GCP GKE Autopilot.",
+      totalTime: "PT1H",
+      step: [
+        {
+          "@type": "HowToStep",
+          name: "Install the CLI",
+          text: "Install with go install until the first release tag, then prefer a GitHub Release archive. Run magelift version.",
+          url: "https://magelift.dev/docs/install/",
+        },
+        {
+          "@type": "HowToStep",
+          name: "Validate sample config",
+          text: "Copy examples/sample-shop/magelift.yaml, fill account and secret refs, then run magelift config validate.",
+          url: "https://magelift.dev/docs/getting-started/",
+        },
+        {
+          "@type": "HowToStep",
+          name: "Preview and destroy",
+          text: "Bootstrap once, then preview and deploy on a certified target. Destroy when the spike is done.",
+          url: "https://magelift.dev/docs/getting-started/",
+        },
+      ],
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://magelift.dev/#faq",
+      mainEntity: faqs.map((item) => ({
+        "@type": "Question",
+        name: item.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.a,
+        },
+      })),
+    },
+  ],
+};
+---
+<Base title={title} description={description} schema={schema}>
+  <Nav />
+  <Hero />
+  <main class="wrap">
+    <ProofStrip />
+    <Personas />
+    <HowItWorks />
+    <Targets />
+    <Trust />
+    <Faq />
+    <FinalCta />
+  </main>
+  <Footer />
+  <script src="../scripts/landing.js"></script>
+</Base>

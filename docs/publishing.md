@@ -22,7 +22,7 @@ attach does not block `v1.0.0`.
 | Surface | Where |
 | --- | --- |
 | Marketing + docs | [magelift.dev](https://magelift.dev/) (docs under `/docs/`) |
-| Build | `cd websites/marketing && npm run build:site` → Cloudflare Pages `magelift` |
+| Build | `cd website && npm run build:site` → Cloudflare Pages `magelift` |
 | Source | [github.com/magelift/magelift](https://github.com/magelift/magelift) |
 
 Canonical docs URL is the `/docs/` path.

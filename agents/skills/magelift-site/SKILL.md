@@ -1,8 +1,8 @@
 ---
 name: magelift-site
 description: >-
-  Build and deploy the MageLift public site (Astro marketing + MkDocs Material
-  docs) to Cloudflare Pages. Use when editing websites/marketing, mkdocs.yml,
+  Build and deploy the MageLift public site (Astro landing + MkDocs Material
+  docs) to Cloudflare Pages. Use when editing website/, mkdocs.yml,
   docs/, or site CI.
 ---
 
@@ -12,17 +12,17 @@ Canonical URL: `https://magelift.dev/` (docs at `/docs/`).
 
 ## Stack
 
-- Marketing: Astro under `websites/marketing/`
+- Landing page: Astro under `website/`
 - Docs: MkDocs Material (`mkdocs.yml`), embedded into `public/docs/` at build
 - Deploy: Cloudflare Pages project `magelift`
-- CI: `.github/workflows/site.yml` builds and uploads `websites/marketing/dist`
+- CI: `.github/workflows/site.yml` builds and uploads `website/dist`
 
 `docs/knowledge/**` is excluded from the public docs build.
 
 ## Local build
 
 ```sh
-cd websites/marketing
+cd website
 npm run build:site
 # → dist/  (docs at dist/docs/)
 ```
@@ -32,7 +32,7 @@ The script creates/uses repo-root `.venv` for MkDocs (do not use system pip).
 ## Deploy
 
 ```sh
-cd websites/marketing
+cd website
 npx wrangler pages deploy dist --project-name=magelift --branch=main
 ```
 

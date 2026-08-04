@@ -28,7 +28,7 @@ description: >-
 | `sdk/v1` | Typed topology/validation contracts |
 | `docs/` | Human docs (MkDocs) |
 | `agents/skills/` | First-party agent skills |
-| `websites/marketing/` | Public site (Astro + embedded MkDocs) |
+| `website/` | Public site (Astro + embedded MkDocs) |
 
 ## Verify before you claim done
 

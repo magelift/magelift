@@ -2,24 +2,25 @@
 
 Public surface for https://magelift.dev/
 
-- Marketing landing: Astro (`src/pages/index.astro`)
+- Landing page: Astro (`src/pages/index.astro`)
 - Docs: MkDocs Material, built into `public/docs/` then shipped in the same
   Cloudflare Pages deploy
 
-## Develop marketing only
+## Develop the landing page only
 
 ```sh
-cd websites/marketing
+cd website
 npm install
 npm run dev
 ```
 
-Docs locally: from repo root, `mkdocs serve` (separate from Astro).
+Docs locally: from repo root, `make docs-serve` (pinned MkDocs Material in the
+repo venv — a system/Homebrew mkdocs does not bundle the theme).
 
-## Production build (marketing + docs)
+## Production build (landing + docs)
 
 ```sh
-cd websites/marketing
+cd website
 npm run build:site
 # → dist/  (docs at dist/docs/)
 ```

@@ -1,0 +1,135 @@
+---
+import { terminal } from "../data/content.js";
+
+const transcript = terminal.lines
+  .map((line) => (line.type === "cmd" ? `$ ${line.text}` : line.text))
+  .join("\n");
+---
+<div class="terminal" data-terminal data-lines={JSON.stringify(terminal.lines)} data-enter>
+  <div class="terminal-bar">
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="terminal-title">{terminal.title}</span>
+    <button class="copy-btn" type="button" data-copy={terminal.copyCommand} aria-label="Copy install command">
+      <svg class="icon-copy" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <span class="copy-label">install</span>
+    </button>
+  </div>
+  <pre aria-hidden="true"><code data-terminal-body></code><span class="caret" data-caret></span></pre>
+  <pre class="sr-only">{transcript}</pre>
+</div>
+
+<style>
+  .terminal {
+    container-type: inline-size;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.6;
+  }
+  .terminal-bar {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    padding: 0.7rem 0.85rem;
+    border-bottom: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.72rem;
+    background: var(--bg1);
+  }
+  .dot {
+    width: 0.68rem;
+    height: 0.68rem;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 0.5px rgba(11, 18, 32, 0.18);
+  }
+  .dot:nth-child(1) {
+    background: #ff5f57;
+  }
+  .dot:nth-child(2) {
+    background: #febc2e;
+  }
+  .dot:nth-child(3) {
+    background: #28c840;
+  }
+  .terminal-title {
+    margin-left: 0.25rem;
+  }
+  .copy-btn {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--accent);
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 0.22rem 0.55rem;
+    cursor: pointer;
+    transition:
+      border-color 160ms ease,
+      background 160ms ease;
+  }
+  .copy-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .copy-btn.is-copied {
+    color: var(--accent-ink);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  pre {
+    margin: 0;
+    padding: 1rem 1.05rem 1.2rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: #1e293b;
+    min-height: 17.5rem;
+  }
+  .prompt {
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .out-ok {
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .out-dim {
+    color: #64748b;
+  }
+  .caret {
+    display: inline-block;
+    width: 0.52em;
+    height: 1.05em;
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    background: var(--accent);
+    animation: blink 1.06s steps(2, start) infinite;
+  }
+  @keyframes blink {
+    to {
+      visibility: hidden;
+    }
+  }
+  @container (max-width: 24rem) {
+    pre {
+      font-size: 0.72rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .caret {
+      animation: none;
+    }
+  }
+</style>

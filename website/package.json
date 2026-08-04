@@ -10,7 +10,8 @@
     "build:site": "bash ./scripts/build-site.sh"
   },
   "dependencies": {
-    "astro": "7.1.6"
+    "astro": "7.1.6",
+    "motion": "^12.43.0"
   },
   "allowScripts": {
     "esbuild@0.28.1": true

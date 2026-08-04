@@ -67,7 +67,7 @@ updates:
       prefix: chore
       include: scope
   - package-ecosystem: npm
-    directory: /websites/marketing
+    directory: /website
     schedule:
       interval: weekly
     cooldown:

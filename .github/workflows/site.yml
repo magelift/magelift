@@ -1,7 +1,7 @@
 name: Public site
 
-# Builds marketing (Astro) + docs (MkDocs Material) the same way Cloudflare Pages
-# is fed locally via websites/marketing/scripts/build-site.sh.
+# Builds the site (Astro) + docs (MkDocs Material) the same way Cloudflare Pages
+# is fed locally via website/scripts/build-site.sh.
 on:
   push:
     branches: [main]
@@ -9,14 +9,14 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - 'docs/requirements.txt'
-      - 'websites/marketing/**'
+      - 'website/**'
       - '.github/workflows/site.yml'
   pull_request:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
       - 'docs/requirements.txt'
-      - 'websites/marketing/**'
+      - 'website/**'
       - '.github/workflows/site.yml'
   workflow_dispatch:
 
@@ -42,11 +42,11 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: websites/marketing/package-lock.json
+          cache-dependency-path: website/package-lock.json
       - name: Build site
-        run: websites/marketing/scripts/build-site.sh
+        run: website/scripts/build-site.sh
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: public-site
-          path: websites/marketing/dist
+          path: website/dist
           retention-days: 14

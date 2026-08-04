@@ -69,4 +69,4 @@ them. Only MageLift-specific rules live here.
 - [docs/adding-a-provider.md](../docs/adding-a-provider.md)
 - [docs/release-readiness.md](../docs/release-readiness.md)
 - [docs/publishing.md](../docs/publishing.md)
-- [websites/marketing/README.md](../websites/marketing/README.md)
+- [website/README.md](../website/README.md)

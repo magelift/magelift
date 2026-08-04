@@ -1,0 +1,68 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  description: string;
+  schema?: Record<string, unknown>;
+}
+
+const { title, description, schema } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="author" content="MageLift contributors" />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <link rel="canonical" href="https://magelift.dev/" />
+    <link rel="alternate" type="text/plain" title="Plain-text site summary" href="/llms.txt" />
+    <link rel="alternate" type="text/plain" title="Extended plain-text summary" href="/llms-full.txt" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MageLift" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://magelift.dev/" />
+    <meta property="og:title" content="MageLift: Magento on AWS and GCP" />
+    <meta
+      property="og:description"
+      content="Open-source CLI and ACC/Upsun-shaped YAML for Magento in your own AWS or GCP account. Certified on ECS Fargate and GKE Autopilot."
+    />
+    <meta property="og:image" content="https://magelift.dev/media/logo.png" />
+    <meta property="og:image:alt" content="MageLift logo" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="MageLift: Magento on AWS and GCP" />
+    <meta
+      name="twitter:description"
+      content="Open-source Magento CLI for your AWS or GCP account. Free software; you pay the cloud bill."
+    />
+    <meta name="twitter:image" content="https://magelift.dev/media/logo.png" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/Lexend-var.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/SourceSans3-var.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/IBMPlexMono-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link
+      rel="preload"
+      href="/media/hero-atmosphere-1600.avif"
+      as="image"
+      type="image/avif"
+      fetchpriority="high"
+    />
+    {schema && <script type="application/ld+json" set:html={JSON.stringify(schema)} />}
+    <script is:inline>
+      (() => {
+        const d = document.documentElement;
+        d.classList.add("js");
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          d.classList.add("rm");
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

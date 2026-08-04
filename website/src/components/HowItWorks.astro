@@ -1,0 +1,116 @@
+---
+import { how } from "../data/content.js";
+---
+<section class="section" data-reveal>
+  <h2>{how.heading}</h2>
+  <p class="lede">{how.lede}</p>
+
+  <div class="how-grid">
+    <div>
+      <ol class="steps">
+        {how.steps.map((step) => (
+          <li><span>{step}</span></li>
+        ))}
+      </ol>
+      <p class="section-links">
+        {how.links.map((link, i) => (
+          <>
+            {i > 0 && <span class="sep" aria-hidden="true">·</span>}
+            <a href={link.href}>{link.label}</a>
+          </>
+        ))}
+      </p>
+    </div>
+
+    <figure class="yaml-panel">
+      <pre><code>{how.yaml.map((line) => (
+        <span class:list={["yaml-line", { hl: line.hl }]}>{line.text}{"\n"}</span>
+      ))}</code></pre>
+      <figcaption>{how.yamlCaption}</figcaption>
+    </figure>
+  </div>
+</section>
+
+<style>
+  .how-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 2.25rem;
+    align-items: start;
+    margin-top: 1.5rem;
+  }
+  .steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+    display: grid;
+    max-width: 44rem;
+    border-top: 1px solid var(--rule);
+  }
+  .steps li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 2.25rem 1fr;
+    gap: 0.9rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--rule);
+    color: var(--muted);
+  }
+  .steps li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--ink);
+    padding-top: 0.15rem;
+  }
+  .section-links {
+    margin-top: 1.15rem;
+    color: var(--muted);
+  }
+  .section-links .sep {
+    margin: 0 0.45rem;
+    color: var(--rule-strong);
+  }
+  .yaml-panel {
+    margin: 0;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .yaml-panel pre {
+    margin: 0;
+    padding: 1rem 1.05rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.62;
+    color: #1e293b;
+  }
+  .yaml-line {
+    display: block;
+    padding: 0 0.35rem;
+    margin: 0 -0.35rem;
+    border-radius: 2px;
+  }
+  .yaml-line.hl {
+    background: var(--accent-soft);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .yaml-panel figcaption {
+    padding: 0.7rem 1.05rem;
+    border-top: 1px solid var(--rule);
+    background: var(--bg1);
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+  @media (max-width: 900px) {
+    .how-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

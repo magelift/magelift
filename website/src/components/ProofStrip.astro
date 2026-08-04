@@ -1,0 +1,74 @@
+---
+import { proof } from "../data/content.js";
+---
+<section class="proof wrap" aria-label="Key facts" data-reveal>
+  <dl class="proof-grid">
+    {proof.map((item) => (
+      <div class="proof-cell">
+        <dt>{item.k}</dt>
+        <dd class="proof-value">{item.v}</dd>
+        <dd class="proof-note">{item.note}</dd>
+      </div>
+    ))}
+  </dl>
+</section>
+
+<style>
+  .proof {
+    padding: 2.25rem 0 1.25rem;
+  }
+  .proof-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .proof-cell {
+    padding: 1.15rem 1.1rem 1.15rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .proof-cell + .proof-cell {
+    padding-left: 1.1rem;
+    border-left: 1px solid var(--rule);
+  }
+  dt {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+  }
+  .proof-value {
+    margin: 0 0 0.25rem;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.02rem;
+    letter-spacing: -0.01em;
+  }
+  .proof-note {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  @media (max-width: 900px) {
+    .proof-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .proof-cell:nth-child(odd) {
+      padding-left: 0;
+      border-left: 0;
+    }
+  }
+  @media (max-width: 560px) {
+    .proof-grid {
+      grid-template-columns: 1fr;
+    }
+    .proof-cell + .proof-cell {
+      padding-left: 0;
+      border-left: 0;
+    }
+  }
+</style>
