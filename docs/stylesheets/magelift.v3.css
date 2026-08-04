@@ -67,9 +67,18 @@
   box-shadow: 0 0.4rem 1.2rem rgba(11, 18, 32, 0.18);
 }
 
+/* Markdown wraps the bare logo <img> in a <p>; unwrap it so the image is a
+   direct flex child, and beat .md-typeset img's max-width: 100%, which
+   otherwise caps the width below height and stretches the square art. */
+.mdx-hero > p {
+  display: contents;
+}
+
 .mdx-hero img {
   width: 4.25rem;
   height: 4.25rem;
+  max-width: none;
+  object-fit: contain;
   border-radius: 0.75rem;
   flex-shrink: 0;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);

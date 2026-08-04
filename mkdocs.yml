@@ -12,7 +12,7 @@ theme:
   custom_dir: docs/overrides
   logo: assets/logo.png
   favicon: assets/favicon.svg
-  # Colors come from docs/stylesheets/magelift.v2.css (landing-page tokens),
+  # Colors come from docs/stylesheets/magelift.v3.css (landing-page tokens),
   # not from Material's named palette — keep this to scheme + toggle only.
   # Bump the .vN filename on every edit: extra_css is not fingerprinted,
   # and browsers cache the old one aggressively under mkdocs serve.
@@ -44,7 +44,7 @@ theme:
     text: Source Sans 3
     code: IBM Plex Mono
 extra_css:
-  - stylesheets/magelift.v2.css
+  - stylesheets/magelift.v3.css
 
 extra:
   social:
