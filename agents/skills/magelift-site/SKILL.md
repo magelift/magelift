@@ -2,7 +2,7 @@
 name: magelift-site
 description: >-
   Build and deploy the MageLift public site (Astro landing + MkDocs Material
-  docs) to Cloudflare Pages. Use when editing website/, mkdocs.yml,
+  docs) to GitHub Pages. Use when editing website/, mkdocs.yml,
   docs/, or site CI.
 ---
 
@@ -14,8 +14,8 @@ Canonical URL: `https://magelift.dev/` (docs at `/docs/`).
 
 - Landing page: Astro under `website/`
 - Docs: MkDocs Material (`mkdocs.yml`), embedded into `public/docs/` at build
-- Deploy: Cloudflare Pages project `magelift`
-- CI: `.github/workflows/site.yml` builds and uploads `website/dist`
+- Deploy: GitHub Pages, custom domain `magelift.dev`
+- CI: `.github/workflows/site.yml` builds and deploys `website/dist`
 
 `docs/knowledge/**` is excluded from the public docs build.
 

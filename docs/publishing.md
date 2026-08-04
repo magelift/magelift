@@ -22,7 +22,7 @@ attach does not block `v1.0.0`.
 | Surface | Where |
 | --- | --- |
 | Marketing + docs | [magelift.dev](https://magelift.dev/) (docs under `/docs/`) |
-| Build | `cd website && npm run build:site` → Cloudflare Pages `magelift` |
+| Build | `cd website && npm run build:site` → GitHub Pages via the Public site workflow |
 | Source | [github.com/magelift/magelift](https://github.com/magelift/magelift) |
 
 Canonical docs URL is the `/docs/` path.
@@ -42,7 +42,7 @@ blobs until Support clears them; a normal `git clone` does not fetch `refs/pull/
 
 | Item | Status |
 | --- | --- |
-| Site on Cloudflare Pages (`magelift.dev`) | Done |
+| Site on GitHub Pages (`magelift.dev`) | Done |
 | Private vulnerability reporting | Done |
 | ≥3 `good first issue` items | Done - #38, #42, #44 open |
 | Hosted CI green on `main` | Done - force-all [30836267745](https://github.com/magelift/magelift/actions/runs/30836267745) |

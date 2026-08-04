@@ -1,7 +1,7 @@
 name: Public site
 
-# Builds the site (Astro) + docs (MkDocs Material) the same way Cloudflare Pages
-# is fed locally via website/scripts/build-site.sh.
+# Builds the site (Astro) + docs (MkDocs Material) via website/scripts/build-site.sh
+# and deploys website/dist to GitHub Pages on pushes to main. PRs build only.
 on:
   push:
     branches: [main]
@@ -24,7 +24,7 @@ permissions: {}
 
 concurrency:
   group: public-site-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -45,8 +45,21 @@ jobs:
           cache-dependency-path: website/package-lock.json
       - name: Build site
         run: website/scripts/build-site.sh
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          name: public-site
           path: website/dist
-          retention-days: 14
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

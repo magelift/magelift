@@ -4,7 +4,7 @@ Public surface for https://magelift.dev/
 
 - Landing page: Astro (`src/pages/index.astro`)
 - Docs: MkDocs Material, built into `public/docs/` then shipped in the same
-  Cloudflare Pages deploy
+  GitHub Pages deploy
 
 ## Develop the landing page only
 
@@ -25,7 +25,7 @@ npm run build:site
 # → dist/  (docs at dist/docs/)
 ```
 
-Deploy `dist/` to the Cloudflare Pages project `magelift`.
+The Public site workflow deploys `dist/` to GitHub Pages on pushes to `main`.
 
 Do not invent certified claims. Copy status wording from
 [docs/capability-matrix.md](../../docs/capability-matrix.md).

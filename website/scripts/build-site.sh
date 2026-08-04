@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the site (Astro) + docs (MkDocs) into a single static tree for Cloudflare Pages.
+# Build the site (Astro) + docs (MkDocs) into a single static tree for GitHub Pages.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
