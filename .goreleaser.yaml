@@ -23,6 +23,10 @@ archives:
   - id: cli
     ids: [magelift]
     formats: [tar.gz]
+    # Scoop convention is zip; tar.gz stays for brew/install.sh on unix.
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
@@ -47,9 +51,35 @@ signs:
       - "--yes"
     artifacts: checksum
 
-# Homebrew cask: re-enable when magelift/homebrew-tap exists and
-# HOMEBREW_TAP_GITHUB_TOKEN is configured. GoReleaser v2.17 has no
-# homebrew_casks.skip field; an empty token fails the release.
+# Homebrew cask with binary stanzas: goreleaser deprecated brews (formula
+# generation) in v2.16 in favor of homebrew_casks; casks install binaries on
+# macOS and Linuxbrew alike. Casks live in Casks/ (default) — no Formula dir.
+# HOMEBREW_TAP_GITHUB_TOKEN is currently acourtiol's OAuth token (repo scope);
+# upgrade path: a GitHub App with contents:write on homebrew-tap + scoop-bucket.
+homebrew_casks:
+  - name: magelift
+    repository:
+      owner: magelift
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://magelift.dev
+    description: Open-source Magento CLI for your AWS or GCP account
+    license: Apache-2.0
+    binaries:
+      - magelift
+
+scoops:
+  - name: magelift
+    repository:
+      owner: magelift
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: bucket
+    homepage: https://magelift.dev
+    description: Open-source Magento CLI for your AWS or GCP account
+    license: Apache-2.0
 
 changelog:
   use: github-native
