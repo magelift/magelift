@@ -1,0 +1,126 @@
+/* MageLift docs theme: aligns Material with the magelift.dev landing tokens
+   (daylight industrial dock — ink navy, single teal accent, Lexend display).
+   Loaded via extra_css, after the Material bundle, so same-specificity
+   overrides win. */
+
+@font-face {
+  font-family: "Lexend";
+  src: url("../assets/fonts/Lexend-var.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #0f766e;
+  --md-primary-fg-color--light: #14a397;
+  --md-primary-fg-color--dark: #115e59;
+  --md-accent-fg-color: #0f766e;
+  --md-accent-fg-color--transparent: rgba(15, 118, 110, 0.12);
+  --md-typeset-a-color: #0f766e;
+  --md-footer-bg-color: #0b1220;
+  --md-footer-bg-color--dark: #070d18;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #134e4a;
+  --md-primary-fg-color--light: #0f766e;
+  --md-primary-fg-color--dark: #042f2e;
+  --md-accent-fg-color: #2dd4bf;
+  --md-typeset-a-color: #2dd4bf;
+}
+
+/* Display type: Lexend for anything a reader scans. */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-header__topic,
+.md-nav__title,
+.md-tabs__link,
+.md-footer__title,
+.mdx-hero__title {
+  font-family: "Lexend", var(--md-text-font-family), sans-serif;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  letter-spacing: -0.02em;
+  color: #0b1220;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3 {
+  color: #e2e8f0;
+}
+
+/* Docs homepage hero: deep teal band echoing the landing CTA section. */
+.mdx-hero {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  padding: 2rem 2.2rem;
+  margin: 1.2rem 0 1.6rem;
+  border-radius: 0.6rem;
+  background: linear-gradient(135deg, #0f766e 0%, #0b3f3a 100%);
+  box-shadow: 0 0.4rem 1.2rem rgba(11, 18, 32, 0.18);
+}
+
+.mdx-hero img {
+  width: 4.25rem;
+  height: 4.25rem;
+  border-radius: 0.75rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+}
+
+.mdx-hero .mdx-hero__title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.mdx-hero .mdx-hero__lede {
+  margin: 0.4rem 0 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+  max-width: 44rem;
+}
+
+.mdx-hero__cta {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.mdx-hero .md-button {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.65);
+}
+
+.mdx-hero .md-button:hover {
+  border-color: #ffffff;
+}
+
+.mdx-hero .md-button--primary {
+  background: #ffffff;
+  border-color: transparent;
+  color: #0b3f3a;
+}
+
+.mdx-hero .md-button--primary:hover {
+  background: #e6f4f2;
+}
+
+@media (max-width: 44rem) {
+  .mdx-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1.4rem;
+  }
+}

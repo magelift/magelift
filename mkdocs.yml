@@ -12,18 +12,18 @@ theme:
   custom_dir: docs/overrides
   logo: assets/logo.png
   favicon: assets/favicon.svg
+  # Colors come from docs/stylesheets/magelift.v2.css (landing-page tokens),
+  # not from Material's named palette — keep this to scheme + toggle only.
+  # Bump the .vN filename on every edit: extra_css is not fingerprinted,
+  # and browsers cache the old one aggressively under mkdocs serve.
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: teal
-      accent: green
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: teal
-      accent: green
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -43,22 +43,31 @@ theme:
   font:
     text: Source Sans 3
     code: IBM Plex Mono
+extra_css:
+  - stylesheets/magelift.v2.css
+
 extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/magelift/magelift
     - icon: fontawesome/solid/globe
       link: https://magelift.dev/
+# Journey-first tree: a new reader walks Start -> Migrate -> Operate.
+# Cloud targets and Reference are lookup sections; Project is meta.
 nav:
   - Home: index.md
   - Start:
-      - Getting started: getting-started.md
       - Install: install.md
+      - Getting started: getting-started.md
       - Local vs cloud: local-vs-cloud.md
       - Compare to PaaS: compare-paas.md
       - FAQ: faq.md
+  - Migrate:
       - Leave PaaS in a weekend: weekend-migrate.md
-  - Guides:
+      - Migrate from ACC / Platform.sh: migrating-from-paas.md
+      - Brownfield attach: brownfield-attach.md
+      - ece-tools parity: ece-parity.md
+  - Operate:
       - Configuration: configuration.md
       - CLI reference: cli-reference.md
       - Secrets: secrets.md
@@ -67,20 +76,17 @@ nav:
       - Storefront recipes: storefront-recipes.md
       - Compatibility: compatibility.md
       - Benchmarking: benchmarks.md
-  - Cloud:
+  - Cloud targets:
       - Capability matrix: capability-matrix.md
       - AWS bootstrap: bootstrap.md
       - AWS acceptance: aws-acceptance.md
-      - Migrate from ACC / Platform.sh: migrating-from-paas.md
-      - Brownfield attach: brownfield-attach.md
-      - ece-tools parity: ece-parity.md
       - GCP acceptance: gcp-acceptance.md
       - Experimental:
           - AWS EKS: aws-eks-experimental.md
           - GCP notes: gcp-experimental.md
           - OVH MKS: ovh-experimental.md
           - Scaleway Kapsule: scaleway-experimental.md
-  - Develop:
+  - Reference:
       - Architecture: architecture.md
       - Adding a provider: adding-a-provider.md
       - Provenance: provenance.md

@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help generate generate-check cli-docs cli-docs-check fmt fmt-check test lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test floci-test acceptance-harness-test aws-acceptance-local gcp-acceptance-local docs workflow-check verify release-smoke ci-act-go
+.PHONY: help generate generate-check cli-docs cli-docs-check fmt fmt-check test lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test floci-test acceptance-harness-test aws-acceptance-local gcp-acceptance-local docs docs-serve workflow-check verify release-smoke ci-act-go
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -85,7 +85,10 @@ gcp-acceptance-local: ## Run a local real-GCP acceptance pass (experimental; des
 	./scripts/gcp-acceptance-local.sh
 
 docs: ## Build documentation with strict link and navigation checks
-	PATH="$(HOME)/.local/bin:$(PATH)" mkdocs build --strict
+	"$$(scripts/docs-venv.sh)/mkdocs" build --strict
+
+docs-serve: ## Serve docs locally with the pinned MkDocs Material stack
+	"$$(scripts/docs-venv.sh)/mkdocs" serve
 
 workflow-check: ## Validate GitHub Actions workflow syntax and expressions
 	go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
