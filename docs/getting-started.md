@@ -61,7 +61,7 @@ Prefer free-tier-safe shapes (`searchMode: disabled`, database queues) unless yo
 intentionally want OpenSearch or a broker. Rough AWS shape estimates:
 `magelift cost --env preview`.
 
-1. `magelift bootstrap --env preview --access-log-bucket … --github-owner … --github-repo …`
+1. `magelift bootstrap --env preview --access-log-bucket … --github-owner … --github-repo …` ([bootstrap prerequisites](bootstrap.md))
 2. Build or promote a signed image digest into config
 3. `magelift preview --env preview` then `magelift deploy --env preview --yes`
 4. `magelift outputs` / `magelift health`
