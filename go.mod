@@ -21,12 +21,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.73.3
 	github.com/aws/aws-sdk-go-v2/service/sts v1.45.3
 	github.com/aws/smithy-go v1.27.6
-	github.com/ovh/pulumi-ovh/sdk/v2 v2.17.0
-	github.com/pulumi/pulumi-aws/sdk/v7 v7.40.0
-	github.com/pulumi/pulumi-gcp/sdk/v9 v9.32.1
+	github.com/ovh/pulumi-ovh/sdk/v2 v2.19.1
+	github.com/pulumi/pulumi-aws/sdk/v7 v7.43.0
+	github.com/pulumi/pulumi-gcp/sdk/v9 v9.35.0
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.33.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.1
-	github.com/pulumi/pulumi/sdk/v3 v3.255.0
+	github.com/pulumi/pulumi/sdk/v3 v3.256.0
 	github.com/pulumiverse/pulumi-scaleway/sdk v1.54.0
 	github.com/spf13/cobra v1.10.2
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
