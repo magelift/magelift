@@ -29,8 +29,12 @@ Auto-approved per the standing `/goal` instruction.
   proof, order-9 GCP search cell, order-10 preview loop —
   verify: evidence plus destroy plus assert_clean plus spend line
 - [ ] 1.5 AWS packed session: preview create-once plus warm
-  transitions, order-9 AWS search cell — verify: evidence plus
-  destroy plus assert_clean, spend inside $25
+  transitions (queue db, ecs-rabbitmq, amazon-mq; search
+  disabled then provisioned per ADR 0012; database rds-mysql
+  then aurora-mysql; ha multi-az; NO serverless apply,
+  artemis, or CloudFront — August evidence stands), order-9
+  AWS search cell — verify: evidence plus destroy plus
+  assert_clean, spend inside $25
 - [ ] 1.6 Matrix plus evidence index update — verify: docs build
 
 ## Risks

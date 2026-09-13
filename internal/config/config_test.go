@@ -1323,7 +1323,7 @@ func TestResolveUsesMagento246RDSMariaDBCompatibilityDefault(t *testing.T) {
 }
 
 func TestResolveRejectsUnsupportedAWSServiceVersionBeforePlanning(t *testing.T) {
-	input := strings.Replace(base, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: aws, runtime: ecs-fargate, aws: {catalog: {versions: {openSearch: OpenSearch_2.19}}}}", 1)
+	input := strings.Replace(base, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: aws, runtime: ecs-fargate, aws: {catalog: {searchMode: serverless, versions: {openSearch: OpenSearch_2.19}}}}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)

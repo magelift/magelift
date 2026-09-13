@@ -1,5 +1,5 @@
 ---
-status: draft
+status: accepted
 slug: preview-env-lifecycle
 ---
 
