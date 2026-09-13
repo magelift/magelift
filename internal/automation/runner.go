@@ -7,6 +7,7 @@ import (
 	"io"
 	"sort"
 
+	"github.com/magelift/magelift/internal/secretsafe"
 	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
@@ -136,9 +137,29 @@ func (r *Runner) run(ctx context.Context, request Request, operationError error,
 		if errors.As(err, &ownershipErr) {
 			return ChangeSummary{}, fmt.Errorf("%w: %w", operationError, ownershipErr)
 		}
-		return ChangeSummary{}, operationError
+		// A typed collision passes through once; lock text from a backend
+		// that cannot carry Go types gets typed here. Every other cause is
+		// wrapped, never dropped. Classification runs on the raw cause;
+		// only redacted text enters the returned chain, so credential
+		// shapes from provider output can never print.
+		var concurrentErr *ConcurrentUpdateError
+		if errors.As(err, &concurrentErr) {
+			return ChangeSummary{}, fmt.Errorf("%w: %w", operationError, concurrentErr)
+		}
+		if IsConcurrentUpdate(err) {
+			return ChangeSummary{}, fmt.Errorf("%w: %w", operationError, &ConcurrentUpdateError{Cause: redactedCause(err)})
+		}
+		return ChangeSummary{}, fmt.Errorf("%w: %w", operationError, redactedCause(err))
 	}
 	return summarize(changes), nil
+}
+
+// redactedCause keeps the backend cause readable while replacing
+// credential-shaped material with the shared redactor. The raw cause
+// never enters the returned chain.
+func redactedCause(err error) error {
+	redacted, _ := secretsafe.RedactSensitiveText(err.Error())
+	return errors.New(redacted)
 }
 
 func summarize(changes map[string]int) ChangeSummary {

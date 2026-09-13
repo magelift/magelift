@@ -9,6 +9,7 @@ import (
 type extensionInventory struct {
 	Modules     []v1.ExtensionDescriptor  `json:"modules" yaml:"modules"`
 	WebRuntimes []webruntime.ListedPlugin `json:"webRuntimes" yaml:"webRuntimes"`
+	Providers   []providerProvenance      `json:"providers" yaml:"providers"`
 }
 
 func extensionsCommand(o *options) *cobra.Command {
@@ -21,11 +22,12 @@ func extensionsCommand(o *options) *cobra.Command {
 		Use:   "list",
 		Short: "List extension provenance and targets",
 		Args:  cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			inventory := extensionInventory{WebRuntimes: webruntime.List()}
 			if o.modules != nil {
 				inventory.Modules = o.modules.Extensions()
 			}
+			inventory.Providers = o.subprocessProvenance(cmd.Context())
 			return o.write(inventory)
 		},
 	})

@@ -47,6 +47,10 @@ func (p Planned) TargetDescriptor() sdk.TargetDescriptor {
 	return descriptorForRuntime(p.Runtime())
 }
 
+// OpaquePlanSpec exposes the provider-owned plan spec for subprocess
+// execution. Only the proof provider implements providerhost.OpaqueSpecProvider.
+func (p Planned) OpaquePlanSpec() any { return p.Spec }
+
 func (p Planned) WithImageDigest(digest string) (platform.PlannedStack, error) {
 	next := p
 	next.Spec.Artifact.ImageDigest = digest

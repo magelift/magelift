@@ -14,6 +14,10 @@ prints all readiness checks, including failures, before exiting. Exit code 4 mea
 the file parsed but one or more resolved contracts are invalid; read and schema
 errors use the invalid-input exit code 2.
 
+When `preview`, `deploy`, or `destroy` fails because another Pulumi update
+holds the stack lock, the command exits 5 with a wait-and-retry sentence
+instead of the generic failure, so CI can tell a collision from a graph bug.
+
 Production requests need an approval and a digest-pinned signed image. Deployment
 re-verifies the promoted digest against its recorded certificate identity and OIDC
 issuer before any infrastructure mutation. A rollback is another forward deployment.

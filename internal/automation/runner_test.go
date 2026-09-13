@@ -102,10 +102,16 @@ func TestRunnerPreservesCancellation(t *testing.T) {
 }
 
 func TestRunnerRedactsBackendFailure(t *testing.T) {
-	backend := &mockBackend{err: errors.New("provider output with sensitive-token")}
+	backend := &mockBackend{err: errors.New(`provider output failed with password="hunter2-secret-value" on resource x`)}
 	_, err := NewRunner(backend, io.Discard).Update(context.Background(), validRequest)
-	if !errors.Is(err, ErrUpdateFailed) || strings.Contains(err.Error(), "sensitive-token") {
+	if !errors.Is(err, ErrUpdateFailed) {
 		t.Fatalf("error = %v", err)
+	}
+	if strings.Contains(err.Error(), "hunter2-secret-value") {
+		t.Fatalf("credential material leaked: %v", err)
+	}
+	if !strings.Contains(err.Error(), "[REDACTED]") || !strings.Contains(err.Error(), "provider output failed") {
+		t.Fatalf("cause was dropped instead of redacted: %v", err)
 	}
 }
 

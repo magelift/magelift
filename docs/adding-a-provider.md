@@ -95,17 +95,25 @@ on AWS is not every SKU.
 
 ## Community binary
 
-The released `magelift` binary will load first-party adapters as signed
-subprocess artifacts (`magelift.providers.lock`, Cosign, HashiCorp go-plugin).
+The released `magelift` binary loads the proof adapter as a signed
+subprocess artifact (`magelift.providers.lock`, Cosign, HashiCorp go-plugin).
 `internal/providerhost` refuses unsigned or digest-mismatched lock entries,
 then `Dial` starts a gRPC subprocess (`cmd/magelift-provider-gcp`) that
-serves Ping, GCP Autopilot `Describe`, and `sdk.Module` Plan/Program JSON
-RPCs. Magento cells stay linked in-process until the CLI is wired to `Dial`
-(one-release ceiling). Tests and
+serves Ping, GCP Autopilot `Describe`, `sdk.Module` Plan/Program JSON RPCs,
+and the `Execute` RPC that runs the stack lifecycle inside the provider
+process. `Dial` refuses SDK API versions other than the host version.
+`gcp`/`gke-autopilot` deploys through the subprocess when a verified
+artifact is installed beside the CLI, with an in-process fallback and a
+stderr notice otherwise ([ADR 0011](adr/0011-subprocess-dial-proof.md)).
+`extensions list` reports the installed provider version, digest, and mode.
+Day-2 ports (ops, bootstrap, state, secrets, observe) stay in-process for
+every adapter; subprocess execution covers the stack lifecycle only. Tests and
 Floci suites always load in-process. External providers
 may still ship as a **compile-time custom binary** that calls
 `cli.NewWithExtensions` (`examples/custom-cli`). There is no Go `plugin.Open`
 ABI and no unsigned remote loader ([ADR 0008](adr/0008-provider-load-path.md)).
+Post-v1 extraction order: AWS ECS Fargate next, then the experimental
+providers, then community plugin onboarding.
 
 The public extension boundary avoids `internal/` imports. An extension implements
 `sdk.Module`, returns provider-neutral plan data, and returns its concrete Pulumi

@@ -1,4 +1,4 @@
-package certification
+package secretsafe
 
 import (
 	"strings"

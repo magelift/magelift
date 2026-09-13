@@ -37,6 +37,22 @@ against the shared source-dated compatibility catalog before it writes
 Compose. File a genuine mismatch rather than papering over it with
 "works on my machine."
 
+## What local proves
+
+A green local run proves the code and the contracts: the PHP and
+Composer versions from the compatibility row, the extension baseline,
+Magento install plus CLI verbs, queue consumer logic against the
+container broker, search queries against container OpenSearch, web
+runtime behavior, and outbound mail captured by Mailpit.
+
+It does not prove the cloud: managed-service auth and IAM, edge and
+WAF and DNS and TLS, multi-AZ behavior, backup and restore, secret
+reference resolution, deploy migrations under lock, or performance at
+scale. `local init` prints `substitutes` for every managed product
+with a container twin, and `warnings` when the cloud environment has
+less than local (disabled search, database-backed queues). Treat each
+entry as a line that still needs a cloud preview.
+
 ## Closer iso (later)
 
 A cheap cloud `preview` stage that reuses the same `magelift.yaml` is the path

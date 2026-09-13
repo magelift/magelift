@@ -709,6 +709,7 @@ func (o *options) runMediaSync(ctx context.Context, environment, source string) 
 		if err != nil {
 			return nil, fmt.Errorf("create infrastructure backend: %w", err)
 		}
+		defer o.closeProviderSessions()
 		outputs, err := backend.Outputs(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("read infrastructure outputs: %w", err)

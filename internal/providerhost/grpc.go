@@ -163,6 +163,50 @@ func (c *grpcProviderClient) Program(ctx context.Context, plan sdk.ModulePlan) (
 	return result, nil
 }
 
+func (s *grpcProvider) Execute(ctx context.Context, req *hostproto.ExecuteRequest) (*hostproto.ExecuteResponse, error) {
+	if s.Impl == nil {
+		return nil, errors.New("provider plugin implementation is nil")
+	}
+	var request ExecuteRequest
+	if err := decodeJSON("execute request", req.GetExecuteJson(), executeRequestLimit, &request); err != nil {
+		return nil, err
+	}
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	result, err := s.Impl.Execute(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("encode execute result: %w", err)
+	}
+	if len(payload) > executeResultLimit {
+		return nil, fmt.Errorf("execute result exceeds %d bytes", executeResultLimit)
+	}
+	return &hostproto.ExecuteResponse{ResultJson: string(payload)}, nil
+}
+
+func (c *grpcProviderClient) Execute(ctx context.Context, request ExecuteRequest) (ExecuteResult, error) {
+	if err := request.Validate(); err != nil {
+		return ExecuteResult{}, err
+	}
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return ExecuteResult{}, fmt.Errorf("encode execute request: %w", err)
+	}
+	resp, err := c.client.Execute(ctx, &hostproto.ExecuteRequest{ExecuteJson: string(payload)})
+	if err != nil {
+		return ExecuteResult{}, err
+	}
+	var result ExecuteResult
+	if err := decodeJSON("execute result", resp.GetResultJson(), executeResultLimit, &result); err != nil {
+		return ExecuteResult{}, err
+	}
+	return result, nil
+}
+
 func decodeJSON(label, payload string, limit int, dest any) error {
 	if len(payload) > limit {
 		return fmt.Errorf("%s exceeds %d bytes", label, limit)

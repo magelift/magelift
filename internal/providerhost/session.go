@@ -18,9 +18,12 @@ type Session struct {
 	api    API
 }
 
+var _ API = (*Session)(nil)
+
 // Dial starts a HashiCorp go-plugin gRPC subprocess. Callers must verify the
-// binary with Load/VerifyLocal first. This does not switch Magento cells off
-// the in-process path.
+// binary with Load/VerifyLocal first. Dial pings the subprocess and refuses
+// SDK API versions other than the host version before returning the session.
+// This does not switch Magento cells off the in-process path.
 func Dial(ctx context.Context, binaryPath string) (*Session, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -54,7 +57,25 @@ func Dial(ctx context.Context, binaryPath string) (*Session, error) {
 		client.Kill()
 		return nil, errors.New("dispensed plugin does not implement provider API")
 	}
+	version, err := api.Ping(ctx)
+	if err != nil {
+		client.Kill()
+		return nil, fmt.Errorf("ping provider plugin: %w", err)
+	}
+	if err := checkAPIVersion(version); err != nil {
+		client.Kill()
+		return nil, err
+	}
 	return &Session{client: client, api: api}, nil
+}
+
+// checkAPIVersion refuses a plugin whose SDK API version differs from the
+// host. A mismatch means the JSON contracts may have drifted.
+func checkAPIVersion(version string) error {
+	if strings.TrimSpace(version) != SDKAPIVersion {
+		return fmt.Errorf("%w: plugin reports %q, host requires %q", ErrUnsupportedAPI, version, SDKAPIVersion)
+	}
+	return nil
 }
 
 func (s *Session) Ping(ctx context.Context) (string, error) {
@@ -95,6 +116,16 @@ func (s *Session) Program(ctx context.Context, plan sdk.ModulePlan) (ProgramResu
 		ctx = context.Background()
 	}
 	return s.api.Program(ctx, plan)
+}
+
+func (s *Session) Execute(ctx context.Context, request ExecuteRequest) (ExecuteResult, error) {
+	if s == nil || s.api == nil {
+		return ExecuteResult{}, errors.New("provider plugin session is nil")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return s.api.Execute(ctx, request)
 }
 
 func (s *Session) Close() {

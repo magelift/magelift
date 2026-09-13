@@ -134,7 +134,7 @@ func TestTopLevelCommandNamesAreUnique(t *testing.T) {
 func TestConfigValidateRejectsEnvironmentBuildOverrides(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "magelift.yaml")
-	contents := strings.Replace(starterConfig, "    account: \"123456789012\"", "    account: \"123456789012\"\n    build:\n      php: \"8.4\"", 1)
+	contents := strings.Replace(starterConfig, "    inherits: preview\n    account: \"123456789012\"", "    inherits: preview\n    account: \"123456789012\"\n    build:\n      php: \"8.4\"", 1)
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestConfigValidateRejectsEnvironmentBuildOverrides(t *testing.T) {
 func TestConfigValidateWarnsExperimentalManagedInstancesWithoutHatch(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "magelift.yaml")
-	contents := strings.Replace(starterConfig, "target:\n  provider: aws\n  runtime: ecs-fargate\n", "target:\n  provider: aws\n  runtime: ecs-fargate\n  aws:\n    catalog:\n      fargate:\n        computeMode: managed-instances\n", 1)
+	contents := strings.Replace(starterConfig, "  aws:\n    catalog:\n", "  aws:\n    catalog:\n      fargate:\n        computeMode: managed-instances\n", 1)
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestEnvironmentSelectionPrecedence(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "magelift.yaml")
 	contents := strings.Replace(starterConfig, "  staging:\n", "  staging:\n    branches: [main]\n", 1)
-	contents = strings.Replace(contents, "extensions: {}", "  production:\n    account: \"210987654321\"\nextensions: {}", 1)
+	// The default starter already carries production on 210987654321.
 	if err := os.WriteFile(configPath, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}

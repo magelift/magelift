@@ -357,6 +357,94 @@ func (x *ProgramResponse) GetResultJson() string {
 	return ""
 }
 
+type ExecuteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ExecuteJson   string                 `protobuf:"bytes,1,opt,name=execute_json,json=executeJson,proto3" json:"execute_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecuteRequest) Reset() {
+	*x = ExecuteRequest{}
+	mi := &file_ping_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecuteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecuteRequest) ProtoMessage() {}
+
+func (x *ExecuteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ping_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecuteRequest.ProtoReflect.Descriptor instead.
+func (*ExecuteRequest) Descriptor() ([]byte, []int) {
+	return file_ping_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ExecuteRequest) GetExecuteJson() string {
+	if x != nil {
+		return x.ExecuteJson
+	}
+	return ""
+}
+
+type ExecuteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ResultJson    string                 `protobuf:"bytes,1,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecuteResponse) Reset() {
+	*x = ExecuteResponse{}
+	mi := &file_ping_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecuteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecuteResponse) ProtoMessage() {}
+
+func (x *ExecuteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ping_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecuteResponse.ProtoReflect.Descriptor instead.
+func (*ExecuteResponse) Descriptor() ([]byte, []int) {
+	return file_ping_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ExecuteResponse) GetResultJson() string {
+	if x != nil {
+		return x.ResultJson
+	}
+	return ""
+}
+
 var File_ping_proto protoreflect.FileDescriptor
 
 const file_ping_proto_rawDesc = "" +
@@ -377,12 +465,18 @@ const file_ping_proto_rawDesc = "" +
 	"\tplan_json\x18\x01 \x01(\tR\bplanJson\"2\n" +
 	"\x0fProgramResponse\x12\x1f\n" +
 	"\vresult_json\x18\x01 \x01(\tR\n" +
-	"resultJson2\xfb\x02\n" +
+	"resultJson\"3\n" +
+	"\x0eExecuteRequest\x12!\n" +
+	"\fexecute_json\x18\x01 \x01(\tR\vexecuteJson\"2\n" +
+	"\x0fExecuteResponse\x12\x1f\n" +
+	"\vresult_json\x18\x01 \x01(\tR\n" +
+	"resultJson2\xdb\x03\n" +
 	"\bProvider\x12U\n" +
 	"\x04Ping\x12%.magelift.providerhost.v1.PingRequest\x1a&.magelift.providerhost.v1.PingResponse\x12a\n" +
 	"\bDescribe\x12).magelift.providerhost.v1.DescribeRequest\x1a*.magelift.providerhost.v1.DescribeResponse\x12U\n" +
 	"\x04Plan\x12%.magelift.providerhost.v1.PlanRequest\x1a&.magelift.providerhost.v1.PlanResponse\x12^\n" +
-	"\aProgram\x12(.magelift.providerhost.v1.ProgramRequest\x1a).magelift.providerhost.v1.ProgramResponseB>Z<github.com/magelift/magelift/internal/providerhost/hostprotob\x06proto3"
+	"\aProgram\x12(.magelift.providerhost.v1.ProgramRequest\x1a).magelift.providerhost.v1.ProgramResponse\x12^\n" +
+	"\aExecute\x12(.magelift.providerhost.v1.ExecuteRequest\x1a).magelift.providerhost.v1.ExecuteResponseB>Z<github.com/magelift/magelift/internal/providerhost/hostprotob\x06proto3"
 
 var (
 	file_ping_proto_rawDescOnce sync.Once
@@ -396,7 +490,7 @@ func file_ping_proto_rawDescGZIP() []byte {
 	return file_ping_proto_rawDescData
 }
 
-var file_ping_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_ping_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_ping_proto_goTypes = []any{
 	(*PingRequest)(nil),      // 0: magelift.providerhost.v1.PingRequest
 	(*PingResponse)(nil),     // 1: magelift.providerhost.v1.PingResponse
@@ -406,18 +500,22 @@ var file_ping_proto_goTypes = []any{
 	(*PlanResponse)(nil),     // 5: magelift.providerhost.v1.PlanResponse
 	(*ProgramRequest)(nil),   // 6: magelift.providerhost.v1.ProgramRequest
 	(*ProgramResponse)(nil),  // 7: magelift.providerhost.v1.ProgramResponse
+	(*ExecuteRequest)(nil),   // 8: magelift.providerhost.v1.ExecuteRequest
+	(*ExecuteResponse)(nil),  // 9: magelift.providerhost.v1.ExecuteResponse
 }
 var file_ping_proto_depIdxs = []int32{
 	0, // 0: magelift.providerhost.v1.Provider.Ping:input_type -> magelift.providerhost.v1.PingRequest
 	2, // 1: magelift.providerhost.v1.Provider.Describe:input_type -> magelift.providerhost.v1.DescribeRequest
 	4, // 2: magelift.providerhost.v1.Provider.Plan:input_type -> magelift.providerhost.v1.PlanRequest
 	6, // 3: magelift.providerhost.v1.Provider.Program:input_type -> magelift.providerhost.v1.ProgramRequest
-	1, // 4: magelift.providerhost.v1.Provider.Ping:output_type -> magelift.providerhost.v1.PingResponse
-	3, // 5: magelift.providerhost.v1.Provider.Describe:output_type -> magelift.providerhost.v1.DescribeResponse
-	5, // 6: magelift.providerhost.v1.Provider.Plan:output_type -> magelift.providerhost.v1.PlanResponse
-	7, // 7: magelift.providerhost.v1.Provider.Program:output_type -> magelift.providerhost.v1.ProgramResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
+	8, // 4: magelift.providerhost.v1.Provider.Execute:input_type -> magelift.providerhost.v1.ExecuteRequest
+	1, // 5: magelift.providerhost.v1.Provider.Ping:output_type -> magelift.providerhost.v1.PingResponse
+	3, // 6: magelift.providerhost.v1.Provider.Describe:output_type -> magelift.providerhost.v1.DescribeResponse
+	5, // 7: magelift.providerhost.v1.Provider.Plan:output_type -> magelift.providerhost.v1.PlanResponse
+	7, // 8: magelift.providerhost.v1.Provider.Program:output_type -> magelift.providerhost.v1.ProgramResponse
+	9, // 9: magelift.providerhost.v1.Provider.Execute:output_type -> magelift.providerhost.v1.ExecuteResponse
+	5, // [5:10] is the sub-list for method output_type
+	0, // [0:5] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -434,7 +532,7 @@ func file_ping_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ping_proto_rawDesc), len(file_ping_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

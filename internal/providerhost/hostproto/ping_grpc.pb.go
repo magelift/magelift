@@ -23,6 +23,7 @@ const (
 	Provider_Describe_FullMethodName = "/magelift.providerhost.v1.Provider/Describe"
 	Provider_Plan_FullMethodName     = "/magelift.providerhost.v1.Provider/Plan"
 	Provider_Program_FullMethodName  = "/magelift.providerhost.v1.Provider/Program"
+	Provider_Execute_FullMethodName  = "/magelift.providerhost.v1.Provider/Execute"
 )
 
 // ProviderClient is the client API for Provider service.
@@ -33,6 +34,7 @@ type ProviderClient interface {
 	Describe(ctx context.Context, in *DescribeRequest, opts ...grpc.CallOption) (*DescribeResponse, error)
 	Plan(ctx context.Context, in *PlanRequest, opts ...grpc.CallOption) (*PlanResponse, error)
 	Program(ctx context.Context, in *ProgramRequest, opts ...grpc.CallOption) (*ProgramResponse, error)
+	Execute(ctx context.Context, in *ExecuteRequest, opts ...grpc.CallOption) (*ExecuteResponse, error)
 }
 
 type providerClient struct {
@@ -83,6 +85,16 @@ func (c *providerClient) Program(ctx context.Context, in *ProgramRequest, opts .
 	return out, nil
 }
 
+func (c *providerClient) Execute(ctx context.Context, in *ExecuteRequest, opts ...grpc.CallOption) (*ExecuteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExecuteResponse)
+	err := c.cc.Invoke(ctx, Provider_Execute_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProviderServer is the server API for Provider service.
 // All implementations must embed UnimplementedProviderServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type ProviderServer interface {
 	Describe(context.Context, *DescribeRequest) (*DescribeResponse, error)
 	Plan(context.Context, *PlanRequest) (*PlanResponse, error)
 	Program(context.Context, *ProgramRequest) (*ProgramResponse, error)
+	Execute(context.Context, *ExecuteRequest) (*ExecuteResponse, error)
 	mustEmbedUnimplementedProviderServer()
 }
 
@@ -112,6 +125,9 @@ func (UnimplementedProviderServer) Plan(context.Context, *PlanRequest) (*PlanRes
 }
 func (UnimplementedProviderServer) Program(context.Context, *ProgramRequest) (*ProgramResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Program not implemented")
+}
+func (UnimplementedProviderServer) Execute(context.Context, *ExecuteRequest) (*ExecuteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Execute not implemented")
 }
 func (UnimplementedProviderServer) mustEmbedUnimplementedProviderServer() {}
 func (UnimplementedProviderServer) testEmbeddedByValue()                  {}
@@ -206,6 +222,24 @@ func _Provider_Program_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Provider_Execute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExecuteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderServer).Execute(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Provider_Execute_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderServer).Execute(ctx, req.(*ExecuteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Provider_ServiceDesc is the grpc.ServiceDesc for Provider service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +262,10 @@ var Provider_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Program",
 			Handler:    _Provider_Program_Handler,
+		},
+		{
+			MethodName: "Execute",
+			Handler:    _Provider_Execute_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

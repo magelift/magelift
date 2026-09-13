@@ -5,6 +5,7 @@ package upgrade
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -157,7 +158,7 @@ func (c *Client) Install(ctx context.Context, release Release, executable string
 	if err := verifyChecksum(archiveBody, expectedChecksum); err != nil {
 		return err
 	}
-	binary, err := extractBinary(archiveBody, filepath.Base(executable))
+	binary, err := extractBinary(archiveBody, archive.Name, filepath.Base(executable))
 	if err != nil {
 		return err
 	}
@@ -192,7 +193,7 @@ func (c *Client) assets(ctx context.Context, release Release) (Asset, Asset, Ass
 	if !releaseTagPattern.MatchString(release.TagName) {
 		return Asset{}, Asset{}, Asset{}, "", fmt.Errorf("release tag %q is not a semantic version", release.TagName)
 	}
-	archiveName := fmt.Sprintf("magelift_%s_%s_%s.tar.gz", strings.TrimPrefix(release.TagName, "v"), c.goos, c.goarch)
+	archiveName := archiveNameFor(c.goos, strings.TrimPrefix(release.TagName, "v"), c.goarch)
 	var archive, checksums, signature Asset
 	for _, asset := range release.Assets {
 		switch asset.Name {
@@ -225,6 +226,17 @@ func (c *Client) assets(ctx context.Context, release Release) (Asset, Asset, Ass
 		return Asset{}, Asset{}, Asset{}, "", err
 	}
 	return archive, checksums, signature, expected, nil
+}
+
+// archiveNameFor mirrors the GoReleaser archives matrix: the cli archive
+// uses name_template magelift_<version>_<os>_<arch> with tar.gz everywhere
+// except Windows, which overrides to zip. Version arrives without the tag's
+// leading v.
+func archiveNameFor(goos, version, goarch string) string {
+	if goos == "windows" {
+		return fmt.Sprintf("magelift_%s_%s_%s.zip", version, goos, goarch)
+	}
+	return fmt.Sprintf("magelift_%s_%s_%s.tar.gz", version, goos, goarch)
 }
 
 func (c *Client) download(ctx context.Context, endpoint string) ([]byte, error) {
@@ -304,10 +316,52 @@ func writeTemporaryAsset(pattern string, body []byte) (string, error) {
 	return name, nil
 }
 
-func extractBinary(archive []byte, executableName string) ([]byte, error) {
+func extractBinary(archive []byte, assetName, executableName string) ([]byte, error) {
 	if executableName == "" {
 		return nil, errors.New("executable name is required")
 	}
+	// Format follows the GoReleaser archives matrix: tar.gz everywhere,
+	// zip on Windows (format_overrides). The asset name, already matched
+	// against the release, selects the reader.
+	if strings.HasSuffix(assetName, ".zip") {
+		return extractZipBinary(archive, executableName)
+	}
+	return extractTarBinary(archive, executableName)
+}
+
+func extractZipBinary(archive []byte, executableName string) ([]byte, error) {
+	reader, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
+	if err != nil {
+		return nil, fmt.Errorf("open release archive: %w", err)
+	}
+	for _, file := range reader.File {
+		if file.FileInfo().IsDir() || filepath.Base(file.Name) != executableName || strings.Contains(filepath.Clean(file.Name), "..") {
+			continue
+		}
+		if file.UncompressedSize64 == 0 || file.UncompressedSize64 > 128<<20 {
+			return nil, errors.New("release executable has an invalid size")
+		}
+		opened, err := file.Open()
+		if err != nil {
+			return nil, fmt.Errorf("read release executable: %w", err)
+		}
+		binary, err := io.ReadAll(io.LimitReader(opened, int64(file.UncompressedSize64)+1))
+		closeErr := opened.Close()
+		if err != nil {
+			return nil, fmt.Errorf("read release executable: %w", err)
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("read release executable: %w", closeErr)
+		}
+		if uint64(len(binary)) != file.UncompressedSize64 {
+			return nil, errors.New("release executable was truncated")
+		}
+		return binary, nil
+	}
+	return nil, ErrNoReleaseAsset
+}
+
+func extractTarBinary(archive []byte, executableName string) ([]byte, error) {
 	reader, err := gzip.NewReader(bytes.NewReader(archive))
 	if err != nil {
 		return nil, fmt.Errorf("open release archive: %w", err)

@@ -366,6 +366,15 @@ func PlanFor(build config.BuildSpec, hints CloudHints) (RuntimePlan, error) {
 	if unsupportedCache {
 		plan.Warnings = append(plan.Warnings, "Redis 7.2 is an explicit local compatibility exception; Adobe's current release rows list Valkey instead")
 	}
+	// Drift direction is cloud-has-less: local runs a container the cloud
+	// environment does not have, so local success proves nothing there.
+	if strings.EqualFold(strings.TrimSpace(hints.SearchMode), "disabled") {
+		plan.Warnings = append(plan.Warnings, "cloud search is disabled for this environment; local OpenSearch does not prove cloud behavior")
+	}
+	switch strings.ToLower(strings.TrimSpace(hints.QueueMode)) {
+	case "db", "database":
+		plan.Warnings = append(plan.Warnings, "cloud queues are database-backed for this environment; the local broker does not prove cloud behavior")
+	}
 	return plan, nil
 }
 

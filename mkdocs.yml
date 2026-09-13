@@ -104,6 +104,8 @@ nav:
           - "0008 Provider load path": adr/0008-provider-load-path.md
           - "0009 Dump seed and attach": adr/0009-dump-seed-and-attach.md
           - "0010 Live certification": adr/0010-live-certification.md
+          - "0011 Subprocess Dial proof": adr/0011-subprocess-dial-proof.md
+          - "0012 Search proof shapes": adr/0012-search-proof-shapes.md
   - Project:
       - Versioning: versioning.md
       - Release readiness: release-readiness.md

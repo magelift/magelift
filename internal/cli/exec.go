@@ -189,6 +189,7 @@ func (o *options) plannedOutputs(ctx context.Context) (string, platform.PlannedS
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("create infrastructure backend: %w", err)
 	}
+	defer o.closeProviderSessions()
 	outputs, err := backend.Outputs(ctx)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("read infrastructure outputs: %w", err)

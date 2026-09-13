@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/localdev"
@@ -44,6 +45,7 @@ func doctorCommand(o *options) *cobra.Command {
 		if installDependencies {
 			if err := installMissingDependencies(cmd.Context(), o, specs, dependencies); err != nil {
 				appendDependencyChecks(&report, dependencies)
+				setNextFromFirstFailure(&report)
 				if writeErr := o.write(report); writeErr != nil {
 					return writeErr
 				}
@@ -52,6 +54,7 @@ func doctorCommand(o *options) *cobra.Command {
 			dependencies = toolchain.CheckDependencies(cmd.Context(), dependencyRunner(o), specs)
 		}
 		appendDependencyChecks(&report, dependencies)
+		setNextFromFirstFailure(&report)
 		if err := o.write(report); err != nil {
 			return err
 		}
@@ -101,4 +104,26 @@ func inspectProject(path string, file *config.File) doctorReport {
 		Message: localdev.CloudOnlyNote,
 	})
 	return report
+}
+
+// setNextFromFirstFailure points Next at the fix for the first failed
+// check. Config families land on validate; missing dependencies land on
+// the installer flag. Unknown check IDs default to validate so the map
+// cannot go stale silently as checks grow. A healthy report keeps the
+// bootstrap Next set by inspectProject.
+func setNextFromFirstFailure(report *doctorReport) {
+	if report == nil || report.Status == "ok" {
+		return
+	}
+	for _, check := range report.Checks {
+		if check.Status == "ok" {
+			continue
+		}
+		if strings.HasPrefix(check.ID, "dependency.") {
+			report.Next = "magelift doctor --install-dependencies"
+			return
+		}
+		report.Next = "magelift config validate"
+		return
+	}
 }

@@ -76,6 +76,7 @@ func (o *options) runHealth(ctx context.Context, mode string) (health.Report, er
 		if err != nil {
 			return health.Report{}, fmt.Errorf("create infrastructure backend: %w", err)
 		}
+		defer o.closeProviderSessions()
 		outputs, err := backend.Outputs(ctx)
 		if err != nil {
 			return health.Report{}, fmt.Errorf("read infrastructure outputs: %w", err)

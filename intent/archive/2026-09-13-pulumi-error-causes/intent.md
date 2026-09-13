@@ -1,5 +1,5 @@
 ---
-status: draft
+status: accepted
 slug: pulumi-error-causes
 ---
 
@@ -15,7 +15,7 @@ When `magelift deploy` or destroy fails inside Pulumi, the operator usually sees
 
 ## Proposed outcome
 
-A failed preview, update, or destroy still fails, and the printed error includes the Pulumi cause. A concurrent-update / stack-lock failure is distinguishable from a generic graph failure (exit code or message operators can match). Existing ownership errors stay classified.
+A failed preview, update, or destroy still fails, and the printed error includes the Pulumi cause. A concurrent-update / stack-lock failure is distinguishable from a generic graph failure (exit code or message operators can match). Existing ownership errors stay classified. V1 priority: agency and SME operators without DevOps background cannot debug a bare sentinel, so this classification ships before the stable cut (see ROADMAP.md).
 
 ## Affected users and systems
 

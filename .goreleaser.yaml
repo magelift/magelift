@@ -18,6 +18,18 @@ builds:
       - -s
       - -w
       - -X github.com/magelift/magelift/internal/cli.Version={{ .Version }}
+  # v1 subprocess proof: one provider binary, same matrix as the CLI, same
+  # version. The artifact version equals the CLI version (single-version v1).
+  - id: magelift-provider-gcp
+    main: ./cmd/magelift-provider-gcp
+    binary: magelift-provider-gcp
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
 
 archives:
   - id: cli
@@ -35,6 +47,12 @@ archives:
       - agents/README.md
       - agents/manifest.json
       - agents/skills/**/SKILL.md
+  # Provider binaries upload raw beside the CLI archives (default binary name
+  # template). Windows .exe handling and bundle upload are verified on the
+  # first tag release; see ADR 0011.
+  - id: provider-gcp
+    ids: [magelift-provider-gcp]
+    formats: [binary]
 
 checksum:
   name_template: checksums.txt
@@ -53,6 +71,20 @@ signs:
       - "${artifact}"
       - "--yes"
     artifacts: checksum
+  - id: provider-gcp
+    cmd: cosign
+    # Per-binary bundle for the provider artifacts. signs (unlike
+    # binary_signs) runs at release time only, so the local `build` smoke
+    # stays offline. The CLI verifies the installed provider binary against
+    # this bundle before Dial.
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: binary
+    ids: [magelift-provider-gcp]
 
 # Homebrew cask with binary stanzas: goreleaser deprecated brews (formula
 # generation) in v2.16 in favor of homebrew_casks; casks install binaries on

@@ -102,7 +102,7 @@ func applyCloudHints(local *config.LocalRuntime, hints CloudHints, row localRele
 			return err
 		}
 	}
-	if hints.CacheProduct == "memorystore" && strings.TrimSpace(local.Cache.Family) == "" {
+	if _, ok := cacheTwinProduct(hints.CacheProduct); ok && strings.TrimSpace(local.Cache.Family) == "" {
 		if err := preferFamily(&local.Cache, "valkey", "", row.Cache); err != nil {
 			return err
 		}
@@ -118,16 +118,49 @@ func namedSubstitutes(hints CloudHints, plan RuntimePlan) []Substitute {
 	if hints.SearchMode == "serverless" {
 		substitutes = append(substitutes, Substitute{Cloud: "OpenSearch Serverless", Local: plan.Search.Family + " " + plan.Search.Version})
 	}
+	if hints.SearchMode == "provisioned" {
+		substitutes = append(substitutes, Substitute{Cloud: "OpenSearch provisioned domain", Local: plan.Search.Family + " " + plan.Search.Version})
+	}
 	switch hints.QueueMode {
 	case "amazon-mq":
 		substitutes = append(substitutes, Substitute{Cloud: "Amazon MQ", Local: plan.Queue.Family + " " + plan.Queue.Version})
 	case "ecs-rabbitmq":
 		substitutes = append(substitutes, Substitute{Cloud: "ECS RabbitMQ", Local: plan.Queue.Family + " " + plan.Queue.Version})
+	case "ecs-artemis":
+		substitutes = append(substitutes, Substitute{Cloud: "ECS Artemis", Local: plan.Queue.Family + " " + plan.Queue.Version})
+	case "rabbitmq":
+		substitutes = append(substitutes, Substitute{Cloud: rabbitWorkloadName(hints.Provider), Local: plan.Queue.Family + " " + plan.Queue.Version})
 	}
-	if hints.CacheProduct == "memorystore" {
-		substitutes = append(substitutes, Substitute{Cloud: "Memorystore", Local: plan.Cache.Family + " " + plan.Cache.Version})
+	if cloudName, ok := cacheTwinProduct(hints.CacheProduct); ok {
+		substitutes = append(substitutes, Substitute{Cloud: cloudName, Local: plan.Cache.Family + " " + plan.Cache.Version})
 	}
 	return substitutes
+}
+
+// cacheTwinProduct names the managed Valkey twin for a cloud cache
+// product. ElastiCache and Memorystore both pair with a local Valkey
+// container; anything else has no container twin rule.
+func cacheTwinProduct(product string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(product)) {
+	case "elasticache-valkey":
+		return "ElastiCache Valkey", true
+	case "memorystore":
+		return "Memorystore", true
+	default:
+		return "", false
+	}
+}
+
+// rabbitWorkloadName qualifies a bare rabbitmq queue mode by provider.
+func rabbitWorkloadName(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "gcp":
+		return "GKE RabbitMQ"
+	case "aws":
+		return "EKS RabbitMQ"
+	default:
+		return "managed RabbitMQ"
+	}
 }
 
 func databaseSubstitute(engine string) (family, cloudName string, ok bool) {
@@ -206,7 +239,7 @@ func defaultAWSQueueHint(preset, queueMode string) string {
 
 func queueUsesRabbitFamily(mode string) bool {
 	switch strings.TrimSpace(mode) {
-	case "amazon-mq", "ecs-rabbitmq":
+	case "amazon-mq", "ecs-rabbitmq", "ecs-artemis", "rabbitmq":
 		return true
 	default:
 		return false

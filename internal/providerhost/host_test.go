@@ -239,6 +239,89 @@ func TestDialPingsVerifiedProvider(t *testing.T) {
 	}
 }
 
+func TestDialExecutesOverMockBackend(t *testing.T) {
+	binary := buildGCPProvider(t)
+	lockPath, bundlePath := writeVerifiedLock(t, binary)
+	loaded, err := Load(context.Background(), Options{
+		Mode:       ModeSubprocess,
+		Provider:   "gcp",
+		LockPath:   lockPath,
+		BinaryPath: binary,
+		BundlePath: bundlePath,
+		Verifier:   fakeVerifier{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := Dial(context.Background(), loaded.Binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(session.Close)
+	payload, err := json.Marshal(gcpAutopilotPlanConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var configuration map[string]any
+	if err := json.Unmarshal(payload, &configuration); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := session.Plan(context.Background(), sdk.ModulePlanRequest{
+		Environment:   "staging",
+		Configuration: configuration,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, operation := range []ExecuteOperation{ExecutePreview, ExecuteUp, ExecuteDestroy, ExecuteOutputs, ExecuteValidateRequest} {
+		result, err := session.Execute(context.Background(), ExecuteRequest{
+			Operation:  operation,
+			Plan:       plan,
+			BackendURL: "test://mock",
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", operation, err)
+		}
+		if result.Operation != operation {
+			t.Fatalf("%s: operation echo = %q", operation, result.Operation)
+		}
+		if len(result.Diagnostics) == 0 || !strings.Contains(result.Diagnostics[0], "mock execute") {
+			t.Fatalf("%s: diagnostics = %v", operation, result.Diagnostics)
+		}
+	}
+	preview, err := session.Execute(context.Background(), ExecuteRequest{
+		Operation:  ExecutePreview,
+		Plan:       plan,
+		BackendURL: "test://mock",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Changes["create"] != 1 {
+		t.Fatalf("preview changes = %v", preview.Changes)
+	}
+	outputs, err := session.Execute(context.Background(), ExecuteRequest{
+		Operation:  ExecuteOutputs,
+		Plan:       plan,
+		BackendURL: "test://mock",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outputs.Outputs["mock"] != true {
+		t.Fatalf("outputs = %v", outputs.Outputs)
+	}
+	broken := plan
+	broken.Opaque = "not-a-gcp-spec"
+	if _, err := session.Execute(context.Background(), ExecuteRequest{
+		Operation:  ExecutePreview,
+		Plan:       broken,
+		BackendURL: "test://mock",
+	}); err == nil || !strings.Contains(err.Error(), "decode GCP plan") {
+		t.Fatalf("broken plan err = %v, want decode failure", err)
+	}
+}
+
 func gcpAutopilotPlanConfig() config.Config {
 	return config.Config{
 		SchemaVersion: 1,
@@ -320,4 +403,79 @@ type fakeVerifier struct {
 
 func (f fakeVerifier) VerifyBlob(context.Context, string, string, cosign.VerifyOptions) error {
 	return f.err
+}
+
+func TestLoadSubprocessRefusesUnknownProvider(t *testing.T) {
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, "magelift.providers.lock")
+	if err := os.WriteFile(lockPath, validLockJSON(""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(context.Background(), Options{
+		Mode:       ModeSubprocess,
+		Provider:   "aws",
+		LockPath:   lockPath,
+		BinaryPath: filepath.Join(dir, "magelift-provider-aws"),
+		BundlePath: filepath.Join(dir, "bundle.json"),
+		Verifier:   fakeVerifier{},
+	})
+	if !errors.Is(err, ErrUnknownProvider) {
+		t.Fatalf("err = %v, want %v", err, ErrUnknownProvider)
+	}
+}
+
+func TestLoadSubprocessRefusesUnsignedVerify(t *testing.T) {
+	dir := t.TempDir()
+	payload := []byte("provider-bytes")
+	sum := sha256.Sum256(payload)
+	digest := "sha256:" + hex.EncodeToString(sum[:])
+	binary := filepath.Join(dir, "magelift-provider-gcp")
+	if err := os.WriteFile(binary, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(dir, "magelift.providers.lock")
+	if err := os.WriteFile(lockPath, validLockJSON(digest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name    string
+		options Options
+	}{
+		{
+			name: "missing bundle path",
+			options: Options{
+				Mode: ModeSubprocess, Provider: "gcp", LockPath: lockPath,
+				BinaryPath: binary, BundlePath: "", Verifier: fakeVerifier{},
+			},
+		},
+		{
+			name: "nil verifier",
+			options: Options{
+				Mode: ModeSubprocess, Provider: "gcp", LockPath: lockPath,
+				BinaryPath: binary, BundlePath: filepath.Join(dir, "bundle.json"), Verifier: nil,
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Load(context.Background(), tc.options)
+			if !errors.Is(err, ErrUnsigned) {
+				t.Fatalf("err = %v, want %v", err, ErrUnsigned)
+			}
+		})
+	}
+}
+
+func TestCheckAPIVersion(t *testing.T) {
+	if err := checkAPIVersion(SDKAPIVersion); err != nil {
+		t.Fatalf("host version refused: %v", err)
+	}
+	for _, version := range []string{"", "v0", "v2"} {
+		if err := checkAPIVersion(version); !errors.Is(err, ErrUnsupportedAPI) {
+			t.Fatalf("version %q err = %v, want %v", version, err, ErrUnsupportedAPI)
+		}
+	}
+	// Dial enforces checkAPIVersion after Ping; the Dial-level mismatch path
+	// would need a dedicated fake plugin binary, so the helper carries the
+	// contract and TestDialPingsVerifiedProvider covers the accept path.
 }

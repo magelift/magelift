@@ -21,6 +21,7 @@ service Provider {
   rpc Describe(DescribeRequest) returns (DescribeResponse);
   rpc Plan(PlanRequest) returns (PlanResponse);
   rpc Program(ProgramRequest) returns (ProgramResponse);
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
 }
 
 message PlanRequest {
@@ -36,5 +37,13 @@ message ProgramRequest {
 }
 
 message ProgramResponse {
+  string result_json = 1;
+}
+
+message ExecuteRequest {
+  string execute_json = 1;
+}
+
+message ExecuteResponse {
   string result_json = 1;
 }
