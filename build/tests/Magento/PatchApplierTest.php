@@ -70,6 +70,29 @@ PATCH);
         self::assertSame('hello patched', rtrim((string) file_get_contents($root.'/app/sample.txt')));
     }
 
+    public function testReapplyingSyntheticPatchIsIdempotent(): void
+    {
+        $root = $this->tempProject();
+        mkdir($root.'/app', 0o700);
+        file_put_contents($root.'/app/sample.txt', "hello world\n");
+        mkdir($root.'/m2-hotfixes', 0o700);
+        file_put_contents($root.'/m2-hotfixes/01-sample.patch', <<<'PATCH'
+--- a/app/sample.txt
++++ b/app/sample.txt
+@@ -1 +1 @@
+-hello world
++hello patched
+
+PATCH);
+
+        $applier = new PatchApplier(new NativeProcessRunner());
+        $applier->apply($root);
+        $applier->apply($root);
+
+        self::assertSame('hello patched', rtrim((string) file_get_contents($root.'/app/sample.txt')));
+        self::assertFileDoesNotExist($root.'/app/sample.txt.rej');
+    }
+
     public function testCorruptPatchFailsLoud(): void
     {
         $root = $this->tempProject();

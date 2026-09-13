@@ -22,7 +22,7 @@ type accEnvDocument struct {
 	Stage struct {
 		Global map[string]string `yaml:"global"`
 		Deploy map[string]string `yaml:"deploy"`
-		Build  map[string]string `yaml:"build"`
+		Build  map[string]any    `yaml:"build"`
 	} `yaml:"stage"`
 	Variables struct {
 		Env map[string]string `yaml:"env"`
@@ -59,6 +59,12 @@ func MapACC(root string) (Result, error) {
 		if err := yaml.Unmarshal(servicesData, &services); err != nil {
 			return Result{}, fmt.Errorf("parse %s: %w", accServicesFile, err)
 		}
+		var fastlyUnmapped []UnmappedKey
+		doc.Edge, fastlyUnmapped = fastlyEdgeIntent(accServicesFile, services)
+		unmapped = append(unmapped, fastlyUnmapped...)
+		if observability := observabilityServiceIntent(services); observability != nil {
+			doc.Observability = observability
+		}
 		unmapped = append(unmapped, mapServices(accServicesFile, services)...)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Result{}, err
@@ -74,6 +80,9 @@ func MapACC(root string) (Result, error) {
 			staging.Domain = domainFromRoutes(routes)
 		}
 		doc.Environments["staging"] = staging
+		if doc.Edge != nil && staging.Domain != "" {
+			doc.Edge.Domains = []string{staging.Domain}
+		}
 		// All route patterns are structural / consumed.
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Result{}, err
@@ -109,7 +118,7 @@ func mapAppTree(source string, raw accAppRaw) (mageliftDocument, []UnmappedKey, 
 	}
 
 	doc := baseDocument(name, php)
-	var unmapped []UnmappedKey
+	unmapped := mapBuildRequirements(source, raw, &doc)
 
 	if relsRaw, ok := raw["relationships"]; ok {
 		rels, ok := asStringMap(relsRaw)
@@ -139,7 +148,7 @@ func mapAppTree(source string, raw accAppRaw) (mageliftDocument, []UnmappedKey, 
 
 	for key, value := range raw {
 		switch key {
-		case "name", "type", "relationships":
+		case "name", "type", "relationships", "runtime", "dependencies":
 			continue
 		case "crons":
 			unmapped = append(unmapped, mapCrons(source, value, &doc)...)
@@ -150,6 +159,64 @@ func mapAppTree(source string, raw accAppRaw) (mageliftDocument, []UnmappedKey, 
 		}
 	}
 	return doc, unmapped, nil
+}
+
+func mapBuildRequirements(source string, raw accAppRaw, doc *mageliftDocument) []UnmappedKey {
+	var unmapped []UnmappedKey
+	if value, ok := raw["runtime"]; ok {
+		runtime, ok := asStringMap(value)
+		if !ok {
+			unmapped = append(unmapped, UnmappedKey{Source: source, Path: "runtime"})
+		} else {
+			for key, value := range runtime {
+				switch key {
+				case "extensions":
+					extensions, ok := stringList(value)
+					if !ok {
+						unmapped = append(unmapped, UnmappedKey{Source: source, Path: "runtime.extensions"})
+						continue
+					}
+					doc.Build.Extensions = extensions
+				case "disabled_extensions":
+					unmapped = append(unmapped, UnmappedKey{Source: source, Path: "runtime.disabled_extensions"})
+				default:
+					unmapped = append(unmapped, UnmappedKey{Source: source, Path: "runtime." + key})
+				}
+			}
+		}
+	}
+	if value, ok := raw["dependencies"]; ok {
+		dependencies, ok := asStringMap(value)
+		if !ok {
+			unmapped = append(unmapped, UnmappedKey{Source: source, Path: "dependencies"})
+			return unmapped
+		}
+		for name, value := range dependencies {
+			if name != "php" {
+				unmapped = append(unmapped, UnmappedKey{Source: source, Path: "dependencies." + name})
+				continue
+			}
+			phpDependencies, ok := asStringMap(value)
+			if !ok {
+				unmapped = append(unmapped, UnmappedKey{Source: source, Path: "dependencies.php"})
+				continue
+			}
+			for packageName, packageVersion := range phpDependencies {
+				if packageName != "composer/composer" {
+					unmapped = append(unmapped, UnmappedKey{Source: source, Path: "dependencies.php." + packageName})
+					continue
+				}
+				version, ok := packageVersion.(string)
+				if !ok || !validComposerVersion(version) {
+					unmapped = append(unmapped, UnmappedKey{Source: source, Path: "dependencies.php.composer/composer"})
+					continue
+				}
+				doc.Build.Composer = &mageliftComposer{Version: strings.TrimSpace(version)}
+			}
+		}
+	}
+
+	return unmapped
 }
 
 func mapServices(source string, services map[string]any) []UnmappedKey {
@@ -247,6 +314,71 @@ func asStringMap(value any) (map[string]any, bool) {
 	}
 }
 
+func stringList(value any) ([]string, bool) {
+	var values []any
+	switch typed := value.(type) {
+	case []any:
+		values = typed
+	case []string:
+		values = make([]any, len(typed))
+		for index, item := range typed {
+			values[index] = item
+		}
+	default:
+		return nil, false
+	}
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		item, ok := value.(string)
+		if !ok {
+			return nil, false
+		}
+		item = strings.ToLower(strings.TrimSpace(item))
+		if !validPHPExtensionName(item) {
+			return nil, false
+		}
+		if _, exists := seen[item]; exists {
+			return nil, false
+		}
+		seen[item] = struct{}{}
+		result = append(result, item)
+	}
+	sort.Strings(result)
+	return result, true
+}
+
+func validPHPExtensionName(value string) bool {
+	if value == "" || value[0] < 'a' || value[0] > 'z' {
+		return false
+	}
+	for _, character := range value {
+		if character != '_' && character != '-' && (character < 'a' || character > 'z') && (character < '0' || character > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func validComposerVersion(value string) bool {
+	value = strings.TrimSuffix(strings.TrimSpace(value), "+")
+	parts := strings.Split(value, ".")
+	if len(parts) < 2 || len(parts) > 3 || parts[0] != "2" {
+		return false
+	}
+	for _, part := range parts[1:] {
+		if part == "" {
+			return false
+		}
+		for _, character := range part {
+			if character < '0' || character > '9' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func isMagentoCron(cmd string) bool {
 	c := strings.ToLower(strings.TrimSpace(cmd))
 	return strings.Contains(c, "bin/magento") && strings.Contains(c, "cron:run")
@@ -267,13 +399,62 @@ func relationshipMapped(name, value string) bool {
 	case strings.Contains(service, "rabbitmq") || strings.Contains(service, "amqp") ||
 		key == "rabbitmq" || key == "amqp" || key == "queue":
 		return true
+	case strings.Contains(service, "fastly") || strings.Contains(key, "fastly"):
+		return true
+	case observabilityProvider(key, service) != "":
+		return true
 	default:
 		return false
 	}
 }
 
+func observabilityProvider(name, typeValue string) string {
+	value := strings.ToLower(name + " " + typeValue)
+	switch {
+	case strings.Contains(value, "newrelic") || strings.Contains(value, "new-relic"):
+		return "newrelic"
+	case strings.Contains(value, "datadog"):
+		return "datadog"
+	case strings.Contains(value, "opentelemetry") || strings.Contains(value, "otel"):
+		return "otlp"
+	default:
+		return ""
+	}
+}
+
+func observabilityServiceIntent(services map[string]any) *mageliftObservability {
+	for name, raw := range services {
+		provider := observabilityProvider(name, serviceType(raw))
+		if provider == "" {
+			continue
+		}
+		return &mageliftObservability{
+			ExternalProvider: provider,
+			Logs:             true,
+			Metrics:          provider == "newrelic" || provider == "datadog",
+			Traces:           provider == "newrelic" || provider == "datadog",
+		}
+	}
+	return nil
+}
+
 func serviceMapped(name, typeValue string) bool {
 	return relationshipMapped(name, typeValue)
+}
+
+func fastlyEdgeIntent(source string, services map[string]any) (*mageliftEdge, []UnmappedKey) {
+	for name, raw := range services {
+		typeValue := strings.ToLower(serviceType(raw))
+		key := strings.ToLower(name)
+		if !strings.Contains(typeValue, "fastly") && !strings.Contains(key, "fastly") {
+			continue
+		}
+		return &mageliftEdge{ExternalProvider: "fastly", TLS: true}, []UnmappedKey{
+			{Source: source, Path: name + ".serviceId"},
+			{Source: source, Path: name + ".tokenSecret"},
+		}
+	}
+	return nil, nil
 }
 
 func sortUnmapped(keys []UnmappedKey) {

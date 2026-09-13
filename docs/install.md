@@ -41,4 +41,4 @@ Ordinary installs do not need it.
 
 - Local Magento without cloud credentials: [local vs cloud](local-vs-cloud.md)
 - Sample config: `examples/sample-shop/` in the repository
-- Cloud preview: [getting started](getting-started.md#4-aws-preview-certified)
+- Cloud preview: [getting started](getting-started.md#4-cloud-preview-certified)

@@ -71,14 +71,18 @@ type HookRetries struct {
 // PrepareRequest contains only inputs that affect artifact bytes. Credentials
 // and environment runtime values are deliberately absent from the protocol.
 type PrepareRequest struct {
-	RepositoryRoot      string          `json:"repositoryRoot"`
-	SourceRevision      string          `json:"sourceRevision"`
-	Application         Application     `json:"application"`
-	PHPVersion          string          `json:"phpVersion"`
-	CompatibilityStatus string          `json:"compatibilityStatus"`
-	InputFiles          []InputFile     `json:"inputFiles"`
-	StaticContent       []StaticContent `json:"staticContent"`
-	LifecycleHooks      []LifecycleHook `json:"lifecycleHooks,omitempty"`
+	RepositoryRoot        string          `json:"repositoryRoot"`
+	SourceRevision        string          `json:"sourceRevision"`
+	Application           Application     `json:"application"`
+	PHPVersion            string          `json:"phpVersion"`
+	PHPRequiredExtensions []string        `json:"phpExtensions,omitempty"`
+	ComposerVersion       string          `json:"composerVersion,omitempty"`
+	CompatibilityStatus   string          `json:"compatibilityStatus"`
+	RefreshModules        bool            `json:"refreshModules,omitempty"`
+	InputFiles            []InputFile     `json:"inputFiles"`
+	StaticContent         []StaticContent `json:"staticContent"`
+	LifecycleHooks        []LifecycleHook `json:"lifecycleHooks,omitempty"`
+	QualityPatches        []string        `json:"qualityPatches,omitempty"`
 }
 
 type FinalizeRequest struct {
@@ -103,6 +107,7 @@ type PrepareResponse struct {
 	PreparedArtifact            string         `json:"preparedArtifact"`
 	PHPVersion                  string         `json:"phpVersion"`
 	PHPExtensions               []string       `json:"phpExtensions"`
+	ComposerVersion             string         `json:"composerVersion"`
 	EnabledModules              []string       `json:"enabledModules"`
 	Checksums                   []FileChecksum `json:"checksums"`
 	RequiredRuntimeCapabilities []string       `json:"requiredRuntimeCapabilities"`
@@ -118,6 +123,9 @@ var sha256Digest = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 var sha256Checksum = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var sourceRevision = regexp.MustCompile(`^(?:[a-f0-9]{40}|[a-f0-9]{64})$`)
 var stableID = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
+var phpExtensionName = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
+var composerVersion = regexp.MustCompile(`^2\.\d+(?:\.\d+)?\+?$`)
+var qualityPatchID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
 func (request Request) Validate() error {
 	var problems []error
@@ -156,14 +164,42 @@ func (request PrepareRequest) validate() error {
 	}
 	if request.Application.Version == "" || request.PHPVersion == "" || request.Application.WebRuntime == "" {
 		problems = append(problems, errors.New("application version, PHP version, and web runtime are required"))
-	} else if request.Application.WebRuntime != "nginx-fpm" && request.Application.WebRuntime != "frankenphp-classic" {
-		problems = append(problems, errors.New("web runtime must be nginx-fpm or frankenphp-classic"))
+	} else {
+		switch request.Application.WebRuntime {
+		case "nginx-fpm", "frankenphp-classic", "php-apache":
+		default:
+			problems = append(problems, fmt.Errorf("web runtime plugin %q is not registered", request.Application.WebRuntime))
+		}
 	}
 	if request.CompatibilityStatus != "supported" && request.CompatibilityStatus != "unsupported-allowed" {
 		problems = append(problems, errors.New("compatibilityStatus must be supported or unsupported-allowed"))
 	}
 	if request.Application.Mode != "integrated" && request.Application.Mode != "headless" {
 		problems = append(problems, errors.New("application mode must be integrated or headless"))
+	}
+	seenExtensions := make(map[string]struct{}, len(request.PHPRequiredExtensions))
+	for _, extension := range request.PHPRequiredExtensions {
+		if !phpExtensionName.MatchString(extension) {
+			problems = append(problems, fmt.Errorf("PHP extension %q must be a lowercase extension name", extension))
+		}
+		if _, exists := seenExtensions[extension]; exists {
+			problems = append(problems, fmt.Errorf("duplicate PHP extension %q", extension))
+		}
+		seenExtensions[extension] = struct{}{}
+	}
+	if request.ComposerVersion != "" && !composerVersion.MatchString(request.ComposerVersion) {
+		problems = append(problems, fmt.Errorf("Composer version %q must be a Composer 2 major.minor or major.minor.patch version", request.ComposerVersion))
+	}
+	seenPatches := make(map[string]struct{}, len(request.QualityPatches))
+	for _, id := range request.QualityPatches {
+		if !qualityPatchID.MatchString(id) {
+			problems = append(problems, fmt.Errorf("quality patch ID %q is invalid", id))
+			continue
+		}
+		if _, exists := seenPatches[id]; exists {
+			problems = append(problems, fmt.Errorf("duplicate quality patch ID %q", id))
+		}
+		seenPatches[id] = struct{}{}
 	}
 	if len(request.InputFiles) == 0 {
 		problems = append(problems, errors.New("at least one immutable build input file is required"))
@@ -300,6 +336,9 @@ func (response PrepareResponse) validate() error {
 	if response.PHPVersion == "" {
 		problems = append(problems, errors.New("prepared PHP version is required"))
 	}
+	if !composerVersion.MatchString(response.ComposerVersion) {
+		problems = append(problems, errors.New("prepared Composer version must be a Composer 2 version"))
+	}
 	problems = append(problems, validateUniqueStrings("PHP extensions", response.PHPExtensions, false))
 	problems = append(problems, validateUniqueStrings("enabled modules", response.EnabledModules, false))
 	problems = append(problems, validateUniqueStrings("runtime capabilities", response.RequiredRuntimeCapabilities, true))
@@ -388,6 +427,8 @@ func canonicalRequest(request Request) Request {
 			}
 			return prepare.StaticContent[i].Locale < prepare.StaticContent[j].Locale
 		})
+		prepare.PHPRequiredExtensions = sortedCopy(prepare.PHPRequiredExtensions)
+		prepare.QualityPatches = append([]string(nil), prepare.QualityPatches...)
 		prepare.LifecycleHooks = append(make([]LifecycleHook, 0, len(prepare.LifecycleHooks)), prepare.LifecycleHooks...)
 		for i := range prepare.LifecycleHooks {
 			hook := &prepare.LifecycleHooks[i]

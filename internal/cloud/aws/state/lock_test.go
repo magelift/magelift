@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -119,6 +120,27 @@ func TestReleaseAcceptsEquivalentTimestampLocations(t *testing.T) {
 	}
 	if err := handle.Release(context.Background()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestReleaseDoesNotDeleteSuccessorLock(t *testing.T) {
+	fake := &fakeS3{}
+	manager, err := NewManager(fake, "state-bucket", "shop", "staging", ObjectEncryption{Mode: EncryptionKMS, KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.now = func() time.Time { return time.Unix(100, 0).UTC() }
+	handle, err := manager.Acquire(context.Background(), "shop", "staging", "ci-run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.body = []byte(`{"project":"shop","environment":"staging","owner":"ci-run-2","acquiredAt":"2026-07-21T00:00:00Z"}`)
+	fake.etag = "etag-successor"
+	if err := handle.Release(context.Background()); err == nil || !strings.Contains(err.Error(), "ownership changed") {
+		t.Fatalf("release error = %v", err)
+	}
+	if fake.delete || len(fake.body) == 0 {
+		t.Fatal("successor lock object was deleted")
 	}
 }
 

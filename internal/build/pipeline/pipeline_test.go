@@ -36,6 +36,9 @@ func TestPipelineCoordinatesBuildAndPublishesVerifiedManifest(t *testing.T) {
 	if result.Image.Digest != pipelineDigest || result.ManifestSHA256 == "" {
 		t.Fatalf("result = %#v", result)
 	}
+	if result.Runtime.PHPVersion != "8.5.4" || result.Runtime.ComposerVersion != "2.10.2" || strings.Join(result.Runtime.PHPExtensions, ",") != "intl,zend_opcache" {
+		t.Fatalf("runtime contract = %#v", result.Runtime)
+	}
 	contents, err := os.ReadFile(result.Manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -58,6 +61,68 @@ func TestPipelineCoordinatesBuildAndPublishesVerifiedManifest(t *testing.T) {
 	}
 	if len(containers.finalizeSecrets) != 0 {
 		t.Fatalf("finalize received secrets: %#v", containers.finalizeSecrets)
+	}
+}
+
+func TestPipelineRejectsPreparedRuntimeContractMismatches(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*fakeContainers)
+		want   string
+	}{
+		{
+			name: "PHP branch",
+			mutate: func(fake *fakeContainers) {
+				fake.preparePHPVersion = "8.4.99"
+			},
+			want: "prepared PHP version",
+		},
+		{
+			name: "Composer version",
+			mutate: func(fake *fakeContainers) {
+				fake.prepareComposerVersion = "2.9.2"
+			},
+			want: "prepared Composer version",
+		},
+		{
+			name: "required extension",
+			mutate: func(fake *fakeContainers) {
+				fake.prepareExtensions = []string{"curl"}
+			},
+			want: "missing requested extensions",
+		},
+		{
+			name: "canonical duplicate extension",
+			mutate: func(fake *fakeContainers) {
+				fake.prepareExtensions = []string{"opcache", "Zend OPcache"}
+			},
+			want: "duplicate extension",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := pipelineRequest(t)
+			containers := &fakeContainers{t: t, events: &[]string{}}
+			test.mutate(containers)
+			_, err := New(containers, &fakeBuilder{t: t}).Run(context.Background(), request)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Run() error = %v, want %q", err, test.want)
+			}
+			if strings.Join(*containers.events, ",") != "prepare" {
+				t.Fatalf("pipeline continued after invalid runtime contract: %v", *containers.events)
+			}
+		})
+	}
+}
+
+func TestPipelineNormalizesPreparedPHPExtensionDisplayNames(t *testing.T) {
+	containers := &fakeContainers{t: t, events: &[]string{}, prepareExtensions: []string{"Zend OPcache", "intl"}}
+	result, err := New(containers, &fakeBuilder{t: t}).Run(context.Background(), pipelineRequest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(result.Runtime.PHPExtensions, ","); got != "intl,zend_opcache" {
+		t.Fatalf("normalized PHP extensions = %q, want intl,zend_opcache", got)
 	}
 }
 
@@ -135,6 +200,37 @@ func TestPipelineCoordinatesReleaseBuild(t *testing.T) {
 	if !strings.Contains(string(applicationDockerfile), "org.opencontainers.image.source") || !strings.Contains(string(applicationDockerfile), "org.opencontainers.image.version") {
 		t.Fatal("embedded Dockerfile does not declare release labels")
 	}
+	if !strings.Contains(string(applicationDockerfile), "cp /app/app/etc/env.php /tmp/magelift-runtime-env.php") || !strings.Contains(string(applicationDockerfile), "cp /tmp/magelift-runtime-env.php /app/app/etc/env.php") {
+		t.Fatal("embedded Dockerfile does not preserve the runtime deployment scaffold")
+	}
+}
+
+func TestPipelineResultConvertsPublishedBuildToImmutableArtifactContract(t *testing.T) {
+	request := releaseRequest(t)
+	result, err := New(&fakeContainers{t: t}, &fakeBuilder{t: t, expectedRuntime: request.RuntimeImage, expectedOutput: buildkit.OutputPush}).Run(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract, err := result.ImmutableArtifactContract(strings.Repeat("a", 64), request.ProvenanceSource, "oci://registry.example/signatures/shop@sha256:"+strings.Repeat("f", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contract.ImageDigest != request.ImageReference+"@"+pipelineDigest || contract.InputFingerprint != strings.Repeat("a", 64) || !strings.HasPrefix(contract.ManifestDigest, "sha256:") {
+		t.Fatalf("immutable artifact contract = %#v", contract)
+	}
+	if err := contract.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPipelineResultRejectsLocalBuildForImmutableArtifactContract(t *testing.T) {
+	result, err := New(&fakeContainers{t: t}, &fakeBuilder{t: t}).Run(context.Background(), pipelineRequest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := result.ImmutableArtifactContract(strings.Repeat("a", 64), "https://example.invalid/source", "oci://example.invalid/signature"); err == nil || !strings.Contains(err.Error(), "confirmed image push") {
+		t.Fatalf("local artifact contract error = %v", err)
+	}
 }
 
 func TestPipelineRejectsInvalidReleaseInputsBeforePrepare(t *testing.T) {
@@ -193,6 +289,17 @@ func TestPipelineDefaultsToLocalLoadAndLegacyPlatform(t *testing.T) {
 	}
 }
 
+func TestPipelineUsesConfiguredBuildxBuilder(t *testing.T) {
+	t.Setenv("BUILDX_BUILDER", "colima")
+	builder := &fakeBuilder{t: t}
+	if _, err := New(&fakeContainers{t: t}, builder).Run(context.Background(), pipelineRequest(t)); err != nil {
+		t.Fatal(err)
+	}
+	if builder.request.Builder != "colima" {
+		t.Fatalf("Buildx builder = %q, want colima", builder.request.Builder)
+	}
+}
+
 func TestPipelineRejectsStrictProtocolAndManifestMismatches(t *testing.T) {
 	for _, test := range []struct {
 		name       string
@@ -239,18 +346,21 @@ func TestPipelineRejectsNonPrivatePrepareOutput(t *testing.T) {
 }
 
 type fakeContainers struct {
-	t                  *testing.T
-	events             *[]string
-	prepareImage       string
-	finalizeImage      string
-	prepareSecrets     []containerrunner.Secret
-	finalizeSecrets    []containerrunner.Secret
-	output             string
-	manifest           string
-	malformedPrepare   bool
-	mismatchedDigest   bool
-	mismatchedChecksum bool
-	publicOutput       bool
+	t                      *testing.T
+	events                 *[]string
+	prepareImage           string
+	finalizeImage          string
+	prepareSecrets         []containerrunner.Secret
+	finalizeSecrets        []containerrunner.Secret
+	output                 string
+	manifest               string
+	malformedPrepare       bool
+	mismatchedDigest       bool
+	mismatchedChecksum     bool
+	publicOutput           bool
+	preparePHPVersion      string
+	prepareComposerVersion string
+	prepareExtensions      []string
 }
 
 func (fake *fakeContainers) Run(_ context.Context, image, _ string, payload []byte, secrets ...containerrunner.Secret) (containerrunner.Result, error) {
@@ -289,13 +399,26 @@ func (fake *fakeContainers) Run(_ context.Context, image, _ string, payload []by
 	if fake.malformedPrepare {
 		return containerrunner.Result{OutputDir: fake.output, Response: []byte(`{"protocolVersion":1,"stage":"prepare","prepare":{},"extra":true}`)}, nil
 	}
+	phpVersion := fake.preparePHPVersion
+	if phpVersion == "" {
+		phpVersion = "8.5.4"
+	}
+	composerVersion := fake.prepareComposerVersion
+	if composerVersion == "" {
+		composerVersion = "2.10.2"
+	}
+	extensions := fake.prepareExtensions
+	if extensions == nil {
+		extensions = []string{"Zend OPcache", "intl"}
+	}
 	response, err := buildrunner.EncodeResponse(buildrunner.Response{
 		ProtocolVersion: buildrunner.ProtocolVersion,
 		Stage:           buildrunner.StagePrepare,
 		Prepare: &buildrunner.PrepareResponse{
 			PreparedArtifact:            filepath.ToSlash(preparedPath),
-			PHPVersion:                  "8.5.4",
-			PHPExtensions:               []string{"intl"},
+			PHPVersion:                  phpVersion,
+			PHPExtensions:               extensions,
+			ComposerVersion:             composerVersion,
 			EnabledModules:              []string{"Magento_Catalog"},
 			Checksums:                   []buildrunner.FileChecksum{{Path: "vendor/autoload.php", SHA256: strings.Repeat("d", 64)}},
 			RequiredRuntimeCapabilities: []string{"database.mysql"},
@@ -412,7 +535,7 @@ func pipelineRequest(t *testing.T) Request {
 	file, err := config.Load([]byte(`schemaVersion: 1
 project: {name: shop}
 application: {edition: open-source, version: 2.4.9, mode: integrated}
-build: {php: "8.5"}
+build: {php: "8.5", extensions: [intl, opcache], composer: {version: "2.10+"}}
 target: {provider: aws, runtime: ecs-fargate}
 defaults: {region: eu-west-3, preset: preview}
 environments:

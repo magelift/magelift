@@ -75,6 +75,7 @@ type Args struct {
 	ExecutionRoleARN   pulumi.StringInput
 	TaskRoleARN        pulumi.StringInput
 	LogGroupPrefix     string
+	LogRetentionDays   int
 	PrivateSubnetCount int
 }
 
@@ -201,9 +202,16 @@ func provisionECSBroker(ctx *pulumi.Context, name, mode string, args Args, compo
 	if err != nil {
 		return fmt.Errorf("create broker ECS cluster: %w", err)
 	}
+	logRetentionDays := args.LogRetentionDays
+	if logRetentionDays <= 0 {
+		// Direct component callers that do not use the stack catalog retain the
+		// historical bounded default. The AWS stack supplies the resolved YAML
+		// retention value.
+		logRetentionDays = 14
+	}
 	logGroup, err := cloudwatch.NewLogGroup(ctx, name+"-broker-logs", &cloudwatch.LogGroupArgs{
 		Name:            pulumi.String(args.LogGroupPrefix + "/broker"),
-		RetentionInDays: pulumi.Int(14),
+		RetentionInDays: pulumi.Int(logRetentionDays),
 		Region:          pulumi.String(args.Region),
 		Tags:            pulumi.ToStringMap(tags(args.Tags, name)),
 	}, child...)
@@ -303,7 +311,17 @@ func lookupPassword(ctx *pulumi.Context, region, arn string, provider *awsprovid
 	secret := secretsmanager.LookupSecretVersionOutput(ctx, secretsmanager.LookupSecretVersionOutputArgs{
 		Region: pulumi.String(region), SecretId: pulumi.String(arn), VersionStage: pulumi.String("AWSCURRENT"),
 	}, pulumi.Provider(provider))
-	return pulumi.ToSecret(secret.SecretString()).(pulumi.StringOutput)
+	password := secret.SecretString().ApplyT(func(raw string) string {
+		return normalizeBrokerPassword(raw)
+	}).(pulumi.StringOutput)
+	return pulumi.ToSecret(password).(pulumi.StringOutput)
+}
+
+// normalizeBrokerPassword strips CR/LF that openssl and file:// secret
+// writes leave behind. Amazon MQ CreateBroker rejects any byte outside
+// ASCII printable (0x20-0x7E), including a trailing newline.
+func normalizeBrokerPassword(value string) string {
+	return strings.TrimSpace(value)
 }
 
 func validate(name, mode string, args Args) error {

@@ -7,40 +7,31 @@ import (
 	"os"
 
 	"github.com/magelift/magelift/internal/cloud/kube"
-	"github.com/magelift/magelift/internal/config"
+	scalewaycost "github.com/magelift/magelift/internal/cloud/scaleway/cost"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
 )
 
-// unsupported covers remaining experimental gaps: Bootstrap, Secrets, Cost only.
+// unsupported covers the remaining experimental gap: Bootstrap only.
 // Observe/Steps/State live on shared kube / concrete State adapters (D-05).
 type unsupported struct{}
 
 func (Module) Bootstrap() platform.Bootstrap { return unsupported{} }
 func (Module) State() platform.State         { return State{} }
-func (Module) Secrets() platform.Secrets     { return unsupported{} }
+func (Module) Secrets() platform.Secrets     { return Secrets{} }
 func (Module) RuntimeObserve() platform.RuntimeObserve {
 	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
 }
-func (Module) CostEstimator() platform.CostEstimator { return unsupported{} }
+func (Module) RuntimeTunnel() platform.RuntimeTunnel {
+	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
+}
+func (Module) CostEstimator() platform.CostEstimator { return scalewaycost.Estimator{} }
 
 func (unsupported) VerifyAccount(context.Context, platform.PlannedStack) error {
 	return platform.ErrNotSupported
 }
 func (unsupported) Ensure(context.Context, platform.PlannedStack, platform.BootstrapRequest) (platform.BootstrapResult, error) {
 	return platform.BootstrapResult{}, platform.ErrNotSupported
-}
-func (unsupported) List(context.Context, platform.PlannedStack) ([]platform.SecretMeta, error) {
-	return nil, platform.ErrNotSupported
-}
-func (unsupported) Set(context.Context, platform.PlannedStack, string, []byte) error {
-	return platform.ErrNotSupported
-}
-func (unsupported) Remove(context.Context, platform.PlannedStack, string) error {
-	return platform.ErrNotSupported
-}
-func (unsupported) Estimate(context.Context, platform.PlannedStack, config.Config, platform.CostOptions) (platform.CostReport, error) {
-	return platform.CostReport{}, platform.ErrNotSupported
 }
 
 // Ops remains Magento deploy-only; day-2 ports are separate Has* interfaces.
@@ -69,13 +60,15 @@ func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.P
 	}
 	spec := scwPlanned.Spec
 	deploySpec := kube.DeploySpec{
-		ImageDigest:     spec.Artifact.ImageDigest,
-		DatabaseName:    spec.Dependencies.DatabaseName,
-		ApplicationMode: spec.Application.Mode,
-		WebRuntime:      spec.Application.WebRuntime,
-		CPURequest:      spec.Catalog.CPURequest,
-		MemoryRequest:   spec.Catalog.MemoryRequest,
-		Region:          spec.Identity.Region,
+		ImageDigest:        spec.Artifact.ImageDigest,
+		DatabaseName:       spec.Dependencies.DatabaseName,
+		ApplicationMode:    spec.Application.Mode,
+		ApplicationVersion: spec.Application.Version,
+		WebRuntime:         spec.Application.WebRuntime,
+		Magento:            spec.Application.Magento,
+		CPURequest:         spec.Catalog.CPURequest,
+		MemoryRequest:      spec.Catalog.MemoryRequest,
+		Region:             spec.Identity.Region,
 	}
 	newCandidate := o.NewCandidate
 	if newCandidate == nil {

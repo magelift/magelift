@@ -25,6 +25,8 @@ type Args struct {
 type Component struct {
 	pulumi.ResourceState
 	NetworkID          pulumi.StringOutput
+	GatewayID          pulumi.StringOutput
+	GatewayIP          pulumi.StringOutput
 	PrivateSubnetIDs   pulumi.StringArrayOutput
 	PrivateSubnetNames pulumi.StringArrayOutput
 	NetworkName        pulumi.StringOutput
@@ -42,7 +44,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 
-	component := &Component{}
+	component := &Component{
+		// Keep optional outputs concrete when this region uses floating IPs and
+		// no custom gateway resource is created.
+		GatewayID: pulumi.String("").ToStringOutput(),
+		GatewayIP: pulumi.String("").ToStringOutput(),
+	}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{
 		"serviceName": pulumi.String(args.ServiceName),
 		"region":      pulumi.String(args.Region),
@@ -62,40 +69,92 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	subnetIDs := make(pulumi.StringArray, 0, len(args.Zones))
 	subnetNames := make(pulumi.StringArray, 0, len(args.Zones))
+	subnets := make([]pulumi.Resource, 0, len(args.Zones))
 	for index, zone := range args.Zones {
 		cidr, err := subnetCIDR(prefix, index)
 		if err != nil {
 			return nil, err
 		}
+		gatewayIP, err := subnetGatewayIP(cidr)
+		if err != nil {
+			return nil, err
+		}
 		subnetName := fmt.Sprintf("%s-%s", name, strings.ToLower(zone))
 		subnet, err := cloudproject.NewNetworkPrivateSubnetV2(ctx, subnetName, &cloudproject.NetworkPrivateSubnetV2Args{
-			ServiceName:     pulumi.String(args.ServiceName),
-			NetworkId:       network.ID().ToStringOutput(),
+			ServiceName: pulumi.String(args.ServiceName),
+			// OVH's global private-network ID has the pn-* form. Regional
+			// subnet, database, and MKS APIs require the region's OpenStack UUID.
+			NetworkId:       network.RegionsOpenstackIds.MapIndex(pulumi.String(args.Region)),
 			Name:            pulumi.String(subnetName),
 			Region:          pulumi.String(args.Region),
 			Cidr:            pulumi.String(cidr),
 			Dhcp:            pulumi.Bool(true),
 			EnableGatewayIp: pulumi.Bool(true),
+			GatewayIp:       pulumi.String(gatewayIP),
 		}, parent, pulumi.DependsOn([]pulumi.Resource{network}))
 		if err != nil {
 			return nil, fmt.Errorf("create OVH subnet %s: %w", zone, err)
 		}
+		subnets = append(subnets, subnet)
 		subnetIDs = append(subnetIDs, subnet.ID().ToStringOutput())
 		subnetNames = append(subnetNames, subnet.Name)
 	}
 
-	component.NetworkID = network.ID().ToStringOutput()
+	// Consumers of this component call regional OVH APIs, which expect the
+	// OpenStack UUID rather than NetworkPrivate's global pn-* resource ID.
+	component.NetworkID = network.RegionsOpenstackIds.MapIndex(pulumi.String(args.Region))
+	// MKS requires a real OpenStack gateway on a nodes subnet. The subnet's
+	// gatewayIp is only DHCP metadata and does not satisfy that requirement.
+	// Keep the gateway inside this component so it is deleted with the test
+	// network and never becomes an untracked billable orphan.
+	gateway, err := cloudproject.NewGateway(ctx, name+"-gateway", &cloudproject.GatewayArgs{
+		ServiceName: pulumi.String(args.ServiceName),
+		Name:        pulumi.String(name + "-gateway"),
+		Model:       pulumi.String("s"),
+		NetworkId:   network.RegionsOpenstackIds.MapIndex(pulumi.String(args.Region)),
+		Region:      pulumi.String(args.Region),
+		SubnetId:    subnetIDs[0],
+	}, parent, pulumi.DependsOn(subnets))
+	if err != nil {
+		return nil, fmt.Errorf("create OVH network gateway: %w", err)
+	}
+	component.GatewayID = gateway.ID().ToStringOutput()
+	// OVH MKS expects the gateway IP advertised by the nodes subnet, not the
+	// gateway resource ID. The first subnet is the MKS nodes subnet.
+	firstSubnetCIDR, err := subnetCIDR(prefix, 0)
+	if err != nil {
+		return nil, err
+	}
+	firstGatewayIP, err := subnetGatewayIP(firstSubnetCIDR)
+	if err != nil {
+		return nil, err
+	}
+	component.GatewayIP = pulumi.String(firstGatewayIP).ToStringOutput()
 	component.NetworkName = network.Name
 	component.PrivateSubnetIDs = subnetIDs.ToStringArrayOutput()
 	component.PrivateSubnetNames = subnetNames.ToStringArrayOutput()
 
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
 		"networkId":        component.NetworkID,
+		"gatewayId":        component.GatewayID,
+		"gatewayIp":        component.GatewayIP,
 		"privateSubnetIds": component.PrivateSubnetIDs,
 	}); err != nil {
 		return nil, err
 	}
 	return component, nil
+}
+
+func subnetGatewayIP(cidr string) (string, error) {
+	prefix, err := netip.ParsePrefix(cidr)
+	if err != nil || !prefix.Addr().Is4() {
+		return "", fmt.Errorf("subnet CIDR must be IPv4: %w", err)
+	}
+	gateway := prefix.Addr().Next()
+	if !gateway.IsValid() || !prefix.Contains(gateway) {
+		return "", fmt.Errorf("subnet CIDR %s has no usable gateway address", cidr)
+	}
+	return gateway.String(), nil
 }
 
 // validateSubnetCarve ensures NetworkCIDR is IPv4 and can hold one /24 per zone.

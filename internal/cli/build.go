@@ -21,24 +21,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type composerSecretProvider interface {
+// ComposerSecretProvider resolves Composer credentials from supported secret
+// reference backends.
+type ComposerSecretProvider interface {
 	secretref.SecretsManagerProvider
 	secretref.ParameterStoreProvider
 }
 
-type gcpComposerSecretAdapter struct {
-	store interface {
-		GetSecretValue(context.Context, string) ([]byte, error)
-	}
-}
-
-func (a gcpComposerSecretAdapter) GetSecretValue(ctx context.Context, id string) ([]byte, error) {
-	return a.store.GetSecretValue(ctx, id)
-}
-
-func (a gcpComposerSecretAdapter) GetParameter(context.Context, string) ([]byte, error) {
-	return nil, errors.New("GCP Secret Manager does not resolve Parameter Store references")
-}
+type composerSecretProvider = ComposerSecretProvider
 
 func buildCommand(o *options) *cobra.Command {
 	var push bool
@@ -60,6 +50,9 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
+		if err := requireDependencies(cmd.Context(), o, toolchain.SpecsForBuild(push), "local build"); err != nil {
+			return err
+		}
 		repository, err := (source.GitInspector{}).Inspect(cmd.Context(), filepath.Dir(o.configPath))
 		if err != nil {
 			return invalid(err)
@@ -80,6 +73,10 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		tempRoot, err := buildTempRoot(artifactDirectory)
+		if err != nil {
+			return err
+		}
 		request, err := buildPipelineRequest(buildRequestOptions{
 			Push:              push,
 			ImageReference:    imageReference,
@@ -95,9 +92,11 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
+		builder := buildkit.NewRunner(o.stderr)
+		builder.TempRoot = tempRoot
 		pipeline := buildpipeline.New(
-			buildpipeline.ContainerAdapter{Stderr: o.stderr, Network: "bridge"},
-			buildkit.NewRunner(o.stderr),
+			buildpipeline.ContainerAdapter{TempRoot: tempRoot, Stderr: o.stderr, Network: "bridge"},
+			builder,
 		)
 		request.Config = file
 		request.MageLiftVersion = Version
@@ -116,7 +115,7 @@ func buildCommand(o *options) *cobra.Command {
 				_ = os.Remove(result.Manifest)
 				return &exitError{code: 3, err: err}
 			}
-			if err := cosign.New().Sign(cmd.Context(), reference); err != nil {
+			if err := o.signDigest(cmd.Context(), reference, ""); err != nil {
 				_ = os.Remove(result.Manifest)
 				return &exitError{code: 3, err: fmt.Errorf("sign pushed image: %w", err)}
 			}
@@ -323,6 +322,22 @@ func artifactDirectory() (string, error) {
 		return "", fmt.Errorf("create artifact directory: %w", err)
 	}
 	return directory, nil
+}
+
+func buildTempRoot(artifactDirectory string) (string, error) {
+	root := filepath.Join(filepath.Dir(artifactDirectory), "tmp")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		return "", fmt.Errorf("create private build temp directory: %w", err)
+	}
+	info, err := os.Stat(root)
+	if err != nil {
+		return "", fmt.Errorf("inspect private build temp directory: %w", err)
+	}
+	if !info.IsDir() || info.Mode().Perm()&0o077 != 0 {
+		return "", errors.New("private build temp directory must be a mode 700 directory")
+	}
+
+	return root, nil
 }
 
 func localLinuxPlatform() (string, error) {

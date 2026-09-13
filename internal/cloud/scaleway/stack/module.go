@@ -9,7 +9,9 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
-type Module struct{}
+type Module struct {
+	platform.LifecycleFactories
+}
 
 type Planned struct {
 	Spec Spec
@@ -48,6 +50,10 @@ func (Module) Descriptor() sdk.TargetDescriptor {
 
 func (Module) CertificationTier() platform.CertificationTier { return platform.TierExperimental }
 
+// PlanAdmission resolves current Scaleway catalog availability before the
+// Pulumi program can begin any paid resource mutation.
+func (Module) PlanAdmission() platform.PlanAdmission { return RegionAdmission{} }
+
 func (Module) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
 	spec, err := PlanFromConfigWithOptions(cfg, environment, PlanOptions{AllowExpiredPreview: opts.AllowExpiredPreview})
 	if err != nil {
@@ -65,5 +71,6 @@ func (Module) Program(planned platform.PlannedStack) (pulumi.RunFunc, error) {
 }
 
 func (Module) OutputKeys() []string {
-	return platform.RequiredOutputKeys()
+	keys := append([]string(nil), platform.RequiredOutputKeys()...)
+	return append(keys, platform.OutputDatabaseSecretName, platform.OutputEncryptionKeySecretName)
 }

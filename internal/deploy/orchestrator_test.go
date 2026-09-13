@@ -12,15 +12,17 @@ import (
 )
 
 type fakeLock struct {
-	order *[]string
-	owned bool
+	order           *[]string
+	owned           bool
+	releaseCanceled bool
 }
 
 func (l *fakeLock) Acquire(context.Context, Request) (func(context.Context) error, error) {
 	*l.order = append(*l.order, "lock.acquire")
 	l.owned = true
-	return func(context.Context) error {
+	return func(ctx context.Context) error {
 		*l.order = append(*l.order, "lock.release")
+		l.releaseCanceled = ctx.Err() != nil
 		l.owned = false
 		return nil
 	}, nil
@@ -93,6 +95,62 @@ func TestFailureStillReleasesLock(t *testing.T) {
 	_, err := New(&fakeLock{order: &order}, &fakeSteps{order: &order, fail: "stabilize"}).Run(context.Background(), validRequest())
 	if err == nil || order[len(order)-2] != "cleanup" || order[len(order)-1] != "lock.release" {
 		t.Fatalf("error or release order is incorrect: %v %v", err, order)
+	}
+}
+
+func TestRunJoinsPrimaryErrorWithLockReleaseFailure(t *testing.T) {
+	order := []string{}
+	releaseErr := errors.New("unlock failed")
+	lock := &fakeLock{order: &order}
+	lockFail := &failingReleaseLock{fakeLock: lock, releaseErr: releaseErr}
+	_, err := New(lockFail, &fakeSteps{order: &order, fail: "stabilize"}).Run(context.Background(), validRequest())
+	if err == nil {
+		t.Fatal("expected joined error")
+	}
+	if !strings.Contains(err.Error(), "stabilize failed") || !strings.Contains(err.Error(), "unlock failed") {
+		t.Fatalf("joined error missing causes: %v", err)
+	}
+	if !errors.Is(err, ErrLockRelease) {
+		t.Fatalf("expected ErrLockRelease in chain, got %v", err)
+	}
+}
+
+type failingReleaseLock struct {
+	*fakeLock
+	releaseErr error
+}
+
+func (l *failingReleaseLock) Acquire(ctx context.Context, request Request) (func(context.Context) error, error) {
+	release, err := l.fakeLock.Acquire(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	return func(ctx context.Context) error {
+		_ = release(ctx)
+		return l.releaseErr
+	}, nil
+}
+
+type cancelingSteps struct {
+	*fakeSteps
+	cancel context.CancelFunc
+}
+
+func (s *cancelingSteps) Preview(ctx context.Context, request Request) (automation.ChangeSummary, error) {
+	s.cancel()
+	return s.fakeSteps.Preview(ctx, request)
+}
+
+func TestLockReleaseSurvivesContextCancellation(t *testing.T) {
+	order := []string{}
+	ctx, cancel := context.WithCancel(context.Background())
+	lock := &fakeLock{order: &order}
+	steps := &cancelingSteps{fakeSteps: &fakeSteps{order: &order}, cancel: cancel}
+	if _, err := New(lock, steps).Run(ctx, validRequest()); err != nil {
+		t.Fatal(err)
+	}
+	if lock.releaseCanceled {
+		t.Fatal("deployment lock release inherited the canceled deployment context")
 	}
 }
 

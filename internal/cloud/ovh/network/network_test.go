@@ -116,6 +116,17 @@ func TestSubnetCIDRRejectsNarrowerThanSlash24(t *testing.T) {
 	}
 }
 
+func TestSubnetGatewayIPUsesFirstUsableAddress(t *testing.T) {
+	t.Parallel()
+	got, err := subnetGatewayIP("10.30.4.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "10.30.4.1" {
+		t.Fatalf("gateway = %s, want 10.30.4.1", got)
+	}
+}
+
 func TestValidateSubnetCarveAcceptsSixteenZonesOnSlash16(t *testing.T) {
 	t.Parallel()
 	zones := make([]string, 16)

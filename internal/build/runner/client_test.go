@@ -72,7 +72,7 @@ func TestRunnerHelperProcess(t *testing.T) {
 	if stage == StagePrepare {
 		response.Prepare = &PrepareResponse{
 			PreparedArtifact: "dist/rootfs.tar", PHPVersion: "8.5.1",
-			PHPExtensions: []string{"intl"}, EnabledModules: []string{"Magento_Catalog"},
+			PHPExtensions: []string{"intl"}, ComposerVersion: "2.10.2", EnabledModules: []string{"Magento_Catalog"},
 			Checksums:                   []FileChecksum{{Path: "composer.lock", SHA256: strings.Repeat("a", 64)}},
 			RequiredRuntimeCapabilities: []string{"database.mysql"},
 		}

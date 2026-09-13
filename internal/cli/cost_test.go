@@ -19,16 +19,19 @@ import (
 const costNotSupportedPrefix = "cost estimation is not supported for target aws/ecs-fargate yet"
 
 type recordingCostEstimator struct {
-	lastLive *bool
-	calls    int
-	report   platform.CostReport
-	err      error
+	lastLive   *bool
+	lastBudget *bool
+	calls      int
+	report     platform.CostReport
+	err        error
 }
 
 func (e *recordingCostEstimator) Estimate(_ context.Context, _ platform.PlannedStack, _ config.Config, opts platform.CostOptions) (platform.CostReport, error) {
 	e.calls++
 	live := opts.Live
 	e.lastLive = &live
+	budget := opts.Budget
+	e.lastBudget = &budget
 	return e.report, e.err
 }
 
@@ -100,6 +103,22 @@ func TestCostLiveFlag(t *testing.T) {
 				t.Fatalf("calls=%d live=%v want live=%v", estimator.calls, estimator.lastLive, tt.live)
 			}
 		})
+	}
+}
+
+func TestCostBudgetFlag(t *testing.T) {
+	path := writeCostConfig(t, starterConfig)
+	var out bytes.Buffer
+	estimator := &recordingCostEstimator{report: sampleCostReport()}
+	o := testOptions(&out, nil)
+	o.testCostEstimator = estimator
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "cost", "--budget"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if estimator.lastBudget == nil || !*estimator.lastBudget {
+		t.Fatalf("budget option was not propagated: %#v", estimator)
 	}
 }
 
@@ -203,7 +222,7 @@ func TestCostModuleWithoutEstimatorExits2(t *testing.T) {
 
 func TestCostUnregisteredTargetFailsBeforeEstimator(t *testing.T) {
 	// gcp/gke-autopilot validates in config but is not registered by registerTestModules
-	// (aws/eks-autopilot is registered for tier-keyed experimental warning tests).
+	// (aws/eks is registered for tier-keyed experimental warning tests).
 	contents := `schemaVersion: 1
 project:
   name: example-shop

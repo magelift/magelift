@@ -25,6 +25,7 @@ final class NativePreparationTest extends TestCase
         mkdir($source.'/vendor', 0o700, true);
         file_put_contents($source.'/app/etc/config.php', "<?php\nreturn ['modules' => ['Vendor_Custom' => 1, 'Magento_Catalog' => 0]];\n");
         file_put_contents($source.'/vendor/autoload.php', '<?php return true;');
+        symlink($source.'/source-only.txt', $source.'/vendor/source-only-link.txt');
         file_put_contents($source.'/source-only.txt', 'unchanged');
         mkdir($source.'/.git', 0o700);
         mkdir($source.'/.magelift', 0o700);
@@ -53,6 +54,7 @@ final class NativePreparationTest extends TestCase
         self::assertFileDoesNotExist($workspace.'/rootfs/.git/config');
         self::assertFileDoesNotExist($workspace.'/rootfs/.magelift/state.json');
         self::assertFileDoesNotExist($workspace.'/rootfs/magelift.yaml');
+        self::assertFileExists($workspace.'/rootfs/vendor/autoload.php');
         self::assertFileDoesNotExist($source.'/generated');
         self::assertSame('unchanged', file_get_contents($source.'/source-only.txt'));
     }
@@ -82,6 +84,46 @@ final class NativePreparationTest extends TestCase
             self::assertDirectoryDoesNotExist($workspace.'/rootfs');
             self::assertSame([], $runner->requests);
         }
+    }
+
+    public function testRejectsMissingRequiredExtensionBeforeCreatingWorkspace(): void
+    {
+        [$source, $workspace] = self::minimalSource();
+        $runner = new SuccessfulRunner();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('missing required extensions: magelift_missing');
+        try {
+            (new NativePreparation($runner, $workspace, new FixedCapabilities(), new ConfigModuleReader()))
+                ->prepare(PrepareRequest::fromJson(str_replace(
+                    '"staticContent":[]',
+                    '"phpExtensions":["magelift_missing"],"staticContent":[]',
+                    self::request($source),
+                )));
+        } finally {
+            self::assertDirectoryDoesNotExist($workspace.'/rootfs');
+            self::assertSame([], $runner->requests);
+        }
+    }
+
+    public function testChecksTheRequestedComposerVersionBeforeLifecycle(): void
+    {
+        [$source, $workspace] = self::minimalSource();
+        mkdir($source.'/app/etc', 0o700, true);
+        mkdir($source.'/vendor', 0o700, true);
+        file_put_contents($source.'/app/etc/config.php', "<?php\nreturn ['modules' => ['Vendor_Custom' => 1]];\n");
+        file_put_contents($source.'/vendor/autoload.php', '<?php return true;');
+        $runner = new ComposerVersionRunner();
+        $request = str_replace(
+            '"staticContent":[]',
+            '"phpExtensions":["mbstring","opcache"],"composerVersion":"2.10","staticContent":[]',
+            self::request($source),
+        );
+
+        (new NativePreparation($runner, $workspace, new FixedCapabilities(), new ConfigModuleReader()))
+            ->prepare(PrepareRequest::fromJson($request));
+
+        self::assertSame(['composer', '--version', '--no-ansi'], $runner->requests[0]->argv);
     }
 
     public function testRejectsSymlinkedMagentoEnvironmentBeforeCreatingWorkspace(): void
@@ -117,7 +159,7 @@ final class NativePreparationTest extends TestCase
             (new NativePreparation($runner, $workspace, new FixedCapabilities(), new ConfigModuleReader()))
                 ->prepare(PrepareRequest::fromJson(self::request($source)));
         } finally {
-            self::assertCount(3, $runner->requests);
+            self::assertCount(5, $runner->requests);
         }
     }
 
@@ -137,7 +179,10 @@ final class NativePreparationTest extends TestCase
         (new NativePreparation($runner, $workspace, new FixedCapabilities(), new ConfigModuleReader()))
             ->prepare(PrepareRequest::fromJson($request));
 
-        self::assertSame(['composer', 'run-script', 'prepare'], $runner->requests[2]->argv);
+        self::assertContains(
+            ['composer', 'run-script', 'prepare'],
+            array_map(static fn (ProcessRequest $process): array => $process->argv, $runner->requests),
+        );
     }
 
     public function testExecutesConfiguredStaticContentMatrix(): void
@@ -157,11 +202,11 @@ final class NativePreparationTest extends TestCase
             ->prepare(PrepareRequest::fromJson($request));
 
         self::assertContains(
-            ['bin/magento', 'setup:static-content:deploy', '--language', 'en_US', '--theme', 'Magento/blank', '--no-interaction'],
+            ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'en_US', '--theme', 'Magento/blank', '--no-interaction'],
             array_map(static fn (ProcessRequest $process): array => $process->argv, $runner->requests),
         );
         self::assertContains(
-            ['bin/magento', 'setup:static-content:deploy', '--language', 'fr_FR', '--theme', 'Vendor/theme', '--no-interaction'],
+            ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'fr_FR', '--theme', 'Vendor/theme', '--no-interaction'],
             array_map(static fn (ProcessRequest $process): array => $process->argv, $runner->requests),
         );
     }
@@ -183,7 +228,7 @@ final class NativePreparationTest extends TestCase
             ->prepare(PrepareRequest::fromJson($request));
 
         self::assertContains(
-            ['bin/magento', 'setup:static-content:deploy', '--language', 'en_US', '--theme', 'Magento/blank', '-s', 'standard', '-j', '2', '--no-interaction'],
+            ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'en_US', '--theme', 'Magento/blank', '-s', 'standard', '-j', '2', '--no-interaction'],
             array_map(static fn (ProcessRequest $process): array => $process->argv, $runner->requests),
         );
     }
@@ -225,6 +270,31 @@ final class NativePreparationTest extends TestCase
         );
     }
 
+    public function testStopsBeforeCompileWhenQualityPatchToolRejectsAnId(): void
+    {
+        [$source, $workspace] = self::minimalSource();
+        mkdir($source.'/vendor', 0o700, true);
+        file_put_contents($source.'/app/etc/config.php', "<?php\nreturn ['modules' => ['Vendor_Custom' => 1]];\n");
+        file_put_contents($source.'/vendor/autoload.php', '<?php return true;');
+        file_put_contents($source.'/composer.lock', json_encode([
+            'packages' => [['name' => 'magento/quality-patches']],
+        ], JSON_THROW_ON_ERROR));
+        file_put_contents($source.'/.magento.env.yaml', "stage:\n  build:\n    QUALITY_PATCHES:\n      - ACSD-999\n");
+        $runner = new QualityPatchFailureRunner();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('ACSD-123 is unavailable');
+        try {
+            $json = str_replace('"staticContent":[]', '"staticContent":[],"qualityPatches":["ACSD-123"]', self::request($source));
+            (new NativePreparation($runner, $workspace, new FixedCapabilities(), new ConfigModuleReader()))
+                ->prepare(PrepareRequest::fromJson($json));
+        } finally {
+            $argv = array_map(static fn (ProcessRequest $process): array => $process->argv, $runner->requests);
+            self::assertContains(['php', 'vendor/bin/magento-patches', 'apply', 'ACSD-123'], $argv);
+            self::assertNotContains(['bin/magento', 'setup:di:compile'], $argv);
+        }
+    }
+
     /** @return array{string, string} */
     private static function minimalSource(): array
     {
@@ -239,7 +309,7 @@ final class NativePreparationTest extends TestCase
     private static function request(string $root): string
     {
         [$major, $minor] = explode('.', PHP_VERSION);
-        return '{"protocolVersion":1,"stage":"prepare","prepare":{"repositoryRoot":"'.$root.'","sourceRevision":"'.str_repeat('a', 40).'","application":{"edition":"open-source","version":"2.4.9","mode":"integrated","webRuntime":"nginx-fpm"},"phpVersion":"'.$major.'.'.$minor.'","compatibilityStatus":"supported","inputFiles":[{"path":"source-only.txt","sha256":"'.hash('sha256', 'unchanged').'"}],"staticContent":[]}}';
+        return '{"protocolVersion":1,"stage":"prepare","prepare":{"repositoryRoot":"'.$root.'","sourceRevision":"'.str_repeat('a', 40).'","application":{"edition":"open-source","version":"2.4.9","mode":"integrated","webRuntime":"nginx-fpm"},"phpVersion":"'.$major.'.'.$minor.'","composerVersion":"2.10","compatibilityStatus":"supported","inputFiles":[{"path":"source-only.txt","sha256":"'.hash('sha256', 'unchanged').'"}],"staticContent":[]}}';
     }
 }
 
@@ -251,8 +321,24 @@ final class SuccessfulRunner implements ProcessRunner
     public function run(ProcessRequest $request): ProcessResult
     {
         $this->requests[] = $request;
+        if ($request->argv === ['composer', '--version', '--no-ansi']) {
+            return new ProcessResult(0, "Composer version 2.10.2 2026-07-01 11:24:45\n", '');
+        }
+        self::materializeComposerOutput($request);
 
         return new ProcessResult(0, '', '');
+    }
+
+    public static function materializeComposerOutput(ProcessRequest $request): void
+    {
+        if ($request->argv === ['composer', '--version', '--no-ansi']) {
+            return;
+        }
+        if ($request->argv[0] !== 'composer' || $request->argv[1] !== 'install') {
+            return;
+        }
+        mkdir($request->workingDirectory.'/vendor', 0o700, true);
+        file_put_contents($request->workingDirectory.'/vendor/autoload.php', '<?php return true;');
     }
 }
 
@@ -264,8 +350,49 @@ final class FailingRunner implements ProcessRunner
     public function run(ProcessRequest $request): ProcessResult
     {
         $this->requests[] = $request;
+        if ($request->argv === ['composer', '--version', '--no-ansi']) {
+            return new ProcessResult(0, "Composer version 2.10.2 2026-07-01 11:24:45\n", '');
+        }
 
-        return new ProcessResult(count($this->requests) === 3 ? 17 : 0, '', 'failed');
+        return new ProcessResult(count($this->requests) === 5 ? 17 : 0, '', 'failed');
+    }
+}
+
+final class ComposerVersionRunner implements ProcessRunner
+{
+    /** @var list<ProcessRequest> */
+    public array $requests = [];
+
+    public function run(ProcessRequest $request): ProcessResult
+    {
+        $this->requests[] = $request;
+        if ($request->argv === ['composer', '--version', '--no-ansi']) {
+            return new ProcessResult(0, "Composer version 2.10.2 2026-07-01 11:24:45\n", '');
+        }
+
+        SuccessfulRunner::materializeComposerOutput($request);
+
+        return new ProcessResult(0, '', '');
+    }
+}
+
+final class QualityPatchFailureRunner implements ProcessRunner
+{
+    /** @var list<ProcessRequest> */
+    public array $requests = [];
+
+    public function run(ProcessRequest $request): ProcessResult
+    {
+        $this->requests[] = $request;
+        if ($request->argv === ['composer', '--version', '--no-ansi']) {
+            return new ProcessResult(0, "Composer version 2.10.2 2026-07-01 11:24:45\n", '');
+        }
+        SuccessfulRunner::materializeComposerOutput($request);
+        if ($request->argv === ['php', 'vendor/bin/magento-patches', 'apply', 'ACSD-123']) {
+            return new ProcessResult(17, '', 'ACSD-123 is unavailable');
+        }
+
+        return new ProcessResult(0, '', '');
     }
 }
 

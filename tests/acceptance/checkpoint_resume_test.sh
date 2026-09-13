@@ -30,7 +30,15 @@ CELL1="${CELLS[0]}"
 CELL2="${CELLS[1]}"
 
 acceptance_checkpoint_ensure
+export MAGELIFT_ACCEPTANCE_PROVIDER_OPERATION_IDS=operation-1
+export MAGELIFT_ACCEPTANCE_BACKUP_IDS=backup-1
+export MAGELIFT_ACCEPTANCE_RESTORE_IDS=restore-1
+export MAGELIFT_ACCEPTANCE_EDGE_IDENTITIES=edge-1
+export MAGELIFT_ACCEPTANCE_OBSERVABILITY_IDENTITIES=telemetry-1
+export MAGELIFT_ACCEPTANCE_CLEANUP_STATE=complete
 record_cell "$CELL1" "PASS"
+
+jq -e --arg cell "$CELL1" '.version == 4 and .cells[$cell].providerOperationIds == ["operation-1"] and .cells[$cell].backupIds == ["backup-1"] and .cells[$cell].restoreIds == ["restore-1"] and .cells[$cell].edgeIdentities == ["edge-1"] and .cells[$cell].observabilityIdentities == ["telemetry-1"] and .cells[$cell].cleanupState == "complete"' "$ACCEPTANCE_CHECKPOINT" >/dev/null
 
 LOG="$TMP/harness.log"
 set +e

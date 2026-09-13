@@ -6,13 +6,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/magelift/magelift/internal/cloud/aws/network"
+	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
 	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 const (
-	RuntimeID = "eks-autopilot"
-	TargetID  = "aws.eks-autopilot"
+	RuntimeID = "eks"
+	TargetID  = "aws.eks"
 )
 
 type PlanOptions struct {
@@ -32,6 +35,12 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	}
 	if cfg.Target.AWS == nil {
 		return Spec{}, fmt.Errorf("target.aws is required for AWS EKS deployment")
+	}
+	if err := platform.ValidateFirstPartyEdge(cfg); err != nil {
+		return Spec{}, err
+	}
+	if err := platform.ValidateFirstPartyObservability(cfg); err != nil {
+		return Spec{}, err
 	}
 	aws := cfg.Target.AWS
 	presetName := cfg.Preset
@@ -65,13 +74,23 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	if natMode == "" {
 		natMode = NatModeGateway
 	}
+	natTopology := network.ResolveNatTopology(aws.NatTopology, preset)
+	natReplacementMode := network.ResolveNatReplacementMode(aws.NatReplacementMode, preset, natMode, natTopology)
 	cpu := aws.Catalog.EKS.CPURequest
 	if cpu == "" {
 		cpu = "500m"
 	}
 	memory := aws.Catalog.EKS.MemoryRequest
 	if memory == "" {
-		memory = "1Gi"
+		memory = kube.DefaultApplicationMemoryRequest
+	}
+	kubernetesVersion := strings.TrimSpace(aws.Catalog.EKS.KubernetesVersion)
+	if kubernetesVersion == "" {
+		kubernetesVersion = DefaultKubernetesVersion
+	}
+	computeMode := strings.TrimSpace(aws.Catalog.EKS.ComputeMode)
+	if computeMode == "" {
+		computeMode = ComputeModeAuto
 	}
 	desired := aws.Catalog.EKS.DesiredWebReplicas
 	if desired == 0 {
@@ -84,6 +103,61 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 			desired = 1
 		}
 	}
+	nodeInstanceType := strings.TrimSpace(aws.Catalog.EKS.NodeInstanceType)
+	if nodeInstanceType == "" && computeMode != ComputeModeAuto && computeMode != ComputeModeFargate {
+		nodeInstanceType = "m6i.large"
+	}
+	nodeMinSize := aws.Catalog.EKS.NodeMinSize
+	nodeDesiredSize := aws.Catalog.EKS.NodeDesiredSize
+	nodeMaxSize := aws.Catalog.EKS.NodeMaxSize
+	if computeMode != ComputeModeAuto && computeMode != ComputeModeFargate {
+		if nodeDesiredSize == 0 {
+			nodeDesiredSize = desired
+		}
+		if nodeMinSize == 0 {
+			nodeMinSize = 1
+		}
+		if nodeMaxSize == 0 {
+			nodeMaxSize = nodeDesiredSize
+		}
+	}
+	fargateNamespaces := append([]string(nil), aws.Catalog.EKS.FargateNamespaces...)
+	searchMode := strings.TrimSpace(aws.Catalog.EKS.SearchMode)
+	if searchMode == "" {
+		searchMode = SearchModeDisabled
+		if preset != sdk.PresetPreview {
+			searchMode = SearchModeOpenSearch
+		}
+	}
+	searchReplicas := aws.Catalog.EKS.SearchReplicas
+	if searchMode == SearchModeOpenSearch && searchReplicas == 0 {
+		searchReplicas = 1
+		if preset == sdk.PresetHighAvailability {
+			searchReplicas = 3
+		}
+	}
+	queueMode := strings.TrimSpace(aws.Catalog.EKS.QueueMode)
+	if queueMode == "" {
+		queueMode = QueueModeDatabase
+		if preset != sdk.PresetPreview {
+			queueMode = QueueModeRabbitMQ
+		}
+	}
+	queueReplicas := aws.Catalog.EKS.QueueReplicas
+	if queueMode == QueueModeRabbitMQ && queueReplicas == 0 {
+		queueReplicas = 1
+		if preset == sdk.PresetHighAvailability {
+			queueReplicas = 2
+		}
+	}
+	queueConsumers := aws.Catalog.EKS.QueueConsumerCount
+	if queueMode == QueueModeRabbitMQ && queueConsumers == 0 {
+		queueConsumers = 1
+		if preset == sdk.PresetHighAvailability {
+			queueConsumers = 2
+		}
+	}
+	queueConsumers = platform.MagentoConsumerProcessCount(cfg.Application.Magento.Consumers.Mode, queueConsumers)
 	databaseName := aws.DatabaseName
 	if databaseName == "" {
 		databaseName = "magento"
@@ -108,18 +182,24 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 				"magelift:environment": environment, "magelift:tier": "experimental",
 			},
 		},
-		Application: Application{Edition: cfg.Application.Edition, Version: cfg.Application.Version, Mode: cfg.Application.Mode, WebRuntime: cfg.Application.WebRuntime},
+		Application: Application{Edition: cfg.Application.Edition, Version: cfg.Application.Version, Mode: cfg.Application.Mode, WebRuntime: cfg.Application.WebRuntime, Magento: platform.NewMagentoOverlays(cfg.Application.Magento.FrontName, cfg.Application.Magento.CookieDomain, cfg.Application.Magento.UnsecureBaseURL, cfg.Application.Magento.SecureBaseURL, cfg.Application.Magento.StorefrontOrigin, cfg.Application.Magento.Consumers.Mode, cfg.Application.Magento.CORSOrigins, cfg.Application.Magento.Consumers.Names, cfg.Application.Magento.Variables)},
 		Artifact:    Artifact{ImageDigest: aws.ImageDigest},
 		Lifecycle:   Lifecycle{ExpiresAt: expiresAt, Protection: cfg.Protection},
-		Policy:      NetworkPolicy{VPCCIDR: cidr, AvailabilityZones: append([]string(nil), aws.AvailabilityZones...), NatMode: natMode},
+		Policy:      NetworkPolicy{VPCCIDR: cidr, AvailabilityZones: append([]string(nil), aws.AvailabilityZones...), NatMode: natMode, NatTopology: natTopology, NatReplacementMode: natReplacementMode, NatInstanceType: aws.NatInstanceType},
 		Catalog: CatalogSelection{
-			DatabaseEngine: engine,
-			AuroraMinACU:   aws.Catalog.Aurora.MinimumACU, AuroraMaxACU: aws.Catalog.Aurora.MaximumACU,
+			DatabaseEngine: engine, KubernetesVersion: kubernetesVersion, ComputeMode: computeMode,
+			NodeInstanceType: nodeInstanceType, NodeAMI: aws.Catalog.EKS.NodeAMI, NodeMinSize: nodeMinSize, NodeDesiredSize: nodeDesiredSize, NodeMaxSize: nodeMaxSize, FargateNamespaces: fargateNamespaces,
+			SearchMode: searchMode, SearchReplicas: searchReplicas,
+			QueueMode: queueMode, QueueReplicas: queueReplicas,
+			AuroraMinACU: aws.Catalog.Aurora.MinimumACU, AuroraMaxACU: aws.Catalog.Aurora.MaximumACU,
 			AuroraAutoPause: aws.Catalog.Aurora.AutoPauseSeconds, AuroraAutoPauseOK: aws.Catalog.Aurora.EngineSupportsAutoPause,
 			InstanceClass: aws.Catalog.Aurora.InstanceClass, InstanceCount: aws.Catalog.Aurora.InstanceCount,
 			ValkeyNodeType: aws.Catalog.Valkey.NodeType, ValkeyReplicaCount: aws.Catalog.Valkey.ReplicaCount,
-			CPURequest: cpu, MemoryRequest: memory, DesiredWebReplicas: desired, QueueConsumerCount: aws.Catalog.EKS.QueueConsumerCount,
-			BackupDays: backupDays, AuroraMySQLVersion: aws.Catalog.Versions.AuroraMySQL, MySQLVersion: aws.Catalog.Versions.MySQL, ValkeyVersion: aws.Catalog.Versions.Valkey,
+			CPURequest: cpu, MemoryRequest: memory, DesiredWebReplicas: desired, QueueConsumerCount: queueConsumers,
+			BackupDays: backupDays, DatabaseBackupWindow: aws.Catalog.DatabaseBackupWindow, DatabaseMaintenanceWindow: aws.Catalog.DatabaseMaintenanceWindow,
+			DatabaseDeletionProtection: aws.Catalog.DatabaseDeletionProtection, DatabaseDeleteAutomatedBackups: aws.Catalog.DatabaseDeleteAutomatedBackups,
+			CacheSnapshotRetentionLimit: aws.Catalog.CacheSnapshotRetentionLimit, CacheSnapshotWindow: aws.Catalog.CacheSnapshotWindow,
+			AuroraMySQLVersion: config.CanonicalAuroraMySQLVersion(aws.Catalog.Versions.AuroraMySQL), MySQLVersion: aws.Catalog.Versions.MySQL, MariaDBVersion: aws.Catalog.Versions.MariaDB, ValkeyVersion: aws.Catalog.Versions.Valkey,
 		},
 		Dependencies: Dependencies{
 			KMSKeyARN: aws.KMSKeyARN, CacheSecretARN: aws.CacheSecretARN, SessionSecretARN: aws.SessionSecretARN,

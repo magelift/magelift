@@ -61,6 +61,15 @@ func TestPreviewResourceGraphSnapshot(t *testing.T) {
 	if got := mocks.values("aws:ec2/subnet:Subnet", "cidrBlock"); !reflect.DeepEqual(got, []string{"10.40.0.0/20", "10.40.16.0/20", "10.40.32.0/20", "10.40.48.0/20", "10.40.64.0/20", "10.40.80.0/20"}) {
 		t.Fatalf("subnet CIDRs = %v", got)
 	}
+	if got := subnetTag(mocks.named(t, "aws:ec2/subnet:Subnet", "shop-public-subnet-01"), "kubernetes.io/role/elb"); got != "1" {
+		t.Fatalf("public subnet kubernetes.io/role/elb = %q, want 1", got)
+	}
+	if got := subnetTag(mocks.named(t, "aws:ec2/subnet:Subnet", "shop-private-subnet-01"), "kubernetes.io/role/internal-elb"); got != "1" {
+		t.Fatalf("private subnet kubernetes.io/role/internal-elb = %q, want 1", got)
+	}
+	if got := subnetTag(mocks.named(t, "aws:ec2/subnet:Subnet", "shop-data-subnet-01"), "kubernetes.io/role/elb"); got != "" {
+		t.Fatalf("data subnet must not advertise ELB discovery, got %q", got)
+	}
 	endpoint := mocks.one(t, "aws:ec2/vpcEndpoint:VpcEndpoint")
 	if got := len(endpoint.inputs[resource.PropertyKey("routeTableIds")].ArrayValue()); got != 4 {
 		t.Fatalf("S3 endpoint route table count = %d, want 4", got)
@@ -94,6 +103,88 @@ func TestPresetNATAndZoneGraphs(t *testing.T) {
 				t.Fatalf("default routes = %d", got)
 			}
 		})
+	}
+}
+
+func TestFckNatTopologyControlsNATInstanceCount(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		topology   string
+		wantNATs   int
+		wantRoutes int
+	}{
+		{name: "single-az", topology: NatTopologySingleAZ, wantNATs: 1, wantRoutes: 2},
+		{name: "multi-az", topology: NatTopologyMultiAZ, wantNATs: 2, wantRoutes: 2},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			mocks := deploy(t, Args{
+				Preset: sdk.PresetPreview, Region: "eu-west-3", VPCCIDR: "10.40.0.0/16", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"},
+				NatMode: NatModeFckNat, NatTopology: test.topology, NatReplacementMode: NatReplacementNone,
+			})
+			if got := mocks.count("aws:ec2/instance:Instance"); got != test.wantNATs {
+				t.Fatalf("fck-nat instances = %d, want %d", got, test.wantNATs)
+			}
+			if got := mocks.count("aws:ec2/natGateway:NatGateway"); got != 0 {
+				t.Fatalf("fck-nat created managed NAT gateways = %d", got)
+			}
+			privateRoutes := 0
+			for _, node := range mocks.nodes {
+				if node.typeToken == "aws:ec2/route:Route" && strings.Contains(node.name, "private-default") {
+					privateRoutes++
+				}
+			}
+			if privateRoutes != test.wantRoutes {
+				t.Fatalf("private default routes = %d, want %d", privateRoutes, test.wantRoutes)
+			}
+		})
+	}
+}
+
+func TestFckNatAutoScalingUsesStableNetworkInterfaces(t *testing.T) {
+	t.Parallel()
+	mocks := deploy(t, Args{
+		Preset: sdk.PresetPreview, Region: "eu-west-3", VPCCIDR: "10.40.0.0/16", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"},
+		NatMode: NatModeFckNat, NatTopology: NatTopologyMultiAZ, NatReplacementMode: NatReplacementAutoScaling,
+	})
+	if got := mocks.count("aws:ec2/instance:Instance"); got != 0 {
+		t.Fatalf("auto-scaling fck-nat created unmanaged instances = %d", got)
+	}
+	if got := mocks.count("aws:autoscaling/group:Group"); got != 2 {
+		t.Fatalf("fck-nat auto-scaling groups = %d, want 2", got)
+	}
+	if got := mocks.count("aws:ec2/networkInterface:NetworkInterface"); got != 2 {
+		t.Fatalf("stable fck-nat interfaces = %d, want 2", got)
+	}
+	if got := mocks.count("aws:ec2/launchTemplate:LaunchTemplate"); got != 2 {
+		t.Fatalf("fck-nat launch templates = %d, want 2", got)
+	}
+	for index := 1; index <= 2; index++ {
+		var route resourceNode
+		for _, node := range mocks.nodes {
+			if node.typeToken == "aws:ec2/route:Route" && node.name == fmt.Sprintf("shop-private-default-%02d", index) {
+				route = node
+				break
+			}
+		}
+		if value := route.inputs[resource.PropertyKey("networkInterfaceId")].StringValue(); !strings.Contains(value, "fck-nat-eni") {
+			t.Fatalf("private route %d target = %q, want stable fck-nat ENI", index, value)
+		}
+	}
+}
+
+func TestFckNatUsesDocumentedAMIAndCostOptimizedDefaultInstance(t *testing.T) {
+	if FckNatAMIOwner != "568608671756" || FckNatAMINamePrefix != "fck-nat-al2023-*-arm64-ebs" {
+		t.Fatalf("fck-nat AMI contract changed: owner=%q name=%q", FckNatAMIOwner, FckNatAMINamePrefix)
+	}
+	if got := resolveNatInstanceType("", NatModeFckNat); got != "t4g.nano" {
+		t.Fatalf("default fck-nat instance type = %q, want t4g.nano", got)
+	}
+	if got := resolveNatInstanceType("c6gn.medium", NatModeFckNat); got != "c6gn.medium" {
+		t.Fatalf("custom fck-nat instance type = %q", got)
 	}
 }
 
@@ -156,6 +247,9 @@ func TestNetworkRejectsInvalidInputsBeforeRegistration(t *testing.T) {
 		{Preset: sdk.PresetPreview, Region: "eu-west-3", VPCCIDR: "10.0.0.0/16", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, GatewayEndpoints: []GatewayEndpoint{{Service: GatewayEndpointS3}}},
 		{Preset: sdk.PresetPreview, Region: "eu-west-3", VPCCIDR: "10.0.0.0/16", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, InterfaceEndpoints: []InterfaceEndpoint{{Service: "unsupported", Rationale: ReduceNATCostAndExposure}}},
 		{Preset: sdk.PresetPreview, Region: "eu-west-3", VPCCIDR: "10.0.0.0/16", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, InterfaceEndpoints: []InterfaceEndpoint{{Service: InterfaceEndpointLogs, Rationale: ""}}},
+		{Preset: sdk.PresetPreview, Region: "eu-west-3", VPCCIDR: "10.0.0.0/16", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, NatMode: NatModeFckNat, NatTopology: "zone-local"},
+		{Preset: sdk.PresetPreview, Region: "eu-west-3", VPCCIDR: "10.0.0.0/16", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, NatMode: NatModeGateway, NatReplacementMode: NatReplacementAutoScaling},
+		{Preset: sdk.PresetPreview, Region: "eu-west-3", VPCCIDR: "10.0.0.0/16", AvailabilityZones: []string{"eu-west-3a", "eu-west-3b"}, NatMode: NatModeFckNat, NatReplacementMode: "recreate"},
 	}
 	for index, args := range tests {
 		t.Run(fmt.Sprint(index), func(t *testing.T) {
@@ -326,6 +420,31 @@ func (mocks *networkMocks) one(t *testing.T, typeToken string) resourceNode {
 	}
 	t.Fatalf("resource type %s not found", typeToken)
 	return resourceNode{}
+}
+
+func (mocks *networkMocks) named(t *testing.T, typeToken, name string) resourceNode {
+	t.Helper()
+	mocks.mu.Lock()
+	defer mocks.mu.Unlock()
+	for _, node := range mocks.nodes {
+		if node.typeToken == typeToken && node.name == name {
+			return node
+		}
+	}
+	t.Fatalf("resource %s:%s not found", typeToken, name)
+	return resourceNode{}
+}
+
+func subnetTag(node resourceNode, key string) string {
+	tags := node.inputs[resource.PropertyKey("tags")]
+	if !tags.IsObject() {
+		return ""
+	}
+	value := tags.ObjectValue()[resource.PropertyKey(key)]
+	if !value.IsString() {
+		return ""
+	}
+	return value.StringValue()
 }
 
 func contains(values []string, wanted string) bool {

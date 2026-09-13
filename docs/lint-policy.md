@@ -16,6 +16,10 @@ tractable. Expand deliberately; do not dump every available linter into CI.
 | `revive` | Style subset (narrow rules in `.golangci.yml`) |
 | `gocritic` | Selected diagnostics (`#diagnostic` only; opinionated off) |
 
+`gofmt` is `make fmt-check` (the Go 1.27.1 toolchain). golangci-lint 2.13.2's
+gofmt formatter disagrees with that toolchain on some composite literals, so it
+is not enabled.
+
 `govulncheck` runs as a separate CI step inside `go-verify` (not inside golangci-lint).
 
 ## CI partitioning (QUALITY-06)
@@ -88,7 +92,7 @@ measured, not assumed.
 | Environment | Command | Wall time | Peak RSS | Outcome |
 | --- | --- | --- | --- | --- |
 | Local (serial sample) | `GOMAXPROCS=1 GOFLAGS=-p=1 go test -race ./internal/lintcoverage/ ./internal/usererr/ -count=1` | ~4.7s | ~102 MiB | pass (narrow sample only) |
-| Local (full race) | `GOMAXPROCS=1 GOFLAGS=-p=1 go test -race ./... -count=1` | deferred-local | deferred-local | Prefer CI; see `agents/skills/magelift-serial-builds` for local smoke guidance |
+| Local (full race) | `GOMAXPROCS=1 GOFLAGS=-p=1 go test -race ./... -count=1` | deferred-local | deferred-local | Prefer CI; see `contrib/skills/magelift-serial-builds` for local smoke guidance |
 | CI `go-verify` (2 vCPU / 7 GB) | `go test -race ./...` | ~12m | n/a | pass on run 30836267745 |
 
 If CI fails on memory or the runner is reaped with no test output, partition the

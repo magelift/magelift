@@ -9,12 +9,13 @@ use MageLift\Build\Process\ProcessRunner;
 use RuntimeException;
 
 /**
- * Clean-room m2-hotfixes applicator.
+ * Clean-room m2-hotfixes discovery and fallback applicator.
  *
  * Behavioral contract from public Adobe Commerce Cloud docs: custom patches live
  * under project-root m2-hotfixes/*.patch and apply in alphabetical order via the
- * host patch(1) tool after composer install. Does not vendor Adobe patch DBs or
- * magento-cloud-patches / ece-tools source.
+ * host patch(1) tool after composer install. Upstream Cloud Patches and Quality
+ * Patches tools are selected by PatchLifecycle when the target project provides
+ * them; this class does not vendor their source or patch databases.
  */
 final class PatchApplier
 {
@@ -100,27 +101,14 @@ final class PatchApplier
     {
         $commands = [];
         foreach ($relativePatchPaths as $relative) {
-            if (!is_string($relative) || $relative === '' || str_contains($relative, "\0")) {
-                throw new RuntimeException('Hotfix patch paths must be non-empty strings without null bytes.');
+            if (!is_string($relative)) {
+                throw new RuntimeException('Hotfix patch paths must be strings.');
             }
-            if (
-                !str_starts_with($relative, self::HOTFIX_DIRECTORY.'/')
-                || str_contains($relative, '..')
-                || str_contains($relative, '\\')
-            ) {
-                throw new RuntimeException(sprintf(
-                    'Hotfix patch path "%s" must stay under %s/.',
-                    $relative,
-                    self::HOTFIX_DIRECTORY,
-                ));
+            try {
+                $commands[] = new PatchCommand($relative);
+            } catch (\InvalidArgumentException $error) {
+                throw new RuntimeException($error->getMessage(), previous: $error);
             }
-            $commands[] = new Command(Executable::Patch, [
-                '-p1',
-                '--forward',
-                '--batch',
-                '-i',
-                $relative,
-            ]);
         }
 
         return $commands;
@@ -139,8 +127,9 @@ final class PatchApplier
         }
         $this->assertPatchToolAvailable();
         $root = self::resolveProjectRoot($projectRoot);
-        foreach (self::commands($patches) as $command) {
-            $result = $this->runner->run(new ProcessRequest(
+        foreach ($patches as $patchPath) {
+            $command = new PatchCommand($patchPath, $this->patchBinary);
+            $result = $command->run($this->runner, new ProcessRequest(
                 $command->argv(),
                 $root,
                 [],

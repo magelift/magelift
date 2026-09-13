@@ -71,7 +71,7 @@ type Component struct {
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
-	if err := validate(name, args); err != nil {
+	if err := validate(naming.AWSName(name, 26), args); err != nil {
 		return nil, err
 	}
 
@@ -82,12 +82,17 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 
-	if args.Preset == sdk.PresetPreview {
+	switch {
+	case args.Serverless != nil && args.Provisioned == nil:
 		if err := createServerless(ctx, name, args, component); err != nil {
 			return nil, err
 		}
-	} else if err := createProvisioned(ctx, name, args, component); err != nil {
-		return nil, err
+	case args.Provisioned != nil && args.Serverless == nil:
+		if err := createProvisioned(ctx, name, args, component); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("search requires exactly one of Serverless or Provisioned settings")
 	}
 
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
@@ -168,12 +173,21 @@ func createServerless(ctx *pulumi.Context, name string, args Args, component *Co
 
 func createProvisioned(ctx *pulumi.Context, name string, args Args, component *Component) error {
 	provisioned := args.Provisioned
+	providerName := naming.AWSName(name, 26)
 	zones := len(args.SubnetIDs)
-	accessPolicy := provisionedAccessPolicyInput(name, args.Region, identityInput(args))
+	accessPolicy, err := provisionedVPCAccessPolicy(providerName, args.Region, args.KMSKeyARN)
+	if err != nil {
+		return err
+	}
+	// Magento/ElasticSuite does not SigV4. Match the live AWS Magento shop:
+	// FGAC off, unsigned HTTPS in-VPC, security groups as the network gate.
+	zoneAware := provisioned.InstanceCount >= 2 && zones >= 2
 	clusterConfig := &opensearch.DomainClusterConfigArgs{
 		InstanceType: pulumi.String(provisioned.InstanceType), InstanceCount: pulumi.Int(provisioned.InstanceCount),
-		ZoneAwarenessEnabled: pulumi.Bool(true), MultiAzWithStandbyEnabled: pulumi.Bool(args.Preset == sdk.PresetHighAvailability),
-		ZoneAwarenessConfig: &opensearch.DomainClusterConfigZoneAwarenessConfigArgs{AvailabilityZoneCount: pulumi.Int(zones)},
+		ZoneAwarenessEnabled: pulumi.Bool(zoneAware), MultiAzWithStandbyEnabled: pulumi.Bool(args.Preset == sdk.PresetHighAvailability),
+	}
+	if zoneAware {
+		clusterConfig.ZoneAwarenessConfig = &opensearch.DomainClusterConfigZoneAwarenessConfigArgs{AvailabilityZoneCount: pulumi.Int(zones)}
 	}
 	if args.Preset == sdk.PresetHighAvailability {
 		clusterConfig.DedicatedMasterEnabled = pulumi.Bool(true)
@@ -181,16 +195,15 @@ func createProvisioned(ctx *pulumi.Context, name string, args Args, component *C
 		clusterConfig.DedicatedMasterCount = pulumi.Int(provisioned.DedicatedMasterCount)
 	}
 	domain, err := opensearch.NewDomain(ctx, name, &opensearch.DomainArgs{
-		DomainName: pulumi.String(name), Region: pulumi.String(args.Region), EngineVersion: pulumi.String(provisioned.EngineVersion),
-		AccessPolicies:        accessPolicy,
+		DomainName: pulumi.String(providerName), Region: pulumi.String(args.Region), EngineVersion: pulumi.String(provisioned.EngineVersion),
+		AccessPolicies:        pulumi.String(accessPolicy),
 		ClusterConfig:         clusterConfig,
 		EbsOptions:            &opensearch.DomainEbsOptionsArgs{EbsEnabled: pulumi.Bool(true), VolumeType: pulumi.String(provisioned.EBSVolumeType), VolumeSize: pulumi.Int(provisioned.EBSVolumeSizeGiB)},
 		EncryptAtRest:         &opensearch.DomainEncryptAtRestArgs{Enabled: pulumi.Bool(true), KmsKeyId: pulumi.String(args.KMSKeyARN)},
 		NodeToNodeEncryption:  &opensearch.DomainNodeToNodeEncryptionArgs{Enabled: pulumi.Bool(true)},
 		DomainEndpointOptions: &opensearch.DomainDomainEndpointOptionsArgs{EnforceHttps: pulumi.Bool(true), TlsSecurityPolicy: pulumi.String(minimumTLSPolicy)},
 		AdvancedSecurityOptions: &opensearch.DomainAdvancedSecurityOptionsArgs{
-			Enabled: pulumi.Bool(true), InternalUserDatabaseEnabled: pulumi.Bool(false),
-			MasterUserOptions: &opensearch.DomainAdvancedSecurityOptionsMasterUserOptionsArgs{MasterUserArn: identityInput(args)},
+			Enabled: pulumi.Bool(false), InternalUserDatabaseEnabled: pulumi.Bool(false),
 		},
 		VpcOptions: &opensearch.DomainVpcOptionsArgs{SubnetIds: args.SubnetIDs, SecurityGroupIds: args.SecurityGroupIDs, VpcId: args.VPCID},
 		Tags:       tags(args.Tags, name, "domain"),
@@ -216,43 +229,51 @@ func validate(name string, args Args) error {
 	if args.AccessIdentityInput == nil && !identityARN.MatchString(args.AccessIdentityARN) {
 		return errors.New("search access identity must be an IAM role or user ARN")
 	}
-	if args.Preset == sdk.PresetPreview {
-		if args.Serverless == nil || args.Provisioned != nil {
-			return errors.New("preview search requires Serverless settings and no provisioned capacity")
-		}
-		if !args.Serverless.AcceptColdStarts {
-			return errors.New("preview search must explicitly accept Serverless cold starts")
-		}
-		capacity := args.Serverless.Capacity
-		// AOSS collection-group capacity: MageLift accepts 1, 2, 4, 8, 16, or
-		// multiples of 16 at/above 32. See validServerlessOCU for provenance; // this step rule is unpublished by AWS.
-		if !validServerlessOCU(capacity.MinimumIndexingOCU) || !validServerlessOCU(capacity.MinimumSearchOCU) {
-			return errors.New("Serverless minimum indexing and search capacity must be 1, 2, 4, 8, 16, or a multiple of 16")
-		}
-		if !validCapacityRange(capacity.MinimumIndexingOCU, capacity.MaximumIndexingOCU) || !validCapacityRange(capacity.MinimumSearchOCU, capacity.MaximumSearchOCU) {
-			return errors.New("Serverless indexing and search capacity must have finite positive maxima at least as large as their minima")
-		}
-		if !validServerlessOCU(capacity.MaximumIndexingOCU) || !validServerlessOCU(capacity.MaximumSearchOCU) {
-			return errors.New("Serverless maximum indexing and search capacity must be 1, 2, 4, 8, 16, or a multiple of 16")
-		}
-		if len(args.SubnetIDs) > 6 {
-			return errors.New("Serverless VPC endpoints support at most six subnets")
-		}
-		return nil
-	}
-
-	if args.Preset != sdk.PresetStandard && args.Preset != sdk.PresetHighAvailability {
+	if args.Preset != sdk.PresetPreview && args.Preset != sdk.PresetStandard && args.Preset != sdk.PresetHighAvailability {
 		return fmt.Errorf("unsupported search preset %q", args.Preset)
 	}
-	if args.Provisioned == nil || args.Serverless != nil {
-		return fmt.Errorf("preset %q requires provisioned settings and no Serverless capacity", args.Preset)
+	switch {
+	case args.Serverless != nil && args.Provisioned == nil:
+		return validateServerless(args)
+	case args.Provisioned != nil && args.Serverless == nil:
+		return validateProvisioned(args)
+	default:
+		return errors.New("search requires exactly one of Serverless or Provisioned settings")
 	}
-	wantZones, minimumInstances := 2, 2
+}
+
+func validateServerless(args Args) error {
+	if args.Preset == sdk.PresetPreview && !args.Serverless.AcceptColdStarts {
+		return errors.New("preview search must explicitly accept Serverless cold starts")
+	}
+	capacity := args.Serverless.Capacity
+	// AOSS collection-group capacity: MageLift accepts 1, 2, 4, 8, 16, or
+	// multiples of 16 at/above 32. See validServerlessOCU for provenance; // this step rule is unpublished by AWS.
+	if !validServerlessOCU(capacity.MinimumIndexingOCU) || !validServerlessOCU(capacity.MinimumSearchOCU) {
+		return errors.New("Serverless minimum indexing and search capacity must be 1, 2, 4, 8, 16, or a multiple of 16")
+	}
+	if !validCapacityRange(capacity.MinimumIndexingOCU, capacity.MaximumIndexingOCU) || !validCapacityRange(capacity.MinimumSearchOCU, capacity.MaximumSearchOCU) {
+		return errors.New("Serverless indexing and search capacity must have finite positive maxima at least as large as their minima")
+	}
+	if !validServerlessOCU(capacity.MaximumIndexingOCU) || !validServerlessOCU(capacity.MaximumSearchOCU) {
+		return errors.New("Serverless maximum indexing and search capacity must be 1, 2, 4, 8, 16, or a multiple of 16")
+	}
+	if len(args.SubnetIDs) > 6 {
+		return errors.New("Serverless VPC endpoints support at most six subnets")
+	}
+	return nil
+}
+
+func validateProvisioned(args Args) error {
+	wantZones, minimumInstances := 1, 1
+	if args.Preset == sdk.PresetStandard {
+		wantZones, minimumInstances = 2, 2
+	}
 	if args.Preset == sdk.PresetHighAvailability {
 		wantZones, minimumInstances = 3, 3
 	}
 	if len(args.SubnetIDs) != wantZones {
-		return fmt.Errorf("preset %q requires exactly %d search subnets", args.Preset, wantZones)
+		return fmt.Errorf("preset %q provisioned search requires exactly %d search subnets", args.Preset, wantZones)
 	}
 	provisioned := args.Provisioned
 	if strings.TrimSpace(provisioned.EngineVersion) == "" || strings.TrimSpace(provisioned.InstanceType) == "" || strings.TrimSpace(provisioned.EBSVolumeType) == "" || provisioned.EBSVolumeSizeGiB <= 0 {
@@ -267,8 +288,8 @@ func validate(name string, args Args) error {
 	if args.Preset == sdk.PresetHighAvailability && (strings.TrimSpace(provisioned.DedicatedMasterType) == "" || provisioned.DedicatedMasterCount != 3) {
 		return errors.New("high-availability search requires a caller-selected dedicated master type and three dedicated masters")
 	}
-	if args.Preset == sdk.PresetStandard && (provisioned.DedicatedMasterType != "" || provisioned.DedicatedMasterCount != 0) {
-		return errors.New("standard search does not accept dedicated master settings")
+	if args.Preset != sdk.PresetHighAvailability && (provisioned.DedicatedMasterType != "" || provisioned.DedicatedMasterCount != 0) {
+		return errors.New("non-HA provisioned search does not accept dedicated master settings")
 	}
 	return nil
 }
@@ -325,21 +346,18 @@ func marshalPolicy(value any) (string, error) {
 	return string(encoded), nil
 }
 
-func provisionedAccessPolicy(name, region, principalARN string) (string, error) {
-	parts := strings.SplitN(principalARN, ":", 6)
+func provisionedVPCAccessPolicy(name, region, kmsKeyARN string) (string, error) {
+	parts := strings.SplitN(kmsKeyARN, ":", 6)
+	if len(parts) < 5 {
+		return "", errors.New("search encryption requires a KMS key ARN")
+	}
 	return marshalPolicy(iamPolicyDocument{
 		Version: "2012-10-17",
 		Statement: []iamStatement{{
-			Effect: "Allow", Principal: map[string]string{"AWS": principalARN}, Action: []string{"es:ESHttp*"},
+			Effect: "Allow", Principal: map[string]string{"AWS": "*"}, Action: []string{"es:ESHttp*"},
 			Resource: fmt.Sprintf("arn:%s:es:%s:%s:domain/%s/*", parts[1], region, parts[4], name),
 		}},
 	})
-}
-
-func provisionedAccessPolicyInput(name, region string, principal pulumi.StringInput) pulumi.StringOutput {
-	return principal.ToStringOutput().ApplyT(func(principalARN string) (string, error) {
-		return provisionedAccessPolicy(name, region, principalARN)
-	}).(pulumi.StringOutput)
 }
 
 func identityInput(args Args) pulumi.StringOutput {

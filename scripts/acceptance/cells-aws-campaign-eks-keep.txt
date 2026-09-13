@@ -1,0 +1,8 @@
+# Packed AWS EKS KEEP catalog for certify-aws 3.2.
+# Cold Auto Mode Magento origin, then warm in-cluster RabbitMQ.
+# Preview profile. Destroy plus orphan assert at cell close.
+# Do not mark experimental PASS as certified.
+computeMode:auto-mode
+queueMode:database
+queueMode:rabbitmq
+searchMode:disabled

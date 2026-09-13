@@ -36,6 +36,7 @@ type Entry struct {
 	SignatureIssuer            string    `json:"signatureIssuer" yaml:"signatureIssuer"`
 	ForwardOnly                bool      `json:"forwardOnly" yaml:"forwardOnly"`
 	DatabaseMigrationsReversed bool      `json:"databaseMigrationsReversed" yaml:"databaseMigrationsReversed"`
+	SchemaEpoch                int       `json:"schemaEpoch,omitempty" yaml:"schemaEpoch,omitempty"`
 }
 
 type Store struct {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	gcpbootstrap "github.com/magelift/magelift/internal/cloud/gcp/bootstrap"
 	gcpcost "github.com/magelift/magelift/internal/cloud/gcp/cost"
@@ -35,8 +34,9 @@ func (Bootstrap) VerifyAccount(ctx context.Context, planned platform.PlannedStac
 }
 
 func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, req platform.BootstrapRequest) (platform.BootstrapResult, error) {
-	if strings.TrimSpace(req.GitHubOwner) == "" || strings.TrimSpace(req.GitHubRepo) == "" {
-		return platform.BootstrapResult{}, fmt.Errorf("--github-owner and --github-repo are required")
+	owner, repo, wantGitHub, err := req.GitHubIdentity()
+	if err != nil {
+		return platform.BootstrapResult{}, err
 	}
 	gcpPlanned, ok := gcpstack.AsGCPPlanned(planned)
 	if !ok {
@@ -58,32 +58,33 @@ func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, req 
 	if err != nil {
 		return platform.BootstrapResult{}, err
 	}
-	identityPlan, err := gcpbootstrap.BuildIdentityPlan(gcpbootstrap.IdentitySpec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
-		GCPProject:  spec.Identity.GCPProject,
-		GitHubOwner: req.GitHubOwner, GitHubRepo: req.GitHubRepo,
-	})
-	if err != nil {
-		return platform.BootstrapResult{}, err
-	}
-	identity, err := gcpbootstrap.NewIdentity(ctx)
-	if err != nil {
-		return platform.BootstrapResult{}, err
-	}
-	wif, err := identity.Ensure(ctx, identityPlan)
-	if err != nil {
-		return platform.BootstrapResult{}, err
+	details := map[string]any{"state": result}
+	if wantGitHub {
+		identityPlan, err := gcpbootstrap.BuildIdentityPlan(gcpbootstrap.IdentitySpec{
+			Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+			GCPProject:  spec.Identity.GCPProject,
+			GitHubOwner: owner, GitHubRepo: repo,
+		})
+		if err != nil {
+			return platform.BootstrapResult{}, err
+		}
+		identity, err := gcpbootstrap.NewIdentity(ctx)
+		if err != nil {
+			return platform.BootstrapResult{}, err
+		}
+		wif, err := identity.Ensure(ctx, identityPlan)
+		if err != nil {
+			return platform.BootstrapResult{}, err
+		}
+		details["wif"] = map[string]any{
+			"pool":           wif.PoolResource,
+			"provider":       wif.ProviderResource,
+			"serviceAccount": wif.ServiceAccountEmail,
+		}
 	}
 	return platform.BootstrapResult{
 		BackendURL: gcpbootstrap.BackendURL(result.Plan),
-		Details: map[string]any{
-			"state": result,
-			"wif": map[string]any{
-				"pool":           wif.PoolResource,
-				"provider":       wif.ProviderResource,
-				"serviceAccount": wif.ServiceAccountEmail,
-			},
-		},
+		Details:    details,
 	}, nil
 }
 
@@ -143,7 +144,7 @@ func (State) Backup(ctx context.Context, planned platform.PlannedStack) (platfor
 	if err != nil {
 		return platform.BackupResult{}, err
 	}
-	return platform.BackupResult{ID: result.ID, Location: result.Prefix}, nil
+	return platform.BackupResult{ID: result.ID, Location: result.Prefix, Objects: result.Objects, Bytes: result.Bytes, ManifestDigest: result.ManifestDigest}, nil
 }
 
 func (State) Restore(ctx context.Context, planned platform.PlannedStack, location string) (platform.RestoreResult, error) {
@@ -155,7 +156,7 @@ func (State) Restore(ctx context.Context, planned platform.PlannedStack, locatio
 	if err != nil {
 		return platform.RestoreResult{}, err
 	}
-	return platform.RestoreResult{ID: result.ID, Location: result.Prefix}, nil
+	return platform.RestoreResult{ID: result.ID, Location: result.Prefix, Objects: result.Objects, Bytes: result.Bytes, ManifestDigest: result.ManifestDigest}, nil
 }
 
 // Secrets implements platform.Secrets for Secret Manager.

@@ -18,6 +18,7 @@ final class ResponseTest extends TestCase
             'dist/rootfs.tar',
             '8.5.1',
             ['pdo_mysql', 'intl'],
+            '2.10.2',
             ['Vendor_Second', 'Magento_Catalog'],
             [
                 ['path' => 'vendor/autoload.php', 'sha256' => str_repeat('d', 64)],
@@ -27,7 +28,7 @@ final class ResponseTest extends TestCase
         );
 
         self::assertSame(
-            '{"protocolVersion":1,"stage":"prepare","prepare":{"preparedArtifact":"dist/rootfs.tar","phpVersion":"8.5.1","phpExtensions":["intl","pdo_mysql"],"enabledModules":["Magento_Catalog","Vendor_Second"],"checksums":[{"path":"app/etc/config.php","sha256":"'.str_repeat('e', 64).'"},{"path":"vendor/autoload.php","sha256":"'.str_repeat('d', 64).'"}],"requiredRuntimeCapabilities":["database.mysql","search.opensearch"]}}',
+            '{"protocolVersion":1,"stage":"prepare","prepare":{"preparedArtifact":"dist/rootfs.tar","phpVersion":"8.5.1","phpExtensions":["intl","pdo_mysql"],"composerVersion":"2.10.2","enabledModules":["Magento_Catalog","Vendor_Second"],"checksums":[{"path":"app/etc/config.php","sha256":"'.str_repeat('e', 64).'"},{"path":"vendor/autoload.php","sha256":"'.str_repeat('d', 64).'"}],"requiredRuntimeCapabilities":["database.mysql","search.opensearch"]}}',
             $response->toCanonicalJson(),
         );
     }
@@ -55,6 +56,7 @@ final class ResponseTest extends TestCase
             'dist/rootfs.tar',
             '8.5.1',
             ['intl', 'intl'],
+            '2.10.2',
             ['Magento_Catalog'],
             [['path' => 'file', 'sha256' => str_repeat('a', 64)]],
             ['database.mysql'],
@@ -67,6 +69,7 @@ final class ResponseTest extends TestCase
             'dist/'.str_repeat('x', 1_048_576),
             '8.5.1',
             ['intl'],
+            '2.10.2',
             ['Magento_Catalog'],
             [['path' => 'file', 'sha256' => str_repeat('a', 64)]],
             ['database.mysql'],

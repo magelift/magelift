@@ -34,6 +34,13 @@ type Client struct {
 	runner CommandRunner
 }
 
+type SignOptions struct {
+	// IdentityTokenPath is a filesystem path to a single-line JWT. It is
+	// passed to cosign as --identity-token PATH so the token never appears
+	// on argv. Empty means ambient OIDC (CI workload identity or device flow).
+	IdentityTokenPath string
+}
+
 type VerifyOptions struct {
 	CertificateIdentity string
 	OIDCIssuer          string
@@ -52,8 +59,15 @@ func ValidateReference(reference string) error {
 }
 
 func (c *Client) Sign(ctx context.Context, reference string) error {
+	return c.SignWithOptions(ctx, reference, SignOptions{})
+}
+
+func (c *Client) SignWithOptions(ctx context.Context, reference string, options SignOptions) error {
 	if err := validateReference(reference); err != nil {
 		return err
+	}
+	if options.IdentityTokenPath != "" && !validBlobPath(options.IdentityTokenPath) {
+		return ErrInvalidBlobPath
 	}
 	if c == nil || c.runner == nil {
 		return ErrRunnerRequired
@@ -61,7 +75,12 @@ func (c *Client) Sign(ctx context.Context, reference string) error {
 	if cause := context.Cause(ctx); cause != nil {
 		return cause
 	}
-	if err := c.runner.Run(ctx, "cosign", "sign", "--yes", reference); err != nil {
+	args := []string{"sign", "--yes"}
+	if options.IdentityTokenPath != "" {
+		args = append(args, "--identity-token", options.IdentityTokenPath)
+	}
+	args = append(args, reference)
+	if err := c.runner.Run(ctx, "cosign", args...); err != nil {
 		if cause := context.Cause(ctx); cause != nil {
 			return cause
 		}
@@ -104,6 +123,16 @@ func (c *Client) Verify(ctx context.Context, reference string, options VerifyOpt
 		return cause
 	}
 	return nil
+}
+
+// VerifyArtifact exposes the provider-neutral verification shape used by the
+// certification artifact boundary while keeping cosign's policy type private
+// to this package.
+func (c *Client) VerifyArtifact(ctx context.Context, reference, certificateIdentity, oidcIssuer string) error {
+	return c.Verify(ctx, reference, VerifyOptions{
+		CertificateIdentity: certificateIdentity,
+		OIDCIssuer:          oidcIssuer,
+	})
 }
 
 func (c *Client) VerifyBlob(ctx context.Context, bundlePath, artifactPath string, options VerifyOptions) error {

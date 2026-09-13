@@ -1,0 +1,5 @@
+# Ordered EKS preview cells. Keep one Auto Mode + RDS/Valkey stack for the
+# whole sequence; the harness updates only the Kubernetes capability graph.
+computeMode:auto-mode
+queueMode:database
+searchMode:disabled

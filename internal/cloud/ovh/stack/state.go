@@ -122,7 +122,7 @@ func (State) Backup(ctx context.Context, planned platform.PlannedStack) (platfor
 	if err != nil {
 		return platform.BackupResult{}, err
 	}
-	return platform.BackupResult{ID: result.ID, Location: result.Prefix}, nil
+	return platform.BackupResult{ID: result.ID, Location: result.Prefix, Objects: result.Objects, Bytes: result.Bytes, ManifestDigest: result.ManifestDigest}, nil
 }
 
 func (State) Restore(ctx context.Context, planned platform.PlannedStack, location string) (platform.RestoreResult, error) {
@@ -134,7 +134,7 @@ func (State) Restore(ctx context.Context, planned platform.PlannedStack, locatio
 	if err != nil {
 		return platform.RestoreResult{}, err
 	}
-	return platform.RestoreResult{ID: result.ID, Location: result.Prefix}, nil
+	return platform.RestoreResult{ID: result.ID, Location: result.Prefix, Objects: result.Objects, Bytes: result.Bytes, ManifestDigest: result.ManifestDigest}, nil
 }
 
 func toLockInfo(info awsstate.Info) platform.LockInfo {

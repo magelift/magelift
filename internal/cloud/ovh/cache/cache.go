@@ -13,13 +13,17 @@ import (
 const TypeToken = "magelift:ovh:Cache"
 
 type Args struct {
-	ServiceName string
-	Region      string
-	NetworkID   pulumi.StringInput
-	SubnetID    pulumi.StringInput
-	Flavor      string
-	Plan        string
-	Version     string
+	ServiceName        string
+	Region             string
+	NetworkID          pulumi.StringInput
+	SubnetID           pulumi.StringInput
+	Flavor             string
+	Plan               string
+	Version            string
+	NodeCount          int
+	BackupTime         string
+	BackupRegions      []string
+	DeletionProtection *bool
 }
 
 type Component struct {
@@ -36,13 +40,19 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, errors.New("OVH service name and region are required")
 	}
 	if args.Flavor == "" {
-		args.Flavor = "db1-4"
+		args.Flavor = "b3-8"
 	}
 	if args.Plan == "" {
 		args.Plan = "essential"
 	}
 	if args.Version == "" {
-		args.Version = "8.0"
+		args.Version = "8.1"
+	}
+	if args.NodeCount == 0 {
+		args.NodeCount = 1
+	}
+	if args.NodeCount < 1 {
+		return nil, errors.New("OVH Valkey node count must be at least 1")
 	}
 
 	component := &Component{}
@@ -61,24 +71,35 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("generate Valkey password: %w", err)
 	}
 
-	node := &cloudproject.DatabaseNodeArgs{
-		Region: pulumi.String(args.Region),
-	}
-	if args.NetworkID != nil && args.SubnetID != nil {
-		node.NetworkId = args.NetworkID.ToStringOutput().ToStringPtrOutput()
-		node.SubnetId = args.SubnetID.ToStringOutput().ToStringPtrOutput()
+	nodes := make(cloudproject.DatabaseNodeArray, 0, args.NodeCount)
+	for range args.NodeCount {
+		node := &cloudproject.DatabaseNodeArgs{Region: pulumi.String(args.Region)}
+		if args.NetworkID != nil && args.SubnetID != nil {
+			node.NetworkId = args.NetworkID.ToStringOutput().ToStringPtrOutput()
+			node.SubnetId = args.SubnetID.ToStringOutput().ToStringPtrOutput()
+		}
+		nodes = append(nodes, node)
 	}
 
-	instance, err := cloudproject.NewDatabase(ctx, name, &cloudproject.DatabaseArgs{
-		ServiceName:        pulumi.String(args.ServiceName),
-		Description:        pulumi.String(name),
-		Engine:             pulumi.String("valkey"),
-		Version:            pulumi.String(args.Version),
-		Plan:               pulumi.String(args.Plan),
-		Flavor:             pulumi.String(args.Flavor),
-		DeletionProtection: pulumi.Bool(false),
-		Nodes:              cloudproject.DatabaseNodeArray{node},
-	}, parent)
+	instanceArgs := &cloudproject.DatabaseArgs{
+		ServiceName: pulumi.String(args.ServiceName),
+		Description: pulumi.String(name),
+		Engine:      pulumi.String("valkey"),
+		Version:     pulumi.String(args.Version),
+		Plan:        pulumi.String(args.Plan),
+		Flavor:      pulumi.String(args.Flavor),
+		Nodes:       nodes,
+	}
+	if args.BackupTime != "" {
+		instanceArgs.BackupTime = pulumi.StringPtr(args.BackupTime)
+	}
+	if len(args.BackupRegions) > 0 {
+		instanceArgs.BackupRegions = pulumi.ToStringArray(args.BackupRegions)
+	}
+	if args.DeletionProtection != nil {
+		instanceArgs.DeletionProtection = pulumi.BoolPtr(*args.DeletionProtection)
+	}
+	instance, err := cloudproject.NewDatabase(ctx, name, instanceArgs, parent)
 	if err != nil {
 		return nil, fmt.Errorf("create OVH Valkey cache: %w", err)
 	}

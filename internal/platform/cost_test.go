@@ -2,6 +2,7 @@ package platform
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/magelift/magelift/internal/config"
@@ -56,4 +57,17 @@ func TestModuleCostEstimator(t *testing.T) {
 			t.Fatalf("estimator = %#v err=%v", report, err)
 		}
 	})
+}
+
+func TestUnavailableCostBudgetReportIsExplicit(t *testing.T) {
+	report := UnavailableCostBudgetReport("ovh/service/shop", "OVHcloud budget adapter", "not wired")
+	if report == nil || report.State != CostBudgetUnavailable || report.Scope != "ovh/service/shop" || report.Source != "OVHcloud budget adapter" {
+		t.Fatalf("report = %#v", report)
+	}
+	if report.Freshness != CostFreshnessUnknown || len(report.Budgets) != 0 || report.ObservedAt.IsZero() {
+		t.Fatalf("report metadata = %#v", report)
+	}
+	if !strings.Contains(report.Notice, "not wired") {
+		t.Fatalf("report notice = %q", report.Notice)
+	}
 }

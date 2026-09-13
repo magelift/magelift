@@ -64,8 +64,11 @@ func TestRunUsesIsolatedMountsAndProtocolStdin(t *testing.T) {
 	if !containsMountDestination(invocation.Args, "/run/secrets/composer-auth") {
 		t.Fatalf("composer secret mount missing from %#v", invocation.Args)
 	}
-	if invocation.EnvironmentCount != 0 {
-		t.Fatalf("child inherited %d environment entries", invocation.EnvironmentCount)
+	if invocation.EnvironmentCount == 0 {
+		t.Fatal("Docker CLI did not receive its allowlisted environment")
+	}
+	if strings.Contains(strings.Join(invocation.Environment, "\n"), "MAGELIFT_TEST_SECRET") {
+		t.Fatal("ambient secret leaked into Docker CLI environment")
 	}
 	info, err := os.Stat(result.OutputDir)
 	if err != nil {
@@ -231,6 +234,7 @@ type helperInvocation struct {
 	Args             []string        `json:"args"`
 	Stdin            json.RawMessage `json:"stdin"`
 	EnvironmentCount int             `json:"environmentCount"`
+	Environment      []string        `json:"environment"`
 }
 
 func fakeDocker() {
@@ -252,7 +256,7 @@ func fakeDocker() {
 			os.Exit(10)
 		}
 		_, _ = fmt.Fprintln(os.Stderr, "helper diagnostic")
-		response, err := json.Marshal(helperInvocation{Args: os.Args[1:], Stdin: input, EnvironmentCount: len(os.Environ())})
+		response, err := json.Marshal(helperInvocation{Args: os.Args[1:], Stdin: input, EnvironmentCount: len(os.Environ()), Environment: os.Environ()})
 		if err != nil {
 			os.Exit(11)
 		}

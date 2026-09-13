@@ -89,6 +89,6 @@ func gcpTestSpec() gcpstack.Spec {
 		Artifact:     gcpstack.Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)},
 		Policy:       gcpstack.NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b"}},
 		Catalog:      gcpstack.CatalogSelection{DesiredWebReplicas: 1, AutopilotCPURequest: "500m", AutopilotMemoryRequest: "1Gi"},
-		Dependencies: gcpstack.Dependencies{DatabaseName: "magento", MasterUsername: "magento"},
+		Dependencies: gcpstack.Dependencies{DatabaseName: "magento", MasterUsername: "magento", EncryptionKeySecret: "magento-crypt-key"},
 	}
 }

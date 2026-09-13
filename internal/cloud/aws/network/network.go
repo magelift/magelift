@@ -1,6 +1,7 @@
 package network
 
 import (
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -10,7 +11,9 @@ import (
 	"strings"
 
 	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/autoscaling"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/ec2"
+	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -22,13 +25,20 @@ const (
 	NatModeGateway = "nat-gateway"
 	NatModeFckNat  = "fck-nat"
 
-	fckNatAMIOwner      = "568608671756"
-	fckNatAMINamePrefix = "fck-nat-al2023-*-arm64-ebs"
-	fckNatInstanceType  = "t4g.micro"
+	NatTopologySingleAZ = "single-az"
+	NatTopologyMultiAZ  = "multi-az"
+
+	NatReplacementNone        = "none"
+	NatReplacementAutoScaling = "auto-scaling"
+
+	FckNatAMIOwner      = "568608671756"
+	FckNatAMINamePrefix = "fck-nat-al2023-*-arm64-ebs"
+	FckNatInstanceType  = "t4g.nano"
 )
 
 var existingVPCID = regexp.MustCompile(`^vpc-[A-Za-z0-9-]+$`)
 var existingSubnetID = regexp.MustCompile(`^subnet-[A-Za-z0-9-]+$`)
+var arm64NatInstanceType = regexp.MustCompile(`^(?:a1|[a-z0-9]+g[a-z0-9]*)\.[a-z0-9]+$`)
 
 type GatewayEndpointService string
 type InterfaceEndpointService string
@@ -62,6 +72,9 @@ type Args struct {
 	VPCCIDR            string
 	AvailabilityZones  []string
 	NatMode            string
+	NatTopology        string
+	NatReplacementMode string
+	NatInstanceType    string
 	Existing           *ExistingNetwork
 	GatewayEndpoints   []GatewayEndpoint
 	InterfaceEndpoints []InterfaceEndpoint
@@ -77,11 +90,13 @@ type ExistingNetwork struct {
 
 type Component struct {
 	pulumi.ResourceState
-	VpcID            pulumi.IDOutput
-	PublicSubnetIDs  []pulumi.IDOutput
-	PrivateSubnetIDs []pulumi.IDOutput
-	DataSubnetIDs    []pulumi.IDOutput
-	NATGatewayIDs    []pulumi.IDOutput
+	VpcID                    pulumi.IDOutput
+	PublicSubnetIDs          []pulumi.IDOutput
+	PrivateSubnetIDs         []pulumi.IDOutput
+	DataSubnetIDs            []pulumi.IDOutput
+	NATGatewayIDs            []pulumi.IDOutput
+	NATNetworkInterfaceIDs   []pulumi.StringOutput
+	NATAutoScalingGroupNames []pulumi.StringOutput
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
@@ -91,25 +106,28 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	component := &Component{}
 	inputs := pulumi.Map{
-		"preset":            pulumi.String(args.Preset),
-		"region":            pulumi.String(args.Region),
-		"vpcCidr":           pulumi.String(args.VPCCIDR),
-		"availabilityZones": pulumi.ToStringArray(args.AvailabilityZones),
+		"preset":                pulumi.String(args.Preset),
+		"region":                pulumi.String(args.Region),
+		"vpcCidr":               pulumi.String(args.VPCCIDR),
+		"availabilityZones":     pulumi.ToStringArray(args.AvailabilityZones),
+		"natMode":               pulumi.String(resolveNatMode(args.NatMode)),
+		"natTopology":           pulumi.String(resolveNatTopology(args.NatTopology, args.Preset)),
+		"natReplacementMode":    pulumi.String(resolveNatReplacementMode(args.NatReplacementMode, args.Preset, args.NatMode, args.NatTopology)),
+		"fckNatAmiOwner":        pulumi.String(FckNatAMIOwner),
+		"fckNatAmiArchitecture": pulumi.String("arm64"),
+		"fckNatInstanceType":    pulumi.String(resolveNatInstanceType(args.NatInstanceType, args.NatMode)),
 	}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, inputs, component, opts...); err != nil {
 		return nil, err
 	}
 	if args.Existing != nil {
-		if err := validateExistingNetwork(args, args.Existing); err != nil {
-			return nil, err
-		}
 		component.VpcID = pulumi.ID(args.Existing.VPCID).ToIDOutput()
 		component.PublicSubnetIDs = idInputs(args.Existing.PublicSubnetIDs)
 		component.PrivateSubnetIDs = idInputs(args.Existing.PrivateSubnetIDs)
 		component.DataSubnetIDs = idInputs(args.Existing.DataSubnetIDs)
 		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
 			"vpcId": pulumi.String(args.Existing.VPCID), "publicSubnetIds": idArray(component.PublicSubnetIDs), "privateSubnetIds": idArray(component.PrivateSubnetIDs),
-			"dataSubnetIds": idArray(component.DataSubnetIDs), "natGatewayIds": pulumi.Array{},
+			"dataSubnetIds": idArray(component.DataSubnetIDs), "natGatewayIds": pulumi.Array{}, "natNetworkInterfaceIds": pulumi.Array{}, "natAutoScalingGroupNames": pulumi.Array{},
 		}); err != nil {
 			return nil, err
 		}
@@ -184,14 +202,13 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		}
 	}
 
+	natTopology := resolveNatTopology(args.NatTopology, args.Preset)
 	natCount := 1
-	if args.Preset != sdk.PresetPreview {
+	if natTopology == NatTopologyMultiAZ {
 		natCount = len(args.AvailabilityZones)
 	}
-	natMode := args.NatMode
-	if strings.TrimSpace(natMode) == "" {
-		natMode = NatModeGateway
-	}
+	natMode := resolveNatMode(args.NatMode)
+	natReplacementMode := resolveNatReplacementMode(args.NatReplacementMode, args.Preset, natMode, natTopology)
 	var privateDefaultRouteTargets []pulumi.StringOutput
 	switch natMode {
 	case NatModeGateway:
@@ -216,7 +233,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		}
 		for index := range privateTables {
 			natIndex := index
-			if args.Preset == sdk.PresetPreview {
+			if natTopology == NatTopologySingleAZ {
 				natIndex = 0
 			}
 			_, err := ec2.NewRoute(ctx, name+"-private-default-"+fmt.Sprintf("%02d", index+1), &ec2.RouteArgs{
@@ -228,10 +245,10 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		}
 	case NatModeFckNat:
 		ami, err := ec2.LookupAmi(ctx, &ec2.LookupAmiArgs{
-			Owners:     []string{fckNatAMIOwner},
+			Owners:     []string{FckNatAMIOwner},
 			MostRecent: pulumi.BoolRef(true),
 			Filters: []ec2.GetAmiFilter{
-				{Name: "name", Values: []string{fckNatAMINamePrefix}},
+				{Name: "name", Values: []string{FckNatAMINamePrefix}},
 				{Name: "state", Values: []string{"available"}},
 				{Name: "architecture", Values: []string{"arm64"}},
 			},
@@ -254,34 +271,95 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 			return nil, err
 		}
 		eniIDs := make([]pulumi.StringOutput, natCount)
-		for index := 0; index < natCount; index++ {
-			suffix := fmt.Sprintf("%02d", index+1)
-			eip, err := ec2.NewEip(ctx, name+"-fck-nat-eip-"+suffix, &ec2.EipArgs{
-				Domain: pulumi.String("vpc"), Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "fck-nat-eip", suffix, args.AvailabilityZones[index]),
-			}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
+		if natReplacementMode == NatReplacementAutoScaling {
+			profile, policy, err := newFckNatInstanceProfile(ctx, name, args, component)
 			if err != nil {
 				return nil, err
 			}
-			instance, err := ec2.NewInstance(ctx, name+"-fck-nat-"+suffix, &ec2.InstanceArgs{
-				Ami: pulumi.String(ami.Id), InstanceType: pulumi.String(fckNatInstanceType), SubnetId: component.PublicSubnetIDs[index],
-				VpcSecurityGroupIds: pulumi.StringArray{securityGroup.ID()}, SourceDestCheck: pulumi.Bool(false),
-				AssociatePublicIpAddress: pulumi.Bool(true), Region: pulumi.String(args.Region),
-				Tags: tags(args.Tags, name, "fck-nat", suffix, args.AvailabilityZones[index]),
-			}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
-			if err != nil {
-				return nil, err
+			for index := 0; index < natCount; index++ {
+				suffix := fmt.Sprintf("%02d", index+1)
+				fixedInterface, err := ec2.NewNetworkInterface(ctx, name+"-fck-nat-eni-"+suffix, &ec2.NetworkInterfaceArgs{
+					SubnetId: component.PublicSubnetIDs[index], SecurityGroups: pulumi.StringArray{securityGroup.ID()}, SourceDestCheck: pulumi.Bool(false),
+					Description: pulumi.String("MageLift fck-nat stable egress interface"), Region: pulumi.String(args.Region),
+					Tags: tags(args.Tags, name, "fck-nat-eni", suffix, args.AvailabilityZones[index]),
+				}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
+				if err != nil {
+					return nil, err
+				}
+				component.NATNetworkInterfaceIDs = append(component.NATNetworkInterfaceIDs, fixedInterface.ID().ToStringOutput())
+				eniIDs[index] = fixedInterface.ID().ToStringOutput()
+				eip, err := ec2.NewEip(ctx, name+"-fck-nat-eip-"+suffix, &ec2.EipArgs{
+					Domain: pulumi.String("vpc"), Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "fck-nat-eip", suffix, args.AvailabilityZones[index]),
+				}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
+				if err != nil {
+					return nil, err
+				}
+				if _, err = ec2.NewEipAssociation(ctx, name+"-fck-nat-eip-assoc-"+suffix, &ec2.EipAssociationArgs{
+					AllocationId: eip.ID(), NetworkInterfaceId: fixedInterface.ID(), Region: pulumi.String(args.Region),
+				}, child); err != nil {
+					return nil, err
+				}
+				launchTemplate, err := ec2.NewLaunchTemplate(ctx, name+"-fck-nat-launch-template-"+suffix, &ec2.LaunchTemplateArgs{
+					ImageId: pulumi.String(ami.Id), InstanceType: pulumi.String(resolveNatInstanceType(args.NatInstanceType, args.NatMode)),
+					IamInstanceProfile: &ec2.LaunchTemplateIamInstanceProfileArgs{Name: profile.Name},
+					NetworkInterfaces: ec2.LaunchTemplateNetworkInterfaceArray{
+						&ec2.LaunchTemplateNetworkInterfaceArgs{
+							DeviceIndex: pulumi.Int(0), SubnetId: component.PublicSubnetIDs[index], AssociatePublicIpAddress: pulumi.String("true"),
+							SecurityGroups: pulumi.StringArray{securityGroup.ID()}, DeleteOnTermination: pulumi.String("true"),
+						},
+					},
+					UserData: fckNatUserData(fixedInterface.ID()), Region: pulumi.String(args.Region),
+					Tags: tags(args.Tags, name, "fck-nat-launch-template", suffix, args.AvailabilityZones[index]),
+					TagSpecifications: ec2.LaunchTemplateTagSpecificationArray{
+						&ec2.LaunchTemplateTagSpecificationArgs{ResourceType: pulumi.String("instance"), Tags: tags(args.Tags, name, "fck-nat", suffix, args.AvailabilityZones[index])},
+					},
+				}, child, pulumi.DependsOn([]pulumi.Resource{igw, policy, fixedInterface}))
+				if err != nil {
+					return nil, err
+				}
+				group, err := autoscaling.NewGroup(ctx, name+"-fck-nat-asg-"+suffix, &autoscaling.GroupArgs{
+					MinSize: pulumi.Int(1), DesiredCapacity: pulumi.Int(1), MaxSize: pulumi.Int(1),
+					VpcZoneIdentifiers: pulumi.StringArray{component.PublicSubnetIDs[index]},
+					LaunchTemplate:     &autoscaling.GroupLaunchTemplateArgs{Id: launchTemplate.ID(), Version: pulumi.String("$Latest")},
+					HealthCheckType:    pulumi.String("EC2"), HealthCheckGracePeriod: pulumi.Int(300), DefaultInstanceWarmup: pulumi.Int(300),
+					ForceDelete: pulumi.Bool(false), WaitForCapacityTimeout: pulumi.String("15m"), Region: pulumi.String(args.Region),
+					TerminationPolicies: pulumi.StringArray{pulumi.String("OldestInstance")}, Tags: groupTags(args.Tags, name, "fck-nat", suffix, args.AvailabilityZones[index]),
+				}, child, pulumi.DependsOn([]pulumi.Resource{launchTemplate, policy, fixedInterface}))
+				if err != nil {
+					return nil, err
+				}
+				component.NATAutoScalingGroupNames = append(component.NATAutoScalingGroupNames, group.Name)
 			}
-			_, err = ec2.NewEipAssociation(ctx, name+"-fck-nat-eip-assoc-"+suffix, &ec2.EipAssociationArgs{
-				AllocationId: eip.ID(), InstanceId: instance.ID(), Region: pulumi.String(args.Region),
-			}, child)
-			if err != nil {
-				return nil, err
+		} else {
+			for index := 0; index < natCount; index++ {
+				suffix := fmt.Sprintf("%02d", index+1)
+				eip, err := ec2.NewEip(ctx, name+"-fck-nat-eip-"+suffix, &ec2.EipArgs{
+					Domain: pulumi.String("vpc"), Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "fck-nat-eip", suffix, args.AvailabilityZones[index]),
+				}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
+				if err != nil {
+					return nil, err
+				}
+				instance, err := ec2.NewInstance(ctx, name+"-fck-nat-"+suffix, &ec2.InstanceArgs{
+					Ami: pulumi.String(ami.Id), InstanceType: pulumi.String(resolveNatInstanceType(args.NatInstanceType, args.NatMode)), SubnetId: component.PublicSubnetIDs[index],
+					VpcSecurityGroupIds: pulumi.StringArray{securityGroup.ID()}, SourceDestCheck: pulumi.Bool(false),
+					AssociatePublicIpAddress: pulumi.Bool(true), Region: pulumi.String(args.Region),
+					Tags: tags(args.Tags, name, "fck-nat", suffix, args.AvailabilityZones[index]),
+				}, child, pulumi.DependsOn([]pulumi.Resource{igw}))
+				if err != nil {
+					return nil, err
+				}
+				if _, err = ec2.NewEipAssociation(ctx, name+"-fck-nat-eip-assoc-"+suffix, &ec2.EipAssociationArgs{
+					AllocationId: eip.ID(), InstanceId: instance.ID(), Region: pulumi.String(args.Region),
+				}, child); err != nil {
+					return nil, err
+				}
+				eniIDs[index] = instance.PrimaryNetworkInterfaceId
+				component.NATNetworkInterfaceIDs = append(component.NATNetworkInterfaceIDs, instance.PrimaryNetworkInterfaceId)
 			}
-			eniIDs[index] = instance.PrimaryNetworkInterfaceId
 		}
 		for index := range privateTables {
 			natIndex := index
-			if args.Preset == sdk.PresetPreview {
+			if natTopology == NatTopologySingleAZ {
 				natIndex = 0
 			}
 			_, err := ec2.NewRoute(ctx, name+"-private-default-"+fmt.Sprintf("%02d", index+1), &ec2.RouteArgs{
@@ -341,6 +419,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
 		"vpcId": vpc.ID(), "publicSubnetIds": idArray(component.PublicSubnetIDs), "privateSubnetIds": idArray(component.PrivateSubnetIDs),
 		"dataSubnetIds": idArray(component.DataSubnetIDs), "natGatewayIds": idArray(component.NATGatewayIDs),
+		"natNetworkInterfaceIds": stringArray(component.NATNetworkInterfaceIDs), "natAutoScalingGroupNames": stringArray(component.NATAutoScalingGroupNames),
 	}); err != nil {
 		return nil, err
 	}
@@ -352,11 +431,27 @@ func validate(args Args) ([]string, error) {
 		return nil, errors.New("AWS region is required")
 	}
 	natMode := args.NatMode
-	if strings.TrimSpace(natMode) == "" {
-		natMode = NatModeGateway
-	}
-	if natMode != NatModeGateway && natMode != NatModeFckNat {
+	if natMode = resolveNatMode(natMode); natMode != NatModeGateway && natMode != NatModeFckNat {
 		return nil, errors.New("natMode must be nat-gateway or fck-nat")
+	}
+	natTopology := resolveNatTopology(args.NatTopology, args.Preset)
+	if natTopology != NatTopologySingleAZ && natTopology != NatTopologyMultiAZ {
+		return nil, errors.New("natTopology must be single-az or multi-az")
+	}
+	natReplacementMode := resolveNatReplacementMode(args.NatReplacementMode, args.Preset, natMode, natTopology)
+	if natReplacementMode != NatReplacementNone && natReplacementMode != NatReplacementAutoScaling {
+		return nil, errors.New("natReplacementMode must be none or auto-scaling")
+	}
+	if natMode == NatModeGateway && natReplacementMode != NatReplacementNone {
+		return nil, errors.New("natReplacementMode is only supported with fck-nat")
+	}
+	if instanceType := strings.TrimSpace(args.NatInstanceType); instanceType != "" {
+		if natMode != NatModeFckNat {
+			return nil, errors.New("natInstanceType is only supported with fck-nat")
+		}
+		if !arm64NatInstanceType.MatchString(instanceType) {
+			return nil, errors.New("natInstanceType must be an ARM64-compatible Graviton instance type")
+		}
 	}
 	seen := map[string]bool{}
 	for _, zone := range args.AvailabilityZones {
@@ -390,11 +485,116 @@ func validate(args Args) ([]string, error) {
 	// Aurora requires a DB subnet group spanning two zones, even for disposable
 	// preview environments. Web workloads can still use only the first zone.
 	wantZones := map[sdk.PresetID]int{sdk.PresetPreview: 2, sdk.PresetStandard: 2, sdk.PresetHighAvailability: 3}[args.Preset]
-	standardQueueLayout := args.Preset == sdk.PresetStandard && len(args.AvailabilityZones) == 3
-	if wantZones == 0 || (len(args.AvailabilityZones) != wantZones && !standardQueueLayout) {
-		return nil, fmt.Errorf("preset %q requires exactly %d availability zones, or three for a standard RabbitMQ queue layout", args.Preset, wantZones)
+	queueLayout3AZ := (args.Preset == sdk.PresetPreview || args.Preset == sdk.PresetStandard) && len(args.AvailabilityZones) == 3
+	if wantZones == 0 || (len(args.AvailabilityZones) != wantZones && !queueLayout3AZ) {
+		return nil, fmt.Errorf("preset %q requires exactly %d availability zones, or three for an Amazon MQ queue layout", args.Preset, wantZones)
+	}
+	if args.Existing != nil {
+		if strings.TrimSpace(args.NatMode) == NatModeFckNat || strings.TrimSpace(args.NatTopology) != "" || strings.TrimSpace(args.NatReplacementMode) != "" || strings.TrimSpace(args.NatInstanceType) != "" {
+			return nil, errors.New("existing network owns egress; fck-nat and NAT topology/replacement settings cannot be selected")
+		}
+		if err := validateExistingNetwork(args, args.Existing); err != nil {
+			return nil, err
+		}
 	}
 	return subnetCIDRs(prefix, len(args.AvailabilityZones)*3), nil
+}
+
+func resolveNatMode(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return NatModeGateway
+	}
+	return strings.TrimSpace(value)
+}
+
+func resolveNatTopology(value string, preset sdk.PresetID) string {
+	if strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	if preset == sdk.PresetPreview {
+		return NatTopologySingleAZ
+	}
+	return NatTopologyMultiAZ
+}
+
+func resolveNatReplacementMode(value string, preset sdk.PresetID, natMode, topology string) string {
+	if strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	if resolveNatMode(natMode) != NatModeFckNat || resolveNatTopology(topology, preset) != NatTopologyMultiAZ {
+		return NatReplacementNone
+	}
+	return NatReplacementAutoScaling
+}
+
+func resolveNatInstanceType(value, natMode string) string {
+	if resolveNatMode(natMode) != NatModeFckNat {
+		return ""
+	}
+	if strings.TrimSpace(value) == "" {
+		return FckNatInstanceType
+	}
+	return strings.TrimSpace(value)
+}
+
+// ResolveNatTopology returns the stable topology used by the AWS plan when
+// YAML omits the provider-specific choice.
+func ResolveNatTopology(value string, preset sdk.PresetID) string {
+	return resolveNatTopology(value, preset)
+}
+
+// ResolveNatReplacementMode returns the stable fck-nat repair policy used by
+// the AWS plan when YAML omits the provider-specific choice.
+func ResolveNatReplacementMode(value string, preset sdk.PresetID, natMode, topology string) string {
+	return resolveNatReplacementMode(value, preset, natMode, topology)
+}
+
+func newFckNatInstanceProfile(ctx *pulumi.Context, name string, args Args, parent pulumi.Resource) (*iam.InstanceProfile, *iam.RolePolicy, error) {
+	role, err := iam.NewRole(ctx, name+"-fck-nat-role", &iam.RoleArgs{
+		AssumeRolePolicy: pulumi.String(ec2AssumeRolePolicy), Description: pulumi.String("MageLift fck-nat attachment role"),
+		Tags: tags(args.Tags, name, "fck-nat-role", "", ""),
+	}, pulumi.Parent(parent))
+	if err != nil {
+		return nil, nil, err
+	}
+	policy, err := iam.NewRolePolicy(ctx, name+"-fck-nat-role-policy", &iam.RolePolicyArgs{
+		Role: role.Name, Policy: pulumi.String(fckNatRolePolicy), Name: pulumi.String(name + "-fck-nat-attachment"),
+	}, pulumi.Parent(parent))
+	if err != nil {
+		return nil, nil, err
+	}
+	profile, err := iam.NewInstanceProfile(ctx, name+"-fck-nat-instance-profile", &iam.InstanceProfileArgs{
+		Role: role.Name, Name: pulumi.String(name + "-fck-nat"), Tags: tags(args.Tags, name, "fck-nat-instance-profile", "", ""),
+	}, pulumi.Parent(parent), pulumi.DependsOn([]pulumi.Resource{policy}))
+	if err != nil {
+		return nil, nil, err
+	}
+	return profile, policy, nil
+}
+
+const ec2AssumeRolePolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`
+
+const fckNatRolePolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["ec2:AttachNetworkInterface","ec2:ModifyNetworkInterfaceAttribute","ec2:AssociateAddress","ec2:DisassociateAddress"],"Resource":"*"}]}`
+
+func fckNatUserData(networkInterfaceID pulumi.StringInput) pulumi.StringOutput {
+	return networkInterfaceID.ToStringOutput().ApplyT(func(id string) string {
+		content := fmt.Sprintf("#!/bin/bash\nset -eu\necho \"eni_id=%s\" >> /etc/fck-nat.conf\nsystemctl restart fck-nat\n", id)
+		return base64.StdEncoding.EncodeToString([]byte(content))
+	}).(pulumi.StringOutput)
+}
+
+func groupTags(input map[string]string, component, role, suffix, zone string) autoscaling.GroupTagArray {
+	values := tags(input, component, role, suffix, zone)
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	result := make(autoscaling.GroupTagArray, 0, len(keys))
+	for _, key := range keys {
+		result = append(result, &autoscaling.GroupTagArgs{Key: pulumi.String(key), Value: values[key], PropagateAtLaunch: pulumi.Bool(true)})
+	}
+	return result
 }
 
 // validateCarveCapacity rejects a zone count whose public/private/data carve
@@ -488,13 +688,38 @@ func tags(input map[string]string, component, role, suffix, zone string) pulumi.
 	if zone != "" {
 		result["magelift:availability-zone"] = pulumi.String(zone)
 	}
+	for key, value := range kubernetesSubnetDiscoveryTags(role) {
+		result[key] = pulumi.String(value)
+	}
 	return result
+}
+
+// kubernetesSubnetDiscoveryTags advertises public and private subnets to EKS
+// Auto Mode NLB discovery. Without kubernetes.io/role/elb=1, an internet-facing
+// Service stays on private subnets (or fails to find a public subnet at all).
+func kubernetesSubnetDiscoveryTags(role string) map[string]string {
+	switch role {
+	case "public-subnet":
+		return map[string]string{"kubernetes.io/role/elb": "1"}
+	case "private-subnet":
+		return map[string]string{"kubernetes.io/role/internal-elb": "1"}
+	default:
+		return nil
+	}
 }
 
 func idArray(ids []pulumi.IDOutput) pulumi.Array {
 	result := make(pulumi.Array, len(ids))
 	for index := range ids {
 		result[index] = ids[index]
+	}
+	return result
+}
+
+func stringArray(values []pulumi.StringOutput) pulumi.Array {
+	result := make(pulumi.Array, len(values))
+	for index := range values {
+		result[index] = values[index]
 	}
 	return result
 }

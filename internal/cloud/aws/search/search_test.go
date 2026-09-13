@@ -90,7 +90,21 @@ func TestPreviewCreatesPrivateBoundedServerlessSearch(t *testing.T) {
 	}
 }
 
-func TestProvisionedSearchEnforcesTransportEncryptionAndFineGrainedAccess(t *testing.T) {
+func TestStandardCreatesServerlessSearch(t *testing.T) {
+	t.Parallel()
+	args := previewArgs()
+	args.Preset = sdk.PresetStandard
+	args.Serverless.AcceptColdStarts = false
+	m := deploy(t, args)
+	_ = m.one(t, "aws:opensearch/serverlessCollection:ServerlessCollection")
+	for _, resource := range m.snapshot() {
+		if strings.Contains(resource, "aws:opensearch/domain:Domain") {
+			t.Fatalf("standard serverless created a provisioned domain: %v", m.snapshot())
+		}
+	}
+}
+
+func TestProvisionedSearchUsesUnsignedVPCAccess(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		preset      sdk.PresetID
@@ -98,9 +112,11 @@ func TestProvisionedSearchEnforcesTransportEncryptionAndFineGrainedAccess(t *tes
 		instances   int
 		zones       float64
 		withStandby bool
+		zoneAware   bool
 	}{
-		{sdk.PresetStandard, stringsInput("data-a", "data-b"), 2, 2, false},
-		{sdk.PresetHighAvailability, stringsInput("data-a", "data-b", "data-c"), 3, 3, true},
+		{sdk.PresetPreview, stringsInput("data-a"), 1, 0, false, false},
+		{sdk.PresetStandard, stringsInput("data-a", "data-b"), 2, 2, false, true},
+		{sdk.PresetHighAvailability, stringsInput("data-a", "data-b", "data-c"), 3, 3, true, true},
 	}
 	for _, test := range tests {
 		test := test
@@ -120,20 +136,21 @@ func TestProvisionedSearchEnforcesTransportEncryptionAndFineGrainedAccess(t *tes
 				t.Fatalf("endpoint policy = %v", endpoint)
 			}
 			security := domain["advancedSecurityOptions"].ObjectValue()
-			if !security["enabled"].BoolValue() || security["internalUserDatabaseEnabled"].BoolValue() {
-				t.Fatalf("fine-grained access = %v", security)
-			}
-			master := security["masterUserOptions"].ObjectValue()
-			if master["masterUserArn"].StringValue() != testIdentityARN || master.HasValue("masterUserPassword") || master.HasValue("masterUserName") {
-				t.Fatalf("master identity = %v", master)
+			if security["enabled"].BoolValue() || security["internalUserDatabaseEnabled"].BoolValue() {
+				t.Fatalf("fine-grained access must be off for Magento unsigned clients: %v", security)
 			}
 			accessPolicy := domain["accessPolicies"].StringValue()
-			if !strings.Contains(accessPolicy, testIdentityARN) || !strings.Contains(accessPolicy, "arn:aws:es:eu-west-3:123456789012:domain/shop/*") || strings.Contains(strings.ToLower(accessPolicy), "password") {
+			if !strings.Contains(accessPolicy, `"AWS":"*"`) || !strings.Contains(accessPolicy, "es:ESHttp*") || strings.Contains(accessPolicy, testIdentityARN) || strings.Contains(strings.ToLower(accessPolicy), "password") {
 				t.Fatalf("domain access policy = %s", accessPolicy)
 			}
 			cluster := domain["clusterConfig"].ObjectValue()
-			if cluster["zoneAwarenessConfig"].ObjectValue()["availabilityZoneCount"].NumberValue() != test.zones || cluster["multiAzWithStandbyEnabled"].BoolValue() != test.withStandby {
-				t.Fatalf("zone policy = %v", cluster)
+			if cluster["zoneAwarenessEnabled"].BoolValue() != test.zoneAware {
+				t.Fatalf("zone awareness = %v, want %v", cluster["zoneAwarenessEnabled"], test.zoneAware)
+			}
+			if test.zoneAware {
+				if cluster["zoneAwarenessConfig"].ObjectValue()["availabilityZoneCount"].NumberValue() != test.zones || cluster["multiAzWithStandbyEnabled"].BoolValue() != test.withStandby {
+					t.Fatalf("zone policy = %v", cluster)
+				}
 			}
 			if test.withStandby && (!cluster["dedicatedMasterEnabled"].BoolValue() || cluster["dedicatedMasterCount"].NumberValue() != 3 || cluster["dedicatedMasterType"].StringValue() != "m7g.master-selected.search") {
 				t.Fatalf("dedicated master policy = %v", cluster)
@@ -154,6 +171,24 @@ func TestSearchAcceptsOutputIdentityInput(t *testing.T) {
 	}
 }
 
+func TestSearchNormalizesLongLogicalNamesForAWS(t *testing.T) {
+	t.Parallel()
+	name := "a-very-long-magelift-project-preview-search"
+	args := previewArgs()
+	m := &mocks{}
+	if err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		_, err := New(ctx, name, args)
+		return err
+	}, pulumi.WithMocks("project", "stack", m)); err != nil {
+		t.Fatal(err)
+	}
+	collection := m.one(t, "aws:opensearch/serverlessCollection:ServerlessCollection").inputs
+	providerName := collection["name"].StringValue()
+	if len(providerName) > 26 || !resourceName.MatchString(providerName) {
+		t.Fatalf("provider name = %q", providerName)
+	}
+}
+
 func TestSearchRejectsUnsafeOrGuessedInputsBeforeRegistration(t *testing.T) {
 	t.Parallel()
 	previewCases := []func(*Args){
@@ -165,6 +200,7 @@ func TestSearchRejectsUnsafeOrGuessedInputsBeforeRegistration(t *testing.T) {
 		func(args *Args) { args.Serverless.Capacity.MaximumIndexingOCU = 0 },
 		func(args *Args) { args.Serverless.Capacity.MaximumSearchOCU = math.Inf(1) },
 		func(args *Args) { args.Serverless.Capacity.MaximumIndexingOCU = 3 },
+		func(args *Args) { args.Serverless = nil },
 		func(args *Args) { args.Provisioned = &Provisioned{} },
 	}
 	for index, mutate := range previewCases {

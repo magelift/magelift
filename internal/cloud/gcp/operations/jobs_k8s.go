@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	gcpruntime "github.com/magelift/magelift/internal/cloud/gcp/runtime"
+	"github.com/magelift/magelift/internal/cloud/kube"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -61,6 +63,10 @@ func (k k8sJobs) WaitJob(ctx context.Context, namespace, name string, timeout ti
 					if msg == "" {
 						msg = condition.Reason
 					}
+					diagnostics := kube.JobFailureDiagnostics(ctx, k.client, namespace, name)
+					if diagnostics != "" {
+						return fmt.Errorf("wait for migrate Job: job failed: %s\n%s", msg, diagnostics)
+					}
 					return fmt.Errorf("wait for migrate Job: job failed: %s", msg)
 				}
 			}
@@ -100,19 +106,24 @@ func migrationJob(name string, request CandidateRequest) *batchv1.Job {
 	}
 	memory := request.MemoryRequest
 	if memory == "" {
-		memory = "1Gi"
+		memory = gcpruntime.DefaultApplicationMemoryRequest
 	}
 	bindings := platform.CoreEnvBindings(platform.CapabilityEndpoints{
-		ApplicationMode: request.ApplicationMode,
-		WebRuntime:      request.WebRuntime,
-		DatabaseWriter:  request.DatabaseWriter,
-		DatabaseName:    request.DatabaseName,
-		CacheEndpoint:   request.CacheEndpoint,
+		ApplicationMode:    request.ApplicationMode,
+		ApplicationVersion: request.ApplicationVersion,
+		WebRuntime:         request.WebRuntime,
+		Magento:            request.Magento,
+		DatabaseWriter:     request.DatabaseWriter,
+		DatabaseName:       request.DatabaseName,
+		CacheEndpoint:      request.CacheEndpoint,
+		SearchEndpoint:     request.SearchEndpoint,
 	})
 	env := make([]corev1.EnvVar, 0, len(bindings))
 	for _, binding := range bindings {
 		env = append(env, corev1.EnvVar{Name: binding.Name, Value: binding.Value})
 	}
+	env = append(env, kube.DatabaseCredentialEnvVars(request.DatabaseSecretName)...)
+	env = append(env, kube.EncryptionKeyEnvVars(request.EncryptionKeySecretName)...)
 	backoff := int32(0)
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

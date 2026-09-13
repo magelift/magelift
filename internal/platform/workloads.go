@@ -4,12 +4,13 @@ package platform
 // GKE Jobs/Deployments; they must not invent alternate Magento CLI sequences.
 
 // MagentoMigrationShell is the pre-traffic migrate candidate command
-// (config import, setup:upgrade, cache clean+flush).
+// (config import, setup:upgrade, static content deploy, cache clean+flush).
 func MagentoMigrationShell() []string {
 	return []string{
 		"/bin/sh", "-ec",
 		"bin/magento app:config:import --no-interaction && " +
 			"bin/magento setup:upgrade --keep-generated --no-interaction && " +
+			"bin/magento setup:static-content:deploy --no-interaction && " +
 			"bin/magento cache:clean && bin/magento cache:flush",
 	}
 }
@@ -21,5 +22,16 @@ func MagentoCronShell() []string {
 
 // MagentoQueueArgs starts Magento message-queue consumers.
 func MagentoQueueArgs() []string {
-	return []string{"bin/magento", "queue:consumers:start", "--max-messages=10000"}
+	return MagentoQueueArgsFor(nil)
+}
+
+// MagentoQueueArgsFor starts the named Magento consumers, or Magento's default async worker.
+func MagentoQueueArgsFor(names []string) []string {
+	command := []string{"bin/magento", "queue:consumers:start"}
+	if trimmed := nonEmptyStrings(names); len(trimmed) > 0 {
+		command = append(command, trimmed...)
+	} else {
+		command = append(command, "async.operations.all")
+	}
+	return append(command, "--max-messages=10000")
 }

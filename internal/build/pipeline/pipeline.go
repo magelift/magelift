@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 
 	buildkit "github.com/magelift/magelift/internal/build/kit"
@@ -20,6 +22,7 @@ import (
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/containerrunner"
 	"github.com/magelift/magelift/internal/source"
+	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
 const maxManifestBytes int64 = 4 << 20
@@ -28,6 +31,8 @@ var pinnedImage = regexp.MustCompile(`^(?:sha256:[a-f0-9]{64}|[^\s@]+@sha256:[a-
 var repositoryDigest = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
 var sourceRevision = regexp.MustCompile(`^(?:[a-f0-9]{40}|[a-f0-9]{64})$`)
 var localImageTag = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
+var digestPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
+var hexDigestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 //go:embed assets/application.Dockerfile
 var applicationDockerfile []byte
@@ -61,6 +66,54 @@ type Result struct {
 	Image          buildkit.Result `json:"image" yaml:"image"`
 	Manifest       string          `json:"manifest" yaml:"manifest"`
 	ManifestSHA256 string          `json:"manifestSha256" yaml:"manifestSha256"`
+	Runtime        RuntimeContract `json:"runtime" yaml:"runtime"`
+}
+
+// ImmutableArtifactContract converts a pushed pipeline result into the
+// provider-neutral artifact identity used by certification reuse. The build
+// pipeline proves the image and manifest digests; signing remains an explicit
+// release step, so its opaque reference is supplied by the caller.
+func (result Result) ImmutableArtifactContract(inputFingerprint, provenanceReference, signatureReference string) (sdk.ImmutableArtifactContract, error) {
+	if !result.Image.Pushed {
+		return sdk.ImmutableArtifactContract{}, errors.New("immutable artifact contract requires a confirmed image push")
+	}
+	baseReference := result.Image.ImageReference
+	if base, _, found := strings.Cut(baseReference, "@"); found {
+		baseReference = base
+	}
+	if !registryQualifiedReference(baseReference) {
+		return sdk.ImmutableArtifactContract{}, errors.New("immutable artifact contract requires a registry-qualified image reference")
+	}
+	if !digestPattern.MatchString(result.Image.Digest) {
+		return sdk.ImmutableArtifactContract{}, errors.New("immutable artifact contract requires an image SHA-256 digest")
+	}
+	manifestDigest := result.ManifestSHA256
+	if !strings.HasPrefix(manifestDigest, "sha256:") {
+		if !hexDigestPattern.MatchString(manifestDigest) {
+			return sdk.ImmutableArtifactContract{}, errors.New("immutable artifact contract requires a manifest SHA-256 digest")
+		}
+		manifestDigest = "sha256:" + manifestDigest
+	}
+	contract := sdk.ImmutableArtifactContract{
+		ImageDigest:         baseReference + "@" + result.Image.Digest,
+		ManifestDigest:      manifestDigest,
+		InputFingerprint:    inputFingerprint,
+		ProvenanceReference: provenanceReference,
+		SignatureReference:  signatureReference,
+	}
+	if err := contract.Validate(); err != nil {
+		return sdk.ImmutableArtifactContract{}, err
+	}
+	return contract, nil
+}
+
+// RuntimeContract is the resolved runtime that the isolated builder proved
+// before the application image was created. It is kept alongside the manifest
+// path so callers can publish the same contract in certification evidence.
+type RuntimeContract struct {
+	PHPVersion      string   `json:"phpVersion" yaml:"phpVersion"`
+	PHPExtensions   []string `json:"phpExtensions" yaml:"phpExtensions"`
+	ComposerVersion string   `json:"composerVersion" yaml:"composerVersion"`
 }
 
 type Pipeline struct {
@@ -109,6 +162,13 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 	if prepareResponse.Stage != buildrunner.StagePrepare || prepareResponse.Prepare == nil {
 		return Result{}, errors.New("build runner returned the wrong prepare stage")
 	}
+	preparedExtensions, err := canonicalPHPExtensions(prepareResponse.Prepare.PHPExtensions)
+	if err != nil {
+		return Result{}, fmt.Errorf("normalize prepared PHP extensions: %w", err)
+	}
+	if err := validatePreparedRuntimeContract(prepareRequest.Prepare, prepareResponse.Prepare); err != nil {
+		return Result{}, fmt.Errorf("validate prepared runtime contract: %w", err)
+	}
 
 	dockerfilePath := filepath.Join(prepared.OutputDir, "Dockerfile")
 	if err := writeNewRegularFile(dockerfilePath, applicationDockerfile, 0o600); err != nil {
@@ -131,7 +191,7 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 		Platforms:        platforms,
 		Output:           output,
 		ProvenanceSource: request.ProvenanceSource,
-		Builder:          "default",
+		Builder:          buildkitBuilder(),
 		BuildArgs:        buildArguments,
 	})
 	if err != nil {
@@ -177,7 +237,139 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 	if err := atomicCopy(destination, manifest); err != nil {
 		return Result{}, fmt.Errorf("publish artifact manifest: %w", err)
 	}
-	return Result{Image: image, Manifest: destination, ManifestSHA256: final.ManifestSHA256}, nil
+	return Result{
+		Image:          image,
+		Manifest:       destination,
+		ManifestSHA256: final.ManifestSHA256,
+		Runtime: RuntimeContract{
+			PHPVersion:      prepareResponse.Prepare.PHPVersion,
+			PHPExtensions:   append([]string(nil), preparedExtensions...),
+			ComposerVersion: prepareResponse.Prepare.ComposerVersion,
+		},
+	}, nil
+}
+
+func validatePreparedRuntimeContract(request *buildrunner.PrepareRequest, response *buildrunner.PrepareResponse) error {
+	if request == nil || response == nil {
+		return errors.New("prepare request and response are required")
+	}
+	if !runtimeVersionMatches(request.PHPVersion, response.PHPVersion) {
+		return fmt.Errorf("prepared PHP version %q does not satisfy requested %q", response.PHPVersion, request.PHPVersion)
+	}
+	if !runtimeVersionMatches(request.ComposerVersion, response.ComposerVersion) {
+		return fmt.Errorf("prepared Composer version %q does not satisfy requested %q", response.ComposerVersion, request.ComposerVersion)
+	}
+	availableExtensions, err := canonicalPHPExtensions(response.PHPExtensions)
+	if err != nil {
+		return err
+	}
+	available := make(map[string]struct{}, len(availableExtensions))
+	for _, extension := range availableExtensions {
+		available[extension] = struct{}{}
+	}
+	missing := make([]string, 0)
+	for _, extension := range request.PHPRequiredExtensions {
+		extension = canonicalPHPExtensionName(extension)
+		if _, ok := available[extension]; ok {
+			continue
+		}
+		if extension == "opcache" {
+			if _, ok := available["zend_opcache"]; ok {
+				continue
+			}
+		}
+		missing = append(missing, extension)
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf("prepared PHP runtime is missing requested extensions: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+func canonicalPHPExtensions(values []string) ([]string, error) {
+	canonical := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		name := canonicalPHPExtensionName(value)
+		if name == "" {
+			return nil, fmt.Errorf("prepared PHP runtime returned invalid extension %q", value)
+		}
+		key := name
+		if key == "zend_opcache" {
+			key = "opcache"
+		}
+		if _, exists := seen[key]; exists {
+			return nil, fmt.Errorf("prepared PHP runtime returned duplicate extension %q", name)
+		}
+		seen[key] = struct{}{}
+		canonical = append(canonical, name)
+	}
+	sort.Strings(canonical)
+	return canonical, nil
+}
+
+func canonicalPHPExtensionName(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var builder strings.Builder
+	pendingSeparator := false
+	for _, character := range value {
+		valid := (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') || character == '_' || character == '-'
+		if valid {
+			if pendingSeparator && builder.Len() > 0 {
+				builder.WriteByte('_')
+			}
+			builder.WriteRune(character)
+			pendingSeparator = false
+			continue
+		}
+		if builder.Len() > 0 {
+			pendingSeparator = true
+		}
+	}
+	return builder.String()
+}
+
+func runtimeVersionMatches(requested, prepared string) bool {
+	requested = strings.TrimSpace(requested)
+	prepared = strings.TrimSpace(prepared)
+	if requested == "" || prepared == "" {
+		return requested == prepared
+	}
+	if strings.HasSuffix(requested, "+") {
+		return numericVersionAtLeast(prepared, strings.TrimSuffix(requested, "+"))
+	}
+	return prepared == requested || strings.HasPrefix(prepared, requested+".")
+}
+
+func numericVersionAtLeast(got, want string) bool {
+	gotParts := strings.Split(got, ".")
+	wantParts := strings.Split(want, ".")
+	for index := 0; index < len(gotParts) || index < len(wantParts); index++ {
+		gotValue, wantValue := 0, 0
+		if index < len(gotParts) {
+			parsed, err := strconv.Atoi(gotParts[index])
+			if err != nil {
+				return false
+			}
+			gotValue = parsed
+		}
+		if index < len(wantParts) {
+			parsed, err := strconv.Atoi(wantParts[index])
+			if err != nil {
+				return false
+			}
+			wantValue = parsed
+		}
+		if gotValue != wantValue {
+			return gotValue > wantValue
+		}
+	}
+	return true
+}
+
+func buildkitBuilder() string {
+	return strings.TrimSpace(os.Getenv("BUILDX_BUILDER"))
 }
 
 func validateRequest(request Request, containers Container, builder Builder) (string, buildkit.OutputMode, []string, error) {

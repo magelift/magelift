@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/health"
@@ -36,8 +37,10 @@ func healthCommand(o *options) *cobra.Command {
 			switch report.Status {
 			case health.StatusHealthy:
 				return nil
-			case health.StatusUnhealthy:
+			case health.StatusUnhealthy, health.StatusDegraded:
 				return &exitError{code: healthExitUnhealthy, err: errors.New("health checks failed")}
+			case health.StatusStale:
+				return &exitError{code: healthExitUnavailable, err: errors.New("health evidence is stale")}
 			default:
 				return &exitError{code: healthExitUnavailable, err: errors.New("runtime health evidence is unavailable")}
 			}
@@ -53,7 +56,8 @@ func (o *options) runHealth(ctx context.Context, mode string) (health.Report, er
 		return health.Report{}, invalid(err)
 	}
 	target := effective.Config.Target.Provider + "." + effective.Config.Target.Runtime
-	report := health.Report{Environment: environment, Target: target, Mode: mode, Checks: []health.Check{}}
+	observedAt := time.Now().UTC()
+	report := health.Report{Environment: environment, Target: target, Mode: mode, Checks: []health.Check{}, ObservedAt: observedAt, Source: mode, Freshness: health.FreshnessCurrent}
 	switch mode {
 	case "config":
 		report.Checks = o.configHealthChecks(effective.Config)
@@ -65,7 +69,10 @@ func (o *options) runHealth(ctx context.Context, mode string) (health.Report, er
 		if o.newBackend == nil {
 			return health.Report{}, errors.New("infrastructure backend factory is required")
 		}
-		backend, err := o.newBackend(ctx, planned, strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL")))
+		if err := requireTargetDependencies(ctx, o, planned); err != nil {
+			return health.Report{}, err
+		}
+		backend, err := o.newBackend(ctx, planned, o.infrastructureBackendURL(planned))
 		if err != nil {
 			return health.Report{}, fmt.Errorf("create infrastructure backend: %w", err)
 		}
@@ -79,12 +86,30 @@ func (o *options) runHealth(ctx context.Context, mode string) (health.Report, er
 	default:
 		return health.Report{}, invalid(fmt.Errorf("unsupported health mode %q", mode))
 	}
+	for i := range report.Checks {
+		report.Checks[i] = health.AnnotateLayer(report.Checks[i])
+		if report.Checks[i].Source == "" {
+			report.Checks[i].Source = mode
+		}
+		if report.Checks[i].ObservedAt.IsZero() {
+			report.Checks[i].ObservedAt = observedAt
+		}
+		if report.Checks[i].Freshness == "" {
+			report.Checks[i].Freshness = health.FreshnessCurrent
+		}
+	}
 	report.Status = health.Summarize(report.Checks)
+	switch report.Status {
+	case health.StatusStale:
+		report.Freshness = health.FreshnessStale
+	case health.StatusUnavailable:
+		report.Freshness = health.FreshnessUnknown
+	}
 	return report, nil
 }
 
 func (o *options) runtimeHealthEvidence(ctx context.Context) []health.Check {
-	unavailable := []health.Check{{ID: "runtime.observe", Status: health.StatusUnavailable, Message: "runtime health evidence is unavailable"}}
+	unavailable := []health.Check{health.AnnotateLayer(health.Check{ID: "runtime.observe", Status: health.StatusUnavailable, Message: "runtime health evidence is unavailable"})}
 	observe, err := o.runtimeObserve()
 	if err != nil {
 		return unavailable
@@ -99,7 +124,7 @@ func (o *options) runtimeHealthEvidence(ctx context.Context) []health.Check {
 	items, err := observe.CheckRuntime(ctx, planned, outputs)
 	if err != nil {
 		if errors.Is(err, platform.ErrNotSupported) {
-			return []health.Check{{ID: "runtime.observe", Status: health.StatusUnavailable, Message: notSupportedForPlanned(planned, "runtime health")}}
+			return []health.Check{health.AnnotateLayer(health.Check{ID: "runtime.observe", Status: health.StatusUnavailable, Message: notSupportedForPlanned(planned, "runtime health")})}
 		}
 		return unavailable
 	}
@@ -119,21 +144,26 @@ func runtimeHealthChecks(items []platform.RuntimeHealth) []health.Check {
 			status = health.StatusHealthy
 		case "unhealthy":
 			status = health.StatusUnhealthy
+		case "degraded":
+			status = health.StatusDegraded
+		case "stale":
+			status = health.StatusStale
 		}
 		message := item.Detail
 		if message == "" {
 			message = item.Service + " is " + item.Status
 		}
-		checks = append(checks, health.Check{ID: id, Status: status, Message: message})
+		check := health.Check{ID: id, Layer: health.Layer(item.Layer), Status: status, Message: message}
+		checks = append(checks, health.AnnotateLayer(check))
 	}
 	if len(checks) == 0 {
-		return []health.Check{{ID: "runtime.observe", Status: health.StatusUnavailable, Message: "runtime health returned no probes"}}
+		return []health.Check{health.AnnotateLayer(health.Check{ID: "runtime.observe", Status: health.StatusUnavailable, Message: "runtime health returned no probes"})}
 	}
 	return checks
 }
 
 func (o *options) configHealthChecks(cfg config.Config) []health.Check {
-	checks := []health.Check{{ID: "config.resolved", Status: health.StatusHealthy, Message: "configuration resolved and passed schema and compatibility validation"}}
+	checks := []health.Check{health.AnnotateLayer(health.Check{ID: "config.resolved", Status: health.StatusHealthy, Message: "configuration resolved and passed schema and compatibility validation"})}
 	status, message := health.StatusHealthy, "registered Magento target is selected"
 	if o.modules != nil {
 		if _, found := o.modules.Module(sdk.ProviderID(cfg.Target.Provider), sdk.RuntimeID(cfg.Target.Runtime)); !found {
@@ -142,7 +172,7 @@ func (o *options) configHealthChecks(cfg config.Config) []health.Check {
 	} else if cfg.Target.Provider != "aws" || cfg.Target.Runtime != "ecs-fargate" {
 		status, message = health.StatusUnhealthy, "the selected target is not supported by this release"
 	}
-	return append(checks, health.Check{ID: "target.supported", Status: status, Message: message})
+	return append(checks, health.AnnotateLayer(health.Check{ID: "target.supported", Status: status, Message: message}))
 }
 
 func outputHealthChecks(outputs map[string]any) []health.Check {
@@ -151,10 +181,10 @@ func outputHealthChecks(outputs map[string]any) []health.Check {
 		value, ok := outputs[key].(string)
 		parsed, err := url.ParseRequestURI(value)
 		if !ok || err != nil || parsed.Scheme != "https" || parsed.Host == "" {
-			checks = append(checks, health.Check{ID: "output." + key, Status: health.StatusUnhealthy, Message: key + " is missing or is not an HTTPS URL"})
+			checks = append(checks, health.AnnotateLayer(health.Check{ID: "output." + key, Status: health.StatusUnhealthy, Message: key + " is missing or is not an HTTPS URL"}))
 			continue
 		}
-		checks = append(checks, health.Check{ID: "output." + key, Status: health.StatusHealthy, Message: key + " is present and structurally valid"})
+		checks = append(checks, health.AnnotateLayer(health.Check{ID: "output." + key, Status: health.StatusHealthy, Message: key + " is present and structurally valid"}))
 	}
 	return checks
 }

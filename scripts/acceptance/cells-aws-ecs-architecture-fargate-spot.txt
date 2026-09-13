@@ -1,0 +1,4 @@
+# Cold ECS architecture cell: Fargate Spot. Use with a config whose
+# target.runtime is ecs-fargate and target.aws.catalog.fargate.computeMode is fargate-spot.
+computeMode:fargate-spot
+queueMode:db

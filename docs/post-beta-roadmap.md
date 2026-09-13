@@ -17,4 +17,4 @@ Explicitly **after** public beta. Do not block the certified AWS path on these.
 | MageLift OpenSearch SigV4 data-plane | Paid AWS acceptance: index/query/reconnect/least-privilege on a real MageLift stack (deferred from public-tag gate; see [release-readiness.md](release-readiness.md)). **Not** on the Community Launch critical path; see [publishing.md](publishing.md). |
 | Cloud SQL / multi-cloud attach | AWS VPC+RDS adopt shipped; Cloud SQL attach stays v1.1+ (same decision as OpenSearch SigV4 for launch) |
 
-See [capability matrix](capability-matrix.md), [ADR 0007](adr/0007-multi-provider-community-targets.md), and [publishing.md](publishing.md).
+See [capability matrix](capability-matrix.md), [ADR 0002](adr/0002-certified-vs-experimental.md), and [publishing.md](publishing.md).

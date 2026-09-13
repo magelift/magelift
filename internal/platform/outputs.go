@@ -19,6 +19,32 @@ const (
 	OutputClusterName      = "clusterName"
 	OutputServiceName      = "serviceName"
 	OutputPrivateSubnetIDs = "privateSubnetIds"
+	// OutputDatabaseSecretName is the namespace-local Kubernetes Secret used by
+	// K8s workloads and candidate migration Jobs for DB credentials.
+	OutputDatabaseSecretName = "databaseSecretName"
+	// OutputEncryptionKeySecretName is the namespace-local Kubernetes Secret
+	// used by K8s workloads and candidate migration Jobs for Magento's stable
+	// encryption key.
+	OutputEncryptionKeySecretName = "encryptionKeySecretName"
+	// OutputQueuePasswordSecretName is the namespace-local Kubernetes Secret
+	// used by RabbitMQ workloads and candidate migration Jobs for the broker
+	// password. It is present only when the selected queue mode needs AMQP.
+	OutputQueuePasswordSecretName = "queuePasswordSecretName"
+	// OutputSearchEndpoint is the internal OpenSearch endpoint consumed by
+	// Magento web and candidate migration workloads. It is optional when
+	// search is disabled.
+	OutputSearchEndpoint = "searchEndpoint"
+	// OutputQueueHost is the internal RabbitMQ service endpoint used by
+	// Kubernetes runtimes. It is optional when database-backed messaging is
+	// selected.
+	OutputQueueHost = "queueHost"
+	// OutputQueueReplicas is the live Magento broker replica count exported by
+	// Kubernetes adapters that run RabbitMQ. Optional; missing means create.
+	OutputQueueReplicas = "queueReplicas"
+	// OutputDatabaseConnectionName is an optional provider-native connection
+	// handle, such as a GCP Cloud SQL instance connection name, used by private
+	// database tunnel adapters. It is never a credential.
+	OutputDatabaseConnectionName = "databaseConnectionName"
 	// OutputMediaBucket is the Magento media object-storage bucket (env media-sync).
 	// Not in RequiredOutputKeys yet; AWS historically exported mediaURL only; adapters
 	// that support media-sync must export this key (GCP already does; AWS added in 05-05).

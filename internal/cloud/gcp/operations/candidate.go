@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/magelift/magelift/internal/platform"
 	batchv1 "k8s.io/api/batch/v1"
 )
 
@@ -30,19 +31,24 @@ type DeploymentStore struct {
 }
 
 type CandidateRequest struct {
-	Project         string
-	Region          string
-	Cluster         string
-	Namespace       string
-	ServiceName     string
-	ImageDigest     string
-	DatabaseWriter  string
-	DatabaseName    string
-	CacheEndpoint   string
-	ApplicationMode string
-	WebRuntime      string
-	CPURequest      string
-	MemoryRequest   string
+	Project                 string
+	Region                  string
+	Cluster                 string
+	Namespace               string
+	ServiceName             string
+	ImageDigest             string
+	DatabaseWriter          string
+	DatabaseName            string
+	DatabaseSecretName      string
+	EncryptionKeySecretName string
+	CacheEndpoint           string
+	SearchEndpoint          string
+	ApplicationMode         string
+	ApplicationVersion      string
+	WebRuntime              string
+	Magento                 platform.MagentoOverlays
+	CPURequest              string
+	MemoryRequest           string
 }
 
 type Candidate struct {
@@ -163,6 +169,9 @@ func validateCandidateRequest(request CandidateRequest) error {
 	}
 	if strings.TrimSpace(request.CacheEndpoint) == "" {
 		problems = append(problems, errors.New("cache endpoint is required"))
+	}
+	if strings.TrimSpace(request.EncryptionKeySecretName) == "" {
+		problems = append(problems, errors.New("Magento encryption key Secret is required"))
 	}
 	return errors.Join(problems...)
 }

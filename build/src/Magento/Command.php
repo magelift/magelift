@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace MageLift\Build\Magento;
 
 use InvalidArgumentException;
+use MageLift\Build\Process\ProcessRequest;
+use MageLift\Build\Process\ProcessResult;
+use MageLift\Build\Process\ProcessRunner;
 
 final readonly class Command implements CommandInterface
 {
@@ -38,5 +41,10 @@ final readonly class Command implements CommandInterface
     public function argv(): array
     {
         return [$this->commandExecutable->value, ...$this->commandArguments];
+    }
+
+    public function run(ProcessRunner $runner, ProcessRequest $request): ProcessResult
+    {
+        return $runner->run($request);
     }
 }

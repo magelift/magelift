@@ -10,9 +10,9 @@ import (
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
-	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/batch/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
+	"github.com/pulumi/pulumi-random/sdk/v4/go/random"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	scwk8s "github.com/pulumiverse/pulumi-scaleway/sdk/go/scaleway/kubernetes"
 )
@@ -28,29 +28,36 @@ type Args struct {
 	PrivateNetworkID    pulumi.StringInput
 	Image               string
 	ApplicationMode     string
+	ApplicationVersion  string
 	WebRuntime          string
 	DatabaseWriter      pulumi.StringInput
 	DatabaseName        string
+	DatabaseUsername    string
+	DatabasePassword    pulumi.StringInput
 	CacheEndpoint       pulumi.StringInput
 	SessionEndpoint     pulumi.StringInput
 	EncryptionKeySecret string
 	KapsuleVersion      string
 	NodeType            string
 	NodeCount           int
+	AvailabilityZones   []string
 	CPURequest          string
 	MemoryRequest       string
 	DesiredWebReplicas  int
 	QueueConsumerCount  int
 	Labels              map[string]string
+	Magento             platform.MagentoOverlays
 }
 
 type Component struct {
 	pulumi.ResourceState
-	ClusterName     pulumi.StringOutput
-	ServiceName     pulumi.StringOutput
-	ApplicationURL  pulumi.StringOutput
-	ClusterEndpoint pulumi.StringOutput
-	Kubeconfig      pulumi.StringOutput
+	ClusterName             pulumi.StringOutput
+	ServiceName             pulumi.StringOutput
+	ApplicationURL          pulumi.StringOutput
+	ClusterEndpoint         pulumi.StringOutput
+	DatabaseSecretName      pulumi.StringOutput
+	EncryptionKeySecretName pulumi.StringOutput
+	Kubeconfig              pulumi.StringOutput
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
@@ -66,11 +73,17 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if strings.TrimSpace(args.Image) == "" {
 		return nil, errors.New("container image digest is required")
 	}
+	if strings.TrimSpace(args.DatabaseUsername) == "" || args.DatabasePassword == nil {
+		return nil, errors.New("database username and password are required")
+	}
+	if strings.TrimSpace(args.EncryptionKeySecret) == "" {
+		return nil, errors.New("Kubernetes Secret name for Magento encryption key is required")
+	}
 	if args.DesiredWebReplicas < 1 {
 		args.DesiredWebReplicas = 1
 	}
 	if strings.TrimSpace(args.KapsuleVersion) == "" {
-		args.KapsuleVersion = "1.29.1"
+		args.KapsuleVersion = "1.36.1"
 	}
 	if strings.TrimSpace(args.NodeType) == "" {
 		args.NodeType = "DEV1-M"
@@ -82,7 +95,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		args.CPURequest = "500m"
 	}
 	if args.MemoryRequest == "" {
-		args.MemoryRequest = "1Gi"
+		args.MemoryRequest = kube.DefaultApplicationMemoryRequest
 	}
 	component := &Component{}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{
@@ -111,54 +124,83 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if err != nil {
 		return nil, fmt.Errorf("create Scaleway Kapsule cluster: %w", err)
 	}
-	pool, err := scwk8s.NewPool(ctx, name+"-pool", &scwk8s.PoolArgs{
-		ClusterId: cluster.ID(),
-		Version:   cluster.Version,
-		Name:      pulumi.String(name + "-pool"),
-		NodeType:  pulumi.String(args.NodeType),
-		Size:      pulumi.Int(args.NodeCount),
-		Region:    pulumi.String(args.Region),
-	}, parent, pulumi.DependsOn([]pulumi.Resource{cluster}))
+	placements, err := poolPlacements(name, args.NodeCount, args.AvailabilityZones)
 	if err != nil {
-		return nil, fmt.Errorf("create Scaleway Kapsule pool: %w", err)
+		return nil, fmt.Errorf("plan Scaleway Kapsule pools: %w", err)
 	}
+	poolResources := make([]pulumi.Resource, 0, len(placements))
+	for _, placement := range placements {
+		poolArgs := &scwk8s.PoolArgs{
+			ClusterId: cluster.ID(),
+			Version:   cluster.Version,
+			Name:      pulumi.String(placement.Name),
+			NodeType:  pulumi.String(args.NodeType),
+			Size:      pulumi.Int(placement.Size),
+			Region:    pulumi.String(args.Region),
+		}
+		if placement.Zone != "" {
+			poolArgs.Zone = pulumi.StringPtr(placement.Zone)
+		}
+		pool, err := scwk8s.NewPool(ctx, placement.Name, poolArgs, parent, pulumi.DependsOn([]pulumi.Resource{cluster}))
+		if err != nil {
+			return nil, fmt.Errorf("create Scaleway Kapsule pool %s: %w", placement.Name, err)
+		}
+		poolResources = append(poolResources, pool)
+	}
+
+	clusterDependencies := append([]pulumi.Resource{cluster}, poolResources...)
 
 	kubeconfig := pulumi.ToSecret(generateKubeconfig(clusterName, cluster.Kubeconfigs)).(pulumi.StringOutput)
 	k8sProvider, err := kubernetes.NewProvider(ctx, name+"-k8s", &kubernetes.ProviderArgs{
 		Kubeconfig:        kubeconfig,
 		ClusterIdentifier: cluster.ID().ToStringOutput(),
-	}, parent, pulumi.DependsOn([]pulumi.Resource{cluster, pool}))
+	}, parent, pulumi.DependsOn(clusterDependencies))
 	if err != nil {
 		return nil, fmt.Errorf("create Kubernetes provider: %w", err)
 	}
-	k8sOpts := []pulumi.ResourceOption{parent, pulumi.Provider(k8sProvider), pulumi.DependsOn([]pulumi.Resource{cluster, pool})}
+	k8sOpts := []pulumi.ResourceOption{parent, pulumi.Provider(k8sProvider), pulumi.DependsOn(clusterDependencies)}
 	skipAwait := kube.SkipAwaitAnnotations()
 
 	env := containerEnv(args)
+	databaseSecret, err := kube.NewDatabaseCredentialsSecret(ctx, name, args.DatabaseUsername, args.DatabasePassword, k8sOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("create database credentials Secret: %w", err)
+	}
+	databaseSecretName := kube.DatabaseCredentialsSecretName(name)
+	env = kube.AppendDatabaseCredentialEnv(env, databaseSecretName)
+	encryptionKeySecretName := strings.TrimSpace(args.EncryptionKeySecret)
+	encryptionKey, err := random.NewRandomPassword(ctx, name+"-encryption-key-value", &random.RandomPasswordArgs{
+		Length: pulumi.Int(64), Special: pulumi.Bool(true), OverrideSpecial: pulumi.String("!@#%+=-"),
+	}, parent)
+	if err != nil {
+		return nil, fmt.Errorf("generate Magento encryption key: %w", err)
+	}
+	encryptionSecret, err := kube.NewNamedMagentoEncryptionKeySecret(ctx, name, encryptionKeySecretName, pulumi.ToSecret(encryptionKey.Result).(pulumi.StringOutput), k8sOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("create Magento encryption key Secret: %w", err)
+	}
+	env = kube.AppendEncryptionKeyEnv(env, encryptionKeySecretName)
+	workloadOpts := append(k8sOpts, pulumi.DependsOn([]pulumi.Resource{databaseSecret, encryptionSecret}))
+	webLabels := pulumi.StringMap{"app": pulumi.String(name + "-web")}
 
+	webContainers, err := kube.WebRuntimeContainers(args.WebRuntime, args.Image, env, args.CPURequest, args.MemoryRequest)
+	if err != nil {
+		return nil, err
+	}
 	web, err := appsv1.NewDeployment(ctx, name+"-web", &appsv1.DeploymentArgs{
 		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-web"), Annotations: skipAwait},
 		Spec: &appsv1.DeploymentSpecArgs{
 			Replicas: pulumi.Int(args.DesiredWebReplicas),
-			Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-web")}},
+			Selector: &metav1.LabelSelectorArgs{MatchLabels: webLabels},
 			Template: &corev1.PodTemplateSpecArgs{
-				Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String(name + "-web")}},
+				Metadata: &metav1.ObjectMetaArgs{Labels: webLabels},
 				Spec: &corev1.PodSpecArgs{
-					Containers: corev1.ContainerArray{
-						&corev1.ContainerArgs{
-							Name:  pulumi.String("web"),
-							Image: pulumi.String(args.Image),
-							Ports: corev1.ContainerPortArray{&corev1.ContainerPortArgs{ContainerPort: pulumi.Int(ApplicationPort)}},
-							Env:   env,
-							Resources: &corev1.ResourceRequirementsArgs{
-								Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
-							},
-						},
-					},
+					TopologySpreadConstraints: zoneSpreadConstraints(args.DesiredWebReplicas, args.AvailabilityZones, webLabels),
+					Containers:                webContainers,
 				},
 			},
 		},
-	}, k8sOpts...)
+	}, workloadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("create web Deployment: %w", err)
 	}
@@ -199,47 +241,27 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 				},
 			},
 		},
-	}, k8sOpts...)
+	}, workloadOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("create cron Deployment: %w", err)
 	}
 
-	_, err = batchv1.NewJob(ctx, name+"-deploy", &batchv1.JobArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-deploy"), Annotations: skipAwait},
-		Spec: &batchv1.JobSpecArgs{
-			Template: &corev1.PodTemplateSpecArgs{
-				Spec: &corev1.PodSpecArgs{
-					RestartPolicy: pulumi.String("Never"),
-					Containers: corev1.ContainerArray{
-						&corev1.ContainerArgs{
-							Name:    pulumi.String("deploy"),
-							Image:   pulumi.String(args.Image),
-							Command: kube.ToStringArray(platform.MagentoMigrationShell()),
-							Env:     env,
-						},
-					},
-				},
-			},
-		},
-	}, k8sOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("create deploy Job: %w", err)
-	}
-
 	if args.QueueConsumerCount > 0 {
+		queueLabels := pulumi.StringMap{"app": pulumi.String(name + "-queue")}
 		_, err = appsv1.NewDeployment(ctx, name+"-queue", &appsv1.DeploymentArgs{
 			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-queue"), Annotations: skipAwait},
 			Spec: &appsv1.DeploymentSpecArgs{
 				Replicas: pulumi.Int(args.QueueConsumerCount),
-				Selector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-queue")}},
+				Selector: &metav1.LabelSelectorArgs{MatchLabels: queueLabels},
 				Template: &corev1.PodTemplateSpecArgs{
-					Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String(name + "-queue")}},
+					Metadata: &metav1.ObjectMetaArgs{Labels: queueLabels},
 					Spec: &corev1.PodSpecArgs{
+						TopologySpreadConstraints: zoneSpreadConstraints(args.QueueConsumerCount, args.AvailabilityZones, queueLabels),
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
 								Name:    pulumi.String("queue"),
 								Image:   pulumi.String(args.Image),
-								Command: kube.ToStringArray(platform.MagentoQueueArgs()),
+								Command: kube.ToStringArray(platform.MagentoQueueArgsFor(args.Magento.ConsumerNames)),
 								Env:     env,
 								Resources: &corev1.ResourceRequirementsArgs{
 									Requests: pulumi.StringMap{"cpu": pulumi.String(args.CPURequest), "memory": pulumi.String(args.MemoryRequest)},
@@ -249,7 +271,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 					},
 				},
 			},
-		}, k8sOpts...)
+		}, workloadOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("create queue Deployment: %w", err)
 		}
@@ -258,6 +280,8 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.ClusterName = cluster.Name
 	component.ServiceName = pulumi.String(name + "-web").ToStringOutput()
 	component.ClusterEndpoint = cluster.ApiserverUrl
+	component.DatabaseSecretName = pulumi.String(databaseSecretName).ToStringOutput()
+	component.EncryptionKeySecretName = pulumi.String(encryptionKeySecretName).ToStringOutput()
 	component.Kubeconfig = kubeconfig
 	component.ApplicationURL = service.Status.ApplyT(func(status *corev1.ServiceStatus) string {
 		if status == nil || len(status.LoadBalancer.Ingress) == 0 {
@@ -275,11 +299,69 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
 		"clusterName": component.ClusterName, "serviceName": component.ServiceName, "applicationURL": component.ApplicationURL,
-		"kubeconfig": component.Kubeconfig,
+		"databaseSecretName":      component.DatabaseSecretName,
+		"encryptionKeySecretName": component.EncryptionKeySecretName,
+		"kubeconfig":              component.Kubeconfig,
 	}); err != nil {
 		return nil, err
 	}
 	return component, nil
+}
+
+type poolPlacement struct {
+	Name string
+	Zone string
+	Size int
+}
+
+func poolPlacements(name string, nodeCount int, zones []string) ([]poolPlacement, error) {
+	if nodeCount < 1 {
+		return nil, errors.New("node count must be at least one")
+	}
+	if len(zones) == 0 {
+		return []poolPlacement{{Name: name + "-pool", Size: nodeCount}}, nil
+	}
+
+	seen := make(map[string]struct{}, len(zones))
+	for _, zone := range zones {
+		zone = strings.TrimSpace(zone)
+		if zone == "" {
+			return nil, errors.New("availability zones cannot be empty")
+		}
+		if _, exists := seen[zone]; exists {
+			return nil, fmt.Errorf("availability zone %q is repeated", zone)
+		}
+		seen[zone] = struct{}{}
+	}
+	if nodeCount < len(zones) {
+		return nil, fmt.Errorf("node count %d cannot place at least one node in each of %d availability zones", nodeCount, len(zones))
+	}
+
+	placements := make([]poolPlacement, 0, len(zones))
+	baseSize := nodeCount / len(zones)
+	extraNodes := nodeCount % len(zones)
+	for index, zone := range zones {
+		size := baseSize
+		if index < extraNodes {
+			size++
+		}
+		placements = append(placements, poolPlacement{Name: fmt.Sprintf("%s-pool-%d", name, index+1), Zone: strings.TrimSpace(zone), Size: size})
+	}
+	return placements, nil
+}
+
+func zoneSpreadConstraints(replicas int, zones []string, labels pulumi.StringMap) corev1.TopologySpreadConstraintArray {
+	if len(zones) < 2 || replicas < len(zones) {
+		return nil
+	}
+	return corev1.TopologySpreadConstraintArray{
+		&corev1.TopologySpreadConstraintArgs{
+			MaxSkew:           pulumi.Int(1),
+			TopologyKey:       pulumi.String("topology.kubernetes.io/zone"),
+			WhenUnsatisfiable: pulumi.String("DoNotSchedule"),
+			LabelSelector:     &metav1.LabelSelectorArgs{MatchLabels: labels},
+		},
+	}
 }
 
 func containerEnv(args Args) corev1.EnvVarArrayOutput {
@@ -289,12 +371,14 @@ func containerEnv(args Args) corev1.EnvVarArrayOutput {
 			session = values[1].(string)
 		}
 		bindings := platform.CoreEnvBindings(platform.CapabilityEndpoints{
-			ApplicationMode: args.ApplicationMode,
-			WebRuntime:      args.WebRuntime,
-			DatabaseWriter:  values[0].(string),
-			DatabaseName:    args.DatabaseName,
-			CacheEndpoint:   values[1].(string),
-			SessionEndpoint: session,
+			ApplicationMode:    args.ApplicationMode,
+			ApplicationVersion: args.ApplicationVersion,
+			WebRuntime:         args.WebRuntime,
+			DatabaseWriter:     values[0].(string),
+			DatabaseName:       args.DatabaseName,
+			CacheEndpoint:      values[1].(string),
+			SessionEndpoint:    session,
+			Magento:            args.Magento,
 		})
 		return kube.EnvVars(bindings)
 	}).(corev1.EnvVarArrayOutput)

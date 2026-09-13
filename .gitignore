@@ -31,9 +31,11 @@
 
 # AI agent local caches and user-installed third-party skills (not audited for
 # this repository's Apache-2.0 license surface). First-party skills live in
-# agents/skills/ and are tracked.
+# agents/skills/ and are tracked. The OKF bundle under .agents/knowledge/ is
+# committed.
 .claude/
-.agents/
+.agents/*
+!.agents/knowledge/
 .cursor/
 .serena/
 skills-lock.json
@@ -42,6 +44,3 @@ skills-lock.json
 .planning/
 .wrangler/
 .venv/
-
-# Maintainer OKF / session notes (not public product docs)
-/docs/knowledge/

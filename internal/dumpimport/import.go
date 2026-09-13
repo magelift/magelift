@@ -24,8 +24,14 @@ var ErrNonEmptyRequiresYes = errors.New("importing into a non-empty database req
 type Options struct {
 	// DumpPath is a .sql or .sql.gz file (synthetic fixtures under testdata/fixtures/migrate).
 	DumpPath string
+	// OutputPath is the local destination for Export. Must be a file path, not "-".
+	OutputPath string
 	// Yes confirms destructive schema-replace when the target is non-empty (D-04).
+	// For Export, Yes overwrites an existing OutputPath.
 	Yes bool
+	// Sanitize rewrites the exported SQL so mailbox addresses are hashed. Off by
+	// default; the result is still not a certified anonymous dump.
+	Sanitize bool
 
 	// Database is the target schema name (default magento).
 	Database string
@@ -171,6 +177,7 @@ func openDumpReader(ctx context.Context, path string) (io.Reader, func(), error)
 type mysqlRunner interface {
 	ExecSQL(ctx context.Context, database string, stdin io.Reader) (stderr string, err error)
 	Query(ctx context.Context, database, sql string) (string, error)
+	Dump(ctx context.Context, database string, stdout io.Writer) (stderr string, err error)
 }
 
 func resolveRunner(opts Options) (mysqlRunner, error) {
@@ -261,6 +268,25 @@ func (h *hostMySQL) Query(ctx context.Context, database, sql string) (string, er
 	return strings.TrimSpace(stdout.String()), nil
 }
 
+func (h *hostMySQL) Dump(ctx context.Context, database string, stdout io.Writer) (string, error) {
+	if _, err := exec.LookPath("mysqldump"); err != nil {
+		return "", errors.New("dumpimport: mysqldump not found on PATH")
+	}
+	args := []string{"-h", h.host, "-P", strconv.Itoa(h.port), "-u", h.user, "--single-transaction", "--quick"}
+	if database != "" {
+		args = append(args, database)
+	}
+	cmd := exec.CommandContext(ctx, "mysqldump", args...)
+	if h.password != "" {
+		cmd.Env = append(os.Environ(), "MYSQL_PWD="+h.password)
+	}
+	cmd.Stdout = stdout
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stderr.String(), err
+}
+
 type composeMySQL struct {
 	workDir, composeFile, project string
 	user, password                string
@@ -307,4 +333,26 @@ func (c *composeMySQL) Query(ctx context.Context, database, sql string) (string,
 		return "", fmt.Errorf("dumpimport: mysql query failed: %s", msg)
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+func (c *composeMySQL) Dump(ctx context.Context, database string, stdout io.Writer) (string, error) {
+	args := []string{
+		"compose", "-f", c.composeFile, "--project-name", c.project,
+		"exec", "-T", "database",
+		"mysqldump", "-u", c.user,
+	}
+	if c.password != "" {
+		args = append(args, "-p"+c.password)
+	}
+	args = append(args, "--single-transaction", "--quick")
+	if database != "" {
+		args = append(args, database)
+	}
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Dir = c.workDir
+	cmd.Stdout = stdout
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stderr.String(), err
 }

@@ -11,16 +11,22 @@ final readonly class PrepareRequest
      * @param list<array{path: string, sha256: string}> $inputFiles
      * @param list<array{locale: string, theme: string, strategy?: string, threads?: int}> $staticContent
      * @param list<array<string, mixed>> $lifecycleHooks
+     * @param list<string> $phpExtensions
+     * @param list<string> $qualityPatches
      */
     private function __construct(
         public string $repositoryRoot,
         public string $sourceRevision,
         public array $application,
         public string $phpVersion,
+        public array $phpExtensions,
+        public string $composerVersion,
         public string $compatibilityStatus,
+        public bool $refreshModules,
         public array $inputFiles,
         public array $staticContent,
         public array $lifecycleHooks,
+        public array $qualityPatches,
     ) {
     }
 
@@ -32,7 +38,7 @@ final readonly class PrepareRequest
         $payload = ProtocolJson::object($envelope['prepare'], 'prepare');
         ProtocolJson::assertKeys(
             $payload,
-            ['repositoryRoot', 'sourceRevision', 'application', 'phpVersion', 'compatibilityStatus', 'inputFiles', 'staticContent', 'lifecycleHooks'],
+            ['repositoryRoot', 'sourceRevision', 'application', 'phpVersion', 'phpExtensions', 'composerVersion', 'compatibilityStatus', 'refreshModules', 'inputFiles', 'staticContent', 'lifecycleHooks', 'qualityPatches'],
             ['repositoryRoot', 'sourceRevision', 'application', 'phpVersion', 'compatibilityStatus', 'inputFiles', 'staticContent'],
             'prepare',
         );
@@ -66,10 +72,26 @@ final readonly class PrepareRequest
         if (!in_array($compatibilityStatus, ['supported', 'unsupported-allowed'], true)) {
             throw new InvalidProtocolRequest('compatibilityStatus must be supported or unsupported-allowed.');
         }
+        $phpExtensions = self::parsePHPExtensions($payload['phpExtensions'] ?? []);
+        $composerVersion = '';
+        if (array_key_exists('composerVersion', $payload)) {
+            $composerVersion = self::requiredString($payload['composerVersion'], 'prepare.composerVersion');
+            if (preg_match('/^2\.\d+(?:\.\d+)?\+?$/D', $composerVersion) !== 1) {
+                throw new InvalidProtocolRequest('prepare.composerVersion must be a Composer 2 major.minor, major.minor.patch, or minimum version with +.');
+            }
+        }
+        $refreshModules = false;
+        if (array_key_exists('refreshModules', $payload)) {
+            if (!is_bool($payload['refreshModules'])) {
+                throw new InvalidProtocolRequest('prepare.refreshModules must be a boolean.');
+            }
+            $refreshModules = $payload['refreshModules'];
+        }
         $inputFiles = self::parseInputFiles($payload['inputFiles']);
         $staticContent = self::parseStaticContent($payload['staticContent']);
         $lifecycleHooks = self::parseLifecycleHooks($payload['lifecycleHooks'] ?? []);
-        return new self($repositoryRoot, $sourceRevision, $application, $phpVersion, $compatibilityStatus, $inputFiles, $staticContent, $lifecycleHooks);
+        $qualityPatches = self::parseQualityPatches($payload['qualityPatches'] ?? []);
+        return new self($repositoryRoot, $sourceRevision, $application, $phpVersion, $phpExtensions, $composerVersion, $compatibilityStatus, $refreshModules, $inputFiles, $staticContent, $lifecycleHooks, $qualityPatches);
     }
 
     public function toCanonicalJson(): string
@@ -98,10 +120,21 @@ final readonly class PrepareRequest
             'sourceRevision' => $this->sourceRevision,
             'application' => $this->application,
             'phpVersion' => $this->phpVersion,
-            'compatibilityStatus' => $this->compatibilityStatus,
-            'inputFiles' => $inputFiles,
-            'staticContent' => $staticContent,
         ];
+        if ($this->phpExtensions !== []) {
+            $phpExtensions = $this->phpExtensions;
+            sort($phpExtensions, SORT_STRING);
+            $prepare['phpExtensions'] = $phpExtensions;
+        }
+        if ($this->composerVersion !== '') {
+            $prepare['composerVersion'] = $this->composerVersion;
+        }
+        $prepare['compatibilityStatus'] = $this->compatibilityStatus;
+        if ($this->refreshModules) {
+            $prepare['refreshModules'] = true;
+        }
+        $prepare['inputFiles'] = $inputFiles;
+        $prepare['staticContent'] = $staticContent;
         if ($this->lifecycleHooks !== []) {
             $prepare['lifecycleHooks'] = array_map(static function (array $hook): array {
                 $canonical = [
@@ -125,6 +158,9 @@ final readonly class PrepareRequest
 
                 return $canonical;
             }, $this->lifecycleHooks);
+        }
+        if ($this->qualityPatches !== []) {
+            $prepare['qualityPatches'] = $this->qualityPatches;
         }
 
         return ProtocolJson::encode([
@@ -157,6 +193,47 @@ final readonly class PrepareRequest
         }
 
         return $string;
+    }
+
+    /** @return list<string> */
+    private static function parsePHPExtensions(mixed $value): array
+    {
+        $result = [];
+        $seen = [];
+        foreach (ProtocolJson::list($value, 'prepare.phpExtensions') as $entry) {
+            $extension = self::requiredString($entry, 'prepare.phpExtensions[]');
+            if (preg_match('/^[a-z][a-z0-9_-]*$/D', $extension) !== 1) {
+                throw new InvalidProtocolRequest('prepare.phpExtensions entries must be lowercase PHP extension names.');
+            }
+            if (isset($seen[$extension])) {
+                throw new InvalidProtocolRequest(sprintf('prepare.phpExtensions cannot contain duplicate "%s".', $extension));
+            }
+            $seen[$extension] = true;
+            $result[] = $extension;
+        }
+        sort($result, SORT_STRING);
+
+        return $result;
+    }
+
+    /** @return list<string> */
+    private static function parseQualityPatches(mixed $value): array
+    {
+        $result = [];
+        $seen = [];
+        foreach (ProtocolJson::list($value, 'prepare.qualityPatches') as $entry) {
+            $id = self::requiredString($entry, 'prepare.qualityPatches[]');
+            if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/D', $id) !== 1) {
+                throw new InvalidProtocolRequest('prepare.qualityPatches entries must be Quality Patch IDs.');
+            }
+            if (isset($seen[$id])) {
+                throw new InvalidProtocolRequest(sprintf('prepare.qualityPatches cannot contain duplicate "%s".', $id));
+            }
+            $seen[$id] = true;
+            $result[] = $id;
+        }
+
+        return $result;
     }
 
     /** @return list<array{path: string, sha256: string}> */

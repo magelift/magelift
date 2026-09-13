@@ -3,6 +3,7 @@ package stack
 import (
 	"fmt"
 
+	awsbootstrap "github.com/magelift/magelift/internal/cloud/aws/bootstrap"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	sdk "github.com/magelift/magelift/sdk/v1"
@@ -10,7 +11,9 @@ import (
 )
 
 // Module wraps the AWS stack planner as a platform.StackModule.
-type Module struct{}
+type Module struct {
+	platform.LifecycleFactories
+}
 
 // Planned is the AWS PlannedStack adapter.
 type Planned struct {
@@ -28,7 +31,10 @@ func (p Planned) Project() string        { return p.Spec.Identity.Project }
 func (p Planned) Environment() string    { return p.Spec.Identity.Environment }
 func (p Planned) Region() string         { return p.Spec.Identity.Region }
 func (p Planned) CertificationTier() platform.CertificationTier {
-	return platform.TierCertified
+	if awsPreviewFargateMagentoCertified(p.Spec) {
+		return platform.TierCertified
+	}
+	return platform.TierExperimental
 }
 func (p Planned) EnvironmentClass() string { return p.Spec.Identity.EnvironmentClass }
 func (p Planned) Protected() bool          { return p.Spec.Lifecycle.Protection }
@@ -49,11 +55,23 @@ func (p Planned) WithImageDigest(digest string) (platform.PlannedStack, error) {
 // AWSSpec exposes the concrete Spec for AWS-only deploy/lock factories.
 func (p Planned) AWSSpec() Spec { return p.Spec }
 
+func (p Planned) StateBackendURL() string {
+	url, err := awsbootstrap.StateBackendURL(p.Spec.Identity.Project, p.Spec.Identity.Environment, p.Spec.Identity.AccountID, p.Spec.Identity.Region)
+	if err != nil {
+		return ""
+	}
+	return url
+}
+
 func (Module) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: "aws.ecs-fargate", Provider: "aws", Runtime: "ecs-fargate"}
 }
 
 func (Module) CertificationTier() platform.CertificationTier { return platform.TierCertified }
+
+// PlanAdmission resolves current AWS account and catalog availability before
+// the Pulumi program can begin any paid resource mutation.
+func (Module) PlanAdmission() platform.PlanAdmission { return RegionAdmission{} }
 
 func (Module) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
 	spec, err := PlanFromConfigWithOptions(cfg, environment, PlanOptions{AllowExpiredPreview: opts.AllowExpiredPreview})

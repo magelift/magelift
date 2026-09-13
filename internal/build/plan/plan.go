@@ -21,6 +21,10 @@ func PrepareRequest(file *config.File, repository source.Repository, runnerRoot 
 	if err != nil {
 		return buildrunner.Request{}, err
 	}
+	refreshModules, err := needsModuleRefresh(repository.Root)
+	if err != nil {
+		return buildrunner.Request{}, err
+	}
 	inputs, err := hashInputs(repository.Root)
 	if err != nil {
 		return buildrunner.Request{}, err
@@ -45,17 +49,43 @@ func PrepareRequest(file *config.File, repository source.Repository, runnerRoot 
 				Mode:       spec.Application.Mode,
 				WebRuntime: spec.Application.WebRuntime,
 			},
-			PHPVersion:          spec.Build.PHP,
-			CompatibilityStatus: string(spec.Compatibility.Status),
-			InputFiles:          inputs,
-			StaticContent:       staticContent,
-			LifecycleHooks:      lifecycleHooks,
+			PHPVersion:            spec.Build.PHP,
+			PHPRequiredExtensions: sortedCopy(spec.Build.Extensions),
+			ComposerVersion:       spec.Build.Composer.Version,
+			CompatibilityStatus:   string(spec.Compatibility.Status),
+			RefreshModules:        refreshModules,
+			InputFiles:            inputs,
+			StaticContent:         staticContent,
+			LifecycleHooks:        lifecycleHooks,
+			QualityPatches:        append([]string(nil), spec.Build.QualityPatches...),
 		},
 	}
 	if err := request.Validate(); err != nil {
 		return buildrunner.Request{}, fmt.Errorf("create build runner request: %w", err)
 	}
 	return request, nil
+}
+
+func needsModuleRefresh(root string) (bool, error) {
+	path := filepath.Join(root, "app", "etc", "config.php")
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("inspect app/etc/config.php: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return false, errors.New("immutable build input app/etc/config.php must be a regular file")
+	}
+
+	return false, nil
+}
+
+func sortedCopy(values []string) []string {
+	result := append([]string(nil), values...)
+	sort.Strings(result)
+	return result
 }
 
 func lifecycleHooks(settings map[string]config.BuildHook) ([]buildrunner.LifecycleHook, error) {

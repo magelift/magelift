@@ -14,12 +14,12 @@ import (
 
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/cloud/kube"
-	"github.com/magelift/magelift/internal/config"
+	ovhcost "github.com/magelift/magelift/internal/cloud/ovh/cost"
 	"github.com/magelift/magelift/internal/platform"
 )
 
 // Remaining unsupported allowlist after Observe+Steps+State moved off the shell
-// (D-05): Bootstrap VerifyAccount/Ensure, Secrets List/Set/Remove, Cost Estimate.
+// (D-05): Bootstrap VerifyAccount/Ensure and Secrets List/Set/Remove.
 func TestUnsupportedAllowlistMethodsReturnSentinelAndZeroValues(t *testing.T) {
 	ctx := context.Background()
 	u := unsupported{}
@@ -65,17 +65,10 @@ func TestUnsupportedAllowlistMethodsReturnSentinelAndZeroValues(t *testing.T) {
 				return caseResult{err: u.Remove(ctx, nil, "k"), zero: true}
 			},
 		},
-		{
-			name: "Estimate",
-			call: func() caseResult {
-				got, err := u.Estimate(ctx, nil, config.Config{}, platform.CostOptions{})
-				return caseResult{err: err, zero: reflect.ValueOf(got).IsZero()}
-			},
-		},
 	}
 
-	if len(cases) != 6 {
-		t.Fatalf("unsupported allowlist requires exactly 6 methods (Bootstrap/Secrets/Cost); got %d", len(cases))
+	if len(cases) != 5 {
+		t.Fatalf("unsupported allowlist requires exactly 5 methods (Bootstrap/Secrets); got %d", len(cases))
 	}
 
 	for _, tc := range cases {
@@ -152,7 +145,10 @@ func TestModuleAccessorsReturnNonNilUnsupportedShells(t *testing.T) {
 		t.Fatalf("RuntimeObserve type identity: want *kube.Observe, got %T", m.RuntimeObserve())
 	}
 	if m.CostEstimator() == nil {
-		t.Fatal("CostEstimator must return the unsupported shell, not nil")
+		t.Fatal("CostEstimator must return the OVH adapter, not nil")
+	}
+	if _, ok := m.CostEstimator().(ovhcost.Estimator); !ok {
+		t.Fatalf("CostEstimator type = %T, want ovh cost estimator", m.CostEstimator())
 	}
 }
 
@@ -305,7 +301,7 @@ func ovhDeploySpec() Spec {
 		Application:  Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
 		Artifact:     Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
 		Policy:       NetworkPolicy{NetworkCIDR: "10.30.0.0/16", Zones: []string{"GRA9"}},
-		Catalog:      CatalogSelection{DatabaseFlavor: "db1-4", DatabasePlan: "essential", ValkeyFlavor: "db1-4", ValkeyPlan: "essential", NodeFlavor: "b3-8", NodeCount: 1, CPURequest: "500m", MemoryRequest: "1Gi", DesiredWebReplicas: 1},
-		Dependencies: Dependencies{DatabaseName: "magento", MasterUsername: "magento"},
+		Catalog:      CatalogSelection{DatabaseFlavor: "db1-4", DatabasePlan: "essential", DatabaseVersion: "8.4", ValkeyFlavor: "db1-4", ValkeyPlan: "essential", ValkeyVersion: "8.1", MKSPlan: "standard", NodeFlavor: "b3-8", NodeCount: 1, CPURequest: "500m", MemoryRequest: "1Gi", DesiredWebReplicas: 1},
+		Dependencies: Dependencies{DatabaseName: "magento", MasterUsername: "magento", EncryptionKeySecret: "magento-crypt-key"},
 	}
 }

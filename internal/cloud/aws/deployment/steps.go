@@ -69,7 +69,7 @@ func (s *Steps) Validate(_ context.Context, request deployflow.Request) error {
 }
 
 func (s *Steps) Preview(ctx context.Context, request deployflow.Request) (automation.ChangeSummary, error) {
-	return automation.NewRunner(s.backend, s.diagnostics).Preview(ctx, automation.Request{Target: request.Target})
+	return automation.NewRunner(s.backend, s.diagnostics).Preview(ctx, automation.Request{Target: request.Target, Preview: request.Preview})
 }
 
 func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Request) error {
@@ -140,7 +140,7 @@ func (s *Steps) CleanupCandidate(ctx context.Context, _ deployflow.Request) erro
 }
 
 func (s *Steps) UpdateServices(ctx context.Context, request deployflow.Request) (automation.ChangeSummary, error) {
-	return automation.NewRunner(s.backend, s.diagnostics).Update(ctx, automation.Request{Target: request.Target})
+	return automation.NewRunner(s.backend, s.diagnostics).Update(ctx, automation.Request{Target: request.Target, Preview: request.Preview})
 }
 
 func (s *Steps) Stabilize(ctx context.Context, _ deployflow.Request) error {

@@ -18,12 +18,16 @@ var (
 	ErrLockRelease            = errors.New("deployment lock release failed")
 )
 
-const candidateCleanupTimeout = 2 * time.Minute
+const (
+	candidateCleanupTimeout = 2 * time.Minute
+	lockReleaseTimeout      = time.Minute
+)
 
 var digestPattern = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
 
 type Request struct {
 	Target                   sdk.TargetDescriptor
+	Preview                  *automation.PreviewMetadata
 	ImageDigest              string
 	Application              sdk.Application
 	Artifact                 sdk.BuildArtifact
@@ -111,8 +115,10 @@ func (o *Orchestrator) Run(ctx context.Context, request Request) (result Result,
 	}
 	candidateRegistered := false
 	defer func() {
-		if releaseErr := release(ctx); releaseErr != nil && err == nil {
-			err = fmt.Errorf("%w: %v", ErrLockRelease, releaseErr)
+		releaseContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), lockReleaseTimeout)
+		defer cancel()
+		if releaseErr := release(releaseContext); releaseErr != nil {
+			err = errors.Join(err, fmt.Errorf("%w: %w", ErrLockRelease, releaseErr))
 		}
 	}()
 	defer func() {

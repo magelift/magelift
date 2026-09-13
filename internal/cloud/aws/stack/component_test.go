@@ -170,10 +170,18 @@ func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
 	}
 	webTask := resourceInput(m, "aws:ecs/taskDefinition:TaskDefinition", "shop-preview-1-runtime-web-task")
 	definitions := webTask["containerDefinitions"].StringValue()
-	for _, required := range []string{"MAGELIFT_DATABASE_WRITER", "shop.writer", "MAGELIFT_DATABASE_SECRET_ARN", "arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed", "MAGELIFT_CACHE_ENDPOINT", "MAGELIFT_SEARCH_ENDPOINT", "MAGELIFT_MEDIA_BUCKET", "shop-media", "aws-observability/aws-sigv4-proxy:1.11.1", "docker.io/library/varnish:8.0.2", "VARNISH_HTTP_PORT", "6081", "MAGENTO_DC_CATALOG__SEARCH__ENGINE", "127.0.0.1"} {
+	for _, required := range []string{"MAGELIFT_DATABASE_WRITER", "shop.writer", "MAGELIFT_DATABASE_SECRET_ARN", "arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed", "MAGELIFT_CACHE_ENDPOINT", "MAGELIFT_SEARCH_ENDPOINT", "MAGELIFT_MEDIA_BUCKET", "shop-media", "docker.io/library/varnish:8.0.2", "VARNISH_HTTP_PORT", "6081", "MAGENTO_DC_CATALOG__SEARCH__ENGINE", "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT"} {
 		if !strings.Contains(definitions, required) {
 			t.Fatalf("runtime capability configuration is missing %q: %s", required, definitions)
 		}
+	}
+	if strings.Contains(definitions, "aws-sigv4-proxy") && strings.Contains(definitions, "search-proxy") && strings.Contains(definitions, "127.0.0.1") && strings.Contains(definitions, "8081") {
+		// Magento talks to the AOSS signing proxy; MAGELIFT_SEARCH_ENDPOINT stays the collection URL.
+	} else {
+		t.Fatalf("preview serverless must attach a SigV4 search sidecar for Magento: %s", definitions)
+	}
+	if !strings.Contains(definitions, "shop.eu-west-3.aoss.amazonaws.com") {
+		t.Fatal("runtime must keep the AWS OpenSearch collection endpoint on MAGELIFT_SEARCH_ENDPOINT")
 	}
 	targetGroup := resourceInput(m, "aws:lb/targetGroup:TargetGroup", "shop-preview-1-ingress-web")
 	if targetGroup["port"].NumberValue() != 6081 {
@@ -188,6 +196,72 @@ func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
 	deployTask := resourceInput(m, "aws:ecs/taskDefinition:TaskDefinition", "shop-preview-1-runtime-deploy-task")
 	if !strings.Contains(deployTask["taskRoleArn"].StringValue(), "deployment-role") {
 		t.Fatalf("deploy task does not use the deployment identity: %v", deployTask)
+	}
+}
+
+func TestNewOmitsNativeEdgeForExternalIntent(t *testing.T) {
+	t.Parallel()
+	spec := validSpec()
+	spec.Existing.HostedZone = nil
+	spec.Edge = sdk.EdgeIntent{
+		ExternalProvider: "fastly", Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+		Mode: "external", CredentialRefs: []string{"aws-secrets-manager://magelift/fastly-token"}, ServiceReference: "svc-123",
+		Domains: []string{"preview.example.com"}, TLS: true, TLSMode: "fastly", DNSMode: "external",
+		OriginHealthRef: "aws/alb", OwnershipMarker: "magelift/edge/test",
+	}
+	m := &stackMocks{}
+	var component *Component
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		providers, err := NewProviders(ctx, "shop", "eu-west-3")
+		if err != nil {
+			return err
+		}
+		component, err = New(ctx, "shop-preview-1", spec, providers)
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if component == nil || component.Edge != nil {
+		t.Fatal("external-only edge intent provisioned a native AWS edge")
+	}
+	if componentCount(m, "magelift:aws:Edge") != 0 {
+		t.Fatalf("external-only edge registered the application CloudFront component: %#v", m.resources)
+	}
+	if _, ok := component.Outputs()["applicationURL"]; !ok {
+		t.Fatal("external-only stack omitted the direct origin application URL output")
+	}
+}
+
+func TestNewOmitsNativeObservabilityForExternalIntent(t *testing.T) {
+	t.Parallel()
+	spec := validSpec()
+	spec.Observability = sdk.ObservabilityIntent{
+		ExternalProvider: "newrelic", Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+		CredentialRefs: []string{"aws-secrets-manager://magelift/newrelic-token"}, Endpoint: "https://otlp.eu01.nr-data.net",
+		OwnershipMarker: "magelift/observability/test", Signals: []string{"metrics"}, RetentionDays: 30,
+	}
+	m := &stackMocks{}
+	var component *Component
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		providers, err := NewProviders(ctx, "shop", "eu-west-3")
+		if err != nil {
+			return err
+		}
+		component, err = New(ctx, "shop-preview-1", spec, providers)
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if component == nil || component.Observability != nil {
+		t.Fatal("external-only observability provisioned the native AWS observability component")
+	}
+	if componentCount(m, "magelift:aws:Observability") != 0 {
+		t.Fatalf("external-only observability registered the native component: %#v", m.resources)
+	}
+	if componentCount(m, "magelift:aws:ObservabilityLogGroups") != 1 {
+		t.Fatal("ECS log sources were not retained for runtime logging")
 	}
 }
 
@@ -355,10 +429,35 @@ func TestNewComposesPreviewEscapeHatches(t *testing.T) {
 			},
 		},
 		{
+			name: "aurora-mysql-from-rds-instance-class",
+			edit: func(spec *Spec) {
+				spec.Catalog.DatabaseEngine = DatabaseEngineAuroraMySQL
+				spec.Catalog.AuroraProvisioned = AuroraProvisionedProfile{InstanceClass: "db.t4g.micro", InstanceCount: 1}
+			},
+			want: map[string]int{
+				"magelift:aws:AuroraMysql":                1,
+				"aws:rds/cluster:Cluster":                 1,
+				"aws:rds/clusterInstance:ClusterInstance": 1,
+				"aws:rds/instance:Instance":               0,
+			},
+		},
+		{
 			name: "search-disabled",
 			edit: func(spec *Spec) { spec.Catalog.SearchMode = SearchModeDisabled },
 			want: map[string]int{
 				"magelift:aws:OpenSearch":                                  0,
+				"aws:opensearch/serverlessCollection:ServerlessCollection": 0,
+			},
+		},
+		{
+			name: "search-provisioned",
+			edit: func(spec *Spec) {
+				spec.Catalog.SearchMode = SearchModeProvisioned
+				spec.Catalog.SearchProvisioned = SearchProvisionedProfile{InstanceType: "m7g.medium.search", InstanceCount: 1, EBSVolumeType: "gp3", EBSVolumeSizeGiB: 20}
+			},
+			want: map[string]int{
+				"magelift:aws:OpenSearch":                                  1,
+				"aws:opensearch/domain:Domain":                             1,
 				"aws:opensearch/serverlessCollection:ServerlessCollection": 0,
 			},
 		},
@@ -423,7 +522,7 @@ func resourceInput(m *stackMocks, token, name string) resource.PropertyMap {
 func TestCatalogCellProjectionMatrix(t *testing.T) {
 	t.Parallel()
 
-	webRuntimes := []string{"nginx-fpm", "frankenphp-classic"}
+	webRuntimes := []string{"nginx-fpm"}
 	type cell struct {
 		name             string
 		preset           sdk.PresetID
@@ -437,7 +536,7 @@ func TestCatalogCellProjectionMatrix(t *testing.T) {
 	}
 
 	var tests []cell
-	for _, searchMode := range []string{SearchModeDisabled, SearchModeServerless} {
+	for _, searchMode := range []string{SearchModeDisabled, SearchModeServerless, SearchModeProvisioned} {
 		for _, queueMode := range []string{QueueModeDB, QueueModeECSRabbitMQ, QueueModeECSArtemis} {
 			for _, webRuntime := range webRuntimes {
 				tests = append(tests, cell{
@@ -450,7 +549,7 @@ func TestCatalogCellProjectionMatrix(t *testing.T) {
 			}
 		}
 	}
-	for _, searchMode := range []string{SearchModeDisabled, SearchModeProvisioned} {
+	for _, searchMode := range []string{SearchModeDisabled, SearchModeProvisioned, SearchModeServerless} {
 		for _, queueMode := range []string{QueueModeDB, QueueModeAmazonMQ, QueueModeECSRabbitMQ, QueueModeECSArtemis} {
 			for _, webRuntime := range webRuntimes {
 				tests = append(tests, cell{
@@ -511,7 +610,7 @@ func TestCatalogCellProjectionMatrix(t *testing.T) {
 			if tt.leaveQueueUnset {
 				wantQueue := QueueModeDB
 				if tt.preset == sdk.PresetStandard {
-					wantQueue = QueueModeAmazonMQ
+					wantQueue = QueueModeECSRabbitMQ
 				}
 				if resolvedQueue != wantQueue {
 					t.Fatalf("resolveQueueMode default = %q, want %q", resolvedQueue, wantQueue)
@@ -539,19 +638,6 @@ func TestCatalogCellProjectionMatrix(t *testing.T) {
 			}
 			if got := varnishImageFor(spec.Application.Mode); got != wantVarnish {
 				t.Fatalf("varnishImageFor = %q, want %q", got, wantVarnish)
-			}
-
-			// Mirrors component.go searchProxyImage projection.
-			searchProxyImage := ""
-			if spec.Catalog.SearchMode != SearchModeDisabled {
-				searchProxyImage = sigV4ProxyImage
-			}
-			if spec.Catalog.SearchMode == SearchModeDisabled {
-				if searchProxyImage != "" {
-					t.Fatalf("searchProxyImage = %q, want empty for disabled search", searchProxyImage)
-				}
-			} else if searchProxyImage != sigV4ProxyImage {
-				t.Fatalf("searchProxyImage = %q, want %q", searchProxyImage, sigV4ProxyImage)
 			}
 			if spec.Application.WebRuntime != tt.webRuntime {
 				t.Fatalf("WebRuntime = %q, want %q", spec.Application.WebRuntime, tt.webRuntime)

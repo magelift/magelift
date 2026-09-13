@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export GOMAXPROCS=1
+export GOFLAGS=-p=1
+export GOMEMLIMIT=1GiB
+
 repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-work=$(mktemp -d)
+work=$(mktemp -d "${TMPDIR:-/tmp}/magelift-build.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
 fixture="$work/repository"
@@ -43,5 +47,6 @@ test ! -e /app/.magelift
 test ! -e /app/magelift.yaml
 test ! -e /app/auth.json
 test -f /app/app/etc/env.php
-! grep -Eiq "password|secret|MAGELIFT" /app/app/etc/env.php
+! grep -Eiq "MAGELIFT" /app/app/etc/env.php
 '
+docker run --rm --entrypoint php "$image" -r '$data = require "/app/app/etc/env.php"; array_walk_recursive($data, static function ($value, $key): void { if (preg_match("/password|secret|token/i", (string) $key) === 1 && is_string($value) && $value !== "" && !str_starts_with($value, "#env(")) { exit(1); } });'

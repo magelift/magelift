@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/toolchain"
 	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/spf13/cobra"
 )
@@ -32,7 +33,7 @@ func execCommand(o *options) *cobra.Command {
 		Short: "Run a command on a Magento workload",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			result, target, err := o.prepareRemoteCommand(cmd.Context(), service, container, args)
+			result, target, err := o.prepareRemoteCommand(cmd.Context(), service, container, args, !sessionOnly)
 			if err != nil {
 				return err
 			}
@@ -61,7 +62,7 @@ func magentoOperationCommand(o *options, name string) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Empty container lets the adapter pick php-fpm vs web from WebRuntime.
-			_, target, err := o.prepareRemoteCommand(cmd.Context(), "web", "", strings.Fields(commands[name]))
+			_, target, err := o.prepareRemoteCommand(cmd.Context(), "web", "", strings.Fields(commands[name]), true)
 			if err != nil {
 				return err
 			}
@@ -78,7 +79,7 @@ func sshCommand(o *options) *cobra.Command {
 		Short: "Open a shell on a Magento workload",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			result, target, err := o.prepareRemoteCommand(cmd.Context(), service, container, []string{commandText})
+			result, target, err := o.prepareRemoteCommand(cmd.Context(), service, container, []string{commandText}, !sessionOnly)
 			if err != nil {
 				return err
 			}
@@ -95,20 +96,17 @@ func sshCommand(o *options) *cobra.Command {
 	return command
 }
 
-func tunnelCommand() *cobra.Command {
-	return &cobra.Command{Use: "tunnel", Short: "Explain why port forwarding is unavailable", Args: cobra.ArbitraryArgs, RunE: func(*cobra.Command, []string) error {
-		return &exitError{code: 3, err: errors.New("tunnel is unavailable for the Fargate-only runtime: use local development or an approved private access adapter")}
-	}}
-}
-
 func (o *options) runExecTarget(ctx context.Context, target platform.ExecTarget) error {
+	defer cleanupExecTempFiles(target.CleanupPaths)
 	if o.runCommand == nil {
 		return &exitError{code: 3, err: errors.New("remote command runner is unavailable")}
 	}
-	defer cleanupExecTempFiles(target.CleanupPaths)
 	launcher := target.Launcher
 	if launcher == "" {
 		launcher = "aws"
+	}
+	if err := requireDependencies(ctx, o, toolchain.SpecsForLauncher(launcher), "remote session launcher"); err != nil {
+		return err
 	}
 	args := append([]string{}, target.Args...)
 	// Args are the argv after the launcher binary (AWS CLI and kubectl share this shape).
@@ -128,7 +126,7 @@ func cleanupExecTempFiles(paths []string) {
 	}
 }
 
-func (o *options) prepareRemoteCommand(ctx context.Context, service, container string, command []string) (remoteCommandResult, platform.ExecTarget, error) {
+func (o *options) prepareRemoteCommand(ctx context.Context, service, container string, command []string, waitForReady bool) (remoteCommandResult, platform.ExecTarget, error) {
 	environment, planned, outputs, err := o.plannedOutputs(ctx)
 	if err != nil {
 		return remoteCommandResult{}, platform.ExecTarget{}, err
@@ -154,9 +152,10 @@ func (o *options) prepareRemoteCommand(ctx context.Context, service, container s
 		return remoteCommandResult{}, platform.ExecTarget{}, err
 	}
 	target, err := observe.PrepareExec(ctx, planned, outputs, platform.ExecQuery{
-		Workload:  sdk.WorkloadID(service),
-		Container: container,
-		Command:   command,
+		Workload:     sdk.WorkloadID(service),
+		Container:    container,
+		Command:      command,
+		WaitForReady: waitForReady,
 	})
 	if err != nil {
 		if mapped := notSupported(err, planned, "exec"); mapped != err {
@@ -180,10 +179,13 @@ func (o *options) plannedOutputs(ctx context.Context) (string, platform.PlannedS
 	if err != nil {
 		return "", nil, nil, invalid(err)
 	}
+	if err := requireTargetDependencies(ctx, o, planned); err != nil {
+		return "", nil, nil, err
+	}
 	if o.newBackend == nil {
 		return "", nil, nil, errors.New("infrastructure backend factory is required")
 	}
-	backend, err := o.newBackend(ctx, planned, strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL")))
+	backend, err := o.newBackend(ctx, planned, o.infrastructureBackendURL(planned))
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("create infrastructure backend: %w", err)
 	}

@@ -60,3 +60,14 @@ func TestParseLogStartRejectsFutureAndInvalidValues(t *testing.T) {
 		t.Fatalf("start = %v, err = %v", start, err)
 	}
 }
+
+func TestParseLogEnd(t *testing.T) {
+	now := time.Date(2026, time.July, 18, 2, 0, 0, 0, time.UTC)
+	end, err := parseLogEnd("5m", now)
+	if err != nil || !end.Equal(now.Add(-5*time.Minute)) {
+		t.Fatalf("end = %v, err = %v", end, err)
+	}
+	if _, err := parseLogEnd("2026-07-18T03:00:00Z", now); err == nil {
+		t.Fatal("future RFC3339 end was accepted")
+	}
+}

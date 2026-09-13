@@ -73,6 +73,57 @@ func TestHighAvailabilityRequiresTwoReplicasPerGroup(t *testing.T) {
 	}
 }
 
+func TestSnapshotDurabilityOverridesPreserveExplicitValues(t *testing.T) {
+	args := baseArgs(TopologyPreview, 0)
+	retention := 0
+	args.SnapshotRetentionLimit = &retention
+	mocks := runComponentWithArgs(t, args)
+	group := resourcesOfType(mocks, "aws:elasticache/replicationGroup:ReplicationGroup")[0]
+	if got := group.Inputs["snapshotRetentionLimit"].NumberValue(); got != 0 {
+		t.Fatalf("explicit zero snapshot retention = %v", got)
+	}
+
+	retention = 7
+	args.SnapshotWindow = "03:00-04:00"
+	mocks = runComponentWithArgs(t, args)
+	group = resourcesOfType(mocks, "aws:elasticache/replicationGroup:ReplicationGroup")[0]
+	if got := group.Inputs["snapshotRetentionLimit"].NumberValue(); got != 7 || group.Inputs["snapshotWindow"].StringValue() != args.SnapshotWindow {
+		t.Fatalf("snapshot durability = %v", group.Inputs)
+	}
+}
+
+func TestPrivateTransportOmitsAuthAndTLS(t *testing.T) {
+	mocks := &cacheMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		provider, err := awsprovider.NewProvider(ctx, "regional", &awsprovider.ProviderArgs{Region: pulumi.String("eu-west-3")})
+		if err != nil {
+			return err
+		}
+		args := baseArgs(TopologyPreview, 0)
+		args.DisableTransitEncryption = true
+		args.Provider = provider
+		_, err = New(ctx, "shop", args)
+		return err
+	}, pulumi.WithMocks("magelift", "test", mocks))
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups := resourcesOfType(mocks, "aws:elasticache/replicationGroup:ReplicationGroup")
+	if len(groups) != 1 {
+		t.Fatalf("replication groups = %d, want 1", len(groups))
+	}
+	if groups[0].Inputs["replicationGroupId"].StringValue() != "shop-cache-plain" {
+		t.Fatalf("private Valkey replication group ID = %q, want shop-cache-plain", groups[0].Inputs["replicationGroupId"].StringValue())
+	}
+	if _, found := groups[0].Inputs["authToken"]; found {
+		t.Fatalf("private Valkey group must not configure authToken: %#v", groups[0].Inputs)
+	}
+	if value, found := groups[0].Inputs["transitEncryptionEnabled"]; found && !value.IsNull() && value.BoolValue() {
+		t.Fatal("private Valkey group must not enable transit encryption")
+	}
+	assertSecretReferencesOnly(t, mocks, 0)
+}
+
 func TestRejectsCapacityDefaultsAndUnsafeSecrets(t *testing.T) {
 	valid := baseArgs(TopologyStandard, 1)
 	tests := []struct {
@@ -101,13 +152,17 @@ func TestRejectsCapacityDefaultsAndUnsafeSecrets(t *testing.T) {
 
 func runComponent(t *testing.T, topology Topology, replicas int) *cacheMocks {
 	t.Helper()
+	return runComponentWithArgs(t, baseArgs(topology, replicas))
+}
+
+func runComponentWithArgs(t *testing.T, args Args) *cacheMocks {
+	t.Helper()
 	mocks := &cacheMocks{}
 	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 		provider, err := awsprovider.NewProvider(ctx, "regional", &awsprovider.ProviderArgs{Region: pulumi.String("eu-west-3")})
 		if err != nil {
 			return err
 		}
-		args := baseArgs(topology, replicas)
 		args.Provider = provider
 		_, err = New(ctx, "shop", args)
 		return err

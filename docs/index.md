@@ -1,6 +1,6 @@
 ---
 title: MageLift docs
-description: Docs for MageLift, an open-source Magento CLI and YAML for AWS ECS Fargate and GCP GKE Autopilot. Install, migrate from ACC/Upsun, capability matrix.
+description: Docs for MageLift, an open-source Magento CLI and YAML for AWS, GCP, Scaleway, and OVHcloud architecture profiles. Install, migrate from ACC/Upsun, capability matrix.
 hide:
   - toc
 ---
@@ -9,9 +9,9 @@ hide:
 <img src="assets/logo.png" alt="MageLift logo" />
 
 <div markdown>
-<h1 class="mdx-hero__title">Run Magento in your own AWS or GCP account.</h1>
+<h1 class="mdx-hero__title">Run Magento in your own cloud account.</h1>
 
-<p class="mdx-hero__lede">Open-source CLI with ACC/Upsun-shaped YAML. The store runs in your account, on your invoice. MageLift does not host stores; you pay AWS or GCP directly.</p>
+<p class="mdx-hero__lede">Open-source CLI with ACC/Upsun-shaped YAML. The store runs in your account, on your invoice. MageLift does not host stores; you pay your cloud provider directly.</p>
 
 <div class="mdx-hero__cta" markdown>
 [Install the CLI](install.md){ .md-button .md-button--primary }
@@ -83,8 +83,8 @@ yours. First public tag target: `v1.0.0-rc.1` ([versioning](versioning.md)).
     AWS ECS Fargate, GCP GKE Autopilot.
 
 !!! warning "Experimental"
-    AWS EKS, OVH MKS, Scaleway Kapsule. Exploration only until the matrix marks
-    them certified.
+    AWS EKS, GCP GKE Standard, OVH MKS, Scaleway Kapsule. Exploration only until
+    the matrix marks their target cells certified.
 
 ## Contribute
 

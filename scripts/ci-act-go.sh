@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run MageLift Go CI jobs locally via nektos/act (no GitHub Actions minutes).
 #
-# Serial builds keep local Act/Go smoke light (see agents/skills/magelift-serial-builds).
+# Serial builds keep local Act/Go smoke light (see contrib/skills/magelift-serial-builds).
 # Does not run image/php/docs jobs; those stay for real Actions when minutes return.
 #
 # Prerequisites: brew install act; Colima (or Docker) running.

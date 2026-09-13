@@ -16,6 +16,17 @@ import (
 	"github.com/aws/smithy-go"
 )
 
+func TestStateBackendURLDoesNotNeedAccessLogs(t *testing.T) {
+	url, err := StateBackendURL("shop", "production", "123456789012", "eu-west-3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := testPlan(t)
+	if url != "s3://"+plan.StateBucket {
+		t.Fatalf("url=%q bucket=%q", url, plan.StateBucket)
+	}
+}
+
 func testPlan(t *testing.T) Plan {
 	t.Helper()
 	plan, err := BuildPlan(Spec{Project: "shop", Environment: "production", AccountID: "123456789012", Region: "eu-west-3", AccessLogBucket: "magelift-access-logs-123"})

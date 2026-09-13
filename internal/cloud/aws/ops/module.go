@@ -4,12 +4,14 @@ package ops
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
 	awsbootstrap "github.com/magelift/magelift/internal/cloud/aws/bootstrap"
 	awsdeployment "github.com/magelift/magelift/internal/cloud/aws/deployment"
+	awsedge "github.com/magelift/magelift/internal/cloud/aws/edge"
 	awsoperations "github.com/magelift/magelift/internal/cloud/aws/operations"
 	awsstack "github.com/magelift/magelift/internal/cloud/aws/stack"
 	awsstate "github.com/magelift/magelift/internal/cloud/aws/state"
@@ -21,12 +23,15 @@ import (
 )
 
 // Module is the AWS StackModule with Magento deploy Ops attached.
-type Module struct{}
+type Module struct {
+	platform.LifecycleFactories
+}
 
 func (Module) Descriptor() sdk.TargetDescriptor { return awsstack.Module{}.Descriptor() }
 func (Module) CertificationTier() platform.CertificationTier {
 	return awsstack.Module{}.CertificationTier()
 }
+func (Module) PlanAdmission() platform.PlanAdmission { return awsstack.Module{}.PlanAdmission() }
 func (Module) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
 	return awsstack.Module{}.Plan(cfg, environment, opts)
 }
@@ -35,6 +40,13 @@ func (Module) Program(planned platform.PlannedStack) (pulumi.RunFunc, error) {
 }
 func (Module) OutputKeys() []string { return awsstack.Module{}.OutputKeys() }
 func (Module) Ops() platform.Ops    { return Ops{} }
+
+func (m Module) NewEdge(ctx context.Context, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
+	if m.Edge != nil {
+		return m.Edge(ctx, planned)
+	}
+	return awsedge.NewNativeSDKLifecycleAdapter(ctx, awsedge.AlwaysHealthy{}, sdk.DefaultEdgeOperationPolicy())
+}
 
 // Ops implements platform.Ops for AWS.
 type Ops struct {
@@ -90,6 +102,12 @@ func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.P
 	return awsdeployment.New(typed, spec, candidate, runtime, diagnostics, o.RecordRelease)
 }
 
+// ErrStateBucketMissing is returned when certified deploy cannot lock because
+// the DIY S3 state bucket was never bootstrapped.
+var ErrStateBucketMissing = errors.New("deployment state bucket is missing")
+
+var newAWSState = awsstate.NewAWS
+
 func acquireDeploymentLock(ctx context.Context, spec awsstack.Spec) (func(context.Context) error, error) {
 	plan, err := awsbootstrap.BuildPlan(awsbootstrap.Spec{
 		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
@@ -99,14 +117,17 @@ func acquireDeploymentLock(ctx context.Context, spec awsstack.Spec) (func(contex
 	if err != nil {
 		return nil, err
 	}
-	manager, err := awsstate.NewAWS(ctx, spec.Identity.Region, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment, awsstate.ObjectEncryption{Mode: awsstate.EncryptionKMS, KMSKeyARN: spec.Dependencies.KMSKeyARN})
+	manager, err := newAWSState(ctx, spec.Identity.Region, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment, awsstate.ObjectEncryption{Mode: awsstate.EncryptionKMS, KMSKeyARN: spec.Dependencies.KMSKeyARN})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create S3 state lock: %w", err)
 	}
 	host, _ := os.Hostname()
 	owner := fmt.Sprintf("magelift-cli-%s-%d", host, os.Getpid())
 	handle, err := manager.Acquire(ctx, spec.Identity.Project, spec.Identity.Environment, owner)
 	if err != nil {
+		if awsstate.IsNotFound(err) {
+			return nil, fmt.Errorf("%w: run magelift bootstrap --env %s: %w", ErrStateBucketMissing, spec.Identity.Environment, err)
+		}
 		return nil, err
 	}
 	return handle.Release, nil

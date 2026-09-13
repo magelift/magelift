@@ -5,7 +5,7 @@
 - Price: $0
 - License: [Apache-2.0](https://github.com/magelift/magelift/blob/main/LICENSE)
 - Limits: none on the CLI (you operate inside your own cloud quotas)
-- Includes: config validate, preview, deploy, destroy, day-2 ops on certified targets, ACC/Upsun-shaped YAML, local Compose path (`magelift dev`)
+- Includes: config validate, preview, deploy, destroy, day-2 ops on certified targets, ACC/Upsun-shaped YAML, local Compose path (`magelift local`)
 
 There is no MageLift SaaS subscription, seat fee, or "contact sales" plan for the open-source CLI.
 

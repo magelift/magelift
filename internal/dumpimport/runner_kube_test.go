@@ -15,10 +15,14 @@ import (
 // fakeKubeMySQL simulates an in-pod mysql client reached via kubectl exec.
 // It records argv for assertions and tracks BASE TABLE count + probe label.
 type fakeKubeMySQL struct {
-	failExec bool
-	tables   int
-	probe    string
-	calls    [][]string
+	failExec         bool
+	missingPatchList bool
+	tables           int
+	patches          int
+	modules          int
+	probe            string
+	dumpBody         string
+	calls            [][]string
 }
 
 func (f *fakeKubeMySQL) Exec(ctx context.Context, stdin io.Reader, name string, args []string, env []string) (stdout, stderr string, err error) {
@@ -44,6 +48,12 @@ func (f *fakeKubeMySQL) Exec(ctx context.Context, stdin io.Reader, name string, 
 	if f.failExec {
 		return "", "mysql: fake exec failure", errors.New("exit status 1")
 	}
+	if strings.Contains(strings.Join(args, "\x00"), "mysqldump") {
+		if f.dumpBody != "" {
+			return f.dumpBody, "", nil
+		}
+		return "-- Magento dump\nCREATE TABLE magelift_export_probe (id INT);\n", "", nil
+	}
 	if stdin != nil {
 		body, readErr := io.ReadAll(stdin)
 		if readErr != nil {
@@ -61,6 +71,18 @@ func (f *fakeKubeMySQL) handleQuery(sql string) (stdout, stderr string, err erro
 	}
 	if strings.Contains(lower, "magelift_seed_probe") {
 		return f.probe, "", nil
+	}
+	if strings.Contains(lower, "from patch_list") {
+		if f.missingPatchList {
+			return "", "Table 'magento.patch_list' doesn't exist", errors.New("exit status 1")
+		}
+		return strconv.Itoa(f.patches), "", nil
+	}
+	if strings.Contains(lower, "from setup_module") {
+		if f.modules == 0 && f.tables > 0 {
+			return strconv.Itoa(f.tables), "", nil
+		}
+		return strconv.Itoa(f.modules), "", nil
 	}
 	if strings.Contains(lower, "show tables") {
 		if f.tables == 0 {
@@ -281,5 +303,35 @@ func TestKubeRunnerSelectorResolvesPod(t *testing.T) {
 	}
 	if !foundGet {
 		t.Fatal("expected kubectl get pods for selector resolution")
+	}
+}
+
+func TestSchemaEpochSumsPatchListAndSetupModule(t *testing.T) {
+	fake := &fakeKubeMySQL{patches: 12, modules: 80}
+	got, err := dumpimport.SchemaEpoch(context.Background(), kubeOpts(t, fake))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 92 {
+		t.Fatalf("epoch = %d", got)
+	}
+}
+
+func TestSchemaEpochFallsBackWhenPatchListIsMissing(t *testing.T) {
+	fake := &fakeKubeMySQL{missingPatchList: true, modules: 80}
+	got, err := dumpimport.SchemaEpoch(context.Background(), kubeOpts(t, fake))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 80 {
+		t.Fatalf("epoch = %d", got)
+	}
+}
+
+func TestSchemaEpochFailsClosedWhenCountsAreEmpty(t *testing.T) {
+	fake := &fakeKubeMySQL{}
+	_, err := dumpimport.SchemaEpoch(context.Background(), kubeOpts(t, fake))
+	if err == nil || !strings.Contains(err.Error(), "Magento schema epoch was not recorded") {
+		t.Fatalf("error = %v", err)
 	}
 }

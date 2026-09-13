@@ -17,8 +17,10 @@ The images use Debian for glibc and third-party extension compatibility. Base
 images are pinned by multi-platform digest and updated through reviewed dependency
 changes.
 
-The FrankenPHP classic adapter is published for the same PHP 8.2 through 8.5
-branches with the `frankenphp-classic-supported` Bake target.
+`frankenphp-classic` and `php-apache` are experimental Adobe-hatch adapters,
+not Adobe-certified runtimes. They are published for the same PHP 8.2 through
+8.5 branches with the `frankenphp-classic-supported` and
+`php-apache-supported` Bake targets.
 
 The image runs as UID 10001, writes logs to standard streams, and keeps application
 code under `/app`. It embeds nginx 1.30.4 so the image matches the current Adobe
@@ -55,6 +57,12 @@ Build the FrankenPHP classic adapter:
 
 ```sh
 docker buildx bake frankenphp-classic --load
+```
+
+Build the PHP-Apache adapter:
+
+```sh
+docker buildx bake php-apache --load
 ```
 
 Build the supported multi-platform matrix for a registry exporter:

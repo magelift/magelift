@@ -1,7 +1,7 @@
 # Adding a provider
 
 New clouds are adapters. Do not share Pulumi `Network`/`Database` components with
-a provider switch (ADR 0002, 0004, 0008). Magento-facing code stays in `sdk/v1`,
+a provider switch ([ADR 0003](adr/0003-portable-contracts-vs-topology.md), [ADR 0004](adr/0004-ports-and-adapters.md)). Magento-facing code stays in `sdk/v1`,
 `internal/platform`, `internal/deploy`, and `internal/config`. VPC, DB, and
 runtime stay under `internal/cloud/<provider>/`.
 
@@ -21,14 +21,54 @@ A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`
 3. Capability packages (`network`, `database`, …) as needed; keep them typed and small.
 4. Optional day-2 ports on the module (`HasOps`, `HasBootstrap`, `HasState`,
    `HasSecrets`, `HasRuntimeObserve`). Return `ErrNotSupported` until ready.
-   See [ADR 0009](adr/0009-day2-magento-ports.md). GCP's certified module
+   See [ADR 0004](adr/0004-ports-and-adapters.md). GCP's certified module
    implements these in `internal/cloud/gcp/ops`.
-5. `internal/config`: provider block, enums, validation, then `make generate` for schema.
-6. `cmd/magelift`: `RegisterModule(...)` in the production binary (keep
-   Pulumi SDKs out of `internal/cli` so `gendocs` and CLI unit tests stay
-   linkable on small CI runners).
-7. Mock Pulumi graph tests; docs for experimental vs acceptance.
-8. Later for certification: implement the day-2 ports end-to-end (ADR 0007).
+5. Optional `sdk.ResilienceAdapter` for backup, restore, integrity, fencing,
+   failover, and cleanup. Its descriptor MUST declare each data-class status,
+   supported destination, polling requirement, and protection requirement.
+   Call `sdk.CompileResiliencePlan` from the adapter's side-effect-free plan
+   method instead of rebuilding the recovery graph. Registration validates the
+   descriptor and rejects a provider mismatch before the module can plan a
+   stack. Use the opaque `ServiceBoundaryIntent.ResourceReference` only for a
+   provider-owned resource identity; never add provider SDK fields to the
+   public contract. A module without this port cannot claim automated backup,
+   restore, or disaster-recovery certification.
+6. Optional `sdk.EdgeAdapter` and `sdk.ObservabilityAdapter` ports expose
+   provider-owned plan/apply-or-verify/destroy operations behind the same
+   versioned SDK boundary. Provider-specific adapters must return explicit
+   unavailable signal/capability results, use ownership-scoped resources, and
+   prove health, delivery, retention, redaction, and cleanup through injected
+   probes. The certification scheduler executes the provider callback; it does
+   not import a provider SDK or infer success from a plan.
+   First-party native resource graphs follow the same intent: AWS
+   `internal/cloud/aws/observability` owns CloudWatch resources, GCP
+   `internal/cloud/gcp/observability` owns GKE collection plus Cloud Monitoring
+   dashboards and log-based policies, Scaleway
+   `internal/cloud/scaleway/observability` owns Cockpit data sources, and OVH
+   `internal/cloud/ovh/observability` owns only the documented Kubernetes audit
+   subscription path. The last path requires the opaque
+   `observability.nativeReference` stream identity; it does not pretend to
+   provision generic workload logs or traces. These Pulumi graphs are offline
+   resource evidence, not live delivery or cleanup certification.
+   For a planned target-owned lifecycle, implement the matching optional
+   `sdk.ResilienceAdapterFactory`, `sdk.EdgeAdapterFactory`, or
+   `sdk.ObservabilityAdapterFactory`. The factory receives the opaque public
+   `sdk.ModulePlan` after planning and must only construct an adapter; native
+   SDK clients and credentials remain in the provider package. First-party
+   modules use the equivalent injected `platform.LifecycleFactories` seam.
+   Fastly and New Relic are external adapters: their descriptor identity is
+   independent from the origin target and they run through the typed edge or
+   observability plan request rather than being mislabeled as native target
+   adapters.
+7. `internal/config`: provider block, enums, validation, then `make generate` for schema.
+8. For a first-party provider, register the `StackModule` in
+   `internal/registry`. For a community provider, implement `sdk.Module` and
+   call `cli.NewWithExtensions(...)` from a custom binary. Keep Pulumi SDKs out
+   of `internal/cli` so `gendocs` and CLI unit tests stay linkable on small CI
+   runners.
+9. Mock Pulumi graph tests; docs for experimental vs acceptance.
+10. Later for certification: implement the day-2 ports end-to-end ([ADR 0010](adr/0010-live-certification.md)
+    packed sessions; [ADR 0003](adr/0003-portable-contracts-vs-topology.md) layout).
 
 ## Required stack outputs
 
@@ -42,10 +82,12 @@ fine.
 | --- | --- |
 | Certified | Shared Magento acceptance on a real account; full ops |
 | Experimental | In-tree; may be infra-only; labeled in docs/CLI |
-| Community | Out-of-tree module; custom binary calls `RegisterModule` |
+| Community | Out-of-tree `sdk.Module`; custom binary calls `cli.NewWithExtensions` |
 
-Two certified first-party targets (AWS + GCP) already satisfy the multi-cloud
-claim gate ([ADR 0007](adr/0007-multi-provider-community-targets.md)).
+Two certified first-party Magento origins (GCP Autopilot + AWS ECS Fargate)
+satisfy the multi-cloud claim gate
+([ADR 0002](adr/0002-certified-vs-experimental.md);
+[ADR 0008](adr/0008-provider-load-path.md)).
 
 For AWS product choices (runtime, natMode, databaseEngine, searchMode), see the
 matrix in [architecture.md](architecture.md#aws-magento-product-matrix). Full Magento
@@ -53,31 +95,63 @@ on AWS is not every SKU.
 
 ## Community binary
 
-The released `magelift` binary includes first-party modules only. External
-providers ship as a **compile-time custom binary** of this module (or a fork)
-that calls `RegisterModule`. See `examples/custom-cli`. There is no Go
-`plugin` ABI and no unsigned dynamic loader in v1 (ADR 0007).
+The released `magelift` binary will load first-party adapters as signed
+subprocess artifacts (`magelift.providers.lock`, Cosign, HashiCorp go-plugin).
+`internal/providerhost` refuses unsigned or digest-mismatched lock entries,
+then `Dial` starts a gRPC subprocess (`cmd/magelift-provider-gcp`) that
+serves Ping, GCP Autopilot `Describe`, and `sdk.Module` Plan/Program JSON
+RPCs. Magento cells stay linked in-process until the CLI is wired to `Dial`
+(one-release ceiling). Tests and
+Floci suites always load in-process. External providers
+may still ship as a **compile-time custom binary** that calls
+`cli.NewWithExtensions` (`examples/custom-cli`). There is no Go `plugin.Open`
+ABI and no unsigned remote loader ([ADR 0008](adr/0008-provider-load-path.md)).
 
-**`internal/` visibility:** Go's visibility rule means a *separate* module
-path cannot import `internal/platform` or `internal/cli`. Community providers
-today live in this repository's module graph (custom `main` under
-`examples/custom-cli`, or a fork). Do not claim publish-to-proxy.golang.org of
-an external module that imports those packages. Exporting a public platform API
-is a follow-on public API decision, not required to author an in-tree or
-fork-based custom binary today.
+The public extension boundary avoids `internal/` imports. An extension implements
+`sdk.Module`, returns provider-neutral plan data, and returns its concrete Pulumi
+program from `Program`; MageLift validates that program at the lifecycle boundary.
+The plan request includes typed `sdk.EdgeIntent` and `sdk.ObservabilityIntent`
+values. This lets an extension implement Fastly, a telemetry vendor, or a cloud
+native destination without making the core configuration depend on that vendor.
+When projection recovery is selected, the request also carries the typed
+`sdk.ResilienceIntent.Projection` target; the extension translates its ECS or
+Kubernetes identity through an injected provider SDK client instead of parsing
+the resolved configuration map. The map remains available for provider-owned
+semantic extension namespaces, never for raw SDK argument bags.
+An extension may additionally implement `sdk.ResilienceAdapter`; the core owns
+the portable recovery graph, ownership, idempotency, scheduling, evidence, and
+cleanup gates while the extension owns native backup, restore, fencing, and
+failover calls. Credentials and vendor-specific options stay under the
+extension's namespaced configuration. Extensions are linked at build time and
+are never loaded from an arbitrary path.
 
-### Clean-cache verification (RELEASE-03)
+The first-release configuration has no legacy singular `edge.provider` or
+`observability.provider` field. Edge and observability are independent
+composable boundaries: use `nativeProvider` and/or `externalProvider`. The
+optional `observability.nativeReference` is an opaque identity for an existing
+provider-owned destination; it is not a provider selector, SDK object, or
+credential field. The
+`provider` fields on `target` and existing-resource identity remain identity
+data and are not part of this cleanup.
 
-Use only this document and `examples/custom-cli`. Do not browse
-`internal/cloud/**` to learn registration. From the repo root (prefer a serial
-build for the clean-cache proof):
+### Extension build verification (RELEASE-03)
+
+Use only this document and `examples/custom-extension-contract`. Do not browse
+`internal/cloud/**` to learn the public contract. From the repo root, run the
+SDK contract proof as the only Go command in progress:
 
 ```sh
 export GOMODCACHE="$(mktemp -d /tmp/magelift-modcache.XXXXXX)"
 export GOCACHE="$(mktemp -d /tmp/magelift-gocache.XXXXXX)"
-GOMAXPROCS=1 GOFLAGS=-p=1 go build -o /tmp/magelift-ext ./examples/custom-cli
-/tmp/magelift-ext version
+GOMAXPROCS=1 GOFLAGS=-p=1 go build -o /tmp/magelift-extension-contract ./examples/custom-extension-contract
+/tmp/magelift-extension-contract
 ```
+
+The full `examples/custom-cli` binary remains the integration example, but it
+statically links every first-party Pulumi adapter and can use several
+gigabytes during linking. Build that binary on a worker with enough memory;
+the routine repository test deliberately checks the public SDK contract in a
+small isolated binary and covers the internal adapter through package tests.
 
 A green `version` line proves the custom binary builds from an empty module and
 build cache without consulting core source beyond the example tree's imports.

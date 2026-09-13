@@ -49,6 +49,32 @@ final class RequestTest extends TestCase
         self::assertStringContainsString('"lifecycleHooks":[{', $request->toCanonicalJson());
     }
 
+    public function testParsesAndCanonicalizesBuildToolchainRequirements(): void
+    {
+        $json = str_replace(
+            '"phpVersion":"8.5.1"',
+            '"phpVersion":"8.5.1","phpExtensions":["redis","apcu"],"composerVersion":"2.10"',
+            self::prepareJson(),
+        );
+        $request = PrepareRequest::fromJson($json);
+
+        self::assertSame(['apcu', 'redis'], $request->phpExtensions);
+        self::assertSame('2.10', $request->composerVersion);
+        self::assertStringContainsString('"phpExtensions":["apcu","redis"],"composerVersion":"2.10"', $request->toCanonicalJson());
+    }
+
+    public function testParsesAndCanonicalizesModuleRefresh(): void
+    {
+        $request = PrepareRequest::fromJson(str_replace(
+            '"phpVersion":"8.5.1"',
+            '"phpVersion":"8.5.1","refreshModules":true',
+            self::prepareJson(),
+        ));
+
+        self::assertTrue($request->refreshModules);
+        self::assertStringContainsString('"refreshModules":true', $request->toCanonicalJson());
+    }
+
     #[DataProvider('invalidPrepareRequests')]
     public function testRejectsInvalidPrepareRequests(string $json, string $message): void
     {
@@ -69,6 +95,9 @@ final class RequestTest extends TestCase
         yield 'unsafe input path' => [self::replace('app/etc/config.php', '../auth.json'), 'cannot traverse'];
         yield 'duplicate input path' => [self::replace('composer.lock', 'app/etc/config.php'), 'Duplicate build input'];
         yield 'secret value' => [self::replace('/workspace/shop', 'ssm://workspace'), 'forbidden secret'];
+        yield 'invalid PHP extension' => [str_replace('"phpVersion":"8.5.1"', '"phpVersion":"8.5.1","phpExtensions":["Redis"]', self::prepareJson()), 'lowercase PHP extension'];
+        yield 'duplicate PHP extension' => [str_replace('"phpVersion":"8.5.1"', '"phpVersion":"8.5.1","phpExtensions":["redis","redis"]', self::prepareJson()), 'duplicate'];
+        yield 'invalid Composer version' => [str_replace('"phpVersion":"8.5.1"', '"phpVersion":"8.5.1","composerVersion":"1.10"', self::prepareJson()), 'Composer 2'];
     }
 
     #[DataProvider('invalidFinalizeRequests')]

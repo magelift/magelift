@@ -40,6 +40,12 @@ func MapUpsun(root string) (Result, error) {
 		if err := yaml.Unmarshal(servicesData, &services); err != nil {
 			return Result{}, fmt.Errorf("parse %s: %w", upsunServicesFile, err)
 		}
+		var fastlyUnmapped []UnmappedKey
+		doc.Edge, fastlyUnmapped = fastlyEdgeIntent(upsunServicesFile, services)
+		unmapped = append(unmapped, fastlyUnmapped...)
+		if observability := observabilityServiceIntent(services); observability != nil {
+			doc.Observability = observability
+		}
 		unmapped = append(unmapped, mapServices(upsunServicesFile, services)...)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Result{}, err
@@ -55,6 +61,9 @@ func MapUpsun(root string) (Result, error) {
 			staging.Domain = domainFromRoutes(routes)
 		}
 		doc.Environments["staging"] = staging
+		if doc.Edge != nil && staging.Domain != "" {
+			doc.Edge.Domains = []string{staging.Domain}
+		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Result{}, err
 	}

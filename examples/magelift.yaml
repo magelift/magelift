@@ -5,14 +5,22 @@ application:
   edition: open-source
   version: 2.4.9
   mode: integrated
+  webRuntime: nginx-fpm
+  magento:
+    frontName: admin
 build:
   php: "8.5"
+  extensions: [apcu, bcmath, ftp, gd, intl, mbstring, opcache, pdo_mysql, redis, soap, sockets, sodium, xsl, zip]
   composer:
+    version: "2.10"
     credentials: aws-secrets-manager://magelift/composer
 target:
   provider: aws
   runtime: ecs-fargate
   aws: {}
+# Dense AWS cells (aurora-mysql, provisioned OpenSearch, amazon-mq, ECS
+# managed-instances) stay MageLift-experimental: `magelift config validate`
+# warns and proceeds. They are not certified. See docs/capability-matrix.md.
 defaults:
   region: eu-west-3
   preset: preview

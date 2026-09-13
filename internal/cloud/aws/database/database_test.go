@@ -28,6 +28,14 @@ func (m *mocks) NewResource(args pulumi.MockResourceArgs) (string, resource.Prop
 		state["readerEndpoint"] = resource.NewStringProperty(args.Name + ".reader")
 		state["masterUserSecrets"] = resource.NewArrayProperty([]resource.PropertyValue{resource.NewObjectProperty(resource.PropertyMap{"secretArn": resource.NewStringProperty("arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed")})})
 	}
+	if args.TypeToken == "aws:rds/instance:Instance" {
+		state["arn"] = resource.NewStringProperty("arn:aws:rds:eu-west-3:123456789012:db:" + args.Name)
+		state["address"] = resource.NewStringProperty(args.Name + ".writer")
+		state["masterUserSecrets"] = resource.NewArrayProperty([]resource.PropertyValue{resource.NewObjectProperty(resource.PropertyMap{"secretArn": resource.NewStringProperty("arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed")})})
+	}
+	if args.TypeToken == "aws:rds/parameterGroup:ParameterGroup" {
+		state["name"] = resource.NewStringProperty(args.Name + "-id")
+	}
 	m.mu.Lock()
 	m.nodes = append(m.nodes, node{args.TypeToken, args.Name, args.Inputs.Copy()})
 	m.mu.Unlock()
@@ -59,6 +67,69 @@ func TestPreviewGraphAndServerlessPolicy(t *testing.T) {
 		t.Fatalf("preview instance = %v", instance)
 	}
 	assertBool(t, instance, "performanceInsightsEnabled", false)
+}
+
+func TestPreviewAuroraIgnoresLeftoverRDSInstanceClass(t *testing.T) {
+	t.Parallel()
+	args := previewArgs()
+	args.ProvisionedInstanceClass = "db.t4g.micro"
+	args.InstanceCount = 1
+	m := deploy(t, args)
+	instance := m.one(t, "aws:rds/clusterInstance:ClusterInstance").inputs
+	if instance["instanceClass"].StringValue() != "db.serverless" {
+		t.Fatalf("leftover RDS instance class leaked into preview Aurora: %v", instance)
+	}
+}
+
+func TestRDSMySQLUsesImportSafeParameterGroup(t *testing.T) {
+	t.Parallel()
+	args := previewArgs()
+	args.Engine = EngineRDSMySQL
+	args.EngineVersion = "8.4.10"
+	args.ServerlessV2 = nil
+	args.ProvisionedInstanceClass = "db.t4g.micro"
+	args.AllocatedStorageGiB = 20
+
+	m := deploy(t, args)
+	parameterGroup := m.one(t, "aws:rds/parameterGroup:ParameterGroup").inputs
+	if parameterGroup["family"].StringValue() != "mysql8.4" {
+		t.Fatalf("parameter group family = %q", parameterGroup["family"].StringValue())
+	}
+	parameters := parameterGroup["parameters"].ArrayValue()
+	if len(parameters) != 1 {
+		t.Fatalf("parameter group parameters = %v", parameters)
+	}
+	parameter := parameters[0].ObjectValue()
+	if parameter["name"].StringValue() != "log_bin_trust_function_creators" || parameter["value"].StringValue() != "1" {
+		t.Fatalf("import parameter = %v", parameter)
+	}
+	instance := m.one(t, "aws:rds/instance:Instance").inputs
+	if instance["parameterGroupName"].StringValue() != "shop-parameters-id" {
+		t.Fatalf("instance parameter group = %q", instance["parameterGroupName"].StringValue())
+	}
+}
+
+func TestRDSMariaDBUsesMariaDBEngineAndParameterGroup(t *testing.T) {
+	t.Parallel()
+	args := previewArgs()
+	args.Engine = EngineRDSMariaDB
+	args.EngineVersion = "11.8.8"
+	args.ServerlessV2 = nil
+	args.ProvisionedInstanceClass = "db.t4g.micro"
+	args.AllocatedStorageGiB = 20
+
+	m := deploy(t, args)
+	parameterGroup := m.one(t, "aws:rds/parameterGroup:ParameterGroup").inputs
+	if parameterGroup["family"].StringValue() != "mariadb11.8" {
+		t.Fatalf("parameter group family = %q", parameterGroup["family"].StringValue())
+	}
+	instance := m.one(t, "aws:rds/instance:Instance").inputs
+	if instance["engine"].StringValue() != "mariadb" || instance["engineVersion"].StringValue() != "11.8.8" {
+		t.Fatalf("MariaDB instance inputs = %v", instance)
+	}
+	if !contains(m.snapshot(), TypeTokenRDSMariaDB+":shop") {
+		t.Fatalf("MariaDB component token missing: %v", m.snapshot())
+	}
 }
 
 func TestProductionPresetGraphsAndProtection(t *testing.T) {
@@ -99,6 +170,41 @@ func TestProductionPresetGraphsAndProtection(t *testing.T) {
 				t.Fatalf("performance insights policy = %v", instance)
 			}
 		})
+	}
+}
+
+func TestManagedDurabilityOverridesAreAppliedToAurora(t *testing.T) {
+	args := provisionedArgs(sdk.PresetStandard, []string{"eu-west-3a", "eu-west-3b"}, 2)
+	args.BackupWindow = "03:00-04:00"
+	args.MaintenanceWindow = "sun:05:00-sun:06:00"
+	args.DeletionProtection = boolPtr(false)
+	args.DeleteAutomatedBackups = boolPtr(true)
+
+	cluster := deploy(t, args).one(t, "aws:rds/cluster:Cluster").inputs
+	assertBool(t, cluster, "deletionProtection", false)
+	assertBool(t, cluster, "deleteAutomatedBackups", true)
+	if cluster["preferredBackupWindow"].StringValue() != args.BackupWindow || cluster["preferredMaintenanceWindow"].StringValue() != args.MaintenanceWindow {
+		t.Fatalf("Aurora durability windows = %v", cluster)
+	}
+}
+
+func TestManagedDurabilityOverridesAreAppliedToRDSInstance(t *testing.T) {
+	args := previewArgs()
+	args.Engine = EngineRDSMySQL
+	args.EngineVersion = "8.4.10"
+	args.ServerlessV2 = nil
+	args.ProvisionedInstanceClass = "db.t4g.micro"
+	args.AllocatedStorageGiB = 20
+	args.BackupWindow = "03:00-04:00"
+	args.MaintenanceWindow = "sun:05:00-sun:06:00"
+	args.DeletionProtection = boolPtr(true)
+	args.DeleteAutomatedBackups = boolPtr(false)
+
+	instance := deploy(t, args).one(t, "aws:rds/instance:Instance").inputs
+	assertBool(t, instance, "deletionProtection", true)
+	assertBool(t, instance, "deleteAutomatedBackups", false)
+	if instance["backupWindow"].StringValue() != args.BackupWindow || instance["maintenanceWindow"].StringValue() != args.MaintenanceWindow {
+		t.Fatalf("RDS durability windows = %v", instance)
 	}
 }
 
@@ -214,6 +320,7 @@ func provisionedArgs(preset sdk.PresetID, zones []string, count int) Args {
 	}
 	return Args{Preset: preset, EnvironmentClass: "production", Region: "eu-west-3", AvailabilityZones: zones, DataSubnetIDs: ids, VpcSecurityGroupIDs: pulumi.StringArray{pulumi.String("sg-db")}, EngineVersion: "8.0.mysql_aurora.3.10.0", DatabaseName: "magento", MasterUsername: "magelift", KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/11111111-2222-3333-4444-555555555555", BackupRetentionDays: 14, FinalSnapshotIdentifier: "shop-final", ProvisionedInstanceClass: "db.benchmark-selected", InstanceCount: count}
 }
+func boolPtr(value bool) *bool { return &value }
 func deploy(t *testing.T, args Args) *mocks {
 	t.Helper()
 	m := &mocks{}

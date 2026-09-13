@@ -14,3 +14,4 @@ Notable third-party licenses that `go-licenses` cannot classify from nested
 package paths (license file is at the module root):
 
 - github.com/ovh/pulumi-ovh/sdk/v2: Apache License 2.0 (OVHcloud)
+- github.com/ovh/okms-sdk-go: Apache License 2.0 (OVHcloud)

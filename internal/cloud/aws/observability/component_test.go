@@ -6,10 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 
+	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -102,6 +104,23 @@ func TestAcceptsOutputMetricDimensions(t *testing.T) {
 	}
 }
 
+func TestNativeGapOutputsKeepUnsupportedSignalsAndOperationsExplicit(t *testing.T) {
+	args := validArgs()
+	args.Intent = sdk.ObservabilityIntent{
+		NativeProvider: "cloudwatch", OwnershipMarker: "magelift/observability/test",
+		Signals:    []string{"logs", "metrics", "traces", "audit-events"},
+		Alerts:     []sdk.AlertIntent{{ID: "backup-stale"}},
+		Dashboards: []sdk.DashboardIntent{{ID: "resilience"}},
+		SLOs:       []sdk.SLOIntent{{ID: "availability"}},
+	}
+	if got, want := unavailableSignals(args), []string{"audit-events", "traces"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("AWS unavailable signals = %v, want %v", got, want)
+	}
+	if got, want := unavailableOperations(args.Intent), []string{"alert:backup-stale", "dashboard:resilience", "slo:availability"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("AWS unavailable operations = %v, want %v", got, want)
+	}
+}
+
 func TestCreatesProductionSyntheticHealthCheck(t *testing.T) {
 	args := validArgs()
 	args.SyntheticEnabled = true
@@ -161,6 +180,7 @@ func validArgs() Args {
 	return Args{
 		Region: "eu-west-3", EnvironmentClass: "production", LogGroupPrefix: "/magelift/shop", KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000", RetentionInDays: 30,
 		ECSClusterName: "shop-cluster", ECSServiceName: "shop-web", DesiredTaskCount: 2, LoadBalancerDimension: "app/shop/123", NotificationTopicARN: "arn:aws:sns:eu-west-3:123456789012:ops", Tags: map[string]string{"magelift:managed-by": "magelift"},
+		Intent: sdk.ObservabilityIntent{NativeProvider: "cloudwatch", OwnershipMarker: "magelift/observability/test", Signals: []string{"logs", "metrics"}},
 	}
 }
 

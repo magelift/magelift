@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
+	"time"
 
 	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/cosign"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
@@ -22,17 +23,31 @@ type infrastructureBackend interface {
 	Outputs(context.Context) (map[string]any, error)
 }
 
+func bindLiveQueueReplicas(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack) (platform.PlannedStack, error) {
+	if _, ok := planned.(platform.LiveQueueReplicaBinder); !ok {
+		return planned, nil
+	}
+	outputs, err := backend.Outputs(ctx)
+	if err != nil {
+		return planned, nil
+	}
+	return platform.BindLiveQueueReplicas(planned, outputs)
+}
+
 type infrastructureResult struct {
-	Environment string                   `json:"environment" yaml:"environment"`
-	Stack       string                   `json:"stack" yaml:"stack"`
-	Preview     automation.ChangeSummary `json:"preview,omitempty" yaml:"preview,omitempty"`
-	Update      automation.ChangeSummary `json:"update,omitempty" yaml:"update,omitempty"`
-	Adopted     []string                 `json:"adopted,omitempty" yaml:"adopted,omitempty"`
+	Environment          string                   `json:"environment" yaml:"environment"`
+	Stack                string                   `json:"stack" yaml:"stack"`
+	Preview              automation.ChangeSummary `json:"preview,omitempty" yaml:"preview,omitempty"`
+	Update               automation.ChangeSummary `json:"update,omitempty" yaml:"update,omitempty"`
+	Adopted              []string                 `json:"adopted,omitempty" yaml:"adopted,omitempty"`
+	DestroyBackups       bool                     `json:"destroyBackups,omitempty" yaml:"destroyBackups,omitempty"`
+	DestroyedBackupNames []string                 `json:"destroyedBackupNames,omitempty" yaml:"destroyedBackupNames,omitempty"`
+	RetainedBackups      []config.RetainedBackup  `json:"retainedBackups,omitempty" yaml:"retainedBackups,omitempty"`
 }
 
 func infrastructureCommands(o *options) []*cobra.Command {
 	return []*cobra.Command{
-		infrastructureCommand(o, "preview", "Preview infrastructure changes", func(ctx context.Context, backend infrastructureBackend, request automation.Request) (infrastructureResult, error) {
+		infrastructureCommand(o, "preview", "Preview Magento environment changes without applying", func(ctx context.Context, backend infrastructureBackend, request automation.Request) (infrastructureResult, error) {
 			summary, err := automation.NewRunner(backend, o.stderr).Preview(ctx, request)
 			return infrastructureResult{Preview: summary}, err
 		}),
@@ -54,9 +69,15 @@ func infrastructureCommands(o *options) []*cobra.Command {
 func infrastructureCommand(o *options, name, short string, operation func(context.Context, infrastructureBackend, automation.Request) (infrastructureResult, error)) *cobra.Command {
 	var digest string
 	var infraOnly bool
+	var skipProviderLock bool
+	var destroyBackups bool
 	command := &cobra.Command{Use: name, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		if name == "deploy" {
 			o.infraOnly = infraOnly
+		}
+		if name == "destroy" {
+			o.skipProviderLock = skipProviderLock
+			o.destroyBackups = destroyBackups
 		}
 		result, err := o.executeInfrastructure(cmd.Context(), name, operation, digest)
 		if err != nil {
@@ -67,6 +88,10 @@ func infrastructureCommand(o *options, name, short string, operation func(contex
 	if name == "deploy" {
 		command.Flags().StringVar(&digest, "digest", "", "override the configured immutable image digest")
 		command.Flags().BoolVar(&infraOnly, "infra-only", false, "update the infrastructure graph only (skip Magento migrate/health)")
+	}
+	if name == "destroy" {
+		command.Flags().BoolVar(&skipProviderLock, "skip-lock", false, "skip the provider distributed state lock (acceptance cleanup only)")
+		command.Flags().BoolVar(&destroyBackups, "destroy-backups", false, "also destroy leftover provider backups after the environment is gone; GCP Cloud SQL leftovers are deleted even when the backup policy is disposable, AWS snapshots are still refused")
 	}
 	return command
 }
@@ -80,6 +105,43 @@ func (o *options) destroyOperation(ctx context.Context, backend infrastructureBa
 	return infrastructureResult{Preview: preview, Update: destroyed}, err
 }
 
+func (o *options) refuseUnimplementedDestroyBackups() error {
+	if !o.destroyBackups {
+		return nil
+	}
+	effective, _, err := o.resolveWithEnvironment()
+	if err != nil {
+		return err
+	}
+	retained := config.RetainedBackupsOnDestroy(effective.Config)
+	for _, item := range retained {
+		if destroyBackupsImplemented(item.Mechanism) {
+			continue
+		}
+		return invalid(fmt.Errorf("--destroy-backups is not implemented while %s backups remain inside retention; omit the flag so destroy keeps them", item.Mechanism))
+	}
+	return nil
+}
+
+func (o *options) applyDestroyBackupRetention(ctx context.Context, planned platform.PlannedStack, result *infrastructureResult) error {
+	effective, _, err := o.resolveWithEnvironment()
+	if err != nil {
+		return err
+	}
+	retained := config.RetainedBackupsOnDestroy(effective.Config)
+	if !o.destroyBackups {
+		result.RetainedBackups = retained
+		return nil
+	}
+	result.DestroyBackups = true
+	names, err := o.destroyLeftoverProviderBackups(ctx, planned, retained)
+	if err != nil {
+		return err
+	}
+	result.DestroyedBackupNames = names
+	return nil
+}
+
 func (o *options) executeInfrastructure(ctx context.Context, name string, operation func(context.Context, infrastructureBackend, automation.Request) (infrastructureResult, error), digestOverride string) (infrastructureResult, error) {
 	environment, planned, err := o.planStack(name == "destroy")
 	if err != nil {
@@ -91,11 +153,25 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 			return infrastructureResult{}, invalid(fmt.Errorf("deployment digest is invalid: %w", err))
 		}
 	}
+	if err := requireTargetDependencies(ctx, o, planned); err != nil {
+		return infrastructureResult{}, err
+	}
+	if name != "destroy" {
+		planned, err = o.admitPlanned(ctx, planned)
+		if err != nil {
+			return infrastructureResult{}, invalid(fmt.Errorf("provider plan admission: %w", err))
+		}
+	}
 	if (name == "deploy" || name == "destroy") && planned.EnvironmentClass() == "production" && !o.yes {
 		return infrastructureResult{}, invalid(errors.New("production changes require explicit --yes approval"))
 	}
 	if name == "destroy" && planned.Protected() {
 		return infrastructureResult{}, invalid(errors.New("protected environments must be unprotected before destroy"))
+	}
+	if name == "destroy" {
+		if err := o.refuseUnimplementedDestroyBackups(); err != nil {
+			return infrastructureResult{}, err
+		}
 	}
 	if name == "deploy" {
 		return o.runDeployment(ctx, environment, planned, planned.ImageDigest())
@@ -103,34 +179,41 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 	if o.newBackend == nil {
 		return infrastructureResult{}, errors.New("infrastructure backend factory is required")
 	}
-	backendURL := strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL"))
+	backendURL := o.infrastructureBackendURL(planned)
 	backend, err := o.newBackend(ctx, planned, backendURL)
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
+	if name != "destroy" {
+		planned, err = bindLiveQueueReplicas(ctx, backend, planned)
+		if err != nil {
+			return infrastructureResult{}, invalid(err)
+		}
+	}
 	requestTarget := planned.TargetDescriptor()
+	request := o.automationRequest(requestTarget, name == "destroy")
+	if err := automation.ValidateRequest(ctx, backend, request); err != nil {
+		return infrastructureResult{}, err
+	}
 	var release func(context.Context) error
-	if name == "destroy" {
+	if name == "destroy" && !o.skipProviderLock {
 		release, err = o.acquireProviderLock(ctx, planned)
 		if err != nil {
 			return infrastructureResult{}, err
 		}
+	} else if name == "destroy" && o.skipProviderLock {
+		announceSkipProviderLock(o.stderr)
 	}
 	if err := refuseAdoptedMutationForOperation(planned, name); err != nil {
 		return infrastructureResult{}, err
 	}
 	adopted := announceAdoptedResources(o.stderr, planned)
-	request := automation.Request{Target: requestTarget}
 	result, err := operation(ctx, backend, request)
+	if err == nil && name == "destroy" {
+		err = o.destroyFastlyEdge(ctx, environment)
+	}
 	if release != nil {
-		releaseErr := release(ctx)
-		if releaseErr != nil {
-			if err != nil {
-				err = fmt.Errorf("%w; release deployment lock: %v", err, releaseErr)
-			} else {
-				err = fmt.Errorf("release deployment lock: %w", releaseErr)
-			}
-		}
+		err = joinReleaseError(err, release(ctx))
 	}
 	if err != nil {
 		return infrastructureResult{}, err
@@ -138,6 +221,11 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 	result.Environment = environment
 	result.Stack = planned.StackName()
 	result.Adopted = adopted
+	if name == "destroy" {
+		if err := o.applyDestroyBackupRetention(ctx, planned, &result); err != nil {
+			return infrastructureResult{}, err
+		}
+	}
 	return result, nil
 }
 
@@ -145,25 +233,55 @@ type deploymentOptions struct {
 	rollback                 bool
 	acknowledgeForwardOnlyDB bool
 	infraOnly                bool
+	dependenciesChecked      bool
 }
 
 func (o *options) runDeployment(ctx context.Context, environment string, planned platform.PlannedStack, digest string) (infrastructureResult, error) {
-	return o.runDeploymentWithOptions(ctx, environment, planned, digest, deploymentOptions{infraOnly: o.infraOnly})
+	return o.runDeploymentWithOptions(ctx, environment, planned, digest, deploymentOptions{infraOnly: o.infraOnly, dependenciesChecked: true})
 }
 
 func (o *options) runDeploymentWithOptions(ctx context.Context, environment string, planned platform.PlannedStack, digest string, deployOptions deploymentOptions) (infrastructureResult, error) {
+	if !deployOptions.dependenciesChecked {
+		if err := requireTargetDependencies(ctx, o, planned); err != nil {
+			return infrastructureResult{}, err
+		}
+	}
 	if o.newBackend == nil {
 		return infrastructureResult{}, errors.New("infrastructure backend factory is required")
 	}
-	backendURL := strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL"))
+	backendURL := o.infrastructureBackendURL(planned)
 	backend, err := o.newBackend(ctx, planned, backendURL)
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
+	planned, err = bindLiveQueueReplicas(ctx, backend, planned)
+	if err != nil {
+		return infrastructureResult{}, invalid(err)
+	}
 	requestTarget := planned.TargetDescriptor()
+	request := o.automationRequest(requestTarget, false)
+	if err := automation.ValidateRequest(ctx, backend, request); err != nil {
+		return infrastructureResult{}, err
+	}
 	if deployOptions.infraOnly {
 		announceInfraOnlyDeploy(o.stderr)
-	} else if o.newDeploySteps != nil {
+		preview, previewErr := automation.NewRunner(backend, o.stderr).Preview(ctx, request)
+		if previewErr != nil {
+			return infrastructureResult{}, previewErr
+		}
+		update, updateErr := automation.NewRunner(backend, o.stderr).Update(ctx, request)
+		if updateErr != nil {
+			return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview}, updateErr
+		}
+		adopted := announceAdoptedResources(o.stderr, planned)
+		if outputs, outErr := backend.Outputs(ctx); outErr == nil && len(outputs) > 0 {
+			if reqErr := platform.RequireOutputs(outputs, platform.RequiredOutputKeys()); reqErr != nil {
+				return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update, Adopted: adopted}, reqErr
+			}
+		}
+		return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update, Adopted: adopted}, nil
+	}
+	if o.newDeploySteps != nil {
 		steps, stepsErr := o.newDeploySteps(ctx, backend, planned, o.stderr)
 		if stepsErr == nil && steps != nil {
 			if planned.EnvironmentClass() == "production" {
@@ -179,7 +297,7 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			}
 			adopted := announceAdoptedResources(o.stderr, planned)
 			result, runErr := deployflow.New(cliDeploymentLock{factory: o.newLock, planned: planned}, steps).Run(ctx, deployflow.Request{
-				Target: requestTarget, ImageDigest: digest, Production: planned.EnvironmentClass() == "production", Approved: o.yes,
+				Target: requestTarget, ImageDigest: digest, Preview: request.Preview, Production: planned.EnvironmentClass() == "production", Approved: o.yes,
 				Rollback: deployOptions.rollback, AcknowledgeForwardOnlyDB: deployOptions.acknowledgeForwardOnlyDB,
 			})
 			if runErr != nil {
@@ -188,6 +306,15 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			out := infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: result.Preview, Update: result.Update, Adopted: adopted}
 			// Auto-import after lock release (deployflow.Run completed); D-01/D-02 once-from-recorded.
 			if err := o.maybeAutoImportSeedDump(ctx, environment); err != nil {
+				return out, err
+			}
+			originURL := ""
+			if outputs, outputErr := backend.Outputs(ctx); outputErr == nil {
+				if applicationURL, ok := outputs[platform.OutputApplicationURL].(string); ok {
+					originURL = applicationURL
+				}
+			}
+			if err := o.applyFastlyEdge(ctx, environment, originURL); err != nil {
 				return out, err
 			}
 			return out, nil
@@ -210,11 +337,11 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			return infrastructureResult{}, refuseErr
 		}
 		adopted := announceAdoptedResources(o.stderr, planned)
-		preview, previewErr := automation.NewRunner(backend, o.stderr).Preview(ctx, automation.Request{Target: requestTarget})
+		preview, previewErr := automation.NewRunner(backend, o.stderr).Preview(ctx, request)
 		if previewErr != nil {
 			return infrastructureResult{}, previewErr
 		}
-		update, updateErr := automation.NewRunner(backend, o.stderr).Update(ctx, automation.Request{Target: requestTarget})
+		update, updateErr := automation.NewRunner(backend, o.stderr).Update(ctx, request)
 		if updateErr != nil {
 			return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Adopted: adopted}, updateErr
 		}
@@ -225,17 +352,14 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 		}
 		return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update, Adopted: adopted}, nil
 	}()
-	if releaseErr := release(ctx); releaseErr != nil {
-		if err != nil {
-			err = fmt.Errorf("%w; release deployment lock: %v", err, releaseErr)
-		} else {
-			err = fmt.Errorf("release deployment lock: %w", releaseErr)
-		}
-	}
+	err = joinReleaseError(err, releaseDeploymentLock(ctx, release))
 	return result, err
 }
 
 func (o *options) requireSignedRelease(ctx context.Context, environment, digest string) error {
+	if err := requireCosignVerificationDependencies(ctx, o); err != nil {
+		return err
+	}
 	store, err := o.releaseStore(environment)
 	if err != nil {
 		return &exitError{code: 3, err: err}
@@ -268,6 +392,24 @@ func (l cliDeploymentLock) Acquire(ctx context.Context, _ deployflow.Request) (f
 	return l.factory(ctx, l.planned)
 }
 
+const deploymentLockReleaseTimeout = time.Minute
+
+func releaseDeploymentLock(ctx context.Context, release func(context.Context) error) error {
+	if release == nil {
+		return errors.New("deployment lock release function is required")
+	}
+	releaseContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), deploymentLockReleaseTimeout)
+	defer cancel()
+	return release(releaseContext)
+}
+
+func joinReleaseError(err, releaseErr error) error {
+	if releaseErr == nil {
+		return err
+	}
+	return errors.Join(err, fmt.Errorf("release deployment lock: %w", releaseErr))
+}
+
 func outputsCommand(o *options) *cobra.Command {
 	return &cobra.Command{Use: "outputs", Short: "Read outputs from the selected environment", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		environment, planned, err := o.planStack(false)
@@ -277,7 +419,10 @@ func outputsCommand(o *options) *cobra.Command {
 		if o.newBackend == nil {
 			return errors.New("infrastructure backend factory is required")
 		}
-		backendURL := strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL"))
+		if err := requireTargetDependencies(cmd.Context(), o, planned); err != nil {
+			return err
+		}
+		backendURL := o.infrastructureBackendURL(planned)
 		backend, err := o.newBackend(cmd.Context(), planned, backendURL)
 		if err != nil {
 			return fmt.Errorf("create infrastructure backend: %w", err)
@@ -303,6 +448,7 @@ func outputsCommand(o *options) *cobra.Command {
 }
 
 func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedStack, error) {
+	o.resolvedPreviewIdentity = nil
 	if o.modules == nil {
 		return "", nil, errors.New("stack module registry is required")
 	}
@@ -310,7 +456,8 @@ func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedS
 	if err != nil {
 		return "", nil, err
 	}
-	_, planned, err := o.modules.Plan(effective.Config, environment, platform.PlanOptions{AllowExpiredPreview: allowExpiredPreview})
+	o.resolvedPreviewIdentity = effective.Config.PreviewIdentity
+	_, planned, err := o.modules.Plan(effective.Config, environment, platform.PlanOptions{AllowExpiredPreview: allowExpiredPreview, Context: o.planContext})
 	if err != nil {
 		return "", nil, err
 	}
@@ -319,8 +466,8 @@ func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedS
 }
 
 // experimentalTargetWarningFmt is the TRUST-01 stderr line. Keep factual: tier,
-// provider/runtime, day-2 honesty, acceptance evidence, docs; never ARNs or backend URLs.
-const experimentalTargetWarningFmt = "warning: target %s/%s is experimental: day-2 operations may be unimplemented and this target has no real-account acceptance evidence; see docs/capability-matrix.md"
+// provider/runtime, coverage honesty, docs; never ARNs or backend URLs.
+const experimentalTargetWarningFmt = "warning: MageLift: target %s/%s is experimental: broader release, architecture, and day-2 acceptance coverage is incomplete; see docs/capability-matrix.md"
 
 func warnExperimentalTarget(stderr io.Writer, planned platform.PlannedStack) {
 	if planned == nil || planned.CertificationTier() != platform.TierExperimental || stderr == nil {
@@ -332,11 +479,20 @@ func warnExperimentalTarget(stderr io.Writer, planned platform.PlannedStack) {
 // infraOnlyDeployNoticeFmt is the TRUST-02 stderr line when --infra-only proceeds.
 const infraOnlyDeployNoticeFmt = "notice: --infra-only: Magento migrate, cutover, and health were skipped\n"
 
+const skipProviderLockNoticeFmt = "notice: --skip-lock: provider distributed state lock was skipped; use only when no concurrent operation is running\n"
+
 func announceInfraOnlyDeploy(stderr io.Writer) {
 	if stderr == nil {
 		return
 	}
 	_, _ = io.WriteString(stderr, infraOnlyDeployNoticeFmt)
+}
+
+func announceSkipProviderLock(stderr io.Writer) {
+	if stderr == nil {
+		return
+	}
+	_, _ = io.WriteString(stderr, skipProviderLockNoticeFmt)
 }
 
 func refuseInfraOnlyDeploy(planned platform.PlannedStack) error {

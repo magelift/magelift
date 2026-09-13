@@ -1,0 +1,9 @@
+services:
+  floci-gcp:
+    image: floci/floci-gcp:0.7.0@sha256:9f1a020fdd5ac8b6ca568b60e793a9a0e88b8df400ae6bd68283ec5208788180
+    ports:
+      - "4588:4588"
+    environment:
+      FLOCI_GCP_HOSTNAME: localhost
+      FLOCI_GCP_BASE_URL: http://localhost:4588
+      FLOCI_GCP_STORAGE_MODE: memory

@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -50,5 +51,28 @@ func TestLoginSurfacesCredentialFailureWithoutMutation(t *testing.T) {
 	err := command.Execute()
 	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "verify credentials") {
 		t.Fatalf("error=%v code=%d", err, ExitCode(err))
+	}
+}
+
+func TestLoginBlocksBeforeCredentialVerificationWhenPlanAdmissionFails(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	fake := &recordingLoginBootstrap{}
+	admission := &rejectingBootstrapPlanAdmission{err: errors.New("login quota admission failed")}
+	modules := platform.NewModuleRegistry()
+	if err := modules.RegisterModule(bootstrapAdmissionModule{admission: admission}); err != nil {
+		t.Fatal(err)
+	}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.modules = modules
+	o.configPath, o.environment = path, "staging"
+	o.testBootstrap = fake
+	command := newCommandWithOptions(o)
+	command.SetArgs([]string{"--config", path, "--env", "staging", "login"})
+	err := command.Execute()
+	if err == nil || !strings.Contains(err.Error(), "provider plan admission") || !strings.Contains(err.Error(), "login quota admission failed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if admission.calls != 1 || fake.verified {
+		t.Fatalf("admission calls=%d verified=%v, want one admission and no verification", admission.calls, fake.verified)
 	}
 }

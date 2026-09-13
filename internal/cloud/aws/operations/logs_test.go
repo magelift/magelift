@@ -34,9 +34,8 @@ func TestTailPaginatesAndSortsWithoutExceedingLimit(t *testing.T) {
 	client := &fakeLogs{outputs: []*cloudwatchlogs.FilterLogEventsOutput{
 		{Events: []types.FilteredLogEvent{
 			{Timestamp: awssdk.Int64(2000), IngestionTime: awssdk.Int64(2100), Message: awssdk.String("later"), EventId: awssdk.String("b")},
-			{Timestamp: awssdk.Int64(1000), IngestionTime: awssdk.Int64(1100), Message: awssdk.String("first"), EventId: awssdk.String("a")},
 		}, NextToken: awssdk.String("next")},
-		{Events: []types.FilteredLogEvent{{Timestamp: awssdk.Int64(3000), Message: awssdk.String("ignored")}}},
+		{Events: []types.FilteredLogEvent{{Timestamp: awssdk.Int64(1000), IngestionTime: awssdk.Int64(1100), Message: awssdk.String("first"), EventId: awssdk.String("a")}}},
 	}}
 	store, err := NewFromClient(client)
 	if err != nil {
@@ -50,8 +49,23 @@ func TestTailPaginatesAndSortsWithoutExceedingLimit(t *testing.T) {
 	if len(events) != 2 || events[0].Message != "first" || events[1].Message != "later" {
 		t.Fatalf("events = %#v", events)
 	}
-	if len(client.inputs) != 1 || awssdk.ToString(client.inputs[0].LogGroupName) != "/magelift/shop/staging/web" || awssdk.ToString(client.inputs[0].FilterPattern) != "ERROR" {
+	if len(client.inputs) != 2 || awssdk.ToString(client.inputs[0].LogGroupName) != "/magelift/shop/staging/web" || awssdk.ToString(client.inputs[0].FilterPattern) != "ERROR" || awssdk.ToString(client.inputs[1].NextToken) != "next" {
 		t.Fatalf("request = %#v", client.inputs)
+	}
+}
+
+func TestTailDeduplicatesRepeatedEventIDs(t *testing.T) {
+	client := &fakeLogs{outputs: []*cloudwatchlogs.FilterLogEventsOutput{
+		{Events: []types.FilteredLogEvent{{Timestamp: awssdk.Int64(1000), Message: awssdk.String("one"), EventId: awssdk.String("same")}}, NextToken: awssdk.String("next")},
+		{Events: []types.FilteredLogEvent{{Timestamp: awssdk.Int64(1000), Message: awssdk.String("one"), EventId: awssdk.String("same")}, {Timestamp: awssdk.Int64(2000), Message: awssdk.String("two"), EventId: awssdk.String("two")}}},
+	}}
+	store, err := NewFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := store.Tail(context.Background(), "group", time.UnixMilli(0).UTC(), nil, "", 10)
+	if err != nil || len(events) != 2 {
+		t.Fatalf("events=%#v err=%v", events, err)
 	}
 }
 

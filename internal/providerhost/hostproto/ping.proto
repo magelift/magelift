@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package magelift.providerhost.v1;
+
+option go_package = "github.com/magelift/magelift/internal/providerhost/hostproto";
+
+message PingRequest {}
+
+message PingResponse {
+  string sdk_api_version = 1;
+}
+
+message DescribeRequest {}
+
+message DescribeResponse {
+  string identity_json = 1;
+}
+
+service Provider {
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc Describe(DescribeRequest) returns (DescribeResponse);
+  rpc Plan(PlanRequest) returns (PlanResponse);
+  rpc Program(ProgramRequest) returns (ProgramResponse);
+}
+
+message PlanRequest {
+  string request_json = 1;
+}
+
+message PlanResponse {
+  string plan_json = 1;
+}
+
+message ProgramRequest {
+  string plan_json = 1;
+}
+
+message ProgramResponse {
+  string result_json = 1;
+}

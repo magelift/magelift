@@ -2,14 +2,16 @@ package stack
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
 	"time"
 
+	"github.com/magelift/magelift/internal/cloud/aws/network"
 	awstarget "github.com/magelift/magelift/internal/cloud/aws/target"
 	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/edge/waf"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/topology"
 	sdk "github.com/magelift/magelift/sdk/v1"
 )
@@ -38,6 +40,23 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	}
 	if cfg.Target.AWS == nil {
 		return Spec{}, fmt.Errorf("target.aws is required for AWS deployment")
+	}
+	if err := platform.ValidateFirstPartyEdge(cfg); err != nil {
+		return Spec{}, err
+	}
+	if err := platform.ValidateFirstPartyObservability(cfg); err != nil {
+		return Spec{}, err
+	}
+	observability, err := platform.ObservabilityIntentFromConfig(cfg, environment)
+	if err != nil {
+		return Spec{}, err
+	}
+	edgeIntent, err := platform.EdgeIntentFromConfig(cfg, environment)
+	if err != nil {
+		return Spec{}, err
+	}
+	if strings.TrimSpace(cfg.Edge.Mode) == "" && strings.TrimSpace(cfg.Edge.NativeProvider) == "" && strings.TrimSpace(cfg.Edge.ExternalProvider) == "" {
+		edgeIntent = defaultAWSEdgeIntent(edgeIntent, cfg.Domain)
 	}
 	aws := cfg.Target.AWS
 	presetName := cfg.Preset
@@ -76,6 +95,11 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	hostedZone := sdk.ExistingResourceRef{ID: sdk.ResourceID(cfg.Project.Name + "-" + environment + "-hosted-zone"), Provider: sdk.ProviderID("aws"), Kind: zone, ExternalID: aws.HostedZoneID}
 	cloudFrontCertificate := sdk.ExistingResourceRef{ID: sdk.ResourceID(cfg.Project.Name + "-" + environment + "-cloudfront-certificate"), Provider: sdk.ProviderID("aws"), Kind: certificate, ExternalID: aws.CloudFrontCertificateARN}
 	albCertificate := sdk.ExistingResourceRef{ID: sdk.ResourceID(cfg.Project.Name + "-" + environment + "-alb-certificate"), Provider: sdk.ProviderID("aws"), Kind: certificate, ExternalID: aws.ALBCertificateARN}
+	var hostedZoneRef *sdk.ExistingResourceRef
+	cloudFrontCertificateRef := &cloudFrontCertificate
+	if nativeEdgeEnabled(edgeIntent) {
+		hostedZoneRef = &hostedZone
+	}
 	var existingNetwork *sdk.ExistingResourceRef
 	var existingDatabase *sdk.ExistingResourceRef
 	existingPublicSubnets := append([]string(nil), aws.Existing.PublicSubnetIDs...)
@@ -100,23 +124,36 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	if err := validateAWSServiceCompatibility(cfg); err != nil && !cfg.Compatibility.AllowUnsupported {
 		return Spec{}, err
 	}
+	tags := map[string]string{"magelift:managed-by": "magelift", "magelift:project": cfg.Project.Name, "magelift:environment": environment}
+	for key, value := range aws.Labels {
+		tags[key] = value
+	}
+	natMode := resolveNatMode(aws.NatMode)
+	natTopology := aws.NatTopology
+	natReplacementMode := aws.NatReplacementMode
+	if aws.Existing.Network == nil {
+		natTopology = network.ResolveNatTopology(natTopology, preset)
+		natReplacementMode = network.ResolveNatReplacementMode(natReplacementMode, preset, natMode, natTopology)
+	}
 	spec := Spec{
 		Identity: Identity{
 			Project: cfg.Project.Name, Environment: environment, AccountID: cfg.Account, Region: cfg.Defaults.Region,
 			EnvironmentClass: class, Preset: preset,
-			Tags: map[string]string{"magelift:managed-by": "magelift", "magelift:project": cfg.Project.Name, "magelift:environment": environment},
+			Tags: tags,
 		},
-		Application: Application{Edition: cfg.Application.Edition, Version: cfg.Application.Version, Mode: cfg.Application.Mode, WebRuntime: cfg.Application.WebRuntime},
+		Application: Application{Edition: cfg.Application.Edition, Version: cfg.Application.Version, Mode: cfg.Application.Mode, WebRuntime: cfg.Application.WebRuntime, Magento: platform.NewMagentoOverlays(cfg.Application.Magento.FrontName, cfg.Application.Magento.CookieDomain, cfg.Application.Magento.UnsecureBaseURL, cfg.Application.Magento.SecureBaseURL, cfg.Application.Magento.StorefrontOrigin, cfg.Application.Magento.Consumers.Mode, cfg.Application.Magento.CORSOrigins, cfg.Application.Magento.Consumers.Names, cfg.Application.Magento.Variables)},
 		Artifact:    Artifact{ImageDigest: aws.ImageDigest, CompatibilityStatus: status},
 		Lifecycle:   Lifecycle{ExpiresAt: expiresAt, MonthlyBudgetCents: cfg.MonthlyBudgetCents, Protection: cfg.Protection},
 		Existing: ExistingResources{
 			Network: existingNetwork, PublicSubnetIDs: existingPublicSubnets, PrivateSubnetIDs: existingPrivateSubnets, DataSubnetIDs: existingDataSubnets,
 			Database: existingDatabase, DatabaseSecretARN: existingDatabaseSecretARN, DatabaseEndpoint: existingDatabaseEndpoint,
-			HostedZone: &hostedZone, Certificate: &cloudFrontCertificate, ALBCertificate: &albCertificate, SNSTopicARN: aws.SNSTopicARN,
+			HostedZone: hostedZoneRef, Certificate: cloudFrontCertificateRef, ALBCertificate: &albCertificate, SNSTopicARN: aws.SNSTopicARN,
 		},
-		Dependencies: Dependencies{KMSKeyARN: aws.KMSKeyARN, CacheSecretARN: aws.CacheSecretARN, SessionSecretARN: aws.SessionSecretARN, QueueSecretARN: aws.QueueSecretARN, EncryptionKeyARN: aws.EncryptionKeySecretARN, DatabaseName: aws.DatabaseName, MasterUsername: aws.MasterUsername},
-		Policy:       NetworkPolicy{VPCCIDR: cidr, AvailabilityZones: append([]string(nil), aws.AvailabilityZones...), MediaDomain: aws.MediaDomain, ApplicationDomain: cfg.Domain, NatMode: resolveNatMode(aws.NatMode)},
-		Catalog:      catalogFromConfig(aws.Catalog, preset),
+		Dependencies:  Dependencies{KMSKeyARN: aws.KMSKeyARN, CacheSecretARN: aws.CacheSecretARN, SessionSecretARN: aws.SessionSecretARN, QueueSecretARN: aws.QueueSecretARN, EncryptionKeyARN: aws.EncryptionKeySecretARN, DatabaseName: aws.DatabaseName, MasterUsername: aws.MasterUsername},
+		Policy:        NetworkPolicy{VPCCIDR: cidr, AvailabilityZones: append([]string(nil), aws.AvailabilityZones...), MediaDomain: aws.MediaDomain, ApplicationDomain: cfg.Domain, NatMode: natMode, NatTopology: natTopology, NatReplacementMode: natReplacementMode, NatInstanceType: aws.NatInstanceType},
+		Catalog:       catalogFromConfig(aws.Catalog, preset),
+		Edge:          edgeIntent,
+		Observability: observability,
 	}
 	validate := spec.Validate
 	if options.AllowExpiredPreview && preset == sdk.PresetPreview && !expiresAt.IsZero() && expiresAt.Before(time.Now().UTC()) {
@@ -128,70 +165,20 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	return spec, nil
 }
 
-func validateAWSServiceCompatibility(cfg config.Config) error {
-	versionLine := strings.SplitN(cfg.Application.Version, "-", 2)[0]
-	policy, ok := map[string]struct {
-		openSearchPrefix string
-		valkeyPrefixes   []string
-	}{
-		"2.4.9": {openSearchPrefix: "OpenSearch_3", valkeyPrefixes: []string{"8", "9"}},
-		"2.4.8": {openSearchPrefix: "OpenSearch_3", valkeyPrefixes: []string{"8"}},
-		"2.4.7": {openSearchPrefix: "OpenSearch_", valkeyPrefixes: []string{"8"}},
-		"2.4.6": {openSearchPrefix: "OpenSearch_", valkeyPrefixes: []string{"8"}},
-	}[versionLine]
-	if !ok {
-		return fmt.Errorf("AWS service compatibility is not cataloged for Magento %s", versionLine)
-	}
-	versions := cfg.Target.AWS.Catalog.Versions
-	engine := resolveDatabaseEngine(cfg.Target.AWS.Catalog.DatabaseEngine)
-	presetName := cfg.Preset
-	if strings.TrimSpace(presetName) == "" {
-		presetName = cfg.Defaults.Preset
-	}
-	searchMode := resolveSearchMode(cfg.Target.AWS.Catalog.SearchMode, sdk.PresetID(presetName))
-	queueMode := resolveQueueMode(cfg.Target.AWS.Catalog.QueueMode, sdk.PresetID(presetName))
-	if searchMode != SearchModeDisabled {
-		searchCompatible := strings.HasPrefix(versions.OpenSearch, policy.openSearchPrefix)
-		if versionLine == "2.4.7" || versionLine == "2.4.6" {
-			searchCompatible = strings.HasPrefix(versions.OpenSearch, "OpenSearch_2") || strings.HasPrefix(versions.OpenSearch, "OpenSearch_3")
-		}
-		if !searchCompatible {
-			return fmt.Errorf("Magento %s requires an Adobe-listed AWS OpenSearch 2 or 3 version", versionLine)
-		}
-	}
-	if !hasPrefix(versions.Valkey, policy.valkeyPrefixes) {
-		return fmt.Errorf("Magento %s requires an Adobe-listed AWS Valkey version", versionLine)
-	}
-	if queueMode == QueueModeAmazonMQ || queueMode == QueueModeECSRabbitMQ {
-		if !strings.HasPrefix(versions.RabbitMQ, "3.13") && !strings.HasPrefix(versions.RabbitMQ, "4.2") {
-			return fmt.Errorf("Magento %s requires RabbitMQ 3.13 or 4.2 for queueMode %s", versionLine, queueMode)
-		}
-	}
-	// Amazon MQ 4.2 instance gate; ecs / db modes may leave instance type empty.
-	if queueMode == QueueModeAmazonMQ {
-		if instanceType := strings.TrimSpace(cfg.Target.AWS.Catalog.RabbitMQ.InstanceType); strings.HasPrefix(versions.RabbitMQ, "4.2") && instanceType != "" && !strings.HasPrefix(instanceType, "mq.m7g.") {
-			return errors.New("AWS MQ RabbitMQ 4.2 requires an mq.m7g instance type")
-		}
-	}
-	if engine == DatabaseEngineRDSMySQL {
-		if strings.TrimSpace(versions.MySQL) == "" || (!strings.HasPrefix(versions.MySQL, "8.0.") && !strings.HasPrefix(versions.MySQL, "8.4.")) {
-			return fmt.Errorf("Magento %s requires an AWS RDS MySQL 8.0 or 8.4 engine", versionLine)
-		}
-		return nil
-	}
-	if !strings.Contains(versions.AuroraMySQL, ".3.12") && !strings.Contains(versions.AuroraMySQL, ".3.11") {
-		return fmt.Errorf("Magento %s requires an AWS Aurora MySQL 3.11 or 3.12 engine", versionLine)
-	}
-	return nil
+func defaultAWSEdgeIntent(intent sdk.EdgeIntent, domain string) sdk.EdgeIntent {
+	intent.Mode = "native"
+	intent.NativeProvider = "cloudfront-waf"
+	intent.Domains = []string{domain}
+	intent.TLS = true
+	intent.TLSMode = "existing"
+	intent.DNSMode = "existing"
+	intent.OriginHealthRef = "aws/alb"
+	intent.WAFPolicyRef = waf.PolicyRef
+	return intent
 }
 
-func hasPrefix(value string, prefixes []string) bool {
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(value, prefix) {
-			return true
-		}
-	}
-	return false
+func validateAWSServiceCompatibility(cfg config.Config) error {
+	return config.ValidateAWSServiceCompatibility(cfg)
 }
 
 func parseExpiration(value string) (time.Time, error) {
@@ -207,19 +194,25 @@ func parseExpiration(value string) (time.Time, error) {
 
 func catalogFromConfig(input config.AWSCatalog, preset sdk.PresetID) CatalogSelection {
 	return CatalogSelection{
-		Version:           input.Version,
-		DatabaseEngine:    resolveDatabaseEngine(input.DatabaseEngine),
-		SearchMode:        resolveSearchMode(input.SearchMode, preset),
-		QueueMode:         resolveQueueMode(input.QueueMode, preset),
-		Aurora:            AuroraPreviewProfile{MinimumACU: input.Aurora.MinimumACU, MaximumACU: input.Aurora.MaximumACU, AutoPauseSeconds: input.Aurora.AutoPauseSeconds, EngineSupportsAutoPause: input.Aurora.EngineSupportsAutoPause},
-		Valkey:            ValkeyPreviewProfile{NodeType: input.Valkey.NodeType, ReplicaCount: input.Valkey.ReplicaCount},
-		Search:            SearchPreviewProfile{MaximumIndexingOCU: input.Search.MaximumIndexingOCU, MaximumSearchOCU: input.Search.MaximumSearchOCU, AcceptColdStarts: input.Search.AcceptColdStarts},
-		Fargate:           FargatePreviewProfile{CPU: input.Fargate.CPU, MemoryMiB: input.Fargate.MemoryMiB, DesiredCount: input.Fargate.DesiredCount},
-		Retention:         RetentionProfile{LogDays: input.Retention.LogDays, BackupDays: input.Retention.BackupDays, ArtifactDays: input.Retention.ArtifactDays},
-		Versions:          ServiceVersions{AuroraMySQL: input.Versions.AuroraMySQL, MySQL: input.Versions.MySQL, Valkey: input.Versions.Valkey, OpenSearch: input.Versions.OpenSearch, RabbitMQ: input.Versions.RabbitMQ},
-		AuroraProvisioned: AuroraProvisionedProfile{InstanceClass: input.Aurora.InstanceClass, InstanceCount: input.Aurora.InstanceCount},
-		SearchProvisioned: SearchProvisionedProfile{InstanceType: input.Search.InstanceType, InstanceCount: input.Search.InstanceCount, DedicatedMasterType: input.Search.DedicatedMasterType, DedicatedMasterCount: input.Search.DedicatedMasterCount, EBSVolumeType: input.Search.EBSVolumeType, EBSVolumeSizeGiB: input.Search.EBSVolumeSizeGiB},
-		RabbitMQ:          RabbitMQProfile{InstanceType: input.RabbitMQ.InstanceType},
+		Version:                        input.Version,
+		DatabaseEngine:                 resolveDatabaseEngine(input.DatabaseEngine),
+		SearchMode:                     resolveSearchMode(input.SearchMode, preset),
+		QueueMode:                      resolveQueueMode(input.QueueMode, preset),
+		DatabaseBackupWindow:           input.DatabaseBackupWindow,
+		DatabaseMaintenanceWindow:      input.DatabaseMaintenanceWindow,
+		DatabaseDeletionProtection:     input.DatabaseDeletionProtection,
+		DatabaseDeleteAutomatedBackups: input.DatabaseDeleteAutomatedBackups,
+		CacheSnapshotRetentionLimit:    input.CacheSnapshotRetentionLimit,
+		CacheSnapshotWindow:            input.CacheSnapshotWindow,
+		Aurora:                         AuroraPreviewProfile{MinimumACU: input.Aurora.MinimumACU, MaximumACU: input.Aurora.MaximumACU, AutoPauseSeconds: input.Aurora.AutoPauseSeconds, EngineSupportsAutoPause: input.Aurora.EngineSupportsAutoPause},
+		Valkey:                         ValkeyPreviewProfile{NodeType: input.Valkey.NodeType, ReplicaCount: input.Valkey.ReplicaCount},
+		Search:                         SearchPreviewProfile{MaximumIndexingOCU: input.Search.MaximumIndexingOCU, MaximumSearchOCU: input.Search.MaximumSearchOCU, AcceptColdStarts: input.Search.AcceptColdStarts},
+		Fargate:                        FargatePreviewProfile{ComputeMode: input.Fargate.ComputeMode, CPU: input.Fargate.CPU, MemoryMiB: input.Fargate.MemoryMiB, DesiredCount: input.Fargate.DesiredCount, InstanceType: input.Fargate.InstanceType, InstanceAMI: input.Fargate.InstanceAMI, MinCapacity: input.Fargate.MinCapacity, MaxCapacity: input.Fargate.MaxCapacity},
+		Retention:                      RetentionProfile{LogDays: input.Retention.LogDays, BackupDays: input.Retention.BackupDays, ArtifactDays: input.Retention.ArtifactDays},
+		Versions:                       ServiceVersions{AuroraMySQL: config.CanonicalAuroraMySQLVersion(input.Versions.AuroraMySQL), MySQL: input.Versions.MySQL, MariaDB: input.Versions.MariaDB, Valkey: input.Versions.Valkey, OpenSearch: input.Versions.OpenSearch, RabbitMQ: input.Versions.RabbitMQ},
+		AuroraProvisioned:              AuroraProvisionedProfile{InstanceClass: input.Aurora.InstanceClass, InstanceCount: input.Aurora.InstanceCount},
+		SearchProvisioned:              SearchProvisionedProfile{InstanceType: input.Search.InstanceType, InstanceCount: input.Search.InstanceCount, DedicatedMasterType: input.Search.DedicatedMasterType, DedicatedMasterCount: input.Search.DedicatedMasterCount, EBSVolumeType: input.Search.EBSVolumeType, EBSVolumeSizeGiB: input.Search.EBSVolumeSizeGiB},
+		RabbitMQ:                       RabbitMQProfile{InstanceType: input.RabbitMQ.InstanceType},
 	}
 }
 
@@ -251,8 +244,5 @@ func resolveQueueMode(value string, preset sdk.PresetID) string {
 	if strings.TrimSpace(value) != "" {
 		return strings.TrimSpace(value)
 	}
-	if preset == sdk.PresetPreview {
-		return QueueModeDB
-	}
-	return QueueModeAmazonMQ
+	return defaultQueueMode(preset)
 }

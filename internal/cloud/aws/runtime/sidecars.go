@@ -18,14 +18,17 @@ func appendSearchProxy(args Args, containers []containerDefinition, endpoint str
 	proxy := containerDefinition{
 		Name:                   "search-proxy",
 		Image:                  args.SearchProxyImage,
-		Command:                []string{"--port", strconv.Itoa(searchProxyPort), "--name", service, "--region", args.Region, "--host", host, "--sign-host", host, "--upstream-url-scheme", "https"},
-		Essential:              true,
+		Command:                []string{"--port", searchProxyListenAddr(), "--name", service, "--region", args.Region, "--host", host, "--sign-host", host, "--upstream-url-scheme", "https"},
+		Essential:              searchProxyEssential(containers),
 		ReadonlyRootFilesystem: true,
 		LinuxParameters:        containerLinux{InitProcessEnabled: false},
 		LogConfiguration:       awslogsConfig(args, "web"),
 	}
 	for index := range containers {
-		if args.WebRuntime != "nginx-fpm" || containers[index].Name == "php-fpm" {
+		// nginx-fpm has a web sidecar with no Magento environment; only its
+		// PHP-FPM process needs the signed search endpoint. Process runtimes
+		// put Magento in web, so web must wait for the proxy instead.
+		if containers[index].Name != "web" || args.WebRuntime != "nginx-fpm" {
 			containers[index].DependsOn = []containerDependency{{ContainerName: "search-proxy", Condition: "START"}}
 		}
 	}
@@ -70,6 +73,25 @@ func appendVarnish(args Args, containers []containerDefinition) ([]containerDefi
 			{Name: "VARNISH_SIZE", Value: strconv.Itoa(varnishMallocMiB) + "m"},
 		},
 	}), nil
+}
+
+// searchProxyListenAddr is the aws-sigv4-proxy --port value. That flag is a
+// Go listen address (":8081"), not a bare port; "8081" fatals with
+// "listen tcp: address 8081: missing port in address".
+func searchProxyListenAddr() string {
+	return ":" + strconv.Itoa(searchProxyPort)
+}
+
+// searchProxyEssential is false on one-off Magento migrate tasks. The deploy
+// container exits 0 after setup:upgrade; an essential signing proxy then
+// receives SIGTERM and ECS reports the whole task as failed.
+func searchProxyEssential(containers []containerDefinition) bool {
+	for _, container := range containers {
+		if container.Name == "deploy" {
+			return false
+		}
+	}
+	return true
 }
 
 func searchProxyTarget(endpoint string) (string, string) {

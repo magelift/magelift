@@ -1,10 +1,22 @@
-# syntax=docker/dockerfile:1.18
+# syntax=docker/dockerfile:1.27
 
-ARG PHP_BASE=docker.io/library/php:8.5-fpm-trixie@sha256:f56f4a81de6cd33ddfd6e99352889a53c94c3ffccce89e494563845a1c8ba75a
-ARG COMPOSER_BASE=docker.io/library/composer:2.10.2@sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760
-ARG NGINX_BASE=docker.io/library/nginx:1.30.4-trixie@sha256:5cf90903deda2c5981b8ad05e7617ac010e389f0dde0ac83487c02c509281de6
+ARG PHP_BASE=docker.io/library/php:8.5-fpm-trixie@sha256:70076c1cae0cd0ba6761832417e3a1df3e5560f0544eb0fe40357373e54420fe
+ARG COMPOSER_BASE=docker.io/library/composer:2.10.3@sha256:d8f6343d3fae98107426bc49163ccad46ef85aabd4a27d80a74401fab4aba332
+ARG NGINX_BASE=docker.io/library/nginx:1.30.4-trixie@sha256:d5792f71a9496b833bc08ea834a758c46e2b6a6306c10f4be926f38a656cdc1c
+ARG APCU_VERSION=5.1.28
+ARG REDIS_VERSION=6.3.0
 FROM ${COMPOSER_BASE} AS composer
+# Keep extension compilation bounded on developer machines.
 FROM ${PHP_BASE} AS extensions
+
+ARG APCU_VERSION
+ARG REDIS_VERSION
+
+# The official PHP image sets PHP_LDFLAGS to include -pie for the PHP binary.
+# libtool misroutes that flag while linking out-of-tree shared extensions on
+# Debian Trixie/GCC 14, turning -soname into a compiler option. The PHP binary
+# remains PIE; only extension linking needs the narrower linker flags.
+ENV PHP_LDFLAGS="-Wl,-O1"
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -18,15 +30,21 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         libxslt1-dev \
         libzip-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" \
+    && docker-php-ext-install -j1 \
         bcmath \
         gd \
+        ftp \
         intl \
         pdo_mysql \
         soap \
         sockets \
         xsl \
-        zip
+        zip \
+    && pecl install \
+        "apcu-${APCU_VERSION}" \
+        "redis-${REDIS_VERSION}" \
+    && docker-php-ext-enable apcu redis \
+    && rm -rf /tmp/pear
 
 FROM ${NGINX_BASE} AS nginx
 
@@ -70,6 +88,9 @@ COPY images/php-runtime/www.conf /usr/local/etc/php-fpm.d/zz-magelift.conf
 COPY images/php-runtime/nginx.conf /etc/nginx/nginx.conf
 
 RUN install -d -o magelift -g magelift /var/cache/nginx /var/log/nginx
+
+RUN install -d -o root -g root /usr/local/lib/magelift
+COPY images/php-runtime/deployment-config.php /usr/local/lib/magelift/deployment-config.php
 
 RUN install -d -o magelift -g magelift /app/app/etc
 COPY --chown=magelift:magelift images/php-runtime/env.php /app/app/etc/env.php

@@ -45,7 +45,10 @@ func TestRegisterCandidateUsesPlatformMigrationContract(t *testing.T) {
 		Project: "example-gcp-project", Region: "europe-west1", Cluster: "shop-gke",
 		ImageDigest:    "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64),
 		DatabaseWriter: "10.0.0.1", DatabaseName: "magento", CacheEndpoint: "10.0.0.2",
-		ApplicationMode: "integrated", WebRuntime: "nginx-fpm",
+		DatabaseSecretName:      "shop-preview-app-db-credentials",
+		EncryptionKeySecretName: "shop-preview-app-encryption-key",
+		SearchEndpoint:          "search.internal",
+		ApplicationMode:         "integrated", WebRuntime: "nginx-fpm",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +62,7 @@ func TestRegisterCandidateUsesPlatformMigrationContract(t *testing.T) {
 	}
 	container := job.Spec.Template.Spec.Containers[0]
 	cmd := strings.Join(container.Command, " ")
-	for _, want := range []string{"app:config:import", "setup:upgrade", "cache:clean"} {
+	for _, want := range []string{"app:config:import", "setup:upgrade", "setup:static-content:deploy", "cache:clean"} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("command missing %q: %v", want, container.Command)
 		}
@@ -72,6 +75,36 @@ func TestRegisterCandidateUsesPlatformMigrationContract(t *testing.T) {
 	}
 	if !foundDBHost {
 		t.Fatalf("missing %s env: %#v", platform.EnvMagentoDBHost, container.Env)
+	}
+	foundSearchHost := false
+	for _, env := range container.Env {
+		if env.Name == platform.EnvMagentoSearchHost && env.Value == "search.internal" {
+			foundSearchHost = true
+		}
+	}
+	if !foundSearchHost {
+		t.Fatalf("missing %s env: %#v", platform.EnvMagentoSearchHost, container.Env)
+	}
+	for _, want := range []struct {
+		name string
+		key  string
+	}{
+		{platform.EnvMagentoDBUser, "username"},
+		{platform.EnvMagentoDBPass, "password"},
+	} {
+		var found bool
+		for _, env := range container.Env {
+			if env.Name != want.name {
+				continue
+			}
+			found = true
+			if env.ValueFrom == nil || env.ValueFrom.SecretKeyRef == nil || env.ValueFrom.SecretKeyRef.Name != "shop-preview-app-db-credentials" || env.ValueFrom.SecretKeyRef.Key != want.key {
+				t.Fatalf("%s secret binding = %#v", env.Name, env.ValueFrom)
+			}
+		}
+		if !found {
+			t.Fatalf("missing %s secret binding", want.name)
+		}
 	}
 }
 

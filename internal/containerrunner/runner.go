@@ -88,7 +88,7 @@ func (runner Runner) run(ctx context.Context, sourceDir, outputDir string, proto
 
 	result := Result{OutputDir: outputDir}
 
-	secretMounts, cleanupSecrets, err := materializeSecrets(secrets)
+	secretMounts, cleanupSecrets, err := materializeSecrets(runner.TempRoot, secrets)
 	if err != nil {
 		return Result{}, err
 	}
@@ -112,7 +112,7 @@ func (runner Runner) run(ctx context.Context, sourceDir, outputDir string, proto
 	}
 	arguments = append(arguments, runner.Image)
 	command := exec.CommandContext(ctx, runner.binary(), arguments...)
-	command.Env = []string{}
+	command.Env = dockerEnvironment()
 	command.Stdin = bytes.NewReader(protocolJSON)
 	command.Stderr = runner.stderr()
 	stdout := &limitedBuffer{maximum: runner.maximumStdout()}
@@ -130,6 +130,18 @@ func (runner Runner) run(ctx context.Context, sourceDir, outputDir string, proto
 	}
 	result.Response = append([]byte(nil), stdout.buffer.Bytes()...)
 	return result, nil
+}
+
+func dockerEnvironment() []string {
+	environment := make([]string, 0, 6)
+	for _, name := range []string{"HOME", "PATH", "DOCKER_CONFIG", "DOCKER_HOST", "DOCKER_CONTEXT", "BUILDX_CONFIG"} {
+		value := os.Getenv(name)
+		if value != "" {
+			environment = append(environment, name+"="+value)
+		}
+	}
+
+	return environment
 }
 
 func (runner Runner) validate(protocolJSON []byte, secrets []Secret) error {
@@ -165,8 +177,8 @@ func (runner Runner) network() string {
 	return runner.Network
 }
 
-func materializeSecrets(secrets []Secret) ([]string, func(), error) {
-	directory, err := os.MkdirTemp("", "magelift-runner-secrets-")
+func materializeSecrets(tempRoot string, secrets []Secret) ([]string, func(), error) {
+	directory, err := os.MkdirTemp(tempRoot, "magelift-runner-secrets-")
 	if err != nil {
 		return nil, func() {}, fmt.Errorf("create private runner secret directory: %w", err)
 	}

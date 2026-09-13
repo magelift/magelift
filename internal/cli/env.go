@@ -13,6 +13,7 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/magelift/magelift/internal/automation"
 	awsendpoint "github.com/magelift/magelift/internal/cloud/aws/endpoint"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/dumpimport"
@@ -20,6 +21,7 @@ import (
 	"github.com/magelift/magelift/internal/mediasync"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/seeddump"
+	"github.com/magelift/magelift/internal/toolchain"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 )
@@ -173,7 +175,8 @@ func envCreateCommand(o *options) *cobra.Command {
 }
 
 func envDestroyCommand(o *options) *cobra.Command {
-	return &cobra.Command{
+	var destroyBackups bool
+	command := &cobra.Command{
 		Use:   "destroy <environment>",
 		Short: "Destroy an environment and remove its configuration overlay",
 		Args:  cobra.ExactArgs(1),
@@ -181,6 +184,7 @@ func envDestroyCommand(o *options) *cobra.Command {
 			if !o.yes {
 				return invalid(errors.New("destroying an environment requires --yes"))
 			}
+			o.destroyBackups = destroyBackups
 			result, err := o.destroyEnvironment(cmd.Context(), args[0])
 			if err != nil {
 				return err
@@ -188,6 +192,8 @@ func envDestroyCommand(o *options) *cobra.Command {
 			return o.write(result)
 		},
 	}
+	command.Flags().BoolVar(&destroyBackups, "destroy-backups", false, "also destroy leftover provider backups after the environment is gone; GCP Cloud SQL leftovers are deleted even when the backup policy is disposable, AWS snapshots are still refused")
+	return command
 }
 
 type environmentSweepEntry struct {
@@ -220,6 +226,13 @@ func envSweepCommand(o *options) *cobra.Command {
 			file, err := o.load()
 			if err != nil {
 				return invalid(err)
+			}
+			if o.previewIdentityRequested() {
+				result, err := o.runPreviewSweep(cmd.Context(), file, cutoff, dryRun)
+				if err != nil {
+					return err
+				}
+				return o.write(result)
 			}
 			entries := make([]environmentSweepEntry, 0)
 			for _, name := range file.Environments() {
@@ -265,6 +278,144 @@ func envSweepCommand(o *options) *cobra.Command {
 	return command
 }
 
+func (o *options) runPreviewSweep(ctx context.Context, file *config.File, cutoff time.Time, dryRun bool) (map[string]any, error) {
+	repository, err := config.CanonicalPreviewRepository(o.previewRepository)
+	if err != nil {
+		return nil, invalid(fmt.Errorf("preview sweep requires a valid --preview-repository: %w", err))
+	}
+	if o.previewPullRequest < 0 {
+		return nil, invalid(errors.New("--preview-number cannot be negative"))
+	}
+	baseEnvironment, err := o.selectEnvironment(file)
+	if err != nil {
+		return nil, invalid(err)
+	}
+	baseEffective, err := file.Resolve(baseEnvironment, config.ResolveOptions{})
+	if err != nil {
+		return nil, invalid(fmt.Errorf("resolve preview environment %q: %w", baseEnvironment, err))
+	}
+	if baseEffective.Config.Class != "preview" {
+		return nil, invalid(errors.New("preview sweep requires a selected environment with class preview"))
+	}
+	if o.modules == nil {
+		return nil, errors.New("stack module registry is required")
+	}
+	_, planned, err := o.modules.Plan(baseEffective.Config, baseEnvironment, platform.PlanOptions{AllowExpiredPreview: true, Context: ctx})
+	if err != nil {
+		return nil, invalid(err)
+	}
+	if err := requireTargetDependencies(ctx, o, planned); err != nil {
+		return nil, err
+	}
+	listRecords := o.listPreviewRecords
+	if listRecords == nil {
+		listRecords = automation.ListPreviewRecords
+	}
+	records, err := listRecords(ctx, o.infrastructureBackendURL(planned), baseEffective.Config.Project.Name)
+	if err != nil {
+		return nil, fmt.Errorf("list preview ownership records: %w", err)
+	}
+	entries := make([]environmentSweepEntry, 0, len(records))
+	for _, record := range records {
+		if record.Metadata.Repository != repository {
+			continue
+		}
+		if o.previewPullRequest > 0 && record.Metadata.PullRequest != o.previewPullRequest {
+			continue
+		}
+		expiresAt, err := parseSweepExpiration(record.Metadata.ExpiresAt)
+		if err != nil {
+			return nil, invalid(fmt.Errorf("preview stack %q: %w", record.StackName, err))
+		}
+		if expiresAt.IsZero() || expiresAt.After(cutoff) {
+			continue
+		}
+		entry := environmentSweepEntry{Environment: record.Metadata.Environment, ExpiresAt: expiresAt, Action: "skipped"}
+		if baseEffective.Config.Protection {
+			entry.Reason = "environment is protected"
+		} else if dryRun {
+			entry.Action = "would-destroy"
+			entry.Result = map[string]any{"stack": record.StackName, "generation": record.Metadata.Generation}
+		} else {
+			result, err := o.destroyPreviewRecord(ctx, baseEnvironment, record)
+			if err != nil {
+				return nil, fmt.Errorf("destroy expired preview stack %q: %w", record.StackName, err)
+			}
+			entry.Action = "destroyed"
+			entry.Result = result
+		}
+		entries = append(entries, entry)
+	}
+	return map[string]any{"before": cutoff, "environments": entries}, nil
+}
+
+func (o *options) destroyPreviewRecord(ctx context.Context, baseEnvironment string, record automation.PreviewRecord) (map[string]any, error) {
+	identity, err := previewIdentityFromRecord(record.Metadata)
+	if err != nil {
+		return nil, err
+	}
+	previousEnvironment := o.environment
+	previousRepository := o.previewRepository
+	previousPullRequest := o.previewPullRequest
+	previousBranch := o.previewBranch
+	previousCommit := o.previewCommit
+	previousDomain := o.previewDomain
+	previousGeneration := o.previewGeneration
+	previousIdentity := o.previewIdentityOverride
+	previousResolvedIdentity := o.resolvedPreviewIdentity
+	o.environment = baseEnvironment
+	o.previewRepository = identity.Repository
+	o.previewPullRequest = identity.PullRequest
+	o.previewBranch = identity.Branch
+	o.previewCommit = identity.CommitDigest
+	o.previewDomain = identity.Domain
+	o.previewGeneration = identity.Generation
+	o.previewIdentityOverride = &identity
+	defer func() {
+		o.environment = previousEnvironment
+		o.previewRepository = previousRepository
+		o.previewPullRequest = previousPullRequest
+		o.previewBranch = previousBranch
+		o.previewCommit = previousCommit
+		o.previewDomain = previousDomain
+		o.previewGeneration = previousGeneration
+		o.previewIdentityOverride = previousIdentity
+		o.resolvedPreviewIdentity = previousResolvedIdentity
+	}()
+	_, planned, err := o.planStack(true)
+	if err != nil {
+		return nil, err
+	}
+	if planned.StackName() != record.StackName {
+		return nil, fmt.Errorf("preview ownership record points to stack %q, expected %q", record.StackName, planned.StackName())
+	}
+	result, err := o.executeInfrastructure(ctx, "destroy", o.destroyOperation, "")
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"stack": result.Stack, "generation": identity.Generation, "destroyed": result}, nil
+}
+
+func previewIdentityFromRecord(metadata automation.PreviewMetadata) (config.PreviewIdentity, error) {
+	identity, err := config.BuildPreviewIdentity(config.PreviewIdentityInput{
+		Project:     metadata.Project,
+		Repository:  metadata.Repository,
+		PullRequest: metadata.PullRequest,
+		Branch:      metadata.Branch,
+		Commit:      metadata.CommitDigest,
+		Generation:  metadata.Generation,
+		Domain:      metadata.Domain,
+		ExpiresAt:   metadata.ExpiresAt,
+	})
+	if err != nil {
+		return config.PreviewIdentity{}, fmt.Errorf("rebuild preview identity: %w", err)
+	}
+	if identity.Environment != metadata.Environment || identity.StackKey != metadata.StackKey || identity.OwnershipMarker != metadata.Owner {
+		return config.PreviewIdentity{}, errors.New("persisted preview ownership record does not match its derived identity")
+	}
+	return identity, nil
+}
+
 func parseSweepExpiration(value string) (time.Time, error) {
 	if value == "" {
 		return time.Time{}, nil
@@ -294,7 +445,7 @@ func (o *options) destroyEnvironment(ctx context.Context, name string) (map[stri
 	if !found {
 		return nil, invalid(fmt.Errorf("environment %q does not exist", name))
 	}
-	if _, err := file.Resolve(name, config.ResolveOptions{}); err != nil {
+	if _, _, err := o.resolveEnvironment(file, name); err != nil {
 		return nil, invalid(err)
 	}
 	previous := o.environment
@@ -396,11 +547,97 @@ func envProtectCommand(o *options) *cobra.Command {
 	return command
 }
 
+func envDumpCommand(o *options) *cobra.Command {
+	var dest string
+	var sanitize bool
+	command := &cobra.Command{
+		Use:   "dump <environment>",
+		Short: "Create a Magento database dump from a live environment and write it locally",
+		Long: strings.TrimSpace(`
+Runs mysqldump against the selected environment over the dumpimport transport (host mysql, Docker Compose, or kube) and writes the SQL only to --to.
+
+The dump is unsanitized Magento data unless --sanitize is set. --sanitize hashes mailbox addresses only and is not certified anonymization. Database passwords travel through MAGELIFT_DUMPIMPORT_* / MYSQL_PWD and are not printed. Overwriting --to requires --yes.
+`),
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			if !environmentName.MatchString(name) {
+				return invalid(errors.New("environment name must be a lowercase stable name"))
+			}
+			if strings.TrimSpace(dest) == "" || strings.TrimSpace(dest) == "-" {
+				return invalid(errors.New("--to must be a local file path"))
+			}
+			result, err := o.runEnvDump(cmd.Context(), name, dest, sanitize)
+			if err != nil {
+				return err
+			}
+			return o.write(result)
+		},
+	}
+	command.Flags().StringVar(&dest, "to", "", "local .sql or .sql.gz path to write (required)")
+	command.Flags().BoolVar(&sanitize, "sanitize", false, "hash mailbox addresses in the dump (not certified anonymous)")
+	_ = command.MarkFlagRequired("to")
+	return command
+}
+
+func envUICommand(o *options) *cobra.Command {
+	var target string
+	command := &cobra.Command{
+		Use:   "ui <environment>",
+		Short: "Print a time-limited management UI tunnel without starting it",
+		Long: strings.TrimSpace(`
+Resolves a provider management UI (database, queue, or search) through the same capability path as tunnel --session-only.
+
+A missing UI is typed unavailable (exit 3) and does not block dump, logs, or other tunnels the target supports.
+`),
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			if !environmentName.MatchString(name) {
+				return invalid(errors.New("environment name must be a lowercase stable name"))
+			}
+			o.environment = name
+			uiTarget, err := normalizeManagementUITarget(target)
+			if err != nil {
+				return invalid(err)
+			}
+			result, _, err := o.prepareTunnel(cmd.Context(), uiTarget, 0, 0)
+			if err != nil {
+				return err
+			}
+			return o.write(map[string]any{
+				"environment": result.Environment,
+				"target":      result.Target,
+				"localPort":   result.LocalPort,
+				"remotePort":  result.RemotePort,
+				"launcher":    result.Launcher,
+				"args":        result.Args,
+				"sessionOnly": true,
+			})
+		},
+	}
+	command.Flags().StringVar(&target, "target", platform.TunnelTargetDatabaseUI, "management UI: db-ui, queue-ui, or search-ui")
+	return command
+}
+
+func normalizeManagementUITarget(target string) (string, error) {
+	normalized, err := platform.NormalizeTunnelTarget(target)
+	if err != nil {
+		return "", err
+	}
+	switch normalized {
+	case platform.TunnelTargetDatabaseUI, platform.TunnelTargetQueueUI, platform.TunnelTargetSearchUI:
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("management UI target must be db-ui, queue-ui, or search-ui")
+	}
+}
+
 func envImportDumpCommand(o *options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "import-dump <environment>",
 		Short: "Import the environment seedDump into the target database",
-		Long:  "Runs the dump importer with journal transitions (recorded|failed → importing → imported|failed). Retries into a non-empty database require persistent --yes (D-04). Named import-dump to avoid colliding with magelift dev seed.",
+		Long:  "Runs the dump importer with journal transitions (recorded|failed → importing → imported|failed). Retries into a non-empty database require persistent --yes (D-04). Named import-dump to avoid colliding with magelift local seed.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
@@ -461,10 +698,13 @@ func (o *options) runMediaSync(ctx context.Context, environment, source string) 
 			return nil, err
 		}
 		_ = environmentName
+		if err := requireTargetDependencies(ctx, o, planned); err != nil {
+			return nil, err
+		}
 		if o.newBackend == nil {
 			return nil, errors.New("infrastructure backend factory is required")
 		}
-		backendURL := strings.TrimSpace(o.getenv("PULUMI_BACKEND_URL"))
+		backendURL := o.infrastructureBackendURL(planned)
 		backend, err := o.newBackend(ctx, planned, backendURL)
 		if err != nil {
 			return nil, fmt.Errorf("create infrastructure backend: %w", err)
@@ -514,7 +754,7 @@ func (o *options) planStackForEnvironment(environment string) (string, platform.
 	if err != nil {
 		return "", nil, invalid(err)
 	}
-	_, planned, err := o.modules.Plan(effective.Config, environment, platform.PlanOptions{})
+	_, planned, err := o.modules.Plan(effective.Config, environment, platform.PlanOptions{Context: o.planContext})
 	if err != nil {
 		return "", nil, err
 	}
@@ -553,12 +793,12 @@ func envStatusCommand(o *options) *cobra.Command {
 			if err != nil {
 				return invalid(err)
 			}
-			effective, err := file.Resolve(name, config.ResolveOptions{})
+			effective, resolvedName, err := o.resolveEnvironment(file, name)
 			if err != nil {
 				return invalid(err)
 			}
 			result := map[string]any{
-				"environment": name,
+				"environment": resolvedName,
 				"class":       effective.Config.Class,
 				"domain":      effective.Config.Domain,
 				"protected":   effective.Config.Protection,
@@ -569,7 +809,7 @@ func envStatusCommand(o *options) *cobra.Command {
 			}
 			result["seedDump"] = seedDump
 			projectRoot := filepath.Dir(filepath.Clean(o.configPath))
-			store, err := seeddump.New(projectRoot, name)
+			store, err := seeddump.New(projectRoot, resolvedName)
 			if err != nil {
 				return invalid(err)
 			}
@@ -604,7 +844,7 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 	if err != nil {
 		return nil, invalid(err)
 	}
-	effective, err := file.Resolve(environment, config.ResolveOptions{})
+	effective, resolvedEnvironment, err := o.resolveEnvironment(file, environment)
 	if err != nil {
 		return nil, invalid(err)
 	}
@@ -617,7 +857,7 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 	}
 
 	projectRoot := filepath.Dir(filepath.Clean(o.configPath))
-	store, err := seeddump.New(projectRoot, environment)
+	store, err := seeddump.New(projectRoot, resolvedEnvironment)
 	if err != nil {
 		return nil, invalid(err)
 	}
@@ -641,14 +881,6 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 		yes = true
 	}
 
-	if _, err := store.MarkImporting(ctx); err != nil {
-		return nil, invalid(err)
-	}
-
-	importFn := o.importSeedDump
-	if importFn == nil {
-		importFn = dumpimport.Import
-	}
 	opts := dumpimport.Options{
 		DumpPath: dumpPath,
 		Yes:      yes,
@@ -659,33 +891,20 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 			opts.ComposeProject = project
 		}
 	}
-	// Private Cloud SQL (GCP/EKS); harness sets MAGELIFT_DUMPIMPORT_RUNNER=kube.
-	if runner := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_RUNNER")); runner != "" {
-		opts.Runner = runner
+	o.applyDumpimportTransportEnv(&opts)
+
+	if err := requireDependencies(ctx, o, toolchain.SpecsForDumpImport(
+		dependencyRunner(o), opts.Runner, strings.HasSuffix(strings.ToLower(dumpPath), ".gz"),
+	), "database dump import"); err != nil {
+		return nil, err
 	}
-	if host := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_HOST")); host != "" {
-		opts.Host = host
+	if _, err := store.MarkImporting(ctx); err != nil {
+		return nil, invalid(err)
 	}
-	if user := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_USER")); user != "" {
-		opts.User = user
-	}
-	if pass := o.getenv("MAGELIFT_DUMPIMPORT_PASSWORD"); pass != "" {
-		opts.Password = pass
-	}
-	if ns := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_NAMESPACE")); ns != "" {
-		opts.Namespace = ns
-	}
-	if pod := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_POD")); pod != "" {
-		opts.Pod = pod
-	}
-	if sel := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_POD_SELECTOR")); sel != "" {
-		opts.PodSelector = sel
-	}
-	if kc := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_KUBECONFIG")); kc != "" {
-		opts.Kubeconfig = kc
-	}
-	if db := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_DATABASE")); db != "" {
-		opts.Database = db
+
+	importFn := o.importSeedDump
+	if importFn == nil {
+		importFn = dumpimport.Import
 	}
 
 	if err := importFn(ctx, opts); err != nil {
@@ -717,4 +936,93 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 func (o *options) maybeAutoImportSeedDump(ctx context.Context, environment string) error {
 	_, err := o.runSeedDumpImport(ctx, environment, seedDumpImportAuto)
 	return err
+}
+
+func (o *options) applyDumpimportTransportEnv(opts *dumpimport.Options) {
+	if o.getenv == nil {
+		return
+	}
+	if runner := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_RUNNER")); runner != "" {
+		opts.Runner = runner
+	}
+	if host := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_HOST")); host != "" {
+		opts.Host = host
+	}
+	if user := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_USER")); user != "" {
+		opts.User = user
+	}
+	if pass := o.getenv("MAGELIFT_DUMPIMPORT_PASSWORD"); pass != "" {
+		opts.Password = pass
+	}
+	if ns := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_NAMESPACE")); ns != "" {
+		opts.Namespace = ns
+	}
+	if pod := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_POD")); pod != "" {
+		opts.Pod = pod
+	}
+	if sel := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_POD_SELECTOR")); sel != "" {
+		opts.PodSelector = sel
+	}
+	if kc := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_KUBECONFIG")); kc != "" {
+		opts.Kubeconfig = kc
+	}
+	if db := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_DATABASE")); db != "" {
+		opts.Database = db
+	}
+	if container := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_CONTAINER")); container != "" {
+		opts.Container = container
+	}
+}
+
+func (o *options) runEnvDump(ctx context.Context, environment, dest string, sanitize bool) (map[string]any, error) {
+	file, err := o.load()
+	if err != nil {
+		return nil, invalid(err)
+	}
+	effective, _, err := o.resolveEnvironment(file, environment)
+	if err != nil {
+		return nil, invalid(err)
+	}
+	projectRoot := filepath.Dir(filepath.Clean(o.configPath))
+	absDest, err := filepath.Abs(dest)
+	if err != nil {
+		return nil, invalid(err)
+	}
+	opts := dumpimport.Options{
+		OutputPath: absDest,
+		Yes:        o.yes,
+		Sanitize:   sanitize,
+		WorkDir:    projectRoot,
+	}
+	if name := strings.TrimSpace(effective.Config.Project.Name); name != "" {
+		if project, err := localdev.ProjectName(name); err == nil {
+			opts.ComposeProject = project
+		}
+	}
+	o.applyDumpimportTransportEnv(&opts)
+	if err := requireDependencies(ctx, o, toolchain.SpecsForDumpExport(
+		dependencyRunner(o), opts.Runner,
+	), "database dump retrieve"); err != nil {
+		return nil, err
+	}
+	exportFn := o.exportDump
+	if exportFn == nil {
+		exportFn = dumpimport.Export
+	}
+	if err := exportFn(ctx, opts); err != nil {
+		if errors.Is(err, dumpimport.ErrOutputExists) {
+			return nil, invalid(err)
+		}
+		return nil, err
+	}
+	label := dumpimport.UnsanitizedLabel
+	if sanitize {
+		label = dumpimport.SanitizedLabel
+	}
+	return map[string]any{
+		"environment": environment,
+		"path":        absDest,
+		"sanitized":   sanitize,
+		"label":       label,
+	}, nil
 }

@@ -261,10 +261,14 @@ func assertProbeRow(t *testing.T, opts dumpimport.Options) error {
 	if err != nil {
 		return errors.New(string(out) + ": " + err.Error())
 	}
-	label := strings.TrimSpace(string(out))
-	// mysql may print password warnings on stderr mixed into CombinedOutput
-	lines := strings.Split(label, "\n")
-	label = strings.TrimSpace(lines[len(lines)-1])
+	label := ""
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(strings.ToLower(line), "mysql: [warning]") {
+			continue
+		}
+		label = line
+	}
 	if label != "tiny-fixture" {
 		return errors.New("magelift_seed_probe row missing or wrong: " + label)
 	}

@@ -23,6 +23,7 @@ import (
 
 type fakeInfrastructureBackend struct {
 	calls      []string
+	requests   []automation.Request
 	outputs    map[string]any
 	previewErr error
 	updateErr  error
@@ -34,24 +35,31 @@ func (b *fakeInfrastructureBackend) Outputs(context.Context) (map[string]any, er
 	return b.outputs, nil
 }
 
-func (b *fakeInfrastructureBackend) Preview(context.Context, automation.Request, io.Writer) (map[string]int, error) {
+func (*fakeInfrastructureBackend) ValidateRequest(context.Context, automation.Request) error {
+	return nil
+}
+
+func (b *fakeInfrastructureBackend) Preview(_ context.Context, request automation.Request, _ io.Writer) (map[string]int, error) {
 	b.calls = append(b.calls, "preview")
+	b.requests = append(b.requests, request)
 	if b.previewErr != nil {
 		return nil, b.previewErr
 	}
 	return map[string]int{"create": 2}, nil
 }
 
-func (b *fakeInfrastructureBackend) Update(context.Context, automation.Request, io.Writer) (map[string]int, error) {
+func (b *fakeInfrastructureBackend) Update(_ context.Context, request automation.Request, _ io.Writer) (map[string]int, error) {
 	b.calls = append(b.calls, "update")
+	b.requests = append(b.requests, request)
 	if b.updateErr != nil {
 		return nil, b.updateErr
 	}
 	return map[string]int{"update": 1}, nil
 }
 
-func (b *fakeInfrastructureBackend) Destroy(context.Context, automation.Request, io.Writer) (map[string]int, error) {
+func (b *fakeInfrastructureBackend) Destroy(_ context.Context, request automation.Request, _ io.Writer) (map[string]int, error) {
 	b.calls = append(b.calls, "destroy")
+	b.requests = append(b.requests, request)
 	if b.destroyErr != nil {
 		return nil, b.destroyErr
 	}
@@ -355,6 +363,272 @@ func TestProtectedDestroyCannotBeBypassedWithYes(t *testing.T) {
 	}
 }
 
+func TestDestroySkipProviderLockRunsAcceptanceCleanup(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	backend := &fakeInfrastructureBackend{}
+	var stderr bytes.Buffer
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.stderr = &stderr
+	o.configPath = path
+	o.environment = "staging"
+	o.yes = true
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		t.Fatal("acceptance cleanup must not acquire the provider lock when --skip-lock is explicit")
+		return nil, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "destroy", "--skip-lock"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stderr.String(), "--skip-lock") {
+		t.Fatalf("skip-lock notice missing: %q", stderr.String())
+	}
+	if !reflect.DeepEqual(backend.calls, []string{"preview", "destroy"}) {
+		t.Fatalf("backend calls = %v", backend.calls)
+	}
+}
+
+func TestDestroyReportsRetainedProductionBackups(t *testing.T) {
+	path := writeLifecycleConfig(t, "production", false)
+	backend := &fakeInfrastructureBackend{}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.environment = "staging"
+	o.yes = true
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "--output", "json", "destroy"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"mechanism": "rds-final-snapshot-and-automated-backups"`) || !strings.Contains(out.String(), `"retainedBackups"`) {
+		t.Fatalf("production destroy did not report retained backups: %s", out.String())
+	}
+	if strings.Contains(out.String(), `"destroyBackups"`) {
+		t.Fatalf("destroy without --destroy-backups should not claim backups were destroyed: %s", out.String())
+	}
+}
+
+func TestDestroyBackupsFlagRefusedWhenRetentionApplies(t *testing.T) {
+	path := writeLifecycleConfig(t, "production", false)
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.environment = "staging"
+	o.yes = true
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		t.Fatal("destroy must not reach the backend when --destroy-backups is refused")
+		return nil, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "destroy", "--destroy-backups"})
+	err := cmd.Execute()
+	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "--destroy-backups is not implemented") {
+		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
+	}
+}
+
+func writeGCPLifecycleConfig(t *testing.T, class string) string {
+	t.Helper()
+	enabled := true
+	document := map[string]any{
+		"schemaVersion": 1,
+		"project":       config.Project{Name: "shop"},
+		"application":   config.Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		"build":         config.Build{PHP: "8.3"},
+		"target": config.Target{Provider: "gcp", Runtime: "gke-autopilot", GCP: &config.GCPTarget{
+			Project:               "example-gcp",
+			ImageDigest:           "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			CloudSQLAvailability:  "REGIONAL",
+			CloudSQLBackupEnabled: &enabled,
+			EncryptionKeySecret:   "encryption-key",
+		}},
+		"defaults": config.Defaults{Region: "europe-west1", Preset: "standard"},
+		"environments": map[string]any{"staging": map[string]any{
+			"account":            "example-gcp",
+			"class":              class,
+			"domain":             "shop.example",
+			"monthlyBudgetCents": int64(250000),
+		}},
+	}
+	data, err := yaml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "magelift.yaml")
+	if err := writeFile(path, data); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestDestroyBackupsFlagAllowedWhenBackupsAreDisposable(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	backend := &fakeInfrastructureBackend{}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.environment = "staging"
+	o.yes = true
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "--output", "json", "destroy", "--destroy-backups"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"destroyBackups": true`) {
+		t.Fatalf("disposable destroy did not record --destroy-backups: %s", out.String())
+	}
+	if strings.Contains(out.String(), `"retainedBackups"`) {
+		t.Fatalf("disposable destroy should not report retained backups: %s", out.String())
+	}
+}
+
+func TestDestroyBackupsDeletesGCPCloudSQLLeftovers(t *testing.T) {
+	path := writeGCPLifecycleConfig(t, "production")
+	backend := &fakeInfrastructureBackend{}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	if err := o.modules.RegisterModule(stubGCPModule{}); err != nil {
+		t.Fatal(err)
+	}
+	o.configPath = path
+	o.environment = "staging"
+	o.yes = true
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	called := 0
+	o.newLeftoverBackupDestroyer = func(_ context.Context, planned platform.PlannedStack) (leftoverBackupDestroyer, error) {
+		called++
+		if planned.Provider() != "gcp" {
+			t.Fatalf("leftover destroyer planned provider = %q", planned.Provider())
+		}
+		return leftoverBackupDestroyerFunc(func(context.Context) ([]string, error) {
+			return []string{"projects/example-gcp/backups/final"}, nil
+		}), nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "--output", "json", "destroy", "--destroy-backups"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if called != 1 {
+		t.Fatalf("leftover destroyer called %d times", called)
+	}
+	if !strings.Contains(out.String(), `"destroyBackups": true`) || !strings.Contains(out.String(), `"projects/example-gcp/backups/final"`) {
+		t.Fatalf("GCP destroy-backups output = %s", out.String())
+	}
+	if strings.Contains(out.String(), `"retainedBackups"`) {
+		t.Fatalf("GCP destroy --destroy-backups still reported retained backups: %s", out.String())
+	}
+	if !reflect.DeepEqual(backend.calls, []string{"preview", "destroy"}) {
+		t.Fatalf("backend calls = %v", backend.calls)
+	}
+}
+
+func TestDestroyLeftoverProviderBackupsGCPWhenPolicyIsDisposable(t *testing.T) {
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	called := 0
+	o.newLeftoverBackupDestroyer = func(_ context.Context, planned platform.PlannedStack) (leftoverBackupDestroyer, error) {
+		called++
+		if planned.Provider() != "gcp" {
+			t.Fatalf("leftover destroyer planned provider = %q", planned.Provider())
+		}
+		return leftoverBackupDestroyerFunc(func(context.Context) ([]string, error) {
+			return []string{"projects/example-gcp/backups/final"}, nil
+		}), nil
+	}
+	names, err := o.destroyLeftoverProviderBackups(context.Background(), stubPlanned{provider: "gcp"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called != 1 {
+		t.Fatalf("leftover destroyer called %d times", called)
+	}
+	if len(names) != 1 || names[0] != "projects/example-gcp/backups/final" {
+		t.Fatalf("destroyed names = %#v", names)
+	}
+}
+
+func TestDestroyLeftoverProviderBackupsGCPRequiresInjectedDestroyer(t *testing.T) {
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	_, err := o.destroyLeftoverProviderBackups(context.Background(), stubPlanned{provider: "gcp"}, nil)
+	if err == nil || !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestDestroyLeftoverProviderBackupsAWSDisposableIsNoop(t *testing.T) {
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.newLeftoverBackupDestroyer = func(context.Context, platform.PlannedStack) (leftoverBackupDestroyer, error) {
+		t.Fatal("AWS disposable destroy must not create a leftover destroyer")
+		return nil, nil
+	}
+	names, err := o.destroyLeftoverProviderBackups(context.Background(), stubPlanned{provider: "aws"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("AWS disposable leftover names = %#v", names)
+	}
+}
+
+func TestDestroyBackupsGCPLeftoverFailureFailsAfterInfrastructureDestroy(t *testing.T) {
+	path := writeGCPLifecycleConfig(t, "production")
+	backend := &fakeInfrastructureBackend{}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	if err := o.modules.RegisterModule(stubGCPModule{}); err != nil {
+		t.Fatal(err)
+	}
+	o.configPath = path
+	o.environment = "staging"
+	o.yes = true
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	o.newLeftoverBackupDestroyer = func(context.Context, platform.PlannedStack) (leftoverBackupDestroyer, error) {
+		return leftoverBackupDestroyerFunc(func(context.Context) ([]string, error) {
+			return nil, errors.New("delete leftover backup denied")
+		}), nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "destroy", "--destroy-backups"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "delete leftover backup denied") {
+		t.Fatalf("error = %v", err)
+	}
+	if !reflect.DeepEqual(backend.calls, []string{"preview", "destroy"}) {
+		t.Fatalf("backend calls = %v", backend.calls)
+	}
+}
+
+type leftoverBackupDestroyerFunc func(context.Context) ([]string, error)
+
+func (fn leftoverBackupDestroyerFunc) Destroy(ctx context.Context) ([]string, error) {
+	return fn(ctx)
+}
+
 func TestDeployReleasesLockAfterBackendFailure(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
 	backend := &fakeInfrastructureBackend{previewErr: errors.New("preview failed")}
@@ -394,6 +668,47 @@ func TestDeployReportsLockReleaseFailure(t *testing.T) {
 	}
 }
 
+func TestDeployJoinsBackendAndLockReleaseErrors(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	backend := &fakeInfrastructureBackend{previewErr: errors.New("preview failed")}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.environment = "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return errors.New("unlock failed") }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "deploy"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "preview failed") || !strings.Contains(err.Error(), "unlock failed") {
+		t.Fatalf("joined error missing causes: %v", err)
+	}
+}
+
+func TestDestroyJoinsBackendAndLockReleaseErrors(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	backend := &fakeInfrastructureBackend{destroyErr: errors.New("destroy failed")}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.environment = "staging"
+	o.yes = true
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return errors.New("unlock failed") }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "destroy"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "destroy failed") || !strings.Contains(err.Error(), "unlock failed") {
+		t.Fatalf("joined error missing causes: %v", err)
+	}
+}
+
 func TestExperimentalTargetWarnsAtPlanStack(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -423,7 +738,7 @@ func TestExperimentalTargetWarnsAtPlanStack(t *testing.T) {
 			name: "experimental aws kubernetes",
 			configPath: func(t *testing.T) string {
 				t.Helper()
-				contents := strings.Replace(starterConfig, "runtime: ecs-fargate", "runtime: eks-autopilot", 1)
+				contents := strings.Replace(starterConfig, "runtime: ecs-fargate", "runtime: eks", 1)
 				path := filepath.Join(t.TempDir(), "magelift.yaml")
 				if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 					t.Fatal(err)
@@ -433,7 +748,7 @@ func TestExperimentalTargetWarnsAtPlanStack(t *testing.T) {
 			command:      "preview",
 			wantWarn:     true,
 			wantProvider: "aws",
-			wantRuntime:  "eks-autopilot",
+			wantRuntime:  "eks",
 		},
 		{
 			name: "certified aws no warning",

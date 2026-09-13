@@ -105,10 +105,13 @@ func TestStepsSequence(t *testing.T) {
 		t.Fatal(err)
 	}
 	backend := &stepsBackend{outputs: map[string]any{
-		platform.OutputClusterName:    "shop-gke",
-		platform.OutputServiceName:    "shop-web",
-		platform.OutputDatabaseWriter: "10.0.0.1",
-		platform.OutputCacheEndpoint:  "10.0.0.2",
+		platform.OutputClusterName:             "shop-gke",
+		platform.OutputServiceName:             "shop-web",
+		platform.OutputDatabaseWriter:          "10.0.0.1",
+		platform.OutputCacheEndpoint:           "10.0.0.2",
+		platform.OutputSearchEndpoint:          "shop-search",
+		platform.OutputDatabaseSecretName:      "shop-preview-app-db-credentials",
+		platform.OutputEncryptionKeySecretName: "shop-preview-app-encryption-key",
 	}}
 	recorded := false
 	steps, err := New(backend, testDeploySpec(digest), candidate, runtime, io.Discard,
@@ -133,6 +136,30 @@ func TestStepsSequence(t *testing.T) {
 	}
 	if len(jobs.created) != 1 {
 		t.Fatalf("expected one migrate Job, got %d", len(jobs.created))
+	}
+	sawSearch := false
+	for _, env := range jobs.created[0].Spec.Template.Spec.Containers[0].Env {
+		if env.Name == platform.EnvMagentoSearchHost && env.Value == "shop-search" {
+			sawSearch = true
+			break
+		}
+	}
+	if !sawSearch {
+		t.Fatalf("migration Job is missing %s: %#v", platform.EnvMagentoSearchHost, jobs.created[0].Spec.Template.Spec.Containers[0].Env)
+	}
+	if got := jobs.created[0].Spec.Template.Spec.Containers[0].Env; len(DatabaseCredentialEnvVars("shop-preview-app-db-credentials")) == 0 || got[len(got)-1].ValueFrom == nil {
+		t.Fatalf("migration Job did not receive database SecretKeyRefs: %#v", got)
+	}
+	var encryptionBinding *corev1.EnvVar
+	for index := range jobs.created[0].Spec.Template.Spec.Containers[0].Env {
+		binding := &jobs.created[0].Spec.Template.Spec.Containers[0].Env[index]
+		if binding.Name == platform.EnvMagentoCryptKey {
+			encryptionBinding = binding
+			break
+		}
+	}
+	if encryptionBinding == nil || encryptionBinding.Value != "" || encryptionBinding.ValueFrom == nil || encryptionBinding.ValueFrom.SecretKeyRef == nil {
+		t.Fatalf("migration Job did not receive encryption SecretKeyRef: %#v", jobs.created[0].Spec.Template.Spec.Containers[0].Env)
 	}
 	if err := steps.RunMigrations(ctx, req); err != nil {
 		t.Fatalf("RunMigrations: %v", err)
@@ -175,10 +202,12 @@ func TestRegisterCandidateBootstrapsGreenfieldStack(t *testing.T) {
 	backend := &stepsBackend{
 		outputs: map[string]any{},
 		afterUpdate: map[string]any{
-			platform.OutputClusterName:    "shop-preview-app-gke",
-			platform.OutputServiceName:    "shop-preview-app-web",
-			platform.OutputDatabaseWriter: "10.20.1.5",
-			platform.OutputCacheEndpoint:  "10.20.2.5",
+			platform.OutputClusterName:             "shop-preview-app-gke",
+			platform.OutputServiceName:             "shop-preview-app-web",
+			platform.OutputDatabaseWriter:          "10.20.1.5",
+			platform.OutputCacheEndpoint:           "10.20.2.5",
+			platform.OutputDatabaseSecretName:      "shop-preview-app-db-credentials",
+			platform.OutputEncryptionKeySecretName: "shop-preview-app-encryption-key",
 		},
 	}
 	candidate := &recordingCandidate{}
@@ -202,10 +231,12 @@ func TestRunMigrationsCleansUpOnFailure(t *testing.T) {
 	candidate := &recordingCandidate{failRun: true}
 	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)
 	steps, err := New(&stepsBackend{outputs: map[string]any{
-		platform.OutputClusterName:    "c",
-		platform.OutputServiceName:    "s",
-		platform.OutputDatabaseWriter: "10.0.0.1",
-		platform.OutputCacheEndpoint:  "10.0.0.2",
+		platform.OutputClusterName:             "c",
+		platform.OutputServiceName:             "s",
+		platform.OutputDatabaseWriter:          "10.0.0.1",
+		platform.OutputCacheEndpoint:           "10.0.0.2",
+		platform.OutputDatabaseSecretName:      "shop-preview-app-db-credentials",
+		platform.OutputEncryptionKeySecretName: "shop-preview-app-encryption-key",
 	}}, testDeploySpec(digest), candidate, stepsRuntime{}, io.Discard, nil)
 	if err != nil {
 		t.Fatal(err)

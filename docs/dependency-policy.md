@@ -12,7 +12,7 @@ MageLift uses the newest production-suitable dependency compatible with its supp
   every supported branch.
 - PHPStan and Psalm run on every verification job. Their dynamic JSON and process
   boundary checks are kept in source rather than hidden in a generated baseline.
-- Docker base images are pinned by multi-platform digest. The FrankenPHP classic adapter currently uses the Debian Trixie PHP 8.5 image from the 1.12.6 release; Dependabot tracks Docker digest updates.
+- Docker base images are pinned by multi-platform digest. The FrankenPHP classic adapter currently uses the Debian Trixie PHP 8.5 image from the 1.12.7 release; Dependabot tracks Docker digest updates.
 - Pulumi Automation API and cloud provider SDKs that MageLift implements are direct
   Go dependencies. Their versions are pinned in `go.mod`, checked with
   `go list -m -u all`, and exercised by Pulumi mock graph tests. Additional cloud
@@ -28,8 +28,9 @@ Dependabot opens the dependency update pull requests. Go modules, Composer packa
 CI also runs Go vulnerability and license checks, CodeQL for Go, and Trivy
 against every published Debian PHP runtime, builder, and FrankenPHP classic image
 for each supported PHP branch. `go-licenses` ignores `github.com/ovh/pulumi-ovh`
-because the Apache-2.0 LICENSE sits at the module root while nested Go packages
-are not classified; that license is recorded in `NOTICE`. Shellcheck validates repository shell scripts, and
+and `github.com/ovh/okms-sdk-go` because their Apache-2.0 LICENSE files sit at
+the module root while nested Go packages are not classified; those licenses are
+recorded in `NOTICE`. Shellcheck validates repository shell scripts, and
 actionlint validates workflow syntax and expressions;
 Zizmor audits GitHub Actions workflows for unsafe
 permissions, unpinned actions, and injection paths. A finding blocks the relevant job until it is fixed,

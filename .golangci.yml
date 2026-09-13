@@ -106,13 +106,3 @@ linters:
       - text: "Error return value of `os\\.RemoveAll` is not checked"
         linters:
           - errcheck
-
-formatters:
-  enable:
-    - gofmt
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$

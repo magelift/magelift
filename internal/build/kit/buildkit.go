@@ -69,6 +69,7 @@ type commandFactory func(context.Context, string, ...string) *exec.Cmd
 type Runner struct {
 	diagnostics io.Writer
 	command     commandFactory
+	TempRoot    string
 }
 
 func NewRunner(diagnostics io.Writer) *Runner {
@@ -79,7 +80,7 @@ func (r *Runner) Build(ctx context.Context, request Request) (Result, error) {
 	if err := validate(request, r.diagnostics); err != nil {
 		return Result{}, err
 	}
-	temporaryDirectory, err := os.MkdirTemp("", "magelift-buildkit-")
+	temporaryDirectory, err := os.MkdirTemp(r.TempRoot, "magelift-buildkit-")
 	if err != nil {
 		return Result{}, fmt.Errorf("create private BuildKit directory: %w", err)
 	}

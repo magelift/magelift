@@ -6,8 +6,12 @@ You still declare environments in YAML, promote an immutable build, and use
 CLI verbs for logs and shells. The cloud account, network, and managed services
 are yours. MageLift does not rent a PaaS for you.
 
-Certified path today: AWS ECS Fargate. Experimental targets are labeled and are
-not ACC replacements yet.
+Certified paths today: AWS ECS Fargate and the evidenced GCP GKE Autopilot
+cells. AWS EKS, GCP GKE Standard, OVH MKS, and Scaleway Kapsule stay
+experimental. Import maps allowlisted Magento configuration into
+`application.magento`, including an admin front name, cookie domain, CORS origins,
+and consumer mode or names when the source provides them. It does not invent
+websites, stores, or store views.
 
 ## Mental model
 
@@ -20,7 +24,7 @@ not ACC replacements yet.
 | `magento-cloud` / `platform` SSH | `magelift exec` / `magelift ssh` (ECS Exec into web or cron) |
 | Environment logs | `magelift logs --service web\|deploy\|cron` |
 | Cron workers | ECS cron service + `magelift cron-run` |
-| Local Lando / Docker | `magelift dev` Compose loop (account-free) |
+| Local Lando / Docker | `magelift local` Compose loop (account-free) |
 
 ## What stays the same
 
@@ -33,8 +37,11 @@ not ACC replacements yet.
 
 - **You own the AWS account.** Billing, IAM, DNS, and KMS keys are yours.
   Bootstrap creates the shared control-plane pieces; stacks stay in that account.
-- **Topology is not YAML soup.** Network CIDRs, Aurora vs RDS, OpenSearch mode,
-  and NAT mode are explicit escape hatches on `target.aws`, not hidden SKU swaps.
+- **Topology is not YAML soup.** Network CIDRs, RDS vs experimental Aurora,
+  OpenSearch mode, and NAT mode are explicit escape hatches on `target.aws`,
+  not hidden SKU swaps. Standard/HA YAML that omits `queueMode` defaults to
+  `ecs-rabbitmq`; explicit `amazon-mq` remains experimental-warn. Certified
+  queue cells are `db` and `ecs-rabbitmq`.
 - **No inbound SSH.** `magelift ssh` is ECS Exec. There is no bastion and no
   `magelift tunnel` on the Fargate path.
 - **Deploy is not a shell service.** Migrations run as a one-off candidate ECS
@@ -75,7 +82,9 @@ application:
   mode: integrated
 build:
   php: "8.5"
+  extensions: [apcu, bcmath, ftp, gd, intl, mbstring, opcache, pdo_mysql, redis, soap, sockets, sodium, xsl, zip]
   composer:
+    version: "2.10"
     credentials: aws-secrets-manager://magelift/composer
 target:
   provider: aws
@@ -122,13 +131,58 @@ magelift init --from-acc --config-out review.magelift.yaml
 `--from-acc` and `--from-upsun` are mutually exclusive. The mapper covers structural
 app/services/routes/cron plus the frozen D-07 env allowlist (crypt → encryption
 secret ref placeholder; `UPDATE_URLS`/routes → domain; DB/Redis/OpenSearch/AMQP
-relationships → capability / catalog intent; `SCD_*` → `build.staticContent`). See
-[ece-tools parity](ece-parity.md).
+relationships → capability / catalog intent; `SCD_*` → `build.staticContent`; and
+allowlisted `CONFIG__DEFAULT__*` values → Magento admin, cookie, CORS, and consumer
+overlays). See [ece-tools parity](ece-parity.md).
+
+The importer also carries ACC and Upsun PHP `runtime.extensions` into
+`build.extensions`, and the `composer/composer` PHP dependency into
+`build.composer.version`. The isolated builder checks both values before it runs
+Magento lifecycle steps. Unsupported PaaS settings remain in the unmapped sidecar.
 
 When any key is outside that allowlist, MageLift still writes the YAML, writes a
 sidecar next to the output path (`magelift.unmapped.md`, or
 `<stem>.unmapped.md` when using `--config-out`), and exits non-zero. Fix or accept
 the residuals by hand before deploy.
+
+## Fastly migration intent
+
+If the source service file declares a Fastly service, the importer writes an
+`edge.externalProvider: fastly` intent and keeps the route hostname as an edge domain.
+It never copies a Fastly token, private key, or VCL body. The unmapped sidecar
+names the missing `serviceId` and `tokenSecret` fields so an operator can add a
+secret reference deliberately:
+
+```yaml
+edge:
+  externalProvider: fastly
+  serviceId: "123456"
+  tokenSecret: aws-secrets-manager://magelift/fastly-api-token
+  domains: [store.example.com]
+  tls: true
+  purgeOnDeploy: true
+  # Optional reviewed VCL or policy artifact reference.
+  vclRef: fastly/vcl/store.vcl
+```
+
+Fastly is an experimental migration target in RC1. Use an authenticated Fastly
+CLI profile and run `magelift edge plan`, `magelift edge apply`, and
+`magelift edge destroy --yes` to manage the declared domains. A normal origin
+deployment applies Fastly after its candidate and health gates pass. The
+first-party AWS, GCP, OVHcloud, and Scaleway stacks keep origin and edge as
+separate capabilities, so a Fastly request cannot silently become CloudFront.
+
+The first Fastly account smoke is recorded in
+[fastly-adapter-live-2026-08-13.md](evidence/fastly-adapter-live-2026-08-13.md).
+It found that the authenticated account rejects the CLI's classic service-domain
+endpoint in favor of Domain Management. A disposable routed-domain test then proved
+TLS, active-version attachment, origin routing, purge, and teardown. The adapter
+uses the current `fastly domain create`, `domain list`, and `domain delete
+--domain-id` commands, reuses domains whose description matches the exact
+MageLift marker, and stores only ownership IDs in mode-0600 local state. Existing
+Fastly services are preserved unless the adapter created them. The live adapter
+lifecycle test proves the create, list, purge, and cleanup path, while full
+production edge certification remains open.
 
 Phase 4 ships the config onramp above. Database dump import, media sync, and the
 cutover runbook below ship in Phase 5. Brownfield attach of an existing AWS VPC /
@@ -177,7 +231,7 @@ magelift --yes env import-dump <environment>
 magelift env status <environment> -o json
 ```
 
-Do not use `magelift dev seed` for cloud environments; that verb is local Compose only.
+Do not use `magelift local seed` for cloud environments; that verb is local Compose only.
 
 ### 2. Sync media into object storage
 
@@ -255,7 +309,7 @@ TARGET=example.invalid ./scripts/cutover-dns-cloudflare.sh --dry-run
 ```
 
 Auth and zone notes: use a Cloudflare API token with Zone.DNS Edit on the
-preview host zone; see [gcp-certified-pass](evidence/gcp-certified-pass-2026-08-02.md)
+preview host zone; see [evidence](evidence/README.md)
 for a rehearsal that used `cf` CLI `dns_records:edit` and `--cleanup`.
 
 ### 7. Rollback

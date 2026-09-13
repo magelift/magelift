@@ -13,16 +13,21 @@ import (
 )
 
 const (
-	TypeTokenAurora = "magelift:aws:AuroraMysql"
-	TypeTokenRDS    = "magelift:aws:RdsMysql"
+	TypeTokenAurora     = "magelift:aws:AuroraMysql"
+	TypeTokenRDS        = "magelift:aws:RdsMysql"
+	TypeTokenRDSMariaDB = "magelift:aws:RdsMariaDb"
 	// TypeToken is the historical Aurora component token.
 	TypeToken = TypeTokenAurora
 
 	EngineAuroraMySQL = "aurora-mysql"
 	EngineRDSMySQL    = "rds-mysql"
+	EngineRDSMariaDB  = "rds-mariadb"
 )
 
 var kmsARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):kms:[a-z0-9-]+:[0-9]{12}:key/[0-9a-fA-F-]+$`)
+
+var backupWindowPattern = regexp.MustCompile(`^(?:[01][0-9]|2[0-3]):[0-5][0-9]-(?:[01][0-9]|2[0-3]):[0-5][0-9]$`)
+var maintenanceWindowPattern = regexp.MustCompile(`(?i)^(?:mon|tue|wed|thu|fri|sat|sun):(?:[01][0-9]|2[0-3]):[0-5][0-9]-(?:mon|tue|wed|thu|fri|sat|sun):(?:[01][0-9]|2[0-3]):[0-5][0-9]$`)
 
 // Secret name may include "!" (RDS/Aurora ManageMasterUserPassword: rds!db-… / rds!cluster-…).
 var secretARN = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@!-]+$`)
@@ -57,6 +62,10 @@ type Args struct {
 	MasterUsername           string
 	KMSKeyARN                string
 	BackupRetentionDays      int
+	BackupWindow             string
+	MaintenanceWindow        string
+	DeletionProtection       *bool
+	DeleteAutomatedBackups   *bool
 	FinalSnapshotIdentifier  string
 	ProvisionedInstanceClass string
 	InstanceCount            int
@@ -85,7 +94,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if err := validate(name, args); err != nil {
 		return nil, err
 	}
-	if args.Engine == EngineRDSMySQL {
+	if args.Engine == EngineRDSMySQL || args.Engine == EngineRDSMariaDB {
 		return newRDSInstance(ctx, name, args, opts...)
 	}
 	return newAuroraCluster(ctx, name, args, opts...)
@@ -155,14 +164,28 @@ func newAuroraCluster(ctx *pulumi.Context, name string, args Args, opts ...pulum
 		return nil, err
 	}
 	production := args.EnvironmentClass == "production"
+	deletionProtection := production
+	if args.DeletionProtection != nil {
+		deletionProtection = *args.DeletionProtection
+	}
+	deleteAutomatedBackups := !production
+	if args.DeleteAutomatedBackups != nil {
+		deleteAutomatedBackups = *args.DeleteAutomatedBackups
+	}
 	clusterArgs := &rds.ClusterArgs{
 		Engine: pulumi.String("aurora-mysql"), EngineMode: pulumi.String("provisioned"), EngineVersion: pulumi.String(args.EngineVersion),
 		DatabaseName: pulumi.String(args.DatabaseName), MasterUsername: pulumi.String(args.MasterUsername), ManageMasterUserPassword: pulumi.Bool(true),
 		MasterUserSecretKmsKeyId: pulumi.String(args.KMSKeyARN), StorageEncrypted: pulumi.Bool(true), KmsKeyId: pulumi.String(args.KMSKeyARN),
 		DbSubnetGroupName: subnets.Name, VpcSecurityGroupIds: args.VpcSecurityGroupIDs, BackupRetentionPeriod: pulumi.Int(args.BackupRetentionDays),
-		DeletionProtection: pulumi.Bool(production), SkipFinalSnapshot: pulumi.Bool(!production), DeleteAutomatedBackups: pulumi.Bool(!production),
+		DeletionProtection: pulumi.Bool(deletionProtection), SkipFinalSnapshot: pulumi.Bool(!production), DeleteAutomatedBackups: pulumi.Bool(deleteAutomatedBackups),
 		CopyTagsToSnapshot: pulumi.Bool(true), EnabledCloudwatchLogsExports: pulumi.StringArray{pulumi.String("error"), pulumi.String("slowquery")},
 		Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "cluster"),
+	}
+	if args.BackupWindow != "" {
+		clusterArgs.PreferredBackupWindow = pulumi.String(args.BackupWindow)
+	}
+	if args.MaintenanceWindow != "" {
+		clusterArgs.PreferredMaintenanceWindow = pulumi.String(args.MaintenanceWindow)
 	}
 	if production {
 		clusterArgs.FinalSnapshotIdentifier = pulumi.String(args.FinalSnapshotIdentifier)
@@ -215,7 +238,11 @@ func newAuroraCluster(ctx *pulumi.Context, name string, args Args, opts ...pulum
 
 func newRDSInstance(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
 	component := &Component{}
-	if err := ctx.RegisterComponentResourceV2(TypeTokenRDS, name, pulumi.Map{
+	typeToken := TypeTokenRDS
+	if args.Engine == EngineRDSMariaDB {
+		typeToken = TypeTokenRDSMariaDB
+	}
+	if err := ctx.RegisterComponentResourceV2(typeToken, name, pulumi.Map{
 		"preset": pulumi.String(args.Preset), "environmentClass": pulumi.String(args.EnvironmentClass), "region": pulumi.String(args.Region),
 		"engine": pulumi.String(args.Engine), "engineVersion": pulumi.String(args.EngineVersion), "backupRetentionDays": pulumi.Int(args.BackupRetentionDays), "dataSubnetIds": args.DataSubnetIDs,
 	}, component, opts...); err != nil {
@@ -229,20 +256,52 @@ func newRDSInstance(ctx *pulumi.Context, name string, args Args, opts ...pulumi.
 		return nil, err
 	}
 	production := args.EnvironmentClass == "production"
+	deletionProtection := production
+	if args.DeletionProtection != nil {
+		deletionProtection = *args.DeletionProtection
+	}
+	deleteAutomatedBackups := !production
+	if args.DeleteAutomatedBackups != nil {
+		deleteAutomatedBackups = *args.DeleteAutomatedBackups
+	}
 	storage := args.AllocatedStorageGiB
 	if storage <= 0 {
 		storage = 20
 	}
+	parameterFamily, err := rdsParameterGroupFamily(args.Engine, args.EngineVersion)
+	if err != nil {
+		return nil, err
+	}
+	parameterGroup, err := rds.NewParameterGroup(ctx, name+"-parameters", &rds.ParameterGroupArgs{
+		Description: pulumi.String("MageLift Magento database import parameters"),
+		Family:      pulumi.String(parameterFamily),
+		Parameters: rds.ParameterGroupParameterArray{
+			&rds.ParameterGroupParameterArgs{
+				Name:  pulumi.String("log_bin_trust_function_creators"),
+				Value: pulumi.String("1"),
+			},
+		},
+		Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "parameters"),
+	}, child)
+	if err != nil {
+		return nil, err
+	}
 	instanceArgs := &rds.InstanceArgs{
-		Engine: pulumi.String("mysql"), EngineVersion: pulumi.String(args.EngineVersion), InstanceClass: pulumi.String(args.ProvisionedInstanceClass),
+		Engine: pulumi.String(rdsEngine(args.Engine)), EngineVersion: pulumi.String(args.EngineVersion), InstanceClass: pulumi.String(args.ProvisionedInstanceClass),
 		AllocatedStorage: pulumi.Int(storage), StorageType: pulumi.String("gp3"), StorageEncrypted: pulumi.Bool(true), KmsKeyId: pulumi.String(args.KMSKeyARN),
-		DbSubnetGroupName: subnets.Name, VpcSecurityGroupIds: args.VpcSecurityGroupIDs, DbName: pulumi.String(args.DatabaseName),
+		DbSubnetGroupName: subnets.Name, ParameterGroupName: parameterGroup.Name, VpcSecurityGroupIds: args.VpcSecurityGroupIDs, DbName: pulumi.String(args.DatabaseName),
 		Username: pulumi.String(args.MasterUsername), ManageMasterUserPassword: pulumi.Bool(true), MasterUserSecretKmsKeyId: pulumi.String(args.KMSKeyARN),
 		BackupRetentionPeriod: pulumi.Int(args.BackupRetentionDays), MultiAz: pulumi.Bool(false), PubliclyAccessible: pulumi.Bool(false),
-		DeletionProtection: pulumi.Bool(production), SkipFinalSnapshot: pulumi.Bool(!production), DeleteAutomatedBackups: pulumi.Bool(!production),
+		DeletionProtection: pulumi.Bool(deletionProtection), SkipFinalSnapshot: pulumi.Bool(!production), DeleteAutomatedBackups: pulumi.Bool(deleteAutomatedBackups),
 		CopyTagsToSnapshot: pulumi.Bool(true), AutoMinorVersionUpgrade: pulumi.Bool(true),
 		EnabledCloudwatchLogsExports: pulumi.StringArray{pulumi.String("error"), pulumi.String("slowquery")},
 		Region:                       pulumi.String(args.Region), Tags: tags(args.Tags, name, "instance"),
+	}
+	if args.BackupWindow != "" {
+		instanceArgs.BackupWindow = pulumi.String(args.BackupWindow)
+	}
+	if args.MaintenanceWindow != "" {
+		instanceArgs.MaintenanceWindow = pulumi.String(args.MaintenanceWindow)
 	}
 	if production {
 		instanceArgs.FinalSnapshotIdentifier = pulumi.String(args.FinalSnapshotIdentifier)
@@ -269,8 +328,8 @@ func validate(name string, args Args) error {
 	if strings.TrimSpace(name) == "" || strings.TrimSpace(args.Region) == "" || strings.TrimSpace(args.EngineVersion) == "" {
 		return errors.New("database name, region, and engine version are required")
 	}
-	if args.Engine != EngineAuroraMySQL && args.Engine != EngineRDSMySQL {
-		return errors.New("database engine must be aurora-mysql or rds-mysql")
+	if args.Engine != EngineAuroraMySQL && args.Engine != EngineRDSMySQL && args.Engine != EngineRDSMariaDB {
+		return errors.New("database engine must be aurora-mysql, rds-mysql, or rds-mariadb")
 	}
 	if !databaseName.MatchString(args.DatabaseName) || !username.MatchString(args.MasterUsername) {
 		return errors.New("database and master user names are invalid")
@@ -280,6 +339,12 @@ func validate(name string, args Args) error {
 	}
 	if args.BackupRetentionDays < 1 || args.BackupRetentionDays > 35 {
 		return errors.New("backup retention must be between 1 and 35 days to provide PITR")
+	}
+	if args.BackupWindow != "" && !backupWindowPattern.MatchString(args.BackupWindow) {
+		return errors.New("database backup window must use HH:MM-HH:MM in UTC")
+	}
+	if args.MaintenanceWindow != "" && !maintenanceWindowPattern.MatchString(args.MaintenanceWindow) {
+		return errors.New("database maintenance window must use ddd:HH:MM-ddd:HH:MM in UTC")
 	}
 	wantZones := map[sdk.PresetID]int{sdk.PresetPreview: 2, sdk.PresetStandard: 2, sdk.PresetHighAvailability: 3}[args.Preset]
 	if wantZones == 0 || len(args.AvailabilityZones) != wantZones || len(args.DataSubnetIDs) != wantZones {
@@ -302,9 +367,9 @@ func validate(name string, args Args) error {
 	if production && strings.TrimSpace(args.FinalSnapshotIdentifier) == "" {
 		return errors.New("production databases require a final snapshot identifier")
 	}
-	if args.Engine == EngineRDSMySQL {
+	if args.Engine == EngineRDSMySQL || args.Engine == EngineRDSMariaDB {
 		if args.Preset != sdk.PresetPreview {
-			return errors.New("rds-mysql is only supported for the preview preset")
+			return errors.New("RDS database engines are only supported for the preview preset")
 		}
 		if strings.TrimSpace(args.ProvisionedInstanceClass) == "" || args.ServerlessV2 != nil {
 			return errors.New("rds-mysql requires an explicit instance class and no Aurora Serverless settings")
@@ -315,8 +380,8 @@ func validate(name string, args Args) error {
 		return nil
 	}
 	if args.Preset == sdk.PresetPreview {
-		if args.ServerlessV2 == nil || args.InstanceCount != 0 || args.ProvisionedInstanceClass != "" {
-			return errors.New("preview requires bounded Serverless v2 settings and no provisioned capacity")
+		if args.ServerlessV2 == nil {
+			return errors.New("preview aurora-mysql requires bounded Serverless v2 settings")
 		}
 		settings := args.ServerlessV2
 		if settings.MinimumACU < 0 || settings.MaximumACU <= 0 || settings.MaximumACU > 256 || settings.MaximumACU < settings.MinimumACU || !halfStep(settings.MinimumACU) || !halfStep(settings.MaximumACU) {
@@ -335,6 +400,25 @@ func validate(name string, args Args) error {
 		}
 	}
 	return nil
+}
+
+func rdsParameterGroupFamily(engine, engineVersion string) (string, error) {
+	parts := strings.SplitN(strings.TrimSpace(engineVersion), ".", 3)
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", fmt.Errorf("RDS %s engine version %q cannot determine a parameter group family", engine, engineVersion)
+	}
+	family := "mysql"
+	if engine == EngineRDSMariaDB {
+		family = "mariadb"
+	}
+	return family + parts[0] + "." + parts[1], nil
+}
+
+func rdsEngine(engine string) string {
+	if engine == EngineRDSMariaDB {
+		return "mariadb"
+	}
+	return "mysql"
 }
 
 func halfStep(value float64) bool { return value*2 == float64(int(value*2)) }

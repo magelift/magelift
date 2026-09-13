@@ -14,23 +14,34 @@ import (
 	"strings"
 
 	"github.com/magelift/magelift/internal/automation"
-	awssecrets "github.com/magelift/magelift/internal/cloud/aws/secrets"
-	gcpsecrets "github.com/magelift/magelift/internal/cloud/gcp/secrets"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/cosign"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/dumpimport"
+	fastlyedge "github.com/magelift/magelift/internal/external/fastly"
 	"github.com/magelift/magelift/internal/mediasync"
 	"github.com/magelift/magelift/internal/paasimport"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/releasejournal"
+	"github.com/magelift/magelift/internal/toolchain"
 	mageliftupgrade "github.com/magelift/magelift/internal/upgrade"
 	"github.com/magelift/magelift/internal/usererr"
+	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 )
 
 var Version = "dev"
+
+// Hooks provide provider-specific clients to the Cobra command layer. The
+// production entrypoint supplies these; tests and documentation tools may
+// leave them nil when they do not exercise the corresponding operation.
+type Hooks struct {
+	NewComposerSecrets         func(context.Context, string) (ComposerSecretProvider, error)
+	NewComposerGCPSecrets      func(context.Context) (ComposerSecretProvider, error)
+	NewLeftoverBackupDestroyer func(context.Context, platform.PlannedStack) (LeftoverBackupDestroyer, error)
+	NewGCPCleanupProvider      func(context.Context, sdk.CleanupLedger) (CleanupProvider, error)
+}
 
 type exitError struct {
 	code int
@@ -49,38 +60,60 @@ func ExitCode(err error) int {
 }
 
 type options struct {
-	configPath            string
-	environment           string
-	output                string
-	noInteraction         bool
-	yes                   bool
-	verbose               int
-	stdout                io.Writer
-	stderr                io.Writer
-	getenv                func(string) string
-	currentBranch         func(string) (string, error)
-	terminal              environmentTerminal
-	modules               *platform.ModuleRegistry
-	newBackend            func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error)
-	newDeploySteps        func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error)
-	importSeedDump        func(context.Context, dumpimport.Options) error
-	mediaSync             func(context.Context, mediasync.Options) (mediasync.Result, error)
-	newLock               func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
-	runCommand            func(context.Context, string, []string, io.Writer, io.Writer) error
-	runCompose            func(context.Context, string, []string, []string, io.Writer, io.Writer) error
-	newReleaseStore       func(string, string) (releaseStore, error)
-	verifyRelease         func(context.Context, string, cosign.VerifyOptions) error
-	newComposerSecrets    func(context.Context, string) (composerSecretProvider, error)
-	newComposerGCPSecrets func(context.Context) (composerSecretProvider, error)
-	newUpgrade            func() upgradeClient
-	executable            func() (string, error)
+	configPath              string
+	environment             string
+	previewRepository       string
+	previewPullRequest      int64
+	previewBranch           string
+	previewCommit           string
+	previewDomain           string
+	previewGeneration       uint64
+	resolvedPreviewIdentity *config.PreviewIdentity
+	previewIdentityOverride *config.PreviewIdentity
+	planContext             context.Context
+	output                  string
+	noInteraction           bool
+	yes                     bool
+	verbose                 int
+	stdout                  io.Writer
+	stderr                  io.Writer
+	getenv                  func(string) string
+	lookPath                func(string) (string, error)
+	currentBranch           func(string) (string, error)
+	terminal                environmentTerminal
+	modules                 *platform.ModuleRegistry
+	newBackend              func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error)
+	newDeploySteps          func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error)
+	importSeedDump          func(context.Context, dumpimport.Options) error
+	exportDump              func(context.Context, dumpimport.Options) error
+	mediaSync               func(context.Context, mediasync.Options) (mediasync.Result, error)
+	newLock                 func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
+	runCommand              func(context.Context, string, []string, io.Writer, io.Writer) error
+	runCompose              func(context.Context, string, []string, []string, io.Writer, io.Writer) error
+	dependencyRunner        toolchain.DependencyRunner
+	newReleaseStore         func(string, string) (releaseStore, error)
+	verifyRelease           func(context.Context, string, cosign.VerifyOptions) error
+	signRelease             func(context.Context, string, cosign.SignOptions) error
+	liveSchemaEpoch         func(context.Context) (int, error)
+	newComposerSecrets      func(context.Context, string) (composerSecretProvider, error)
+	newComposerGCPSecrets   func(context.Context) (composerSecretProvider, error)
+	newUpgrade              func() upgradeClient
+	newFastly               func(fastlyedge.Request) (fastlyLifecycle, error)
+	executable              func() (string, error)
 	// Test doubles for day-2 ports (override Module* resolution).
-	testBootstrap      platform.Bootstrap
-	testState          platform.State
-	testSecrets        platform.Secrets
-	testRuntimeObserve platform.RuntimeObserve
-	testCostEstimator  platform.CostEstimator
-	infraOnly          bool
+	testBootstrap              platform.Bootstrap
+	testState                  platform.State
+	testSecrets                platform.Secrets
+	testRuntimeObserve         platform.RuntimeObserve
+	testRuntimeTunnel          platform.RuntimeTunnel
+	testCostEstimator          platform.CostEstimator
+	infraOnly                  bool
+	skipProviderLock           bool
+	destroyBackups             bool
+	newLeftoverBackupDestroyer func(context.Context, platform.PlannedStack) (leftoverBackupDestroyer, error)
+	newGCPCleanupProvider      func(context.Context, sdk.CleanupLedger) (cleanupProvider, error)
+	newCleanupProvider         func(context.Context, sdk.CleanupLedger) (cleanupProvider, error)
+	listPreviewRecords         func(context.Context, string, string) ([]automation.PreviewRecord, error)
 }
 
 type environmentTerminal interface {
@@ -118,6 +151,20 @@ func (t consoleTerminal) SelectEnvironment(environments []string) (string, error
 	return environments[selection-1], nil
 }
 
+func (t consoleTerminal) Confirm(prompt string) (bool, error) {
+	_, _ = fmt.Fprintf(t.out, "%s [y/N] ", prompt)
+	line, err := bufio.NewReader(t.in).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, fmt.Errorf("read confirmation: %w", err)
+	}
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "y", "yes":
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
 // New returns the CLI command tree with an empty module registry.
 // Production binaries must call NewWithModules after registering adapters
 // (see cmd/magelift). Keeping Pulumi SDKs out of this package lets tools like
@@ -131,7 +178,17 @@ func NewWithModules(modules *platform.ModuleRegistry) *cobra.Command {
 	return newCommand(os.Stdout, os.Stderr, modules)
 }
 
+// NewWithModulesAndHooks returns the CLI with provider clients supplied by its
+// production entrypoint.
+func NewWithModulesAndHooks(modules *platform.ModuleRegistry, hooks Hooks) *cobra.Command {
+	return newCommandWithHooks(os.Stdout, os.Stderr, modules, hooks)
+}
+
 func newCommand(stdout, stderr io.Writer, modules *platform.ModuleRegistry) *cobra.Command {
+	return newCommandWithHooks(stdout, stderr, modules, Hooks{})
+}
+
+func newCommandWithHooks(stdout, stderr io.Writer, modules *platform.ModuleRegistry, hooks Hooks) *cobra.Command {
 	if modules == nil {
 		modules = platform.NewModuleRegistry()
 	}
@@ -139,6 +196,7 @@ func newCommand(stdout, stderr io.Writer, modules *platform.ModuleRegistry) *cob
 		stdout:        stdout,
 		stderr:        stderr,
 		getenv:        os.Getenv,
+		lookPath:      exec.LookPath,
 		currentBranch: gitCurrentBranch,
 		terminal:      consoleTerminal{in: os.Stdin, out: stderr},
 		modules:       modules,
@@ -157,7 +215,8 @@ func newCommand(stdout, stderr io.Writer, modules *platform.ModuleRegistry) *cob
 			}
 			return automation.NewPulumiBackend(pulumiStack), nil
 		},
-		newDeploySteps: nil,
+		listPreviewRecords: automation.ListPreviewRecords,
+		newDeploySteps:     nil,
 		newLock: func(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
 			module, found := modules.Module(planned.Provider(), planned.Runtime())
 			if !found {
@@ -169,24 +228,30 @@ func newCommand(stdout, stderr io.Writer, modules *platform.ModuleRegistry) *cob
 			}
 			return ops.AcquireLock(ctx, planned)
 		},
-		runCommand: runRemoteCommand,
-		runCompose: runDockerCompose,
+		runCommand:       runRemoteCommand,
+		runCompose:       runDockerCompose,
+		dependencyRunner: toolchain.SystemDependencyRunner(),
 		newReleaseStore: func(root, environment string) (releaseStore, error) {
 			return releasejournal.New(root, environment)
 		},
-		verifyRelease: cosign.New().Verify,
-		newComposerSecrets: func(ctx context.Context, region string) (composerSecretProvider, error) {
-			return awssecrets.New(ctx, region)
-		},
-		newComposerGCPSecrets: func(ctx context.Context) (composerSecretProvider, error) {
-			store, err := gcpsecrets.NewStore(ctx)
+		verifyRelease:              cosign.New().Verify,
+		newComposerSecrets:         hooks.NewComposerSecrets,
+		newComposerGCPSecrets:      hooks.NewComposerGCPSecrets,
+		newLeftoverBackupDestroyer: hooks.NewLeftoverBackupDestroyer,
+		newGCPCleanupProvider:      hooks.NewGCPCleanupProvider,
+		newUpgrade:                 func() upgradeClient { return mageliftupgrade.New(nil) },
+		newFastly: func(request fastlyedge.Request) (fastlyLifecycle, error) {
+			runner := fastlyedge.ExecRunner{}
+			probe, err := fastlyHealthProbe(request)
 			if err != nil {
 				return nil, err
 			}
-			return gcpComposerSecretAdapter{store: store}, nil
+			return fastlyedge.NewWithProbes(runner, probe, fastlyedge.NewCLIInventoryDeletionProbe(runner)), nil
 		},
-		newUpgrade: func() upgradeClient { return mageliftupgrade.New(nil) },
 		executable: os.Executable,
+	}
+	o.liveSchemaEpoch = func(ctx context.Context) (int, error) {
+		return o.observeLiveSchemaEpoch(ctx)
 	}
 	o.newDeploySteps = func(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
 		module, found := modules.Module(planned.Provider(), planned.Runtime())
@@ -202,9 +267,20 @@ func newCommand(stdout, stderr io.Writer, modules *platform.ModuleRegistry) *cob
 			if err != nil {
 				return err
 			}
+			entries, err := store.List(ctx)
+			if err != nil {
+				return err
+			}
+			identity, issuer := releasejournal.SignatureMetadataForDigest(entries, request.ImageDigest)
+			epoch := o.schemaEpochOrZero(ctx)
+			if epoch < 1 {
+				epoch = releasejournal.SchemaEpochForDigest(entries, request.ImageDigest)
+			}
 			_, err = store.Append(ctx, releasejournal.Entry{
 				Action: releasejournal.ActionDeploy, Environment: planned.Environment(),
 				DigestReference: request.ImageDigest, ForwardOnly: true,
+				SignatureIdentity: identity, SignatureIssuer: issuer,
+				SchemaEpoch: epoch,
 			})
 			return err
 		}
@@ -222,6 +298,9 @@ func newCommandWithOptions(o *options) *cobra.Command {
 		Short:         "Deploy Magento applications to certified and experimental cloud targets",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+			o.planContext = cmd.Context()
+		},
 	}
 	root.SetOut(o.stdout)
 	root.SetErr(o.stderr)
@@ -235,12 +314,18 @@ func newCommandWithOptions(o *options) *cobra.Command {
 	}
 	root.PersistentFlags().StringVar(&o.configPath, "config", configDefault, "configuration file")
 	root.PersistentFlags().StringVar(&o.environment, "env", o.environment, "environment name")
+	root.PersistentFlags().StringVar(&o.previewRepository, "preview-repository", o.previewRepository, "canonical repository slug for a pull-request preview")
+	root.PersistentFlags().Int64Var(&o.previewPullRequest, "preview-number", o.previewPullRequest, "pull-request number for a preview identity")
+	root.PersistentFlags().StringVar(&o.previewBranch, "preview-branch", o.previewBranch, "source branch metadata for a preview identity")
+	root.PersistentFlags().StringVar(&o.previewCommit, "preview-commit", o.previewCommit, "commit digest metadata for a preview identity")
+	root.PersistentFlags().StringVar(&o.previewDomain, "preview-domain", o.previewDomain, "domain metadata for a preview identity")
+	root.PersistentFlags().Uint64Var(&o.previewGeneration, "preview-generation", o.previewGeneration, "deployment generation for a preview identity")
 	root.PersistentFlags().StringVarP(&o.output, "output", "o", outputDefault, "output format: table, json, or yaml")
 	root.PersistentFlags().BoolVar(&o.noInteraction, "no-interaction", o.noInteraction, "never prompt for input")
 	root.PersistentFlags().BoolVarP(&o.yes, "yes", "y", o.yes, "confirm destructive actions")
 	root.PersistentFlags().CountVarP(&o.verbose, "verbose", "v", "increase diagnostic verbosity")
 
-	root.AddCommand(versionCommand(o), initCommand(o), doctorCommand(o), configCommand(o), buildCommand(o), bootstrapCommand(o), benchmarkCommand(o))
+	root.AddCommand(versionCommand(o), initCommand(o), doctorCommand(o), configCommand(o), compatibilityCommand(o), certificationCommand(o), skillsCommand(o), extensionsCommand(o), edgeCommand(o), buildCommand(o), bootstrapCommand(o), benchmarkCommand(o), cleanupCommand(o))
 	root.AddCommand(statusCommand(o), costCommand(o), healthCommand(o))
 	root.AddCommand(infrastructureCommands(o)...)
 	root.AddCommand(commandGroups(o)...)
@@ -259,7 +344,7 @@ func initCommand(o *options) *cobra.Command {
 	var configOut string
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Create a starter magelift.yaml",
+		Short: "Create a starter magelift.yaml for Magento's PHP storefront",
 		Args:  cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
 			if fromACC && fromUpsun {
@@ -342,19 +427,31 @@ func configCommand(o *options) *cobra.Command {
 		if _, err := file.ResolveBuild(); err != nil {
 			return invalid(err)
 		}
+		var warnings []string
 		for _, env := range envs {
-			if _, err := file.Resolve(env, config.ResolveOptions{}); err != nil {
+			effective, err := file.Resolve(env, config.ResolveOptions{})
+			if err != nil {
 				return invalid(fmt.Errorf("environment %s: %w", env, err))
 			}
+			warnings = append(warnings, effective.Compatibility.Warnings...)
 		}
-		return o.write(map[string]any{"valid": true, "environments": envs})
+		for _, warning := range warnings {
+			if o.stderr != nil {
+				_, _ = fmt.Fprintln(o.stderr, "warning: "+warning)
+			}
+		}
+		result := map[string]any{"valid": true, "environments": envs}
+		if len(warnings) > 0 {
+			result["warnings"] = warnings
+		}
+		return o.write(result)
 	}})
 	cmd.AddCommand(&cobra.Command{Use: "effective", Short: "Print effective configuration with provenance", Args: cobra.NoArgs, RunE: func(*cobra.Command, []string) error {
 		effective, err := o.resolve()
 		if err != nil {
 			return invalid(err)
 		}
-		return o.write(effective)
+		return o.write(effective.SafeEffectiveOutput())
 	}})
 	cmd.AddCommand(&cobra.Command{Use: "explain [path]", Short: "Explain where an effective value came from", Args: cobra.ExactArgs(1), RunE: func(_ *cobra.Command, args []string) error {
 		effective, err := o.resolve()
@@ -432,8 +529,8 @@ func (o *options) resolveWithEnvironment() (config.Effective, string, error) {
 	if err != nil {
 		return config.Effective{}, "", err
 	}
-	effective, err := file.Resolve(env, config.ResolveOptions{})
-	return effective, env, err
+	effective, resolvedEnvironment, err := o.resolveEnvironment(file, env)
+	return effective, resolvedEnvironment, err
 }
 
 func (o *options) selectEnvironment(file *config.File) (string, error) {
@@ -474,7 +571,15 @@ func (o *options) load() (*config.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	return config.Load(data)
+	file, err := config.Load(data)
+	if err != nil {
+		return nil, err
+	}
+	lockPath := filepath.Join(filepath.Dir(o.configPath), "composer.lock")
+	if lock, err := os.ReadFile(lockPath); err == nil {
+		file.AttachComposerLock(lock)
+	}
+	return file, nil
 }
 
 func (o *options) write(value any) error {
@@ -528,11 +633,11 @@ func completionCommand(root *cobra.Command) *cobra.Command {
 
 func commandGroups(o *options) []*cobra.Command {
 	groups := map[string][]string{
-		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "create", "status", "import-dump", "media-sync", "destroy", "protect", "sweep"},
+		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "create", "status", "dump", "import-dump", "media-sync", "destroy", "protect", "sweep", "ui"},
 		"secret": {"set", "list", "remove"},
 	}
 	var commands []*cobra.Command
-	commands = append(commands, upgradeCommand(o), loginCommand(o), execCommand(o), sshCommand(o), tunnelCommand(), devCommand(o))
+	commands = append(commands, upgradeCommand(o), loginCommand(o), execCommand(o), sshCommand(o), tunnelCommand(o), devCommand(o))
 	for _, name := range []string{"cache-flush", "reindex", "cron-run", "queue-status"} {
 		commands = append(commands, magentoOperationCommand(o, name))
 	}
@@ -545,6 +650,8 @@ func commandGroups(o *options) []*cobra.Command {
 				group.AddCommand(envCreateCommand(o))
 			} else if groupName == "env" && name == "status" {
 				group.AddCommand(envStatusCommand(o))
+			} else if groupName == "env" && name == "dump" {
+				group.AddCommand(envDumpCommand(o))
 			} else if groupName == "env" && name == "import-dump" {
 				group.AddCommand(envImportDumpCommand(o))
 			} else if groupName == "env" && name == "media-sync" {
@@ -555,6 +662,8 @@ func commandGroups(o *options) []*cobra.Command {
 				group.AddCommand(envProtectCommand(o))
 			} else if groupName == "env" && name == "sweep" {
 				group.AddCommand(envSweepCommand(o))
+			} else if groupName == "env" && name == "ui" {
+				group.AddCommand(envUICommand(o))
 			} else if groupName == "state" && name == "status" {
 				group.AddCommand(stateStatusCommand(o))
 			} else if groupName == "state" && name == "unlock" {
@@ -581,7 +690,7 @@ func commandGroups(o *options) []*cobra.Command {
 		commands = append(commands, group)
 	}
 	commands = append(commands, ciCommand(o), logsCommand(o))
-	commands = append(commands, promoteCommand(o), rollbackCommand(o), historyCommand(o))
+	commands = append(commands, signCommand(o), promoteCommand(o), rollbackCommand(o), historyCommand(o), evidenceCommand(o), auditCommand(o))
 	return commands
 }
 
@@ -598,6 +707,9 @@ application:
   edition: open-source
   version: 2.4.9
   mode: integrated
+  webRuntime: nginx-fpm
+  magento:
+    frontName: admin
 build:
   php: "8.5"
 target:

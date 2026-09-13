@@ -28,7 +28,7 @@ final class ArtifactManifestTest extends TestCase
 
         self::assertSame($first->toCanonicalJson(), $second->toCanonicalJson());
         self::assertSame(
-            '{"buildInputs":{"app/etc/config.php":"second","composer.lock":"first"},"buildPackageVersion":"1.2.3","checksums":{"app/etc/config.php":"'.str_repeat('a', 64).'","vendor/autoload.php":"'.str_repeat('b', 64).'"},"compatibilityStatus":"supported","enabledModules":["Magento_Catalog"],"imageDigest":"sha256:'.str_repeat('d', 64).'","mageLiftVersion":"1.2.3","magento":{"edition":"open-source","version":"2.4.8"},"php":{"extensions":["intl","pdo_mysql"],"version":"8.4.1"},"requiredRuntimeCapabilities":["cache.valkey","database.mysql"],"sourceRevision":"'.str_repeat('c', 40).'","staticContentMatrix":{"en_US":["Magento/luma"]}}',
+            '{"buildInputs":{"app/etc/config.php":"second","composer.lock":"first"},"buildPackageVersion":"1.2.3","checksums":{"app/etc/config.php":"'.str_repeat('a', 64).'","vendor/autoload.php":"'.str_repeat('b', 64).'"},"compatibilityStatus":"supported","composer":{"version":"2.10.2"},"enabledModules":["Magento_Catalog"],"imageDigest":"sha256:'.str_repeat('d', 64).'","mageLiftVersion":"1.2.3","magento":{"edition":"open-source","version":"2.4.8"},"php":{"extensions":["intl","pdo_mysql"],"version":"8.4.1"},"requiredRuntimeCapabilities":["cache.valkey","database.mysql"],"sourceRevision":"'.str_repeat('c', 40).'","staticContentMatrix":{"en_US":["Magento/luma"]}}',
             $first->toCanonicalJson(),
         );
     }
@@ -47,6 +47,7 @@ final class ArtifactManifestTest extends TestCase
         yield 'mutable revision' => ['sourceRevision', 'main', 'Source revision'];
         yield 'tag instead of digest' => ['imageDigest', 'ghcr.io/magelift/magelift:latest', 'Image digest'];
         yield 'partial PHP version' => ['phpVersion', '8.4', 'PHP version'];
+        yield 'invalid Composer version' => ['composerVersion', '1.10.2', 'Composer version'];
         yield 'duplicate extensions' => ['phpExtensions', ['intl', 'intl'], 'cannot contain duplicates'];
         yield 'invalid module' => ['enabledModules', ['magento/catalog'], 'Invalid Magento module'];
         yield 'missing checksums' => ['checksums', [], 'checksums cannot be empty'];
@@ -73,6 +74,7 @@ final class ArtifactManifestTest extends TestCase
         MagentoEdition $magentoEdition = MagentoEdition::OpenSource,
         string $magentoVersion = '2.4.8',
         string $phpVersion = '8.4.1',
+        string $composerVersion = '2.10.2',
         array $phpExtensions = ['intl', 'pdo_mysql'],
         array $enabledModules = ['Magento_Catalog'],
         array $buildInputs = ['composer.lock' => 'first'],
@@ -89,6 +91,7 @@ final class ArtifactManifestTest extends TestCase
             $magentoEdition,
             $magentoVersion,
             $phpVersion,
+            $composerVersion,
             $phpExtensions,
             $enabledModules,
             $buildInputs,

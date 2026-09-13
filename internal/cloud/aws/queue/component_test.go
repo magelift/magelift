@@ -130,7 +130,7 @@ func TestECSRabbitMQCreatesBrokerService(t *testing.T) {
 			VpcID:            pulumi.String("vpc-123"),
 			ExecutionRoleARN: pulumi.String("arn:aws:iam::123456789012:role/exec"),
 			TaskRoleARN:      pulumi.String("arn:aws:iam::123456789012:role/task"),
-			LogGroupPrefix:   "/magelift/shop/staging",
+			LogGroupPrefix:   "/magelift/shop/staging", LogRetentionDays: 30,
 		})
 		return err
 	}, pulumi.WithMocks("magelift", "test", m))
@@ -145,6 +145,10 @@ func TestECSRabbitMQCreatesBrokerService(t *testing.T) {
 	}
 	if got := m.count("aws:servicediscovery/privateDnsNamespace:PrivateDnsNamespace"); got != 1 {
 		t.Fatalf("discovery namespace count = %d", got)
+	}
+	logGroups := m.resourcesOf("aws:cloudwatch/logGroup:LogGroup")
+	if len(logGroups) != 1 || logGroups[0].Inputs["retentionInDays"].NumberValue() != 30 {
+		t.Fatalf("ECS broker log retention = %v", logGroups)
 	}
 }
 
@@ -166,6 +170,28 @@ func run(t *testing.T, args Args) *mocks {
 		t.Fatal(err)
 	}
 	return m
+}
+
+func TestNormalizeBrokerPassword(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "openssl hex trailing newline", input: "abcdef0123456789\n", want: "abcdef0123456789"},
+		{name: "crlf", input: "BrokerPassw0rd!\r\n", want: "BrokerPassw0rd!"},
+		{name: "surrounding space", input: "  BrokerPassw0rd!  ", want: "BrokerPassw0rd!"},
+		{name: "already clean", input: "BrokerPassw0rd!", want: "BrokerPassw0rd!"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := normalizeBrokerPassword(tc.input); got != tc.want {
+				t.Fatalf("normalizeBrokerPassword() = %q, want %q", got, tc.want)
+			}
+		})
+	}
 }
 
 func (m *mocks) count(token string) int {

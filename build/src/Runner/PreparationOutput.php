@@ -15,6 +15,7 @@ final readonly class PreparationOutput
     public function __construct(
         public string $phpVersion,
         public array $phpExtensions,
+        public string $composerVersion,
         public array $enabledModules,
         public array $checksums,
         public array $requiredRuntimeCapabilities,

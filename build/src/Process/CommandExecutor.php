@@ -72,7 +72,7 @@ final readonly class CommandExecutor
             ));
         }
 
-        return $this->runner->run(new ProcessRequest(
+        return $command->run($this->runner, new ProcessRequest(
             $command->argv(),
             $resolvedDirectory,
             $environment,

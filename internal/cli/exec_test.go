@@ -140,7 +140,7 @@ func TestMagentoOperationTargetsPHPContainer(t *testing.T) {
 	}
 }
 
-func TestMagentoOperationTargetsFrankenPHPWebContainer(t *testing.T) {
+func TestCacheFlushRejectsFrankenPHPWithoutAdobeHatch(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -150,46 +150,14 @@ func TestMagentoOperationTargetsFrankenPHPWebContainer(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	backend := &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster", "serviceName": "shop-web-service"}}
-	var captured []string
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath, o.environment = path, "staging"
-	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
-		return backend, nil
-	}
-	o.testRuntimeObserve = frankenObserve{}
-	o.runCommand = func(_ context.Context, _ string, args []string, _, _ io.Writer) error {
-		captured = append([]string(nil), args...)
-		return nil
-	}
 	command := newCommandWithOptions(o)
 	command.SetArgs([]string{"--config", path, "--env", "staging", "cache-flush"})
-	if err := command.Execute(); err != nil {
-		t.Fatal(err)
+	err = command.Execute()
+	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "allowUnsupported") {
+		t.Fatalf("error=%v code=%d", err, ExitCode(err))
 	}
-	if got := captured[7]; got != "web" {
-		t.Fatalf("FrankenPHP Magento operation container = %q, want web; args = %#v", got, captured)
-	}
-}
-
-type frankenObserve struct{}
-
-func (frankenObserve) TailLogs(context.Context, platform.PlannedStack, platform.LogQuery) ([]platform.LogEvent, error) {
-	return nil, platform.ErrNotSupported
-}
-func (frankenObserve) CheckRuntime(context.Context, platform.PlannedStack, map[string]any) ([]platform.RuntimeHealth, error) {
-	return nil, platform.ErrNotSupported
-}
-func (frankenObserve) PrepareExec(_ context.Context, _ platform.PlannedStack, _ map[string]any, query platform.ExecQuery) (platform.ExecTarget, error) {
-	container := query.Container
-	if container == "" {
-		container = "web"
-	}
-	return platform.ExecTarget{
-		Launcher: "aws",
-		Args:     []string{"ecs", "execute-command", "--cluster", "shop-cluster", "--task", "task-a", "--container", container, "--command", strings.Join(query.Command, " "), "--interactive"},
-		Cluster:  "shop-cluster", Task: "task-a", Container: container,
-	}, nil
 }
 
 func TestSSHUsesECSExecAsTheSupportedPath(t *testing.T) {
@@ -256,9 +224,9 @@ func TestExecRunsKubectlLauncherBinary(t *testing.T) {
 	}
 }
 
-func TestTunnelExplainsTheFargateBoundary(t *testing.T) {
-	err := tunnelCommand().Execute()
-	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "Fargate-only") {
+func TestTunnelRequiresConfiguredOptions(t *testing.T) {
+	err := tunnelCommand(nil).Execute()
+	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "options are required") {
 		t.Fatalf("error=%v code=%d", err, ExitCode(err))
 	}
 }

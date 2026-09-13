@@ -1,4 +1,5 @@
 -- Synthetic Magento-shaped seed fixture (no PII). Clean-room for MIGRATE-01 offline proof.
+-- HA known-content reads magelift_seed_probe.label (tiny-fixture). There are no catalog products.
 CREATE TABLE IF NOT EXISTS magelift_seed_probe (
   id INT NOT NULL PRIMARY KEY,
   label VARCHAR(64) NOT NULL

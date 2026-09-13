@@ -45,6 +45,7 @@ func TestEdgeResourceGraphEnforcesSecurityBoundaries(t *testing.T) {
 		}
 		_, err = New(ctx, "shop-production", Args{
 			DomainName:  "shop.example.com",
+			FrontName:   "backend",
 			HostedZone:  sdk.ExistingResourceRef{ID: "shop-zone", Provider: "aws", Kind: sdk.ExistingDNSZone, ExternalID: "Z123456789"},
 			Certificate: sdk.ExistingResourceRef{ID: "shop-certificate", Provider: "aws", Kind: sdk.ExistingCertificate, ExternalID: "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"},
 			Origin: ALBOrigin{
@@ -86,10 +87,22 @@ func TestEdgeResourceGraphEnforcesSecurityBoundaries(t *testing.T) {
 		t.Fatalf("distribution permits plaintext viewer or origin traffic: %s", distribution)
 	}
 	waf := encodedInputs(t, byType["aws:wafv2/webAcl:WebAcl"])
-	for _, required := range []string{"CLOUDFRONT", "AWSManagedRulesCommonRuleSet", "count"} {
+	for _, required := range []string{
+		"CLOUDFRONT", "AWSManagedRulesCommonRuleSet", "AWSManagedRulesSQLiRuleSet",
+		"SizeRestrictions_BODY", "SQLi_BODY", "KB_64", "RateLimit",
+	} {
 		if !strings.Contains(strings.ToLower(waf), strings.ToLower(required)) {
 			t.Fatalf("WAF lacks %q: %s", required, waf)
 		}
+	}
+	if strings.Contains(strings.ToLower(waf), `"name":"aws-common"`) {
+		t.Fatalf("WAF still uses the unmodified CommonRuleSet count group: %s", waf)
+	}
+	if !strings.Contains(waf, "/backend") || !strings.Contains(waf, "magelift:magento-front-name") {
+		t.Fatalf("WAF is not driven from configured frontName: %s", waf)
+	}
+	if strings.Contains(waf, `"/admin"`) {
+		t.Fatalf("WAF hardcodes /admin instead of configured frontName: %s", waf)
 	}
 	record := encodedInputs(t, byType["aws:route53/record:Record"])
 	if !strings.Contains(record, "Z123456789") || !strings.Contains(record, "shop.example.com") {

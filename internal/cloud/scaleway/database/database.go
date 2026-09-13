@@ -19,6 +19,12 @@ type Args struct {
 	DatabaseName     string
 	MasterUsername   string
 	NodeType         string
+	HighAvailability bool
+	BackupEnabled    *bool
+	BackupFrequency  int
+	BackupRetention  int
+	BackupSameRegion *bool
+	EncryptionAtRest *bool
 	Labels           map[string]string
 }
 
@@ -27,6 +33,7 @@ type Component struct {
 	WriterEndpoint pulumi.StringOutput
 	DatabaseName   pulumi.StringOutput
 	InstanceName   pulumi.StringOutput
+	Password       pulumi.StringOutput
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
@@ -41,6 +48,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	if strings.TrimSpace(args.NodeType) == "" {
 		args.NodeType = "DB-DEV-S"
+	}
+	if args.BackupFrequency < 0 || args.BackupRetention < 0 {
+		return nil, errors.New("Scaleway database backup settings cannot be negative")
+	}
+	if args.BackupEnabled != nil && !*args.BackupEnabled && (args.BackupFrequency > 0 || args.BackupRetention > 0 || args.BackupSameRegion != nil) {
+		return nil, errors.New("Scaleway database backup schedule settings require automated backups")
 	}
 	component := &Component{}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{
@@ -57,26 +70,44 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	password, err := random.NewRandomPassword(ctx, name+"-password", &random.RandomPasswordArgs{
 		Length:          pulumi.Int(32),
-		Special:         pulumi.Bool(false),
-		OverrideSpecial: pulumi.String(""),
+		Special:         pulumi.Bool(true),
+		OverrideSpecial: pulumi.String("!@#%+=-"),
 	}, parent)
 	if err != nil {
 		return nil, fmt.Errorf("generate database password: %w", err)
 	}
 
-	instance, err := databases.NewInstance(ctx, name, &databases.InstanceArgs{
-		Name:      pulumi.String(name),
-		NodeType:  pulumi.String(args.NodeType),
-		Engine:    pulumi.String("MySQL-8"),
-		Region:    pulumi.String(args.Region),
-		ProjectId: pulumi.String(args.ProjectID),
-		UserName:  pulumi.String(args.MasterUsername),
-		Password:  password.Result,
+	instanceArgs := &databases.InstanceArgs{
+		Name:        pulumi.String(name),
+		NodeType:    pulumi.String(args.NodeType),
+		IsHaCluster: pulumi.Bool(args.HighAvailability),
+		Engine:      pulumi.String("MySQL-8"),
+		Region:      pulumi.String(args.Region),
+		ProjectId:   pulumi.String(args.ProjectID),
+		UserName:    pulumi.String(args.MasterUsername),
+		Password:    password.Result,
 		PrivateNetwork: &databases.InstancePrivateNetworkArgs{
-			PnId: args.PrivateNetworkID,
+			PnId:       args.PrivateNetworkID,
+			EnableIpam: pulumi.BoolPtr(true),
 		},
 		Tags: tags,
-	}, parent, pulumi.DependsOn([]pulumi.Resource{password}))
+	}
+	if args.BackupEnabled != nil {
+		instanceArgs.DisableBackup = pulumi.BoolPtr(!*args.BackupEnabled)
+	}
+	if args.BackupFrequency > 0 {
+		instanceArgs.BackupScheduleFrequency = pulumi.IntPtr(args.BackupFrequency)
+	}
+	if args.BackupRetention > 0 {
+		instanceArgs.BackupScheduleRetention = pulumi.IntPtr(args.BackupRetention)
+	}
+	if args.BackupSameRegion != nil {
+		instanceArgs.BackupSameRegion = pulumi.BoolPtr(*args.BackupSameRegion)
+	}
+	if args.EncryptionAtRest != nil {
+		instanceArgs.EncryptionAtRest = pulumi.BoolPtr(*args.EncryptionAtRest)
+	}
+	instance, err := databases.NewInstance(ctx, name, instanceArgs, parent, pulumi.DependsOn([]pulumi.Resource{password}))
 	if err != nil {
 		return nil, fmt.Errorf("create Scaleway Database Instance: %w", err)
 	}
@@ -98,6 +129,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}).(pulumi.StringOutput)
 	component.DatabaseName = pulumi.String(args.DatabaseName).ToStringOutput()
 	component.InstanceName = instance.Name
+	component.Password = pulumi.ToSecret(password.Result).(pulumi.StringOutput)
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
 		"writerEndpoint": component.WriterEndpoint, "databaseName": component.DatabaseName,
 	}); err != nil {

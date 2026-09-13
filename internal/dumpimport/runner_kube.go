@@ -86,6 +86,19 @@ func (k *kubeMySQL) Query(ctx context.Context, database, sql string) (string, er
 	return strings.TrimSpace(stdout), nil
 }
 
+func (k *kubeMySQL) Dump(ctx context.Context, database string, stdout io.Writer) (string, error) {
+	args, err := k.kubectlDumpArgs(ctx, database)
+	if err != nil {
+		return "", err
+	}
+	out, stderr, err := k.run(ctx, k.withPasswordStdin(nil), args)
+	if err != nil {
+		return stderr, err
+	}
+	_, werr := io.WriteString(stdout, out)
+	return stderr, werr
+}
+
 func (k *kubeMySQL) run(ctx context.Context, stdin io.Reader, args []string) (stdout, stderr string, err error) {
 	fn := k.exec
 	if fn == nil {
@@ -131,6 +144,30 @@ fi
 exec mysql -h "$host" -P "$port" -u "$user" "$@"`
 	args = append(args, "sh", "-c", script, "mysql", k.host, strconv.Itoa(k.port), k.user, database)
 	args = append(args, mysqlExtra...)
+	return args, nil
+}
+
+func (k *kubeMySQL) kubectlDumpArgs(ctx context.Context, database string) ([]string, error) {
+	target, err := k.resolveTarget(ctx)
+	if err != nil {
+		return nil, err
+	}
+	args := []string{"exec", "-i", "-n", k.namespace, target}
+	if k.kubeconfig != "" {
+		args = append([]string{"--kubeconfig", k.kubeconfig}, args...)
+	}
+	if k.container != "" {
+		args = append(args, "-c", k.container)
+	}
+	args = append(args, "--")
+	const script = `read -r _ml_b64
+MYSQL_PWD=$(printf '%s' "$_ml_b64" | base64 -d)
+export MYSQL_PWD
+unset _ml_b64
+host=$1; port=$2; user=$3; db=$4
+shift 4
+exec mysqldump -h "$host" -P "$port" -u "$user" --single-transaction --quick "$db" "$@"`
+	args = append(args, "sh", "-c", script, "mysqldump", k.host, strconv.Itoa(k.port), k.user, database)
 	return args, nil
 }
 

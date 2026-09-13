@@ -1,0 +1,27 @@
+schemaVersion: 1
+project:
+  name: ci-gcp-fixture
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+build:
+  php: "8.5"
+target:
+  provider: gcp
+  runtime: gke-autopilot
+  gcp:
+    project: example-gcp-project
+    region: europe-west1
+defaults:
+  region: europe-west1
+  preset: preview
+environments:
+  preview:
+    class: preview
+    domain: preview.example.com
+    expiresAt: "2030-01-01T00:00:00Z"
+  staging:
+    class: staging
+    domain: staging.example.com
+extensions: {}

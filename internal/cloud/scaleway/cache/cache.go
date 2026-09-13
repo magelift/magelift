@@ -23,6 +23,8 @@ type Args struct {
 	Zone             string
 	PrivateNetworkID pulumi.StringInput
 	NodeType         string
+	Version          string
+	ClusterSize      int
 	Labels           map[string]string
 }
 
@@ -42,6 +44,15 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if strings.TrimSpace(args.NodeType) == "" {
 		args.NodeType = "RED1-MICRO"
 	}
+	if strings.TrimSpace(args.Version) == "" {
+		args.Version = "8.6.3"
+	}
+	if args.ClusterSize == 0 {
+		args.ClusterSize = 1
+	}
+	if args.ClusterSize < 1 || args.ClusterSize > 6 {
+		return nil, errors.New("Scaleway Redis cluster size must be between 1 and 6")
+	}
 	component := &Component{}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{
 		"projectId": pulumi.String(args.ProjectID), "zone": pulumi.String(args.Zone),
@@ -57,8 +68,8 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	password, err := random.NewRandomPassword(ctx, name+"-password", &random.RandomPasswordArgs{
 		Length:          pulumi.Int(32),
-		Special:         pulumi.Bool(false),
-		OverrideSpecial: pulumi.String(""),
+		Special:         pulumi.Bool(true),
+		OverrideSpecial: pulumi.String("!@#%+=-"),
 	}, parent)
 	if err != nil {
 		return nil, fmt.Errorf("generate cache password: %w", err)
@@ -66,9 +77,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 
 	cluster, err := redis.NewCluster(ctx, name, &redis.ClusterArgs{
 		Name:        pulumi.String(name),
-		Version:     pulumi.String("7.0.5"),
+		Version:     pulumi.String(args.Version),
 		NodeType:    pulumi.String(args.NodeType),
-		ClusterSize: pulumi.Int(1),
+		ClusterSize: pulumi.Int(args.ClusterSize),
 		UserName:    pulumi.String("magelift"),
 		Password:    password.Result,
 		ProjectId:   pulumi.String(args.ProjectID),
