@@ -76,7 +76,7 @@ func defaultAWSPreset(runtime, preset, applicationVersion string) map[string]any
 	artifactRetentionDays := 30
 	if preset == "preview" {
 		databaseEngine = "rds-mysql"
-		searchMode = "serverless"
+		searchMode = "disabled"
 		queueMode = "db"
 		fargateCPU = 512
 		fargateMemoryMiB = 1024

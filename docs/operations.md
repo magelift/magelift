@@ -27,6 +27,12 @@ an explicit acknowledgement of that limitation.
 Preview environments must have a TTL and budget before infrastructure is created.
 Protected environments reject destroy requests until protection is removed.
 
+The v1 preview promise, per certified origin: database-backed queues and a
+single-AZ failure domain on both; search disabled on AWS (opt in with
+`searchMode` when the feature needs it); the 1-replica OpenSearch workload
+on GCP. Previews stay cheap and short-lived by default; standard and
+high-availability presets scale up from there.
+
 `magelift env list` lists configured environments without contacting AWS. `magelift
 env create <name>` adds a validated overlay using the supplied account, preset,
 class, domain, TTL, budget, protection, and branch flags. `magelift env destroy

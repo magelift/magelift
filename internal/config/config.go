@@ -1735,7 +1735,7 @@ func ValidateAWSServiceCompatibility(c Config) error {
 	searchMode := strings.TrimSpace(c.Target.AWS.Catalog.SearchMode)
 	if searchMode == "" {
 		if preset == "preview" {
-			searchMode = "serverless"
+			searchMode = "disabled"
 		} else {
 			searchMode = "provisioned"
 		}

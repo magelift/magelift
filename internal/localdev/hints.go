@@ -61,7 +61,7 @@ func HintsFromConfig(cfg config.Config) CloudHints {
 			hints.QueueMode = defaultAWSQueueHint(hints.Preset, catalog.QueueMode)
 		} else if hints.Preset == "preview" {
 			hints.DatabaseEngine = "rds-mysql"
-			hints.SearchMode = "serverless"
+			hints.SearchMode = "disabled"
 			hints.QueueMode = "db"
 		} else {
 			hints.DatabaseEngine = "aurora-mysql"
