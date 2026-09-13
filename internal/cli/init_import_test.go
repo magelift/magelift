@@ -66,6 +66,74 @@ func TestInitFromAccWritesLoadValidConfig(t *testing.T) {
 	}
 }
 
+func TestInitProviderStartersValidate(t *testing.T) {
+	for _, provider := range []string{"aws", "gcp"} {
+		t.Run(provider, func(t *testing.T) {
+			dir := t.TempDir()
+			configPath := filepath.Join(dir, "magelift.yaml")
+			var out bytes.Buffer
+			cmd := newCommand(&out, &out, nil)
+			cmd.SetArgs([]string{"--config", configPath, "init", "--provider", provider})
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("init --provider %s: %v\n%s", provider, err, out.String())
+			}
+			var validateOut bytes.Buffer
+			validate := newCommand(&validateOut, &validateOut, nil)
+			validate.SetArgs([]string{"--config", configPath, "config", "validate"})
+			if err := validate.Execute(); err != nil {
+				t.Fatalf("config validate: %v\n%s", err, validateOut.String())
+			}
+			data, err := os.ReadFile(configPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			file, err := config.Load(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := file.Environments(); len(got) != 3 {
+				t.Fatalf("environments = %v, want preview, staging, production", got)
+			}
+		})
+	}
+}
+
+func TestInitProviderDefaultsToAWS(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "magelift.yaml")
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", configPath, "init"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init: %v\n%s", err, out.String())
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "provider: aws") {
+		t.Fatalf("default starter is not AWS:\n%s", data)
+	}
+}
+
+func TestInitUnknownProviderRefusedBeforeOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(configPath, []byte(starterConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", configPath, "init", "--provider", "ovh"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "MageLift supports starter providers") {
+		t.Fatalf("err = %v, want MageLift authority refusal", err)
+	}
+	if ExitCode(err) != 2 {
+		t.Fatalf("exit code = %d, want 2", ExitCode(err))
+	}
+}
+
 func TestInitFromAccRefusesExistingConfig(t *testing.T) {
 	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "supported")
 	dir := t.TempDir()

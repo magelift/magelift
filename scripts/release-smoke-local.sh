@@ -27,6 +27,13 @@ if [[ -z "$bin" ]]; then
 	exit 1
 fi
 
+provider_bin="$(find dist -type f \( -name 'magelift-provider-gcp' -o -name 'magelift-provider-gcp.exe' \) | head -1 || true)"
+if [[ -z "$provider_bin" ]]; then
+	printf 'magelift-provider-gcp binary missing under dist/\n' >&2
+	find dist -maxdepth 4 -type f 2>/dev/null | head -40 >&2 || true
+	exit 1
+fi
+
 # Archives.files in .goreleaser.yaml; confirm sources exist for real releases.
 test -f LICENSE
 test -f NOTICE
@@ -51,4 +58,4 @@ cp "$bin" LICENSE NOTICE README.md "$smoke_dir/"
 tar -tzf "$smoke_dir/magelift-smoke.tar.gz" | rg -q 'LICENSE'
 tar -tzf "$smoke_dir/magelift-smoke.tar.gz" | rg -q 'NOTICE'
 
-printf 'release smoke ok binary=%s (serial single-target)\n' "$bin"
+printf 'release smoke ok binary=%s provider=%s (serial single-target)\n' "$bin" "$provider_bin"

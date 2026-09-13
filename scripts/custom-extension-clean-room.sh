@@ -25,3 +25,9 @@ cd "$repo_root"
 printf '+ building the public extension SDK contract with empty caches\n'
 go build -trimpath -o "$scratch/magelift-extension-contract" ./examples/custom-extension-contract
 "$scratch/magelift-extension-contract" | rg '^example\.community-contract$'
+
+printf '+ asserting the example imports no internal/ packages\n'
+if go list -deps ./examples/custom-extension-contract | rg 'magelift/internal/'; then
+	printf 'custom-extension-contract must not import internal/ packages\n' >&2
+	exit 1
+fi

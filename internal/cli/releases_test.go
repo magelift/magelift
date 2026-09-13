@@ -273,7 +273,7 @@ func TestRollbackRequiresForwardOnlyAcknowledgement(t *testing.T) {
 func TestProductionReleaseChangesRequireApproval(t *testing.T) {
 	directory := t.TempDir()
 	configPath := filepath.Join(directory, "magelift.yaml")
-	production := strings.Replace(starterConfig, "    account: \"123456789012\"", "    account: \"123456789012\"\n    class: production", 1)
+	production := strings.Replace(starterConfig, "    class: staging", "    class: production", 1)
 	if err := os.WriteFile(configPath, []byte(production), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -56,3 +56,18 @@ jobs:
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: dist/checksums.txt
+  # The cask publishes to the tap during release; this job is the tested
+  # macOS install path the readiness doc requires. A failure fails the
+  # workflow visibly so the tap file gets fixed forward the same day.
+  cask-verify:
+    needs: [release]
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Install the published cask
+        run: |
+          brew tap magelift/homebrew-tap
+          brew install --cask magelift
+          magelift version

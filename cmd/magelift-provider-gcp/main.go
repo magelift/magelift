@@ -86,6 +86,13 @@ func (g gcpAPI) Program(_ context.Context, plan sdk.ModulePlan) (providerhost.Pr
 	return providerhost.ProgramResult{Kind: providerhost.ProgramKindPulumiRunFunc}, nil
 }
 
+func (g gcpAPI) Execute(ctx context.Context, request providerhost.ExecuteRequest) (providerhost.ExecuteResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return execute(ctx, g.module, request)
+}
+
 func configFromMap(values map[string]any) (config.Config, error) {
 	if len(values) == 0 {
 		return config.Config{}, errors.New("plan configuration is required")

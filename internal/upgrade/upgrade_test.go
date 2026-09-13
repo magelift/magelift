@@ -2,6 +2,7 @@ package upgrade
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -139,6 +140,54 @@ func testArchive(t *testing.T, name string, contents []byte) []byte {
 		t.Fatal(err)
 	}
 	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return output.Bytes()
+}
+
+func TestInstallExtractsWindowsZip(t *testing.T) {
+	archive := testZipArchive(t, "magelift.exe", []byte("new windows binary"))
+	digest := sha256.Sum256(archive)
+	checksum := hex.EncodeToString(digest[:]) + "  magelift_1.2.3_windows_amd64.zip\n"
+	httpClient := &fakeHTTP{responses: map[string]string{
+		"https://api.example/checksums.txt":           checksum,
+		"https://api.example/checksums.sigstore.json": "{}",
+		"https://api.example/magelift.zip":            string(archive),
+	}}
+	client := &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "windows", goarch: "amd64", verifier: fakeBlobVerifier{}}
+	executable := filepath.Join(t.TempDir(), "magelift.exe")
+	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	assets := []Asset{
+		{Name: "magelift_1.2.3_windows_amd64.zip", DownloadURL: "https://api.example/magelift.zip"},
+		{Name: "checksums.txt", DownloadURL: "https://api.example/checksums.txt"},
+		{Name: "checksums.txt.sigstore.json", DownloadURL: "https://api.example/checksums.sigstore.json"},
+	}
+	if err := client.Install(context.Background(), Release{TagName: "v1.2.3", Assets: assets}, executable); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "new windows binary" {
+		t.Fatalf("installed executable = %q", contents)
+	}
+}
+
+func testZipArchive(t *testing.T, name string, contents []byte) []byte {
+	t.Helper()
+	var output bytes.Buffer
+	zipWriter := zip.NewWriter(&output)
+	entry, err := zipWriter.Create(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := entry.Write(contents); err != nil {
+		t.Fatal(err)
+	}
+	if err := zipWriter.Close(); err != nil {
 		t.Fatal(err)
 	}
 	return output.Bytes()

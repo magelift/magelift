@@ -121,7 +121,7 @@ func TestCIValidateDetectsWorkflowAndConfigDrift(t *testing.T) {
 	}
 
 	executeCI(t, configPath, "generate")
-	updated := strings.Replace(starterConfig, "extensions: {}", "  production:\n    account: \"210987654321\"\nextensions: {}", 1)
+	updated := strings.Replace(starterConfig, "  production:\n    inherits: staging\n    account: \"210987654321\"\n    class: production\n    preset: high-availability\n    domain: example.com\n    protection: true\n", "", 1)
 	if err := os.WriteFile(configPath, []byte(updated), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,8 @@ func TestCIGenerateRejectsMutableToolVersion(t *testing.T) {
 func TestCIGenerateIncludesProductionApprovalAndPromotion(t *testing.T) {
 	directory := t.TempDir()
 	configPath := filepath.Join(directory, "magelift.yaml")
-	config := strings.Replace(starterConfig, "  staging:\n    account: \"123456789012\"\n", "  staging:\n    account: \"123456789012\"\n  production:\n    account: \"210987654321\"\n    class: production\n", 1)
+	// The default starter already carries staging plus production.
+	config := starterConfig
 	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +175,8 @@ func TestCIGenerateIncludesProductionApprovalAndPromotion(t *testing.T) {
 func TestCIGenerateIncludesClosedPreviewCleanup(t *testing.T) {
 	directory := t.TempDir()
 	configPath := filepath.Join(directory, "magelift.yaml")
-	config := strings.Replace(starterConfig, "environments:\n  staging:\n", "environments:\n  preview:\n    account: \"123456789012\"\n    monthlyBudgetCents: 10000\n    expiresAt: \"2026-07-19T00:00:00Z\"\n  staging:\n", 1)
+	// The default starter already carries a preview env.
+	config := starterConfig
 	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -194,8 +196,8 @@ func TestCIGenerateIncludesClosedPreviewCleanup(t *testing.T) {
 func TestCIGenerateGCPUsesFederationAndPRScopedIdentity(t *testing.T) {
 	directory := t.TempDir()
 	configPath := filepath.Join(directory, "magelift.yaml")
-	config := strings.Replace(starterConfig, "target:\n  provider: aws\n  runtime: ecs-fargate", "target:\n  provider: gcp\n  runtime: gke-autopilot\n  gcp:\n    project: example-gcp\n    region: europe-west1", 1)
-	config = strings.Replace(config, "environments:\n  staging:\n", "environments:\n  preview:\n    class: preview\n    domain: preview.example.com\n    expiresAt: \"2030-01-01T00:00:00Z\"\n  staging:\n", 1)
+	// The GCP starter already carries preview, staging, and production.
+	config := strings.Replace(starterGCPConfig, "example-gcp-project", "example-gcp", 1)
 	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +236,7 @@ func TestCIGenerateGCPUsesFederationAndPRScopedIdentity(t *testing.T) {
 func TestCIGenerateRejectsUnsupportedProviderGenerator(t *testing.T) {
 	directory := t.TempDir()
 	configPath := filepath.Join(directory, "magelift.yaml")
-	config := strings.Replace(starterConfig, "target:\n  provider: aws\n  runtime: ecs-fargate", "target:\n  provider: ovh\n  runtime: mks\n  ovh:\n    serviceName: example-service", 1)
+	config := strings.Replace(starterConfig, "  provider: aws\n  runtime: ecs-fargate\n  aws:\n    catalog:\n      # Certified cell: no managed search on first run. Managed search\n      # proves in Phase 2; until then this avoids surprise AOSS bills.\n      searchMode: disabled", "  provider: ovh\n  runtime: mks\n  ovh:\n    serviceName: example-service", 1)
 	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}

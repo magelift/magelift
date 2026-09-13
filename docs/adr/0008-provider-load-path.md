@@ -13,7 +13,7 @@ The default binary must not download unsigned plugins. Go `plugin.Open` is ABI-f
 - The published CLI path for extracted adapters is `magelift.providers.lock`: sha256 digest plus Cosign identity and issuer. `VerifyLocal` hashes the binary and checks the Cosign blob before any HashiCorp go-plugin spawn. Unsigned entries are refused.
 - Go `plugin.Open` is forbidden.
 - Community providers are compile-time custom binaries (`examples/custom-cli`). They are not auto-downloaded.
-- In-process `Load` skips the lock (tests and Floci). `ModeSubprocess` verifies first, then `Dial` starts gRPC. Magento deploy is not wired through `Dial` yet; that remains an extract lag, not a Magento claim.
+- In-process `Load` skips the lock (tests and Floci). `ModeSubprocess` verifies first, then `Dial` starts gRPC. The `gcp`/`gke-autopilot` proof cell deploys through `Dial` when a verified artifact is installed ([ADR 0011](0011-subprocess-dial-proof.md)); every other Magento cell stays in-process until its extraction lands.
 
 ## Consequences
 

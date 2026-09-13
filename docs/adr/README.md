@@ -18,3 +18,5 @@ Each ADR states context, decision, consequences, alternatives, and provenance.
 - [ADR 0008](0008-provider-load-path.md): In-process Magento; signed go-plugin lock for published adapters.
 - [ADR 0009](0009-dump-seed-and-attach.md): Dump seed after first deploy. Brownfield attach only where implemented.
 - [ADR 0010](0010-live-certification.md): No paid multi-cloud CI. Packed live certification with GCP as the thorough path.
+- [ADR 0011](0011-subprocess-dial-proof.md): Subprocess Dial proof for one adapter (GCP Autopilot); rest stay in-process.
+- [ADR 0012](0012-search-proof-shapes.md): Search proof shapes and AWS spend cap; live runs in Phase 2.

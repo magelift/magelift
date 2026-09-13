@@ -23,7 +23,7 @@ Public docs on magelift.dev, `docs/requirements.txt`, `website/scripts/build-sit
 
 ## Constraints
 
-Do not invent certified claims. Copy still goes through humanizer then remove-ai-marks. Exact pins until the cut. No MkDocs 2 while Material is the theme.
+Do not invent certified claims. Copy still goes through humanizer then remove-ai-marks. Exact pins until the cut. No MkDocs 2 while Material is the theme. Deferred until after the v1 stable cut (see ROADMAP.md): the pinned toolchain builds green today and a docs migration before the tag adds risk for no user gain.
 
 ## Out of scope
 

@@ -120,8 +120,8 @@ Every public-tag gate is **Closed**, **Deferred**, or **Offline closed** with a 
 | GCP Magento 2.4.9 standard live cell | **Experimental outside this exact bounded cell** | 13/13 cells PASS with Cloud SQL `MYSQL_8_4`, current OpenSearch 3/RabbitMQ 4.3, the real B2B dump, explicit `VALKEY_9_0`, and independent cleanup. The 2026-08-15 run repeats the earlier `20260813an` boundary; public HTTP/TLS, HA, DR, and broader architecture claims remain open; [evidence](evidence/gcp-gke-standard-magento-valkey90-live-20260815.md) |
 | GCP Magento 2.4.9 HA Standard live cell | **Experimental** | [gcha36](evidence/gcp-gke-ha-standard-magento-live-gcha36-20260820.md) catalog PASS including Magento seed-probe after pod, node, and backing-VM zone-loss. Not a certified target. Physical zone outage, regional DR, fencing/failback, and the broader matrix stay open. |
 | NOTICE + license review | **Closed** | `NOTICE`, `LICENSE`, `make license-check` (recorded below) |
-| First ship path | **Closed** | GitHub Release archives first; Homebrew cask optional post-tag; Windows = archive until winget/Scoop owned |
-| Packaging smoke | **Closed** | 2026-07-28T15:11:04Z - `make release-smoke` exit 0 (serial single-target host build) |
+| First ship path | **Closed** | GitHub Release archives first; Homebrew cask publishes at the tag with the `cask-verify` pipeline job as the tested macOS install path; Windows = archive until winget/Scoop owned |
+| Packaging smoke | **Closed** | 2026-09-13 - `make release-smoke` exit 0 (serial single-target host build, both binaries) |
 | Shared Kubernetes day-2 | **Offline closed** | Unit/fake-clientset: `*kube.Observe` + `*kube.Steps` type-identity across gcp/eksops/ovh/scaleway; AES256 DIY state unit proof. **Not** live GKE/OVH/SCW Magento acceptance beyond the GCP certified create-once path. |
 | Cloudflare DNS cutover (MIGRATE-04) | **Closed** | Live `cutover:dns` PASS + `--cleanup` on an operator-owned preview host (2026-08-02); script + Zone.DNS Edit via `cf` CLI. Preview-host rehearsal, not a production storefront cutover. See [evidence](evidence/README.md). |
 | Hosted CI / GitHub Actions | **Closed** | Public repo; hosted workflows run on `main`. Shell/docs/Go path filters green after org move (see Actions). Local Act remains available for offline iteration. |
@@ -157,8 +157,10 @@ gitignored `.magelift/`.
 2. `make license-check` (or CI `go-licenses`) clean for disallowed types.
 3. GoReleaser archives retain LICENSE + NOTICE (verified by `scripts/release-smoke-local.sh`).
 
-Ship GitHub Release archives first after clearance. Add brew only when the cask
-install path is tested on macOS. Treat Windows as archive download until a
+Ship GitHub Release archives first after clearance. The cask install path is
+tested on macOS by the release pipeline's `cask-verify` job (tap plus
+install plus `magelift version` on `macos-latest`); keep that job green
+before calling the cask done. Treat Windows as archive download until a
 maintainer owns winget/Scoop if demand appears.
 
 ### Local packaging smoke
@@ -170,10 +172,12 @@ smoke; that matrix belongs on CI.
 
 ### Packaging smoke record
 
+- 2026-09-13: `make release-smoke` exit 0 (serial single-target host build; asserts `magelift` plus `magelift-provider-gcp` in `dist/`)
 - 2026-07-28: `make release-smoke` exit 0 (serial single-target host build, ~159s)
 - 2026-07-22: `goreleaser check` validated `.goreleaser.yaml`
 
 ### License check record
 
+- 2026-09-13: `make license-check` exit 0
 - `make license-check` green on 2026-07-22 with `--ignore=github.com/ovh/pulumi-ovh`
   (Apache-2.0 at module root; recorded in `NOTICE`).

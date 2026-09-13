@@ -23,7 +23,7 @@ func TestDevInitCreatesComposeTemplate(t *testing.T) {
 	o := testOptions(&output, &fakeTerminal{interactive: false})
 	o.configPath, o.output = path, "json"
 	command := newCommandWithOptions(o)
-	command.SetArgs([]string{"--config", path, "local", "init"})
+	command.SetArgs([]string{"--config", path, "--env", "staging", "local", "init"})
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestDevInitWritesConfiguredPHPSettings(t *testing.T) {
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath, o.output = path, "json"
 	command := newCommandWithOptions(o)
-	command.SetArgs([]string{"--config", path, "local", "init"})
+	command.SetArgs([]string{"--config", path, "--env", "staging", "local", "init"})
 	if err := command.Execute(); err != nil {
 		t.Fatal(err)
 	}

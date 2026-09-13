@@ -38,6 +38,7 @@ type API interface {
 	Describe(ctx context.Context) (Identity, error)
 	Plan(ctx context.Context, request sdk.ModulePlanRequest) (sdk.ModulePlan, error)
 	Program(ctx context.Context, plan sdk.ModulePlan) (ProgramResult, error)
+	Execute(ctx context.Context, request ExecuteRequest) (ExecuteResult, error)
 }
 
 type ProgramResult struct {

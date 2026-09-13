@@ -16,11 +16,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// concurrentUpdateExit is the dedicated code for preview/deploy/destroy
+// when another Pulumi update holds the stack lock. Generated CI matches
+// on it to distinguish a collision (wait and retry) from a graph bug.
+const concurrentUpdateExit = 5
+
 // infrastructureBackend is the small surface the CLI needs from Pulumi. It
 // keeps command tests independent of the Automation API and AWS credentials.
 type infrastructureBackend interface {
 	automation.Backend
 	Outputs(context.Context) (map[string]any, error)
+}
+
+// mapConcurrentUpdateError converts a classified stack collision into the
+// dedicated exit code. Errors that already carry a code pass through, and
+// everything else is untouched.
+func mapConcurrentUpdateError(err error) error {
+	var exit *exitError
+	if errors.As(err, &exit) {
+		return err
+	}
+	var concurrentErr *automation.ConcurrentUpdateError
+	if errors.As(err, &concurrentErr) {
+		return &exitError{code: concurrentUpdateExit, err: err}
+	}
+	return err
 }
 
 func bindLiveQueueReplicas(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack) (platform.PlannedStack, error) {
@@ -81,7 +101,7 @@ func infrastructureCommand(o *options, name, short string, operation func(contex
 		}
 		result, err := o.executeInfrastructure(cmd.Context(), name, operation, digest)
 		if err != nil {
-			return err
+			return mapConcurrentUpdateError(err)
 		}
 		return o.write(result)
 	}}
@@ -184,6 +204,7 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
+	defer o.closeProviderSessions()
 	if name != "destroy" {
 		planned, err = bindLiveQueueReplicas(ctx, backend, planned)
 		if err != nil {
@@ -254,6 +275,7 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
+	defer o.closeProviderSessions()
 	planned, err = bindLiveQueueReplicas(ctx, backend, planned)
 	if err != nil {
 		return infrastructureResult{}, invalid(err)
@@ -427,6 +449,7 @@ func outputsCommand(o *options) *cobra.Command {
 		if err != nil {
 			return fmt.Errorf("create infrastructure backend: %w", err)
 		}
+		defer o.closeProviderSessions()
 		var outputs map[string]any
 		// Prefer redacted secrets for user-facing JSON (kubeconfig, DB passwords).
 		// Fail closed: never fall through to decrypted Outputs on redaction error.

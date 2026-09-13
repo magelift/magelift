@@ -9,7 +9,9 @@ import (
 )
 
 func previewTestConfig() string {
-	return strings.Replace(starterConfig, "  staging:\n    account: \"123456789012\"", "  preview:\n    class: preview\n    domain: preview.example.com\n    expiresAt: \"2026-08-15T12:00:00Z\"", 1)
+	// The default starter already carries a preview env with a PR-scoped
+	// domain; no surgery needed.
+	return starterConfig
 }
 
 func TestResolveWithEnvironmentUsesStablePreviewIdentity(t *testing.T) {

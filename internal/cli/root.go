@@ -22,6 +22,7 @@ import (
 	"github.com/magelift/magelift/internal/mediasync"
 	"github.com/magelift/magelift/internal/paasimport"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/internal/releasejournal"
 	"github.com/magelift/magelift/internal/toolchain"
 	mageliftupgrade "github.com/magelift/magelift/internal/upgrade"
@@ -88,6 +89,9 @@ type options struct {
 	exportDump              func(context.Context, dumpimport.Options) error
 	mediaSync               func(context.Context, mediasync.Options) (mediasync.Result, error)
 	newLock                 func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
+	loadProvider            func(context.Context, string) (providerhost.Loaded, error)
+	dialProvider            func(context.Context, string) (providerhost.API, error)
+	providerSessions        []*providerhost.Session
 	runCommand              func(context.Context, string, []string, io.Writer, io.Writer) error
 	runCompose              func(context.Context, string, []string, []string, io.Writer, io.Writer) error
 	dependencyRunner        toolchain.DependencyRunner
@@ -193,28 +197,16 @@ func newCommandWithHooks(stdout, stderr io.Writer, modules *platform.ModuleRegis
 		modules = platform.NewModuleRegistry()
 	}
 	o := &options{
-		stdout:        stdout,
-		stderr:        stderr,
-		getenv:        os.Getenv,
-		lookPath:      exec.LookPath,
-		currentBranch: gitCurrentBranch,
-		terminal:      consoleTerminal{in: os.Stdin, out: stderr},
-		modules:       modules,
-		newBackend: func(ctx context.Context, planned platform.PlannedStack, backendURL string) (infrastructureBackend, error) {
-			module, found := modules.Module(planned.Provider(), planned.Runtime())
-			if !found {
-				return nil, fmt.Errorf("no stack module for %q/%q", planned.Provider(), planned.Runtime())
-			}
-			program, err := module.Program(planned)
-			if err != nil {
-				return nil, err
-			}
-			pulumiStack, err := automation.NewInlineStackWithBackend(ctx, planned.StackName(), program, backendURL)
-			if err != nil {
-				return nil, err
-			}
-			return automation.NewPulumiBackend(pulumiStack), nil
-		},
+		stdout:             stdout,
+		stderr:             stderr,
+		getenv:             os.Getenv,
+		lookPath:           exec.LookPath,
+		currentBranch:      gitCurrentBranch,
+		terminal:           consoleTerminal{in: os.Stdin, out: stderr},
+		modules:            modules,
+		newBackend:         nil, // Assigned post-literal to o.defaultNewBackend below.
+		loadProvider:       nil, // Assigned post-literal to o.defaultLoadProvider below.
+		dialProvider:       nil, // Assigned post-literal to o.defaultDialProvider below.
 		listPreviewRecords: automation.ListPreviewRecords,
 		newDeploySteps:     nil,
 		newLock: func(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
@@ -253,6 +245,9 @@ func newCommandWithHooks(stdout, stderr io.Writer, modules *platform.ModuleRegis
 	o.liveSchemaEpoch = func(ctx context.Context) (int, error) {
 		return o.observeLiveSchemaEpoch(ctx)
 	}
+	o.newBackend = o.defaultNewBackend
+	o.loadProvider = o.defaultLoadProvider
+	o.dialProvider = o.defaultDialProvider
 	o.newDeploySteps = func(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
 		module, found := modules.Module(planned.Provider(), planned.Runtime())
 		if !found {
@@ -341,7 +336,7 @@ func versionCommand(o *options) *cobra.Command {
 
 func initCommand(o *options) *cobra.Command {
 	var fromACC, fromUpsun bool
-	var configOut string
+	var configOut, provider string
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Create a starter magelift.yaml for Magento's PHP storefront",
@@ -349,6 +344,13 @@ func initCommand(o *options) *cobra.Command {
 		RunE: func(*cobra.Command, []string) error {
 			if fromACC && fromUpsun {
 				return invalid(fmt.Errorf("--from-acc and --from-upsun are mutually exclusive"))
+			}
+			if provider == "" {
+				provider = "aws"
+			}
+			starter, err := starterForProvider(provider)
+			if err != nil {
+				return invalid(err)
 			}
 			writePath := o.configPath
 			if configOut != "" {
@@ -388,7 +390,7 @@ func initCommand(o *options) *cobra.Command {
 				}
 				data, unmapped = result.YAML, result.Unmapped
 			default:
-				data = []byte(starterConfig)
+				data = []byte(starter)
 			}
 			if err := os.MkdirAll(filepath.Dir(writePath), 0o755); err != nil {
 				return err
@@ -410,7 +412,23 @@ func initCommand(o *options) *cobra.Command {
 	cmd.Flags().BoolVar(&fromACC, "from-acc", false, "generate magelift.yaml from Adobe Commerce Cloud config")
 	cmd.Flags().BoolVar(&fromUpsun, "from-upsun", false, "generate magelift.yaml from Upsun / Platform.sh config")
 	cmd.Flags().StringVar(&configOut, "config-out", "", "write generated YAML to PATH for review (default: --config path)")
+	cmd.Flags().StringVar(&provider, "provider", "aws", "starter provider: aws or gcp (certified starters only)")
 	return cmd
+}
+
+// starterForProvider returns the starter for a certified provider. The
+// provider check runs before the overwrite check so a bad flag never
+// looks like a file problem. MageLift is the authority for the
+// supported set: other providers have no certified starter in v1.
+func starterForProvider(provider string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "aws":
+		return starterAWSConfig, nil
+	case "gcp":
+		return starterGCPConfig, nil
+	default:
+		return "", fmt.Errorf("MageLift supports starter providers \"aws\" and \"gcp\" only, got %q", provider)
+	}
 }
 
 func configCommand(o *options) *cobra.Command {
@@ -700,7 +718,11 @@ func unavailable(name string) *cobra.Command {
 	}}
 }
 
-const starterConfig = `schemaVersion: 1
+// starterConfig is the default (AWS) starter, kept as the shared test
+// fixture name.
+const starterConfig = starterAWSConfig
+
+const starterAWSConfig = `schemaVersion: 1
 project:
   name: example-shop
 application:
@@ -715,11 +737,76 @@ build:
 target:
   provider: aws
   runtime: ecs-fargate
+  aws:
+    catalog:
+      # Certified cell: no managed search on first run. Managed search
+      # proves in Phase 2; until then this avoids surprise AOSS bills.
+      searchMode: disabled
 defaults:
   region: eu-west-3
   preset: preview
 environments:
-  staging:
+  preview:
     account: "123456789012"
+    class: preview
+    preset: preview
+    domain: preview.example.com
+    expiresAt: "2026-12-31T23:59:59Z"
+  staging:
+    inherits: preview
+    account: "123456789012"
+    class: staging
+    preset: standard
+    domain: staging.example.com
+  production:
+    inherits: staging
+    account: "210987654321"
+    class: production
+    preset: high-availability
+    domain: example.com
+    protection: true
+extensions: {}
+`
+
+const starterGCPConfig = `schemaVersion: 1
+project:
+  name: example-shop
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+  webRuntime: nginx-fpm
+  magento:
+    frontName: admin
+build:
+  php: "8.5"
+target:
+  provider: gcp
+  runtime: gke-autopilot
+  gcp:
+    project: example-gcp-project
+    region: europe-west1
+    # Certified cell: no managed search on first run.
+    openSearchMode: disabled
+defaults:
+  region: europe-west1
+  preset: preview
+environments:
+  preview:
+    class: preview
+    preset: preview
+    domain: preview.example.com
+    expiresAt: "2026-12-31T23:59:59Z"
+  staging:
+    inherits: preview
+    class: staging
+    preset: standard
+    domain: staging.example.com
+  production:
+    inherits: staging
+    class: production
+    preset: high-availability
+    domain: example.com
+    protection: true
 extensions: {}
 `

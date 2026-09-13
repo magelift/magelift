@@ -18,6 +18,8 @@ Breaking changes to any of the following require a documented RC break note
 | Exit codes | Documented CLI exit codes stay stable |
 | AWS ECS Fargate certified cells | See [capability-matrix.md](capability-matrix.md); honesty labels for OpenSearch |
 | Provider IDs | `aws` / `gcp` / `ovh` / `scaleway` string IDs |
+| Provider lockfile schema | `magelift.providers.lock` `schemaVersion: 1`, SDK API `"v1"` |
+| Provider `Execute` RPC | Operation names and result shape stay (`preview`, `up`, `destroy`, `outputs`, `validate-request`) |
 
 Experimental cells and providers may still return `ErrNotSupported` or change
 without a bump when clearly labeled experimental.
@@ -36,6 +38,7 @@ series** unless a documented RC break note lands in CHANGELOG / this document:
 | Certified AWS ECS honesty labels | OpenSearch / free-tier labels in the capability matrix |
 | `sdk/v1` | `Target` / `Capability` / `Hook` shapes stay |
 | `platform.StackModule` | Module registration and core stack-module contract stay, subject to the shared-Kubernetes reservation below |
+| Provider extension boundary | Lockfile schema `1`, SDK API `"v1"`, `Execute` operation names and result shape stay |
 
 **May change during RC** without a major `v2` bump when labeled experimental:
 

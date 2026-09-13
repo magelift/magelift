@@ -16,7 +16,7 @@ or about an hour to a cloud preview URL (AWS or GCP).
 
 1. **Install the CLI.** Follow [Install](install.md), then run `magelift version`.
 2. **Choose local or cloud.** See [local vs cloud](local-vs-cloud.md). Local Compose needs no cloud credentials.
-3. **Copy the sample shop.** Use `examples/sample-shop/magelift.yaml`, fill account and secret refs, then `magelift doctor`.
+3. **Start a config.** Run `magelift init --provider aws` (or `gcp`), fill the placeholders, then `magelift doctor`.
 4. **Preview on a certified target.** AWS ECS Fargate or GCP GKE Autopilot; destroy when done.
 5. **Optional migrate.** Leave ACC/Upsun via [weekend-migrate](weekend-migrate.md).
 
@@ -39,19 +39,35 @@ magelift local init
 magelift local up
 ```
 
-## 3. Sample shop config
+## 3. Starter config
 
-Copy [`examples/sample-shop/magelift.yaml`](https://github.com/magelift/magelift/tree/main/examples/sample-shop) from the repository into your Magento
-repo root. Complete the "What to replace" table in
-`examples/sample-shop/README.md` (accounts, domains, secret refs; no plaintext
-secrets).
+Generate a starter for a certified provider. Each starter carries
+preview, staging, and production env blocks and validates with no
+other edits:
+
+```sh
+magelift init --provider aws    # AWS ECS Fargate; the default
+magelift init --provider gcp    # GCP GKE Autopilot
+```
+
+What you get: preview runs database-backed queues (`db` on AWS,
+`database` on GCP) and search `disabled`, the certified cell, stated
+explicitly so no default bills you by surprise. Staging and production
+inherit with larger presets. `magelift config effective --env preview`
+shows every resolved value, so no default stays hidden.
+
+Fill the placeholders (accounts or the GCP project, domains, secret
+refs; no plaintext secrets), then:
 
 ```sh
 magelift doctor
 ```
 
 Doctor validates YAML and prints the next Magelift command. Stay on that
-command. Then continue with [local vs cloud](local-vs-cloud.md) if you are still
+command. The full worked example lives at
+[`examples/sample-shop/magelift.yaml`](https://github.com/magelift/magelift/tree/main/examples/sample-shop)
+with its "What to replace" table in `examples/sample-shop/README.md`.
+Then continue with [local vs cloud](local-vs-cloud.md) if you are still
 offline, or jump to a certified cloud preview below.
 
 ## 4. Cloud preview (certified)

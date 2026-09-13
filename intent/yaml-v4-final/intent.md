@@ -23,7 +23,7 @@ MageLift uses `go.yaml.in/yaml/v4` because v3 is frozen except for security and 
 
 ## Constraints
 
-Strict decoding stays. No secret values in YAML. RC must not be replaced by a different incompatible YAML library. Public config contract stays YAML-only.
+Strict decoding stays. No secret values in YAML. RC must not be replaced by a different incompatible YAML library. Public config contract stays YAML-only. Blocked on upstream and off the v1 path (see ROADMAP.md): there is nothing to do until the module proxy shows a final v4 tag, and the current RC pin passes strict-decoding, merge, and provenance tests.
 
 ## Out of scope
 
