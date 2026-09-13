@@ -93,6 +93,11 @@ signs:
 # upgrade path: a GitHub App with contents:write on homebrew-tap + scoop-bucket.
 homebrew_casks:
   - name: magelift
+    # The cask ships the CLI only: two binaries share every OS/arch
+    # archive combination since the provider split, and one tap
+    # handles a single archive per combination.
+    ids:
+      - magelift
     repository:
       owner: magelift
       name: homebrew-tap
@@ -106,6 +111,9 @@ homebrew_casks:
 
 scoops:
   - name: magelift
+    # Same single-archive rule as the cask: scoop ships the CLI.
+    ids:
+      - magelift
     repository:
       owner: magelift
       name: scoop-bucket
