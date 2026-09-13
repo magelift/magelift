@@ -6,11 +6,6 @@ version: 2
 
 project_name: magelift
 
-# Twelve serial Pulumi-heavy cross-compiles (six targets times two
-# binaries) exceed GoReleaser's default 1h timeout; the workflow allows
-# 180 minutes and this keeps the tool inside it.
-timeout: 150m
-
 builds:
   - id: magelift
     main: ./cmd/magelift

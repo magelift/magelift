@@ -18,7 +18,7 @@ Auto-approved per the standing `/goal` instruction.
 
 ## Order of work
 
-- [ ] 1.1 Pyramid base — verify: `make local-gates` exit 0
+- [x] 1.1 Pyramid base — verify: `make local-gates` exit 0
 - [x] 1.2 Maintainer unblock: gcloud re-auth plus project confirm
   plus ephemeral-tag permission — verify: `gcloud` identity works
   and the project is named in writing
