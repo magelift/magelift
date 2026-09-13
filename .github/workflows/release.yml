@@ -37,7 +37,9 @@ jobs:
           version: v2.18.1
           # Parallelism 1: private 7 GB runners lose communication under
           # concurrent Pulumi-graph cross-compiles (seen on v1.0.0-rc.1).
-          args: release --clean --parallelism 1
+          # Timeout 150m: twelve serial Pulumi-heavy cross-compiles exceed
+          # GoReleaser's default 1h; the job allows 180 minutes.
+          args: release --clean --parallelism 1 --timeout 150m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Pushes the brew formula and Scoop manifest to their tap repos.
