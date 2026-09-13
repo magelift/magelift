@@ -1,5 +1,6 @@
 # Ordered free-tier AWS preview cells for offline/paid harness proof.
 # Exclude Aurora apply, amazon-mq apply, and OpenSearch apply (unverifiable / costly).
+computeMode:fargate
 queueMode:db
 queueMode:ecs-rabbitmq
 queueMode:ecs-artemis

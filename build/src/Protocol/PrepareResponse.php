@@ -18,12 +18,17 @@ final readonly class PrepareResponse
         public string $preparedArtifact,
         public string $phpVersion,
         public array $phpExtensions,
+        public string $composerVersion,
         public array $enabledModules,
         public array $checksums,
         public array $requiredRuntimeCapabilities,
     ) {
         ProtocolJson::relativePath($this->preparedArtifact, 'prepared artifact');
         ProtocolJson::nonEmptyString($this->phpVersion, 'prepared PHP version');
+        ProtocolJson::nonEmptyString($this->composerVersion, 'prepared Composer version');
+        if (preg_match('/^2\.\d+(?:\.\d+)?$/D', $this->composerVersion) !== 1) {
+            throw new InvalidArgumentException('Prepared Composer version must be a Composer 2 major.minor or major.minor.patch version.');
+        }
         self::validateUniqueStrings($this->phpExtensions, 'PHP extensions');
         self::validateUniqueStrings($this->enabledModules, 'enabled modules');
         self::validateUniqueStrings($this->requiredRuntimeCapabilities, 'runtime capabilities', true);
@@ -77,6 +82,7 @@ final readonly class PrepareResponse
                 'preparedArtifact' => $this->preparedArtifact,
                 'phpVersion' => $this->phpVersion,
                 'phpExtensions' => $phpExtensions,
+                'composerVersion' => $this->composerVersion,
                 'enabledModules' => $enabledModules,
                 'checksums' => $checksums,
                 'requiredRuntimeCapabilities' => $capabilities,

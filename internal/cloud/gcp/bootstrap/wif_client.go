@@ -17,6 +17,13 @@ import (
 // ErrWIFNotFound reports a missing WIF/IAM resource during Ensure.
 var ErrWIFNotFound = errors.New("wif resource not found")
 
+const (
+	wifVisibilityAttempts = 15
+	wifVisibilityDelay    = 2 * time.Second
+	wifTransientAttempts  = 6
+	wifTransientDelay     = 2 * time.Second
+)
+
 // WIFPool describes a workload identity pool create/get payload.
 type WIFPool struct {
 	Name        string
@@ -76,7 +83,9 @@ func NewWIFClient(ctx context.Context) (WIFAPI, error) {
 }
 
 func (c iamWIFClient) ProjectNumber(ctx context.Context, projectID string) (string, error) {
-	project, err := c.crm.Projects.Get(projectID).Context(ctx).Do()
+	project, err := retryWIFCall(ctx, wifTransientDelay, func() (*cloudresourcemanager.Project, error) {
+		return c.crm.Projects.Get(projectID).Context(ctx).Do()
+	})
 	if err != nil {
 		return "", fmt.Errorf("resolve GCP project number: %w", err)
 	}
@@ -87,7 +96,9 @@ func (c iamWIFClient) ProjectNumber(ctx context.Context, projectID string) (stri
 }
 
 func (c iamWIFClient) GetPool(ctx context.Context, name string) (WIFPool, error) {
-	pool, err := c.iam.Projects.Locations.WorkloadIdentityPools.Get(name).Context(ctx).Do()
+	pool, err := retryWIFCall(ctx, wifTransientDelay, func() (*iam.WorkloadIdentityPool, error) {
+		return c.iam.Projects.Locations.WorkloadIdentityPools.Get(name).Context(ctx).Do()
+	})
 	if err != nil {
 		return WIFPool{}, mapWIFError("get workload identity pool", err)
 	}
@@ -106,7 +117,7 @@ func (c iamWIFClient) CreatePool(ctx context.Context, parent, poolID string, poo
 	if err := waitIAMOperation(ctx, c.iam, op); err != nil {
 		return WIFPool{}, err
 	}
-	got, err := c.GetPool(ctx, name)
+	got, err := waitWIFResource(ctx, wifVisibilityDelay, c.GetPool, name)
 	if err != nil {
 		return WIFPool{}, err
 	}
@@ -114,7 +125,9 @@ func (c iamWIFClient) CreatePool(ctx context.Context, parent, poolID string, poo
 }
 
 func (c iamWIFClient) GetProvider(ctx context.Context, name string) (WIFProvider, error) {
-	provider, err := c.iam.Projects.Locations.WorkloadIdentityPools.Providers.Get(name).Context(ctx).Do()
+	provider, err := retryWIFCall(ctx, wifTransientDelay, func() (*iam.WorkloadIdentityPoolProvider, error) {
+		return c.iam.Projects.Locations.WorkloadIdentityPools.Providers.Get(name).Context(ctx).Do()
+	})
 	if err != nil {
 		return WIFProvider{}, mapWIFError("get workload identity provider", err)
 	}
@@ -132,24 +145,106 @@ func (c iamWIFClient) GetProvider(ctx context.Context, name string) (WIFProvider
 }
 
 func (c iamWIFClient) CreateProvider(ctx context.Context, parent, providerID string, provider WIFProvider) (WIFProvider, error) {
-	op, err := c.iam.Projects.Locations.WorkloadIdentityPools.Providers.Create(parent, &iam.WorkloadIdentityPoolProvider{
-		DisplayName:        provider.DisplayName,
-		AttributeMapping:   provider.AttributeMapping,
-		AttributeCondition: provider.AttributeCondition,
-		Oidc:               &iam.Oidc{IssuerUri: provider.IssuerURI},
-	}).WorkloadIdentityPoolProviderId(providerID).Context(ctx).Do()
-	if err != nil {
-		return WIFProvider{}, fmt.Errorf("create workload identity provider: %w", err)
-	}
 	name := parent + "/providers/" + providerID
+	var op *iam.Operation
+	var err error
+	for attempt := 1; attempt <= wifVisibilityAttempts; attempt++ {
+		op, err = c.iam.Projects.Locations.WorkloadIdentityPools.Providers.Create(parent, &iam.WorkloadIdentityPoolProvider{
+			DisplayName:        provider.DisplayName,
+			AttributeMapping:   provider.AttributeMapping,
+			AttributeCondition: provider.AttributeCondition,
+			Oidc:               &iam.Oidc{IssuerUri: provider.IssuerURI},
+		}).WorkloadIdentityPoolProviderId(providerID).Context(ctx).Do()
+		if err == nil {
+			break
+		}
+		var apiErr *googleapi.Error
+		if errors.As(err, &apiErr) && apiErr.Code == http.StatusConflict {
+			return waitWIFResource(ctx, 0, c.GetProvider, name)
+		}
+		if !errors.As(err, &apiErr) || apiErr.Code != http.StatusNotFound || attempt == wifVisibilityAttempts {
+			return WIFProvider{}, fmt.Errorf("create workload identity provider: %w", err)
+		}
+		if err := waitWIFVisibility(ctx, wifVisibilityDelay); err != nil {
+			return WIFProvider{}, err
+		}
+	}
 	if err := waitIAMOperation(ctx, c.iam, op); err != nil {
 		return WIFProvider{}, err
 	}
-	return c.GetProvider(ctx, name)
+	return waitWIFResource(ctx, wifVisibilityDelay, c.GetProvider, name)
+}
+
+// waitWIFResource covers the short read-after-create window in IAM. The
+// operation can be DONE before the resource is visible to Get, so a single
+// 404 here must not turn a successful create into a failed bootstrap.
+func waitWIFResource[T any](ctx context.Context, delay time.Duration, get func(context.Context, string) (T, error), name string) (T, error) {
+	var zero T
+	var lastErr error
+	for attempt := 1; attempt <= wifVisibilityAttempts; attempt++ {
+		value, err := get(ctx, name)
+		if err == nil {
+			return value, nil
+		}
+		if !errors.Is(err, ErrWIFNotFound) {
+			return zero, err
+		}
+		lastErr = err
+		if attempt == wifVisibilityAttempts {
+			break
+		}
+		if err := waitWIFVisibility(ctx, delay); err != nil {
+			return zero, err
+		}
+	}
+	return zero, lastErr
+}
+
+func waitWIFVisibility(ctx context.Context, delay time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(delay):
+		return nil
+	}
+}
+
+func retryWIFCall[T any](ctx context.Context, delay time.Duration, call func() (T, error)) (T, error) {
+	var zero T
+	for attempt := 1; attempt <= wifTransientAttempts; attempt++ {
+		value, err := call()
+		if err == nil {
+			return value, nil
+		}
+		if !isTransientWIFError(err) || attempt == wifTransientAttempts {
+			return zero, err
+		}
+		if err := waitWIFVisibility(ctx, delay); err != nil {
+			return zero, err
+		}
+	}
+	return zero, errors.New("WIF retry loop exhausted")
+}
+
+func isTransientWIFError(err error) bool {
+	var apiErr *googleapi.Error
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	switch apiErr.Code {
+	case http.StatusTooManyRequests, http.StatusInternalServerError,
+		http.StatusBadGateway, http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 func (c iamWIFClient) GetServiceAccount(ctx context.Context, name string) (WIFServiceAccount, error) {
-	sa, err := c.iam.Projects.ServiceAccounts.Get(name).Context(ctx).Do()
+	sa, err := retryWIFCall(ctx, wifTransientDelay, func() (*iam.ServiceAccount, error) {
+		return c.iam.Projects.ServiceAccounts.Get(name).Context(ctx).Do()
+	})
 	if err != nil {
 		return WIFServiceAccount{}, mapWIFError("get service account", err)
 	}
@@ -166,11 +261,17 @@ func (c iamWIFClient) CreateServiceAccount(ctx context.Context, projectID, accou
 	if err != nil {
 		return WIFServiceAccount{}, fmt.Errorf("create service account: %w", err)
 	}
-	return WIFServiceAccount{Name: sa.Name, Email: sa.Email}, nil
+	created := WIFServiceAccount{Name: sa.Name, Email: sa.Email}
+	// IAM can report the create operation as successful before the service
+	// account is visible to GetIamPolicy. Wait through that read-after-create
+	// window before the caller applies the workload identity binding.
+	return waitWIFResource(ctx, wifVisibilityDelay, c.GetServiceAccount, created.Name)
 }
 
 func (c iamWIFClient) GetServiceAccountIAMPolicy(ctx context.Context, resource string) ([]WIFBinding, error) {
-	policy, err := c.iam.Projects.ServiceAccounts.GetIamPolicy(resource).Context(ctx).Do()
+	policy, err := retryWIFCall(ctx, wifTransientDelay, func() (*iam.Policy, error) {
+		return c.iam.Projects.ServiceAccounts.GetIamPolicy(resource).Context(ctx).Do()
+	})
 	if err != nil {
 		return nil, fmt.Errorf("get service account IAM policy: %w", err)
 	}

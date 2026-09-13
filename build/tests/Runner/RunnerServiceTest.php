@@ -93,7 +93,7 @@ final class RunnerServiceTest extends TestCase
 
     private static function prepareRequest(): string
     {
-        return '{"protocolVersion":1,"stage":"prepare","prepare":{"repositoryRoot":"/repo","sourceRevision":"'.str_repeat('a', 40).'","application":{"edition":"open-source","version":"2.4.9","mode":"integrated","webRuntime":"nginx-fpm"},"phpVersion":"8.5","compatibilityStatus":"unsupported-allowed","inputFiles":[{"path":"composer.lock","sha256":"'.str_repeat('b', 64).'"}],"staticContent":[{"locale":"en_US","theme":"Magento/luma"}]}}';
+        return '{"protocolVersion":1,"stage":"prepare","prepare":{"repositoryRoot":"/repo","sourceRevision":"'.str_repeat('a', 40).'","application":{"edition":"open-source","version":"2.4.9","mode":"integrated","webRuntime":"nginx-fpm"},"phpVersion":"8.5","composerVersion":"2.10","compatibilityStatus":"unsupported-allowed","inputFiles":[{"path":"composer.lock","sha256":"'.str_repeat('b', 64).'"}],"staticContent":[{"locale":"en_US","theme":"Magento/luma"}]}}';
     }
 
     private static function finalizeRequest(string $digest, string $revision = ''): string
@@ -155,6 +155,7 @@ final class FakePreparation implements Preparation
         return new PreparationOutput(
             '8.5.4',
             ['intl', 'pdo_mysql'],
+            '2.10.2',
             ['Magento_Catalog'],
             [['path' => 'app/etc/config.php', 'sha256' => str_repeat('c', 64)]],
             ['cache.valkey', 'database.mysql'],

@@ -352,6 +352,22 @@ func TestInitBareWithYesOverwritesStarter(t *testing.T) {
 	if string(data) != starterConfig {
 		t.Fatalf("expected starter rewrite; got %q", data)
 	}
+	if !strings.Contains(string(data), "mode: integrated") || !strings.Contains(string(data), "webRuntime: nginx-fpm") || !strings.Contains(string(data), "frontName: admin") {
+		t.Fatalf("starter is not an integrated PHP storefront: %s", data)
+	}
+}
+
+func TestSampleShopExampleValidates(t *testing.T) {
+	path := filepath.Join(cliRepoRoot(t), "examples", "sample-shop", "magelift.yaml")
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "config", "validate"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("config validate %s: %v\n%s", path, err, out.String())
+	}
+	if !strings.Contains(out.String(), `"valid": true`) {
+		t.Fatalf("validate output = %s", out.String())
+	}
 }
 
 func cliRepoRoot(t *testing.T) string {

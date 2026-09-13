@@ -1,0 +1,6 @@
+# Ordered self-managed EKS zone-loss simulation cells. The first cell creates
+# the cold stack; the final cell terminates every Ready ASG-backed EC2 node in
+# one selected declared zone and verifies a zero-Ready gap plus full recovery.
+computeMode:self-managed
+queueMode:database
+resilience:zone-loss

@@ -1,0 +1,5 @@
+# Cold EKS architecture cell: self-managed capacity. Use with a config whose
+# target.runtime is eks and target.aws.catalog.eks.computeMode is self-managed.
+computeMode:self-managed
+queueMode:database
+searchMode:disabled

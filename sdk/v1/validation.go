@@ -3,12 +3,16 @@ package v1
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 var stableID = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
+var credentialScheme = regexp.MustCompile(`^[a-z][a-z0-9+.-]*$`)
+var sensitiveField = regexp.MustCompile(`(?i)(?:password|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)`)
 
 func ValidateTargetDescriptor(descriptor TargetDescriptor) error {
 	return errors.Join(
@@ -16,6 +20,71 @@ func ValidateTargetDescriptor(descriptor TargetDescriptor) error {
 		validateID("provider ID", string(descriptor.Provider)),
 		validateID("runtime ID", string(descriptor.Runtime)),
 	)
+}
+
+// ValidateCredentialReference checks that a credential is an opaque reference
+// rather than a secret value or a network URL. The scheme is intentionally
+// open-ended so community providers can introduce their own secret stores;
+// the core only rejects schemes that are inherently unsafe at this boundary.
+func ValidateCredentialReference(reference string) error {
+	if strings.TrimSpace(reference) != reference || reference == "" || strings.IndexFunc(reference, unicode.IsSpace) >= 0 {
+		return errors.New("credential reference must be a non-empty URI without whitespace")
+	}
+	if !strings.Contains(reference, "://") {
+		return errors.New("credential reference must be a URI-shaped secret reference")
+	}
+	parsed, err := url.Parse(reference)
+	if err != nil || !credentialScheme.MatchString(parsed.Scheme) {
+		return errors.New("credential reference must use a valid URI scheme")
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "data", "env", "file", "http", "https", "literal", "password", "raw", "token":
+		return errors.New("credential reference must point to a secret store and must not embed a credential")
+	}
+	if parsed.User != nil {
+		return errors.New("credential reference must not contain user information")
+	}
+	// Kubernetes Secret references use the URI fragment as a non-secret key
+	// selector (for example kubernetes-secret://namespace/name#key). Keep this
+	// exception explicit and scheme-scoped; generic secret references must not
+	// gain an unreviewed fragment convention.
+	if parsed.Fragment != "" && strings.ToLower(parsed.Scheme) != "kubernetes-secret" {
+		return errors.New("credential reference must not contain a fragment")
+	}
+	if parsed.Host == "" && parsed.Path == "" && parsed.Opaque == "" {
+		return errors.New("credential reference must identify a secret")
+	}
+	return nil
+}
+
+// ValidateExternalIntent checks the portable metadata carried to an edge or
+// observability extension. Secret values are outside this SDK; credential
+// entries are accepted only as opaque references.
+func ValidateExternalIntent(provider string, lifecycle ExternalLifecycle, certification ExternalCertificationStatus, credentialRefs []string) error {
+	provider = strings.TrimSpace(provider)
+	if provider == "" || provider == "none" {
+		if lifecycle != "" || certification != "" || len(credentialRefs) != 0 {
+			return errors.New("external intent metadata requires a provider")
+		}
+		return nil
+	}
+	var problems []error
+	switch lifecycle {
+	case ExternalLifecycleManaged, ExternalLifecycleExtension, ExternalLifecycleObserveOnly:
+	default:
+		problems = append(problems, fmt.Errorf("invalid external lifecycle %q", lifecycle))
+	}
+	switch certification {
+	case ExternalCertified, ExternalExperimental, ExternalUnavailable, ExternalBlocked:
+	default:
+		problems = append(problems, fmt.Errorf("invalid external certification status %q", certification))
+	}
+	for _, reference := range credentialRefs {
+		if err := ValidateCredentialReference(reference); err != nil {
+			problems = append(problems, fmt.Errorf("external credential reference: %w", err))
+		}
+	}
+	return errors.Join(problems...)
 }
 
 func ValidateCapabilityDescriptors(descriptors []CapabilityDescriptor) error {

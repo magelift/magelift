@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,12 +28,14 @@ func testOptions(out *bytes.Buffer, terminal environmentTerminal) *options {
 	modules := platform.NewModuleRegistry()
 	registerTestModules(modules)
 	return &options{
-		stdout:        out,
-		stderr:        out,
-		getenv:        func(string) string { return "" },
-		currentBranch: func(string) (string, error) { return "", nil },
-		terminal:      terminal,
-		modules:       modules,
+		stdout:           out,
+		stderr:           out,
+		getenv:           func(string) string { return "" },
+		lookPath:         func(string) (string, error) { return "", errors.New("not on PATH") },
+		currentBranch:    func(string) (string, error) { return "", nil },
+		terminal:         terminal,
+		modules:          modules,
+		dependencyRunner: &fakeDependencyRunner{},
 	}
 }
 
@@ -141,6 +144,30 @@ func TestConfigValidateRejectsEnvironmentBuildOverrides(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "staging.build") {
 		t.Fatalf("unexpected error/code: %v/%d", err, ExitCode(err))
+	}
+}
+
+func TestConfigValidateWarnsExperimentalManagedInstancesWithoutHatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "magelift.yaml")
+	contents := strings.Replace(starterConfig, "target:\n  provider: aws\n  runtime: ecs-fargate\n", "target:\n  provider: aws\n  runtime: ecs-fargate\n  aws:\n    catalog:\n      fargate:\n        computeMode: managed-instances\n", 1)
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	o := testOptions(&stdout, &fakeTerminal{interactive: false})
+	o.stderr = &stderr
+	o.configPath, o.output = path, "json"
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "config", "validate"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("validate: %v\n%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"valid": true`) {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "MageLift") || !strings.Contains(stderr.String(), "experimental") {
+		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
 
@@ -284,5 +311,71 @@ func TestConfigMigrateRejectsUnknownSchemaWithoutWriting(t *testing.T) {
 	}
 	if string(written) != input {
 		t.Fatal("unsupported migration changed the file")
+	}
+}
+
+func TestExtensionsListIncludesWebRuntimes(t *testing.T) {
+	var out bytes.Buffer
+	cmd := newCommandWithOptions(testOptions(&out, &fakeTerminal{interactive: false}))
+	cmd.SetArgs([]string{"--output", "json", "extensions", "list"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	for _, want := range []string{`"id": "nginx-fpm"`, `"id": "frankenphp-classic"`, `"id": "php-apache"`, `"adobeSupported": true`, `"adobeSupported": false`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("extensions list missing %s:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "frankenphp-worker") {
+		t.Fatalf("extensions list registered worker:\n%s", text)
+	}
+}
+
+func TestConfigExplainStandardQueueDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "magelift.yaml")
+	input := `schemaVersion: 1
+project:
+  name: example-shop
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+  webRuntime: nginx-fpm
+build:
+  php: "8.5"
+target:
+  provider: aws
+  runtime: ecs-fargate
+  aws: {}
+defaults:
+  region: eu-west-3
+  preset: standard
+environments:
+  staging:
+    account: "123456789012"
+extensions: {}
+`
+	if err := os.WriteFile(path, []byte(input), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "config", "explain", "target.aws.catalog.queueMode"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("explain: %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), `"source": "preset standard"`) {
+		t.Fatalf("explain = %s", out.String())
+	}
+	out.Reset()
+	cmd = newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "config", "effective"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("effective: %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), `"queueMode": "ecs-rabbitmq"`) {
+		t.Fatalf("effective missing ecs-rabbitmq default: %s", out.String())
 	}
 }

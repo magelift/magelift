@@ -4,30 +4,16 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/magelift/magelift/internal/cli"
-	awseksops "github.com/magelift/magelift/internal/cloud/aws/eksops"
-	awsops "github.com/magelift/magelift/internal/cloud/aws/ops"
-	gcpops "github.com/magelift/magelift/internal/cloud/gcp/ops"
-	ovhstack "github.com/magelift/magelift/internal/cloud/ovh/stack"
-	scwstack "github.com/magelift/magelift/internal/cloud/scaleway/stack"
-	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/cli"
 )
 
 func main() {
-	modules := platform.NewModuleRegistry()
-	for _, module := range []platform.StackModule{
-		awsops.Module{},
-		awseksops.Module{},
-		gcpops.Module{},
-		ovhstack.Module{},
-		scwstack.Module{},
-	} {
-		if err := modules.RegisterModule(module); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+	command, err := cli.New()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	if err := cli.NewWithModules(modules).Execute(); err != nil {
+	if err := cli.Execute(command); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(cli.ExitCode(err))
 	}

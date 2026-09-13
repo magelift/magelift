@@ -3,6 +3,7 @@ package runtime
 import (
 	"sort"
 
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/ec2"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/ecs"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -15,7 +16,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	component := &Component{}
 	if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{
-		"region": pulumi.String(args.Region), "applicationMode": pulumi.String(args.ApplicationMode), "webRuntime": pulumi.String(args.WebRuntime), "image": pulumi.String(args.Image), "containerPort": pulumi.Int(args.ContainerPort),
+		"region": pulumi.String(args.Region), "computeMode": pulumi.String(args.ComputeMode), "applicationMode": pulumi.String(args.ApplicationMode), "webRuntime": pulumi.String(args.WebRuntime), "image": pulumi.String(args.Image), "containerPort": pulumi.Int(args.ContainerPort),
 		"taskCpu": pulumi.String(args.TaskCPU), "taskMemory": pulumi.String(args.TaskMemory), "desiredCount": pulumi.Int(args.DesiredCount),
 		"privateSubnetIds": args.PrivateSubnetIDs,
 	}, component, opts...); err != nil {
@@ -58,6 +59,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		securityGroupID = securityGroup.ID().ToStringOutput()
 	}
 	component.SecurityGroupID = securityGroupID
+	capacity, err := configureCapacity(ctx, name, args, cluster, securityGroupID, component)
+	if err != nil {
+		return nil, err
+	}
+	serviceOptions := capacity.serviceOptions(component)
+	taskCompatibility := pulumi.String(capacity.taskCompatibility)
 
 	definitions, err := containerDefinitionsInput(args, secrets)
 	if err != nil {
@@ -65,7 +72,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	taskDefinition, err := ecs.NewTaskDefinition(ctx, name+"-web-task", &ecs.TaskDefinitionArgs{
 		Family: pulumi.String(name + "-web"), ContainerDefinitions: definitions, Cpu: pulumi.String(args.TaskCPU), Memory: pulumi.String(args.TaskMemory),
-		ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.TaskRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
+		ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.TaskRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{taskCompatibility},
 		RuntimePlatform: &ecs.TaskDefinitionRuntimePlatformArgs{CpuArchitecture: pulumi.String("X86_64"), OperatingSystemFamily: pulumi.String("LINUX")},
 		Region:          pulumi.String(args.Region), Tags: tags(args.Tags, name, "web-task"),
 	}, child)
@@ -80,7 +87,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	deployTaskDefinition, err := ecs.NewTaskDefinition(ctx, name+"-deploy-task", &ecs.TaskDefinitionArgs{
 		Family: pulumi.String(name + "-deploy"), ContainerDefinitions: deployDefinitions, Cpu: pulumi.String(args.TaskCPU), Memory: pulumi.String(args.TaskMemory),
-		ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.DeploymentRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
+		ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.DeploymentRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{taskCompatibility},
 		RuntimePlatform: &ecs.TaskDefinitionRuntimePlatformArgs{CpuArchitecture: pulumi.String("X86_64"), OperatingSystemFamily: pulumi.String("LINUX")},
 		Region:          pulumi.String(args.Region), Tags: tags(args.Tags, name, "deploy-task"),
 	}, child)
@@ -90,7 +97,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.DeployTaskDefinitionARN = deployTaskDefinition.Arn
 
 	serviceArgs := &ecs.ServiceArgs{
-		Cluster: cluster.Arn, TaskDefinition: taskDefinition.Arn, DesiredCount: pulumi.Int(args.DesiredCount), LaunchType: pulumi.String("FARGATE"),
+		Cluster: cluster.Arn, TaskDefinition: taskDefinition.Arn, DesiredCount: pulumi.Int(args.DesiredCount),
 		AvailabilityZoneRebalancing: pulumi.String("ENABLED"), EnableEcsManagedTags: pulumi.Bool(true), EnableExecuteCommand: pulumi.Bool(true),
 		DeploymentCircuitBreaker: &ecs.ServiceDeploymentCircuitBreakerArgs{Enable: pulumi.Bool(true), Rollback: pulumi.Bool(true)},
 		NetworkConfiguration:     &ecs.ServiceNetworkConfigurationArgs{AssignPublicIp: pulumi.Bool(false), Subnets: args.PrivateSubnetIDs, SecurityGroups: pulumi.StringArray{securityGroupID}},
@@ -99,12 +106,13 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if args.TargetGroupARN != nil {
 		loadBalancerContainer := "web"
 		if args.ApplicationMode == "integrated" {
-			// Integrated traffic enters Varnish; nginx/frankenphp stay internal.
+			// Integrated traffic enters Varnish; nginx-fpm stays internal.
 			loadBalancerContainer = "varnish"
 		}
 		serviceArgs.LoadBalancers = ecs.ServiceLoadBalancerArray{ecs.ServiceLoadBalancerArgs{ContainerName: pulumi.String(loadBalancerContainer), ContainerPort: pulumi.Int(args.ContainerPort), TargetGroupArn: targetGroupInput(args.TargetGroupARN)}}
 	}
-	service, err := ecs.NewService(ctx, name+"-web-service", serviceArgs, child)
+	capacity.applyService(serviceArgs)
+	service, err := ecs.NewService(ctx, name+"-web-service", serviceArgs, serviceOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +125,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	cronTaskDefinition, err := ecs.NewTaskDefinition(ctx, name+"-cron-task", &ecs.TaskDefinitionArgs{
 		Family: pulumi.String(name + "-cron"), ContainerDefinitions: cronDefinitions, Cpu: pulumi.String(args.TaskCPU), Memory: pulumi.String(args.TaskMemory),
-		ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.TaskRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
+		ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.TaskRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{taskCompatibility},
 		RuntimePlatform: &ecs.TaskDefinitionRuntimePlatformArgs{CpuArchitecture: pulumi.String("X86_64"), OperatingSystemFamily: pulumi.String("LINUX")},
 		Region:          pulumi.String(args.Region), Tags: tags(args.Tags, name, "cron-task"),
 	}, child)
@@ -125,26 +133,28 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, err
 	}
 	component.CronTaskDefinitionARN = cronTaskDefinition.Arn
-	cronService, err := ecs.NewService(ctx, name+"-cron-service", &ecs.ServiceArgs{
-		Cluster: cluster.Arn, TaskDefinition: cronTaskDefinition.Arn, DesiredCount: pulumi.Int(1), LaunchType: pulumi.String("FARGATE"),
+	cronServiceArgs := &ecs.ServiceArgs{
+		Cluster: cluster.Arn, TaskDefinition: cronTaskDefinition.Arn, DesiredCount: pulumi.Int(1),
 		AvailabilityZoneRebalancing: pulumi.String("ENABLED"), EnableEcsManagedTags: pulumi.Bool(true), EnableExecuteCommand: pulumi.Bool(true),
 		DeploymentCircuitBreaker: &ecs.ServiceDeploymentCircuitBreakerArgs{Enable: pulumi.Bool(true), Rollback: pulumi.Bool(true)},
 		NetworkConfiguration:     &ecs.ServiceNetworkConfigurationArgs{AssignPublicIp: pulumi.Bool(false), Subnets: args.PrivateSubnetIDs, SecurityGroups: pulumi.StringArray{securityGroupID}},
 		PropagateTags:            pulumi.String("TASK_DEFINITION"), Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "cron-service"),
-	}, child)
+	}
+	capacity.applyService(cronServiceArgs)
+	cronService, err := ecs.NewService(ctx, name+"-cron-service", cronServiceArgs, serviceOptions...)
 	if err != nil {
 		return nil, err
 	}
 	component.CronServiceName = cronService.Name
 
 	if args.QueueConsumerCount > 0 {
-		queueDefinitions, err := containerDefinitionsForInput(args, secrets, "queue", []string{"bin/magento", "queue:consumers:start", "async.operations.all"}, false)
+		queueDefinitions, err := containerDefinitionsForInput(args, secrets, "queue", platform.MagentoQueueArgsFor(args.Magento.ConsumerNames), false)
 		if err != nil {
 			return nil, err
 		}
 		queueTaskDefinition, err := ecs.NewTaskDefinition(ctx, name+"-queue-task", &ecs.TaskDefinitionArgs{
 			Family: pulumi.String(name + "-queue"), ContainerDefinitions: queueDefinitions, Cpu: pulumi.String(args.TaskCPU), Memory: pulumi.String(args.TaskMemory),
-			ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.TaskRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{pulumi.String("FARGATE")},
+			ExecutionRoleArn: identity.ExecutionRoleARN, TaskRoleArn: identity.TaskRoleARN, NetworkMode: pulumi.String("awsvpc"), RequiresCompatibilities: pulumi.StringArray{taskCompatibility},
 			RuntimePlatform: &ecs.TaskDefinitionRuntimePlatformArgs{CpuArchitecture: pulumi.String("X86_64"), OperatingSystemFamily: pulumi.String("LINUX")},
 			Region:          pulumi.String(args.Region), Tags: tags(args.Tags, name, "queue-task"),
 		}, child)
@@ -152,13 +162,15 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 			return nil, err
 		}
 		component.QueueTaskDefinitionARN = queueTaskDefinition.Arn
-		queueService, err := ecs.NewService(ctx, name+"-queue-service", &ecs.ServiceArgs{
-			Cluster: cluster.Arn, TaskDefinition: queueTaskDefinition.Arn, DesiredCount: pulumi.Int(args.QueueConsumerCount), LaunchType: pulumi.String("FARGATE"),
+		queueServiceArgs := &ecs.ServiceArgs{
+			Cluster: cluster.Arn, TaskDefinition: queueTaskDefinition.Arn, DesiredCount: pulumi.Int(args.QueueConsumerCount),
 			AvailabilityZoneRebalancing: pulumi.String("ENABLED"), EnableEcsManagedTags: pulumi.Bool(true), EnableExecuteCommand: pulumi.Bool(true),
 			DeploymentCircuitBreaker: &ecs.ServiceDeploymentCircuitBreakerArgs{Enable: pulumi.Bool(true), Rollback: pulumi.Bool(true)},
 			NetworkConfiguration:     &ecs.ServiceNetworkConfigurationArgs{AssignPublicIp: pulumi.Bool(false), Subnets: args.PrivateSubnetIDs, SecurityGroups: pulumi.StringArray{securityGroupID}},
 			PropagateTags:            pulumi.String("TASK_DEFINITION"), Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "queue-service"),
-		}, child)
+		}
+		capacity.applyService(queueServiceArgs)
+		queueService, err := ecs.NewService(ctx, name+"-queue-service", queueServiceArgs, serviceOptions...)
 		if err != nil {
 			return nil, err
 		}

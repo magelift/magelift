@@ -17,7 +17,7 @@ import (
 
 const (
 	DefaultLogLimit = 100
-	MaxLogLimit     = 1000
+	MaxLogLimit     = 10000
 )
 
 // LogsAPI is the small CloudWatch Logs surface used by the CLI. Keeping the
@@ -98,6 +98,7 @@ func (s *Store) Tail(ctx context.Context, group string, start time.Time, end *ti
 	}
 
 	events := make([]Event, 0, limit)
+	seen := make(map[string]struct{}, limit)
 	var previousToken string
 	for len(events) < limit {
 		output, err := s.client.FilterLogEvents(ctx, input)
@@ -108,7 +109,16 @@ func (s *Store) Tail(ctx context.Context, group string, start time.Time, end *ti
 			return nil, errors.New("filter CloudWatch Logs events returned no output")
 		}
 		for _, value := range output.Events {
-			events = append(events, eventFromSDK(value))
+			event := eventFromSDK(value)
+			key := event.EventID
+			if key == "" {
+				key = fmt.Sprintf("%d/%s/%s", event.Timestamp.UnixNano(), event.LogStream, event.Message)
+			}
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			events = append(events, event)
 			if len(events) == limit {
 				break
 			}

@@ -1,9 +1,8 @@
 # Agents and skills
 
-First-party Agent Skills for MageLift. Use these with Cursor, Claude Code, Codex,
-and other tools that load `SKILL.md` packages. They encode project rules that
-generic coding agents miss (serial builds, certified-cell honesty, provider
-boundaries).
+First-party user Agent Skills for MageLift. Use these with Cursor, Claude Code,
+Codex, and other tools that load `SKILL.md` packages. They explain how to
+configure, migrate, operate, and run MageLift locally.
 
 ## Layout
 
@@ -11,14 +10,39 @@ boundaries).
 agents/
   README.md                 # this file
   skills/
-    magelift-contribute/    # PRs, verify gate, layout
-    magelift-serial-builds/ # local build/test parallelism policy
-    magelift-provider/      # adding a cloud adapter
-    magelift-release/       # tags, GoReleaser, Cosign, GHCR
-    magelift-site/          # marketing + docs site build/deploy
+    magelift-dependencies/  # prerequisite checks and explicit installation
+    magelift-local-runtime/ # local Docker Compose workflow
+    magelift-operate/       # day-to-day status, health, and safe changes
+    magelift-configure/     # configuration, validation, and provenance
+    magelift-migrate/       # ACC and Upsun migration workflows
 ```
 
+Contributor workflows live under [`contrib/skills/`](../contrib/skills/). They
+are not embedded in release binaries and cannot be installed by end users.
+
 Each skill is a directory with a `SKILL.md` (Agent Skills format).
+
+## Install them with MageLift
+
+The release binary includes the skills and installs them without network access:
+
+```sh
+magelift skills list
+magelift skills install --agent codex --scope project --mode symlink
+magelift skills install --agent claude-code --scope global --mode copy
+magelift skills verify --agent codex --scope project
+```
+
+Use `--skill magelift-operate` to install only one skill. The direct installer
+refuses to replace an unrelated destination unless `--replace` is explicit.
+Use `--backend skills-cli` from a source checkout when you want the official
+skills CLI to manage the installation:
+
+```sh
+magelift skills install --backend skills-cli --agent codex --scope project
+```
+
+The skills CLI is optional. The direct installer is the release-safe default.
 
 ## Wire them into your tool
 
@@ -49,8 +73,9 @@ Do not commit `.claude/` or `.cursor/`; they stay local. The source of truth is
 
 ### Codex / other AGENTS.md consumers
 
-Point the session at this file and the skill bodies under `agents/skills/`.
-There is no root `AGENTS.md` in this repository on purpose.
+Root [`AGENTS.md`](../AGENTS.md) is the always-on router (hard constraints plus
+the skill table). Load the matching `SKILL.md` for the task; do not paste skill
+bodies into the session.
 
 ### Manual
 
@@ -66,6 +91,7 @@ them. Only MageLift-specific rules live here.
 ## Related human docs
 
 - [CONTRIBUTING.md](../CONTRIBUTING.md)
+- [Contributor skills](../contrib/skills/)
 - [docs/adding-a-provider.md](../docs/adding-a-provider.md)
 - [docs/release-readiness.md](../docs/release-readiness.md)
 - [docs/publishing.md](../docs/publishing.md)

@@ -46,8 +46,10 @@ func deploymentCommand() []string {
 func capabilityEnvironment(args Args) pulumi.Output {
 	if args.Capabilities == nil {
 		return pulumi.ToOutput(containerEnvFromBindings(platform.CoreEnvBindings(platform.CapabilityEndpoints{
-			ApplicationMode: args.ApplicationMode,
-			WebRuntime:      args.WebRuntime,
+			ApplicationMode:    args.ApplicationMode,
+			ApplicationVersion: args.ApplicationVersion,
+			WebRuntime:         args.WebRuntime,
+			Magento:            args.Magento,
 		})))
 	}
 	capabilities := args.Capabilities
@@ -68,17 +70,22 @@ func capabilityEnvironment(args Args) pulumi.Output {
 			session = values[2].(string)
 		}
 		environment := containerEnvFromBindings(platform.CoreEnvBindings(platform.CapabilityEndpoints{
-			ApplicationMode: args.ApplicationMode,
-			WebRuntime:      args.WebRuntime,
-			DatabaseWriter:  values[0].(string),
-			DatabaseName:    capabilities.DatabaseName,
-			CacheEndpoint:   values[2].(string),
-			SessionEndpoint: session,
+			ApplicationMode:    args.ApplicationMode,
+			ApplicationVersion: args.ApplicationVersion,
+			WebRuntime:         args.WebRuntime,
+			DatabaseWriter:     values[0].(string),
+			DatabaseName:       capabilities.DatabaseName,
+			CacheEndpoint:      values[2].(string),
+			SessionEndpoint:    session,
+			SearchEndpoint:     magentoSearchEndpoint(args, searchEndpoint),
+			Magento:            args.Magento,
 		}))
-		// AWS adapter-local: secret ARNs, search/queue/media until those ports land.
+		// MAGELIFT_SEARCH_ENDPOINT stays the AWS endpoint. Magento may talk to
+		// a local SigV4 proxy when the target is AOSS.
+		environment = upsertContainerEnv(environment, platform.EnvSearchEndpoint, searchEndpoint)
+		// AWS adapter-local: secret ARNs, queue AMQP, media until those ports land.
 		environment = append(environment,
 			containerEnvironment{Name: "MAGELIFT_DATABASE_SECRET_ARN", Value: values[1].(string)},
-			containerEnvironment{Name: "MAGELIFT_SEARCH_ENDPOINT", Value: searchEndpoint},
 			containerEnvironment{Name: "MAGELIFT_QUEUE_MODE", Value: queueMode},
 			containerEnvironment{Name: "MAGELIFT_QUEUE_ENDPOINT", Value: queueEndpoint},
 			containerEnvironment{Name: "MAGELIFT_MEDIA_BUCKET", Value: values[8].(string)},
@@ -88,16 +95,6 @@ func capabilityEnvironment(args Args) pulumi.Output {
 			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__SSL", Value: queueSSL},
 			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__USERNAME", Value: values[7].(string)},
 		)
-		if args.SearchProxyImage != "" {
-			environment = append(environment,
-				containerEnvironment{Name: "MAGENTO_DC_CATALOG__SEARCH__ENGINE", Value: "opensearch"},
-				containerEnvironment{Name: "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME", Value: "127.0.0.1"},
-				containerEnvironment{Name: "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT", Value: strconv.Itoa(searchProxyPort)},
-				containerEnvironment{Name: "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX", Value: "magento2"},
-				containerEnvironment{Name: "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH", Value: "0"},
-				containerEnvironment{Name: "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_TIMEOUT", Value: "15"},
-			)
-		}
 		return environment
 	})
 }
@@ -108,6 +105,23 @@ func containerEnvFromBindings(bindings []platform.EnvBinding) []containerEnviron
 		environment = append(environment, containerEnvironment{Name: binding.Name, Value: binding.Value})
 	}
 	return environment
+}
+
+func magentoSearchEndpoint(args Args, awsEndpoint string) string {
+	if args.SearchProxyImage == "" {
+		return awsEndpoint
+	}
+	return "http://127.0.0.1:" + strconv.Itoa(searchProxyPort)
+}
+
+func upsertContainerEnv(environment []containerEnvironment, name, value string) []containerEnvironment {
+	for index := range environment {
+		if environment[index].Name == name {
+			environment[index].Value = value
+			return environment
+		}
+	}
+	return append(environment, containerEnvironment{Name: name, Value: value})
 }
 
 func amqpSettings(endpoint string) (string, string, string) {

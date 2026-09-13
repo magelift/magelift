@@ -1,14 +1,25 @@
-# GCP target (GKE Autopilot)
+# GCP target (GKE Autopilot and Standard)
 
-Status: **certified** for `gcp` / `gke-autopilot` on the maintainer acceptance path
-(2026-08-02 create-once; evidence `.magelift/gcp-matrix/matrix-results.md`;
-see [gcp-acceptance.md](gcp-acceptance.md) and [capability-matrix.md](capability-matrix.md)).
-AWS ECS Fargate and GCP GKE Autopilot are the two certified first-party targets
-(ADR 0007 multi-cloud gate).
+Status: **certified** for `gcp` / `gke-autopilot` on evidenced Magento cells;
+`gcp` / `gke-standard` is experimental
+(see [gcp-acceptance.md](gcp-acceptance.md), [capability-matrix.md](capability-matrix.md),
+and the [evidence pack](evidence/README.md)).
+AWS ECS Fargate and GCP GKE Autopilot are the two certified first-party Magento
+origins ([ADR 0002](adr/0002-certified-vs-experimental.md)).
 
-**Still experimental / not certified:** non-preview presets (`standard` /
-`high-availability` apply spend), hosted GitHub Actions WIF (Act-only until
-minutes return), and community providers.
+**Still experimental / not certified:** GKE Standard as a release-wide target,
+hosted GitHub Actions WIF (Act-only until minutes return), the complete Valkey 9
+runtime/cache boundary, and community providers. The adapter now selects
+Memorystore `VALKEY_9_0` (GA) for Adobe Commerce 2.4.9 by default and accepts
+`VALKEY_9_1` only as an explicit Preview profile. A bounded real-account
+`VALKEY_9_1` Preview provisioning cell passed on 2026-08-11 and was cleaned;
+it proves the current provider version mapping, not the complete runtime,
+backup, HA, or DR claim. Current 2.4.9 Standard application evidence uses
+Memorystore `VALKEY_9_0`; see
+[20260815](evidence/gcp-gke-standard-magento-valkey90-live-20260815.md).
+The Autopilot preview path has a current Magento pass
+([gcap28](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md));
+the remaining service and release matrix is still open.
 
 ## Day-2 status
 
@@ -18,7 +29,7 @@ minutes return), and community providers.
 | Magento candidate migrate | **certified** (`deploy:candidate` cell) |
 | Bootstrap | state bucket + WIF (pool/provider/CI SA; live STS/impersonation evidenced) |
 | Secrets / Composer SM | `gcp-secret-manager://` via AccessSecretVersion (**certified**) |
-| logs / exec / health | **certified** on Autopilot (kubectl + BindOutputs) |
+| logs / exec / health | **certified for Autopilot evidenced cells**; Standard shapes have bounded live exercise and stay experimental |
 
 See [capability matrix](capability-matrix.md).
 
@@ -49,11 +60,18 @@ target:
 | Queue | Magento DB queue | RabbitMQ on GKE |
 | Media | GCS versioned bucket | Same |
 | Edge | optional Armor | Cloud Armor policy |
-| Compute | GKE Autopilot web/cron | + queue consumers; replicas 2 / 3 |
+| Compute | GKE Autopilot web/cron | GKE Standard for node-level settings; + queue consumers; replicas 2 / 3 |
 | Migrate | GKE Job via Magento Ops | Same |
 
 Magento env contracts (`platform.CoreEnvBindings`, migration shell) stay in core.
 GCP only adapts products.
+
+The three-node OpenSearch HA shape needs the Linux
+`vm.max_map_count=262144` sysctl. The GKE Standard node pool applies it before
+the workload starts. GKE Autopilot intentionally restricts unsafe sysctls and
+privileged initialization, so HA selects Standard; see Google's
+[Autopilot security measures](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-security)
+and [Standard node system configuration](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/node-system-config).
 
 ## GitHub WIF (Act-only until minutes return)
 
@@ -101,8 +119,7 @@ Record the matrix row as Act-only (or `gcloud` STS dry-run) until hosted minutes
 ## Offline verification
 
 - Pulumi mocks: `go test ./internal/cloud/gcp/...` (preview / standard / HA graphs)
-- Floci is **AWS-only** today. There is no floci-gcp. Do not invent GCP emulator coverage;
-  use mocks + short-lived real GCP acceptance.
+- floci-gcp (`make floci-gcp-test`): digest-pinned `floci/floci-gcp:0.7.0` on port 4588. Closes GCS, Secret Manager, Pub/Sub publish, Cloud Logging write/list, and Cloud Monitoring time-series write/list against the official Go clients without a GCP project. Does **not** certify Autopilot, Memorystore Valkey 9.0, Cloud Armor, Google-managed TLS, or Magento Cloud SQL PITR.
 - WIF unit proof: `GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/gcp/bootstrap/ -count=1 -run 'WIF|Identity'`
 - Composer SM: `GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/gcp/secrets/ ./internal/cli/ -count=1 -run 'Secret|Composer|GCP'`
 

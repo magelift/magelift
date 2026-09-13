@@ -9,10 +9,14 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
+	archivecore "github.com/magelift/magelift/internal/cloud/statearchive"
+	"google.golang.org/api/iterator"
 )
 
 var (
@@ -27,7 +31,17 @@ type ObjectAPI interface {
 	PutIfAbsent(ctx context.Context, bucket, key string, body []byte) (string, error)
 	Put(ctx context.Context, bucket, key string, body []byte) (string, error)
 	Delete(ctx context.Context, bucket, key string) error
+	DeleteGeneration(ctx context.Context, bucket, key, generation string) error
 	Copy(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error
+}
+
+// ArchiveAPI extends the lock object API with the prefix listing required to
+// create and verify a complete state snapshot. Keeping this boundary small
+// lets tests and community GCS-compatible implementations provide only the
+// object operations MageLift actually needs.
+type ArchiveAPI interface {
+	ObjectAPI
+	List(ctx context.Context, bucket, prefix string) ([]string, error)
 }
 
 type Manager struct {
@@ -103,14 +117,32 @@ func (m *Manager) Lock(ctx context.Context, project, environment, owner string) 
 	if err != nil {
 		return nil, err
 	}
-	return handle.Release, nil
+	return func() error { return handle.Release(ctx) }, nil
 }
 
-func (h *Handle) Release() error {
-	if h == nil || h.manager == nil {
-		return nil
+func (h *Handle) Info() Info {
+	if h == nil {
+		return Info{}
 	}
-	return h.manager.client.Delete(context.Background(), h.manager.bucket, h.manager.key)
+	return h.info
+}
+
+func (h *Handle) Release(ctx context.Context) error {
+	if h == nil || h.manager == nil {
+		return errors.New("deployment lock handle is required")
+	}
+	current, err := h.manager.inspect(ctx)
+	if err != nil {
+		return err
+	}
+	if current.Owner != h.info.Owner || !current.AcquiredAt.Equal(h.info.AcquiredAt) {
+		return errors.New("deployment lock ownership changed")
+	}
+	if err := h.manager.client.DeleteGeneration(ctx, h.manager.bucket, h.manager.key, current.Generation); err != nil {
+		return fmt.Errorf("release deployment lock: %w", err)
+	}
+	h.manager = nil
+	return nil
 }
 
 func (m *Manager) Status(ctx context.Context) (Info, error) {
@@ -122,7 +154,7 @@ func (m *Manager) Unlock(ctx context.Context) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
-	if err := m.client.Delete(ctx, m.bucket, m.key); err != nil {
+	if err := m.client.DeleteGeneration(ctx, m.bucket, m.key, info.Generation); err != nil {
 		return Info{}, fmt.Errorf("release deployment lock: %w", err)
 	}
 	return info, nil
@@ -145,18 +177,19 @@ func (m *Manager) inspect(ctx context.Context) (Info, error) {
 }
 
 type Archive struct {
-	client      ObjectAPI
-	bucket      string
-	project     string
-	environment string
-	now         func() time.Time
+	core *archivecore.Archive
+	now  func() time.Time
 }
 
-func NewArchive(client ObjectAPI, bucket, project, environment string) (*Archive, error) {
+func NewArchive(client ArchiveAPI, bucket, project, environment string) (*Archive, error) {
 	if client == nil || !bucketName.MatchString(bucket) || !stableName.MatchString(project) || !stableName.MatchString(environment) {
 		return nil, errors.New("state archive requires a GCS client, stable names, and a state bucket")
 	}
-	return &Archive{client: client, bucket: bucket, project: project, environment: environment, now: time.Now}, nil
+	core, err := archivecore.New(gcsArchiveStore{client: client, bucket: bucket}, "backups/"+project+"/"+environment+"/", "gs://"+bucket+"/")
+	if err != nil {
+		return nil, err
+	}
+	return &Archive{core: core, now: time.Now}, nil
 }
 
 func NewArchiveGCS(ctx context.Context, bucket, project, environment string) (*Archive, error) {
@@ -167,34 +200,49 @@ func NewArchiveGCS(ctx context.Context, bucket, project, environment string) (*A
 	return NewArchive(gcsObjects{client: client}, bucket, project, environment)
 }
 
-type BackupResult struct {
-	ID     string
-	Prefix string
-}
-
-type RestoreResult struct {
-	ID     string
-	Prefix string
-}
+type BackupResult = archivecore.BackupResult
+type RestoreResult = archivecore.RestoreResult
 
 func (a *Archive) Backup(ctx context.Context) (BackupResult, error) {
-	id := a.now().UTC().Format("20060102T150405Z")
-	src := ".pulumi/" + a.project + "/" + a.environment
-	dst := "backups/" + a.project + "/" + a.environment + "/" + id
-	// Copy the lock marker as a cheap existence proof when full prefix walk is deferred.
-	lockKey := "locks/" + a.project + "/" + a.environment + ".json"
-	if err := a.client.Copy(ctx, a.bucket, lockKey, a.bucket, dst+"/lock.json"); err != nil && !errors.Is(err, ErrNotLocked) {
-		return BackupResult{}, err
+	if a == nil || a.core == nil {
+		return BackupResult{}, errors.New("state archive is not configured")
 	}
-	_ = src
-	return BackupResult{ID: id, Prefix: "gs://" + a.bucket + "/" + dst}, nil
+	a.core.SetClock(a.now)
+	return a.core.Backup(ctx)
 }
 
-func (a *Archive) Restore(ctx context.Context, location string) (RestoreResult, error) {
-	if strings.TrimSpace(location) == "" {
-		return RestoreResult{}, errors.New("restore location is required")
+func (a *Archive) Restore(ctx context.Context, id string) (RestoreResult, error) {
+	if a == nil || a.core == nil {
+		return RestoreResult{}, errors.New("state archive is not configured")
 	}
-	return RestoreResult{ID: location, Prefix: location}, nil
+	return a.core.Restore(ctx, id)
+}
+
+type gcsArchiveStore struct {
+	client ArchiveAPI
+	bucket string
+}
+
+func (s gcsArchiveStore) List(ctx context.Context, prefix string) ([]string, error) {
+	return s.client.List(ctx, s.bucket, prefix)
+}
+
+func (s gcsArchiveStore) Copy(ctx context.Context, source, target string) error {
+	return s.client.Copy(ctx, s.bucket, source, s.bucket, target)
+}
+
+func (s gcsArchiveStore) Read(ctx context.Context, key string) ([]byte, error) {
+	body, _, err := s.client.Get(ctx, s.bucket, key)
+	return body, err
+}
+
+func (s gcsArchiveStore) Put(ctx context.Context, key string, body []byte) error {
+	_, err := s.client.Put(ctx, s.bucket, key, body)
+	return err
+}
+
+func (s gcsArchiveStore) Delete(ctx context.Context, key string) error {
+	return s.client.Delete(ctx, s.bucket, key)
 }
 
 type gcsObjects struct {
@@ -247,7 +295,19 @@ func (g gcsObjects) Put(ctx context.Context, bucket, key string, body []byte) (s
 }
 
 func (g gcsObjects) Delete(ctx context.Context, bucket, key string) error {
-	err := g.client.Bucket(bucket).Object(key).Delete(ctx)
+	return g.DeleteGeneration(ctx, bucket, key, "")
+}
+
+func (g gcsObjects) DeleteGeneration(ctx context.Context, bucket, key, generation string) error {
+	obj := g.client.Bucket(bucket).Object(key)
+	if generation != "" {
+		gen, err := strconv.ParseInt(generation, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid lock object generation: %w", err)
+		}
+		obj = obj.If(storage.Conditions{GenerationMatch: gen})
+	}
+	err := obj.Delete(ctx)
 	if err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
 		return err
 	}
@@ -264,4 +324,23 @@ func (g gcsObjects) Copy(ctx context.Context, srcBucket, srcKey, dstBucket, dstK
 		return fmt.Errorf("copy GCS object: %w", err)
 	}
 	return nil
+}
+
+func (g gcsObjects) List(ctx context.Context, bucket, prefix string) ([]string, error) {
+	it := g.client.Bucket(bucket).Objects(ctx, &storage.Query{Prefix: prefix})
+	keys := make([]string, 0)
+	for {
+		attrs, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("list GCS objects: %w", err)
+		}
+		if attrs != nil && attrs.Name != "" {
+			keys = append(keys, attrs.Name)
+		}
+	}
+	sort.Strings(keys)
+	return keys, nil
 }

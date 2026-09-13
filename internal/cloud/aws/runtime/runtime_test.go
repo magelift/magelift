@@ -166,53 +166,223 @@ func TestRuntimeResourceGraphAndSecurityContract(t *testing.T) {
 	}
 }
 
-func TestRuntimeAddsSigV4ProxyForMagentoOpenSearch(t *testing.T) {
+func TestRuntimeSupportsFargateSpotCapacityProvider(t *testing.T) {
+	t.Parallel()
+	args := validArgs()
+	args.ComputeMode = ComputeModeFargateSpot
+	m := deploy(t, args)
+
+	if !containsResource(m.snapshot(), "aws:ecs/clusterCapacityProviders:ClusterCapacityProviders:shop-capacity-providers") {
+		t.Fatal("Fargate Spot must associate FARGATE and FARGATE_SPOT with the cluster")
+	}
+	service := m.named(t, "aws:ecs/service:Service", "shop-web-service")
+	if _, found := service.inputs["launchType"]; found {
+		t.Fatal("Fargate Spot service must use a capacity-provider strategy, not launchType")
+	}
+	strategies := service.inputs["capacityProviderStrategies"].ArrayValue()
+	if len(strategies) != 1 || strategies[0].ObjectValue()["capacityProvider"].StringValue() != "FARGATE_SPOT" {
+		t.Fatalf("Fargate Spot service strategy = %#v", strategies)
+	}
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+	if got := task.inputs["requiresCompatibilities"].ArrayValue(); len(got) != 1 || got[0].StringValue() != "FARGATE" {
+		t.Fatalf("Fargate Spot task compatibility = %#v", got)
+	}
+	definitions := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
+	for _, definition := range definitions {
+		if got := int(definition["stopTimeout"].(float64)); got != fargateSpotStopTimeoutSeconds {
+			t.Fatalf("Fargate Spot container %q stop timeout = %d, want %d", definition["name"], got, fargateSpotStopTimeoutSeconds)
+		}
+	}
+}
+
+func TestRuntimeOmitsFargateSpotStopTimeoutForRegularFargate(t *testing.T) {
+	t.Parallel()
+	m := deploy(t, validArgs())
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+	for _, definition := range decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue()) {
+		if _, found := definition["stopTimeout"]; found {
+			t.Fatalf("regular Fargate container %q unexpectedly has Spot stop timeout: %#v", definition["name"], definition["stopTimeout"])
+		}
+	}
+}
+
+func TestRuntimeSupportsEC2AutoScalingCapacity(t *testing.T) {
+	t.Parallel()
+	args := validArgs()
+	args.ComputeMode = ComputeModeEC2AutoScaling
+	args.InstanceAMI = "ami-0123456789abcdef0"
+	args.InstanceType = "m7i.large"
+	args.MinCapacity = 2
+	args.MaxCapacity = 4
+	m := deploy(t, args)
+	resources := m.snapshot()
+	for _, want := range []string{
+		"aws:iam/role:Role:shop-ecs-host-role",
+		"aws:iam/instanceProfile:InstanceProfile:shop-ecs-host-profile",
+		"aws:ec2/launchTemplate:LaunchTemplate:shop-ecs-host-template",
+		"aws:autoscaling/group:Group:shop-ecs-hosts",
+		"aws:ecs/capacityProvider:CapacityProvider:shop-ecs-capacity-provider",
+		"aws:ecs/clusterCapacityProviders:ClusterCapacityProviders:shop-capacity-providers",
+	} {
+		if !containsResource(resources, want) {
+			t.Fatalf("EC2 capacity graph is missing %s:\n%s", want, strings.Join(resources, "\n"))
+		}
+	}
+	service := m.named(t, "aws:ecs/service:Service", "shop-web-service")
+	if _, found := service.inputs["launchType"]; found {
+		t.Fatal("EC2 capacity service must use a capacity-provider strategy, not launchType")
+	}
+	if strategies := service.inputs["capacityProviderStrategies"].ArrayValue(); len(strategies) != 1 {
+		t.Fatalf("EC2 capacity service strategies = %#v", strategies)
+	}
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+	if got := task.inputs["requiresCompatibilities"].ArrayValue(); len(got) != 1 || got[0].StringValue() != "EC2" {
+		t.Fatalf("EC2 task compatibility = %#v", got)
+	}
+	launchTemplate := m.named(t, "aws:ec2/launchTemplate:LaunchTemplate", "shop-ecs-host-template")
+	if launchTemplate.inputs["imageId"].StringValue() != args.InstanceAMI || launchTemplate.inputs["instanceType"].StringValue() != args.InstanceType {
+		t.Fatalf("EC2 launch template pinning = %#v", launchTemplate.inputs)
+	}
+	provider := m.named(t, "aws:ecs/capacityProvider:CapacityProvider", "shop-ecs-capacity-provider")
+	if got := provider.inputs["name"].StringValue(); got != "shop-ec2" {
+		t.Fatalf("EC2 capacity provider name = %q, want shop-ec2", got)
+	}
+	group := m.named(t, "aws:autoscaling/group:Group", "shop-ecs-hosts")
+	if group.inputs["minSize"].NumberValue() != 2 || group.inputs["desiredCapacity"].NumberValue() != 2 || group.inputs["maxSize"].NumberValue() != 4 {
+		t.Fatalf("EC2 host capacity = %#v", group.inputs)
+	}
+}
+
+func TestRuntimeEC2CapacityProviderNameAvoidsAWSPrefix(t *testing.T) {
+	t.Parallel()
+	args := validArgs()
+	args.ComputeMode = ComputeModeEC2AutoScaling
+	args.InstanceAMI = "ami-0123456789abcdef0"
+	args.InstanceType = "t3.medium"
+	m := &mocks{}
+	if err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		_, err := New(ctx, "awsap-preview-runtime", args)
+		return err
+	}, pulumi.WithMocks("project", "stack", m)); err != nil {
+		t.Fatal(err)
+	}
+	provider := m.named(t, "aws:ecs/capacityProvider:CapacityProvider", "awsap-preview-runtime-ecs-capacity-provider")
+	if got := provider.inputs["name"].StringValue(); got != "ml-awsap-preview-runtime-ec2" {
+		t.Fatalf("capacity provider AWS name = %q, want ml-awsap-preview-runtime-ec2", got)
+	}
+}
+
+func TestRuntimeSupportsManagedInstanceCapacity(t *testing.T) {
+	t.Parallel()
+	args := validArgs()
+	args.ComputeMode = ComputeModeManagedInstance
+	args.InstanceType = "c7i.large"
+	m := deploy(t, args)
+	resources := m.snapshot()
+	for _, want := range []string{
+		"aws:iam/role:Role:shop-ecs-managed-instance-role",
+		"aws:iam/instanceProfile:InstanceProfile:shop-ecs-managed-instance-profile",
+		"aws:iam/role:Role:shop-ecs-infrastructure-role",
+		"aws:iam/rolePolicy:RolePolicy:shop-ecs-infrastructure-pass-role",
+		"aws:ecs/capacityProvider:CapacityProvider:shop-ecs-managed-capacity-provider",
+	} {
+		if !containsResource(resources, want) {
+			t.Fatalf("Managed Instance capacity graph is missing %s:\n%s", want, strings.Join(resources, "\n"))
+		}
+	}
+	if containsResource(resources, "aws:ecs/clusterCapacityProviders:ClusterCapacityProviders:shop-capacity-providers") {
+		t.Fatal("Managed Instance capacity must not call PutClusterCapacityProviders; the CP is cluster-scoped at create")
+	}
+	role := m.named(t, "aws:iam/role:Role", "shop-ecs-managed-instance-role")
+	if role.inputs["name"].StringValue() != "ecsInstanceRole-shop" {
+		t.Fatalf("Managed Instance role name = %#v, want ecsInstanceRole-shop", role.inputs["name"])
+	}
+	provider := m.named(t, "aws:ecs/capacityProvider:CapacityProvider", "shop-ecs-managed-capacity-provider")
+	if _, found := provider.inputs["managedInstancesProvider"]; !found {
+		t.Fatalf("Managed Instance capacity provider inputs = %#v", provider.inputs)
+	}
+	if tags, ok := provider.inputs["tags"]; !ok || tags.ObjectValue()["magelift:iam-propagated"].StringValue() != "ready" {
+		t.Fatalf("Managed Instance capacity provider must wait on IAM propagation: %#v", provider.inputs["tags"])
+	}
+	if got := provider.inputs["name"].StringValue(); got != "shop-managed" {
+		t.Fatalf("Managed Instance capacity provider name = %q, want shop-managed", got)
+	}
+	service := m.named(t, "aws:ecs/service:Service", "shop-web-service")
+	if tags, ok := service.inputs["tags"]; !ok || tags.ObjectValue()["magelift:capacity-ready"].StringValue() != "ready" {
+		t.Fatalf("Managed Instance service must wait for capacity provider ACTIVE: %#v", service.inputs["tags"])
+	}
+	if _, found := service.inputs["launchType"]; found {
+		t.Fatal("Managed Instance service must use a capacity-provider strategy, not launchType")
+	}
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+	if got := task.inputs["requiresCompatibilities"].ArrayValue(); len(got) != 1 || got[0].StringValue() != "MANAGED_INSTANCES" {
+		t.Fatalf("Managed Instance task compatibility = %#v", got)
+	}
+	reqs := provider.inputs["managedInstancesProvider"].ObjectValue()["instanceLaunchTemplate"].ObjectValue()["instanceRequirements"].ObjectValue()
+	vcpu := reqs["vcpuCount"].ObjectValue()
+	mem := reqs["memoryMib"].ObjectValue()
+	if vcpu["min"].NumberValue() != 2 || vcpu["max"].NumberValue() != 2 {
+		t.Fatalf("Managed Instance vcpuCount = %#v, want min=max=2", vcpu)
+	}
+	if mem["min"].NumberValue() != 4096 || mem["max"].NumberValue() != 4096 {
+		t.Fatalf("Managed Instance memoryMib = %#v, want min=max=4096 for c7i.large", mem)
+	}
+	if _, found := reqs["instanceGenerations"]; found {
+		t.Fatalf("Managed Instance instanceGenerations = %#v, want omitted with a pinned SKU", reqs["instanceGenerations"])
+	}
+}
+
+func TestRuntimeRejectsUnpinnedEC2CapacityAMI(t *testing.T) {
+	t.Parallel()
+	args := validArgs()
+	args.ComputeMode = ComputeModeEC2AutoScaling
+	m := &mocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error { _, err := New(ctx, "shop", args); return err }, pulumi.WithMocks("project", "stack", m))
+	if err == nil || !strings.Contains(err.Error(), "pinned ami") {
+		t.Fatalf("unpinned EC2 capacity AMI was accepted: %v", err)
+	}
+	if len(m.snapshot()) == 0 {
+		// The component and its cluster are registered before capacity validation;
+		// this assertion documents that the error is raised before host mutation.
+		return
+	}
+	for _, resource := range m.snapshot() {
+		if strings.Contains(resource, "ecs-host") || strings.Contains(resource, "capacityProvider") {
+			t.Fatalf("unpinned EC2 capacity registered host resources: %s", resource)
+		}
+	}
+}
+
+func TestRuntimeWiresMagentoOpenSearchEnvFromEndpoint(t *testing.T) {
 	t.Parallel()
 	args := validArgs()
 	args.Capabilities = testCapabilities()
-	args.SearchProxyImage = "public.ecr.aws/aws-observability/aws-sigv4-proxy:1.11.1@sha256:34bbec3cb98403d3e040ec1dadb53bb02285f70d2f0ead2d16435fd30980abaa"
+	args.Capabilities.SearchEndpoint = pulumi.String("https://vpc-shop.eu-west-3.es.amazonaws.com")
 	m := deploy(t, args)
 	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
-	var definitions []map[string]any
-	if err := json.Unmarshal([]byte(task.inputs["containerDefinitions"].StringValue()), &definitions); err != nil {
-		t.Fatal(err)
-	}
-	proxy := definitionsByName(definitions)["search-proxy"]
-	if proxy == nil {
-		t.Fatalf("search proxy is missing: %#v", definitions)
-	}
-	if proxy["image"] != args.SearchProxyImage || proxy["essential"] != true {
-		t.Fatalf("search proxy definition = %#v", proxy)
-	}
-	command := proxy["command"].([]any)
-	for _, required := range []string{"--port", "8081", "--name", "es", "--region", "eu-west-3", "--host", "shop.search", "--sign-host", "shop.search"} {
-		found := false
-		for _, value := range command {
-			if value == required {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatalf("search proxy command lacks %q: %#v", required, command)
-		}
-	}
-	if _, hasUser := proxy["user"]; hasUser {
-		t.Fatalf("search proxy should use its image user: %#v", proxy)
+	definitions := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
+	if definitionsByName(definitions)["search-proxy"] != nil {
+		t.Fatalf("AWS OpenSearch must not attach a signing sidecar: %#v", definitions)
 	}
 	php := definitionsByName(definitions)["php-fpm"]
 	web := definitionsByName(definitions)["web"]
-	if len(php["dependsOn"].([]any)) != 1 || web["dependsOn"] != nil {
-		t.Fatalf("search proxy dependency placement = php=%#v web=%#v", php["dependsOn"], web["dependsOn"])
+	if php["dependsOn"] != nil {
+		t.Fatalf("php-fpm must not wait on a search sidecar: %#v", php["dependsOn"])
+	}
+	if web["dependsOn"] != nil {
+		t.Fatalf("web dependsOn = %#v", web["dependsOn"])
 	}
 	environment := environmentByName(php)
 	for name, value := range map[string]string{
+		"MAGELIFT_SEARCH_ENDPOINT":                               "https://vpc-shop.eu-west-3.es.amazonaws.com",
 		"MAGENTO_DC_CATALOG__SEARCH__ENGINE":                     "opensearch",
-		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME": "127.0.0.1",
-		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":     "8081",
+		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME": "vpc-shop.eu-west-3.es.amazonaws.com",
+		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":     "443",
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH":     "0",
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX":    "magento2",
-		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_TIMEOUT":  "15",
+		"MAGENTO_DC_ELASTICSUITE__ES_CLIENT__SERVERS":            "vpc-shop.eu-west-3.es.amazonaws.com:443",
+		"MAGENTO_DC_ELASTICSUITE__ES_CLIENT__ENABLE_HTTPS_MODE":  "1",
+		"MAGENTO_DC_ELASTICSUITE__ES_CLIENT__ENABLE_HTTP_AUTH":   "0",
 	} {
 		if environment[name] != value {
 			t.Fatalf("%s = %q, want %q", name, environment[name], value)
@@ -220,16 +390,44 @@ func TestRuntimeAddsSigV4ProxyForMagentoOpenSearch(t *testing.T) {
 	}
 }
 
-func TestRuntimeOmitsSigV4ProxyWhenSearchDisabled(t *testing.T) {
+func TestRuntimeWiresAOSSThroughSigningProxy(t *testing.T) {
+	t.Parallel()
+	args := validArgs()
+	args.SearchProxyImage = testSearchProxyImage
+	args.Capabilities = testCapabilities()
+	args.Capabilities.SearchEndpoint = pulumi.String("https://abc.eu-west-3.aoss.amazonaws.com")
+	m := deploy(t, args)
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+	definitions := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
+	if definitionsByName(definitions)["search-proxy"] == nil {
+		t.Fatal("AOSS Magento search requires a signing sidecar")
+	}
+	php := definitionsByName(definitions)["php-fpm"]
+	environment := environmentByName(php)
+	for name, value := range map[string]string{
+		"MAGELIFT_SEARCH_ENDPOINT":                               "https://abc.eu-west-3.aoss.amazonaws.com",
+		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME": "127.0.0.1",
+		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":     "8081",
+		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH":     "0",
+		"MAGENTO_DC_ELASTICSUITE__ES_CLIENT__SERVERS":            "127.0.0.1:8081",
+		"MAGENTO_DC_ELASTICSUITE__ES_CLIENT__ENABLE_HTTPS_MODE":  "0",
+	} {
+		if environment[name] != value {
+			t.Fatalf("%s = %q, want %q", name, environment[name], value)
+		}
+	}
+}
+
+func TestRuntimeOmitsMagentoSearchEnvWhenEndpointEmpty(t *testing.T) {
 	t.Parallel()
 	args := validArgs()
 	args.Capabilities = testCapabilities()
-	args.SearchProxyImage = ""
+	args.Capabilities.SearchEndpoint = pulumi.String("")
 	m := deploy(t, args)
 	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
 	definitions := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
 	if definitionsByName(definitions)["search-proxy"] != nil {
-		t.Fatalf("search proxy must be absent when SearchProxyImage is empty: %#v", definitions)
+		t.Fatalf("search proxy must be absent: %#v", definitions)
 	}
 	php := definitionsByName(definitions)["php-fpm"]
 	environment := environmentByName(php)
@@ -239,36 +437,15 @@ func TestRuntimeOmitsSigV4ProxyWhenSearchDisabled(t *testing.T) {
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT",
 	} {
 		if _, ok := environment[name]; ok {
-			t.Fatalf("%s must not be set when search proxy is disabled", name)
+			t.Fatalf("%s must not be set when search endpoint is empty", name)
 		}
 	}
 }
 
-func TestRuntimeSigV4ProxySignsAOSSServiceName(t *testing.T) {
+func TestSearchProxyListenAddr(t *testing.T) {
 	t.Parallel()
-	args := validArgs()
-	args.Capabilities = testCapabilities()
-	args.Capabilities.SearchEndpoint = pulumi.String("https://abc123.eu-west-3.aoss.amazonaws.com")
-	args.SearchProxyImage = "public.ecr.aws/aws-observability/aws-sigv4-proxy:1.11.1@sha256:34bbec3cb98403d3e040ec1dadb53bb02285f70d2f0ead2d16435fd30980abaa"
-	m := deploy(t, args)
-	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
-	definitions := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
-	proxy := definitionsByName(definitions)["search-proxy"]
-	if proxy == nil {
-		t.Fatal("search proxy is missing for AOSS endpoint")
-	}
-	command := proxy["command"].([]any)
-	for _, required := range []string{"--name", "aoss", "--host", "abc123.eu-west-3.aoss.amazonaws.com", "--sign-host", "abc123.eu-west-3.aoss.amazonaws.com"} {
-		found := false
-		for _, value := range command {
-			if value == required {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatalf("AOSS search proxy command lacks %q: %#v", required, command)
-		}
+	if got := searchProxyListenAddr(); got != ":8081" {
+		t.Fatalf("searchProxyListenAddr() = %q, want %q", got, ":8081")
 	}
 }
 
@@ -300,37 +477,84 @@ func TestRuntimeCreatesQueueConsumerServiceWhenRequested(t *testing.T) {
 	t.Parallel()
 	args := validArgs()
 	args.QueueConsumerCount = 2
+	args.Magento.ConsumerNames = []string{"product_action_attribute.update"}
 	m := deploy(t, args)
 	if !containsResource(m.snapshot(), "aws:ecs/service:Service:shop-queue-service") || !containsResource(m.snapshot(), "aws:ecs/taskDefinition:TaskDefinition:shop-queue-task") {
 		t.Fatalf("queue consumer resources were not created: %v", m.snapshot())
 	}
 	queueTask := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-queue-task")
-	if !strings.Contains(queueTask.inputs["containerDefinitions"].StringValue(), "queue:consumers:start") {
-		t.Fatalf("queue task does not start the Magento consumer: %s", queueTask.inputs["containerDefinitions"].StringValue())
+	definitions := queueTask.inputs["containerDefinitions"].StringValue()
+	if !strings.Contains(definitions, "queue:consumers:start") || !strings.Contains(definitions, "product_action_attribute.update") {
+		t.Fatalf("queue task does not start the named Magento consumer: %s", definitions)
 	}
 }
 
-func TestRuntimeFrankenPHPClassicUsesSingleHTTPContainer(t *testing.T) {
+func TestRuntimeWritesMagentoOverlayContract(t *testing.T) {
 	t.Parallel()
 	args := validArgs()
-	args.WebRuntime = "frankenphp-classic"
-	args.ApplicationMode = "headless"
-	args.ContainerPort = ApplicationPort
-	args.VarnishImage = ""
+	args.Magento.FrontName = "backend"
+	args.Magento.CookieDomain = ".shop.test"
 	m := deploy(t, args)
 	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
-	var definitions []map[string]any
-	if err := json.Unmarshal([]byte(task.inputs["containerDefinitions"].StringValue()), &definitions); err != nil {
-		t.Fatal(err)
+	definitions := task.inputs["containerDefinitions"].StringValue()
+	if !strings.Contains(definitions, "MAGENTO_DC_BACKEND__FRONTNAME") || !strings.Contains(definitions, "backend") {
+		t.Fatalf("web task missing Magento frontName overlay: %s", definitions)
 	}
-	if len(definitions) != 1 || definitions[0]["name"] != "web" || len(definitions[0]["portMappings"].([]any)) != 1 {
-		t.Fatalf("FrankenPHP classic task containers = %#v", definitions)
+	if !strings.Contains(definitions, "CONFIG__DEFAULT__WEB__COOKIE__COOKIE_DOMAIN") || !strings.Contains(definitions, ".shop.test") {
+		t.Fatalf("web task missing Magento cookie overlay: %s", definitions)
+	}
+}
+
+func TestRuntimeSupportsRegisteredWebRuntimesAndRejectsWorker(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		webRuntime string
+		command    string
+	}{
+		{webRuntime: "nginx-fpm", command: "nginx"},
+		{webRuntime: "frankenphp-classic", command: "frankenphp"},
+		{webRuntime: "php-apache", command: "sh"},
+	} {
+		test := test
+		t.Run(test.webRuntime, func(t *testing.T) {
+			t.Parallel()
+			args := validArgs()
+			args.WebRuntime = test.webRuntime
+			args.ApplicationMode = "headless"
+			args.ContainerPort = ApplicationPort
+			args.VarnishImage = ""
+			m := deploy(t, args)
+			definitions := definitionsByName(decodeDefinitions(t, m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task").inputs["containerDefinitions"].StringValue()))
+			web := definitions["web"]
+			if web == nil || web["command"].([]any)[0] != test.command {
+				t.Fatalf("%s web container = %#v", test.webRuntime, web)
+			}
+			if test.webRuntime == "nginx-fpm" {
+				if definitions["php-fpm"] == nil {
+					t.Fatal("nginx-fpm must retain its PHP-FPM container")
+				}
+			} else {
+				if definitions["php-fpm"] != nil {
+					t.Fatalf("%s must run as one HTTP process container", test.webRuntime)
+				}
+				if _, hasEnvironment := web["environment"]; !hasEnvironment {
+					t.Fatalf("%s web process must receive Magento configuration", test.webRuntime)
+				}
+			}
+		})
+	}
+	args := validArgs()
+	args.WebRuntime = "frankenphp-worker"
+	m := &mocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error { _, err := New(ctx, "shop", args); return err }, pulumi.WithMocks("project", "stack", m))
+	if err == nil || !strings.Contains(err.Error(), `plugin "frankenphp-worker" is not registered`) {
+		t.Fatalf("frankenphp-worker error = %v", err)
 	}
 }
 
 func TestRuntimeInjectsNonSecretCapabilityReferences(t *testing.T) {
 	t.Parallel()
-	for _, webRuntime := range []string{"nginx-fpm", "frankenphp-classic"} {
+	for _, webRuntime := range []string{"nginx-fpm", "frankenphp-classic", "php-apache"} {
 		webRuntime := webRuntime
 		t.Run(webRuntime, func(t *testing.T) {
 			t.Parallel()
@@ -500,7 +724,53 @@ func TestRuntimeContainerGraphInteractions(t *testing.T) {
 		check  func(*testing.T, *mocks)
 	}{
 		{
-			name: "U1_frankenphp_search_proxy_depends_on_web",
+			name: "U1_nginx_fpm_headless_search_proxy_depends_on_web",
+			mutate: func(args *Args) {
+				args.WebRuntime = "nginx-fpm"
+				args.ApplicationMode = "headless"
+				args.ContainerPort = ApplicationPort
+				args.VarnishImage = ""
+				args.SearchProxyImage = testSearchProxyImage
+				args.Capabilities = testCapabilities()
+			},
+			check: func(t *testing.T, m *mocks) {
+				byName := taskContainers(t, m, "shop-web-task")
+				if byName["search-proxy"] == nil || byName["php-fpm"] == nil || byName["web"] == nil {
+					names := make([]string, 0, len(byName))
+					for name := range byName {
+						names = append(names, name)
+					}
+					t.Fatalf("headless nginx-fpm containers = %v", names)
+				}
+				if _, hasVarnish := byName["varnish"]; hasVarnish {
+					t.Fatal("headless nginx-fpm must not append varnish")
+				}
+				assertDependsOnSearchProxy(t, byName["php-fpm"])
+			},
+		},
+		{
+			name: "U2_nginx_fpm_integrated_appends_varnish",
+			mutate: func(args *Args) {
+				args.WebRuntime = "nginx-fpm"
+				args.ApplicationMode = "integrated"
+				args.ContainerPort = VarnishPort
+				args.VarnishImage = testVarnishImage
+			},
+			check: func(t *testing.T, m *mocks) {
+				byName := taskContainers(t, m, "shop-web-task")
+				if byName["php-fpm"] == nil || byName["web"] == nil || byName["varnish"] == nil {
+					t.Fatalf("nginx-fpm integrated containers = %#v", byName)
+				}
+				if _, hasProxy := byName["search-proxy"]; hasProxy {
+					t.Fatal("unexpected search-proxy without SearchProxyImage")
+				}
+				if byName["varnish"]["image"] != testVarnishImage {
+					t.Fatalf("varnish image = %#v", byName["varnish"]["image"])
+				}
+			},
+		},
+		{
+			name: "U3_process_runtime_search_proxy_depends_on_web",
 			mutate: func(args *Args) {
 				args.WebRuntime = "frankenphp-classic"
 				args.ApplicationMode = "headless"
@@ -511,34 +781,10 @@ func TestRuntimeContainerGraphInteractions(t *testing.T) {
 			},
 			check: func(t *testing.T, m *mocks) {
 				byName := taskContainers(t, m, "shop-web-task")
-				if byName["search-proxy"] == nil {
-					t.Fatalf("search-proxy missing: %#v", byName)
-				}
-				if _, hasVarnish := byName["varnish"]; hasVarnish {
-					t.Fatal("headless frankenphp must not append varnish")
+				if byName["web"] == nil || byName["search-proxy"] == nil || byName["php-fpm"] != nil {
+					t.Fatalf("frankenphp-classic containers = %#v", byName)
 				}
 				assertDependsOnSearchProxy(t, byName["web"])
-			},
-		},
-		{
-			name: "U2_frankenphp_integrated_appends_varnish",
-			mutate: func(args *Args) {
-				args.WebRuntime = "frankenphp-classic"
-				args.ApplicationMode = "integrated"
-				args.ContainerPort = VarnishPort
-				args.VarnishImage = testVarnishImage
-			},
-			check: func(t *testing.T, m *mocks) {
-				byName := taskContainers(t, m, "shop-web-task")
-				if byName["web"] == nil || byName["varnish"] == nil {
-					t.Fatalf("frankenphp integrated containers = %#v", byName)
-				}
-				if _, hasProxy := byName["search-proxy"]; hasProxy {
-					t.Fatal("unexpected search-proxy without SearchProxyImage")
-				}
-				if byName["varnish"]["image"] != testVarnishImage {
-					t.Fatalf("varnish image = %#v", byName["varnish"]["image"])
-				}
 			},
 		},
 		{
@@ -562,12 +808,19 @@ func TestRuntimeContainerGraphInteractions(t *testing.T) {
 				args.Capabilities = testCapabilities()
 			},
 			check: func(t *testing.T, m *mocks) {
-				for _, taskName := range []string{"shop-deploy-task", "shop-cron-task"} {
-					byName := taskContainers(t, m, taskName)
-					appName := strings.TrimPrefix(strings.TrimSuffix(taskName, "-task"), "shop-")
-					if byName[appName] == nil || byName["search-proxy"] == nil {
-						t.Fatalf("%s containers = %#v", taskName, byName)
-					}
+				deploy := taskContainers(t, m, "shop-deploy-task")
+				if deploy["deploy"] == nil || deploy["search-proxy"] == nil {
+					t.Fatalf("deploy containers = %#v", deploy)
+				}
+				if deploy["search-proxy"]["essential"] != false {
+					t.Fatalf("deploy search-proxy must not be essential: %#v", deploy["search-proxy"])
+				}
+				cron := taskContainers(t, m, "shop-cron-task")
+				if cron["cron"] == nil || cron["search-proxy"] == nil {
+					t.Fatalf("cron containers = %#v", cron)
+				}
+				if cron["search-proxy"]["essential"] != true {
+					t.Fatalf("cron search-proxy must stay essential: %#v", cron["search-proxy"])
 				}
 			},
 		},

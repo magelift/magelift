@@ -1,5 +1,10 @@
 package platform
 
+import (
+	"strconv"
+	"strings"
+)
+
 // Magento / MageLift environment variable names. Adapters inject values from
 // their capability endpoints; they must not invent alternate Magento env names.
 const (
@@ -19,6 +24,8 @@ const (
 	EnvMagentoDBActive = "MAGENTO_DC_DB__CONNECTION__DEFAULT__ACTIVE"
 	EnvMagentoDBUser   = "MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME"
 	EnvMagentoDBPass   = "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD"
+
+	EnvMagentoInstallDate = "MAGENTO_DC_INSTALL__DATE"
 
 	EnvMagentoCacheBackend = "MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND"
 	EnvMagentoCacheServer  = "MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__SERVER"
@@ -43,23 +50,31 @@ const (
 	EnvMediaURL       = "MAGELIFT_MEDIA_URL"
 	EnvQueueMode      = "MAGELIFT_QUEUE_MODE"
 
-	EnvMagentoSearchEngine      = "MAGENTO_DC_CATALOG__SEARCH__ENGINE"
-	EnvMagentoSearchHost        = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME"
-	EnvMagentoSearchPort        = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT"
-	EnvMagentoSearchIndexPrefix = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX"
-	EnvMagentoSearchEnableAuth  = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH"
-	EnvMagentoSearchTimeout     = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_TIMEOUT"
+	EnvMagentoSearchEngine        = "MAGENTO_DC_CATALOG__SEARCH__ENGINE"
+	EnvMagentoSearchHost          = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME"
+	EnvMagentoSearchPort          = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT"
+	EnvMagentoSearchIndexPrefix   = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX"
+	EnvMagentoSearchEnableAuth    = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH"
+	EnvMagentoSearchTimeout       = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_TIMEOUT"
+	EnvMagentoDCOverride          = "MAGENTO_DC__OVERRIDE"
+	EnvMagentoElasticsuiteServers = "MAGENTO_DC_ELASTICSUITE__ES_CLIENT__SERVERS"
+	EnvMagentoElasticsuiteHTTPS   = "MAGENTO_DC_ELASTICSUITE__ES_CLIENT__ENABLE_HTTPS_MODE"
+	EnvMagentoElasticsuiteAuth    = "MAGENTO_DC_ELASTICSUITE__ES_CLIENT__ENABLE_HTTP_AUTH"
 
 	EnvMagentoQueueHost     = "MAGENTO_DC_QUEUE__AMQP__HOST"
 	EnvMagentoQueuePort     = "MAGENTO_DC_QUEUE__AMQP__PORT"
 	EnvMagentoQueueSSL      = "MAGENTO_DC_QUEUE__AMQP__SSL"
 	EnvMagentoQueueUsername = "MAGENTO_DC_QUEUE__AMQP__USERNAME"
+	EnvMagentoQueuePassword = "MAGENTO_DC_QUEUE__AMQP__PASSWORD"
+	EnvMagentoQueueDefault  = "MAGENTO_DC_QUEUE__DEFAULT_CONNECTION"
 
-	DefaultMySQLPort      = "3306"
-	DefaultValkeyPort     = "6379"
-	DefaultOpenSearchPort = "9200"
-	DefaultAMQPPort       = "5672"
-	RedisCacheBackend     = "Magento\\Framework\\Cache\\Backend\\Redis"
+	DefaultMySQLPort          = "3306"
+	DefaultValkeyPort         = "6379"
+	DefaultOpenSearchPort     = "9200"
+	DefaultAMQPPort           = "5672"
+	DefaultMagentoInstallDate = "Thu, 01 Jan 1970 00:00:00 +0000"
+	RedisCacheBackend         = "Magento\\Framework\\Cache\\Backend\\Redis"
+	ValkeyCacheBackend        = "valkey"
 )
 
 // EnvBinding is a literal container environment entry.
@@ -70,18 +85,20 @@ type EnvBinding struct {
 
 // CapabilityEndpoints are resolved hostnames/endpoints from cloud adapters.
 type CapabilityEndpoints struct {
-	ApplicationMode string
-	WebRuntime      string
-	DatabaseWriter  string
-	DatabaseName    string
-	CacheEndpoint   string
-	SessionEndpoint string
-	SearchEndpoint  string
-	QueueMode       string // database | rabbitmq
-	QueueHost       string
-	QueueUsername   string
-	MediaBucket     string
-	MediaURL        string
+	ApplicationMode    string
+	WebRuntime         string
+	ApplicationVersion string
+	DatabaseWriter     string
+	DatabaseName       string
+	CacheEndpoint      string
+	SessionEndpoint    string
+	SearchEndpoint     string
+	QueueMode          string // database | rabbitmq
+	QueueHost          string
+	QueueUsername      string
+	MediaBucket        string
+	MediaURL           string
+	Magento            MagentoOverlays
 }
 
 // CoreEnvBindings returns the Magento env contract for database + Valkey cache
@@ -90,6 +107,12 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 	session := endpoints.SessionEndpoint
 	if session == "" {
 		session = endpoints.CacheEndpoint
+	}
+	cacheBackend := RedisCacheBackend
+	sessionBackend := "redis"
+	if MagentoUsesValkey(endpoints.ApplicationVersion) {
+		cacheBackend = ValkeyCacheBackend
+		sessionBackend = "valkey"
 	}
 	bindings := []EnvBinding{
 		{Name: EnvApplicationMode, Value: endpoints.ApplicationMode},
@@ -104,36 +127,52 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 		{Name: EnvMagentoDBEngine, Value: "innodb"},
 		{Name: EnvMagentoDBInit, Value: "SET NAMES utf8;"},
 		{Name: EnvMagentoDBActive, Value: "1"},
-		{Name: EnvMagentoCacheBackend, Value: RedisCacheBackend},
+		// Magento only loads the core command list for an installed deployment.
+		// Existing database-backed environments may not carry install/date in the
+		// image's env.php, so provide a stable marker through its documented
+		// deployment-config environment contract.
+		{Name: EnvMagentoInstallDate, Value: DefaultMagentoInstallDate},
+		{Name: EnvMagentoCacheBackend, Value: cacheBackend},
 		{Name: EnvMagentoCacheServer, Value: endpoints.CacheEndpoint},
 		{Name: EnvMagentoCachePort, Value: DefaultValkeyPort},
 		{Name: EnvMagentoCacheDB, Value: "0"},
-		{Name: EnvMagentoPageCacheBackend, Value: RedisCacheBackend},
+		{Name: EnvMagentoPageCacheBackend, Value: cacheBackend},
 		{Name: EnvMagentoPageCacheServer, Value: endpoints.CacheEndpoint},
 		{Name: EnvMagentoPageCachePort, Value: DefaultValkeyPort},
 		{Name: EnvMagentoPageCacheDB, Value: "1"},
 		{Name: EnvMagentoPageCacheCompress, Value: "0"},
-		{Name: EnvMagentoSessionSave, Value: "redis"},
+		{Name: EnvMagentoSessionSave, Value: sessionBackend},
 		{Name: EnvMagentoSessionHost, Value: session},
 		{Name: EnvMagentoSessionPort, Value: DefaultValkeyPort},
 		{Name: EnvMagentoSessionDB, Value: "2"},
 	}
 	if endpoints.SearchEndpoint != "" {
+		host, port, httpsMode, servers := magentoSearchTarget(endpoints.SearchEndpoint)
 		bindings = append(bindings,
 			EnvBinding{Name: EnvSearchEndpoint, Value: endpoints.SearchEndpoint},
 			EnvBinding{Name: EnvMagentoSearchEngine, Value: "opensearch"},
-			EnvBinding{Name: EnvMagentoSearchHost, Value: endpoints.SearchEndpoint},
-			EnvBinding{Name: EnvMagentoSearchPort, Value: DefaultOpenSearchPort},
+			EnvBinding{Name: EnvMagentoSearchHost, Value: host},
+			EnvBinding{Name: EnvMagentoSearchPort, Value: port},
 			EnvBinding{Name: EnvMagentoSearchIndexPrefix, Value: "magento2"},
 			EnvBinding{Name: EnvMagentoSearchEnableAuth, Value: "0"},
 			EnvBinding{Name: EnvMagentoSearchTimeout, Value: "15"},
+			EnvBinding{Name: EnvMagentoElasticsuiteServers, Value: servers},
+			EnvBinding{Name: EnvMagentoElasticsuiteHTTPS, Value: httpsMode},
+			EnvBinding{Name: EnvMagentoElasticsuiteAuth, Value: "0"},
 		)
 	}
 	queueMode := endpoints.QueueMode
 	if queueMode == "" {
 		queueMode = "database"
 	}
-	bindings = append(bindings, EnvBinding{Name: EnvQueueMode, Value: queueMode})
+	queueConnection := "db"
+	if queueMode == "rabbitmq" {
+		queueConnection = "amqp"
+	}
+	bindings = append(bindings,
+		EnvBinding{Name: EnvQueueMode, Value: queueMode},
+		EnvBinding{Name: EnvMagentoQueueDefault, Value: queueConnection},
+	)
 	if queueMode == "rabbitmq" && endpoints.QueueHost != "" {
 		user := endpoints.QueueUsername
 		if user == "" {
@@ -152,5 +191,112 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 	if endpoints.MediaURL != "" {
 		bindings = append(bindings, EnvBinding{Name: EnvMediaURL, Value: endpoints.MediaURL})
 	}
+	override := ""
+	if endpoints.SearchEndpoint != "" {
+		_, _, httpsMode, servers := magentoSearchTarget(endpoints.SearchEndpoint)
+		override = magentoElasticsuiteOverride(servers, httpsMode)
+	}
+	if magentoJSON := MagentoOverlayJSON(endpoints.Magento); magentoJSON != "" {
+		override = MergeDeploymentOverride(override, magentoJSON)
+	}
+	if override != "" {
+		bindings = append(bindings, EnvBinding{Name: EnvMagentoDCOverride, Value: override})
+	}
+	bindings = append(bindings, MagentoOverlayEnv(endpoints.Magento)...)
 	return bindings
+}
+
+// magentoSearchTarget maps a search endpoint onto Magento/ElasticSuite env
+// the same way a shop generates env.php: hostname, port, HTTPS. AWS managed
+// domains use 443 inside the VPC with HTTP auth off. Local service names stay
+// on 9200 without TLS.
+func magentoSearchTarget(endpoint string) (host, port, httpsMode, servers string) {
+	host = strings.TrimSpace(endpoint)
+	port = DefaultOpenSearchPort
+	httpsMode = "0"
+	switch {
+	case strings.HasPrefix(host, "https://"):
+		host = strings.TrimPrefix(host, "https://")
+		port = "443"
+		httpsMode = "1"
+	case strings.HasPrefix(host, "http://"):
+		host = strings.TrimPrefix(host, "http://")
+		port = "80"
+	}
+	if cut := strings.IndexAny(host, "/?"); cut >= 0 {
+		host = host[:cut]
+	}
+	if name, explicitPort, ok := strings.Cut(host, ":"); ok {
+		host, port = name, explicitPort
+	}
+	if httpsMode == "0" && (strings.Contains(host, ".es.amazonaws.com") || strings.Contains(host, ".aoss.amazonaws.com")) {
+		httpsMode = "1"
+		if port == DefaultOpenSearchPort {
+			port = "443"
+		}
+	}
+	if port == "443" {
+		httpsMode = "1"
+	}
+	return host, port, httpsMode, host + ":" + port
+}
+
+func magentoElasticsuiteOverride(servers, httpsMode string) string {
+	if httpsMode != "1" {
+		httpsMode = "0"
+	}
+	return `{"system":{"default":{"smile_elasticsuite_core_base_settings":{"es_client":{"servers":` + strconv.Quote(servers) + `,"enable_https_mode":` + httpsMode + `,"enable_http_auth":0}}}}}`
+}
+
+// MagentoUsesValkey reports whether Adobe's current release guidance requires
+// Valkey instead of Redis for the cache and session configuration. The
+// thresholds are the latest patch releases in each supported 2.4.x line;
+// earlier patches retain the legacy Redis contract.
+func MagentoUsesValkey(version string) bool {
+	base, suffix, _ := strings.Cut(strings.TrimSpace(version), "-")
+	parts := strings.Split(base, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	major, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return false
+	}
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return false
+	}
+	patch, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return false
+	}
+	if major > 2 || (major == 2 && minor > 4) || (major == 2 && minor == 4 && patch >= 9) {
+		return true
+	}
+	if major != 2 || minor != 4 {
+		return false
+	}
+
+	securityPatch := 0
+	if suffix != "" {
+		if !strings.HasPrefix(suffix, "p") {
+			return false
+		}
+		securityPatch, err = strconv.Atoi(strings.TrimPrefix(suffix, "p"))
+		if err != nil {
+			return false
+		}
+	}
+	switch patch {
+	case 8:
+		return securityPatch >= 5
+	case 7:
+		return securityPatch >= 10
+	case 6:
+		return securityPatch >= 15
+	case 5:
+		return securityPatch >= 17
+	default:
+		return false
+	}
 }

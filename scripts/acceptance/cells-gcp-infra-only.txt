@@ -1,0 +1,7 @@
+# Managed-service/topology probe. This catalog never claims Magento application
+# certification and deliberately avoids the preserved unmarked Composer secret.
+bootstrap:wif
+day2:secrets
+day2:state
+search:health
+cost:estimate

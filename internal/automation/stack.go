@@ -8,6 +8,8 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
+const pulumiProjectName = "magelift"
+
 // NewInlineStackWithBackend creates an Automation API stack from any provider
 // program. An empty backendURL keeps Pulumi's normal backend selection.
 func NewInlineStackWithBackend(ctx context.Context, stackName string, program pulumi.RunFunc, backendURL string) (*auto.Stack, error) {
@@ -24,7 +26,7 @@ func NewInlineStackWithBackend(ctx context.Context, stackName string, program pu
 	if backendURL != "" {
 		options = append(options, auto.EnvVars(map[string]string{"PULUMI_BACKEND_URL": backendURL}))
 	}
-	stack, err := auto.UpsertStackInlineSource(ctx, stackName, "magelift", program, options...)
+	stack, err := auto.UpsertStackInlineSource(ctx, stackName, pulumiProjectName, program, options...)
 	if err != nil {
 		return nil, err
 	}

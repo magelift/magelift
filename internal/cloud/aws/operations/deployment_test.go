@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -13,13 +14,16 @@ import (
 )
 
 type deploymentMock struct {
-	definition   *types.TaskDefinition
-	tags         []types.Tag
-	described    *ecs.DescribeTaskDefinitionInput
-	registered   *ecs.RegisterTaskDefinitionInput
-	describes    int
-	stopped      bool
-	deregistered string
+	definition              *types.TaskDefinition
+	tags                    []types.Tag
+	described               *ecs.DescribeTaskDefinitionInput
+	registered              *ecs.RegisterTaskDefinitionInput
+	registrations           []*ecs.RegisterTaskDefinitionInput
+	describes               int
+	stopped                 bool
+	deregistered            string
+	deregisteredDefinitions []string
+	runTaskDefinitions      []string
 }
 
 type runFailureMock struct{ *deploymentMock }
@@ -46,9 +50,12 @@ func (m *deploymentMock) DescribeTaskDefinition(_ context.Context, input *ecs.De
 }
 func (m *deploymentMock) RegisterTaskDefinition(_ context.Context, input *ecs.RegisterTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.RegisterTaskDefinitionOutput, error) {
 	m.registered = input
-	return &ecs.RegisterTaskDefinitionOutput{TaskDefinition: &types.TaskDefinition{TaskDefinitionArn: awssdk.String("arn:aws:ecs:eu-west-3:123:task-definition/shop-candidate:1")}}, nil
+	m.registrations = append(m.registrations, input)
+	arn := fmt.Sprintf("arn:aws:ecs:eu-west-3:123:task-definition/shop-candidate:%d", len(m.registrations))
+	return &ecs.RegisterTaskDefinitionOutput{TaskDefinition: &types.TaskDefinition{TaskDefinitionArn: awssdk.String(arn)}}, nil
 }
-func (*deploymentMock) RunTask(context.Context, *ecs.RunTaskInput, ...func(*ecs.Options)) (*ecs.RunTaskOutput, error) {
+func (m *deploymentMock) RunTask(_ context.Context, input *ecs.RunTaskInput, _ ...func(*ecs.Options)) (*ecs.RunTaskOutput, error) {
+	m.runTaskDefinitions = append(m.runTaskDefinitions, awssdk.ToString(input.TaskDefinition))
 	return &ecs.RunTaskOutput{Tasks: []types.Task{{TaskArn: awssdk.String("arn:aws:ecs:eu-west-3:123:task/shop-migration")}}}, nil
 }
 func (m *deploymentMock) DescribeTasks(context.Context, *ecs.DescribeTasksInput, ...func(*ecs.Options)) (*ecs.DescribeTasksOutput, error) {
@@ -64,7 +71,119 @@ func (m *deploymentMock) StopTask(context.Context, *ecs.StopTaskInput, ...func(*
 }
 func (m *deploymentMock) DeregisterTaskDefinition(_ context.Context, input *ecs.DeregisterTaskDefinitionInput, _ ...func(*ecs.Options)) (*ecs.DeregisterTaskDefinitionOutput, error) {
 	m.deregistered = awssdk.ToString(input.TaskDefinition)
+	m.deregisteredDefinitions = append(m.deregisteredDefinitions, awssdk.ToString(input.TaskDefinition))
 	return &ecs.DeregisterTaskDefinitionOutput{}, nil
+}
+
+func databaseGrantTestContainer() types.ContainerDefinition {
+	return types.ContainerDefinition{
+		Name:  awssdk.String("deploy"),
+		Image: awssdk.String("ghcr.io/example/shop@sha256:" + strings.Repeat("b", 64)),
+		Environment: []types.KeyValuePair{
+			{Name: awssdk.String("MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME"), Value: awssdk.String("magento")},
+			{Name: awssdk.String("MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST"), Value: awssdk.String("db.example")},
+			{Name: awssdk.String("MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT"), Value: awssdk.String("3306")},
+		},
+		Secrets: []types.Secret{
+			{Name: awssdk.String("MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD"), ValueFrom: awssdk.String("password-secret")},
+			{Name: awssdk.String("MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME"), ValueFrom: awssdk.String("username-secret")},
+		},
+		HealthCheck:  &types.HealthCheck{Command: []string{"CMD-SHELL", "true"}},
+		PortMappings: []types.PortMapping{{ContainerPort: awssdk.Int32(8080)}},
+		DependsOn:    []types.ContainerDependency{{ContainerName: awssdk.String("db"), Condition: types.ContainerConditionHealthy}},
+	}
+}
+
+func TestDatabaseGrantContainerUsesDeployDatabaseInputs(t *testing.T) {
+	grant, ok := databaseGrantContainer(types.TaskDefinition{ContainerDefinitions: []types.ContainerDefinition{databaseGrantTestContainer()}})
+	if !ok {
+		t.Fatal("database grant container was not created")
+	}
+	if got := awssdk.ToString(grant.Name); got != "database-grant" {
+		t.Fatalf("grant container name = %q", got)
+	}
+	if got := awssdk.ToString(grant.Image); got != databaseClientImage {
+		t.Fatalf("grant container image = %q, want %q", got, databaseClientImage)
+	}
+	if len(grant.EntryPoint) != 2 || grant.EntryPoint[0] != "/bin/sh" || grant.EntryPoint[1] != "-ec" {
+		t.Fatalf("grant container entrypoint = %#v", grant.EntryPoint)
+	}
+	if len(grant.Command) != 1 || !strings.Contains(grant.Command[0], "GRANT ALL PRIVILEGES ON") {
+		t.Fatalf("grant container command = %#v", grant.Command)
+	}
+	if grant.HealthCheck != nil || len(grant.PortMappings) != 0 || len(grant.DependsOn) != 0 {
+		t.Fatalf("grant container retained runtime-only settings: %#v", grant)
+	}
+}
+
+func TestDatabaseGrantContainerRequiresAllDatabaseInputs(t *testing.T) {
+	container := databaseGrantTestContainer()
+	container.Secrets = container.Secrets[:1]
+	if hasDatabaseGrantInputs(container) {
+		t.Fatal("database grant inputs accepted without the username secret")
+	}
+	container = databaseGrantTestContainer()
+	container.Environment = container.Environment[:2]
+	if hasDatabaseGrantInputs(container) {
+		t.Fatal("database grant inputs accepted without the database port")
+	}
+}
+
+func TestRegisterCandidateRegistersDatabaseGrantDefinition(t *testing.T) {
+	mock := &deploymentMock{definition: &types.TaskDefinition{
+		Family:               awssdk.String("shop-deploy"),
+		Cpu:                  awssdk.String("512"),
+		Memory:               awssdk.String("1024"),
+		ContainerDefinitions: []types.ContainerDefinition{databaseGrantTestContainer()},
+	}}
+	store, err := NewDeploymentFromClient(mock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newImage := "ghcr.io/example/shop@sha256:" + strings.Repeat("a", 64)
+	candidate, err := store.RegisterCandidate(context.Background(), CandidateRequest{
+		Cluster: "shop-cluster", TaskDefinitionARN: "arn:aws:ecs:eu-west-3:123:task-definition/shop-deploy:1",
+		ImageDigest: newImage, PrivateSubnetIDs: []string{"subnet-a"}, SecurityGroupID: "sg-web",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate.DatabaseGrantTaskDefinitionARN == "" || len(mock.registrations) != 2 {
+		t.Fatalf("candidate grant registration = candidate=%#v registrations=%d", candidate, len(mock.registrations))
+	}
+	if got := awssdk.ToString(mock.registrations[0].ContainerDefinitions[0].Image); got != newImage {
+		t.Fatalf("candidate image = %q, want %q", got, newImage)
+	}
+	grant := mock.registrations[1]
+	if got := awssdk.ToString(grant.Family); !strings.HasSuffix(got, "-db-grant") {
+		t.Fatalf("grant family = %q", got)
+	}
+	if len(grant.ContainerDefinitions) != 1 || awssdk.ToString(grant.ContainerDefinitions[0].Name) != "database-grant" {
+		t.Fatalf("grant registration containers = %#v", grant.ContainerDefinitions)
+	}
+}
+
+func TestRunMigrationsRunsDatabaseGrantBeforeMigration(t *testing.T) {
+	mock := &deploymentMock{}
+	store, err := NewDeploymentFromClient(mock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.waitInterval = time.Millisecond
+	store.waitTimeout = time.Second
+	candidate := Candidate{Cluster: "shop-cluster", TaskDefinitionARN: "migration-definition", DatabaseGrantTaskDefinitionARN: "grant-definition", PrivateSubnetIDs: []string{"subnet-a"}, SecurityGroupID: "sg-web", StartedBy: "magelift"}
+	if err := store.RunMigrations(context.Background(), candidate); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(mock.runTaskDefinitions, ","), "grant-definition,migration-definition"; got != want {
+		t.Fatalf("task definition execution order = %q, want %q", got, want)
+	}
+	if err := store.Cleanup(context.Background(), candidate); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(mock.deregisteredDefinitions, ","), "migration-definition,grant-definition"; got != want {
+		t.Fatalf("task definition cleanup order = %q, want %q", got, want)
+	}
 }
 
 func TestDeploymentCandidateRunsMigrationsAndCleansUp(t *testing.T) {
@@ -206,6 +325,35 @@ func TestDeploymentReportsFailedMigrationContainer(t *testing.T) {
 	err = store.RunMigrations(context.Background(), Candidate{Cluster: "shop-cluster", TaskDefinitionARN: "candidate", TaskARN: "migration", PrivateSubnetIDs: []string{"subnet-a"}, SecurityGroupID: "sg-web", StartedBy: "magelift"})
 	if err == nil || !strings.Contains(err.Error(), "setup:upgrade failed") {
 		t.Fatalf("failed migration = %v", err)
+	}
+}
+
+func TestOneOffTaskResultIgnoresSidecarExitAfterDeploySuccess(t *testing.T) {
+	t.Parallel()
+	task := types.Task{
+		StoppedReason: awssdk.String("Essential container in task exited"),
+		Containers: []types.Container{
+			{Name: awssdk.String("deploy"), ExitCode: awssdk.Int32(0)},
+			{Name: awssdk.String("search-proxy"), ExitCode: awssdk.Int32(2)},
+		},
+	}
+	if err := oneOffTaskResult("migration", task); err != nil {
+		t.Fatalf("deploy exit 0 should succeed despite sidecar: %v", err)
+	}
+}
+
+func TestOneOffTaskResultFailsWhenDeployExitsNonZero(t *testing.T) {
+	t.Parallel()
+	task := types.Task{
+		StoppedReason: awssdk.String("Essential container in task exited"),
+		Containers: []types.Container{
+			{Name: awssdk.String("deploy"), ExitCode: awssdk.Int32(1), Reason: awssdk.String("magento setup:upgrade failed")},
+			{Name: awssdk.String("search-proxy"), ExitCode: awssdk.Int32(0)},
+		},
+	}
+	err := oneOffTaskResult("migration", task)
+	if err == nil || !strings.Contains(err.Error(), "setup:upgrade failed") {
+		t.Fatalf("deploy exit 1 = %v", err)
 	}
 }
 

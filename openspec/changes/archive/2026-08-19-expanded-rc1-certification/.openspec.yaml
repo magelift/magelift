@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-08-04
+goal: Certify only Adobe-listed configurations, add provider-specific
+  compatibility labels, and run reproducible live acceptance without leaving
+  billable resources behind.

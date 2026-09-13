@@ -1,0 +1,16 @@
+# Packed AWS Fargate KEEP catalog for audit-catalog-cert-campaign 6.3.
+# Requires MAGELIFT_AWS_ACCEPTANCE_KEEP=true and MAGELIFT_AWS_ACCEPTANCE_ALLOW_COSTLY=true.
+# Origin YAML must list three AZs (amazon-mq CLUSTER_MULTI_AZ) and start on
+# computeMode:fargate, queueMode:db, searchMode:disabled, databaseEngine:rds-mysql.
+# Cold Managed Instances and EKS stay on their architecture catalogs / workdirs.
+# Destroy plus orphan assert at campaign close. Do not promote experimental cells.
+# observability:xray stays typed unsupported until an ObservabilityAdapter registers X-Ray.
+computeMode:fargate
+queueMode:db
+queueMode:ecs-rabbitmq
+queueMode:amazon-mq
+searchMode:disabled
+searchMode:serverless
+databaseEngine:rds-mysql
+databaseEngine:aurora-mysql
+ha:multi-az

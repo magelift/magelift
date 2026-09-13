@@ -13,7 +13,7 @@
 ## How verified
 
 - [ ] `make verify`
-- [ ] `make floci-test` (or N/A — reason: )
+- [ ] `make local-gates` or `make floci-test-aws` / `make floci-gcp-test` (or N/A — reason: )
 - [ ] Real-cloud acceptance (or N/A — reason: )
 - [ ] Other:
 

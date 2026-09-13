@@ -6,15 +6,19 @@ import (
 	"errors"
 	"fmt"
 
+	gcpdatabase "github.com/magelift/magelift/internal/cloud/gcp/database"
+	gcpruntime "github.com/magelift/magelift/internal/cloud/gcp/runtime"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 )
 
 // Estimator is the GCP cost adapter.
-type Estimator struct{}
+type Estimator struct {
+	NewBudgetReader func(context.Context) (BudgetReader, error)
+}
 
 // Estimate reports account-free catalog capacity. Live Catalog API is not wired yet.
-func (Estimator) Estimate(ctx context.Context, planned platform.PlannedStack, cfg config.Config, opts platform.CostOptions) (platform.CostReport, error) {
+func (e Estimator) Estimate(ctx context.Context, planned platform.PlannedStack, cfg config.Config, opts platform.CostOptions) (platform.CostReport, error) {
 	_ = ctx
 	if planned == nil {
 		return platform.CostReport{}, errors.New("planned stack is required")
@@ -23,13 +27,33 @@ func (Estimator) Estimate(ctx context.Context, planned platform.PlannedStack, cf
 	if runtime == "" {
 		runtime = "gke-autopilot"
 	}
-	if runtime != "gke-autopilot" {
+	if runtime != "gke-autopilot" && runtime != "gke-standard" {
 		return platform.CostReport{}, fmt.Errorf("cost estimation is not available for runtime %q yet", runtime)
 	}
 	if opts.Live {
 		return platform.CostReport{}, errors.New("GCP --live Catalog pricing is not wired yet; use account-free mode (omit --live)")
 	}
-	return accountFree(cfg, planned.Environment()), nil
+	report := accountFree(cfg, planned.Environment())
+	if !opts.Budget {
+		return report, nil
+	}
+	if cfg.Target.GCP == nil {
+		return platform.CostReport{}, errors.New("GCP budget lookup requires target.gcp.project")
+	}
+	newReader := e.NewBudgetReader
+	if newReader == nil {
+		newReader = NewBudgetReader
+	}
+	reader, err := newReader(ctx)
+	if err != nil {
+		return platform.CostReport{}, fmt.Errorf("create GCP budget reader: %w", err)
+	}
+	budget, err := reader.Read(ctx, cfg.Target.GCP.Project)
+	if err != nil {
+		return platform.CostReport{}, err
+	}
+	report.Budget = &budget
+	return report, nil
 }
 
 func accountFree(cfg config.Config, environment string) platform.CostReport {
@@ -58,6 +82,10 @@ func accountFree(cfg config.Config, environment string) platform.CostReport {
 	}
 
 	gcp := cfg.Target.GCP
+	clusterResource := "GKE Autopilot"
+	if cfg.Target.Runtime == "gke-standard" {
+		clusterResource = "GKE Standard"
+	}
 	desiredWeb := gcp.DesiredWebReplicas
 	if desiredWeb == 0 {
 		switch preset {
@@ -75,13 +103,14 @@ func accountFree(cfg config.Config, environment string) platform.CostReport {
 	}
 	memoryRequest := gcp.AutopilotMemoryRequest
 	if memoryRequest == "" {
-		memoryRequest = "1Gi"
+		memoryRequest = gcpruntime.DefaultApplicationMemoryRequest
 	}
 	cloudSQLTier := gcp.CloudSQLTier
 	if cloudSQLTier == "" {
-		cloudSQLTier = "db-custom-1-3840"
-		if preset != "preview" {
-			cloudSQLTier = "db-custom-2-7680"
+		if databaseVersion, err := gcpdatabase.DatabaseVersionForMagento(cfg.Application.Version); err == nil {
+			cloudSQLTier = gcpdatabase.DefaultTier(databaseVersion, preset)
+		} else {
+			cloudSQLTier = gcpdatabase.DefaultTier(gcpdatabase.DatabaseVersionMySQL80, preset)
 		}
 	}
 	availability := "ZONAL"
@@ -96,11 +125,15 @@ func accountFree(cfg config.Config, environment string) platform.CostReport {
 		}
 	}
 	memorystoreReplicas := 0
-	if preset == "standard" {
-		memorystoreReplicas = 1
-	}
-	if preset == "high-availability" {
-		memorystoreReplicas = 2
+	if gcp.MemorystoreReplicas != nil {
+		memorystoreReplicas = *gcp.MemorystoreReplicas
+	} else {
+		if preset == "standard" {
+			memorystoreReplicas = 1
+		}
+		if preset == "high-availability" {
+			memorystoreReplicas = 2
+		}
 	}
 	queueMode := "database"
 	queueConsumers := gcp.QueueConsumerCount
@@ -119,21 +152,21 @@ func accountFree(cfg config.Config, environment string) platform.CostReport {
 	}
 
 	report.Estimated = []platform.CostEstimatedItem{
-		{Resource: "GKE Autopilot web", Configuration: fmt.Sprintf("%d replicas, %s CPU, %s memory each", desiredWeb, valueOrUnknown(cpuRequest), valueOrUnknown(memoryRequest))},
+		{Resource: clusterResource + " web", Configuration: fmt.Sprintf("%d replicas, %s CPU, %s memory each", desiredWeb, valueOrUnknown(cpuRequest), valueOrUnknown(memoryRequest))},
 		{Resource: "Cloud SQL MySQL", Configuration: fmt.Sprintf("%s, %s", valueOrUnknown(cloudSQLTier), availability)},
 		{Resource: "Memorystore for Valkey", Configuration: fmt.Sprintf("%s, %d replicas", valueOrUnknown(memorystoreNodeType), memorystoreReplicas)},
 		{Resource: "Edge / load balancer", Configuration: edge},
-		queueCostEstimate(queueMode, queueConsumers),
+		queueCostEstimate(queueMode, queueConsumers, clusterResource),
 	}
 	return report
 }
 
-func queueCostEstimate(queueMode string, consumers int) platform.CostEstimatedItem {
+func queueCostEstimate(queueMode string, consumers int, clusterResource string) platform.CostEstimatedItem {
 	switch queueMode {
 	case "database":
 		return platform.CostEstimatedItem{Resource: "Magento queue", Configuration: "database-backed; no broker"}
 	default:
-		return platform.CostEstimatedItem{Resource: "RabbitMQ on GKE Autopilot", Configuration: fmt.Sprintf("%s mode, %d consumer replicas", queueMode, consumers)}
+		return platform.CostEstimatedItem{Resource: "RabbitMQ on " + clusterResource, Configuration: fmt.Sprintf("%s mode, %d consumer replicas", queueMode, consumers)}
 	}
 }
 

@@ -8,6 +8,14 @@ import (
 	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
+func TestShellJoinPreservesCommandArgumentBoundaries(t *testing.T) {
+	got := shellJoin([]string{"bin/magento", "cache:flush; touch /tmp/owned", "O'Reilly"})
+	want := `bin/magento 'cache:flush; touch /tmp/owned' 'O'"'"'Reilly'`
+	if got != want {
+		t.Fatalf("shellJoin() = %q, want %q", got, want)
+	}
+}
+
 func TestPrepareExecRejectsDeployWorkload(t *testing.T) {
 	t.Parallel()
 	_, err := (Observe{}).PrepareExec(t.Context(), nil, map[string]any{

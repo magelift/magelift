@@ -4,6 +4,7 @@ package runtime
 import (
 	"regexp"
 
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -15,6 +16,9 @@ const (
 	ApplicationPort = 8080
 	VarnishPort     = 6081
 	searchProxyPort = 8081
+	// DefaultSearchProxyImage signs Magento OpenSearch requests to AOSS.
+	// Provisioned domains do not use it; Magento talks HTTPS:443 in-VPC.
+	DefaultSearchProxyImage = "public.ecr.aws/aws-observability/aws-sigv4-proxy:1.11.1@sha256:34bbec3cb98403d3e040ec1dadb53bb02285f70d2f0ead2d16435fd30980abaa"
 )
 
 var imageDigest = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
@@ -69,7 +73,13 @@ type Identity struct {
 
 type Args struct {
 	Region             string
+	ComputeMode        string
+	InstanceType       string
+	InstanceAMI        string
+	MinCapacity        int
+	MaxCapacity        int
 	ApplicationMode    string
+	ApplicationVersion string
 	WebRuntime         string
 	VpcID              pulumi.StringInput
 	PrivateSubnetIDs   pulumi.StringArray
@@ -91,6 +101,7 @@ type Args struct {
 	// LogGroupPrefix is /magelift/<project>/<env>; containers append /web|/deploy|/cron.
 	LogGroupPrefix string
 	Tags           map[string]string
+	Magento        platform.MagentoOverlays
 }
 
 type Component struct {

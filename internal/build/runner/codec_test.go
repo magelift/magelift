@@ -37,6 +37,21 @@ func TestFinalizeValidatesOCIDigest(t *testing.T) {
 	}
 }
 
+func TestPrepareAcceptsRegisteredWebRuntimesAndRejectsWorker(t *testing.T) {
+	for _, webRuntime := range []string{"nginx-fpm", "frankenphp-classic", "php-apache"} {
+		request := validPrepareRequest()
+		request.Prepare.Application.WebRuntime = webRuntime
+		if err := request.Validate(); err != nil {
+			t.Fatalf("%s validation: %v", webRuntime, err)
+		}
+	}
+	request := validPrepareRequest()
+	request.Prepare.Application.WebRuntime = "frankenphp-worker"
+	if err := request.Validate(); err == nil || !strings.Contains(err.Error(), `plugin "frankenphp-worker" is not registered`) {
+		t.Fatalf("frankenphp-worker validation = %v", err)
+	}
+}
+
 func TestDecodeResponseIsStrictAndBounded(t *testing.T) {
 	valid := `{"protocolVersion":1,"stage":"finalize","finalize":{"imageDigest":"sha256:` + strings.Repeat("b", 64) + `","manifestPath":"dist/manifest.json","manifestSha256":"` + strings.Repeat("c", 64) + `"}}`
 	if _, err := DecodeResponse(strings.NewReader(valid)); err != nil {
@@ -88,6 +103,7 @@ func TestPrepareResponseCanonicalizesSetAndChecksumOrder(t *testing.T) {
 		PreparedArtifact: "dist/rootfs.tar",
 		PHPVersion:       "8.5.1",
 		PHPExtensions:    []string{"pdo_mysql", "intl"},
+		ComposerVersion:  "2.10.2",
 		EnabledModules:   []string{"Vendor_Second", "Magento_Catalog"},
 		Checksums: []FileChecksum{
 			{Path: "vendor/autoload.php", SHA256: strings.Repeat("d", 64)},

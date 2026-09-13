@@ -7,22 +7,31 @@ import (
 	"os"
 
 	"github.com/magelift/magelift/internal/cloud/kube"
-	"github.com/magelift/magelift/internal/config"
+	ovhcost "github.com/magelift/magelift/internal/cloud/ovh/cost"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
 )
 
-// unsupported covers remaining experimental gaps: Bootstrap, Secrets, Cost only.
+// unsupported covers remaining experimental gaps: Bootstrap and application
+// Secrets when the module was not given a provider-local OKMS client factory.
 // Observe/Steps/State live on shared kube / concrete State adapters (D-05).
 type unsupported struct{}
 
 func (Module) Bootstrap() platform.Bootstrap { return unsupported{} }
 func (Module) State() platform.State         { return State{} }
-func (Module) Secrets() platform.Secrets     { return unsupported{} }
+func (m Module) Secrets() platform.Secrets {
+	if m.NewApplicationSecretClient == nil {
+		return unsupported{}
+	}
+	return NewSecrets(m.NewApplicationSecretClient)
+}
 func (Module) RuntimeObserve() platform.RuntimeObserve {
 	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
 }
-func (Module) CostEstimator() platform.CostEstimator { return unsupported{} }
+func (Module) RuntimeTunnel() platform.RuntimeTunnel {
+	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
+}
+func (Module) CostEstimator() platform.CostEstimator { return ovhcost.Estimator{} }
 
 func (unsupported) VerifyAccount(context.Context, platform.PlannedStack) error {
 	return platform.ErrNotSupported
@@ -38,9 +47,6 @@ func (unsupported) Set(context.Context, platform.PlannedStack, string, []byte) e
 }
 func (unsupported) Remove(context.Context, platform.PlannedStack, string) error {
 	return platform.ErrNotSupported
-}
-func (unsupported) Estimate(context.Context, platform.PlannedStack, config.Config, platform.CostOptions) (platform.CostReport, error) {
-	return platform.CostReport{}, platform.ErrNotSupported
 }
 
 type Ops struct {
@@ -68,13 +74,15 @@ func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.P
 	}
 	spec := ovhPlanned.Spec
 	deploySpec := kube.DeploySpec{
-		ImageDigest:     spec.Artifact.ImageDigest,
-		DatabaseName:    spec.Dependencies.DatabaseName,
-		ApplicationMode: spec.Application.Mode,
-		WebRuntime:      spec.Application.WebRuntime,
-		CPURequest:      spec.Catalog.CPURequest,
-		MemoryRequest:   spec.Catalog.MemoryRequest,
-		Region:          spec.Identity.Region,
+		ImageDigest:        spec.Artifact.ImageDigest,
+		DatabaseName:       spec.Dependencies.DatabaseName,
+		ApplicationMode:    spec.Application.Mode,
+		ApplicationVersion: spec.Application.Version,
+		WebRuntime:         spec.Application.WebRuntime,
+		Magento:            spec.Application.Magento,
+		CPURequest:         spec.Catalog.CPURequest,
+		MemoryRequest:      spec.Catalog.MemoryRequest,
+		Region:             spec.Identity.Region,
 	}
 	newCandidate := o.NewCandidate
 	if newCandidate == nil {

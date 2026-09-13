@@ -25,7 +25,7 @@ type SecurityPolicy struct {
 }
 
 func DefaultSecurityPolicy() SecurityPolicy {
-	return SecurityPolicy{MinimumTLSVersion: "TLSv1.2_2021", WAFManagedRules: true, WAFCountMode: true}
+	return SecurityPolicy{MinimumTLSVersion: "TLSv1.2_2021", WAFManagedRules: true, WAFCountMode: false}
 }
 
 type ALBOrigin struct {
@@ -36,6 +36,7 @@ type ALBOrigin struct {
 
 type Args struct {
 	DomainName  string
+	FrontName   string
 	HostedZone  sdk.ExistingResourceRef
 	Certificate sdk.ExistingResourceRef
 	Origin      ALBOrigin
@@ -75,18 +76,7 @@ func New(ctx *pulumi.Context, name string, args Args, options ...pulumi.Resource
 		return nil, fmt.Errorf("create CloudFront origin request policy: %w", err)
 	}
 
-	webACL, err := wafv2.NewWebAcl(ctx, name, &wafv2.WebAclArgs{
-		Name: pulumi.String(name), Scope: pulumi.String("CLOUDFRONT"), Region: pulumi.String("us-east-1"),
-		DefaultAction: &wafv2.WebAclDefaultActionArgs{Allow: &wafv2.WebAclDefaultActionAllowArgs{}},
-		Rules: wafv2.WebAclRuleTypeArray{&wafv2.WebAclRuleTypeArgs{
-			Name: pulumi.String("aws-common"), Priority: pulumi.Int(0),
-			OverrideAction:   &wafv2.WebAclRuleOverrideActionArgs{Count: &wafv2.WebAclRuleOverrideActionCountArgs{}},
-			Statement:        &wafv2.WebAclRuleStatementArgs{ManagedRuleGroupStatement: &wafv2.WebAclRuleStatementManagedRuleGroupStatementArgs{Name: pulumi.String("AWSManagedRulesCommonRuleSet"), VendorName: pulumi.String("AWS")}},
-			VisibilityConfig: &wafv2.WebAclRuleVisibilityConfigArgs{CloudwatchMetricsEnabled: pulumi.Bool(true), MetricName: pulumi.String(name + "-aws-common"), SampledRequestsEnabled: pulumi.Bool(true)},
-		}},
-		VisibilityConfig: &wafv2.WebAclVisibilityConfigArgs{CloudwatchMetricsEnabled: pulumi.Bool(true), MetricName: pulumi.String(name), SampledRequestsEnabled: pulumi.Bool(true)},
-		Tags:             pulumi.ToStringMap(args.Tags),
-	}, childOptions...)
+	webACL, err := wafv2.NewWebAcl(ctx, name, magentoWebACLArgs(name, args.Security.WAFCountMode, args.FrontName, args.Tags), childOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("create WAF WebACL: %w", err)
 	}
@@ -140,8 +130,8 @@ func validateArgs(name string, args Args) error {
 	if err := sdk.ValidateExistingResourceRef(args.Certificate); err != nil || args.Certificate.Provider != "aws" || args.Certificate.Kind != sdk.ExistingCertificate || !strings.HasPrefix(args.Certificate.ExternalID, "arn:aws:acm:us-east-1:") {
 		return errors.New("edge certificate must be an explicit us-east-1 AWS certificate reference")
 	}
-	if args.Security.MinimumTLSVersion != "TLSv1.2_2021" || !args.Security.WAFManagedRules || !args.Security.WAFCountMode {
-		return errors.New("edge security policy must enforce TLS 1.2 and managed WAF rules in count mode")
+	if args.Security.MinimumTLSVersion != "TLSv1.2_2021" || !args.Security.WAFManagedRules {
+		return errors.New("edge security policy must enforce TLS 1.2 and Magento-safe managed WAF rules")
 	}
 	return nil
 }

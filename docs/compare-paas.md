@@ -1,26 +1,27 @@
 ---
 title: Compare MageLift to ACC / Upsun
-description: MageLift vs Adobe Commerce Cloud and Upsun. Own-cloud Magento with ACC/Upsun-shaped YAML versus a rented Magento PaaS. Cost model, lock-in, certified AWS/GCP targets.
+description: MageLift vs Adobe Commerce Cloud and Upsun. Own-cloud Magento with ACC/Upsun-shaped YAML versus a rented Magento PaaS. Cost model, lock-in, and the AWS, GCP, Scaleway, and OVHcloud target matrix.
 ---
 
 # Compare MageLift to ACC / Upsun
 
 Adobe Commerce Cloud and Upsun-style products run Magento on their platform.
-MageLift is free open-source software that runs Magento in your AWS or GCP
-account with familiar YAML. You pay the cloud bill and control IAM.
+MageLift is free open-source software that runs Magento in your AWS, GCP,
+Scaleway, or OVHcloud account with familiar YAML. You pay the cloud bill and
+control IAM.
 
 Cost numbers here are illustrative. Plug in your own quotes.
 
 ## Audience
 
-- Agencies with roughly 3-20 Magento shops that have (or want) AWS/GCP accounts
+- Agencies with roughly 3-20 Magento shops that have (or want) cloud accounts
 - SME Magento owners who can follow YAML/CLI docs without a dedicated DevOps hire
 
 ## PaaS vs MageLift
 
 | | Adobe Commerce Cloud / Upsun-style PaaS | MageLift |
 | --- | --- | --- |
-| Where Magento runs | Vendor-managed platform | Your AWS or GCP account |
+| Where Magento runs | Vendor-managed platform | Your AWS, GCP, Scaleway, or OVHcloud account |
 | Config shape | PaaS YAML / UI | ACC/Upsun-shaped `magelift.yaml` + CLI |
 | Lock-in | Platform + often region/tooling | Cloud APIs + open-source CLI (Apache-2.0) |
 | Cost model | Platform fee + usage | Cloud bill (and your time). `magelift cost` estimates AWS shapes |
@@ -72,7 +73,7 @@ DNS cutover: [migrating-from-paas](migrating-from-paas.md) and
 ### Is MageLift cheaper than Adobe Commerce Cloud?
 
 It can be, but MageLift does not publish a fixed savings number. You replace the
-platform fee with your AWS/GCP bill plus operator time. Run `magelift cost` and
+platform fee with your selected cloud bill plus operator time. Run `magelift cost` and
 compare to your PaaS quote on the same assumptions.
 
 ### Will my Magento team recognize the config?

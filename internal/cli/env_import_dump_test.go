@@ -77,6 +77,53 @@ func TestEnvImportDumpSuccessMovesJournalImported(t *testing.T) {
 	}
 }
 
+func TestEnvImportDumpPreflightsTransportBeforeJournalMutation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dumpPath := filepath.Join(dir, "seed.sql")
+	if err := os.WriteFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	create := newCommandWithOptions(testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false}))
+	create.SetArgs([]string{"--config", path, "--output", "json", "env", "create", "preview-preflight", "--dump", dumpPath})
+	if err := create.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	runner := &fakeDependencyRunner{missing: map[string]bool{"mysql": true, "docker": true}}
+	called := false
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.configPath, o.dependencyRunner = path, runner
+	o.importSeedDump = func(context.Context, dumpimport.Options) error {
+		called = true
+		return nil
+	}
+	command := newCommandWithOptions(o)
+	command.SetArgs([]string{"--config", path, "env", "import-dump", "preview-preflight"})
+	err := command.Execute()
+	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "database dump import") {
+		t.Fatalf("error=%v code=%d", err, ExitCode(err))
+	}
+	if called {
+		t.Fatal("dump importer ran after dependency preflight failed")
+	}
+	store, err := seeddump.New(dir, "preview-preflight")
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := store.Read(context.Background())
+	if err != nil || record == nil {
+		t.Fatalf("journal: %v %#v", err, record)
+	}
+	if record.Status != seeddump.StatusRecorded {
+		t.Fatalf("journal status = %q, want recorded", record.Status)
+	}
+}
+
 func TestEnvImportDumpFailureMarksFailed(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "magelift.yaml")

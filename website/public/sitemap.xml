@@ -18,6 +18,7 @@
   <url><loc>https://magelift.dev/docs/cli-reference/</loc></url>
   <url><loc>https://magelift.dev/docs/operations/</loc></url>
   <url><loc>https://magelift.dev/docs/bootstrap/</loc></url>
+  <url><loc>https://magelift.dev/docs/acceptance-dependencies/</loc></url>
   <url><loc>https://magelift.dev/docs/adding-a-provider/</loc></url>
   <url><loc>https://magelift.dev/docs/adr/</loc></url>
   <url><loc>https://magelift.dev/docs/aws-acceptance/</loc></url>
@@ -25,6 +26,7 @@
   <url><loc>https://magelift.dev/docs/benchmarks/</loc></url>
   <url><loc>https://magelift.dev/docs/brownfield-attach/</loc></url>
   <url><loc>https://magelift.dev/docs/builds/</loc></url>
+  <url><loc>https://magelift.dev/docs/certification-sessions/</loc></url>
   <url><loc>https://magelift.dev/docs/compatibility/</loc></url>
   <url><loc>https://magelift.dev/docs/dependency-policy/</loc></url>
   <url><loc>https://magelift.dev/docs/ece-parity/</loc></url>
@@ -33,6 +35,7 @@
   <url><loc>https://magelift.dev/docs/gcp-experimental/</loc></url>
   <url><loc>https://magelift.dev/docs/github-labels/</loc></url>
   <url><loc>https://magelift.dev/docs/lint-policy/</loc></url>
+  <url><loc>https://magelift.dev/docs/operations/ownership-and-escalation/</loc></url>
   <url><loc>https://magelift.dev/docs/ovh-experimental/</loc></url>
   <url><loc>https://magelift.dev/docs/post-beta-roadmap/</loc></url>
   <url><loc>https://magelift.dev/docs/provenance/</loc></url>

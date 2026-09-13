@@ -5,31 +5,53 @@ import (
 	"fmt"
 
 	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/localdev"
+	"github.com/magelift/magelift/internal/toolchain"
 	"github.com/spf13/cobra"
 )
 
 const doctorExitUnhealthy = 4
 
 type doctorCheck struct {
-	ID      string `json:"id" yaml:"id"`
-	Status  string `json:"status" yaml:"status"`
-	Message string `json:"message" yaml:"message"`
+	ID          string `json:"id" yaml:"id"`
+	Status      string `json:"status" yaml:"status"`
+	Message     string `json:"message" yaml:"message"`
+	Capability  string `json:"capability,omitempty" yaml:"capability,omitempty"`
+	Requirement string `json:"requirement,omitempty" yaml:"requirement,omitempty"`
+	Path        string `json:"path,omitempty" yaml:"path,omitempty"`
+	Version     string `json:"version,omitempty" yaml:"version,omitempty"`
+	InstallHint string `json:"installHint,omitempty" yaml:"installHint,omitempty"`
 }
 
 type doctorReport struct {
 	Config       string        `json:"config" yaml:"config"`
 	Status       string        `json:"status" yaml:"status"`
+	Next         string        `json:"next,omitempty" yaml:"next,omitempty"`
 	Environments []string      `json:"environments" yaml:"environments"`
 	Checks       []doctorCheck `json:"checks" yaml:"checks"`
 }
 
 func doctorCommand(o *options) *cobra.Command {
-	return &cobra.Command{Use: "doctor", Short: "Check local project readiness", Args: cobra.NoArgs, RunE: func(*cobra.Command, []string) error {
+	var installDependencies bool
+	command := &cobra.Command{Use: "doctor", Short: "Check this project and print the next Magelift command", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		file, err := o.load()
 		if err != nil {
 			return invalid(err)
 		}
 		report := inspectProject(o.configPath, file)
+		specs := dependencySpecsForDoctor(file)
+		dependencies := toolchain.CheckDependencies(cmd.Context(), dependencyRunner(o), specs)
+		if installDependencies {
+			if err := installMissingDependencies(cmd.Context(), o, specs, dependencies); err != nil {
+				appendDependencyChecks(&report, dependencies)
+				if writeErr := o.write(report); writeErr != nil {
+					return writeErr
+				}
+				return err
+			}
+			dependencies = toolchain.CheckDependencies(cmd.Context(), dependencyRunner(o), specs)
+		}
+		appendDependencyChecks(&report, dependencies)
 		if err := o.write(report); err != nil {
 			return err
 		}
@@ -38,6 +60,13 @@ func doctorCommand(o *options) *cobra.Command {
 		}
 		return nil
 	}}
+	command.Flags().BoolVar(&installDependencies, "install-dependencies", false, "install missing allowlisted dependencies after confirmation")
+	return command
+}
+
+func dependencySpecsForDoctor(file *config.File) []toolchain.DependencySpec {
+	provider, runtimeID := dependencyTarget(file)
+	return toolchain.SpecsForTarget(provider, runtimeID)
 }
 
 func inspectProject(path string, file *config.File) doctorReport {
@@ -62,5 +91,14 @@ func inspectProject(path string, file *config.File) doctorReport {
 		}
 		add("environment."+environment, err)
 	}
+	if report.Status == "ok" && len(environments) > 0 {
+		env := environments[0]
+		report.Next = "magelift bootstrap --env " + env
+	}
+	report.Checks = append(report.Checks, doctorCheck{
+		ID:      "local.edge",
+		Status:  "ok",
+		Message: localdev.CloudOnlyNote,
+	})
 	return report
 }

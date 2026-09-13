@@ -18,8 +18,8 @@ import (
 	"github.com/magelift/magelift/internal/platform"
 )
 
-// Remaining unsupported allowlist after Observe+Steps+State moved off the shell
-// (D-05): Bootstrap VerifyAccount/Ensure, Secrets List/Set/Remove, Cost Estimate.
+// Remaining unsupported allowlist after Observe+Steps+State and Secrets moved
+// off the shell (D-05): Bootstrap VerifyAccount/Ensure only.
 func TestUnsupportedAllowlistMethodsReturnSentinelAndZeroValues(t *testing.T) {
 	ctx := context.Background()
 	u := unsupported{}
@@ -46,36 +46,10 @@ func TestUnsupportedAllowlistMethodsReturnSentinelAndZeroValues(t *testing.T) {
 				return caseResult{err: err, zero: reflect.ValueOf(got).IsZero()}
 			},
 		},
-		{
-			name: "List",
-			call: func() caseResult {
-				got, err := u.List(ctx, nil)
-				return caseResult{err: err, zero: got == nil}
-			},
-		},
-		{
-			name: "Set",
-			call: func() caseResult {
-				return caseResult{err: u.Set(ctx, nil, "k", nil), zero: true}
-			},
-		},
-		{
-			name: "Remove",
-			call: func() caseResult {
-				return caseResult{err: u.Remove(ctx, nil, "k"), zero: true}
-			},
-		},
-		{
-			name: "Estimate",
-			call: func() caseResult {
-				got, err := u.Estimate(ctx, nil, config.Config{}, platform.CostOptions{})
-				return caseResult{err: err, zero: reflect.ValueOf(got).IsZero()}
-			},
-		},
 	}
 
-	if len(cases) != 6 {
-		t.Fatalf("unsupported allowlist requires exactly 6 methods (Bootstrap/Secrets/Cost); got %d", len(cases))
+	if len(cases) != 2 {
+		t.Fatalf("unsupported allowlist requires exactly 2 methods (Bootstrap); got %d", len(cases))
 	}
 
 	for _, tc := range cases {
@@ -121,20 +95,9 @@ func TestBootstrapSecretsNilSuccessGuards(t *testing.T) {
 	if !reflect.ValueOf(got).IsZero() {
 		t.Fatal("Bootstrap.Ensure must not nil-succeed with a non-zero result")
 	}
-	sec := m.Secrets()
-	if sec == nil {
-		t.Fatal("Secrets must not be nil")
-	}
-	list, err := sec.List(context.Background(), nil)
-	if !errors.Is(err, platform.ErrNotSupported) {
-		t.Fatalf("Secrets.List err = %v, want ErrNotSupported", err)
-	}
-	if list != nil {
-		t.Fatal("Secrets.List must not nil-succeed with a non-nil slice")
-	}
 }
 
-func TestModuleAccessorsReturnNonNilUnsupportedShells(t *testing.T) {
+func TestModuleAccessorsReturnNonNilProviderPorts(t *testing.T) {
 	m := Module{}
 	if m.Bootstrap() == nil {
 		t.Fatal("Bootstrap must return the unsupported shell, not nil")
@@ -143,7 +106,7 @@ func TestModuleAccessorsReturnNonNilUnsupportedShells(t *testing.T) {
 		t.Fatal("State must return a non-nil adapter, not nil")
 	}
 	if m.Secrets() == nil {
-		t.Fatal("Secrets must return the unsupported shell, not nil")
+		t.Fatal("Secrets must return the Scaleway Secret Manager adapter, not nil")
 	}
 	if m.RuntimeObserve() == nil {
 		t.Fatal("RuntimeObserve must return shared kube.Observe, not nil")
@@ -152,7 +115,24 @@ func TestModuleAccessorsReturnNonNilUnsupportedShells(t *testing.T) {
 		t.Fatalf("RuntimeObserve type identity: want *kube.Observe, got %T", m.RuntimeObserve())
 	}
 	if m.CostEstimator() == nil {
-		t.Fatal("CostEstimator must return the unsupported shell, not nil")
+		t.Fatal("CostEstimator must return the Scaleway adapter, not nil")
+	}
+}
+
+func TestModuleCostEstimatorAccountFree(t *testing.T) {
+	cfg := config.Config{
+		Target: config.Target{Provider: "scaleway", Runtime: "kapsule", Scaleway: &config.ScalewayTarget{
+			Region: "fr-par", NodeType: "DEV1-M", NodeCount: 2, DatabaseNodeType: "DB-DEV-S",
+			RedisNodeType: "RED1-MICRO", RedisClusterSize: 1, QueueConsumerCount: 1,
+		}},
+		Defaults: config.Defaults{Region: "fr-par", Preset: "preview"}, Preset: "preview",
+	}
+	report, err := Module{}.CostEstimator().Estimate(context.Background(), Planned{Spec: scwDeploySpec()}, cfg, platform.CostOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Mode != "account-free" || len(report.Estimated) == 0 {
+		t.Fatalf("unexpected account-free report: %#v", report)
 	}
 }
 
@@ -307,9 +287,9 @@ func scwDeploySpec() Spec {
 		Policy:      NetworkPolicy{NetworkCIDR: "172.16.0.0/22", Zones: []string{"fr-par-1"}},
 		Catalog: CatalogSelection{
 			DatabaseNodeType: "DB-DEV-S", RedisNodeType: "RED1-MICRO", CacheMode: "redis",
-			KapsuleVersion: "1.29.1", NodeType: "DEV1-M", NodeCount: 2,
+			KapsuleVersion: "1.36.1", NodeType: "DEV1-M", NodeCount: 2,
 			CPURequest: "500m", MemoryRequest: "1Gi", DesiredWebReplicas: 1,
 		},
-		Dependencies: Dependencies{DatabaseName: "magento", MasterUsername: "magento"},
+		Dependencies: Dependencies{DatabaseName: "magento", MasterUsername: "magento", EncryptionKeySecret: "magento-crypt-key"},
 	}
 }

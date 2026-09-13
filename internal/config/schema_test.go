@@ -31,6 +31,43 @@ func TestSchemaJSONIsValidAndStrict(t *testing.T) {
 	}
 }
 
+func TestFirstReleaseSchemaHasOnlyComposableEdgeAndObservabilityProviders(t *testing.T) {
+	data, err := SchemaJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Definitions map[string]struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(data, &schema); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name string
+		want []string
+	}{
+		{name: "edgeConfig", want: []string{"nativeProvider", "externalProvider"}},
+		{name: "observabilityConfig", want: []string{"nativeProvider", "externalProvider"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			definition, ok := schema.Definitions[test.name]
+			if !ok {
+				t.Fatalf("%s definition is missing", test.name)
+			}
+			if _, ok := definition.Properties["provider"]; ok {
+				t.Fatalf("%s exposes removed singular provider field", test.name)
+			}
+			for _, field := range test.want {
+				if _, ok := definition.Properties[field]; !ok {
+					t.Fatalf("%s is missing composable provider field %q", test.name, field)
+				}
+			}
+		})
+	}
+}
+
 func TestReferenceMarkdownIsDeterministic(t *testing.T) {
 	first := ReferenceMarkdown()
 	second := ReferenceMarkdown()

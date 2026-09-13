@@ -61,6 +61,7 @@ final readonly class RunnerService
             $preparedArtifact,
             $output->phpVersion,
             $output->phpExtensions,
+            $output->composerVersion,
             $output->enabledModules,
             $output->checksums,
             $output->requiredRuntimeCapabilities,
@@ -69,6 +70,7 @@ final readonly class RunnerService
             'sourceRevision' => $request->sourceRevision,
             'application' => $request->application,
             'phpVersion' => $output->phpVersion,
+            'composerVersion' => $output->composerVersion,
             'compatibilityStatus' => $request->compatibilityStatus,
             'phpExtensions' => $output->phpExtensions,
             'enabledModules' => $output->enabledModules,
@@ -111,6 +113,7 @@ final readonly class RunnerService
             MagentoEdition::from($metadata['application']['edition']),
             $metadata['application']['version'],
             $metadata['phpVersion'],
+            $metadata['composerVersion'],
             $metadata['phpExtensions'],
             $metadata['enabledModules'],
             $buildInputs,
@@ -132,10 +135,10 @@ final readonly class RunnerService
     {
         $value = ProtocolJson::decodeObject($json);
         ProtocolJson::assertKeys($value, [
-            'sourceRevision', 'application', 'phpVersion', 'compatibilityStatus', 'phpExtensions', 'enabledModules', 'inputFiles',
+            'sourceRevision', 'application', 'phpVersion', 'composerVersion', 'compatibilityStatus', 'phpExtensions', 'enabledModules', 'inputFiles',
             'staticContent', 'checksums', 'requiredRuntimeCapabilities', 'mageLiftVersion', 'buildPackageVersion',
         ], [
-            'sourceRevision', 'application', 'phpVersion', 'compatibilityStatus', 'phpExtensions', 'enabledModules', 'inputFiles',
+            'sourceRevision', 'application', 'phpVersion', 'composerVersion', 'compatibilityStatus', 'phpExtensions', 'enabledModules', 'inputFiles',
             'staticContent', 'checksums', 'requiredRuntimeCapabilities', 'mageLiftVersion', 'buildPackageVersion',
         ], 'prepared metadata');
         ProtocolJson::assertNoSecrets($value);

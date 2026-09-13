@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/cloudwatch"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/s3"
@@ -48,6 +49,7 @@ type Args struct {
 	// ExistingLogGroups, when set, skips creating the Magento workload groups
 	// (created earlier so ECS task definitions can depend on them).
 	ExistingLogGroups *LogGroups
+	Intent            sdk.ObservabilityIntent
 }
 
 // LogGroups are the CloudWatch groups ECS awslogs drivers write into.
@@ -60,13 +62,15 @@ type LogGroups struct {
 
 type Component struct {
 	pulumi.ResourceState
-	WebLogGroupARN     pulumi.StringOutput `pulumi:"webLogGroupArn"`
-	DeployLogGroupARN  pulumi.StringOutput `pulumi:"deployLogGroupArn"`
-	CronLogGroupARN    pulumi.StringOutput `pulumi:"cronLogGroupArn"`
-	DashboardName      pulumi.StringOutput `pulumi:"dashboardName"`
-	AlarmARNs          pulumi.ArrayOutput  `pulumi:"alarmArns"`
-	SyntheticCanaryARN pulumi.StringOutput `pulumi:"syntheticCanaryArn"`
-	SyntheticBucketARN pulumi.StringOutput `pulumi:"syntheticBucketArn"`
+	WebLogGroupARN        pulumi.StringOutput      `pulumi:"webLogGroupArn"`
+	DeployLogGroupARN     pulumi.StringOutput      `pulumi:"deployLogGroupArn"`
+	CronLogGroupARN       pulumi.StringOutput      `pulumi:"cronLogGroupArn"`
+	DashboardName         pulumi.StringOutput      `pulumi:"dashboardName"`
+	AlarmARNs             pulumi.ArrayOutput       `pulumi:"alarmArns"`
+	SyntheticCanaryARN    pulumi.StringOutput      `pulumi:"syntheticCanaryArn"`
+	SyntheticBucketARN    pulumi.StringOutput      `pulumi:"syntheticBucketArn"`
+	UnavailableSignals    pulumi.StringArrayOutput `pulumi:"unavailableSignals"`
+	UnavailableOperations pulumi.StringArrayOutput `pulumi:"unavailableOperations"`
 }
 
 type syntheticArtifactStore struct {
@@ -143,11 +147,13 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.WebLogGroupARN, component.DeployLogGroupARN, component.CronLogGroupARN = logGroups[0].Arn, logGroups[1].Arn, logGroups[2].Arn
 	component.DashboardName = dashboard.DashboardName
 	component.AlarmARNs = alarmIDs(alarms)
+	component.UnavailableSignals = pulumiStringArray(unavailableSignals(args))
+	component.UnavailableOperations = pulumiStringArray(unavailableOperations(args.Intent))
 	if syntheticCanary != nil {
 		component.SyntheticCanaryARN = syntheticCanary.Arn
 		component.SyntheticBucketARN = syntheticBucket.Arn
 	}
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{"webLogGroupArn": component.WebLogGroupARN, "deployLogGroupArn": component.DeployLogGroupARN, "cronLogGroupArn": component.CronLogGroupARN, "dashboardName": component.DashboardName, "alarmArns": component.AlarmARNs, "syntheticCanaryArn": component.SyntheticCanaryARN, "syntheticBucketArn": component.SyntheticBucketARN}); err != nil {
+	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{"webLogGroupArn": component.WebLogGroupARN, "deployLogGroupArn": component.DeployLogGroupARN, "cronLogGroupArn": component.CronLogGroupARN, "dashboardName": component.DashboardName, "alarmArns": component.AlarmARNs, "syntheticCanaryArn": component.SyntheticCanaryARN, "syntheticBucketArn": component.SyntheticBucketARN, "unavailableSignals": component.UnavailableSignals, "unavailableOperations": component.UnavailableOperations}); err != nil {
 		return nil, err
 	}
 	return component, nil
@@ -232,6 +238,12 @@ func validate(name string, args Args) error {
 	if strings.TrimSpace(name) == "" || strings.TrimSpace(args.Region) == "" || strings.TrimSpace(args.LogGroupPrefix) == "" || !hasECSNames(args) {
 		return errors.New("observability requires a name, region, log group prefix, ECS cluster, and ECS service")
 	}
+	if provider := strings.TrimSpace(args.Intent.NativeProvider); provider != "cloudwatch" {
+		return fmt.Errorf("AWS observability requires native provider cloudwatch, got %q", provider)
+	}
+	if err := sdk.ValidateObservabilityIntent(args.Intent); err != nil {
+		return fmt.Errorf("validate AWS observability intent: %w", err)
+	}
 	if !kmsARNPattern.MatchString(args.KMSKeyARN) || args.DesiredTaskCount < 1 {
 		return errors.New("observability requires a KMS key ARN and a positive desired task count")
 	}
@@ -255,6 +267,44 @@ func validate(name string, args Args) error {
 		}
 	}
 	return nil
+}
+
+func unavailableSignals(args Args) []string {
+	supported := map[string]bool{"logs": true, "metrics": true}
+	if args.SyntheticEnabled {
+		supported["application-health"] = true
+	}
+	result := make([]string, 0, len(args.Intent.Signals))
+	for _, signal := range args.Intent.Signals {
+		if !supported[signal] {
+			result = append(result, signal)
+		}
+	}
+	sort.Strings(result)
+	return result
+}
+
+func unavailableOperations(intent sdk.ObservabilityIntent) []string {
+	result := make([]string, 0, len(intent.Alerts)+len(intent.Dashboards)+len(intent.SLOs))
+	for _, alert := range intent.Alerts {
+		result = append(result, "alert:"+alert.ID)
+	}
+	for _, dashboard := range intent.Dashboards {
+		result = append(result, "dashboard:"+dashboard.ID)
+	}
+	for _, slo := range intent.SLOs {
+		result = append(result, "slo:"+slo.ID)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func pulumiStringArray(values []string) pulumi.StringArrayOutput {
+	inputs := make(pulumi.StringArray, 0, len(values))
+	for _, value := range values {
+		inputs = append(inputs, pulumi.String(value))
+	}
+	return inputs.ToStringArrayOutput()
 }
 
 func newSyntheticArtifactBucket(ctx *pulumi.Context, name string, args Args, parent pulumi.ResourceOption) (*syntheticArtifactStore, error) {

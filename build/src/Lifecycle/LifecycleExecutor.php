@@ -65,7 +65,7 @@ final readonly class LifecycleExecutor
         for ($attempt = 1; $attempt <= $policy->maxAttempts; ++$attempt) {
             $processResults = [];
             foreach ($commands as $command) {
-                $processResult = $this->runner->run(new ProcessRequest(
+                $processResult = $command->run($this->runner, new ProcessRequest(
                     $command->argv(),
                     $workingDirectory,
                     $environment,

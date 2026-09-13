@@ -3,6 +3,7 @@ package automation
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sort"
 
@@ -10,15 +11,18 @@ import (
 )
 
 var (
-	ErrBackendRequired     = errors.New("infrastructure automation backend is required")
-	ErrDiagnosticsRequired = errors.New("infrastructure diagnostics writer is required")
-	ErrPreviewFailed       = errors.New("infrastructure preview failed")
-	ErrUpdateFailed        = errors.New("infrastructure update failed")
-	ErrDestroyFailed       = errors.New("infrastructure destroy failed")
+	ErrBackendRequired      = errors.New("infrastructure automation backend is required")
+	ErrDiagnosticsRequired  = errors.New("infrastructure diagnostics writer is required")
+	ErrPreviewFailed        = errors.New("infrastructure preview failed")
+	ErrUpdateFailed         = errors.New("infrastructure update failed")
+	ErrDestroyFailed        = errors.New("infrastructure destroy failed")
+	ErrPreviewGuardRequired = errors.New("preview ownership guard is required")
 )
 
 type Request struct {
-	Target sdk.TargetDescriptor
+	Target  sdk.TargetDescriptor
+	Preview *PreviewMetadata
+	Destroy bool
 }
 
 type Change struct {
@@ -35,6 +39,27 @@ type Backend interface {
 	Preview(context.Context, Request, io.Writer) (map[string]int, error)
 	Update(context.Context, Request, io.Writer) (map[string]int, error)
 	Destroy(context.Context, Request, io.Writer) (map[string]int, error)
+}
+
+type RequestGuard interface {
+	ValidateRequest(context.Context, Request) error
+}
+
+func ValidateRequest(ctx context.Context, backend Backend, request Request) error {
+	if err := sdk.ValidateTargetDescriptor(request.Target); err != nil {
+		return err
+	}
+	if request.Preview == nil {
+		return nil
+	}
+	if err := request.Preview.Validate(); err != nil {
+		return err
+	}
+	guard, ok := backend.(RequestGuard)
+	if !ok {
+		return ErrPreviewGuardRequired
+	}
+	return guard.ValidateRequest(ctx, request)
 }
 
 type Runner struct {
@@ -55,6 +80,7 @@ func (r *Runner) Update(ctx context.Context, request Request) (ChangeSummary, er
 }
 
 func (r *Runner) Destroy(ctx context.Context, request Request) (ChangeSummary, error) {
+	request.Destroy = true
 	return r.run(ctx, request, ErrDestroyFailed, r.backendOperation(operationDestroy))
 }
 
@@ -91,7 +117,11 @@ func (r *Runner) run(ctx context.Context, request Request, operationError error,
 	if r.diagnostics == nil {
 		return ChangeSummary{}, ErrDiagnosticsRequired
 	}
-	if err := sdk.ValidateTargetDescriptor(request.Target); err != nil {
+	if err := ValidateRequest(ctx, r.backend, request); err != nil {
+		var ownershipErr *PreviewOwnershipError
+		if errors.As(err, &ownershipErr) {
+			return ChangeSummary{}, fmt.Errorf("%w: %w", operationError, ownershipErr)
+		}
 		return ChangeSummary{}, err
 	}
 	if cause := context.Cause(ctx); cause != nil {
@@ -102,6 +132,10 @@ func (r *Runner) run(ctx context.Context, request Request, operationError error,
 		return ChangeSummary{}, cause
 	}
 	if err != nil {
+		var ownershipErr *PreviewOwnershipError
+		if errors.As(err, &ownershipErr) {
+			return ChangeSummary{}, fmt.Errorf("%w: %w", operationError, ownershipErr)
+		}
 		return ChangeSummary{}, operationError
 	}
 	return summarize(changes), nil

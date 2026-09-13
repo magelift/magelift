@@ -31,7 +31,7 @@ build:
 
 That field must hold the full Composer auth object.
 
-## GCP (`target.provider: gcp`, experimental)
+## GCP (`target.provider: gcp`)
 
 ```yaml
 build:
@@ -39,9 +39,10 @@ build:
     credentials: gcp-secret-manager://projects/PROJECT/secrets/NAME/versions/latest
 ```
 
-Config accepts the scheme so GCP YAML validates. `magelift build` does not yet
-resolve GCP Secret Manager; implement `secretref.GCPSecretManagerProvider` to
-wire it.
+`magelift build` resolves `gcp-secret-manager://` on a GCP target the same way
+it resolves Secrets Manager and SSM on AWS: the value is written to a private
+temp file for the prepare container, then deleted. Cross-provider schemes still
+fail validation.
 
 ## How resolution works
 

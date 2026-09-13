@@ -16,11 +16,14 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
      * @param array<string, list<CommandInterface>> $hookCommands
      * @param list<array{locale: string, theme: string, strategy?: string, threads?: int}> $staticContent
      * @param list<string> $hotfixPatches Relative m2-hotfixes/*.patch paths (alpha-sorted by caller)
+     * @param null|list<CommandInterface> $patchCommands Resolved patch lifecycle commands
      */
     public function __construct(
         private array $hookCommands = [],
         private array $staticContent = [],
         private array $hotfixPatches = [],
+        private bool $refreshModules = false,
+        private ?array $patchCommands = null,
     )
     {
     }
@@ -65,9 +68,14 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
     /** @return list<CommandInterface> */
     public function commandsFor(Phase $phase): array
     {
-        return match ($phase) {
+            return match ($phase) {
             Phase::Validate => [
-                new Command(Executable::Composer, ['validate', '--strict']),
+                // Adobe's supported source tags contain Composer warnings that
+                // do not make the package invalid. Keep schema errors fatal.
+                // Adobe release locks can carry a Composer-version-specific
+                // content hash. The lock remains an immutable build input and
+                // `composer install` below still resolves from that exact lock.
+                new Command(Executable::Composer, ['validate', '--no-check-lock']),
                 new Command(Executable::Composer, ['check-platform-reqs', '--no-dev']),
             ],
             Phase::Build => [
@@ -79,6 +87,7 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
                     '--no-progress',
                     '--optimize-autoloader',
                 ]),
+                ...$this->moduleRefreshCommands(),
                 ...$this->hotfixPatchCommands(),
                 new Command(Executable::Magento, ['setup:di:compile']),
                 ...$this->staticContentCommands(),
@@ -98,6 +107,9 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
     /** @return list<CommandInterface> */
     private function hotfixPatchCommands(): array
     {
+        if ($this->patchCommands !== null) {
+            return $this->patchCommands;
+        }
         if ($this->hotfixPatches === []) {
             return [];
         }
@@ -106,10 +118,25 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
     }
 
     /** @return list<CommandInterface> */
+    private function moduleRefreshCommands(): array
+    {
+        if (!$this->refreshModules) {
+            return [];
+        }
+
+        // A source release without app/etc/config.php has no module state to preserve.
+        // Generate the standard Adobe module map before compilation instead of
+        // changing the explicit enablement of an existing project.
+        return [new Command(Executable::Magento, ['module:enable', '--all'])];
+    }
+
+    /** @return list<CommandInterface> */
     private function staticContentCommands(): array
     {
         if ($this->staticContent === []) {
-            return [new Command(Executable::Magento, ['setup:static-content:deploy', '--no-interaction'])];
+            // The build runner has no Magento database. SCD is opt-in because
+            // locales and websites must be dumped into config.php first.
+            return [];
         }
 
         $commands = [];
@@ -119,6 +146,7 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
             }
             $args = [
                 'setup:static-content:deploy',
+                '--force',
                 '--language',
                 $content['locale'],
                 '--theme',

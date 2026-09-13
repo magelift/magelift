@@ -6,17 +6,18 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-export GOMAXPROCS="${GOMAXPROCS:-1}"
+export GOMAXPROCS=1
 # Cap package-level compile parallelism inside the single go build as well.
-export GOFLAGS="${GOFLAGS:--p=1}"
+export GOFLAGS=-p=1
+export GOMEMLIMIT=1GiB
 
 printf '+ goreleaser check\n'
-go run github.com/goreleaser/goreleaser/v2@v2.12.7 check
+go run github.com/goreleaser/goreleaser/v2@v2.18.1 check
 
 printf '+ goreleaser build --snapshot --single-target --parallelism=1 GOMAXPROCS=%s GOFLAGS=%s (host only)\n' \
 	"$GOMAXPROCS" "$GOFLAGS"
 rm -rf dist
-go run github.com/goreleaser/goreleaser/v2@v2.12.7 build --snapshot --clean \
+go run github.com/goreleaser/goreleaser/v2@v2.18.1 build --snapshot --clean \
 	--single-target --parallelism=1
 
 bin="$(find dist -type f \( -name 'magelift' -o -name 'magelift.exe' \) | head -1 || true)"

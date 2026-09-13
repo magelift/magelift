@@ -3,6 +3,7 @@ package cost_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	awscost "github.com/magelift/magelift/internal/cloud/aws/cost"
@@ -13,16 +14,22 @@ import (
 )
 
 type fakePlanned struct {
-	env    string
-	region string
+	env     string
+	region  string
+	runtime sdk.RuntimeID
 }
 
 func (f fakePlanned) StackName() string        { return "test" }
 func (f fakePlanned) Provider() sdk.ProviderID { return "aws" }
-func (f fakePlanned) Runtime() sdk.RuntimeID   { return "ecs-fargate" }
-func (f fakePlanned) Project() string          { return "shop" }
-func (f fakePlanned) Environment() string      { return f.env }
-func (f fakePlanned) Region() string           { return f.region }
+func (f fakePlanned) Runtime() sdk.RuntimeID {
+	if f.runtime != "" {
+		return f.runtime
+	}
+	return "ecs-fargate"
+}
+func (f fakePlanned) Project() string     { return "shop" }
+func (f fakePlanned) Environment() string { return f.env }
+func (f fakePlanned) Region() string      { return f.region }
 func (f fakePlanned) CertificationTier() platform.CertificationTier {
 	return platform.TierCertified
 }
@@ -33,7 +40,8 @@ func (f fakePlanned) WithImageDigest(string) (platform.PlannedStack, error) {
 	return f, nil
 }
 func (f fakePlanned) TargetDescriptor() sdk.TargetDescriptor {
-	return sdk.TargetDescriptor{ID: "aws-ecs-fargate", Provider: "aws", Runtime: "ecs-fargate"}
+	runtime := f.Runtime()
+	return sdk.TargetDescriptor{ID: sdk.TargetID("aws-" + string(runtime)), Provider: "aws", Runtime: runtime}
 }
 
 type fakePricing struct {
@@ -96,6 +104,89 @@ func TestCostReportWithoutCatalogIsExplicit(t *testing.T) {
 	}
 }
 
+func TestAccountFreeEKSReportClassifiesArchitectureAndWorkloads(t *testing.T) {
+	cfg := config.Config{
+		Target: config.Target{Provider: "aws", Runtime: "eks", AWS: &config.AWSTarget{Catalog: config.AWSCatalog{
+			EKS: config.AWSCatalogEKS{
+				ComputeMode: "managed-node-groups", KubernetesVersion: "1.36", CPURequest: "500m", MemoryRequest: "1Gi",
+				DesiredWebReplicas: 2, NodeInstanceType: "m6i.large", NodeMinSize: 2, NodeDesiredSize: 3, NodeMaxSize: 6,
+				SearchMode: "opensearch", SearchReplicas: 3, QueueMode: "rabbitmq", QueueReplicas: 2, QueueConsumerCount: 2,
+			},
+			Valkey: config.AWSCatalogValkey{NodeType: "cache.r7g.large", ReplicaCount: 1},
+			Aurora: config.AWSCatalogAurora{InstanceClass: "db.r7g.large", InstanceCount: 2},
+		}}},
+		Defaults: config.Defaults{Region: "eu-west-3"}, Preset: "high-availability",
+	}
+	report, err := awscost.Estimator{}.Estimate(context.Background(), fakePlanned{env: "staging", region: "eu-west-3", runtime: "eks"}, cfg, platform.CostOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Mode != "account-free" || report.Region != "eu-west-3" || report.MonthlyTotalCents != nil || len(report.Priced) != 0 {
+		t.Fatalf("unexpected EKS account-free report: %#v", report)
+	}
+	if len(report.Estimated) != 6 || len(report.Unsupported) != 2 {
+		t.Fatalf("unexpected EKS classifications: %#v", report)
+	}
+	for _, resource := range []string{"Amazon EKS control plane", "EKS managed node groups", "ElastiCache Valkey", "Aurora MySQL", "OpenSearch on EKS", "RabbitMQ on EKS"} {
+		if !hasEstimatedResource(report, resource) {
+			t.Fatalf("missing EKS estimate %q: %#v", resource, report.Estimated)
+		}
+	}
+}
+
+func TestAccountFreeEKSReportsEachComputeMode(t *testing.T) {
+	for _, test := range []struct {
+		mode     string
+		resource string
+	}{
+		{mode: "auto-mode", resource: "EKS Auto Mode compute"},
+		{mode: "managed-node-groups", resource: "EKS managed node groups"},
+		{mode: "self-managed", resource: "EKS self-managed nodes"},
+		{mode: "fargate", resource: "EKS Fargate compute"},
+	} {
+		t.Run(test.mode, func(t *testing.T) {
+			cfg := config.Config{
+				Target: config.Target{Provider: "aws", Runtime: "eks", AWS: &config.AWSTarget{Catalog: config.AWSCatalog{
+					EKS: config.AWSCatalogEKS{ComputeMode: test.mode, DesiredWebReplicas: 1, CPURequest: "500m", MemoryRequest: "1Gi", NodeInstanceType: "m6i.large", NodeMinSize: 1, NodeDesiredSize: 1, NodeMaxSize: 2},
+				}}},
+				Defaults: config.Defaults{Region: "eu-west-3"}, Preset: "preview",
+			}
+			report, err := awscost.Estimator{}.Estimate(context.Background(), fakePlanned{env: "preview", region: "eu-west-3", runtime: "eks"}, cfg, platform.CostOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !hasEstimatedResource(report, test.resource) {
+				t.Fatalf("missing %q in %#v", test.resource, report.Estimated)
+			}
+		})
+	}
+}
+
+func TestLiveEKSReportFailsClosedBeforePricingClient(t *testing.T) {
+	cfg := config.Config{Target: config.Target{Provider: "aws", Runtime: "eks", AWS: &config.AWSTarget{Catalog: config.AWSCatalog{EKS: config.AWSCatalogEKS{ComputeMode: "auto-mode"}}}}, Defaults: config.Defaults{Region: "eu-west-3"}}
+	called := false
+	estimator := awscost.Estimator{NewPricing: func(context.Context, string) (awscost.PricingClient, error) {
+		called = true
+		return nil, nil
+	}}
+	_, err := estimator.Estimate(context.Background(), fakePlanned{env: "preview", region: "eu-west-3", runtime: "eks"}, cfg, platform.CostOptions{Live: true})
+	if err == nil || !strings.Contains(err.Error(), "live cost estimation is not available") {
+		t.Fatalf("expected explicit EKS live pricing refusal, got %v", err)
+	}
+	if called {
+		t.Fatal("EKS live pricing refusal constructed a pricing client")
+	}
+}
+
+func hasEstimatedResource(report platform.CostReport, resource string) bool {
+	for _, item := range report.Estimated {
+		if item.Resource == resource {
+			return true
+		}
+	}
+	return false
+}
+
 func TestLiveCostReportSumsCurrentPricesAndSeparatesMissingProducts(t *testing.T) {
 	cfg := config.Config{
 		Target: config.Target{Provider: "aws", Runtime: "ecs-fargate", AWS: &config.AWSTarget{Catalog: config.AWSCatalog{
@@ -140,4 +231,26 @@ type failingPricing struct{}
 
 func (failingPricing) Estimate(context.Context, awspricing.Query) (awspricing.Price, error) {
 	return awspricing.Price{}, context.DeadlineExceeded
+}
+
+func TestAccountFreePreviewFlagsExpensiveCatalog(t *testing.T) {
+	cfg := config.Config{
+		Class: "preview",
+		Target: config.Target{Provider: "aws", Runtime: "ecs-fargate", AWS: &config.AWSTarget{Catalog: config.AWSCatalog{
+			QueueMode: "amazon-mq",
+			Fargate:   config.AWSCatalogFargate{CPU: 256, MemoryMiB: 512, DesiredCount: 1},
+			Valkey:    config.AWSCatalogValkey{NodeType: "cache.t4g.micro", ReplicaCount: 0},
+			Aurora:    config.AWSCatalogAurora{InstanceClass: "db.t4g.medium", InstanceCount: 2},
+			Search:    config.AWSCatalogSearch{InstanceType: "t3.medium.search", InstanceCount: 1},
+			RabbitMQ:  config.AWSCatalogRabbitMQ{InstanceType: "mq.t3.micro"},
+		}}},
+		Defaults: config.Defaults{Region: "eu-west-3"}, Preset: "preview",
+	}
+	report, err := awscost.Estimator{}.Estimate(context.Background(), fakePlanned{env: "preview", region: "eu-west-3"}, cfg, platform.CostOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(report.Notice, "Amazon MQ") || !strings.Contains(report.Notice, "OpenSearch") || !strings.Contains(report.Notice, "Aurora") {
+		t.Fatalf("expensive preview catalog was not flagged: %q", report.Notice)
+	}
 }

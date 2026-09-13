@@ -4,10 +4,13 @@ package bootstrap
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
@@ -19,6 +22,10 @@ var (
 	projectPattern   = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
 	regionPattern    = regexp.MustCompile(`^[a-z]+-[a-z]+[0-9]+$`)
 )
+
+const highAvailabilityEnvironment = "high-availability"
+
+const stateSoftDeleteRetention = 7 * 24 * time.Hour
 
 type Spec struct {
 	Project     string // Magento project
@@ -51,12 +58,17 @@ func BuildPlan(spec Spec) (Plan, error) {
 	if !regionPattern.MatchString(spec.Region) {
 		return Plan{}, errors.New("bootstrap region is invalid")
 	}
-	bucket := strings.Join([]string{"magelift", spec.GCPProject, spec.Region, spec.Project, spec.Environment, "state"}, "-")
-	if len(bucket) > 63 {
-		return Plan{}, errors.New("generated state bucket name exceeds 63 characters")
-	}
+	stateEnvironment := stateBucketEnvironment(spec.Environment)
+	bucket := strings.Join([]string{
+		"magelift",
+		spec.GCPProject,
+		spec.Region,
+		spec.Project,
+		stateEnvironment,
+		"state",
+	}, "-")
 	return Plan{
-		StateBucket: bucket,
+		StateBucket: compactStateBucketName(bucket, stateEnvironment),
 		GCPProject:  spec.GCPProject,
 		Region:      spec.Region,
 		Labels: map[string]string{
@@ -68,10 +80,35 @@ func BuildPlan(spec Spec) (Plan, error) {
 	}, nil
 }
 
+const maxStateBucketNameLength = 63
+
+func compactStateBucketName(bucket, stateEnvironment string) string {
+	if len(bucket) <= maxStateBucketNameLength {
+		return bucket
+	}
+
+	digest := sha256.Sum256([]byte(bucket))
+	suffix := hex.EncodeToString(digest[:])[:10]
+	tail := stateEnvironment + "-state"
+	prefixLength := maxStateBucketNameLength - len(suffix) - len(tail) - 2
+	prefix := strings.TrimRight(bucket[:prefixLength], "-")
+	return prefix + "-" + suffix + "-" + tail
+}
+
+func stateBucketEnvironment(environment string) string {
+	if environment == highAvailabilityEnvironment {
+		// GCS bucket names are capped at 63 characters. Keep the public
+		// environment label intact while shortening only this physical name.
+		return "ha"
+	}
+	return environment
+}
+
 type BucketAPI interface {
 	BucketExists(ctx context.Context, name string) (bool, error)
 	CreateBucket(ctx context.Context, name, project, location string, labels map[string]string) error
 	EnsureVersioning(ctx context.Context, name string) error
+	EnsureSoftDelete(ctx context.Context, name string, retention time.Duration) error
 }
 
 type Bootstrapper struct {
@@ -126,6 +163,9 @@ func (b *Bootstrapper) Ensure(ctx context.Context, plan Plan) (Result, error) {
 	if err := b.buckets.EnsureVersioning(ctx, plan.StateBucket); err != nil {
 		return Result{}, err
 	}
+	if err := b.buckets.EnsureSoftDelete(ctx, plan.StateBucket, stateSoftDeleteRetention); err != nil {
+		return Result{}, err
+	}
 	return Result{Plan: plan}, nil
 }
 
@@ -167,7 +207,28 @@ func (g gcsBuckets) EnsureVersioning(ctx context.Context, name string) error {
 	return nil
 }
 
+func (g gcsBuckets) EnsureSoftDelete(ctx context.Context, name string, retention time.Duration) error {
+	if retention <= 0 {
+		return errors.New("GCS state soft-delete retention must be positive")
+	}
+	_, err := g.client.Bucket(name).Update(ctx, storage.BucketAttrsToUpdate{
+		SoftDeletePolicy: &storage.SoftDeletePolicy{RetentionDuration: retention},
+	})
+	if err != nil {
+		return fmt.Errorf("enable GCS soft delete: %w", err)
+	}
+	return nil
+}
+
 // BackendURL returns the Pulumi DIY gs:// URL for a plan.
 func BackendURL(plan Plan) string {
 	return "gs://" + plan.StateBucket
+}
+
+func StateBackendURL(spec Spec) (string, error) {
+	plan, err := BuildPlan(spec)
+	if err != nil {
+		return "", err
+	}
+	return BackendURL(plan), nil
 }

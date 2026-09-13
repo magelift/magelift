@@ -1,6 +1,6 @@
 services:
   floci:
-    image: floci/floci:1.5.33@sha256:d2ecc8035822b23b8587a56eab15edd825f41d3fb80d93e8e66680410beddc08
+    image: floci/floci:1.7.0@sha256:bec9b9f749322444a57fb0f00d3e007ffd49015162361aab84ccecd9b4f5f8ed
     ports:
       - "4566:4566"
     environment:

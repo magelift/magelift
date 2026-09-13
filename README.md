@@ -11,7 +11,7 @@ not a hosting service.
 
 **Site:** [magelift.dev](https://magelift.dev/) · **Docs:** [magelift.dev/docs](https://magelift.dev/docs/)
 
-Agent Skills for contributors (Cursor / Claude / Codex): [`agents/`](agents/README.md).
+Agent guide: [`AGENTS.md`](AGENTS.md). User skills: [`agents/`](agents/README.md).
 
 ## Scope
 
@@ -19,10 +19,10 @@ Agent Skills for contributors (Cursor / Claude / Codex): [`agents/`](agents/READ
 | --- | --- |
 | AWS ECS Fargate | Certified |
 | GCP GKE Autopilot | Certified |
-| AWS EKS (`eks-autopilot` runtime), OVH MKS, Scaleway Kapsule | Experimental |
+| AWS EKS, GCP GKE Standard, OVH MKS, Scaleway Kapsule | Experimental |
 
 See the [capability matrix](docs/capability-matrix.md) and
-[ADR 0007](docs/adr/0007-multi-provider-community-targets.md). Only certified
+[ADR 0002](docs/adr/0002-certified-vs-experimental.md). Only certified
 cells are production-supported.
 
 Presets keep YAML small. Power users open the matrix (queue engine, search mode,
@@ -57,21 +57,24 @@ First hour: [getting started](docs/getting-started.md) →
 ```sh
 make help
 make verify
-make floci-test
+make local-gates
 ```
 
-`make floci-test` runs the Floci AWS emulator suite (bootstrap, locks, secrets,
-logs, media restore, ECS candidates). Docker is required; an AWS account is not.
+`make local-gates` is the account-free stack: Pulumi mock graphs, the offline
+acceptance harness, Floci AWS (`make floci-test-aws`), and floci-gcp
+(`make floci-gcp-test`). Docker is required for the Floci legs; a cloud account
+is not. Packed live sessions are documented in
+[certification sessions](docs/certification-sessions.md).
 
 Local Magento without cloud credentials:
 
 ```sh
-magelift dev init
-magelift dev up
-magelift dev status
+magelift local init
+magelift local up
+magelift local status
 ```
 
-Defaults are MySQL and Valkey. `magelift dev up --service app` also starts
+Defaults are MySQL and Valkey. `magelift local up --service app` also starts
 OpenSearch and RabbitMQ with digest-pinned images. Override images with
 `MAGELIFT_LOCAL_*_IMAGE` if needed. HTTP is `http://localhost:8080/`; local HTTPS
 is `https://localhost:8443/` via Caddy's internal CA.
@@ -82,7 +85,7 @@ not match in cloud.
 Seed a repo that already has Composer deps installed:
 
 ```sh
-MAGELIFT_LOCAL_ADMIN_PASSWORD='UseLocalPassword1234' magelift dev seed
+MAGELIFT_LOCAL_ADMIN_PASSWORD='UseLocalPassword1234' magelift local seed
 ```
 
 The password lands only in ignored `.magelift/local.env` (mode 0600).
@@ -98,7 +101,8 @@ magelift outputs --env staging
 
 `preview` plans without mutating. Deploy and destroy take the provider lock when
 Ops exist (AWS DIY S3 lock today). Production and protected destroys need
-`--yes`. Set `PULUMI_BACKEND_URL` for DIY/local Pulumi state. Set
+`--yes`. Magelift derives stack state from `magelift bootstrap`; do not set
+`PULUMI_BACKEND_URL` on the laptop path. Set
 `MAGELIFT_AWS_ENDPOINT_URL` only for loopback emulators such as
 `http://127.0.0.1:4566`; public or credential-bearing URLs are rejected.
 

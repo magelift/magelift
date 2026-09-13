@@ -7,14 +7,82 @@
           "$ref": "#/$defs/aWSCatalogAurora",
           "description": "Aurora or RDS MySQL capacity"
         },
+        "cacheSnapshotRetentionLimit": {
+          "anyOf": [
+            {
+              "description": "AWS ElastiCache Valkey automatic snapshot retention in days; zero disables snapshots",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cacheSnapshotWindow": {
+          "anyOf": [
+            {
+              "description": "AWS ElastiCache Valkey daily snapshot window in UTC",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupWindow": {
+          "anyOf": [
+            {
+              "description": "AWS RDS/Aurora automated backup window in UTC",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseDeleteAutomatedBackups": {
+          "anyOf": [
+            {
+              "description": "Delete AWS RDS/Aurora automated backups when the database is destroyed",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable AWS RDS/Aurora deletion protection",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "databaseEngine": {
           "anyOf": [
             {
-              "description": "MySQL engine shape",
+              "description": "Database engine shape",
               "enum": [
                 "aurora-mysql",
-                "rds-mysql"
+                "rds-mysql",
+                "rds-mariadb"
               ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseMaintenanceWindow": {
+          "anyOf": [
+            {
+              "description": "AWS RDS/Aurora maintenance window in UTC",
               "type": "string"
             },
             {
@@ -26,7 +94,7 @@
           "anyOf": [
             {
               "$ref": "#/$defs/aWSCatalogEKS",
-              "description": "EKS Autopilot capacity (eks-autopilot)"
+              "description": "EKS Autopilot capacity (eks)"
             },
             {
               "type": "null"
@@ -167,6 +235,23 @@
     "aWSCatalogEKS": {
       "additionalProperties": false,
       "properties": {
+        "computeMode": {
+          "anyOf": [
+            {
+              "description": "EKS compute mode",
+              "enum": [
+                "auto-mode",
+                "managed-node-groups",
+                "self-managed",
+                "fargate"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "cpuRequest": {
           "anyOf": [
             {
@@ -189,6 +274,31 @@
             }
           ]
         },
+        "fargateNamespaces": {
+          "anyOf": [
+            {
+              "description": "Namespaces scheduled on EKS Fargate",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kubernetesVersion": {
+          "anyOf": [
+            {
+              "description": "EKS Kubernetes minor version",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "memoryRequest": {
           "anyOf": [
             {
@@ -200,10 +310,117 @@
             }
           ]
         },
+        "nodeAmi": {
+          "anyOf": [
+            {
+              "description": "Pinned AMI for self-managed EKS nodes",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodeDesiredSize": {
+          "anyOf": [
+            {
+              "description": "Desired EKS node count",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodeInstanceType": {
+          "anyOf": [
+            {
+              "description": "EKS node instance type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodeMaxSize": {
+          "anyOf": [
+            {
+              "description": "Maximum EKS node count",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodeMinSize": {
+          "anyOf": [
+            {
+              "description": "Minimum EKS node count",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "queueConsumerCount": {
           "anyOf": [
             {
               "description": "Queue consumer Deployment replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueMode": {
+          "anyOf": [
+            {
+              "description": "EKS queue workload mode",
+              "enum": [
+                "database",
+                "rabbitmq"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueReplicas": {
+          "anyOf": [
+            {
+              "description": "RabbitMQ StatefulSet replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "searchMode": {
+          "anyOf": [
+            {
+              "description": "EKS OpenSearch workload mode",
+              "enum": [
+                "opensearch",
+                "disabled"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "searchReplicas": {
+          "anyOf": [
+            {
+              "description": "OpenSearch StatefulSet replicas",
               "type": "integer"
             },
             {
@@ -217,6 +434,23 @@
     "aWSCatalogEKSOverlay": {
       "additionalProperties": false,
       "properties": {
+        "computeMode": {
+          "anyOf": [
+            {
+              "description": "EKS compute mode",
+              "enum": [
+                "auto-mode",
+                "managed-node-groups",
+                "self-managed",
+                "fargate"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "cpuRequest": {
           "anyOf": [
             {
@@ -239,11 +473,91 @@
             }
           ]
         },
+        "fargateNamespaces": {
+          "anyOf": [
+            {
+              "description": "Namespaces scheduled on EKS Fargate",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kubernetesVersion": {
+          "anyOf": [
+            {
+              "description": "EKS Kubernetes minor version",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "memoryRequest": {
           "anyOf": [
             {
               "description": "Web/cron memory request",
               "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodeAmi": {
+          "anyOf": [
+            {
+              "description": "Pinned AMI for self-managed EKS nodes",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodeDesiredSize": {
+          "anyOf": [
+            {
+              "description": "Desired EKS node count",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodeInstanceType": {
+          "anyOf": [
+            {
+              "description": "EKS node instance type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodeMaxSize": {
+          "anyOf": [
+            {
+              "description": "Maximum EKS node count",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodeMinSize": {
+          "anyOf": [
+            {
+              "description": "Minimum EKS node count",
+              "type": "integer"
             },
             {
               "type": "null"
@@ -260,6 +574,58 @@
               "type": "null"
             }
           ]
+        },
+        "queueMode": {
+          "anyOf": [
+            {
+              "description": "EKS queue workload mode",
+              "enum": [
+                "database",
+                "rabbitmq"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueReplicas": {
+          "anyOf": [
+            {
+              "description": "RabbitMQ StatefulSet replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "searchMode": {
+          "anyOf": [
+            {
+              "description": "EKS OpenSearch workload mode",
+              "enum": [
+                "opensearch",
+                "disabled"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "searchReplicas": {
+          "anyOf": [
+            {
+              "description": "OpenSearch StatefulSet replicas",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "type": "object"
@@ -267,6 +633,23 @@
     "aWSCatalogFargate": {
       "additionalProperties": false,
       "properties": {
+        "computeMode": {
+          "anyOf": [
+            {
+              "description": "ECS capacity mode",
+              "enum": [
+                "fargate",
+                "fargate-spot",
+                "ec2-asg",
+                "managed-instances"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "cpu": {
           "description": "Fargate task CPU",
           "type": "integer"
@@ -275,9 +658,53 @@
           "description": "Fargate desired task count",
           "type": "integer"
         },
+        "instanceAmi": {
+          "anyOf": [
+            {
+              "description": "Pinned AMI for ECS EC2 capacity",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "instanceType": {
+          "anyOf": [
+            {
+              "description": "EC2 or managed-instance capacity type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxCapacity": {
+          "anyOf": [
+            {
+              "description": "Maximum host capacity",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "memoryMiB": {
           "description": "Fargate task memory",
           "type": "integer"
+        },
+        "minCapacity": {
+          "anyOf": [
+            {
+              "description": "Minimum host capacity",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "type": "object"
@@ -285,6 +712,23 @@
     "aWSCatalogFargateOverlay": {
       "additionalProperties": false,
       "properties": {
+        "computeMode": {
+          "anyOf": [
+            {
+              "description": "ECS capacity mode",
+              "enum": [
+                "fargate",
+                "fargate-spot",
+                "ec2-asg",
+                "managed-instances"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "cpu": {
           "description": "Fargate task CPU",
           "type": "integer"
@@ -293,9 +737,53 @@
           "description": "Fargate desired task count",
           "type": "integer"
         },
+        "instanceAmi": {
+          "anyOf": [
+            {
+              "description": "Pinned AMI for ECS EC2 capacity",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "instanceType": {
+          "anyOf": [
+            {
+              "description": "EC2 or managed-instance capacity type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxCapacity": {
+          "anyOf": [
+            {
+              "description": "Maximum host capacity",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "memoryMiB": {
           "description": "Fargate task memory",
           "type": "integer"
+        },
+        "minCapacity": {
+          "anyOf": [
+            {
+              "description": "Minimum host capacity",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "type": "object"
@@ -307,14 +795,82 @@
           "$ref": "#/$defs/aWSCatalogAuroraOverlay",
           "description": "Aurora or RDS MySQL capacity"
         },
+        "cacheSnapshotRetentionLimit": {
+          "anyOf": [
+            {
+              "description": "AWS ElastiCache Valkey automatic snapshot retention in days; zero disables snapshots",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cacheSnapshotWindow": {
+          "anyOf": [
+            {
+              "description": "AWS ElastiCache Valkey daily snapshot window in UTC",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupWindow": {
+          "anyOf": [
+            {
+              "description": "AWS RDS/Aurora automated backup window in UTC",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseDeleteAutomatedBackups": {
+          "anyOf": [
+            {
+              "description": "Delete AWS RDS/Aurora automated backups when the database is destroyed",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable AWS RDS/Aurora deletion protection",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "databaseEngine": {
           "anyOf": [
             {
-              "description": "MySQL engine shape",
+              "description": "Database engine shape",
               "enum": [
                 "aurora-mysql",
-                "rds-mysql"
+                "rds-mysql",
+                "rds-mariadb"
               ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseMaintenanceWindow": {
+          "anyOf": [
+            {
+              "description": "AWS RDS/Aurora maintenance window in UTC",
               "type": "string"
             },
             {
@@ -326,7 +882,7 @@
           "anyOf": [
             {
               "$ref": "#/$defs/aWSCatalogEKSOverlay",
-              "description": "EKS Autopilot capacity (eks-autopilot)"
+              "description": "EKS Autopilot capacity (eks)"
             },
             {
               "type": "null"
@@ -579,6 +1135,10 @@
           "description": "Aurora MySQL engine version",
           "type": "string"
         },
+        "mariaDb": {
+          "description": "RDS MariaDB engine version",
+          "type": "string"
+        },
         "mysql": {
           "description": "RDS MySQL engine version",
           "type": "string"
@@ -603,6 +1163,10 @@
       "properties": {
         "auroraMysql": {
           "description": "Aurora MySQL engine version",
+          "type": "string"
+        },
+        "mariaDb": {
+          "description": "RDS MariaDB engine version",
           "type": "string"
         },
         "mysql": {
@@ -988,6 +1552,20 @@
             }
           ]
         },
+        "labels": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Resource labels",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "masterUsername": {
           "anyOf": [
             {
@@ -1010,6 +1588,17 @@
             }
           ]
         },
+        "natInstanceType": {
+          "anyOf": [
+            {
+              "description": "ARM64 fck-nat instance type; omitted defaults to cost-optimized t4g.nano",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "natMode": {
           "anyOf": [
             {
@@ -1017,6 +1606,36 @@
               "enum": [
                 "nat-gateway",
                 "fck-nat"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "natReplacementMode": {
+          "anyOf": [
+            {
+              "description": "AWS fck-nat replacement mode; omitted defaults to automatic replacement for multi-AZ fck-nat",
+              "enum": [
+                "none",
+                "auto-scaling"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "natTopology": {
+          "anyOf": [
+            {
+              "description": "AWS NAT failure-domain topology; omitted defaults to single-AZ for preview and multi-AZ for standard/high-availability",
+              "enum": [
+                "single-az",
+                "multi-az"
               ],
               "type": "string"
             },
@@ -1192,6 +1811,20 @@
             }
           ]
         },
+        "labels": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Resource labels",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "masterUsername": {
           "anyOf": [
             {
@@ -1214,6 +1847,17 @@
             }
           ]
         },
+        "natInstanceType": {
+          "anyOf": [
+            {
+              "description": "ARM64 fck-nat instance type; omitted defaults to cost-optimized t4g.nano",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "natMode": {
           "anyOf": [
             {
@@ -1221,6 +1865,36 @@
               "enum": [
                 "nat-gateway",
                 "fck-nat"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "natReplacementMode": {
+          "anyOf": [
+            {
+              "description": "AWS fck-nat replacement mode; omitted defaults to automatic replacement for multi-AZ fck-nat",
+              "enum": [
+                "none",
+                "auto-scaling"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "natTopology": {
+          "anyOf": [
+            {
+              "description": "AWS NAT failure-domain topology; omitted defaults to single-AZ for preview and multi-AZ for standard/high-availability",
+              "enum": [
+                "single-az",
+                "multi-az"
               ],
               "type": "string"
             },
@@ -1294,6 +1968,10 @@
           ],
           "type": "string"
         },
+        "magento": {
+          "$ref": "#/$defs/magentoRuntime",
+          "description": "Magento runtime overlays"
+        },
         "mode": {
           "description": "Application mode",
           "enum": [
@@ -1310,7 +1988,8 @@
           "description": "HTTP application runtime",
           "enum": [
             "nginx-fpm",
-            "frankenphp-classic"
+            "frankenphp-classic",
+            "php-apache"
           ],
           "type": "string"
         }
@@ -1340,6 +2019,10 @@
           ],
           "type": "string"
         },
+        "magento": {
+          "$ref": "#/$defs/magentoRuntimeOverlay",
+          "description": "Magento runtime overlays"
+        },
         "mode": {
           "description": "Application mode",
           "enum": [
@@ -1356,7 +2039,8 @@
           "description": "HTTP application runtime",
           "enum": [
             "nginx-fpm",
-            "frankenphp-classic"
+            "frankenphp-classic",
+            "php-apache"
           ],
           "type": "string"
         }
@@ -1370,6 +2054,13 @@
           "$ref": "#/$defs/composer",
           "description": "Composer settings"
         },
+        "extensions": {
+          "description": "Required PHP extensions",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "hooks": {
           "additionalProperties": {
             "$ref": "#/$defs/buildHook"
@@ -1380,6 +2071,13 @@
         "php": {
           "description": "Exact PHP branch or patch version",
           "type": "string"
+        },
+        "qualityPatches": {
+          "description": "Quality Patch IDs applied at build",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "staticContent": {
           "$ref": "#/$defs/staticContentSettings",
@@ -1610,6 +2308,13 @@
           "$ref": "#/$defs/composerOverlay",
           "description": "Composer settings"
         },
+        "extensions": {
+          "description": "Required PHP extensions",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "hooks": {
           "additionalProperties": {
             "$ref": "#/$defs/buildHookOverlay"
@@ -1620,6 +2325,13 @@
         "php": {
           "description": "Exact PHP branch or patch version",
           "type": "string"
+        },
+        "qualityPatches": {
+          "description": "Quality Patch IDs applied at build",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "staticContent": {
           "$ref": "#/$defs/staticContentSettingsOverlay",
@@ -1655,6 +2367,18 @@
           "description": "Composer credentials secret reference",
           "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
           "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "description": "Required Composer 2 major, minor, or patch version",
+              "pattern": "^2\\.\\d+(?:\\.\\d+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "type": "object"
@@ -1666,6 +2390,18 @@
           "description": "Composer credentials secret reference",
           "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
           "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "description": "Required Composer 2 major, minor, or patch version",
+              "pattern": "^2\\.\\d+(?:\\.\\d+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "type": "object"
@@ -1740,6 +2476,732 @@
         "region": {
           "description": "Default AWS region",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "edgeConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "cachePolicyRef": {
+          "anyOf": [
+            {
+              "description": "Reviewed cache-key and bypass policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dnsMode": {
+          "anyOf": [
+            {
+              "description": "DNS ownership and convergence mode",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "domains": {
+          "anyOf": [
+            {
+              "description": "Edge hostnames",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "externalProvider": {
+          "anyOf": [
+            {
+              "description": "External edge delivery provider",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failoverPolicyRef": {
+          "anyOf": [
+            {
+              "description": "Origin failover and failback policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "health": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/edgeHealthConfig",
+              "description": "External edge health verification policy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "description": "Edge composition mode",
+              "enum": [
+                "none",
+                "native",
+                "external",
+                "both"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nativeProvider": {
+          "anyOf": [
+            {
+              "description": "Provider-native edge implementation",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originHealthRef": {
+          "anyOf": [
+            {
+              "description": "Origin health gate reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ownershipMarker": {
+          "anyOf": [
+            {
+              "description": "Edge resource ownership marker",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "purgeOnDeploy": {
+          "description": "Purge Fastly content after deploy",
+          "type": "boolean"
+        },
+        "purgePolicyRef": {
+          "anyOf": [
+            {
+              "description": "Purge verification policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serviceId": {
+          "anyOf": [
+            {
+              "description": "Fastly service identifier",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tls": {
+          "description": "Require edge TLS",
+          "type": "boolean"
+        },
+        "tlsMode": {
+          "anyOf": [
+            {
+              "description": "TLS certificate ownership and renewal mode",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tokenSecret": {
+          "anyOf": [
+            {
+              "description": "Fastly API token secret reference",
+              "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vclRef": {
+          "anyOf": [
+            {
+              "description": "Reference to reviewed Fastly VCL or policy artifact",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wafPolicyRef": {
+          "anyOf": [
+            {
+              "description": "WAF or security-header policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "edgeConfigOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "cachePolicyRef": {
+          "anyOf": [
+            {
+              "description": "Reviewed cache-key and bypass policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dnsMode": {
+          "anyOf": [
+            {
+              "description": "DNS ownership and convergence mode",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "domains": {
+          "anyOf": [
+            {
+              "description": "Edge hostnames",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "externalProvider": {
+          "anyOf": [
+            {
+              "description": "External edge delivery provider",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failoverPolicyRef": {
+          "anyOf": [
+            {
+              "description": "Origin failover and failback policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "health": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/edgeHealthConfigOverlay",
+              "description": "External edge health verification policy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "description": "Edge composition mode",
+              "enum": [
+                "none",
+                "native",
+                "external",
+                "both"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nativeProvider": {
+          "anyOf": [
+            {
+              "description": "Provider-native edge implementation",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originHealthRef": {
+          "anyOf": [
+            {
+              "description": "Origin health gate reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ownershipMarker": {
+          "anyOf": [
+            {
+              "description": "Edge resource ownership marker",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "purgeOnDeploy": {
+          "description": "Purge Fastly content after deploy",
+          "type": "boolean"
+        },
+        "purgePolicyRef": {
+          "anyOf": [
+            {
+              "description": "Purge verification policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serviceId": {
+          "anyOf": [
+            {
+              "description": "Fastly service identifier",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tls": {
+          "description": "Require edge TLS",
+          "type": "boolean"
+        },
+        "tlsMode": {
+          "anyOf": [
+            {
+              "description": "TLS certificate ownership and renewal mode",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tokenSecret": {
+          "anyOf": [
+            {
+              "description": "Fastly API token secret reference",
+              "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vclRef": {
+          "anyOf": [
+            {
+              "description": "Reference to reviewed Fastly VCL or policy artifact",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "wafPolicyRef": {
+          "anyOf": [
+            {
+              "description": "WAF or security-header policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "edgeHealthConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedCname": {
+          "anyOf": [
+            {
+              "description": "Expected edge DNS CNAME",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expectedStatus": {
+          "anyOf": [
+            {
+              "description": "Expected post-mutation HTTP status",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originHost": {
+          "anyOf": [
+            {
+              "description": "TLS SNI and HTTP Host used for the origin health URL",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originUrl": {
+          "anyOf": [
+            {
+              "description": "Origin health URL checked before edge mutation",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "routePath": {
+          "anyOf": [
+            {
+              "description": "Path used for post-mutation edge verification",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "routePollSeconds": {
+          "anyOf": [
+            {
+              "description": "Edge route convergence polling interval",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "routeTimeoutSeconds": {
+          "anyOf": [
+            {
+              "description": "Maximum edge route convergence time",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "edgeHealthConfigOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedCname": {
+          "anyOf": [
+            {
+              "description": "Expected edge DNS CNAME",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expectedStatus": {
+          "anyOf": [
+            {
+              "description": "Expected post-mutation HTTP status",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originHost": {
+          "anyOf": [
+            {
+              "description": "TLS SNI and HTTP Host used for the origin health URL",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originUrl": {
+          "anyOf": [
+            {
+              "description": "Origin health URL checked before edge mutation",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "routePath": {
+          "anyOf": [
+            {
+              "description": "Path used for post-mutation edge verification",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "routePollSeconds": {
+          "anyOf": [
+            {
+              "description": "Edge route convergence polling interval",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "routeTimeoutSeconds": {
+          "anyOf": [
+            {
+              "description": "Maximum edge route convergence time",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "emailConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "credential": {
+          "anyOf": [
+            {
+              "description": "SendGrid or SES credential secret reference",
+              "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from": {
+          "anyOf": [
+            {
+              "description": "Default sender address",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "host": {
+          "anyOf": [
+            {
+              "description": "SMTP host",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "description": "Cloud email mode",
+              "enum": [
+                "disabled",
+                "smtp",
+                "sendgrid",
+                "ses"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "port": {
+          "anyOf": [
+            {
+              "description": "SMTP port",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "username": {
+          "anyOf": [
+            {
+              "description": "SMTP username",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "emailConfigOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "credential": {
+          "anyOf": [
+            {
+              "description": "SendGrid or SES credential secret reference",
+              "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from": {
+          "anyOf": [
+            {
+              "description": "Default sender address",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "host": {
+          "anyOf": [
+            {
+              "description": "SMTP host",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "description": "Cloud email mode",
+              "enum": [
+                "disabled",
+                "smtp",
+                "sendgrid",
+                "ses"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "port": {
+          "anyOf": [
+            {
+              "description": "SMTP port",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "username": {
+          "anyOf": [
+            {
+              "description": "SMTP username",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "type": "object"
@@ -1834,6 +3296,26 @@
             }
           ]
         },
+        "edge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/edgeConfigOverlay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/emailConfigOverlay"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "expiresAt": {
           "anyOf": [
             {
@@ -1858,6 +3340,16 @@
             {
               "description": "Maximum monthly AWS budget in cents",
               "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observability": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/observabilityConfigOverlay"
             },
             {
               "type": "null"
@@ -1895,6 +3387,16 @@
             {
               "description": "Protect against destructive commands",
               "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resilience": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/resilienceConfigOverlay"
             },
             {
               "type": "null"
@@ -1950,10 +3452,115 @@
             }
           ]
         },
+        "cloudSqlAvailability": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL availability type",
+              "enum": [
+                "ZONAL",
+                "REGIONAL"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBackupEnabled": {
+          "anyOf": [
+            {
+              "description": "Enable Cloud SQL automated backups",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBackupLocation": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL automated backup storage location",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBackupRetentionCount": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL retained automated backup count",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBackupStartTime": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL automated backup start time (HH:MM)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBinaryLogEnabled": {
+          "anyOf": [
+            {
+              "description": "Enable Cloud SQL MySQL binary logging for point-in-time recovery",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable Cloud SQL service and IaC deletion protection",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "cloudSqlTier": {
           "anyOf": [
             {
               "description": "Cloud SQL machine tier",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlTransactionLogRetentionDays": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL MySQL transaction log retention in days (1-7)",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clusterIpv4Cidr": {
+          "anyOf": [
+            {
+              "description": "GKE cluster pod IPv4 CIDR",
               "type": "string"
             },
             {
@@ -1983,6 +3590,17 @@
             }
           ]
         },
+        "enableCloudArmor": {
+          "anyOf": [
+            {
+              "description": "Create a GCP Cloud Armor security policy",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "encryptionKeySecret": {
           "anyOf": [
             {
@@ -1998,6 +3616,17 @@
           "anyOf": [
             {
               "description": "Signed immutable OCI image digest",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kubernetesVersion": {
+          "anyOf": [
+            {
+              "description": "GKE Kubernetes version",
               "type": "string"
             },
             {
@@ -2030,10 +3659,114 @@
             }
           ]
         },
+        "memorystoreDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable Memorystore for Valkey deletion protection",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreEngineVersion": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey engine version (VALKEY_9_0 GA or VALKEY_9_1 Preview)",
+              "enum": [
+                "VALKEY_8_0",
+                "VALKEY_9_0",
+                "VALKEY_9_1"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreMode": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey cluster mode",
+              "enum": [
+                "CLUSTER",
+                "CLUSTER_DISABLED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "memorystoreNodeType": {
           "anyOf": [
             {
               "description": "Memorystore for Valkey node type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystorePscConnectionLimit": {
+          "anyOf": [
+            {
+              "description": "Maximum automatic Memorystore PSC connections",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreReplicas": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey replica count per shard (0-5)",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreShardCount": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey shard count",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreZone": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey single-zone placement",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreZoneDistributionMode": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey zone distribution mode",
+              "enum": [
+                "MULTI_ZONE",
+                "SINGLE_ZONE"
+              ],
               "type": "string"
             },
             {
@@ -2046,6 +3779,43 @@
             {
               "description": "VPC IPv4 CIDR",
               "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "openSearchImage": {
+          "anyOf": [
+            {
+              "description": "GKE OpenSearch image reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "openSearchMode": {
+          "anyOf": [
+            {
+              "description": "GKE OpenSearch workload mode",
+              "enum": [
+                "opensearch",
+                "disabled"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "openSearchReplicas": {
+          "anyOf": [
+            {
+              "description": "GKE OpenSearch replica count",
+              "type": "integer"
             },
             {
               "type": "null"
@@ -2068,10 +3838,155 @@
             }
           ]
         },
+        "queueMode": {
+          "anyOf": [
+            {
+              "description": "GKE queue workload mode",
+              "enum": [
+                "database",
+                "rabbitmq"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueReplicas": {
+          "anyOf": [
+            {
+              "description": "GKE RabbitMQ replica count",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rabbitMqImage": {
+          "anyOf": [
+            {
+              "description": "GKE RabbitMQ image reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "region": {
           "anyOf": [
             {
               "description": "GCP region",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "releaseChannel": {
+          "anyOf": [
+            {
+              "description": "GKE release channel",
+              "enum": [
+                "RAPID",
+                "REGULAR",
+                "STABLE"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "servicesIpv4Cidr": {
+          "anyOf": [
+            {
+              "description": "GKE services IPv4 CIDR",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeCount": {
+          "anyOf": [
+            {
+              "description": "GKE Standard initial node count per zone",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeDiskSizeGiB": {
+          "anyOf": [
+            {
+              "description": "GKE Standard node boot disk size",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeDiskType": {
+          "anyOf": [
+            {
+              "description": "GKE Standard node boot disk type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeImageType": {
+          "anyOf": [
+            {
+              "description": "GKE Standard node image type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeMaxCount": {
+          "anyOf": [
+            {
+              "description": "GKE Standard maximum nodes per zone",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeMinCount": {
+          "anyOf": [
+            {
+              "description": "GKE Standard minimum nodes per zone",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeSpot": {
+          "description": "Use Spot VMs for GKE Standard nodes",
+          "type": "boolean"
+        },
+        "standardNodeType": {
+          "anyOf": [
+            {
+              "description": "GKE Standard node machine type",
               "type": "string"
             },
             {
@@ -2124,10 +4039,115 @@
             }
           ]
         },
+        "cloudSqlAvailability": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL availability type",
+              "enum": [
+                "ZONAL",
+                "REGIONAL"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBackupEnabled": {
+          "anyOf": [
+            {
+              "description": "Enable Cloud SQL automated backups",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBackupLocation": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL automated backup storage location",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBackupRetentionCount": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL retained automated backup count",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBackupStartTime": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL automated backup start time (HH:MM)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlBinaryLogEnabled": {
+          "anyOf": [
+            {
+              "description": "Enable Cloud SQL MySQL binary logging for point-in-time recovery",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable Cloud SQL service and IaC deletion protection",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "cloudSqlTier": {
           "anyOf": [
             {
               "description": "Cloud SQL machine tier",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cloudSqlTransactionLogRetentionDays": {
+          "anyOf": [
+            {
+              "description": "Cloud SQL MySQL transaction log retention in days (1-7)",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clusterIpv4Cidr": {
+          "anyOf": [
+            {
+              "description": "GKE cluster pod IPv4 CIDR",
               "type": "string"
             },
             {
@@ -2157,6 +4177,17 @@
             }
           ]
         },
+        "enableCloudArmor": {
+          "anyOf": [
+            {
+              "description": "Create a GCP Cloud Armor security policy",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "encryptionKeySecret": {
           "anyOf": [
             {
@@ -2172,6 +4203,17 @@
           "anyOf": [
             {
               "description": "Signed immutable OCI image digest",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kubernetesVersion": {
+          "anyOf": [
+            {
+              "description": "GKE Kubernetes version",
               "type": "string"
             },
             {
@@ -2204,10 +4246,114 @@
             }
           ]
         },
+        "memorystoreDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable Memorystore for Valkey deletion protection",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreEngineVersion": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey engine version (VALKEY_9_0 GA or VALKEY_9_1 Preview)",
+              "enum": [
+                "VALKEY_8_0",
+                "VALKEY_9_0",
+                "VALKEY_9_1"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreMode": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey cluster mode",
+              "enum": [
+                "CLUSTER",
+                "CLUSTER_DISABLED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "memorystoreNodeType": {
           "anyOf": [
             {
               "description": "Memorystore for Valkey node type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystorePscConnectionLimit": {
+          "anyOf": [
+            {
+              "description": "Maximum automatic Memorystore PSC connections",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreReplicas": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey replica count per shard (0-5)",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreShardCount": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey shard count",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreZone": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey single-zone placement",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "memorystoreZoneDistributionMode": {
+          "anyOf": [
+            {
+              "description": "Memorystore for Valkey zone distribution mode",
+              "enum": [
+                "MULTI_ZONE",
+                "SINGLE_ZONE"
+              ],
               "type": "string"
             },
             {
@@ -2220,6 +4366,43 @@
             {
               "description": "VPC IPv4 CIDR",
               "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "openSearchImage": {
+          "anyOf": [
+            {
+              "description": "GKE OpenSearch image reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "openSearchMode": {
+          "anyOf": [
+            {
+              "description": "GKE OpenSearch workload mode",
+              "enum": [
+                "opensearch",
+                "disabled"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "openSearchReplicas": {
+          "anyOf": [
+            {
+              "description": "GKE OpenSearch replica count",
+              "type": "integer"
             },
             {
               "type": "null"
@@ -2242,10 +4425,155 @@
             }
           ]
         },
+        "queueMode": {
+          "anyOf": [
+            {
+              "description": "GKE queue workload mode",
+              "enum": [
+                "database",
+                "rabbitmq"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueReplicas": {
+          "anyOf": [
+            {
+              "description": "GKE RabbitMQ replica count",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rabbitMqImage": {
+          "anyOf": [
+            {
+              "description": "GKE RabbitMQ image reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "region": {
           "anyOf": [
             {
               "description": "GCP region",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "releaseChannel": {
+          "anyOf": [
+            {
+              "description": "GKE release channel",
+              "enum": [
+                "RAPID",
+                "REGULAR",
+                "STABLE"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "servicesIpv4Cidr": {
+          "anyOf": [
+            {
+              "description": "GKE services IPv4 CIDR",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeCount": {
+          "anyOf": [
+            {
+              "description": "GKE Standard initial node count per zone",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeDiskSizeGiB": {
+          "anyOf": [
+            {
+              "description": "GKE Standard node boot disk size",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeDiskType": {
+          "anyOf": [
+            {
+              "description": "GKE Standard node boot disk type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeImageType": {
+          "anyOf": [
+            {
+              "description": "GKE Standard node image type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeMaxCount": {
+          "anyOf": [
+            {
+              "description": "GKE Standard maximum nodes per zone",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeMinCount": {
+          "anyOf": [
+            {
+              "description": "GKE Standard minimum nodes per zone",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "standardNodeSpot": {
+          "description": "Use Spot VMs for GKE Standard nodes",
+          "type": "boolean"
+        },
+        "standardNodeType": {
+          "anyOf": [
+            {
+              "description": "GKE Standard node machine type",
               "type": "string"
             },
             {
@@ -2270,14 +4598,424 @@
       },
       "type": "object"
     },
+    "localEmailSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "credentialEnv": {
+          "anyOf": [
+            {
+              "description": "Environment variable containing the email credential",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from": {
+          "anyOf": [
+            {
+              "description": "Default sender address",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "host": {
+          "anyOf": [
+            {
+              "description": "SMTP or local email host",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "description": "Email mode",
+              "enum": [
+                "disabled",
+                "smtp",
+                "sendgrid",
+                "ses",
+                "mailpit"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "port": {
+          "anyOf": [
+            {
+              "description": "SMTP or local email port",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "username": {
+          "anyOf": [
+            {
+              "description": "SMTP username",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "localRuntime": {
+      "additionalProperties": false,
+      "properties": {
+        "cache": {
+          "$ref": "#/$defs/localService",
+          "description": "Local cache family and version"
+        },
+        "database": {
+          "$ref": "#/$defs/localService",
+          "description": "Local database family and version"
+        },
+        "email": {
+          "$ref": "#/$defs/localEmailSettings",
+          "description": "Local email delivery mode"
+        },
+        "phpSettings": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Local PHP ini settings",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queue": {
+          "$ref": "#/$defs/localService",
+          "description": "Local queue family and version"
+        },
+        "search": {
+          "$ref": "#/$defs/localService",
+          "description": "Local search family and version"
+        },
+        "webCache": {
+          "$ref": "#/$defs/localService",
+          "description": "Local web cache family and version"
+        },
+        "webServer": {
+          "$ref": "#/$defs/localService",
+          "description": "Local web server family and version"
+        }
+      },
+      "type": "object"
+    },
+    "localService": {
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "anyOf": [
+            {
+              "description": "Service family",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "anyOf": [
+            {
+              "description": "Service version",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "magentoConsumers": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "description": "Consumer runner",
+              "enum": [
+                "cron",
+                "processes",
+                "both"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "names": {
+          "description": "Named Magento consumers",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "magentoConsumersOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "description": "Consumer runner",
+              "enum": [
+                "cron",
+                "processes",
+                "both"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "names": {
+          "description": "Named Magento consumers",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "magentoRuntime": {
+      "additionalProperties": false,
+      "properties": {
+        "consumers": {
+          "$ref": "#/$defs/magentoConsumers",
+          "description": "Magento message consumer runners"
+        },
+        "cookieDomain": {
+          "description": "Magento cookie domain",
+          "type": "string"
+        },
+        "corsOrigins": {
+          "description": "Allowed CORS origins for the Magento API",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "frontName": {
+          "description": "Magento admin frontName",
+          "type": "string"
+        },
+        "queueModule": {
+          "anyOf": [
+            {
+              "description": "Locked Composer Magento package providing SQS or Pub/Sub transport",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueTransport": {
+          "anyOf": [
+            {
+              "description": "Optional Magento-module queue transport",
+              "enum": [
+                "sqs",
+                "pubsub"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secureBaseUrl": {
+          "description": "Secure Magento base URL",
+          "type": "string"
+        },
+        "storefrontOrigin": {
+          "description": "Headless storefront origin allowed by CORS",
+          "type": "string"
+        },
+        "unsecureBaseUrl": {
+          "description": "Unsecure Magento base URL",
+          "type": "string"
+        },
+        "variables": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "CONFIG__* and MAGENTO_DC_* overlays",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "magentoRuntimeOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "consumers": {
+          "$ref": "#/$defs/magentoConsumersOverlay",
+          "description": "Magento message consumer runners"
+        },
+        "cookieDomain": {
+          "description": "Magento cookie domain",
+          "type": "string"
+        },
+        "corsOrigins": {
+          "description": "Allowed CORS origins for the Magento API",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "frontName": {
+          "description": "Magento admin frontName",
+          "type": "string"
+        },
+        "queueModule": {
+          "anyOf": [
+            {
+              "description": "Locked Composer Magento package providing SQS or Pub/Sub transport",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queueTransport": {
+          "anyOf": [
+            {
+              "description": "Optional Magento-module queue transport",
+              "enum": [
+                "sqs",
+                "pubsub"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secureBaseUrl": {
+          "description": "Secure Magento base URL",
+          "type": "string"
+        },
+        "storefrontOrigin": {
+          "description": "Headless storefront origin allowed by CORS",
+          "type": "string"
+        },
+        "unsecureBaseUrl": {
+          "description": "Unsecure Magento base URL",
+          "type": "string"
+        },
+        "variables": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "CONFIG__* and MAGENTO_DC_* overlays",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "oVHTarget": {
       "additionalProperties": false,
       "properties": {
+        "apiEndpoint": {
+          "anyOf": [
+            {
+              "description": "OVHcloud API endpoint alias (ovh-eu, ovh-ca, or ovh-us)",
+              "enum": [
+                "ovh-eu",
+                "ovh-ca",
+                "ovh-us"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attachFloatingIps": {
+          "description": "Attach OVH floating IPs to MKS nodes",
+          "type": "boolean"
+        },
         "cpuRequest": {
           "anyOf": [
             {
               "description": "Kubernetes CPU request",
               "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupRegions": {
+          "anyOf": [
+            {
+              "description": "OVH managed MySQL backup regions",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupTime": {
+          "anyOf": [
+            {
+              "description": "OVH managed MySQL daily backup start time (HH:MM)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable OVH managed MySQL deletion protection",
+              "type": "boolean"
             },
             {
               "type": "null"
@@ -2306,10 +5044,45 @@
             }
           ]
         },
+        "databaseNodeCount": {
+          "anyOf": [
+            {
+              "description": "OVH managed MySQL node count",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "databasePlan": {
           "anyOf": [
             {
-              "description": "OVH managed MySQL plan",
+              "description": "OVH managed MySQL plan (discovery/essential, business/production, or enterprise/advanced)",
+              "enum": [
+                "discovery",
+                "essential",
+                "business",
+                "production",
+                "enterprise",
+                "advanced"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseVersion": {
+          "anyOf": [
+            {
+              "description": "OVH managed MySQL engine version (8.0 or 8.4)",
+              "enum": [
+                "8.0",
+                "8.4"
+              ],
               "type": "string"
             },
             {
@@ -2386,6 +5159,21 @@
             }
           ]
         },
+        "mksPlan": {
+          "anyOf": [
+            {
+              "description": "OVH Managed Kubernetes plan",
+              "enum": [
+                "free",
+                "standard"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "networkCidr": {
           "anyOf": [
             {
@@ -2419,6 +5207,10 @@
             }
           ]
         },
+        "privateNetworkRoutingAsDefault": {
+          "description": "Route MKS egress through OVH's documented private-subnet DHCP gateway; custom gateway routing is not inferred",
+          "type": "boolean"
+        },
         "queueConsumerCount": {
           "anyOf": [
             {
@@ -2433,7 +5225,7 @@
         "region": {
           "anyOf": [
             {
-              "description": "OVH Public Cloud region (e.g. GRA9)",
+              "description": "OVH Public Cloud region (for example EU-WEST-PAR or GRA11)",
               "type": "string"
             },
             {
@@ -2479,6 +5271,42 @@
             }
           ]
         },
+        "valkeyBackupRegions": {
+          "anyOf": [
+            {
+              "description": "OVH managed Valkey backup regions",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "valkeyBackupTime": {
+          "anyOf": [
+            {
+              "description": "OVH managed Valkey daily backup start time (HH:MM)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "valkeyDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable OVH managed Valkey deletion protection",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "valkeyFlavor": {
           "anyOf": [
             {
@@ -2490,10 +5318,46 @@
             }
           ]
         },
+        "valkeyNodeCount": {
+          "anyOf": [
+            {
+              "description": "OVH managed Valkey node count",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "valkeyPlan": {
           "anyOf": [
             {
-              "description": "OVH managed Valkey plan",
+              "description": "OVH managed Valkey plan (discovery/essential or business/production)",
+              "enum": [
+                "discovery",
+                "essential",
+                "business",
+                "production"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "valkeyVersion": {
+          "anyOf": [
+            {
+              "description": "OVH managed Valkey engine version (7.2, 8.0, 8.1, 9.0, or 9.1; default 8.1)",
+              "enum": [
+                "7.2",
+                "8.0",
+                "8.1",
+                "9.0",
+                "9.1"
+              ],
               "type": "string"
             },
             {
@@ -2504,7 +5368,7 @@
         "zones": {
           "anyOf": [
             {
-              "description": "OVH regions used as network availability zones",
+              "description": "OVH MKS availability zones within the selected region",
               "items": {
                 "type": "string"
               },
@@ -2524,11 +5388,67 @@
     "oVHTargetOverlay": {
       "additionalProperties": false,
       "properties": {
+        "apiEndpoint": {
+          "anyOf": [
+            {
+              "description": "OVHcloud API endpoint alias (ovh-eu, ovh-ca, or ovh-us)",
+              "enum": [
+                "ovh-eu",
+                "ovh-ca",
+                "ovh-us"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attachFloatingIps": {
+          "description": "Attach OVH floating IPs to MKS nodes",
+          "type": "boolean"
+        },
         "cpuRequest": {
           "anyOf": [
             {
               "description": "Kubernetes CPU request",
               "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupRegions": {
+          "anyOf": [
+            {
+              "description": "OVH managed MySQL backup regions",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupTime": {
+          "anyOf": [
+            {
+              "description": "OVH managed MySQL daily backup start time (HH:MM)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable OVH managed MySQL deletion protection",
+              "type": "boolean"
             },
             {
               "type": "null"
@@ -2557,10 +5477,45 @@
             }
           ]
         },
+        "databaseNodeCount": {
+          "anyOf": [
+            {
+              "description": "OVH managed MySQL node count",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "databasePlan": {
           "anyOf": [
             {
-              "description": "OVH managed MySQL plan",
+              "description": "OVH managed MySQL plan (discovery/essential, business/production, or enterprise/advanced)",
+              "enum": [
+                "discovery",
+                "essential",
+                "business",
+                "production",
+                "enterprise",
+                "advanced"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseVersion": {
+          "anyOf": [
+            {
+              "description": "OVH managed MySQL engine version (8.0 or 8.4)",
+              "enum": [
+                "8.0",
+                "8.4"
+              ],
               "type": "string"
             },
             {
@@ -2637,6 +5592,21 @@
             }
           ]
         },
+        "mksPlan": {
+          "anyOf": [
+            {
+              "description": "OVH Managed Kubernetes plan",
+              "enum": [
+                "free",
+                "standard"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "networkCidr": {
           "anyOf": [
             {
@@ -2670,6 +5640,10 @@
             }
           ]
         },
+        "privateNetworkRoutingAsDefault": {
+          "description": "Route MKS egress through OVH's documented private-subnet DHCP gateway; custom gateway routing is not inferred",
+          "type": "boolean"
+        },
         "queueConsumerCount": {
           "anyOf": [
             {
@@ -2684,7 +5658,7 @@
         "region": {
           "anyOf": [
             {
-              "description": "OVH Public Cloud region (e.g. GRA9)",
+              "description": "OVH Public Cloud region (for example EU-WEST-PAR or GRA11)",
               "type": "string"
             },
             {
@@ -2730,6 +5704,42 @@
             }
           ]
         },
+        "valkeyBackupRegions": {
+          "anyOf": [
+            {
+              "description": "OVH managed Valkey backup regions",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "valkeyBackupTime": {
+          "anyOf": [
+            {
+              "description": "OVH managed Valkey daily backup start time (HH:MM)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "valkeyDeletionProtection": {
+          "anyOf": [
+            {
+              "description": "Enable OVH managed Valkey deletion protection",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "valkeyFlavor": {
           "anyOf": [
             {
@@ -2741,10 +5751,46 @@
             }
           ]
         },
+        "valkeyNodeCount": {
+          "anyOf": [
+            {
+              "description": "OVH managed Valkey node count",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "valkeyPlan": {
           "anyOf": [
             {
-              "description": "OVH managed Valkey plan",
+              "description": "OVH managed Valkey plan (discovery/essential or business/production)",
+              "enum": [
+                "discovery",
+                "essential",
+                "business",
+                "production"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "valkeyVersion": {
+          "anyOf": [
+            {
+              "description": "OVH managed Valkey engine version (7.2, 8.0, 8.1, 9.0, or 9.1; default 8.1)",
+              "enum": [
+                "7.2",
+                "8.0",
+                "8.1",
+                "9.0",
+                "9.1"
+              ],
               "type": "string"
             },
             {
@@ -2755,7 +5801,7 @@
         "zones": {
           "anyOf": [
             {
-              "description": "OVH regions used as network availability zones",
+              "description": "OVH MKS availability zones within the selected region",
               "items": {
                 "type": "string"
               },
@@ -2765,6 +5811,723 @@
               "type": "null"
             }
           ]
+        }
+      },
+      "type": "object"
+    },
+    "observabilityAlert": {
+      "additionalProperties": false,
+      "properties": {
+        "deduplicationKey": {
+          "description": "Alert deduplication key",
+          "type": "string"
+        },
+        "id": {
+          "description": "Stable alert identifier",
+          "type": "string"
+        },
+        "maintenancePolicyRef": {
+          "anyOf": [
+            {
+              "description": "Maintenance suppression policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operator": {
+          "description": "Threshold operator",
+          "enum": [
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "eq"
+          ],
+          "type": "string"
+        },
+        "owner": {
+          "description": "Alert owner",
+          "type": "string"
+        },
+        "runbookUrl": {
+          "description": "HTTPS runbook URL",
+          "type": "string"
+        },
+        "severity": {
+          "description": "Alert severity",
+          "enum": [
+            "info",
+            "warning",
+            "critical"
+          ],
+          "type": "string"
+        },
+        "signal": {
+          "description": "Portable signal name",
+          "type": "string"
+        },
+        "threshold": {
+          "description": "Threshold value",
+          "type": "number"
+        },
+        "windowSeconds": {
+          "description": "Evaluation window in seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "signal",
+        "severity",
+        "operator",
+        "threshold",
+        "windowSeconds",
+        "owner",
+        "runbookUrl",
+        "deduplicationKey"
+      ],
+      "type": "object"
+    },
+    "observabilityAlertOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "deduplicationKey": {
+          "description": "Alert deduplication key",
+          "type": "string"
+        },
+        "id": {
+          "description": "Stable alert identifier",
+          "type": "string"
+        },
+        "maintenancePolicyRef": {
+          "anyOf": [
+            {
+              "description": "Maintenance suppression policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operator": {
+          "description": "Threshold operator",
+          "enum": [
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "eq"
+          ],
+          "type": "string"
+        },
+        "owner": {
+          "description": "Alert owner",
+          "type": "string"
+        },
+        "runbookUrl": {
+          "description": "HTTPS runbook URL",
+          "type": "string"
+        },
+        "severity": {
+          "description": "Alert severity",
+          "enum": [
+            "info",
+            "warning",
+            "critical"
+          ],
+          "type": "string"
+        },
+        "signal": {
+          "description": "Portable signal name",
+          "type": "string"
+        },
+        "threshold": {
+          "description": "Threshold value",
+          "type": "number"
+        },
+        "windowSeconds": {
+          "description": "Evaluation window in seconds",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "observabilityConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "alertReferences": {
+          "anyOf": [
+            {
+              "description": "Alert and dashboard references",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "alerts": {
+          "anyOf": [
+            {
+              "description": "Actionable alert policies",
+              "items": {
+                "$ref": "#/$defs/observabilityAlert"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "credentialReferences": {
+          "anyOf": [
+            {
+              "description": "Secret references resolved by the observability extension",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dashboards": {
+          "anyOf": [
+            {
+              "description": "Operational dashboards",
+              "items": {
+                "$ref": "#/$defs/observabilityDashboard"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dataResidency": {
+          "anyOf": [
+            {
+              "description": "Declared telemetry data residency",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endpoint": {
+          "anyOf": [
+            {
+              "description": "Optional telemetry endpoint",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "description": "Telemetry environment name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "externalProvider": {
+          "anyOf": [
+            {
+              "description": "External observability destination",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Additional resource attributes",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "logs": {
+          "description": "Export logs",
+          "type": "boolean"
+        },
+        "metrics": {
+          "description": "Export metrics",
+          "type": "boolean"
+        },
+        "nativeProvider": {
+          "anyOf": [
+            {
+              "description": "Provider-native observability destination",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nativeReference": {
+          "anyOf": [
+            {
+              "description": "Opaque provider-owned native destination reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "redactionPolicyRef": {
+          "anyOf": [
+            {
+              "description": "Telemetry redaction policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retentionDays": {
+          "anyOf": [
+            {
+              "description": "Telemetry retention days",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "samplingRatio": {
+          "anyOf": [
+            {
+              "description": "Trace sampling ratio",
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serviceName": {
+          "anyOf": [
+            {
+              "description": "Telemetry service name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "signals": {
+          "anyOf": [
+            {
+              "description": "Portable telemetry signal names",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "slos": {
+          "anyOf": [
+            {
+              "description": "Service-level objectives",
+              "items": {
+                "$ref": "#/$defs/observabilitySLO"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traces": {
+          "description": "Export traces",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "observabilityConfigOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "alertReferences": {
+          "anyOf": [
+            {
+              "description": "Alert and dashboard references",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "alerts": {
+          "anyOf": [
+            {
+              "description": "Actionable alert policies",
+              "items": {
+                "$ref": "#/$defs/observabilityAlertOverlay"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "credentialReferences": {
+          "anyOf": [
+            {
+              "description": "Secret references resolved by the observability extension",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dashboards": {
+          "anyOf": [
+            {
+              "description": "Operational dashboards",
+              "items": {
+                "$ref": "#/$defs/observabilityDashboardOverlay"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dataResidency": {
+          "anyOf": [
+            {
+              "description": "Declared telemetry data residency",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endpoint": {
+          "anyOf": [
+            {
+              "description": "Optional telemetry endpoint",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "description": "Telemetry environment name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "externalProvider": {
+          "anyOf": [
+            {
+              "description": "External observability destination",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "labels": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Additional resource attributes",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "logs": {
+          "description": "Export logs",
+          "type": "boolean"
+        },
+        "metrics": {
+          "description": "Export metrics",
+          "type": "boolean"
+        },
+        "nativeProvider": {
+          "anyOf": [
+            {
+              "description": "Provider-native observability destination",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nativeReference": {
+          "anyOf": [
+            {
+              "description": "Opaque provider-owned native destination reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "redactionPolicyRef": {
+          "anyOf": [
+            {
+              "description": "Telemetry redaction policy reference",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retentionDays": {
+          "anyOf": [
+            {
+              "description": "Telemetry retention days",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "samplingRatio": {
+          "anyOf": [
+            {
+              "description": "Trace sampling ratio",
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serviceName": {
+          "anyOf": [
+            {
+              "description": "Telemetry service name",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "signals": {
+          "anyOf": [
+            {
+              "description": "Portable telemetry signal names",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "slos": {
+          "anyOf": [
+            {
+              "description": "Service-level objectives",
+              "items": {
+                "$ref": "#/$defs/observabilitySLOOverlay"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traces": {
+          "description": "Export traces",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "observabilityDashboard": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Stable dashboard identifier",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Dashboard owner",
+          "type": "string"
+        },
+        "signals": {
+          "description": "Signals shown by the dashboard",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "signals",
+        "owner"
+      ],
+      "type": "object"
+    },
+    "observabilityDashboardOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Stable dashboard identifier",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Dashboard owner",
+          "type": "string"
+        },
+        "signals": {
+          "description": "Signals shown by the dashboard",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "observabilitySLO": {
+      "additionalProperties": false,
+      "properties": {
+        "errorBudgetPolicy": {
+          "description": "Error budget policy reference",
+          "type": "string"
+        },
+        "id": {
+          "description": "Stable SLO identifier",
+          "type": "string"
+        },
+        "owner": {
+          "description": "SLO owner",
+          "type": "string"
+        },
+        "runbookUrl": {
+          "description": "HTTPS runbook URL",
+          "type": "string"
+        },
+        "signal": {
+          "description": "Portable signal name",
+          "type": "string"
+        },
+        "target": {
+          "description": "Objective ratio between zero and one",
+          "type": "number"
+        },
+        "windowSeconds": {
+          "description": "Evaluation window in seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "signal",
+        "target",
+        "windowSeconds",
+        "owner",
+        "runbookUrl",
+        "errorBudgetPolicy"
+      ],
+      "type": "object"
+    },
+    "observabilitySLOOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "errorBudgetPolicy": {
+          "description": "Error budget policy reference",
+          "type": "string"
+        },
+        "id": {
+          "description": "Stable SLO identifier",
+          "type": "string"
+        },
+        "owner": {
+          "description": "SLO owner",
+          "type": "string"
+        },
+        "runbookUrl": {
+          "description": "HTTPS runbook URL",
+          "type": "string"
+        },
+        "signal": {
+          "description": "Portable signal name",
+          "type": "string"
+        },
+        "target": {
+          "description": "Objective ratio between zero and one",
+          "type": "number"
+        },
+        "windowSeconds": {
+          "description": "Evaluation window in seconds",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -2790,6 +6553,595 @@
           "description": "Project name",
           "minLength": 1,
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "resilienceConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "availabilityTarget": {
+          "anyOf": [
+            {
+              "description": "Availability target",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dataClasses": {
+          "anyOf": [
+            {
+              "description": "Independent data-class recovery policies",
+              "items": {
+                "$ref": "#/$defs/resilienceDataClass"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dataRegion": {
+          "anyOf": [
+            {
+              "description": "Optional region residency for Magento database, media, and backups",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failoverOwner": {
+          "anyOf": [
+            {
+              "description": "Failover operator",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fencingPolicy": {
+          "anyOf": [
+            {
+              "description": "Single-writer and split-brain fencing policy",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "profileId": {
+          "anyOf": [
+            {
+              "description": "Named resilience profile",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/resilienceProjection",
+              "description": "Search and cache rebuild workload target"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recoveryDestinations": {
+          "anyOf": [
+            {
+              "description": "Allowed recovery destinations",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recoveryScope": {
+          "anyOf": [
+            {
+              "description": "Recovery scope",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retentionDays": {
+          "anyOf": [
+            {
+              "description": "Backup retention days",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rpoSeconds": {
+          "anyOf": [
+            {
+              "description": "Maximum recovery point objective in seconds",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rtoSeconds": {
+          "anyOf": [
+            {
+              "description": "Maximum recovery time objective in seconds",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "resilienceConfigOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "availabilityTarget": {
+          "anyOf": [
+            {
+              "description": "Availability target",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dataClasses": {
+          "anyOf": [
+            {
+              "description": "Independent data-class recovery policies",
+              "items": {
+                "$ref": "#/$defs/resilienceDataClassOverlay"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dataRegion": {
+          "anyOf": [
+            {
+              "description": "Optional region residency for Magento database, media, and backups",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failoverOwner": {
+          "anyOf": [
+            {
+              "description": "Failover operator",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fencingPolicy": {
+          "anyOf": [
+            {
+              "description": "Single-writer and split-brain fencing policy",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "profileId": {
+          "anyOf": [
+            {
+              "description": "Named resilience profile",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/resilienceProjectionOverlay",
+              "description": "Search and cache rebuild workload target"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recoveryDestinations": {
+          "anyOf": [
+            {
+              "description": "Allowed recovery destinations",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recoveryScope": {
+          "anyOf": [
+            {
+              "description": "Recovery scope",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retentionDays": {
+          "anyOf": [
+            {
+              "description": "Backup retention days",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rpoSeconds": {
+          "anyOf": [
+            {
+              "description": "Maximum recovery point objective in seconds",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rtoSeconds": {
+          "anyOf": [
+            {
+              "description": "Maximum recovery time objective in seconds",
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "resilienceDataClass": {
+      "additionalProperties": false,
+      "properties": {
+        "backupMethod": {
+          "description": "Backup method",
+          "type": "string"
+        },
+        "deletionProtection": {
+          "description": "Deletion protection required",
+          "type": "boolean"
+        },
+        "encrypted": {
+          "description": "Encryption required",
+          "type": "boolean"
+        },
+        "failureDomains": {
+          "anyOf": [
+            {
+              "description": "Failure domains",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "immutable": {
+          "description": "Immutable backup required",
+          "type": "boolean"
+        },
+        "integrityMethod": {
+          "description": "Restore integrity check",
+          "type": "string"
+        },
+        "lossSemantics": {
+          "description": "Data loss or rebuild semantics",
+          "type": "string"
+        },
+        "name": {
+          "description": "Data class name",
+          "type": "string"
+        },
+        "ownershipMarker": {
+          "description": "Data-class ownership marker",
+          "type": "string"
+        },
+        "restoreMethod": {
+          "description": "Restore method",
+          "type": "string"
+        },
+        "retentionDays": {
+          "description": "Data-class retention days",
+          "type": "integer"
+        },
+        "sourceOfTruth": {
+          "description": "Authoritative source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "sourceOfTruth",
+        "backupMethod",
+        "restoreMethod",
+        "integrityMethod",
+        "lossSemantics",
+        "retentionDays",
+        "ownershipMarker"
+      ],
+      "type": "object"
+    },
+    "resilienceDataClassOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "backupMethod": {
+          "description": "Backup method",
+          "type": "string"
+        },
+        "deletionProtection": {
+          "description": "Deletion protection required",
+          "type": "boolean"
+        },
+        "encrypted": {
+          "description": "Encryption required",
+          "type": "boolean"
+        },
+        "failureDomains": {
+          "anyOf": [
+            {
+              "description": "Failure domains",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "immutable": {
+          "description": "Immutable backup required",
+          "type": "boolean"
+        },
+        "integrityMethod": {
+          "description": "Restore integrity check",
+          "type": "string"
+        },
+        "lossSemantics": {
+          "description": "Data loss or rebuild semantics",
+          "type": "string"
+        },
+        "name": {
+          "description": "Data class name",
+          "type": "string"
+        },
+        "ownershipMarker": {
+          "description": "Data-class ownership marker",
+          "type": "string"
+        },
+        "restoreMethod": {
+          "description": "Restore method",
+          "type": "string"
+        },
+        "retentionDays": {
+          "description": "Data-class retention days",
+          "type": "integer"
+        },
+        "sourceOfTruth": {
+          "description": "Authoritative source",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "resilienceProjection": {
+      "additionalProperties": false,
+      "properties": {
+        "cluster": {
+          "anyOf": [
+            {
+              "description": "ECS cluster identity",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "container": {
+          "anyOf": [
+            {
+              "description": "Container receiving projection commands",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "namespace": {
+          "anyOf": [
+            {
+              "description": "Kubernetes workload namespace",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runtime": {
+          "description": "Projection runtime transport",
+          "enum": [
+            "ecs",
+            "kubernetes"
+          ],
+          "type": "string"
+        },
+        "service": {
+          "anyOf": [
+            {
+              "description": "ECS service used to select a running task",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "task": {
+          "anyOf": [
+            {
+              "description": "Optional pinned ECS task identity",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "workload": {
+          "anyOf": [
+            {
+              "description": "Kubernetes workload app label",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "runtime"
+      ],
+      "type": "object"
+    },
+    "resilienceProjectionOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "cluster": {
+          "anyOf": [
+            {
+              "description": "ECS cluster identity",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "container": {
+          "anyOf": [
+            {
+              "description": "Container receiving projection commands",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "namespace": {
+          "anyOf": [
+            {
+              "description": "Kubernetes workload namespace",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runtime": {
+          "description": "Projection runtime transport",
+          "enum": [
+            "ecs",
+            "kubernetes"
+          ],
+          "type": "string"
+        },
+        "service": {
+          "anyOf": [
+            {
+              "description": "ECS service used to select a running task",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "task": {
+          "anyOf": [
+            {
+              "description": "Optional pinned ECS task identity",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "workload": {
+          "anyOf": [
+            {
+              "description": "Kubernetes workload app label",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "type": "object"
@@ -2821,6 +7173,67 @@
               "type": "null"
             }
           ]
+        },
+        "databaseBackupEnabled": {
+          "anyOf": [
+            {
+              "description": "Enable Scaleway RDB automated backups",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupFrequencyHours": {
+          "anyOf": [
+            {
+              "description": "Scaleway RDB automated backup frequency in hours",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupRetentionDays": {
+          "anyOf": [
+            {
+              "description": "Scaleway RDB automated backup retention in days",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupSameRegion": {
+          "anyOf": [
+            {
+              "description": "Store Scaleway RDB logical backups in the instance region",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseEncryptionAtRest": {
+          "anyOf": [
+            {
+              "description": "Enable Scaleway RDB encryption at rest",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseHighAvailability": {
+          "description": "Enable Scaleway RDB high availability",
+          "type": "boolean"
         },
         "databaseName": {
           "anyOf": [
@@ -2973,10 +7386,33 @@
             }
           ]
         },
+        "redisClusterSize": {
+          "anyOf": [
+            {
+              "description": "Scaleway Redis node count (1 standalone, 2 HA, 3-6 cluster mode)",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "redisNodeType": {
           "anyOf": [
             {
               "description": "Scaleway Redis node type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "redisVersion": {
+          "anyOf": [
+            {
+              "description": "Scaleway Redis engine version",
               "type": "string"
             },
             {
@@ -3087,6 +7523,67 @@
             }
           ]
         },
+        "databaseBackupEnabled": {
+          "anyOf": [
+            {
+              "description": "Enable Scaleway RDB automated backups",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupFrequencyHours": {
+          "anyOf": [
+            {
+              "description": "Scaleway RDB automated backup frequency in hours",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupRetentionDays": {
+          "anyOf": [
+            {
+              "description": "Scaleway RDB automated backup retention in days",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseBackupSameRegion": {
+          "anyOf": [
+            {
+              "description": "Store Scaleway RDB logical backups in the instance region",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseEncryptionAtRest": {
+          "anyOf": [
+            {
+              "description": "Enable Scaleway RDB encryption at rest",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "databaseHighAvailability": {
+          "description": "Enable Scaleway RDB high availability",
+          "type": "boolean"
+        },
         "databaseName": {
           "anyOf": [
             {
@@ -3238,10 +7735,33 @@
             }
           ]
         },
+        "redisClusterSize": {
+          "anyOf": [
+            {
+              "description": "Scaleway Redis node count (1 standalone, 2 HA, 3-6 cluster mode)",
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "redisNodeType": {
           "anyOf": [
             {
               "description": "Scaleway Redis node type",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "redisVersion": {
+          "anyOf": [
+            {
+              "description": "Scaleway Redis engine version",
               "type": "string"
             },
             {
@@ -3435,7 +7955,7 @@
           "anyOf": [
             {
               "$ref": "#/$defs/gCPTarget",
-              "description": "GCP deployment inputs (experimental)"
+              "description": "GCP deployment inputs"
             },
             {
               "type": "null"
@@ -3467,8 +7987,9 @@
           "description": "Application runtime",
           "enum": [
             "ecs-fargate",
-            "eks-autopilot",
+            "eks",
             "gke-autopilot",
+            "gke-standard",
             "mks",
             "kapsule"
           ],
@@ -3510,7 +8031,7 @@
           "anyOf": [
             {
               "$ref": "#/$defs/gCPTargetOverlay",
-              "description": "GCP deployment inputs (experimental)"
+              "description": "GCP deployment inputs"
             },
             {
               "type": "null"
@@ -3542,8 +8063,9 @@
           "description": "Application runtime",
           "enum": [
             "ecs-fargate",
-            "eks-autopilot",
+            "eks",
             "gke-autopilot",
+            "gke-standard",
             "mks",
             "kapsule"
           ],
@@ -3584,6 +8106,14 @@
       "$ref": "#/$defs/defaults",
       "description": "Project defaults"
     },
+    "edge": {
+      "$ref": "#/$defs/edgeConfig",
+      "description": "Optional edge delivery provider"
+    },
+    "email": {
+      "$ref": "#/$defs/emailConfig",
+      "description": "Cloud transactional email"
+    },
     "environments": {
       "additionalProperties": {
         "$ref": "#/$defs/environment"
@@ -3597,9 +8127,21 @@
       "description": "Namespaced extension settings",
       "type": "object"
     },
+    "local": {
+      "$ref": "#/$defs/localRuntime",
+      "description": "Local runtime service and email choices"
+    },
+    "observability": {
+      "$ref": "#/$defs/observabilityConfig",
+      "description": "Optional observability provider"
+    },
     "project": {
       "$ref": "#/$defs/project",
       "description": "Project identity"
+    },
+    "resilience": {
+      "$ref": "#/$defs/resilienceConfig",
+      "description": "Availability, backup, and disaster-recovery policy"
     },
     "schemaVersion": {
       "const": 1,

@@ -1,0 +1,51 @@
+# Pinned from GoogleCloudPlatform/prometheus-engine v0.17.2 examples/example-app.yaml
+# plus PodMonitoring. One replica. Image digest is the documented example pin.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prom-example
+  labels:
+    app.kubernetes.io/name: prom-example
+    magelift-owner: native-obs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prom-example
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prom-example
+        magelift-owner: native-obs
+    spec:
+      containers:
+        - name: prom-example
+          image: nilebox/prometheus-example-app@sha256:dab60d038c5d6915af5bcbe5f0279a22b95a8c8be254153e22d7cd81b21b84c5
+          ports:
+            - name: metrics
+              containerPort: 1234
+          command:
+            - /main
+            - --process-metrics
+            - --go-metrics
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: prom-example
+  labels:
+    magelift-owner: native-obs
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prom-example
+  endpoints:
+    - port: metrics
+      interval: 30s

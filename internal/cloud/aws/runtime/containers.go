@@ -3,6 +3,7 @@ package runtime
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -48,22 +49,35 @@ func FrontendPort(applicationMode string) int {
 }
 
 func containerDefinitions(args Args, secrets []SecretReference, environment []containerEnvironment, databaseARN, searchEndpoint string) (string, error) {
-	if args.WebRuntime == "nginx-fpm" {
+	var containers []containerDefinition
+	switch args.WebRuntime {
+	case "nginx-fpm":
 		php := baseContainer(args, appendDatabaseSecret(secrets, databaseARN), environment, "php-fpm", nil, false)
 		web := baseContainer(args, nil, nil, "web", []string{"nginx", "-g", "daemon off;"}, args.ApplicationMode != "integrated")
-		web.HealthCheck = nginxHealthCheck()
-		containers, err := appendSearchProxy(args, []containerDefinition{php, web}, searchEndpoint)
-		if err != nil {
-			return "", err
-		}
-		containers, err = appendVarnish(args, containers)
-		if err != nil {
-			return "", err
-		}
-		encoded, err := json.Marshal(containers)
-		return string(encoded), err
+		web.HealthCheck = webHealthCheck()
+		containers = []containerDefinition{php, web}
+	case "frankenphp-classic":
+		web := baseContainer(args, appendDatabaseSecret(secrets, databaseARN), environment, "web", []string{"frankenphp", "run"}, args.ApplicationMode != "integrated")
+		web.HealthCheck = webHealthCheck()
+		containers = []containerDefinition{web}
+	case "php-apache":
+		web := baseContainer(args, appendDatabaseSecret(secrets, databaseARN), environment, "web", []string{"sh", "-eu", "-c", "php-fpm --daemonize && exec apache2ctl -D FOREGROUND"}, args.ApplicationMode != "integrated")
+		web.HealthCheck = webHealthCheck()
+		containers = []containerDefinition{web}
+	default:
+		return "", fmt.Errorf("runtime web runtime plugin %q is not registered", args.WebRuntime)
 	}
-	return containerDefinitionsFor(args, appendDatabaseSecret(secrets, databaseARN), environment, "web", nil, true, searchEndpoint)
+	containers, err := appendSearchProxy(args, containers, searchEndpoint)
+	if err != nil {
+		return "", err
+	}
+	containers, err = appendVarnish(args, containers)
+	if err != nil {
+		return "", err
+	}
+	containers = withFargateSpotStopTimeout(args, containers)
+	encoded, err := json.Marshal(containers)
+	return string(encoded), err
 }
 
 type containerSecret struct {
@@ -121,6 +135,7 @@ type containerDefinition struct {
 	Image                  string                     `json:"image"`
 	Command                []string                   `json:"command,omitempty"`
 	Essential              bool                       `json:"essential"`
+	StopTimeout            *int                       `json:"stopTimeout,omitempty"`
 	User                   string                     `json:"user,omitempty"`
 	ReadonlyRootFilesystem bool                       `json:"readonlyRootFilesystem"`
 	LinuxParameters        containerLinux             `json:"linuxParameters"`
@@ -166,12 +181,30 @@ func containerDefinitionsFor(args Args, secrets []SecretReference, environment [
 			return "", err
 		}
 	}
+	containers = withFargateSpotStopTimeout(args, containers)
 	encoded, err := json.Marshal(containers)
 	return string(encoded), err
 }
 
-// nginxHealthCheck probes the ALB-facing /health location without booting Magento.
-func nginxHealthCheck() *containerHealthCheck {
+const fargateSpotStopTimeoutSeconds = 120
+
+// withFargateSpotStopTimeout gives every task container the full two-minute
+// Fargate Spot interruption window to drain after ECS sends SIGTERM. The
+// field stays omitted for regular Fargate and EC2 capacity, where their
+// shutdown semantics are different.
+func withFargateSpotStopTimeout(args Args, containers []containerDefinition) []containerDefinition {
+	if args.ComputeMode != ComputeModeFargateSpot {
+		return containers
+	}
+	stopTimeout := fargateSpotStopTimeoutSeconds
+	for index := range containers {
+		containers[index].StopTimeout = &stopTimeout
+	}
+	return containers
+}
+
+// webHealthCheck probes the ALB-facing /health location without booting Magento.
+func webHealthCheck() *containerHealthCheck {
 	return &containerHealthCheck{
 		Command:     []string{"CMD-SHELL", "curl -sf http://127.0.0.1:8080/health"},
 		Interval:    10,

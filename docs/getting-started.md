@@ -5,17 +5,18 @@ description: Install MageLift, validate sample Magento YAML, run local Compose o
 
 # Getting started
 
-Install the CLI, validate a sample config, then run locally or spin up a
-disposable cloud preview.
+Install the CLI, fill in `magelift.yaml`, then let Magelift prepare the cloud
+account and deploy Magento. You should not need Pulumi, Kubernetes, or image
+signing commands on this path.
 
 **Target:** under 30 minutes from clone to a validated `magelift.yaml` (local path),
-or about an hour to a cloud preview URL after bootstrap (AWS or GCP).
+or about an hour to a cloud preview URL (AWS or GCP).
 
 ## How to get Magento running with MageLift
 
 1. **Install the CLI.** Follow [Install](install.md), then run `magelift version`.
 2. **Choose local or cloud.** See [local vs cloud](local-vs-cloud.md). Local Compose needs no cloud credentials.
-3. **Copy the sample shop.** Use `examples/sample-shop/magelift.yaml`, fill account and secret refs, then `magelift config validate --env preview`.
+3. **Copy the sample shop.** Use `examples/sample-shop/magelift.yaml`, fill account and secret refs, then `magelift doctor`.
 4. **Preview on a certified target.** AWS ECS Fargate or GCP GKE Autopilot; destroy when done.
 5. **Optional migrate.** Leave ACC/Upsun via [weekend-migrate](weekend-migrate.md).
 
@@ -34,8 +35,8 @@ Read [local vs cloud](local-vs-cloud.md). Local Compose is for Magento lifecycle
 without cloud credentials; it is not a production replica.
 
 ```sh
-magelift dev init
-magelift dev up
+magelift local init
+magelift local up
 ```
 
 ## 3. Sample shop config
@@ -47,45 +48,50 @@ secrets).
 
 ```sh
 magelift doctor
-magelift config validate --env preview
 ```
 
-Then continue with [local vs cloud](local-vs-cloud.md) if you are still offline,
-or jump to AWS preview below.
+Doctor validates YAML and prints the next Magelift command. Stay on that
+command. Then continue with [local vs cloud](local-vs-cloud.md) if you are still
+offline, or jump to a certified cloud preview below.
 
-## 4. AWS preview (certified)
+## 4. Cloud preview (certified)
 
-Requires AWS credentials and an access-log bucket. Preview stacks are **billable**
-in your account: destroy when you are done (`magelift destroy --env preview --yes`).
-Prefer free-tier-safe shapes (`searchMode: disabled`, database queues) unless you
-intentionally want OpenSearch or a broker. Rough AWS shape estimates:
-`magelift cost --env preview`.
-
-1. `magelift bootstrap --env preview --access-log-bucket … --github-owner … --github-repo …`
-2. Build or promote a signed image digest into config
-3. `magelift preview --env preview` then `magelift deploy --env preview --yes`
-4. `magelift outputs` / `magelift health`
-5. Destroy when done: `magelift destroy --env preview --yes`
-
-## 4b. GCP preview (certified)
-
-GCP GKE Autopilot is also **certified**. Stacks are billable in your GCP project:
-destroy when finished. Set a disposable project ID via env (never commit real IDs):
+Requires you to be logged in to AWS (`aws`) or GCP (`gcloud`) for the account
+in `magelift.yaml`. Preview stacks are **billable** in your account: destroy when
+you are done. Prefer free-tier-safe shapes (`searchMode: disabled`, database
+queues) unless you intentionally want OpenSearch or a broker. Rough cost:
 
 ```sh
-export MAGELIFT_GCP_PROJECT='your-disposable-project'
+magelift cost --env preview
 ```
 
-1. Complete WIF / bootstrap for the project (see [gcp-acceptance](gcp-acceptance.md)
-   for the operator harness shape, or your own `gcloud` WIF setup)
-2. Put a pullable Magento image digest in config
-3. `magelift preview --env preview` then `magelift deploy --env preview --yes`
-4. `magelift outputs` / `magelift health`
-5. `magelift destroy --env preview --yes`
+Laptop path (no GitHub, no extra environment variables):
 
-Maintainer create-once proof and harness details:
-[gcp-acceptance.md](gcp-acceptance.md). Cost estimates via `magelift cost` are
-AWS-oriented today; treat GCP spend as project billing in Cloud Console.
+```sh
+magelift doctor
+magelift bootstrap --env preview
+magelift deploy --env preview --yes
+magelift health --mode runtime
+magelift destroy --env preview --yes
+```
+
+On AWS, `bootstrap` also needs an existing log bucket ([bootstrap prerequisites](bootstrap.md)):
+
+```sh
+magelift bootstrap --env preview --access-log-bucket existing-log-bucket
+```
+
+Magelift prepares the account, signs the image with the current login, and
+stores stack state. GitHub flags on `bootstrap` are only for Actions CI.
+
+For pull-request previews in CI:
+
+```sh
+magelift ci generate --magelift-version v1.0.0-rc.1
+magelift ci validate --magelift-version v1.0.0-rc.1
+```
+
+Then follow [bootstrap](bootstrap.md) for the CI variables Magelift prints.
 
 ## 5. Leaving PaaS
 

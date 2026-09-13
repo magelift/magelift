@@ -119,5 +119,5 @@ MageLift validators accept that form.
 
 - [Configuration](configuration.md): `target.aws.existing.*` fields
 - [Migrating from PaaS](migrating-from-paas.md): dump/media cutover vs attach
-- [ADR 0010](adr/0010-database-dump-seed.md): dump seed; attach supersession note
+- [ADR 0009](adr/0009-dump-seed-and-attach.md): dump seed and AWS attach
 - [Post-beta roadmap](post-beta-roadmap.md): remaining post-beta tracks

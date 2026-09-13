@@ -34,7 +34,7 @@ CVE-2026-64558
 CVE-2026-64600
 
 # Upstream dunglas/frankenphp gobinary (not MageLift Go modules).
-# 1.12.6 still vendors kin-openapi@v0.140.0 and grpc@v1.81.1.
+# 1.12.7 still vendors kin-openapi@v0.140.0 and grpc@v1.81.1.
 # Drop when FrankenPHP ships fixed versions; do not ignore MageLift module CVEs here.
 GHSA-r277-6w6q-xmqw
 GHSA-hrxh-6v49-42gf

@@ -16,6 +16,7 @@ type BuildSpec struct {
 	Project       Project                 `json:"project" yaml:"project"`
 	Application   Application             `json:"application" yaml:"application"`
 	Build         Build                   `json:"build" yaml:"build"`
+	Local         LocalRuntime            `json:"local" yaml:"local"`
 	Compatibility CompatibilityAssessment `json:"compatibility" yaml:"compatibility"`
 }
 
@@ -35,6 +36,7 @@ func (f *File) ResolveBuild() (BuildSpec, error) {
 		Project:       cfg.Project,
 		Application:   cfg.Application,
 		Build:         cfg.Build,
+		Local:         cfg.Local,
 		Compatibility: compatibility,
 	}, nil
 }
@@ -59,6 +61,7 @@ func (f *File) resolveProjectConfig() (Config, error) {
 	value := map[string]any{}
 	provenance := map[string]Provenance{}
 	apply(value, builtInDefaults, "built-in defaults", "", provenance)
+	apply(value, runtimeDefaults(applicationVersion(f.root, nil, nil)), "compatibility defaults", "", provenance)
 	apply(value, f.root, "project", "", provenance)
 	data, err := yaml.Marshal(value)
 	if err != nil {

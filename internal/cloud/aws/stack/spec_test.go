@@ -107,3 +107,23 @@ func TestSpecValidateAllowsThreeZoneStandardQueueLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSpecValidateAcceptsPreviewProvisionedSearch(t *testing.T) {
+	spec := validSpec()
+	spec.Catalog.SearchMode = SearchModeProvisioned
+	spec.Catalog.SearchProvisioned = SearchProvisionedProfile{InstanceType: "m7g.medium.search", InstanceCount: 1, EBSVolumeType: "gp3", EBSVolumeSizeGiB: 20}
+	if err := spec.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSpecValidateAllowsThreeZonePreviewAmazonMQLayout(t *testing.T) {
+	spec := validSpec()
+	spec.Policy.AvailabilityZones = []string{"eu-west-3a", "eu-west-3b", "eu-west-3c"}
+	spec.Catalog.QueueMode = QueueModeAmazonMQ
+	spec.Catalog.RabbitMQ = RabbitMQProfile{InstanceType: "mq.m7g.large"}
+	spec.Dependencies.QueueSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-queue-token"
+	if err := spec.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}

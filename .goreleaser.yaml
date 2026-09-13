@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/goreleaser/goreleaser/v2.17.0/www/docs/static/schema.json
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
 # Local packaging smoke: use scripts/release-smoke-local.sh or make release-smoke
@@ -32,6 +32,9 @@ archives:
       - LICENSE
       - NOTICE
       - README.md
+      - agents/README.md
+      - agents/manifest.json
+      - agents/skills/**/SKILL.md
 
 checksum:
   name_template: checksums.txt
@@ -80,6 +83,12 @@ scoops:
     homepage: https://magelift.dev
     description: Open-source Magento CLI for your AWS or GCP account
     license: Apache-2.0
+
+release:
+  # Fail before the six-arch Pulumi compile if GitHub cannot publish this tag
+  # (missing token, or an immutable release that cannot be updated).
+  preflight:
+    fail_on_error: true
 
 changelog:
   use: github-native

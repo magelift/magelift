@@ -17,6 +17,11 @@ import (
 
 var candidateDigest = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
 
+const (
+	databaseClientImage  = "public.ecr.aws/docker/library/mysql:8.4"
+	databaseGrantCommand = "set -eu; MYSQL_PWD=\"$MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD\" mysql --protocol=TCP -h \"$MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST\" -P \"$MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT\" -u \"$MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME\" -e \"GRANT ALL PRIVILEGES ON \\`$MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME\\`.* TO '$MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME'@'%';\""
+)
+
 // DeploymentAPI is the bounded ECS surface used for pre-traffic Magento
 // migrations. The durable service remains owned by Pulumi; this adapter owns
 // only the short-lived candidate task definition and task.
@@ -39,12 +44,13 @@ type CandidateRequest struct {
 }
 
 type Candidate struct {
-	Cluster           string
-	TaskDefinitionARN string
-	TaskARN           string
-	PrivateSubnetIDs  []string
-	SecurityGroupID   string
-	StartedBy         string
+	Cluster                        string
+	TaskDefinitionARN              string
+	DatabaseGrantTaskDefinitionARN string
+	TaskARN                        string
+	PrivateSubnetIDs               []string
+	SecurityGroupID                string
+	StartedBy                      string
 }
 
 type DeploymentStore struct {
@@ -108,7 +114,27 @@ func (s *DeploymentStore) RegisterCandidate(ctx context.Context, request Candida
 		return Candidate{}, errors.New("deploy task definition has no family")
 	}
 	family := baseFamily + "-candidate-" + time.Now().UTC().Format("20060102T150405000000000")
-	registered, err := s.client.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{
+	registeredARN, err := registerTaskDefinition(ctx, s.client, definition, family, containers, tags)
+	if err != nil {
+		return Candidate{}, fmt.Errorf("register deploy candidate: %w", err)
+	}
+	grantARN := ""
+	if grantContainer, ok := databaseGrantContainer(definition); ok {
+		grantARN, err = registerTaskDefinition(ctx, s.client, definition, family+"-db-grant", []types.ContainerDefinition{grantContainer}, tags)
+		if err != nil {
+			_, _ = s.client.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{TaskDefinition: awssdk.String(registeredARN)})
+			return Candidate{}, fmt.Errorf("register database privilege grant: %w", err)
+		}
+	}
+	startedBy := request.StartedBy
+	if strings.TrimSpace(startedBy) == "" {
+		startedBy = "magelift"
+	}
+	return Candidate{Cluster: request.Cluster, TaskDefinitionARN: registeredARN, DatabaseGrantTaskDefinitionARN: grantARN, PrivateSubnetIDs: append([]string(nil), request.PrivateSubnetIDs...), SecurityGroupID: request.SecurityGroupID, StartedBy: startedBy}, nil
+}
+
+func registerTaskDefinition(ctx context.Context, client DeploymentAPI, definition types.TaskDefinition, family string, containers []types.ContainerDefinition, tags []types.Tag) (string, error) {
+	registered, err := client.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{
 		Family:                  awssdk.String(family),
 		ContainerDefinitions:    containers,
 		Cpu:                     definition.Cpu,
@@ -129,16 +155,58 @@ func (s *DeploymentStore) RegisterCandidate(ctx context.Context, request Candida
 		Volumes:                 append([]types.Volume(nil), definition.Volumes...),
 	})
 	if err != nil {
-		return Candidate{}, fmt.Errorf("register deploy candidate: %w", err)
+		return "", err
 	}
 	if registered == nil || registered.TaskDefinition == nil || registered.TaskDefinition.TaskDefinitionArn == nil {
-		return Candidate{}, errors.New("register deploy candidate returned no task definition ARN")
+		return "", errors.New("registration returned no task definition ARN")
 	}
-	startedBy := request.StartedBy
-	if strings.TrimSpace(startedBy) == "" {
-		startedBy = "magelift"
+	return awssdk.ToString(registered.TaskDefinition.TaskDefinitionArn), nil
+}
+
+func databaseGrantContainer(definition types.TaskDefinition) (types.ContainerDefinition, bool) {
+	for _, container := range definition.ContainerDefinitions {
+		if awssdk.ToString(container.Name) != "deploy" || !hasDatabaseGrantInputs(container) {
+			continue
+		}
+		container.Name = awssdk.String("database-grant")
+		container.Image = awssdk.String(databaseClientImage)
+		container.EntryPoint = []string{"/bin/sh", "-ec"}
+		container.Command = []string{databaseGrantCommand}
+		container.HealthCheck = nil
+		container.PortMappings = nil
+		container.DependsOn = nil
+		return container, true
 	}
-	return Candidate{Cluster: request.Cluster, TaskDefinitionARN: awssdk.ToString(registered.TaskDefinition.TaskDefinitionArn), PrivateSubnetIDs: append([]string(nil), request.PrivateSubnetIDs...), SecurityGroupID: request.SecurityGroupID, StartedBy: startedBy}, nil
+	return types.ContainerDefinition{}, false
+}
+
+func hasDatabaseGrantInputs(container types.ContainerDefinition) bool {
+	environment := map[string]bool{}
+	for _, value := range container.Environment {
+		environment[awssdk.ToString(value.Name)] = true
+	}
+	secrets := map[string]bool{}
+	for _, value := range container.Secrets {
+		secrets[awssdk.ToString(value.Name)] = true
+	}
+	for _, name := range []string{
+		"MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME",
+		"MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST",
+		"MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT",
+	} {
+		if !environment[name] {
+			return false
+		}
+	}
+	for _, name := range []string{
+		"MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD",
+		"MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME",
+	} {
+		if !secrets[name] {
+			return false
+		}
+	}
+	return true
 }
 
 // replaceApplicationImages keeps every container built from the application
@@ -167,6 +235,52 @@ func applicationContainerName(name string) bool {
 	}
 }
 
+// oneOffTaskResult treats Magento migrate as successful when application
+// containers exit 0. Sidecars such as search-proxy are essential on copied
+// deploy task defs and receive SIGTERM after setup:upgrade, which ECS reports
+// as a failed essential container even though Magento finished.
+func oneOffTaskResult(label string, task types.Task) error {
+	application, others := splitTaskContainers(task.Containers)
+	check := others
+	if len(application) > 0 {
+		check = application
+	}
+	for _, container := range check {
+		if container.ExitCode != nil && awssdk.ToInt32(container.ExitCode) == 0 {
+			continue
+		}
+		name := awssdk.ToString(container.Name)
+		if name == "" {
+			name = "unnamed"
+		}
+		exitCode := "unknown"
+		if container.ExitCode != nil {
+			exitCode = fmt.Sprintf("%d", awssdk.ToInt32(container.ExitCode))
+		}
+		reason := strings.TrimSpace(awssdk.ToString(container.Reason))
+		if reason == "" {
+			reason = "not reported by ECS"
+		}
+		stoppedReason := strings.TrimSpace(awssdk.ToString(task.StoppedReason))
+		if stoppedReason == "" {
+			stoppedReason = "not reported by ECS"
+		}
+		return fmt.Errorf("%s container failed: name=%s exit_code=%s reason=%s task_reason=%s", label, name, exitCode, reason, stoppedReason)
+	}
+	return nil
+}
+
+func splitTaskContainers(containers []types.Container) (application, others []types.Container) {
+	for _, container := range containers {
+		if applicationContainerName(awssdk.ToString(container.Name)) {
+			application = append(application, container)
+			continue
+		}
+		others = append(others, container)
+	}
+	return application, others
+}
+
 func (s *DeploymentStore) RunMigrations(ctx context.Context, candidate Candidate) error {
 	if s == nil || s.client == nil {
 		return errors.New("AWS ECS deployment client is required")
@@ -174,9 +288,18 @@ func (s *DeploymentStore) RunMigrations(ctx context.Context, candidate Candidate
 	if strings.TrimSpace(candidate.Cluster) == "" || strings.TrimSpace(candidate.TaskDefinitionARN) == "" || len(candidate.PrivateSubnetIDs) == 0 || strings.TrimSpace(candidate.SecurityGroupID) == "" {
 		return errors.New("candidate cluster, task definition, private subnets, and security group are required")
 	}
+	if candidate.DatabaseGrantTaskDefinitionARN != "" {
+		if err := s.runTask(ctx, candidate, candidate.DatabaseGrantTaskDefinitionARN, "database privilege grant"); err != nil {
+			return err
+		}
+	}
+	return s.runTask(ctx, candidate, candidate.TaskDefinitionARN, "migration")
+}
+
+func (s *DeploymentStore) runTask(ctx context.Context, candidate Candidate, taskDefinitionARN, label string) error {
 	run, err := s.client.RunTask(ctx, &ecs.RunTaskInput{
 		Cluster:        awssdk.String(candidate.Cluster),
-		TaskDefinition: awssdk.String(candidate.TaskDefinitionARN),
+		TaskDefinition: awssdk.String(taskDefinitionARN),
 		StartedBy:      awssdk.String(candidate.StartedBy),
 		LaunchType:     types.LaunchTypeFargate,
 		Count:          awssdk.Int32(1),
@@ -187,35 +310,46 @@ func (s *DeploymentStore) RunMigrations(ctx context.Context, candidate Candidate
 		}},
 	})
 	if err != nil {
-		return fmt.Errorf("run migration task: %w", err)
+		return fmt.Errorf("run %s task: %w", label, err)
 	}
 	if run == nil {
-		return errors.New("run migration task returned no response")
+		return fmt.Errorf("run %s task returned no response", label)
 	}
 	if len(run.Failures) > 0 {
-		return fmt.Errorf("run migration task failed: %s", failureMessage(run.Failures))
+		return fmt.Errorf("run %s task failed: %s", label, failureMessage(run.Failures))
 	}
 	if len(run.Tasks) != 1 || run.Tasks[0].TaskArn == nil {
-		return errors.New("run migration task returned no task ARN")
+		return fmt.Errorf("run %s task returned no task ARN", label)
 	}
 	candidate.TaskARN = awssdk.ToString(run.Tasks[0].TaskArn)
-	return s.waitForTask(ctx, candidate)
+	return s.waitForTask(ctx, candidate, label)
 }
 
 func (s *DeploymentStore) Cleanup(ctx context.Context, candidate Candidate) error {
 	if s == nil || s.client == nil {
 		return errors.New("AWS ECS deployment client is required")
 	}
-	if strings.TrimSpace(candidate.TaskDefinitionARN) == "" {
-		return nil
+	definitions := []struct {
+		arn   string
+		label string
+	}{
+		{arn: candidate.TaskDefinitionARN, label: "deploy candidate"},
+		{arn: candidate.DatabaseGrantTaskDefinitionARN, label: "database privilege grant"},
 	}
-	if _, err := s.client.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{TaskDefinition: awssdk.String(candidate.TaskDefinitionARN)}); err != nil {
-		return fmt.Errorf("deregister deploy candidate: %w", err)
+	seen := map[string]bool{}
+	for _, definition := range definitions {
+		if strings.TrimSpace(definition.arn) == "" || seen[definition.arn] {
+			continue
+		}
+		seen[definition.arn] = true
+		if _, err := s.client.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{TaskDefinition: awssdk.String(definition.arn)}); err != nil {
+			return fmt.Errorf("deregister %s: %w", definition.label, err)
+		}
 	}
 	return nil
 }
 
-func (s *DeploymentStore) waitForTask(ctx context.Context, candidate Candidate) error {
+func (s *DeploymentStore) waitForTask(ctx context.Context, candidate Candidate, label string) error {
 	interval, timeout := s.waitInterval, s.waitTimeout
 	if interval <= 0 {
 		interval = 2 * time.Second
@@ -230,27 +364,25 @@ func (s *DeploymentStore) waitForTask(ctx context.Context, candidate Candidate) 
 	for {
 		output, err := s.client.DescribeTasks(waitContext, &ecs.DescribeTasksInput{Cluster: awssdk.String(candidate.Cluster), Tasks: []string{candidate.TaskARN}})
 		if err != nil {
-			return fmt.Errorf("describe migration task: %w", err)
+			return fmt.Errorf("describe %s task: %w", label, err)
 		}
 		if output == nil || len(output.Tasks) != 1 {
-			return errors.New("migration task was not found")
+			return fmt.Errorf("%s task was not found", label)
 		}
 		task := output.Tasks[0]
 		if awssdk.ToString(task.LastStatus) == "STOPPED" {
 			if task.StopCode != "" && task.StopCode != types.TaskStopCodeEssentialContainerExited {
-				return fmt.Errorf("migration task stopped: %s", awssdk.ToString(task.StoppedReason))
+				return fmt.Errorf("%s task stopped: %s", label, awssdk.ToString(task.StoppedReason))
 			}
-			for _, container := range task.Containers {
-				if container.ExitCode == nil || awssdk.ToInt32(container.ExitCode) != 0 {
-					return fmt.Errorf("migration container failed: %s", awssdk.ToString(container.Reason))
-				}
+			if err := oneOffTaskResult(label, task); err != nil {
+				return err
 			}
 			return nil
 		}
 		select {
 		case <-waitContext.Done():
-			_, _ = s.client.StopTask(context.Background(), &ecs.StopTaskInput{Cluster: awssdk.String(candidate.Cluster), Task: awssdk.String(candidate.TaskARN), Reason: awssdk.String("MageLift migration timeout")})
-			return fmt.Errorf("wait for migration task: %w", waitContext.Err())
+			_, _ = s.client.StopTask(context.Background(), &ecs.StopTaskInput{Cluster: awssdk.String(candidate.Cluster), Task: awssdk.String(candidate.TaskARN), Reason: awssdk.String("MageLift " + label + " timeout")})
+			return fmt.Errorf("wait for %s task: %w", label, waitContext.Err())
 		case <-ticker.C:
 		}
 	}

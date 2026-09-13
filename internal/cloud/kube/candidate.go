@@ -36,19 +36,28 @@ type CandidateStore struct {
 
 // CandidateRequest describes a Magento migrate Job to register.
 type CandidateRequest struct {
-	Project         string
-	Region          string
-	Cluster         string
-	Namespace       string
-	ServiceName     string
-	ImageDigest     string
-	DatabaseWriter  string
-	DatabaseName    string
-	CacheEndpoint   string
-	ApplicationMode string
-	WebRuntime      string
-	CPURequest      string
-	MemoryRequest   string
+	Project                 string
+	Region                  string
+	Cluster                 string
+	Namespace               string
+	ServiceName             string
+	ImageDigest             string
+	DatabaseWriter          string
+	DatabaseName            string
+	DatabaseSecretName      string
+	EncryptionKeySecretName string
+	QueuePasswordSecretName string
+	CacheEndpoint           string
+	SearchEndpoint          string
+	QueueMode               string
+	QueueHost               string
+	QueueUsername           string
+	ApplicationMode         string
+	ApplicationVersion      string
+	WebRuntime              string
+	Magento                 platform.MagentoOverlays
+	CPURequest              string
+	MemoryRequest           string
 	// Outputs supplies stack outputs for ClientFactory-backed stores (kubeconfig).
 	Outputs map[string]any
 }
@@ -170,6 +179,17 @@ func validateCandidateRequest(request CandidateRequest) error {
 	if strings.TrimSpace(request.CacheEndpoint) == "" {
 		problems = append(problems, errors.New("cache endpoint is required"))
 	}
+	if strings.TrimSpace(request.EncryptionKeySecretName) == "" {
+		problems = append(problems, errors.New("Magento encryption key Secret is required"))
+	}
+	if strings.TrimSpace(request.QueueMode) == "rabbitmq" {
+		if strings.TrimSpace(request.QueueHost) == "" {
+			problems = append(problems, errors.New("RabbitMQ queue host is required"))
+		}
+		if strings.TrimSpace(request.QueuePasswordSecretName) == "" {
+			problems = append(problems, errors.New("RabbitMQ queue password Secret is required"))
+		}
+	}
 	return errors.Join(problems...)
 }
 
@@ -234,6 +254,10 @@ func (k k8sJobs) WaitJob(ctx context.Context, namespace, name string, timeout ti
 					if msg == "" {
 						msg = condition.Reason
 					}
+					diagnostics := JobFailureDiagnostics(ctx, k.client, namespace, name)
+					if diagnostics != "" {
+						return fmt.Errorf("wait for migrate Job: job failed: %s\n%s", msg, diagnostics)
+					}
 					return fmt.Errorf("wait for migrate Job: job failed: %s", msg)
 				}
 			}
@@ -273,20 +297,29 @@ func migrationJob(name string, request CandidateRequest) *batchv1.Job {
 	}
 	memory := request.MemoryRequest
 	if memory == "" {
-		memory = "1Gi"
+		memory = DefaultApplicationMemoryRequest
 	}
 	bindings := platform.CoreEnvBindings(platform.CapabilityEndpoints{
-		ApplicationMode: request.ApplicationMode,
-		WebRuntime:      request.WebRuntime,
-		DatabaseWriter:  request.DatabaseWriter,
-		DatabaseName:    request.DatabaseName,
-		CacheEndpoint:   request.CacheEndpoint,
+		ApplicationMode:    request.ApplicationMode,
+		ApplicationVersion: request.ApplicationVersion,
+		WebRuntime:         request.WebRuntime,
+		Magento:            request.Magento,
+		DatabaseWriter:     request.DatabaseWriter,
+		DatabaseName:       request.DatabaseName,
+		CacheEndpoint:      request.CacheEndpoint,
+		SearchEndpoint:     request.SearchEndpoint,
+		QueueMode:          request.QueueMode,
+		QueueHost:          request.QueueHost,
+		QueueUsername:      request.QueueUsername,
 	})
 	env := make([]corev1.EnvVar, 0, len(bindings))
 	for _, binding := range bindings {
 		env = append(env, corev1.EnvVar{Name: binding.Name, Value: binding.Value})
 	}
-	backoff := int32(0)
+	env = append(env, DatabaseCredentialEnvVars(request.DatabaseSecretName)...)
+	env = append(env, EncryptionKeyEnvVars(request.EncryptionKeySecretName)...)
+	env = append(env, QueuePasswordEnvVars(request.QueuePasswordSecretName)...)
+	backoff := int32(2)
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

@@ -11,12 +11,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/localdev"
 	"github.com/spf13/cobra"
 )
 
 func devCommand(o *options) *cobra.Command {
-	command := &cobra.Command{Use: "dev", Short: "Run the local Magento development environment"}
+	command := &cobra.Command{Use: "local", Short: "Run the local Magento environment"}
 	command.AddCommand(devInitCommand(o), devSeedCommand(o), devComposeCommand(o, "up"), devComposeCommand(o, "down"), devComposeCommand(o, "reset"), devComposeCommand(o, "status"), devComposeCommand(o, "logs"), devExecCommand(o))
 	return command
 }
@@ -27,7 +28,25 @@ func devInitCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
+		environment, err := o.selectLocalEnvironment(file)
+		if err != nil {
+			return err
+		}
+		effective, _, err := o.resolveEnvironment(file, environment)
+		if err != nil {
+			return invalid(err)
+		}
 		build, err := file.ResolveBuild()
+		if err != nil {
+			return invalid(err)
+		}
+		hints := localdev.HintsFromConfig(effective.Config)
+		hints.Environment = environment
+		runtimePlan, err := localdev.PlanFor(build, hints)
+		if err != nil {
+			return invalid(err)
+		}
+		phpIni, err := localdev.PHPIniFor(runtimePlan)
 		if err != nil {
 			return invalid(err)
 		}
@@ -40,7 +59,11 @@ func devInitCommand(o *options) *cobra.Command {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(path, []byte(localdev.ComposeTemplate), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(localdev.ComposeTemplateFor(runtimePlan)), 0o644); err != nil {
+			return err
+		}
+		phpIniPath := filepath.Join(filepath.Dir(path), localdev.LocalPHPIniFile)
+		if err := os.WriteFile(phpIniPath, []byte(phpIni), 0o644); err != nil {
 			return err
 		}
 		envPath := filepath.Join(filepath.Dir(path), localdev.LocalEnvFile)
@@ -53,7 +76,7 @@ func devInitCommand(o *options) *cobra.Command {
 		} else if err := os.Chmod(envPath, 0o600); err != nil {
 			return err
 		}
-		return o.write(map[string]any{"composeFile": path, "project": build.Project.Name, "status": "created"})
+		return o.write(map[string]any{"composeFile": path, "phpIniFile": phpIniPath, "project": build.Project.Name, "environment": environment, "runtime": runtimePlan, "status": "created"})
 	}}
 }
 
@@ -76,7 +99,7 @@ func devSeedCommand(o *options) *cobra.Command {
 			composePath := filepath.Join(root, localdev.ComposeFile)
 			if _, err := os.Stat(composePath); err != nil {
 				if errors.Is(err, os.ErrNotExist) {
-					return invalid(fmt.Errorf("local Compose file is missing; run %q first", "magelift dev init"))
+					return invalid(fmt.Errorf("local Compose file is missing; run %q first", "magelift local init"))
 				}
 				return err
 			}
@@ -98,6 +121,9 @@ func devSeedCommand(o *options) *cobra.Command {
 			}
 			if err := validateLocalAdminPassword(password); err != nil {
 				return invalid(err)
+			}
+			if err := requireLocalDependencies(cmd.Context(), o); err != nil {
+				return err
 			}
 			if err := writeLocalCredentials(filepath.Join(root, ".magelift", localdev.LocalEnvFile), map[string]string{
 				"MAGELIFT_LOCAL_ADMIN_PASSWORD": password,
@@ -224,7 +250,7 @@ func devExecCommand(o *options) *cobra.Command {
 
 func (o *options) runLocalCompose(ctx context.Context, action, service string, command []string) error {
 	if action == "reset" && !o.yes {
-		return invalid(errors.New("dev reset requires --yes because it removes local volumes"))
+		return invalid(errors.New("local reset requires --yes because it removes local volumes"))
 	}
 	file, err := o.load()
 	if err != nil {
@@ -238,7 +264,7 @@ func (o *options) runLocalCompose(ctx context.Context, action, service string, c
 	composeFile := filepath.Join(root, localdev.ComposeFile)
 	if _, err := os.Stat(composeFile); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return invalid(fmt.Errorf("local Compose file is missing; run %q first", "magelift dev init"))
+			return invalid(fmt.Errorf("local Compose file is missing; run %q first", "magelift local init"))
 		}
 		return err
 	}
@@ -252,6 +278,9 @@ func (o *options) runLocalCompose(ctx context.Context, action, service string, c
 	}
 	if o.runCompose == nil {
 		return &exitError{code: 3, err: errors.New("Docker Compose runner is unavailable")}
+	}
+	if err := requireLocalDependencies(ctx, o); err != nil {
+		return err
 	}
 	env := []string{"MAGELIFT_PROJECT_ROOT=" + root}
 	if err := o.runCompose(ctx, root, env, args, o.stdout, o.stderr); err != nil {
@@ -268,4 +297,18 @@ func runDockerCompose(ctx context.Context, directory string, env []string, args 
 	command.Stdout = stdout
 	command.Stderr = stderr
 	return command.Run()
+}
+
+func (o *options) selectLocalEnvironment(file *config.File) (string, error) {
+	if o.environment != "" {
+		return o.environment, nil
+	}
+	if env := o.getenv("MAGELIFT_ENV"); env != "" {
+		return env, nil
+	}
+	environments := file.Environments()
+	if len(environments) == 1 {
+		return environments[0], nil
+	}
+	return o.selectEnvironment(file)
 }

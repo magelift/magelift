@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/magelift/magelift/internal/platform"
 	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
@@ -19,13 +20,15 @@ var (
 )
 
 type Spec struct {
-	Identity     Identity
-	Application  Application
-	Artifact     Artifact
-	Lifecycle    Lifecycle
-	Policy       NetworkPolicy
-	Catalog      CatalogSelection
-	Dependencies Dependencies
+	Identity      Identity
+	Application   Application
+	Artifact      Artifact
+	Lifecycle     Lifecycle
+	Policy        NetworkPolicy
+	Catalog       CatalogSelection
+	Dependencies  Dependencies
+	Edge          sdk.EdgeIntent
+	Observability sdk.ObservabilityIntent
 }
 
 type Identity struct {
@@ -44,6 +47,7 @@ type Application struct {
 	Version    string
 	Mode       string
 	WebRuntime string
+	Magento    platform.MagentoOverlays
 }
 
 type Artifact struct {
@@ -64,16 +68,24 @@ type NetworkPolicy struct {
 // explicit escape hatch: Scaleway does not offer managed Valkey yet, so
 // "redis" is the only supported value (see internal/cloud/scaleway/cache).
 type CatalogSelection struct {
-	DatabaseNodeType   string
-	RedisNodeType      string
-	CacheMode          string
-	KapsuleVersion     string
-	NodeType           string
-	NodeCount          int
-	CPURequest         string
-	MemoryRequest      string
-	DesiredWebReplicas int
-	QueueConsumerCount int
+	DatabaseNodeType         string
+	DatabaseHighAvailability bool
+	DatabaseBackupEnabled    *bool
+	DatabaseBackupFrequency  int
+	DatabaseBackupRetention  int
+	DatabaseBackupSameRegion *bool
+	DatabaseEncryptionAtRest *bool
+	RedisNodeType            string
+	RedisVersion             string
+	RedisClusterSize         int
+	CacheMode                string
+	KapsuleVersion           string
+	NodeType                 string
+	NodeCount                int
+	CPURequest               string
+	MemoryRequest            string
+	DesiredWebReplicas       int
+	QueueConsumerCount       int
 }
 
 type Dependencies struct {
@@ -120,8 +132,26 @@ func (s Spec) Validate() error {
 	if s.Catalog.CacheMode != "redis" {
 		problems = append(problems, fmt.Errorf("invalid cache mode %q; Scaleway only supports \"redis\" until Valkey ships", s.Catalog.CacheMode))
 	}
+	if s.Catalog.RedisClusterSize < 0 || s.Catalog.RedisClusterSize > 6 {
+		problems = append(problems, errors.New("Scaleway Redis cluster size must be between 1 and 6"))
+	}
+	if s.Catalog.RedisClusterSize > 2 {
+		problems = append(problems, errors.New("Scaleway Redis cluster mode requires a cluster-aware Magento cache connector; only standalone and two-node HA are supported by the current core endpoint contract"))
+	}
 	if s.Dependencies.DatabaseName == "" || s.Dependencies.MasterUsername == "" {
 		problems = append(problems, errors.New("database name and master username are required"))
+	}
+	if strings.TrimSpace(s.Dependencies.EncryptionKeySecret) == "" {
+		problems = append(problems, errors.New("Kubernetes Secret name for Magento encryption key is required"))
+	}
+	if err := sdk.ValidateEdgeIntent(s.Edge); err != nil {
+		problems = append(problems, fmt.Errorf("edge intent: %w", err))
+	}
+	if native := strings.TrimSpace(s.Edge.NativeProvider); native != "" && native != "none" {
+		problems = append(problems, fmt.Errorf("Scaleway native edge provider %q is cataloged but has no MageLift edge adapter", native))
+	}
+	if err := sdk.ValidateObservabilityIntent(s.Observability); err != nil {
+		problems = append(problems, fmt.Errorf("observability intent: %w", err))
 	}
 	if s.Catalog.DesiredWebReplicas < 1 {
 		problems = append(problems, errors.New("desired web replicas must be at least 1"))

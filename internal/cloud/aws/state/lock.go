@@ -199,6 +199,12 @@ func isPreconditionFailed(err error) bool {
 	return errors.As(err, &apiError) && (apiError.ErrorCode() == "PreconditionFailed" || apiError.ErrorCode() == "ConditionalRequestConflict")
 }
 
+// IsNotFound reports missing-object and missing-bucket errors from S3, including
+// wrapped acquire failures. Certified deploy maps a missing bucket to a bootstrap error.
+func IsNotFound(err error) bool {
+	return isNotFound(err)
+}
+
 func isNotFound(err error) bool {
 	var apiError smithy.APIError
 	if !errors.As(err, &apiError) {

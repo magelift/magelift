@@ -12,6 +12,10 @@ func loginCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
+		planned, err = o.admitPlanned(cmd.Context(), planned)
+		if err != nil {
+			return invalid(fmt.Errorf("provider plan admission: %w", err))
+		}
 		boot, err := o.bootstrapPort()
 		if err != nil {
 			return err

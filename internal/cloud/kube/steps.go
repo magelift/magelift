@@ -44,14 +44,16 @@ type RuntimeChecker interface {
 
 // DeploySpec holds provider-portable Magento deploy knobs for kube.Steps.
 type DeploySpec struct {
-	ImageDigest     string
-	DatabaseName    string
-	ApplicationMode string
-	WebRuntime      string
-	CPURequest      string
-	MemoryRequest   string
-	CloudProject    string
-	Region          string
+	ImageDigest        string
+	DatabaseName       string
+	ApplicationMode    string
+	ApplicationVersion string
+	WebRuntime         string
+	CPURequest         string
+	MemoryRequest      string
+	CloudProject       string
+	Region             string
+	Magento            platform.MagentoOverlays
 }
 
 func (s DeploySpec) Validate() error {
@@ -115,7 +117,7 @@ func (s *Steps) Validate(_ context.Context, request deployflow.Request) error {
 }
 
 func (s *Steps) Preview(ctx context.Context, request deployflow.Request) (automation.ChangeSummary, error) {
-	return automation.NewRunner(s.backend, s.diagnostics).Preview(ctx, automation.Request{Target: request.Target})
+	return automation.NewRunner(s.backend, s.diagnostics).Preview(ctx, automation.Request{Target: request.Target, Preview: request.Preview})
 }
 
 func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Request) error {
@@ -149,21 +151,76 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 	if err != nil {
 		return err
 	}
+	queueMode := "database"
+	if value, ok := outputs["queueMode"]; ok {
+		resolved, valid := value.(string)
+		if !valid {
+			return fmt.Errorf("Pulumi output %q must be a string", "queueMode")
+		}
+		if strings.TrimSpace(resolved) != "" {
+			queueMode = resolved
+		}
+	}
+	queueHost := ""
+	if value, ok := outputs["queueHost"]; ok {
+		resolved, valid := value.(string)
+		if !valid {
+			return fmt.Errorf("Pulumi output %q must be a string", "queueHost")
+		}
+		queueHost = resolved
+	}
+	searchEndpoint := ""
+	if value, ok := outputs[platform.OutputSearchEndpoint]; ok {
+		resolved, valid := value.(string)
+		if !valid {
+			return fmt.Errorf("Pulumi output %q must be a string", platform.OutputSearchEndpoint)
+		}
+		searchEndpoint = resolved
+	}
+	queuePasswordSecretName := ""
+	if queueMode == "rabbitmq" {
+		queuePasswordSecretName, err = platform.RequireStringOutput(outputs, platform.OutputQueuePasswordSecretName)
+		if err != nil {
+			return err
+		}
+	}
+	databaseSecretName, err := platform.RequireStringOutput(outputs, platform.OutputDatabaseSecretName)
+	if err != nil {
+		return err
+	}
+	value, ok := outputs[platform.OutputEncryptionKeySecretName]
+	if !ok {
+		return fmt.Errorf("Pulumi output %q is required for Kubernetes deployments", platform.OutputEncryptionKeySecretName)
+	}
+	var valid bool
+	encryptionKeySecretName, valid := value.(string)
+	if !valid || strings.TrimSpace(encryptionKeySecretName) == "" {
+		return fmt.Errorf("Pulumi output %q must be a non-empty string", platform.OutputEncryptionKeySecretName)
+	}
 	s.registered, err = s.candidate.RegisterCandidate(ctx, CandidateRequest{
-		Project:         s.spec.CloudProject,
-		Region:          s.spec.Region,
-		Cluster:         cluster,
-		Namespace:       defaultNamespace,
-		ServiceName:     service,
-		ImageDigest:     request.ImageDigest,
-		DatabaseWriter:  databaseWriter,
-		DatabaseName:    s.spec.DatabaseName,
-		CacheEndpoint:   cacheEndpoint,
-		ApplicationMode: s.spec.ApplicationMode,
-		WebRuntime:      s.spec.WebRuntime,
-		CPURequest:      s.spec.CPURequest,
-		MemoryRequest:   s.spec.MemoryRequest,
-		Outputs:         outputs,
+		Project:                 s.spec.CloudProject,
+		Region:                  s.spec.Region,
+		Cluster:                 cluster,
+		Namespace:               defaultNamespace,
+		ServiceName:             service,
+		ImageDigest:             request.ImageDigest,
+		DatabaseWriter:          databaseWriter,
+		DatabaseName:            s.spec.DatabaseName,
+		DatabaseSecretName:      databaseSecretName,
+		EncryptionKeySecretName: encryptionKeySecretName,
+		QueuePasswordSecretName: queuePasswordSecretName,
+		CacheEndpoint:           cacheEndpoint,
+		SearchEndpoint:          searchEndpoint,
+		QueueMode:               queueMode,
+		QueueHost:               queueHost,
+		QueueUsername:           "magento",
+		ApplicationMode:         s.spec.ApplicationMode,
+		ApplicationVersion:      s.spec.ApplicationVersion,
+		WebRuntime:              s.spec.WebRuntime,
+		Magento:                 s.spec.Magento,
+		CPURequest:              s.spec.CPURequest,
+		MemoryRequest:           s.spec.MemoryRequest,
+		Outputs:                 outputs,
 	})
 	s.registeredSet = err == nil
 	return err
@@ -200,7 +257,7 @@ func (s *Steps) CleanupCandidate(ctx context.Context, _ deployflow.Request) erro
 }
 
 func (s *Steps) UpdateServices(ctx context.Context, request deployflow.Request) (automation.ChangeSummary, error) {
-	return automation.NewRunner(s.backend, s.diagnostics).Update(ctx, automation.Request{Target: request.Target})
+	return automation.NewRunner(s.backend, s.diagnostics).Update(ctx, automation.Request{Target: request.Target, Preview: request.Preview})
 }
 
 func (s *Steps) Stabilize(ctx context.Context, _ deployflow.Request) error {

@@ -9,6 +9,10 @@ magelift build
 ```
 
 The local build uses the host platform and the pinned MageLift images already loaded in Docker.
+BuildKit temporary bind mounts are created below the user cache so Docker Desktop,
+Colima, and other `/Users`-shared Docker engines can access them. The active Docker
+Buildx builder is used by default; set `BUILDX_BUILDER` when a named builder such as
+`colima` is required.
 
 ## Push a release candidate
 
@@ -35,9 +39,16 @@ magelift build --push \
 
 The CLI adds the full inspected commit checksum to the provenance URL. It rejects URL credentials and unrelated query parameters so they cannot enter image labels or attestations.
 
-BuildKit publishes an SBOM and SLSA provenance with the image. MageLift then signs the pushed digest with Cosign keyless signing. The release workflow pins Cosign 3.0.6 through the verified installer action; local callers need a current Cosign release and a supported OIDC identity.
+BuildKit publishes an SBOM and SLSA provenance with the image. MageLift then signs the pushed digest. `magelift build --push` and `magelift sign` use the current `gcloud` or CI login; GCP impersonates the Magento CI service account from `magelift bootstrap` so operators never pass Cosign flags. Identity tokens are passed to Cosign only as a file path (never a JWT on argv). CR/LF is stripped first. Advanced automation may still set `MAGELIFT_COSIGN_IDENTITY_TOKEN_FILE`, `MAGELIFT_COSIGN_IDENTITY_TOKEN_ARGV`, or `--identity-token-file`. With no Magelift or `gcloud` token source, Cosign uses ambient OIDC (GitHub Actions or a one-time browser confirmation). Artifact Registry, ECR, and Binary Authorization signatures are not substitutes. The release workflow pins Cosign 3.0.6 through the verified installer action.
 
 Composer credentials are mounted as a private file during preparation. They are not passed to BuildKit, copied into the image, or written to the artifact manifest.
+
+Before BuildKit creates the application image, MageLift compares the isolated
+builder's reported PHP branch, Composer version, and loaded extensions with the
+requested build contract. A builder response that does not satisfy the request
+stops the build before image creation; the `opcache` request is satisfied by the
+PHP runtime's `Zend OPcache` module name, which is normalized to the stable
+`zend_opcache` artifact identifier.
 
 ## Preparation hooks
 

@@ -6,13 +6,15 @@ verifiable in this repo) or `intentional-gap` (explicitly not claimed). Blank
 status cells are forbidden.
 
 This is **not** a full ece-tools behavioral clone. Claims below match what Phase 4
-shipped in plans 04-03 (import allowlist), 04-04 (SCD strategy/threads), and
-04-05 (m2-hotfixes). Public Adobe documentation is cited for product shape only;
-no sibling PaaS source is vendored (IMPORT-06 / [provenance](provenance.md)).
+shipped in plans 04-03 (import allowlist), 04-04 (SCD strategy/threads), 04-05
+(m2-hotfixes), and the Magento patch lifecycle change. Public Adobe documentation
+is cited for product shape only; no sibling PaaS source is vendored (IMPORT-06 /
+[provenance](provenance.md)).
 
 Field shapes for portable Magento inputs live in
 [configuration](configuration.md) (`build.staticContent.strategy` /
-`threads`, `application.cron`, typed `build.hooks`).
+`threads`, `build.extensions`, `build.composer.version`, `application.cron`,
+typed `build.hooks`).
 
 Status vocabulary: `closed` | `intentional-gap`.
 
@@ -23,13 +25,16 @@ Status vocabulary: `closed` | `intentional-gap`.
 | `composer validate --strict` | closed | `LifecyclePlan` validate phase (`build/src/Magento/LifecyclePlan.php`). |
 | `composer check-platform-reqs --no-dev` | closed | Same validate phase as ece-tools-style platform gate. |
 | `composer install --no-dev` (prefer-dist, optimize-autoloader) | closed | Build phase before patches and Magento argv. |
-| Custom `m2-hotfixes/*.patch` apply (alpha order, after `composer install`) | closed | Clean-room `MageLift\Build\Magento\PatchApplier` via host `patch -p1`. See `build/src/Magento/PatchApplier.php` (ECE-02 / 04-05). |
-| `QUALITY_PATCHES` / cloud-required Quality Patches Tool IDs | intentional-gap | No Adobe quality-patch database is vendored (IMPORT-06). Selecting QPT IDs is not implemented. |
+| PHP runtime extension declaration | closed | `build.extensions` is checked inside the isolated builder before lifecycle execution; ACC and Upsun `runtime.extensions` entries are imported. |
+| Composer version declaration | closed | `build.composer.version` is checked against the isolated builder; ACC and Upsun `dependencies.php.composer/composer` entries are imported. |
+| Custom `m2-hotfixes/*.patch` apply (alpha order, after `composer install`) | closed | `PatchLifecycle` delegates the complete sequence to the project-installed Cloud Patches executable when available; otherwise the clean-room `PatchApplier` fallback uses host `patch -p1` with idempotent dry-run checks. |
+| `QUALITY_PATCHES` / cloud-required Quality Patches Tool IDs | closed | `PatchLifecycle` invokes the project-installed `ece-patches` or standalone `magento-patches` executable; unsupported IDs remain upstream failures. MageLift does not vendor the Quality Patches database. |
 | `setup:di:compile` during prepare | closed | Emitted after composer install and hotfixes in build phase. |
-| `setup:static-content:deploy` locale × theme matrix | closed | `build.staticContent.locales` / `themes` → prepare protocol → Magento SCD argv. |
+| `setup:static-content:deploy` locale × theme matrix | closed | `build.staticContent.locales` / `themes` → prepare protocol → Magento SCD argv with `--force`. |
 | SCD strategy (`SCD_STRATEGY` / `-s`) | closed | `build.staticContent.strategy` → `-s` per locale×theme (ECE-03 / 04-04). Values: quick, standard, compact. |
 | SCD threads (`SCD_THREADS` / `-j`) | closed | `build.staticContent.threads` (≥1) → `-j` per locale×theme (ECE-03 / 04-04). |
-| Default SCD when locales/themes unset | closed | Single `setup:static-content:deploy --no-interaction` with no `-s`/`-j`. |
+| SCD when locales/themes are configured | closed | MageLift emits forced `setup:static-content:deploy` commands for the explicit locale × theme matrix. |
+| SCD without dumped store configuration | closed | The build phase omits SCD when no matrix is configured because the isolated builder has no Magento database. |
 | Free-form PaaS `hooks.build` shell scripts | intentional-gap | MageLift accepts typed `build.hooks` command vectors (`composer` / `magento` only); shell strings are rejected and importers treat free-form hooks as unmapped. |
 | Magento Cloud `bin/magento` balance / module enable cloud helpers | intentional-gap | Not part of the prepare DAG; operators use typed hooks or day-2 CLI. |
 | OCI packaging after prepare | closed | Go build pipeline owns package; PHP plan exposes a stable package hand-off node. |

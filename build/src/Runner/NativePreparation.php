@@ -17,6 +17,7 @@ use MageLift\Build\Magento\LifecyclePlan;
 use MageLift\Build\Magento\Command;
 use MageLift\Build\Magento\Executable;
 use MageLift\Build\Magento\PatchApplier;
+use MageLift\Build\Magento\PatchLifecycle;
 use MageLift\Build\Process\ProcessRunner;
 use RecursiveDirectoryIterator;
 use RecursiveCallbackFilterIterator;
@@ -38,17 +39,22 @@ final readonly class NativePreparation implements Preparation
         if (!$this->matchesPHPBranch($request->phpVersion)) {
             throw new RuntimeException('Runner PHP version does not match the requested PHP branch.');
         }
+        $this->assertRequiredExtensions($request->phpExtensions);
         $buildRoot = rtrim($this->workspaceRoot, '/').'/rootfs';
         $this->copySource($request->repositoryRoot, $buildRoot);
+        $composerVersion = $this->assertComposerVersion($request->composerVersion, $buildRoot);
 
         $hotfixPatches = PatchApplier::discover($buildRoot);
-        if ($hotfixPatches !== []) {
+        $patchCommands = PatchLifecycle::commands($buildRoot, $hotfixPatches, $request->qualityPatches);
+        if (PatchLifecycle::hasHostPatchFallback($patchCommands)) {
             (new PatchApplier($this->runner))->assertPatchToolAvailable();
         }
         $plan = new LifecyclePlan(
             $this->hookCommands($request->lifecycleHooks),
             $request->staticContent,
             $hotfixPatches,
+            $request->refreshModules,
+            $patchCommands,
         );
         $execution = (new LifecycleExecutor($this->runner, $plan))->execute(
             new LifecycleGraph($plan->steps(), $this->lifecycleHooks($request->lifecycleHooks)),
@@ -61,12 +67,19 @@ final readonly class NativePreparation implements Preparation
             $lastProcess = $lastAttempt !== [] ? $lastAttempt[count($lastAttempt) - 1] : null;
             $exitCode = $lastProcess !== null ? $lastProcess->exitCode : 1;
             $phase = $failed?->phase->value ?? Phase::Build->value;
-            throw new RuntimeException(sprintf(
+            $message = sprintf(
                 'Lifecycle preparation failed during %s step %s (exit %d).',
                 $phase,
                 $execution->failedStepId ?? 'unknown',
                 $exitCode,
-            ));
+            );
+            if ($lastProcess !== null) {
+                $diagnostic = trim($lastProcess->stderr !== '' ? $lastProcess->stderr : $lastProcess->stdout);
+                if ($diagnostic !== '') {
+                    $message .= ' Builder output: '.self::truncateDiagnostic($diagnostic);
+                }
+            }
+            throw new RuntimeException($message);
         }
 
         $checksums = [];
@@ -85,6 +98,7 @@ final readonly class NativePreparation implements Preparation
         return new PreparationOutput(
             PHP_VERSION,
             $extensions,
+            $composerVersion,
             $this->modules->enabledModules($buildRoot.'/app/etc/config.php'),
             $checksums,
             $this->capabilities->capabilitiesFor($request),
@@ -174,6 +188,65 @@ final readonly class NativePreparation implements Preparation
         return PHP_VERSION === $requested || str_starts_with(PHP_VERSION, $requested.'.');
     }
 
+    /** @param list<string> $required */
+    private function assertRequiredExtensions(array $required): void
+    {
+        $missing = [];
+        foreach ($required as $extension) {
+            if (!extension_loaded($extension) && !($extension === 'opcache' && extension_loaded('Zend OPcache'))) {
+                $missing[] = $extension;
+            }
+        }
+        if ($missing !== []) {
+            sort($missing, SORT_STRING);
+            throw new RuntimeException('PHP builder is missing required extensions: '.implode(', ', $missing).'.');
+        }
+    }
+
+    private function assertComposerVersion(string $required, string $repositoryRoot): string
+    {
+        if ($required === '') {
+            throw new RuntimeException('A resolved Composer version is required before isolated preparation.');
+        }
+        $result = $this->runner->run(new \MageLift\Build\Process\ProcessRequest(
+            ['composer', '--version', '--no-ansi'],
+            $repositoryRoot,
+            $this->environment(),
+            60.0,
+        ));
+        if (!$result->succeeded()) {
+            throw new RuntimeException('Composer version check failed before the Magento build.');
+        }
+        if (preg_match('/Composer version\s+([0-9]+\.[0-9]+\.[0-9]+)/i', $result->stdout, $matches) !== 1) {
+            throw new RuntimeException('Composer version check returned an unreadable version.');
+        }
+        $actual = $matches[1];
+        $minimum = str_ends_with($required, '+');
+        $requiredVersion = rtrim($required, '+');
+        $matchesRequirement = $minimum
+            ? version_compare($actual, $requiredVersion, '>=')
+            : ($actual === $requiredVersion || str_starts_with($actual, $requiredVersion.'.'));
+        if (!$matchesRequirement) {
+            throw new RuntimeException(sprintf(
+                'Composer %s is required, but the builder provides Composer %s.',
+                $required,
+                $actual,
+            ));
+        }
+
+        return $actual;
+    }
+
+    private static function truncateDiagnostic(string $diagnostic): string
+    {
+        $limit = 4000;
+        if (strlen($diagnostic) <= $limit) {
+            return $diagnostic;
+        }
+
+        return substr($diagnostic, 0, $limit).' [diagnostic output truncated]';
+    }
+
     private function copySource(string $source, string $destination): void
     {
         foreach (['auth.json', 'app/etc/env.php'] as $sensitivePath) {
@@ -195,7 +268,9 @@ final readonly class NativePreparation implements Preparation
                 $relativePath = $iterator->getSubPathName();
                 return $relativePath !== '.git'
                     && $relativePath !== '.magelift'
-                    && $relativePath !== 'magelift.yaml';
+                    && $relativePath !== 'magelift.yaml'
+                    // Composer dependencies are rebuilt in the isolated workspace.
+                    && $relativePath !== 'vendor';
             },
         );
         $iterator = new RecursiveIteratorIterator(

@@ -3,13 +3,16 @@ package eksops
 import (
 	"fmt"
 
+	awsbootstrap "github.com/magelift/magelift/internal/cloud/aws/bootstrap"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
-type Module struct{}
+type Module struct {
+	platform.LifecycleFactories
+}
 
 type Planned struct {
 	Spec Spec
@@ -42,13 +45,34 @@ func (p Planned) WithImageDigest(digest string) (platform.PlannedStack, error) {
 	return next, nil
 }
 
+func (p Planned) WithLiveQueueReplicas(replicas int) (platform.PlannedStack, error) {
+	next := p
+	next.Spec.Catalog.LiveQueueReplicas = replicas
+	if err := next.Spec.Validate(); err != nil {
+		return nil, err
+	}
+	return next, nil
+}
+
 func (p Planned) AWSSpec() Spec { return p.Spec }
+
+func (p Planned) StateBackendURL() string {
+	url, err := awsbootstrap.StateBackendURL(p.Spec.Identity.Project, p.Spec.Identity.Environment, p.Spec.Identity.AccountID, p.Spec.Identity.Region)
+	if err != nil {
+		return ""
+	}
+	return url
+}
 
 func (Module) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: TargetID, Provider: "aws", Runtime: RuntimeID}
 }
 
 func (Module) CertificationTier() platform.CertificationTier { return platform.TierExperimental }
+
+// PlanAdmission resolves current AWS account, EKS, and catalog availability
+// before the cluster or any data-plane resource can be mutated.
+func (Module) PlanAdmission() platform.PlanAdmission { return RegionAdmission{} }
 
 func (Module) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
 	spec, err := PlanFromConfigWithOptions(cfg, environment, PlanOptions{AllowExpiredPreview: opts.AllowExpiredPreview})
@@ -67,7 +91,9 @@ func (Module) Program(planned platform.PlannedStack) (pulumi.RunFunc, error) {
 }
 
 func (Module) OutputKeys() []string {
-	return platform.RequiredOutputKeys()
+	keys := append([]string(nil), platform.RequiredOutputKeys()...)
+	return append(keys, platform.OutputSearchEndpoint, "queueMode", "queueHost", platform.OutputQueueReplicas,
+		platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, platform.OutputEncryptionKeySecretName)
 }
 
 func AsEKSPlanned(planned platform.PlannedStack) (Planned, bool) {

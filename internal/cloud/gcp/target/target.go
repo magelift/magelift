@@ -12,9 +12,13 @@ import (
 )
 
 const (
-	ProviderID sdk.ProviderID = "gcp"
-	RuntimeID  sdk.RuntimeID  = "gke-autopilot"
-	TargetID   sdk.TargetID   = "gcp.gke-autopilot"
+	ProviderID         sdk.ProviderID = "gcp"
+	RuntimeID          sdk.RuntimeID  = "gke-autopilot"
+	RuntimeAutopilotID sdk.RuntimeID  = RuntimeID
+	RuntimeStandardID  sdk.RuntimeID  = "gke-standard"
+	TargetID           sdk.TargetID   = "gcp.gke-autopilot"
+	TargetAutopilotID  sdk.TargetID   = TargetID
+	TargetStandardID   sdk.TargetID   = "gcp.gke-standard"
 )
 
 type Target struct{}

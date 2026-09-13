@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -25,6 +26,24 @@ func (o *options) resolveModule() (platform.StackModule, error) {
 		)
 	}
 	return module, nil
+}
+
+// admitPlanned applies the provider's read-only pre-mutation boundary to an
+// already resolved plan. Keeping module lookup and admission here prevents
+// lifecycle commands from accidentally reaching provider bootstrap or
+// infrastructure backends without the same guard.
+func (o *options) admitPlanned(ctx context.Context, planned platform.PlannedStack) (platform.PlannedStack, error) {
+	if o.modules == nil {
+		return nil, errors.New("stack module registry is required")
+	}
+	if planned == nil {
+		return nil, errors.New("planned stack is required")
+	}
+	module, found := o.modules.Module(planned.Provider(), planned.Runtime())
+	if !found {
+		return nil, fmt.Errorf("no stack module registered for target %q/%q", planned.Provider(), planned.Runtime())
+	}
+	return platform.AdmitPlan(ctx, module, planned)
 }
 
 func (o *options) bootstrapPort() (platform.Bootstrap, error) {

@@ -11,6 +11,17 @@ import (
 
 func TestPlanFromConfigMapsExplicitAWSInputs(t *testing.T) {
 	cfg := deploymentConfig()
+	cfg.Target.AWS.NatMode = NatModeFckNat
+	cfg.Target.AWS.NatTopology = "single-az"
+	cfg.Target.AWS.NatReplacementMode = "none"
+	cfg.Target.AWS.Catalog.DatabaseBackupWindow = "03:00-04:00"
+	cfg.Target.AWS.Catalog.DatabaseMaintenanceWindow = "sun:05:00-sun:06:00"
+	cfg.Target.AWS.Catalog.DatabaseDeletionProtection = boolPtr(false)
+	cfg.Target.AWS.Catalog.DatabaseDeleteAutomatedBackups = boolPtr(true)
+	cacheRetention := 0
+	cfg.Target.AWS.Catalog.CacheSnapshotRetentionLimit = &cacheRetention
+	cfg.Target.AWS.Catalog.CacheSnapshotWindow = "03:00-04:00"
+	cfg.Observability = config.ObservabilityConfig{NativeProvider: "cloudwatch", Signals: []string{"logs", "metrics"}}
 	spec, err := PlanFromConfig(cfg, "staging")
 	if err != nil {
 		t.Fatal(err)
@@ -30,8 +41,127 @@ func TestPlanFromConfigMapsExplicitAWSInputs(t *testing.T) {
 	if spec.Catalog.AuroraProvisioned.InstanceClass != "db.r7g.large" || spec.Catalog.SearchProvisioned.InstanceCount != 2 {
 		t.Fatalf("catalog was not mapped: %#v", spec.Catalog)
 	}
+	if spec.Policy.NatMode != NatModeFckNat || spec.Policy.NatTopology != "single-az" || spec.Policy.NatReplacementMode != "none" {
+		t.Fatalf("NAT policy was not mapped: %#v", spec.Policy)
+	}
+	if spec.Catalog.DatabaseBackupWindow != "03:00-04:00" || spec.Catalog.DatabaseMaintenanceWindow != "sun:05:00-sun:06:00" || spec.Catalog.DatabaseDeletionProtection == nil || *spec.Catalog.DatabaseDeletionProtection || spec.Catalog.DatabaseDeleteAutomatedBackups == nil || !*spec.Catalog.DatabaseDeleteAutomatedBackups || spec.Catalog.CacheSnapshotRetentionLimit == nil || *spec.Catalog.CacheSnapshotRetentionLimit != 0 || spec.Catalog.CacheSnapshotWindow != "03:00-04:00" {
+		t.Fatalf("managed-service durability was not mapped: %#v", spec.Catalog)
+	}
 	if spec.Existing.Certificate.ExternalID != cfg.Target.AWS.CloudFrontCertificateARN || spec.Existing.ALBCertificate.ExternalID != cfg.Target.AWS.ALBCertificateARN {
 		t.Fatal("certificate references were not mapped")
+	}
+	if spec.Observability.NativeProvider != "cloudwatch" || len(spec.Observability.Signals) != 2 {
+		t.Fatalf("observability intent was not mapped: %#v", spec.Observability)
+	}
+}
+
+func TestPlanFromYAMLMapsAdvancedAWSSettings(t *testing.T) {
+	input := `schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: 2.4.9, mode: integrated}
+build: {php: "8.5"}
+target:
+  provider: aws
+  runtime: ecs-fargate
+  aws:
+    kmsKeyArn: arn:aws:kms:eu-west-3:123456789012:key/01234567-89ab-cdef-0123-456789abcdef
+    hostedZoneId: Z123456789
+    cloudFrontCertificateArn: arn:aws:acm:us-east-1:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef
+    albCertificateArn: arn:aws:acm:eu-west-3:123456789012:certificate/abcdef01-2345-6789-abcd-ef0123456789
+    snsTopicArn: arn:aws:sns:eu-west-3:123456789012:deployments
+    imageDigest: ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    cacheSecretArn: arn:aws:secretsmanager:eu-west-3:123456789012:secret:cache-token
+    sessionSecretArn: arn:aws:secretsmanager:eu-west-3:123456789012:secret:session-token
+    queueSecretArn: arn:aws:secretsmanager:eu-west-3:123456789012:secret:queue-token
+    encryptionKeySecretArn: arn:aws:secretsmanager:eu-west-3:123456789012:secret:encryption-key
+    databaseName: magento
+    masterUsername: magento_admin
+    vpcCidr: 10.20.0.0/16
+    availabilityZones: [eu-west-3a, eu-west-3b]
+    mediaDomain: media.shop.example.com
+    natMode: fck-nat
+    natTopology: multi-az
+    natReplacementMode: auto-scaling
+    natInstanceType: c6gn.medium
+    catalog:
+      version: catalog-2026-07-01
+      databaseEngine: aurora-mysql
+      queueMode: ecs-rabbitmq
+      searchMode: provisioned
+      databaseBackupWindow: "03:00-04:00"
+      databaseMaintenanceWindow: "sun:05:00-sun:06:00"
+      databaseDeletionProtection: true
+      databaseDeleteAutomatedBackups: false
+      cacheSnapshotRetentionLimit: 7
+      cacheSnapshotWindow: "04:00-05:00"
+      aurora: {instanceClass: db.r7g.large, instanceCount: 2}
+      valkey: {nodeType: cache.r7g.large, replicaCount: 1}
+      search: {instanceType: r7g.large.search, instanceCount: 2, ebsVolumeType: gp3, ebsVolumeSizeGiB: 100}
+      rabbitMq: {instanceType: mq.m7g.large}
+      fargate: {computeMode: fargate, cpu: 1024, memoryMiB: 2048, desiredCount: 2}
+      retention: {logDays: 30, backupDays: 7, artifactDays: 30}
+      versions: {auroraMysql: 8.0.mysql_aurora.3.12, valkey: "8.1", openSearch: OpenSearch_3.1, rabbitMq: "3.13"}
+defaults: {region: eu-west-3, preset: standard}
+environments: {staging: {account: "123456789012", class: staging, domain: shop.example.com, monthlyBudgetCents: 100}}
+`
+	file, err := config.Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective, err := file.Resolve("staging", config.ResolveOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, err := PlanFromConfig(effective.Config, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Policy.NatMode != NatModeFckNat || spec.Policy.NatTopology != "multi-az" || spec.Policy.NatReplacementMode != "auto-scaling" || spec.Policy.NatInstanceType != "c6gn.medium" {
+		t.Fatalf("YAML NAT settings were not mapped: %#v", spec.Policy)
+	}
+	if spec.Catalog.DatabaseEngine != DatabaseEngineAuroraMySQL || spec.Catalog.QueueMode != QueueModeECSRabbitMQ || spec.Catalog.SearchMode != SearchModeProvisioned || spec.Catalog.CacheSnapshotRetentionLimit == nil || *spec.Catalog.CacheSnapshotRetentionLimit != 7 {
+		t.Fatalf("YAML catalog settings were not mapped: %#v", spec.Catalog)
+	}
+	if spec.Catalog.DatabaseBackupWindow != "03:00-04:00" || spec.Catalog.DatabaseMaintenanceWindow != "sun:05:00-sun:06:00" || spec.Catalog.DatabaseDeletionProtection == nil || !*spec.Catalog.DatabaseDeletionProtection || spec.Catalog.DatabaseDeleteAutomatedBackups == nil || *spec.Catalog.DatabaseDeleteAutomatedBackups {
+		t.Fatalf("YAML durability settings were not mapped: %#v", spec.Catalog)
+	}
+	if spec.Catalog.Fargate.CPU != 1024 || spec.Catalog.Fargate.MemoryMiB != 2048 || spec.Catalog.Fargate.DesiredCount != 2 || spec.Catalog.RabbitMQ.InstanceType != "mq.m7g.large" {
+		t.Fatalf("YAML capacity settings were not mapped: %#v", spec.Catalog)
+	}
+	if effective.Provenance["target.aws.natTopology"].Source != "project" || effective.Provenance["target.aws.catalog.databaseDeleteAutomatedBackups"].Source != "project" {
+		t.Fatalf("advanced YAML provenance was not retained: %#v", effective.Provenance)
+	}
+	if !strings.HasPrefix(effective.Fingerprint, "sha256:") {
+		t.Fatalf("resolved YAML fingerprint = %q", effective.Fingerprint)
+	}
+	changed, err := config.Load([]byte(strings.Replace(input, "natTopology: multi-az", "natTopology: single-az", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	changedEffective, err := changed.Resolve("staging", config.ResolveOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if effective.Fingerprint == changedEffective.Fingerprint {
+		t.Fatal("advanced YAML change did not change the resolved fingerprint")
+	}
+}
+
+func boolPtr(value bool) *bool { return &value }
+
+func TestPlanFromConfigDoesNotRequireCloudFrontForExternalEdge(t *testing.T) {
+	cfg := deploymentConfig()
+	cfg.Edge = config.EdgeConfig{
+		Mode: "external", ExternalProvider: "fastly", ServiceID: "svc-123",
+		TokenSecret: "aws-secrets-manager://magelift/fastly-token", Domains: []string{"shop.example.com"},
+		TLS: true, TLSMode: "fastly", DNSMode: "external", OriginHealthRef: "health/magento",
+	}
+	spec, err := PlanFromConfig(cfg, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Edge.Mode != "external" || spec.Existing.HostedZone != nil || spec.Existing.Certificate == nil {
+		t.Fatalf("external edge plan retained native AWS references: edge=%#v existing=%#v", spec.Edge, spec.Existing)
 	}
 }
 
@@ -49,6 +179,9 @@ func TestPlanFromConfigMapsExistingNetworkInputs(t *testing.T) {
 	}
 	if spec.Existing.Network == nil || spec.Existing.Network.ExternalID != "vpc-existing" || len(spec.Existing.PrivateSubnetIDs) != 2 {
 		t.Fatalf("existing network was not mapped: %#v", spec.Existing)
+	}
+	if spec.Policy.NatTopology != "" || spec.Policy.NatReplacementMode != "" {
+		t.Fatalf("managed NAT policy leaked into adopted network: %#v", spec.Policy)
 	}
 }
 
@@ -244,6 +377,7 @@ func TestPlanFromConfigRejectsUnsupportedAWSServiceCombination(t *testing.T) {
 func TestPlanFromConfigAcceptsCurrentAWSServiceVersions(t *testing.T) {
 	cfg := deploymentConfig()
 	cfg.Application.Version = "2.4.9"
+	cfg.Target.AWS.Catalog.QueueMode = "amazon-mq"
 	cfg.Target.AWS.Catalog.Versions.Valkey = "9.1"
 	cfg.Target.AWS.Catalog.Versions.RabbitMQ = "4.2"
 	cfg.Target.AWS.Catalog.RabbitMQ.InstanceType = "mq.m7g.large"
@@ -259,6 +393,23 @@ func TestPlanFromConfigAcceptsCurrentAWSServiceVersions(t *testing.T) {
 	cfg.Target.AWS.Catalog.RabbitMQ.InstanceType = ""
 	if err := validateAWSServiceCompatibility(cfg); err != nil {
 		t.Fatalf("empty RabbitMQ instance type should skip the mq.m7g gate: %v", err)
+	}
+}
+
+func TestPlanFromConfigAcceptsPreviewRDSMariaDB(t *testing.T) {
+	cfg := deploymentConfig()
+	cfg.Application.Version = "2.4.9"
+	cfg.Preset = "preview"
+	cfg.Defaults.Preset = "preview"
+	cfg.Class = "preview"
+	cfg.ExpiresAt = "2026-12-01T12:00:00+00:00"
+	cfg.Target.AWS.Catalog.DatabaseEngine = "rds-mariadb"
+	cfg.Target.AWS.Catalog.Versions.MariaDB = "11.8.8"
+	cfg.Target.AWS.Catalog.Aurora.InstanceClass = "db.t4g.micro"
+	cfg.Target.AWS.Catalog.Aurora.InstanceCount = 0
+	cfg.Target.AWS.Catalog.SearchMode = "disabled"
+	if _, err := PlanFromConfig(cfg, "preview"); err != nil {
+		t.Fatalf("RDS MariaDB preview plan was rejected: %v", err)
 	}
 }
 

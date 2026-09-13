@@ -1,0 +1,5 @@
+# Cold EKS architecture cell: Fargate profiles. Use with a config whose
+# target.runtime is eks and target.aws.catalog.eks.computeMode is fargate.
+computeMode:fargate
+queueMode:database
+searchMode:disabled

@@ -1,10 +1,11 @@
-// Package cost implements platform.CostEstimator for the certified AWS ECS Fargate target.
+// Package cost implements platform.CostEstimator for AWS ECS and EKS targets.
 package cost
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	awspricing "github.com/magelift/magelift/internal/cloud/aws/pricing"
 	"github.com/magelift/magelift/internal/config"
@@ -20,6 +21,9 @@ type PricingClient interface {
 type Estimator struct {
 	// NewPricing builds a live PricingClient; nil uses awspricing.New.
 	NewPricing func(context.Context, string) (PricingClient, error)
+	// NewBudgetReader builds the read-only AWS Budgets client; nil uses the
+	// default SDK client.
+	NewBudgetReader func(context.Context, string) (BudgetReader, error)
 }
 
 // Estimate reports account-free catalog capacity or live AWS Price List totals.
@@ -31,11 +35,17 @@ func (e Estimator) Estimate(ctx context.Context, planned platform.PlannedStack, 
 	if runtime == "" {
 		runtime = "ecs-fargate"
 	}
+	if runtime == "eks" {
+		if opts.Live {
+			return platform.CostReport{}, fmt.Errorf("AWS live cost estimation is not available for runtime %q yet; use account-free mode for capacity classification", runtime)
+		}
+		return e.withBudget(ctx, cfg, planned.Region(), accountFreeEKS(cfg, planned.Environment(), planned.Region()), opts)
+	}
 	if runtime != "ecs-fargate" {
 		return platform.CostReport{}, fmt.Errorf("cost estimation is not available for runtime %q yet", runtime)
 	}
 	if !opts.Live {
-		return accountFree(cfg, planned.Environment()), nil
+		return e.withBudget(ctx, cfg, planned.Region(), accountFree(cfg, planned.Environment(), planned.Region()), opts)
 	}
 	newPricing := e.NewPricing
 	if newPricing == nil {
@@ -47,26 +57,57 @@ func (e Estimator) Estimate(ctx context.Context, planned platform.PlannedStack, 
 	if err != nil {
 		return platform.CostReport{}, err
 	}
-	return live(ctx, cfg, planned.Environment(), client)
+	report, err := live(ctx, cfg, planned.Environment(), planned.Region(), client)
+	if err != nil {
+		return platform.CostReport{}, err
+	}
+	return e.withBudget(ctx, cfg, planned.Region(), report, opts)
 }
 
-func accountFree(cfg config.Config, environment string) platform.CostReport {
-	preset := cfg.Preset
-	if preset == "" {
-		preset = cfg.Defaults.Preset
+func (e Estimator) withBudget(ctx context.Context, cfg config.Config, region string, report platform.CostReport, opts platform.CostOptions) (platform.CostReport, error) {
+	if !opts.Budget {
+		return report, nil
 	}
-	report := platform.CostReport{
-		Environment: environment, Provider: cfg.Target.Provider, Region: cfg.Defaults.Region, Preset: preset,
-		Mode: "account-free", Currency: "USD", MonthlyBudgetCents: cfg.MonthlyBudgetCents,
-		Priced: []platform.CostPricedItem{}, MonthlyTotalCents: nil,
-		Notice: "Account-free mode does not call AWS or claim current prices. Capacity is derived from magelift.yaml; use magelift cost --live when current AWS prices are available.",
-		Unsupported: []platform.CostUnsupportedItem{
-			{Resource: "AWS unit prices", Reason: "current regional prices require live AWS Pricing data"},
-			{Resource: "usage-based services", Reason: "data transfer, requests, storage growth, logs, WAF, CloudFront, and NAT processing depend on workload measurements"},
-		},
+	accountID := strings.TrimSpace(cfg.Account)
+	if accountID == "" {
+		return platform.CostReport{}, errors.New("AWS budget lookup requires account")
 	}
+	newReader := e.NewBudgetReader
+	if newReader == nil {
+		newReader = NewBudgetReader
+	}
+	reader, err := newReader(ctx, region)
+	if err != nil {
+		return platform.CostReport{}, fmt.Errorf("create AWS budget reader: %w", err)
+	}
+	budget, err := reader.Read(ctx, accountID)
+	if err != nil {
+		return platform.CostReport{}, err
+	}
+	if strings.EqualFold(strings.TrimSpace(cfg.Class), "preview") {
+		report.Budget = previewEnvironmentBudgetReport(report.Environment, budget)
+		return report, nil
+	}
+	report.Budget = &budget
+	return report, nil
+}
+
+func previewEnvironmentBudgetReport(environment string, account platform.CostBudgetReport) *platform.CostBudgetReport {
+	return &platform.CostBudgetReport{
+		Scope:      "preview/" + environment,
+		Source:     account.Source,
+		ObservedAt: account.ObservedAt,
+		Freshness:  account.Freshness,
+		State:      platform.CostBudgetNotConfigured,
+		Budgets:    []platform.CostBudget{},
+		Notice:     "preview environments do not inherit account or production AWS budgets; no preview-owned budget is configured",
+	}
+}
+
+func accountFree(cfg config.Config, environment, region string) platform.CostReport {
+	report := newAccountFreeReport(cfg, environment, region)
 	if cfg.Target.AWS == nil {
-		report.Estimated = []platform.CostEstimatedItem{{Resource: "MageLift preset", Configuration: valueOrUnknown(preset) + " topology; exact capacity is not configured"}}
+		report.Estimated = []platform.CostEstimatedItem{{Resource: "MageLift preset", Configuration: valueOrUnknown(report.Preset) + " topology; exact capacity is not configured"}}
 		report.Unsupported = append(report.Unsupported, platform.CostUnsupportedItem{Resource: "service capacity", Reason: "target.aws.catalog is not configured"})
 		return report
 	}
@@ -75,13 +116,160 @@ func accountFree(cfg config.Config, environment string) platform.CostReport {
 	report.Estimated = append(report.Estimated,
 		platform.CostEstimatedItem{Resource: "ECS Fargate web service", Configuration: fmt.Sprintf("%d tasks, %d CPU units, %d MiB each", catalog.Fargate.DesiredCount, catalog.Fargate.CPU, catalog.Fargate.MemoryMiB)},
 		platform.CostEstimatedItem{Resource: "ElastiCache Valkey", Configuration: fmt.Sprintf("%s, %d replicas", valueOrUnknown(catalog.Valkey.NodeType), catalog.Valkey.ReplicaCount)},
-		databaseCostEstimate(catalog, preset),
+		databaseCostEstimate(catalog, report.Preset),
 	)
-	if item, ok := searchCostEstimate(catalog, preset); ok {
+	if item, ok := searchCostEstimate(catalog, report.Preset); ok {
 		report.Estimated = append(report.Estimated, item)
 	}
-	report.Estimated = append(report.Estimated, queueCostEstimate(catalog.QueueMode, preset, catalog.RabbitMQ.InstanceType))
+	report.Estimated = append(report.Estimated, queueCostEstimate(catalog.QueueMode, report.Preset, catalog.RabbitMQ.InstanceType))
+	if notice := previewExpensiveCatalogNotice(catalog, report.Preset, cfg.Class); notice != "" {
+		if report.Notice != "" {
+			report.Notice += " "
+		}
+		report.Notice += notice
+	}
 	return report
+}
+
+func previewExpensiveCatalogNotice(catalog config.AWSCatalog, preset, class string) string {
+	if !strings.EqualFold(strings.TrimSpace(class), "preview") && preset != "preview" {
+		return ""
+	}
+	var flags []string
+	mode := catalog.QueueMode
+	if mode == "amazon-mq" {
+		flags = append(flags, "Amazon MQ is production-scale for preview")
+	}
+	if catalog.Search.InstanceCount > 0 && strings.TrimSpace(catalog.Search.InstanceType) != "" {
+		flags = append(flags, "provisioned OpenSearch is expensive for preview")
+	}
+	if catalog.Aurora.InstanceCount > 1 {
+		flags = append(flags, "multi-instance Aurora is expensive for preview")
+	}
+	if len(flags) == 0 {
+		return ""
+	}
+	return "Preview catalog flags: " + strings.Join(flags, "; ") + "."
+}
+
+func newAccountFreeReport(cfg config.Config, environment, region string) platform.CostReport {
+	if region == "" {
+		region = cfg.Defaults.Region
+	}
+	preset := cfg.Preset
+	if preset == "" {
+		preset = cfg.Defaults.Preset
+	}
+	report := platform.CostReport{
+		Environment: environment, Provider: cfg.Target.Provider, Region: region, Preset: preset,
+		Mode: "account-free", Currency: "USD", MonthlyBudgetCents: cfg.MonthlyBudgetCents,
+		Priced: []platform.CostPricedItem{}, MonthlyTotalCents: nil,
+		Notice: "Account-free mode does not call AWS or claim current prices. Capacity is derived from magelift.yaml; use magelift cost --live when current AWS prices are available.",
+		Unsupported: []platform.CostUnsupportedItem{
+			{Resource: "AWS unit prices", Reason: "current regional prices require live AWS Pricing data"},
+			{Resource: "usage-based services", Reason: "data transfer, requests, storage growth, logs, WAF, CloudFront, and NAT processing depend on workload measurements"},
+		},
+	}
+	return report
+}
+
+func accountFreeEKS(cfg config.Config, environment, region string) platform.CostReport {
+	report := newAccountFreeReport(cfg, environment, region)
+	if cfg.Target.AWS == nil {
+		report.Estimated = []platform.CostEstimatedItem{{Resource: "MageLift preset", Configuration: valueOrUnknown(report.Preset) + " topology; exact EKS capacity is not configured"}}
+		report.Unsupported = append(report.Unsupported, platform.CostUnsupportedItem{Resource: "service capacity", Reason: "target.aws.catalog is not configured"})
+		return report
+	}
+
+	catalog := cfg.Target.AWS.Catalog
+	report.Estimated = append(report.Estimated, eksComputeCostEstimates(catalog.EKS, report.Preset)...)
+	report.Estimated = append(report.Estimated,
+		platform.CostEstimatedItem{Resource: "ElastiCache Valkey", Configuration: fmt.Sprintf("%s, %d replicas", valueOrUnknown(catalog.Valkey.NodeType), catalog.Valkey.ReplicaCount)},
+		databaseCostEstimate(catalog, report.Preset),
+	)
+	if item, ok := eksSearchCostEstimate(catalog.EKS, report.Preset); ok {
+		report.Estimated = append(report.Estimated, item)
+	}
+	report.Estimated = append(report.Estimated, eksQueueCostEstimate(catalog.EKS, report.Preset))
+	return report
+}
+
+func eksComputeCostEstimates(catalog config.AWSCatalogEKS, preset string) []platform.CostEstimatedItem {
+	mode := catalog.ComputeMode
+	if mode == "" {
+		mode = "auto-mode"
+	}
+	version := valueOrUnknown(catalog.KubernetesVersion)
+	items := []platform.CostEstimatedItem{{
+		Resource:      "Amazon EKS control plane",
+		Configuration: fmt.Sprintf("1 cluster, Kubernetes %s, %s", version, mode),
+	}}
+
+	replicas := catalog.DesiredWebReplicas
+	cpu := valueOrUnknown(catalog.CPURequest)
+	memory := valueOrUnknown(catalog.MemoryRequest)
+	switch mode {
+	case "managed-node-groups", "self-managed":
+		items = append(items, platform.CostEstimatedItem{
+			Resource: modeLabel(mode),
+			Configuration: fmt.Sprintf("%d-%d nodes, %d desired, %s; %d web replicas at %s CPU / %s memory",
+				catalog.NodeMinSize, catalog.NodeMaxSize, catalog.NodeDesiredSize, valueOrUnknown(catalog.NodeInstanceType), replicas, cpu, memory),
+		})
+	case "fargate":
+		items = append(items, platform.CostEstimatedItem{
+			Resource:      "EKS Fargate compute",
+			Configuration: fmt.Sprintf("%d web replicas at %s CPU / %s memory", replicas, cpu, memory),
+		})
+	default:
+		items = append(items, platform.CostEstimatedItem{
+			Resource:      "EKS Auto Mode compute",
+			Configuration: fmt.Sprintf("%d web replicas at %s CPU / %s memory; node capacity managed by EKS", replicas, cpu, memory),
+		})
+	}
+	return items
+}
+
+func modeLabel(mode string) string {
+	if mode == "self-managed" {
+		return "EKS self-managed nodes"
+	}
+	return "EKS managed node groups"
+}
+
+func eksSearchCostEstimate(catalog config.AWSCatalogEKS, preset string) (platform.CostEstimatedItem, bool) {
+	mode := catalog.SearchMode
+	if mode == "" {
+		if preset == "preview" {
+			mode = "disabled"
+		} else {
+			mode = "opensearch"
+		}
+	}
+	if mode == "disabled" {
+		return platform.CostEstimatedItem{}, false
+	}
+	return platform.CostEstimatedItem{
+		Resource:      "OpenSearch on EKS",
+		Configuration: fmt.Sprintf("%d StatefulSet replicas; storage and worker capacity are separate EKS inputs", maxInt(catalog.SearchReplicas, 1)),
+	}, true
+}
+
+func eksQueueCostEstimate(catalog config.AWSCatalogEKS, preset string) platform.CostEstimatedItem {
+	mode := catalog.QueueMode
+	if mode == "" {
+		if preset == "preview" {
+			mode = "database"
+		} else {
+			mode = "rabbitmq"
+		}
+	}
+	if mode == "database" {
+		return platform.CostEstimatedItem{Resource: "Magento queue", Configuration: "database-backed on EKS; no broker"}
+	}
+	return platform.CostEstimatedItem{
+		Resource:      "RabbitMQ on EKS",
+		Configuration: fmt.Sprintf("%d StatefulSet replicas and %d queue consumers; storage and worker capacity are separate EKS inputs", maxInt(catalog.QueueReplicas, 1), maxInt(catalog.QueueConsumerCount, 1)),
+	}
 }
 
 func databaseCostEstimate(catalog config.AWSCatalog, preset string) platform.CostEstimatedItem {
@@ -134,7 +322,7 @@ func queueCostEstimate(queueMode, preset, instanceType string) platform.CostEsti
 		if preset == "preview" {
 			mode = "db"
 		} else {
-			mode = "amazon-mq"
+			mode = "ecs-rabbitmq"
 		}
 	}
 	switch mode {
@@ -149,8 +337,8 @@ func queueCostEstimate(queueMode, preset, instanceType string) platform.CostEsti
 	}
 }
 
-func live(ctx context.Context, cfg config.Config, environment string, estimator PricingClient) (platform.CostReport, error) {
-	report := accountFree(cfg, environment)
+func live(ctx context.Context, cfg config.Config, environment, region string, estimator PricingClient) (platform.CostReport, error) {
+	report := accountFree(cfg, environment, region)
 	report.Mode = "live"
 	report.Priced = []platform.CostPricedItem{}
 	report.Estimated = liveUnpricedEstimates(cfg)
@@ -276,7 +464,7 @@ func livePriceQueries(cfg config.Config) []awspricing.Query {
 			if preset == "preview" {
 				mode = "db"
 			} else {
-				mode = "amazon-mq"
+				mode = "ecs-rabbitmq"
 			}
 		}
 		if mode == "amazon-mq" {

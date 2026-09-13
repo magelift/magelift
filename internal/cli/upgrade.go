@@ -55,6 +55,9 @@ func upgradeCommand(o *options) *cobra.Command {
 			if err != nil {
 				return &exitError{code: 3, err: fmt.Errorf("locate current executable: %w", err)}
 			}
+			if err := requireCosignVerificationDependencies(cmd.Context(), o); err != nil {
+				return err
+			}
 			if err := client.Install(cmd.Context(), release, executable); err != nil {
 				return &exitError{code: 3, err: err}
 			}

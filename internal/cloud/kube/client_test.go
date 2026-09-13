@@ -1,6 +1,7 @@
 package kube
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -41,7 +42,7 @@ func TestClientFromKubeconfigInvalidFailsClosed(t *testing.T) {
 }
 
 func TestClientFromOutputs(t *testing.T) {
-	t.Parallel()
+	t.Setenv("MAGELIFT_KUBECONFIG", "")
 	kubeconfig := BuildStaticTokenKubeconfig("magelift_shop-cluster", "https://1.2.3.4:6443", testCAData, "mock-token")
 	client, err := ClientFromOutputs(map[string]any{platform.OutputKubeconfig: kubeconfig})
 	if err != nil {
@@ -52,8 +53,37 @@ func TestClientFromOutputs(t *testing.T) {
 	}
 }
 
+func TestClientFromOutputsPrefersMAGELIFT_KUBECONFIG(t *testing.T) {
+	kubeconfig := BuildStaticTokenKubeconfig("magelift_shop-cluster", "https://1.2.3.4:6443", testCAData, "override-token")
+	path := t.TempDir() + "/kubeconfig"
+	if err := os.WriteFile(path, []byte(kubeconfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MAGELIFT_KUBECONFIG", path)
+	client, err := ClientFromOutputs(map[string]any{})
+	if err != nil {
+		t.Fatalf("ClientFromOutputs override: %v", err)
+	}
+	if client == nil {
+		t.Fatal("ClientFromOutputs override returned nil Interface")
+	}
+}
+
+func TestClientFromOutputsRejectsStaleMAGELIFT_KUBECONFIG(t *testing.T) {
+	kubeconfig := BuildStaticTokenKubeconfig("gcap27-preview-gke", "https://1.2.3.4:6443", testCAData, "stale-token")
+	path := t.TempDir() + "/kubeconfig"
+	if err := os.WriteFile(path, []byte(kubeconfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MAGELIFT_KUBECONFIG", path)
+	_, err := ClientFromOutputs(map[string]any{platform.OutputClusterName: "gcha29-high-availability-gke-standard"})
+	if err == nil || !strings.Contains(err.Error(), "not for stack cluster") {
+		t.Fatalf("expected stale MAGELIFT_KUBECONFIG error, got %v", err)
+	}
+}
+
 func TestClientFromOutputsMissingKey(t *testing.T) {
-	t.Parallel()
+	t.Setenv("MAGELIFT_KUBECONFIG", "")
 	_, err := ClientFromOutputs(map[string]any{platform.OutputClusterName: "shop"})
 	if err == nil || !strings.Contains(err.Error(), platform.OutputKubeconfig) {
 		t.Fatalf("expected missing %q error, got %v", platform.OutputKubeconfig, err)
@@ -61,7 +91,7 @@ func TestClientFromOutputsMissingKey(t *testing.T) {
 }
 
 func TestClientFromOutputsEmptyKey(t *testing.T) {
-	t.Parallel()
+	t.Setenv("MAGELIFT_KUBECONFIG", "")
 	_, err := ClientFromOutputs(map[string]any{platform.OutputKubeconfig: "  "})
 	if err == nil || !strings.Contains(err.Error(), platform.OutputKubeconfig) {
 		t.Fatalf("expected empty %q error, got %v", platform.OutputKubeconfig, err)

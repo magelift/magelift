@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -31,6 +32,9 @@ func TestPrepareRequestContainsOnlyImmutableInputs(t *testing.T) {
 	if request.Prepare.RepositoryRoot != "/workspace" || len(request.Prepare.InputFiles) != 1 {
 		t.Fatalf("unexpected request: %#v", request)
 	}
+	if !request.Prepare.RefreshModules {
+		t.Fatal("expected module refresh when app/etc/config.php is absent")
+	}
 	sum := sha256.Sum256(lock)
 	if request.Prepare.InputFiles[0].SHA256 != hex.EncodeToString(sum[:]) {
 		t.Fatal("composer.lock checksum mismatch")
@@ -41,12 +45,68 @@ func TestPrepareRequestContainsOnlyImmutableInputs(t *testing.T) {
 	if request.Prepare.StaticContent[0].Strategy != "" || request.Prepare.StaticContent[0].Threads != 0 {
 		t.Fatalf("unexpected strategy/threads on locale-only config: %#v", request.Prepare.StaticContent[0])
 	}
+	if got := strings.Join(request.Prepare.QualityPatches, ","); got != "ACSD-123,MAGETWO-67097" {
+		t.Fatalf("qualityPatches = %#v", request.Prepare.QualityPatches)
+	}
 	encoded, err := buildrunner.EncodeRequest(request)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(strings.ToLower(string(encoded)), "account") || strings.Contains(strings.ToLower(string(encoded)), "credential") {
 		t.Fatal("request contains environment or credential data")
+	}
+}
+
+func TestPrepareRequestCarriesBuildToolchainRequirements(t *testing.T) {
+	input := strings.Replace(
+		buildConfig,
+		"  php: \"8.5\"",
+		"  php: \"8.5\"\n  extensions: [redis, apcu]\n  composer: {version: \"2.10\"}",
+		1,
+	)
+	file, err := config.Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "composer.lock"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	request, err := PrepareRequest(file, source.Repository{Root: root, Revision: strings.Repeat("a", 40)}, "/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := request.Prepare.PHPRequiredExtensions; !reflect.DeepEqual(got, []string{"apcu", "redis"}) {
+		t.Fatalf("PHP extensions = %#v", got)
+	}
+	if request.Prepare.ComposerVersion != "2.10" {
+		t.Fatalf("Composer version = %q", request.Prepare.ComposerVersion)
+	}
+}
+
+func TestPrepareRequestPreservesExistingModuleMap(t *testing.T) {
+	file, err := config.Load([]byte(buildConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "composer.lock"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "app", "etc"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "app", "etc", "config.php"), []byte("<?php return ['modules' => []];\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	request, err := PrepareRequest(file, source.Repository{Root: root, Revision: strings.Repeat("a", 40)}, "/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Prepare.RefreshModules {
+		t.Fatal("existing app/etc/config.php must not be refreshed")
 	}
 }
 
@@ -148,6 +208,7 @@ project: {name: shop}
 application: {edition: open-source, version: 2.4.9, mode: integrated}
 build:
   php: "8.5"
+  qualityPatches: [ACSD-123, MAGETWO-67097]
   staticContent:
     locales: [fr_FR, en_US]
     themes: [Magento/luma, Magento/blank]

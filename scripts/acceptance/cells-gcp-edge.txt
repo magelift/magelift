@@ -1,0 +1,19 @@
+# Ordered GCP Magento-origin edge certification catalog.
+# The native GKE edge is provisioned by the acceptance harness when
+# MAGELIFT_GCP_ACCEPTANCE_NATIVE_EDGE=1; edge:traffic then exercises the
+# public Cloud CDN/Cloud Armor front end against that real Magento origin.
+# The EXIT trap tears down both the outer edge cell and the GKE origin.
+bootstrap:wif
+composer:sm-write
+composer:sm-read
+day2:secrets
+day2:state
+day2:logs
+day2:exec
+day2:health
+search:health
+migrate:dump
+deploy:candidate
+deploy:repeat
+cost:estimate
+edge:traffic

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"go.yaml.in/yaml/v4"
 )
@@ -127,6 +129,28 @@ func TestEnvDestroyDestroysInfrastructureBeforeRemovingOverlay(t *testing.T) {
 	}
 }
 
+func TestEnvDestroyReportsRetainedProductionBackups(t *testing.T) {
+	path := writeLifecycleConfig(t, "production", false)
+	backend := &fakeInfrastructureBackend{}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--yes", "--output", "json", "env", "destroy", "staging"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"mechanism": "rds-final-snapshot-and-automated-backups"`) {
+		t.Fatalf("env destroy did not report retained backups: %s", out.String())
+	}
+}
+
 func TestEnvSweepDryRunReportsOnlyExpiredPreviewOverlays(t *testing.T) {
 	path := writeLifecycleConfig(t, "preview", false)
 	setEnvironmentExpiration(t, path, "staging", "2020-01-01T00:00:00Z")
@@ -200,6 +224,76 @@ func TestEnvSweepSkipsProtectedExpiredPreview(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "staging:") {
 		t.Fatal("protected preview configuration was removed")
+	}
+}
+
+func TestPreviewSweepUsesPersistedIdentityAndKeepsBaseOverlay(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "magelift.yaml")
+	if err := os.WriteFile(path, []byte(previewTestConfig()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := config.BuildPreviewIdentity(config.PreviewIdentityInput{
+		Project:     "example-shop",
+		Repository:  "acme/magento",
+		PullRequest: 17,
+		Branch:      "feature/cart",
+		Commit:      "abcdef1",
+		Generation:  3,
+		Domain:      "preview.example.com",
+		ExpiresAt:   "2020-01-01T00:00:00Z",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &fakeInfrastructureBackend{}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.environment = "preview"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	o.listPreviewRecords = func(context.Context, string, string) ([]automation.PreviewRecord, error) {
+		return []automation.PreviewRecord{{
+			StackName: "example-shop-" + identity.Environment,
+			Metadata: automation.PreviewMetadata{
+				Project:      identity.Project,
+				Repository:   identity.Repository,
+				PullRequest:  identity.PullRequest,
+				Environment:  identity.Environment,
+				StackKey:     identity.StackKey,
+				Owner:        identity.OwnershipMarker,
+				Branch:       identity.Branch,
+				CommitDigest: identity.CommitDigest,
+				Domain:       identity.Domain,
+				ExpiresAt:    identity.ExpiresAt,
+				Generation:   identity.Generation,
+			},
+		}}, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "preview", "--preview-repository", "acme/magento", "--output", "json", "--yes", "env", "sweep"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(backend.calls, []string{"preview", "destroy"}) {
+		t.Fatalf("backend calls = %v", backend.calls)
+	}
+	if len(backend.requests) != 2 || backend.requests[0].Preview == nil || backend.requests[0].Preview.Generation != 3 || !backend.requests[0].Destroy {
+		t.Fatalf("preview requests = %#v, want persisted identity and destroy intent", backend.requests)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "preview:") {
+		t.Fatalf("base preview overlay was not preserved: %s", data)
+	}
+	if !strings.Contains(out.String(), identity.Environment) || !strings.Contains(out.String(), `"action": "destroyed"`) {
+		t.Fatalf("preview sweep output omitted dynamic identity: %s", out.String())
 	}
 }
 

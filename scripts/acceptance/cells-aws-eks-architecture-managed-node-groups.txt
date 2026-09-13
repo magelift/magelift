@@ -1,0 +1,5 @@
+# Cold EKS architecture cell: managed node groups. Use with a config whose
+# target.runtime is eks and target.aws.catalog.eks.computeMode is managed-node-groups.
+computeMode:managed-node-groups
+queueMode:database
+searchMode:disabled

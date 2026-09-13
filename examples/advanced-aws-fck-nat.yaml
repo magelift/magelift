@@ -1,0 +1,112 @@
+# Advanced configuration example.
+# Start with examples/magelift.yaml for the common preset path; add only the
+# sections whose ownership or availability boundary you need to control.
+schemaVersion: 1
+project:
+  name: example-shop
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+build:
+  php: "8.5"
+  extensions: [apcu, bcmath, gd, intl, mbstring, opcache, pdo_mysql, redis, sodium, zip]
+  composer:
+    version: "2.10"
+    credentials: aws-secrets-manager://magelift/example/composer
+target:
+  provider: aws
+  runtime: ecs-fargate
+  aws:
+    vpcCidr: 10.42.0.0/16
+    availabilityZones: [eu-west-3a, eu-west-3b]
+    natMode: fck-nat
+    natTopology: multi-az
+    natReplacementMode: auto-scaling
+    # Optional semantic sizing override. The default is the cost-optimized
+    # ARM64 Graviton t4g.nano; x86 types are rejected before mutation.
+    natInstanceType: c6gn.medium
+    catalog:
+      # The evidenced AWS preview tuple uses db queue and disabled search. Standard
+      # and high-availability default to ecs-rabbitmq when queueMode is omitted.
+      # aurora-mysql, provisioned OpenSearch, amazon-mq, and ECS managed-instances
+      # remain MageLift-experimental and are not certified. See
+      # docs/capability-matrix.md.
+      queueMode: db
+      searchMode: disabled
+      # Optional managed-service durability controls. Omitted fields keep the
+      # preset safety defaults; explicit false/zero values are intentional.
+      databaseBackupWindow: "03:00-04:00"
+      databaseMaintenanceWindow: "sun:05:00-sun:06:00"
+      databaseDeletionProtection: true
+      databaseDeleteAutomatedBackups: false
+      cacheSnapshotRetentionLimit: 7
+      cacheSnapshotWindow: "04:00-05:00"
+defaults:
+  region: eu-west-3
+  preset: standard
+environments:
+  staging:
+    account: "123456789012"
+    class: staging
+    domain: shop.example.com
+edge:
+  mode: both
+  nativeProvider: cloudfront
+  externalProvider: fastly
+  serviceId: "replace-with-fastly-service-id"
+  tokenSecret: aws-secrets-manager://magelift/example/fastly-token
+  domains: [shop.example.com]
+  tls: true
+  tlsMode: external
+  dnsMode: external
+  originHealthRef: example/origin-health
+  health:
+    # Normal deployment may derive the origin URL from applicationURL. Set
+    # originUrl as well when this file is used with standalone edge apply.
+    originUrl: https://origin.example.com/health
+    originHost: origin.example.com
+    expectedCname: dualstack.e.sni.global.fastly.net
+    routePath: /health
+    expectedStatus: 200
+    routeTimeoutSeconds: 300
+    routePollSeconds: 5
+observability:
+  nativeProvider: cloudwatch
+  externalProvider: newrelic
+  credentialReferences:
+    - aws-secrets-manager://magelift/example/newrelic-license
+  endpoint: https://otlp.eu01.nr-data.net
+  serviceName: example-shop
+  environment: staging
+  logs: true
+  metrics: true
+  traces: true
+  retentionDays: 30
+  samplingRatio: 0.2
+  redactionPolicyRef: example/default-redaction
+  labels:
+    owner: platform
+    cost-center: commerce
+resilience:
+  profileId: standard-multi-az
+  availabilityTarget: multi-az
+  rpoSeconds: 900
+  rtoSeconds: 1800
+  retentionDays: 14
+  recoveryScope: same-region-and-isolated-destination
+  failoverOwner: platform-oncall
+  fencingPolicy: single-writer-lease
+  recoveryDestinations: [same-region, same-region-isolated]
+  # Rebuildable search/cache projections run through this existing workload;
+  # choose `task` instead of `service` only for a deliberately pinned ECS
+  # recovery drill. Kubernetes targets use namespace/workload instead.
+  projection:
+    runtime: ecs
+    cluster: example-shop
+    service: web
+    container: php
+extensions:
+  newrelic.otlp:
+    collectorMode: direct-otlp
+    signalSet: [logs, metrics, traces]

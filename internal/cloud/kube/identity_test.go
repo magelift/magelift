@@ -221,7 +221,7 @@ func scwIdentitySpec(digest string) scwstack.Spec {
 		Policy:      scwstack.NetworkPolicy{NetworkCIDR: "172.16.0.0/22", Zones: []string{"fr-par-1"}},
 		Catalog: scwstack.CatalogSelection{
 			DatabaseNodeType: "DB-DEV-S", RedisNodeType: "RED1-MICRO", CacheMode: "redis",
-			KapsuleVersion: "1.29.1", NodeType: "DEV1-M", NodeCount: 2,
+			KapsuleVersion: "1.36.1", NodeType: "DEV1-M", NodeCount: 2,
 			CPURequest: "500m", MemoryRequest: "1Gi", DesiredWebReplicas: 1,
 		},
 		Dependencies: scwstack.Dependencies{DatabaseName: "magento", MasterUsername: "magento"},

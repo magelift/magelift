@@ -49,6 +49,7 @@ final class ArtifactManifestWriterTest extends TestCase
             MagentoEdition::OpenSource,
             '2.4.8',
             '8.4.1',
+            '2.10.2',
             ['intl', 'pdo_mysql'],
             ['Magento_Catalog'],
             ['composer.lock' => 'locked'],

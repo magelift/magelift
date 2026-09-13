@@ -25,13 +25,12 @@ final class LifecyclePlanTest extends TestCase
     public static function phaseCommands(): iterable
     {
         yield 'validate' => [Phase::Validate, [
-            ['composer', 'validate', '--strict'],
+            ['composer', 'validate', '--no-check-lock'],
             ['composer', 'check-platform-reqs', '--no-dev'],
         ]];
         yield 'build' => [Phase::Build, [
             ['composer', 'install', '--no-dev', '--prefer-dist', '--no-interaction', '--no-progress', '--optimize-autoloader'],
             ['bin/magento', 'setup:di:compile'],
-            ['bin/magento', 'setup:static-content:deploy', '--no-interaction'],
         ]];
         yield 'package' => [Phase::Package, []];
         yield 'deploy' => [Phase::Deploy, [
@@ -69,8 +68,22 @@ final class LifecyclePlanTest extends TestCase
         self::assertSame([
             ['composer', 'install', '--no-dev', '--prefer-dist', '--no-interaction', '--no-progress', '--optimize-autoloader'],
             ['bin/magento', 'setup:di:compile'],
-            ['bin/magento', 'setup:static-content:deploy', '--language', 'en_US', '--theme', 'Magento/blank', '--no-interaction'],
-            ['bin/magento', 'setup:static-content:deploy', '--language', 'fr_FR', '--theme', 'Vendor/theme', '--no-interaction'],
+            ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'en_US', '--theme', 'Magento/blank', '--no-interaction'],
+            ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'fr_FR', '--theme', 'Vendor/theme', '--no-interaction'],
+        ], array_map(
+            static fn ($command): array => $command->argv(),
+            $plan->commandsFor(Phase::Build),
+        ));
+    }
+
+    public function testRefreshesModulesOnlyWhenTheSourceHasNoModuleMap(): void
+    {
+        $plan = new LifecyclePlan([], [], [], true);
+
+        self::assertSame([
+            ['composer', 'install', '--no-dev', '--prefer-dist', '--no-interaction', '--no-progress', '--optimize-autoloader'],
+            ['bin/magento', 'module:enable', '--all'],
+            ['bin/magento', 'setup:di:compile'],
         ], array_map(
             static fn ($command): array => $command->argv(),
             $plan->commandsFor(Phase::Build),
@@ -87,8 +100,8 @@ final class LifecyclePlanTest extends TestCase
         self::assertSame([
             ['composer', 'install', '--no-dev', '--prefer-dist', '--no-interaction', '--no-progress', '--optimize-autoloader'],
             ['bin/magento', 'setup:di:compile'],
-            ['bin/magento', 'setup:static-content:deploy', '--language', 'en_US', '--theme', 'Magento/blank', '-s', 'compact', '-j', '3', '--no-interaction'],
-            ['bin/magento', 'setup:static-content:deploy', '--language', 'fr_FR', '--theme', 'Vendor/theme', '-s', 'compact', '-j', '3', '--no-interaction'],
+            ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'en_US', '--theme', 'Magento/blank', '-s', 'compact', '-j', '3', '--no-interaction'],
+            ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'fr_FR', '--theme', 'Vendor/theme', '-s', 'compact', '-j', '3', '--no-interaction'],
         ], array_map(
             static fn ($command): array => $command->argv(),
             $plan->commandsFor(Phase::Build),
@@ -107,7 +120,6 @@ final class LifecyclePlanTest extends TestCase
             ['patch', '-p1', '--forward', '--batch', '-i', 'm2-hotfixes/a-first.patch'],
             ['patch', '-p1', '--forward', '--batch', '-i', 'm2-hotfixes/b-second.patch'],
             ['bin/magento', 'setup:di:compile'],
-            ['bin/magento', 'setup:static-content:deploy', '--no-interaction'],
         ], array_map(
             static fn ($command): array => $command->argv(),
             $plan->commandsFor(Phase::Build),

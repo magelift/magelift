@@ -13,6 +13,7 @@ final readonly class ArtifactManifest
     private const CHECKSUM_PATTERN = '/^[a-f0-9]{64}$/D';
     private const REVISION_PATTERN = '/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/D';
     private const VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/D';
+    private const COMPOSER_VERSION_PATTERN = '/^2\.\d+(?:\.\d+)?$/D';
     private const CAPABILITY_PATTERN = '/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/D';
     private const PHP_EXTENSION_PATTERN = '/^[a-z][a-z0-9_-]*$/D';
     private const MAGENTO_MODULE_PATTERN = '/^[A-Z][A-Za-z0-9]*_[A-Z][A-Za-z0-9]*$/D';
@@ -33,6 +34,7 @@ final readonly class ArtifactManifest
         public MagentoEdition $magentoEdition,
         public string $magentoVersion,
         public string $phpVersion,
+        public string $composerVersion,
         public array $phpExtensions,
         public array $enabledModules,
         public array $buildInputs,
@@ -47,6 +49,7 @@ final readonly class ArtifactManifest
         self::assertMatches($this->buildPackageVersion, self::VERSION_PATTERN, 'Build package version must be a semantic version.');
         self::assertMatches($this->magentoVersion, self::VERSION_PATTERN, 'Magento version must be a semantic version.');
         self::assertMatches($this->phpVersion, self::VERSION_PATTERN, 'PHP version must be a semantic version.');
+        self::assertMatches($this->composerVersion, self::COMPOSER_VERSION_PATTERN, 'Composer version must be an exact Composer 2 version.');
 
         self::assertUniqueList($this->phpExtensions, 'PHP extensions');
         foreach ($this->phpExtensions as $extension) {
@@ -110,6 +113,7 @@ final readonly class ArtifactManifest
             'buildPackageVersion' => $this->buildPackageVersion,
             'magento' => ['edition' => $this->magentoEdition->value, 'version' => $this->magentoVersion],
             'php' => ['version' => $this->phpVersion, 'extensions' => self::sortedList($this->phpExtensions)],
+            'composer' => ['version' => $this->composerVersion],
             'enabledModules' => self::sortedList($this->enabledModules),
             'buildInputs' => $this->buildInputs,
             'checksums' => $this->checksums,

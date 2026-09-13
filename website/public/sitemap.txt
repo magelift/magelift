@@ -16,6 +16,7 @@ https://magelift.dev/docs/configuration/
 https://magelift.dev/docs/cli-reference/
 https://magelift.dev/docs/operations/
 https://magelift.dev/docs/bootstrap/
+https://magelift.dev/docs/acceptance-dependencies/
 https://magelift.dev/docs/adding-a-provider/
 https://magelift.dev/docs/adr/
 https://magelift.dev/docs/aws-acceptance/
@@ -23,6 +24,7 @@ https://magelift.dev/docs/aws-eks-experimental/
 https://magelift.dev/docs/benchmarks/
 https://magelift.dev/docs/brownfield-attach/
 https://magelift.dev/docs/builds/
+https://magelift.dev/docs/certification-sessions/
 https://magelift.dev/docs/compatibility/
 https://magelift.dev/docs/dependency-policy/
 https://magelift.dev/docs/ece-parity/
@@ -31,6 +33,7 @@ https://magelift.dev/docs/gcp-acceptance/
 https://magelift.dev/docs/gcp-experimental/
 https://magelift.dev/docs/github-labels/
 https://magelift.dev/docs/lint-policy/
+https://magelift.dev/docs/operations/ownership-and-escalation/
 https://magelift.dev/docs/ovh-experimental/
 https://magelift.dev/docs/post-beta-roadmap/
 https://magelift.dev/docs/provenance/

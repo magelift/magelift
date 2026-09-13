@@ -1,0 +1,4 @@
+# Cold ECS architecture cell: ECS Managed Instances. Use with a config whose
+# target.runtime is ecs-fargate and target.aws.catalog.fargate.computeMode is managed-instances.
+computeMode:managed-instances
+queueMode:db

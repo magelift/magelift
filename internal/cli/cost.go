@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/usererr"
@@ -11,7 +12,7 @@ import (
 )
 
 func costCommand(o *options) *cobra.Command {
-	var live bool
+	var live, budget bool
 	command := &cobra.Command{
 		Use:   "cost",
 		Short: "Describe the selected environment's cost inputs",
@@ -29,17 +30,19 @@ func costCommand(o *options) *cobra.Command {
 			if err != nil {
 				return invalid(err)
 			}
-			report, err := estimator.Estimate(cmd.Context(), planned, effective.Config, platform.CostOptions{Live: live})
+			report, err := estimator.Estimate(cmd.Context(), planned, effective.Config, platform.CostOptions{Live: live, Budget: budget})
 			if err != nil {
 				if mapped := notSupported(err, planned, "cost estimation"); mapped != err {
 					return mapped
 				}
 				return &exitError{code: 3, err: usererr.Wrap(err, "cost estimation failed", "Check catalog fields and provider credentials, then retry.", "")}
 			}
+			report = platform.NormalizeCostReport(report, time.Now().UTC())
 			return o.write(report)
 		},
 	}
 	command.Flags().BoolVar(&live, "live", false, "query current provider on-demand prices when the adapter supports it")
+	command.Flags().BoolVar(&budget, "budget", false, "read the provider budget definition and alert thresholds when supported")
 	return command
 }
 

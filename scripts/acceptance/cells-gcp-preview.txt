@@ -4,7 +4,11 @@
 #
 # bootstrap:wif requires Ensure PLUS Act or gcloud STS/WIF token-exchange proof (not Ensure-only).
 # composer:sm-* are explicit SC2 write/read cells (gcp-secret-manager://).
-# migrate:dump runs after deploy:candidate (D-03). cutover:dns needs applicationURL (D-04).
+# migrate:dump runs after infra-only creation and before deploy:candidate so a
+# fresh managed database has Magento's schema before setup:upgrade (D-03).
+# deploy:repeat runs after deploy:candidate against the same lifecycle to prove
+# the normal non-interactive update path is idempotent.
+# cutover:dns needs applicationURL (D-04).
 bootstrap:wif
 composer:sm-write
 composer:sm-read
@@ -13,7 +17,10 @@ day2:state
 day2:logs
 day2:exec
 day2:health
-deploy:candidate
+search:health
 migrate:dump
+deploy:candidate
+deploy:repeat
 cost:estimate
-cutover:dns
+# cutover:dns is opt-in. Supply a real operator-owned Cloudflare zone and host
+# through a dedicated catalog or MAGELIFT_ACCEPTANCE_CELL_CATALOG.

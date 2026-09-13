@@ -4,37 +4,67 @@ package ops
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"cloud.google.com/go/storage"
 	gcpbootstrap "github.com/magelift/magelift/internal/cloud/gcp/bootstrap"
+	gcpedge "github.com/magelift/magelift/internal/cloud/gcp/edge"
 	gcpstack "github.com/magelift/magelift/internal/cloud/gcp/stack"
 	gcpstate "github.com/magelift/magelift/internal/cloud/gcp/state"
+	gcptarget "github.com/magelift/magelift/internal/cloud/gcp/target"
 	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/config"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
 	sdk "github.com/magelift/magelift/sdk/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"google.golang.org/api/googleapi"
 )
 
 // Module is the GCP StackModule with Magento deploy Ops and day-2 ports.
-type Module struct{}
+type Module struct {
+	RuntimeID sdk.RuntimeID
+	platform.LifecycleFactories
+}
 
-func (Module) Descriptor() sdk.TargetDescriptor { return gcpstack.Module{}.Descriptor() }
-func (Module) CertificationTier() platform.CertificationTier {
-	return gcpstack.Module{}.CertificationTier()
+func (m Module) stackModule() gcpstack.Module {
+	return gcpstack.Module{RuntimeID: m.runtime(), LifecycleFactories: m.LifecycleFactories}
 }
-func (Module) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
-	return gcpstack.Module{}.Plan(cfg, environment, opts)
+
+func (m Module) runtime() sdk.RuntimeID {
+	if m.RuntimeID == "" {
+		return gcptarget.RuntimeAutopilotID
+	}
+	return m.RuntimeID
 }
-func (Module) Program(planned platform.PlannedStack) (pulumi.RunFunc, error) {
-	return gcpstack.Module{}.Program(planned)
+func (m Module) Descriptor() sdk.TargetDescriptor { return m.stackModule().Descriptor() }
+func (m Module) CertificationTier() platform.CertificationTier {
+	return m.stackModule().CertificationTier()
 }
-func (Module) OutputKeys() []string { return gcpstack.Module{}.OutputKeys() }
-func (Module) Ops() platform.Ops    { return Ops{} }
+func (m Module) PlanAdmission() platform.PlanAdmission { return m.stackModule().PlanAdmission() }
+func (m Module) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
+	return m.stackModule().Plan(cfg, environment, opts)
+}
+func (m Module) Program(planned platform.PlannedStack) (pulumi.RunFunc, error) {
+	return m.stackModule().Program(planned)
+}
+func (m Module) OutputKeys() []string { return m.stackModule().OutputKeys() }
+func (m Module) Ops() platform.Ops    { return Ops{} }
+
+func (m Module) NewEdge(ctx context.Context, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
+	if m.Edge != nil {
+		return m.Edge(ctx, planned)
+	}
+	gcpPlanned, ok := gcpstack.AsGCPPlanned(planned)
+	if !ok {
+		return nil, fmt.Errorf("GCP edge adapter received unexpected planned type %T", planned)
+	}
+	return gcpedge.NewNativeSDKLifecycleAdapter(ctx, gcpPlanned.GCPSpec().Identity.GCPProject, gcpedge.AlwaysHealthy{}, sdk.DefaultEdgeOperationPolicy())
+}
 
 // Ops implements platform.Ops for GCP GKE Autopilot.
 type Ops struct {
@@ -68,14 +98,16 @@ func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.P
 	}
 	spec := gcpPlanned.GCPSpec()
 	deploySpec := kube.DeploySpec{
-		ImageDigest:     spec.Artifact.ImageDigest,
-		DatabaseName:    spec.Dependencies.DatabaseName,
-		ApplicationMode: spec.Application.Mode,
-		WebRuntime:      spec.Application.WebRuntime,
-		CPURequest:      spec.Catalog.AutopilotCPURequest,
-		MemoryRequest:   spec.Catalog.AutopilotMemoryRequest,
-		CloudProject:    spec.Identity.GCPProject,
-		Region:          spec.Identity.Region,
+		ImageDigest:        spec.Artifact.ImageDigest,
+		DatabaseName:       spec.Dependencies.DatabaseName,
+		ApplicationMode:    spec.Application.Mode,
+		ApplicationVersion: spec.Application.Version,
+		WebRuntime:         spec.Application.WebRuntime,
+		Magento:            spec.Application.Magento,
+		CPURequest:         spec.Catalog.AutopilotCPURequest,
+		MemoryRequest:      spec.Catalog.AutopilotMemoryRequest,
+		CloudProject:       spec.Identity.GCPProject,
+		Region:             spec.Identity.Region,
 	}
 	newCandidate := o.NewCandidate
 	if newCandidate == nil {
@@ -100,6 +132,12 @@ func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.P
 	return kube.New(typed, deploySpec, candidate, runtime, diagnostics, o.RecordRelease)
 }
 
+// ErrStateBucketMissing is returned when certified deploy cannot lock because
+// the DIY GCS state bucket was never bootstrapped.
+var ErrStateBucketMissing = errors.New("deployment state bucket is missing")
+
+var newGCSState = gcpstate.NewGCS
+
 func acquireDeploymentLock(ctx context.Context, spec gcpstack.Spec) (func(context.Context) error, error) {
 	plan, err := gcpbootstrap.BuildPlan(gcpbootstrap.Spec{
 		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
@@ -108,28 +146,33 @@ func acquireDeploymentLock(ctx context.Context, spec gcpstack.Spec) (func(contex
 	if err != nil {
 		return nil, err
 	}
-	manager, err := gcpstate.NewGCS(ctx, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment)
+	manager, err := newGCSState(ctx, plan.StateBucket, spec.Identity.Project, spec.Identity.Environment)
 	if err != nil {
-		// Experimental: when DIY state is not bootstrapped yet, allow deploy without lock.
-		return func(context.Context) error { return nil }, nil
+		return nil, fmt.Errorf("create GCS state lock: %w", err)
 	}
 	host, _ := os.Hostname()
 	owner := fmt.Sprintf("magelift-cli-%s-%d", host, os.Getpid())
 	handle, err := manager.Acquire(ctx, spec.Identity.Project, spec.Identity.Environment, owner)
 	if err != nil {
-		// Bucket missing (404) means bootstrap was never run; same experimental skip.
 		if isGCSNotFound(err) {
-			return func(context.Context) error { return nil }, nil
+			return nil, fmt.Errorf("%w: run magelift bootstrap --env %s: %w", ErrStateBucketMissing, spec.Identity.Environment, err)
 		}
 		return nil, err
 	}
-	return func(context.Context) error { return handle.Release() }, nil
+	return handle.Release, nil
 }
 
 func isGCSNotFound(err error) bool {
 	if err == nil {
 		return false
 	}
+	if errors.Is(err, storage.ErrBucketNotExist) || errors.Is(err, storage.ErrObjectNotExist) {
+		return true
+	}
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) && apiErr.Code == 404 {
+		return true
+	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "notfound") || strings.Contains(msg, "does not exist")
+	return strings.Contains(msg, "notfound") || strings.Contains(msg, "does not exist") || strings.Contains(msg, "doesn't exist")
 }

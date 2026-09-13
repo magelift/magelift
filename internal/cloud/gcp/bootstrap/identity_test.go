@@ -211,3 +211,32 @@ func TestBuildIdentityPlanRejectsWildcardRepo(t *testing.T) {
 		t.Fatal("wildcard repo was accepted")
 	}
 }
+
+func TestWaitWIFResourceRetriesIAMVisibility(t *testing.T) {
+	t.Parallel()
+	attempts := 0
+	pool, err := waitWIFResource(context.Background(), 0, func(_ context.Context, _ string) (WIFPool, error) {
+		attempts++
+		if attempts < 3 {
+			return WIFPool{}, ErrWIFNotFound
+		}
+		return WIFPool{Name: "visible"}, nil
+	}, "pool")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pool.Name != "visible" || attempts != 3 {
+		t.Fatalf("pool=%#v attempts=%d", pool, attempts)
+	}
+}
+
+func TestWaitWIFResourcePropagatesNonNotFound(t *testing.T) {
+	t.Parallel()
+	want := errors.New("permission denied")
+	_, err := waitWIFResource(context.Background(), 0, func(_ context.Context, _ string) (WIFPool, error) {
+		return WIFPool{}, want
+	}, "pool")
+	if !errors.Is(err, want) {
+		t.Fatalf("err=%v want=%v", err, want)
+	}
+}

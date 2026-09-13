@@ -63,7 +63,7 @@ func stateUnlockCommand(o *options) *cobra.Command {
 }
 
 func stateBackupCommand(o *options) *cobra.Command {
-	return &cobra.Command{Use: "backup", Short: "Create a versioned Pulumi state backup", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	return &cobra.Command{Use: "backup", Short: "Create a versioned stack-state backup", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		_, planned, err := o.planStack(false)
 		if err != nil {
 			return invalid(err)
@@ -96,7 +96,7 @@ func stateBackupCommand(o *options) *cobra.Command {
 }
 
 func stateRestoreCommand(o *options) *cobra.Command {
-	return &cobra.Command{Use: "restore <backup-id>", Short: "Restore Pulumi state from a versioned backup", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+	return &cobra.Command{Use: "restore <backup-id>", Short: "Restore stack state from a versioned backup", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		if !o.yes {
 			return invalid(errors.New("restoring deployment state requires --yes"))
 		}

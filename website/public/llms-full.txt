@@ -30,7 +30,7 @@ Users write `magelift.yaml` in an ACC / Upsun-familiar shape. Power users open e
 
 1. Install the CLI (`go install` until the first GitHub Release tag `v1.0.0-rc.1`; then prefer release archives with checksums and SBOM).
 2. Validate sample config (`examples/sample-shop`).
-3. Optional local Magento via `magelift dev` (Compose) without cloud credentials.
+3. Optional local Magento via `magelift local` (Compose) without cloud credentials.
 4. Bootstrap once, then `preview` / `deploy` / `destroy` on a certified target.
 5. Migrate from Adobe Commerce Cloud / Upsun: config import (`magelift init --from-acc` / `--from-upsun`), plus dump/media/DNS cutover docs.
 

@@ -51,6 +51,36 @@ func TestSignUsesDigestOnlyArgv(t *testing.T) {
 	}
 }
 
+func TestSignWithIdentityTokenPathUsesFileArgv(t *testing.T) {
+	runner := &recordingRunner{}
+	client := NewWithRunner(runner)
+	tokenPath := "/tmp/magelift-oidc.jwt"
+	if err := client.SignWithOptions(context.Background(), testReference, SignOptions{IdentityTokenPath: tokenPath}); err != nil {
+		t.Fatal(err)
+	}
+	command := runner.command(t)
+	want := []string{"sign", "--yes", "--identity-token", tokenPath, testReference}
+	if command.name != "cosign" || !reflect.DeepEqual(command.args, want) {
+		t.Fatalf("command = %#v", command)
+	}
+}
+
+func TestSignRejectsUnsafeIdentityTokenPath(t *testing.T) {
+	tests := []string{"-token.jwt", "token\n.jwt"}
+	for _, path := range tests {
+		t.Run(path, func(t *testing.T) {
+			runner := &recordingRunner{}
+			err := NewWithRunner(runner).SignWithOptions(context.Background(), testReference, SignOptions{IdentityTokenPath: path})
+			if !errors.Is(err, ErrInvalidBlobPath) {
+				t.Fatalf("error = %v", err)
+			}
+			if len(runner.commands) != 0 {
+				t.Fatal("cosign was executed")
+			}
+		})
+	}
+}
+
 func TestVerifyUsesExactIdentityPolicyArgv(t *testing.T) {
 	runner := &recordingRunner{}
 	client := NewWithRunner(runner)

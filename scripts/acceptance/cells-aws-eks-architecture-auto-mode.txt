@@ -1,0 +1,5 @@
+# Cold EKS architecture cell: Auto Mode. Use with a config whose
+# target.runtime is eks and target.aws.catalog.eks.computeMode is auto-mode.
+computeMode:auto-mode
+queueMode:database
+searchMode:disabled

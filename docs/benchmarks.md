@@ -17,7 +17,7 @@ magelift benchmark run \
   --database 'Aurora MySQL 3.12' \
   --search 'OpenSearch 3.x' \
   --queue 'RabbitMQ 4.2' \
-  --cache 'Valkey 8.x' \
+  --cache 'Valkey 9.x' \
   --output json > benchmark.json
 ```
 

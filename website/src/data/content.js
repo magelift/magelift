@@ -111,7 +111,7 @@ export const targets = {
   rows: [
     { target: 'AWS ECS Fargate', status: 'certified' },
     { target: 'GCP GKE Autopilot', status: 'certified' },
-    { target: 'AWS EKS · OVH MKS · Scaleway Kapsule', status: 'experimental' },
+    { target: 'AWS EKS · GCP GKE Standard · OVH MKS · Scaleway Kapsule', status: 'experimental' },
   ],
   links: [
     { label: 'Capability matrix', href: `${docsUrl}capability-matrix/` },
@@ -145,7 +145,7 @@ export const faqs = [
   },
   {
     q: 'Which clouds are certified for production?',
-    a: 'AWS ECS Fargate and GCP GKE Autopilot. AWS EKS, OVH MKS, and Scaleway Kapsule are experimental and not production-supported yet.',
+    a: 'AWS ECS Fargate and GCP GKE Autopilot. AWS EKS, GCP GKE Standard, OVH MKS, and Scaleway Kapsule are experimental and not production-supported yet.',
   },
   {
     q: 'Can I migrate from Adobe Commerce Cloud or Upsun?',

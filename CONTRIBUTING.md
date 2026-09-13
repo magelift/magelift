@@ -4,10 +4,12 @@ Thanks for helping. Open an issue before a large change.
 
 ## Agents
 
-First-party Agent Skills for Cursor, Claude Code, Codex, and similar tools live
-under [`agents/`](agents/README.md) (`agents/skills/*/SKILL.md`). Symlink them
-into your local `.cursor/skills` or `.claude/skills` (those dirs stay
-gitignored). Do not commit personal agent caches or third-party skill packs.
+Root [`AGENTS.md`](AGENTS.md) is the always-on agent guide. Contributor skills
+live under [`contrib/skills/`](contrib/skills/). User skills live under
+[`agents/`](agents/README.md) and are the only skills embedded in release
+binaries. Symlink contributor skills into your local `.cursor/skills` or
+`.claude/skills` when useful; those dirs stay gitignored. Do not commit
+personal agent caches or third-party skill packs.
 
 ## 30-minute first PR
 
@@ -46,8 +48,8 @@ global install needed for these):
 
 Optional / situational:
 
-- **Docker**, only for Floci, image builds, and local Compose (`make floci-test`,
-  `magelift dev`, image targets). Not required for default `make verify`.
+- **Docker**, only for Floci, image builds, and local Compose (`make floci-test-aws`,
+  `make floci-gcp-test`, `make local-gates`, `magelift local`, image targets). Not required for default `make verify`.
 - **AWS or GCP credentials**, only for real-cloud acceptance targets
   (`make aws-acceptance-local`, `make gcp-acceptance-local`).
 
@@ -57,15 +59,16 @@ Layout:
 - `internal/`: CLI, config, deploy, automation, `platform`, `cloud/<provider>`
 - `sdk/v1/`: portable Target / Capability / Hook types
 - `build/`: Composer Magento package (not the Go build tree)
-- `images/`: PHP runtime and FrankenPHP
+- `images/`: PHP-FPM + nginx runtime (FrankenPHP classic remains in-tree for provenance; schema rejects it as `application.webRuntime`)
 - `schema/`: generated JSON Schema for `magelift.yaml`
-- `docs/`: MkDocs; ADRs in `docs/adr/`
+- `docs/`: MkDocs; ADRs in `docs/adr/`; short evidence pack in `docs/evidence/`
+- `.agents/knowledge/`: agent OKF bundle (tracked; other `.agents/` caches are not)
 - `tests/`: Floci and fixtures ([tests/README.md](tests/README.md))
 
 ## Principles
 
 - Keep the normal user path YAML-only.
-- Prefer per-provider adapters over shared cloud graphs (ADR 0002, 0008).
+- Prefer per-provider adapters over shared cloud graphs (ADR 0003, 0004).
 - Keep config and deploy behavior deterministic.
 - Do not copy private or employer-owned source, docs, IDs, or secrets.
 - Record design inputs in `docs/provenance.md`; keep third-party notices.
@@ -88,9 +91,12 @@ otherwise.
 | Goal | Command |
 | --- | --- |
 | Default local gate | `make verify` |
-| Account-free AWS paths | `make floci-test` |
-| Real AWS (destroy on exit) | `make aws-acceptance-local`; read `docs/aws-acceptance.md` |
-| Real GCP (certified path; destroy on exit) | `make gcp-acceptance-local`; read `docs/gcp-acceptance.md` |
+| Account-free stack (mocks + harness + Floci) | `make local-gates` |
+| Pulumi mock graphs | `make pulumi-mock-test` |
+| Account-free AWS paths | `make floci-test-aws` |
+| Account-free GCP paths | `make floci-gcp-test` |
+| Real AWS (destroy on exit; light smoke) | `make aws-acceptance-local`; read `docs/aws-acceptance.md` |
+| Real GCP (thorough certified path; destroy on exit) | `make gcp-acceptance-local`; read `docs/gcp-acceptance.md` |
 
 ### Local verification vs hosted CI
 
@@ -109,8 +115,8 @@ More detail: [tests/README.md](tests/README.md).
 
 CLI planning and Pulumi programs go through `platform.ModuleRegistry`
 (`RegisterModule`). `internal/infra.Registry` alone does not wire deploy.
-Checklist: [docs/adding-a-provider.md](docs/adding-a-provider.md). Rules: ADR 0004,
-0007, 0008.
+Checklist: [docs/adding-a-provider.md](docs/adding-a-provider.md). Rules: ADR 0003,
+0004, 0008.
 
 ## Architecture decisions
 

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/magelift/magelift/internal/cloud/aws/network"
+	"github.com/magelift/magelift/internal/platform"
 	sdk "github.com/magelift/magelift/sdk/v1"
 )
 
@@ -29,14 +31,16 @@ var (
 )
 
 type Spec struct {
-	Identity     Identity
-	Application  Application
-	Artifact     Artifact
-	Lifecycle    Lifecycle
-	Existing     ExistingResources
-	Dependencies Dependencies
-	Policy       NetworkPolicy
-	Catalog      CatalogSelection
+	Identity      Identity
+	Application   Application
+	Artifact      Artifact
+	Lifecycle     Lifecycle
+	Existing      ExistingResources
+	Dependencies  Dependencies
+	Policy        NetworkPolicy
+	Catalog       CatalogSelection
+	Edge          sdk.EdgeIntent
+	Observability sdk.ObservabilityIntent
 }
 
 type Identity struct {
@@ -54,6 +58,7 @@ type Application struct {
 	Version    string
 	Mode       string
 	WebRuntime string
+	Magento    platform.MagentoOverlays
 }
 
 type Artifact struct {
@@ -98,6 +103,7 @@ const (
 
 	DatabaseEngineAuroraMySQL = "aurora-mysql"
 	DatabaseEngineRDSMySQL    = "rds-mysql"
+	DatabaseEngineRDSMariaDB  = "rds-mariadb"
 
 	SearchModeServerless  = "serverless"
 	SearchModeProvisioned = "provisioned"
@@ -109,28 +115,44 @@ const (
 	QueueModeECSArtemis  = "ecs-artemis"
 )
 
+func defaultQueueMode(preset sdk.PresetID) string {
+	if preset == sdk.PresetPreview {
+		return QueueModeDB
+	}
+	return QueueModeECSRabbitMQ
+}
+
 type NetworkPolicy struct {
-	VPCCIDR           netip.Prefix
-	AvailabilityZones []string
-	MediaDomain       string
-	ApplicationDomain string
-	NatMode           string
+	VPCCIDR            netip.Prefix
+	AvailabilityZones  []string
+	MediaDomain        string
+	ApplicationDomain  string
+	NatMode            string
+	NatTopology        string
+	NatReplacementMode string
+	NatInstanceType    string
 }
 
 type CatalogSelection struct {
-	Version           string
-	DatabaseEngine    string
-	SearchMode        string
-	QueueMode         string
-	Aurora            AuroraPreviewProfile
-	Valkey            ValkeyPreviewProfile
-	Search            SearchPreviewProfile
-	Fargate           FargatePreviewProfile
-	Retention         RetentionProfile
-	Versions          ServiceVersions
-	AuroraProvisioned AuroraProvisionedProfile
-	SearchProvisioned SearchProvisionedProfile
-	RabbitMQ          RabbitMQProfile
+	Version                        string
+	DatabaseEngine                 string
+	SearchMode                     string
+	QueueMode                      string
+	DatabaseBackupWindow           string
+	DatabaseMaintenanceWindow      string
+	DatabaseDeletionProtection     *bool
+	DatabaseDeleteAutomatedBackups *bool
+	CacheSnapshotRetentionLimit    *int
+	CacheSnapshotWindow            string
+	Aurora                         AuroraPreviewProfile
+	Valkey                         ValkeyPreviewProfile
+	Search                         SearchPreviewProfile
+	Fargate                        FargatePreviewProfile
+	Retention                      RetentionProfile
+	Versions                       ServiceVersions
+	AuroraProvisioned              AuroraProvisionedProfile
+	SearchProvisioned              SearchProvisionedProfile
+	RabbitMQ                       RabbitMQProfile
 }
 
 type AuroraPreviewProfile struct {
@@ -152,9 +174,14 @@ type SearchPreviewProfile struct {
 }
 
 type FargatePreviewProfile struct {
+	ComputeMode  string
 	CPU          int
 	MemoryMiB    int
 	DesiredCount int
+	InstanceType string
+	InstanceAMI  string
+	MinCapacity  int
+	MaxCapacity  int
 }
 
 type AuroraProvisionedProfile struct {
@@ -184,6 +211,7 @@ type RetentionProfile struct {
 type ServiceVersions struct {
 	AuroraMySQL string
 	MySQL       string
+	MariaDB     string
 	Valkey      string
 	OpenSearch  string
 	RabbitMQ    string
@@ -202,8 +230,11 @@ func (s Spec) ValidateAllowExpiredPreview() error {
 
 func (s Spec) validate(allowExpiredPreview bool) error {
 	var problems []error
-	problems = append(problems, s.Identity.validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Lifecycle.validate(s.Identity.Preset, allowExpiredPreview), s.Existing.validate(), s.Dependencies.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset))
+	problems = append(problems, s.Identity.validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Lifecycle.validate(s.Identity.Preset, allowExpiredPreview), s.Existing.validate(s.Edge), s.Dependencies.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset), sdk.ValidateEdgeIntent(s.Edge), sdk.ValidateObservabilityIntent(s.Observability))
 	if s.Existing.Network != nil {
+		if s.Policy.NatMode == NatModeFckNat || strings.TrimSpace(s.Policy.NatTopology) != "" || strings.TrimSpace(s.Policy.NatReplacementMode) != "" || strings.TrimSpace(s.Policy.NatInstanceType) != "" {
+			problems = append(problems, errors.New("existing network owns egress; fck-nat and NAT topology/replacement settings cannot be selected"))
+		}
 		for _, group := range []struct {
 			name   string
 			values []string
@@ -251,7 +282,7 @@ func (a Application) validate() error {
 	if a.Mode != "integrated" && a.Mode != "headless" {
 		problems = append(problems, fmt.Errorf("unsupported application mode %q", a.Mode))
 	}
-	if a.WebRuntime != "nginx-fpm" && a.WebRuntime != "frankenphp-classic" {
+	if a.WebRuntime != "" && a.WebRuntime != "nginx-fpm" && a.WebRuntime != "frankenphp-classic" && a.WebRuntime != "php-apache" {
 		problems = append(problems, fmt.Errorf("unsupported web runtime %q", a.WebRuntime))
 	}
 	return errors.Join(problems...)
@@ -280,11 +311,7 @@ func awsCapabilities(preset sdk.PresetID, queueMode string) []sdk.CapabilityID {
 	}
 	mode := queueMode
 	if mode == "" {
-		if preset == sdk.PresetPreview {
-			mode = QueueModeDB
-		} else {
-			mode = QueueModeAmazonMQ
-		}
+		mode = defaultQueueMode(preset)
 	}
 	if mode == QueueModeDB {
 		return append(capabilities, sdk.CapabilityQueueDatabase)
@@ -306,7 +333,7 @@ func (l Lifecycle) validate(preset sdk.PresetID, allowExpiredPreview bool) error
 	return errors.Join(problems...)
 }
 
-func (e ExistingResources) validate() error {
+func (e ExistingResources) validate(edgeIntent sdk.EdgeIntent) error {
 	var problems []error
 	if e.Network != nil {
 		if e.Network.Provider != "aws" || e.Network.Kind != sdk.ExistingNetwork {
@@ -342,13 +369,17 @@ func (e ExistingResources) validate() error {
 	} else if e.DatabaseSecretARN != "" || e.DatabaseEndpoint != "" {
 		problems = append(problems, errors.New("existing database secretArn and endpoint require an existing database reference"))
 	}
-	if e.HostedZone == nil || e.HostedZone.Provider != "aws" || e.HostedZone.Kind != sdk.ExistingDNSZone {
-		problems = append(problems, errors.New("stack requires an explicit AWS hosted-zone reference"))
-	} else if err := sdk.ValidateExistingResourceRef(*e.HostedZone); err != nil {
-		problems = append(problems, err)
+	if nativeEdgeEnabled(edgeIntent) {
+		if e.HostedZone == nil || e.HostedZone.Provider != "aws" || e.HostedZone.Kind != sdk.ExistingDNSZone {
+			problems = append(problems, errors.New("native AWS edge requires an explicit hosted-zone reference"))
+		} else if err := sdk.ValidateExistingResourceRef(*e.HostedZone); err != nil {
+			problems = append(problems, err)
+		}
+	} else if e.HostedZone != nil {
+		problems = append(problems, errors.New("CloudFront hosted-zone references require native AWS edge mode"))
 	}
 	if e.Certificate == nil || e.Certificate.Provider != "aws" || e.Certificate.Kind != sdk.ExistingCertificate || !certificate.MatchString(e.Certificate.ExternalID) {
-		problems = append(problems, errors.New("stack requires an explicit ACM certificate ARN"))
+		problems = append(problems, errors.New("stack requires an explicit ACM certificate ARN for media delivery"))
 	} else if err := sdk.ValidateExistingResourceRef(*e.Certificate); err != nil {
 		problems = append(problems, err)
 	}
@@ -361,6 +392,17 @@ func (e ExistingResources) validate() error {
 		problems = append(problems, errors.New("stack notification topic must be an ARN"))
 	}
 	return errors.Join(problems...)
+}
+
+// nativeEdgeEnabled is strict for planned intents and preserves the zero-value
+// behavior of an internal Spec used directly by Pulumi unit tests. Config
+// planners always populate an explicit mode.
+func nativeEdgeEnabled(intent sdk.EdgeIntent) bool {
+	mode := strings.TrimSpace(intent.Mode)
+	if mode == "" {
+		return strings.TrimSpace(intent.ExternalProvider) == "" || strings.TrimSpace(intent.NativeProvider) != ""
+	}
+	return mode == "native" || mode == "both"
 }
 
 func validateSubnetIDs(name string, values []string) error {
@@ -404,11 +446,7 @@ func (d Dependencies) validate(preset sdk.PresetID, queueMode string) error {
 	}
 	mode := queueMode
 	if mode == "" {
-		if preset == sdk.PresetPreview {
-			mode = QueueModeDB
-		} else {
-			mode = QueueModeAmazonMQ
-		}
+		mode = defaultQueueMode(preset)
 	}
 	if mode != QueueModeDB && !secretARN.MatchString(d.QueueSecretARN) {
 		problems = append(problems, errors.New("broker queue modes require a RabbitMQ password Secrets Manager ARN"))
@@ -425,7 +463,7 @@ func (p NetworkPolicy) validate(preset sdk.PresetID) error {
 		problems = append(problems, errors.New("stack VPC CIDR must be a canonical IPv4 prefix of /24 or larger"))
 	}
 	wantZones := map[sdk.PresetID]int{sdk.PresetPreview: 2, sdk.PresetStandard: 2, sdk.PresetHighAvailability: 3}[preset]
-	if preset == sdk.PresetStandard && len(p.AvailabilityZones) == 3 {
+	if (preset == sdk.PresetPreview || preset == sdk.PresetStandard) && len(p.AvailabilityZones) == 3 {
 		wantZones = 3
 	}
 	if len(p.AvailabilityZones) != wantZones {
@@ -447,6 +485,20 @@ func (p NetworkPolicy) validate(preset sdk.PresetID) error {
 	if p.NatMode != NatModeGateway && p.NatMode != NatModeFckNat {
 		problems = append(problems, errors.New("natMode must be nat-gateway or fck-nat"))
 	}
+	if p.NatTopology != "" && p.NatTopology != network.NatTopologySingleAZ && p.NatTopology != network.NatTopologyMultiAZ {
+		problems = append(problems, errors.New("natTopology must be single-az or multi-az"))
+	}
+	natTopology := network.ResolveNatTopology(p.NatTopology, preset)
+	natReplacementMode := network.ResolveNatReplacementMode(p.NatReplacementMode, preset, p.NatMode, natTopology)
+	if natReplacementMode != network.NatReplacementNone && natReplacementMode != network.NatReplacementAutoScaling {
+		problems = append(problems, errors.New("natReplacementMode must be none or auto-scaling"))
+	}
+	if p.NatMode == NatModeGateway && natReplacementMode != network.NatReplacementNone {
+		problems = append(problems, errors.New("natReplacementMode is only supported with fck-nat"))
+	}
+	if p.NatMode == NatModeFckNat && preset == sdk.PresetHighAvailability && (natTopology != network.NatTopologyMultiAZ || natReplacementMode != network.NatReplacementAutoScaling) {
+		problems = append(problems, errors.New("high-availability fck-nat requires multi-az topology with auto-scaling replacement"))
+	}
 	return errors.Join(problems...)
 }
 
@@ -455,8 +507,8 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 	if strings.TrimSpace(c.Version) == "" {
 		problems = append(problems, errors.New("benchmark catalog version is required"))
 	}
-	if c.DatabaseEngine != DatabaseEngineAuroraMySQL && c.DatabaseEngine != DatabaseEngineRDSMySQL {
-		problems = append(problems, errors.New("databaseEngine must be aurora-mysql or rds-mysql"))
+	if c.DatabaseEngine != DatabaseEngineAuroraMySQL && c.DatabaseEngine != DatabaseEngineRDSMySQL && c.DatabaseEngine != DatabaseEngineRDSMariaDB {
+		problems = append(problems, errors.New("databaseEngine must be aurora-mysql, rds-mysql, or rds-mariadb"))
 	}
 	if c.SearchMode != SearchModeServerless && c.SearchMode != SearchModeProvisioned && c.SearchMode != SearchModeDisabled {
 		problems = append(problems, errors.New("searchMode must be serverless, provisioned, or disabled"))
@@ -464,23 +516,23 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 	if c.QueueMode != "" && c.QueueMode != QueueModeDB && c.QueueMode != QueueModeAmazonMQ && c.QueueMode != QueueModeECSRabbitMQ && c.QueueMode != QueueModeECSArtemis {
 		problems = append(problems, errors.New("queueMode must be db, amazon-mq, ecs-rabbitmq, or ecs-artemis"))
 	}
-	if c.DatabaseEngine == DatabaseEngineRDSMySQL && preset != sdk.PresetPreview {
-		problems = append(problems, errors.New("rds-mysql is only supported for the preview preset"))
+	if (c.DatabaseEngine == DatabaseEngineRDSMySQL || c.DatabaseEngine == DatabaseEngineRDSMariaDB) && preset != sdk.PresetPreview {
+		problems = append(problems, errors.New("RDS database engines are only supported for the preview preset"))
 	}
 	if c.SearchMode == SearchModeDisabled && preset != sdk.PresetPreview {
 		problems = append(problems, errors.New("searchMode disabled is only supported for the preview preset"))
-	}
-	if c.SearchMode == SearchModeServerless && preset != sdk.PresetPreview {
-		problems = append(problems, errors.New("searchMode serverless is only supported for the preview preset"))
-	}
-	if c.SearchMode == SearchModeProvisioned && preset == sdk.PresetPreview {
-		problems = append(problems, errors.New("searchMode provisioned is not supported for the preview preset"))
 	}
 	if strings.TrimSpace(c.Valkey.NodeType) == "" || c.Valkey.ReplicaCount < 0 {
 		problems = append(problems, errors.New("Valkey capacity is incomplete"))
 	}
 	if c.Fargate.CPU <= 0 || c.Fargate.MemoryMiB <= 0 || c.Fargate.DesiredCount <= 0 {
 		problems = append(problems, errors.New("Fargate capacity is incomplete"))
+	}
+	if mode := strings.TrimSpace(c.Fargate.ComputeMode); mode != "" && mode != "fargate" && mode != "fargate-spot" && mode != "ec2-asg" && mode != "managed-instances" {
+		problems = append(problems, fmt.Errorf("ECS compute mode %q is unsupported", mode))
+	}
+	if c.Fargate.MinCapacity < 0 || c.Fargate.MaxCapacity < 0 || (c.Fargate.MaxCapacity > 0 && c.Fargate.MinCapacity > c.Fargate.MaxCapacity) {
+		problems = append(problems, errors.New("ECS host capacity bounds are invalid"))
 	}
 	minimumTasks := map[sdk.PresetID]int{sdk.PresetPreview: 1, sdk.PresetStandard: 2, sdk.PresetHighAvailability: 3}[preset]
 	if c.Fargate.DesiredCount < minimumTasks {
@@ -498,6 +550,13 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 		}
 		if strings.TrimSpace(c.AuroraProvisioned.InstanceClass) == "" {
 			problems = append(problems, errors.New("rds-mysql requires an explicit instance class"))
+		}
+	} else if c.DatabaseEngine == DatabaseEngineRDSMariaDB {
+		if !version.MatchString(c.Versions.MariaDB) {
+			problems = append(problems, errors.New("rds-mariadb requires an explicit MariaDB engine version"))
+		}
+		if strings.TrimSpace(c.AuroraProvisioned.InstanceClass) == "" {
+			problems = append(problems, errors.New("rds-mariadb requires an explicit instance class"))
 		}
 	} else if !auroraVersion.MatchString(c.Versions.AuroraMySQL) {
 		problems = append(problems, errors.New("aurora-mysql requires an explicit Aurora MySQL engine version"))
@@ -527,14 +586,9 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 		if strings.TrimSpace(c.AuroraProvisioned.InstanceClass) == "" || c.AuroraProvisioned.InstanceCount < minimumInstances {
 			problems = append(problems, fmt.Errorf("preset %q requires at least %d Aurora instances", preset, minimumInstances))
 		}
-		if c.SearchMode == SearchModeProvisioned {
-			if strings.TrimSpace(c.SearchProvisioned.InstanceType) == "" || c.SearchProvisioned.InstanceCount < 2 || strings.TrimSpace(c.SearchProvisioned.EBSVolumeType) == "" || c.SearchProvisioned.EBSVolumeSizeGiB <= 0 {
-				problems = append(problems, errors.New("non-preview catalog requires explicit OpenSearch capacity"))
-			}
-		}
 		queueMode := c.QueueMode
 		if queueMode == "" {
-			queueMode = QueueModeAmazonMQ
+			queueMode = defaultQueueMode(preset)
 		}
 		if queueMode == QueueModeAmazonMQ && strings.TrimSpace(c.RabbitMQ.InstanceType) == "" {
 			problems = append(problems, errors.New("amazon-mq queueMode requires an explicit RabbitMQ instance type"))
@@ -543,7 +597,24 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 			problems = append(problems, errors.New("standard Valkey catalog profile requires at least one replica"))
 		}
 	}
-	if preset == sdk.PresetHighAvailability && (c.SearchProvisioned.InstanceCount%3 != 0 || strings.TrimSpace(c.SearchProvisioned.DedicatedMasterType) == "" || c.SearchProvisioned.DedicatedMasterCount != 3 || c.Valkey.ReplicaCount < 2) {
+	if c.SearchMode == SearchModeProvisioned {
+		minimumSearchNodes := 1
+		if preset == sdk.PresetStandard {
+			minimumSearchNodes = 2
+		}
+		if preset == sdk.PresetHighAvailability {
+			minimumSearchNodes = 3
+		}
+		if strings.TrimSpace(c.SearchProvisioned.InstanceType) == "" || c.SearchProvisioned.InstanceCount < minimumSearchNodes || strings.TrimSpace(c.SearchProvisioned.EBSVolumeType) == "" || c.SearchProvisioned.EBSVolumeSizeGiB <= 0 {
+			problems = append(problems, errors.New("provisioned search requires explicit OpenSearch capacity"))
+		}
+	}
+	if c.SearchMode == SearchModeServerless && preset != sdk.PresetPreview {
+		if c.Search.MaximumIndexingOCU <= 0 || c.Search.MaximumSearchOCU <= 0 {
+			problems = append(problems, errors.New("OpenSearch serverless capacity must be bounded"))
+		}
+	}
+	if preset == sdk.PresetHighAvailability && (c.Valkey.ReplicaCount < 2 || (c.SearchMode == SearchModeProvisioned && (c.SearchProvisioned.InstanceCount%3 != 0 || strings.TrimSpace(c.SearchProvisioned.DedicatedMasterType) == "" || c.SearchProvisioned.DedicatedMasterCount != 3))) {
 		problems = append(problems, errors.New("high-availability catalog requires at least two Valkey replicas, OpenSearch multiples of three, and three dedicated masters"))
 	}
 	return errors.Join(problems...)

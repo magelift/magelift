@@ -49,6 +49,34 @@ type Result struct {
 	KeyARN string `json:"keyArn" yaml:"keyArn"`
 }
 
+func StateBucketName(project, environment, accountID, region string) (string, error) {
+	if !componentPattern.MatchString(project) {
+		return "", errors.New("bootstrap project must be a lowercase stable name")
+	}
+	if !componentPattern.MatchString(environment) {
+		return "", errors.New("bootstrap environment must be a lowercase stable name")
+	}
+	if !accountPattern.MatchString(accountID) {
+		return "", errors.New("bootstrap account ID must contain 12 digits")
+	}
+	if !regionPattern.MatchString(region) {
+		return "", errors.New("bootstrap region is invalid")
+	}
+	bucket := strings.Join([]string{"magelift", accountID, region, project, environment, "state"}, "-")
+	if len(bucket) > 63 {
+		return "", errors.New("generated state bucket name exceeds 63 characters")
+	}
+	return bucket, nil
+}
+
+func StateBackendURL(project, environment, accountID, region string) (string, error) {
+	bucket, err := StateBucketName(project, environment, accountID, region)
+	if err != nil {
+		return "", err
+	}
+	return "s3://" + bucket, nil
+}
+
 func BuildPlan(spec Spec) (Plan, error) {
 	if !componentPattern.MatchString(spec.Project) {
 		return Plan{}, errors.New("bootstrap project must be a lowercase stable name")
@@ -65,9 +93,9 @@ func BuildPlan(spec Spec) (Plan, error) {
 	if !bucketPattern.MatchString(spec.AccessLogBucket) {
 		return Plan{}, errors.New("bootstrap access log bucket is invalid")
 	}
-	bucket := strings.Join([]string{"magelift", spec.AccountID, spec.Region, spec.Project, spec.Environment, "state"}, "-")
-	if len(bucket) > 63 {
-		return Plan{}, errors.New("generated state bucket name exceeds 63 characters")
+	bucket, err := StateBucketName(spec.Project, spec.Environment, spec.AccountID, spec.Region)
+	if err != nil {
+		return Plan{}, err
 	}
 	bootstrapID := spec.AccountID + ":" + spec.Region + ":" + spec.Project + ":" + spec.Environment
 	return Plan{

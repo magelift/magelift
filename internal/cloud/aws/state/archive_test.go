@@ -1,9 +1,12 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/url"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -28,6 +31,7 @@ func (f *fakeArchiveS3) ListObjectsV2(_ context.Context, input *s3.ListObjectsV2
 			keys = append(keys, key)
 		}
 	}
+	sort.Strings(keys)
 	return &s3.ListObjectsV2Output{Contents: func() []s3types.Object {
 		objects := make([]s3types.Object, 0, len(keys))
 		for _, key := range keys {
@@ -35,6 +39,14 @@ func (f *fakeArchiveS3) ListObjectsV2(_ context.Context, input *s3.ListObjectsV2
 		}
 		return objects
 	}()}, nil
+}
+
+func (f *fakeArchiveS3) GetObject(_ context.Context, input *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	body, ok := f.objects[awssdk.ToString(input.Key)]
+	if !ok {
+		return nil, errors.New("object not found")
+	}
+	return &s3.GetObjectOutput{Body: io.NopCloser(bytes.NewBufferString(body))}, nil
 }
 
 func (f *fakeArchiveS3) CopyObject(_ context.Context, input *s3.CopyObjectInput, _ ...func(*s3.Options)) (*s3.CopyObjectOutput, error) {
@@ -60,7 +72,11 @@ func (f *fakeArchiveS3) CopyObject(_ context.Context, input *s3.CopyObjectInput,
 
 func (f *fakeArchiveS3) PutObject(_ context.Context, input *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 	f.lastPut = input
-	f.objects[awssdk.ToString(input.Key)] = ""
+	body, err := io.ReadAll(input.Body)
+	if err != nil {
+		return nil, err
+	}
+	f.objects[awssdk.ToString(input.Key)] = string(body)
 	return &s3.PutObjectOutput{}, nil
 }
 
@@ -165,9 +181,9 @@ func TestArchiveRestoreCopiesBeforeDeletingStaleObjects(t *testing.T) {
 
 func TestArchiveFailedBackupCannotBeRestored(t *testing.T) {
 	fake := &fakeArchiveS3{objects: map[string]string{
-		"stacks/shop.json": "state",
-		"stacks/next.json": "next",
-	}, failCopyFrom: "stacks/next.json"}
+		"stacks/00-shop.json": "state",
+		"stacks/01-next.json": "next",
+	}, failCopyFrom: "stacks/01-next.json"}
 	archive, err := NewArchiveFromClient(fake, "state-bucket", ObjectEncryption{Mode: EncryptionKMS, KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000"})
 	if err != nil {
 		t.Fatal(err)

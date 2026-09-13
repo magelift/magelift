@@ -15,15 +15,24 @@ func TestDoctorChecksBuildAndEveryEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	cmd := newCommand(&out, &out, nil)
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath, o.output = path, "json"
+	o.dependencyRunner = &fakeDependencyRunner{}
+	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	for _, evidence := range []string{`"id": "build"`, `"id": "environment.staging"`, `"status": "ok"`} {
+	for _, evidence := range []string{`"id": "build"`, `"id": "environment.staging"`, `"id": "local.edge"`, `"status": "ok"`, `"next": "magelift bootstrap --env staging"`, `CloudFront, Cloud Armor, and Fastly are cloud-only`} {
 		if !strings.Contains(out.String(), evidence) {
 			t.Fatalf("doctor output missing %s: %s", evidence, out.String())
 		}
+	}
+	if strings.Contains(out.String(), `"id": "runtime.observe"`) || strings.Contains(out.String(), `"mode": "runtime"`) {
+		t.Fatalf("doctor queried cloud runtime health: %s", out.String())
+	}
+	if strings.Contains(out.String(), "pulumi up") {
+		t.Fatalf("doctor next-step documented pulumi up: %s", out.String())
 	}
 }
 
@@ -35,7 +44,10 @@ func TestDoctorPrintsFailedChecksAndUsesStableExitCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	cmd := newCommand(&out, &out, nil)
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath, o.output = path, "json"
+	o.dependencyRunner = &fakeDependencyRunner{}
+	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
 	err := cmd.Execute()
 	if err == nil || ExitCode(err) != doctorExitUnhealthy {

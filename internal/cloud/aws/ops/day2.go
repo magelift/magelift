@@ -13,6 +13,7 @@ import (
 	awsstack "github.com/magelift/magelift/internal/cloud/aws/stack"
 	awsstate "github.com/magelift/magelift/internal/cloud/aws/state"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/usererr"
 )
 
 func (Module) Bootstrap() platform.Bootstrap           { return Bootstrap{} }
@@ -32,10 +33,15 @@ func (Bootstrap) VerifyAccount(ctx context.Context, planned platform.PlannedStac
 
 func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, req platform.BootstrapRequest) (platform.BootstrapResult, error) {
 	if strings.TrimSpace(req.AccessLogBucket) == "" {
-		return platform.BootstrapResult{}, fmt.Errorf("--access-log-bucket is required")
+		return platform.BootstrapResult{}, usererr.New(
+			"AWS bootstrap needs an existing log bucket",
+			"magelift bootstrap --env "+planned.Environment()+" --access-log-bucket <existing-bucket>",
+			"docs/getting-started.md",
+		)
 	}
-	if strings.TrimSpace(req.GitHubOwner) == "" || strings.TrimSpace(req.GitHubRepo) == "" {
-		return platform.BootstrapResult{}, fmt.Errorf("--github-owner and --github-repo are required")
+	owner, repo, wantGitHub, err := req.GitHubIdentity()
+	if err != nil {
+		return platform.BootstrapResult{}, err
 	}
 	awsPlanned, ok := awsstack.AsAWSPlanned(planned)
 	if !ok {
@@ -58,29 +64,30 @@ func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, req 
 	if err != nil {
 		return platform.BootstrapResult{}, err
 	}
-	identityPlan, err := awsbootstrap.BuildIdentityPlan(awsbootstrap.IdentitySpec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
-		AccountID: spec.Identity.AccountID, Region: spec.Identity.Region,
-		GitHubOwner: req.GitHubOwner, GitHubRepo: req.GitHubRepo,
-		StateBucket: result.Plan.StateBucket, KMSKeyARN: result.KeyARN,
-	})
-	if err != nil {
-		return platform.BootstrapResult{}, err
-	}
-	identity, err := awsbootstrap.NewAWSIdentity(ctx, spec.Identity.Region)
-	if err != nil {
-		return platform.BootstrapResult{}, err
-	}
-	if err := identity.Ensure(ctx, identityPlan); err != nil {
-		return platform.BootstrapResult{}, err
+	details := map[string]any{"state": result}
+	if wantGitHub {
+		identityPlan, err := awsbootstrap.BuildIdentityPlan(awsbootstrap.IdentitySpec{
+			Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+			AccountID: spec.Identity.AccountID, Region: spec.Identity.Region,
+			GitHubOwner: owner, GitHubRepo: repo,
+			StateBucket: result.Plan.StateBucket, KMSKeyARN: result.KeyARN,
+		})
+		if err != nil {
+			return platform.BootstrapResult{}, err
+		}
+		identity, err := awsbootstrap.NewAWSIdentity(ctx, spec.Identity.Region)
+		if err != nil {
+			return platform.BootstrapResult{}, err
+		}
+		if err := identity.Ensure(ctx, identityPlan); err != nil {
+			return platform.BootstrapResult{}, err
+		}
+		details["identity"] = identityPlan
 	}
 	return platform.BootstrapResult{
 		BackendURL: "s3://" + result.Plan.StateBucket,
 		KeyRef:     result.KeyARN,
-		Details: map[string]any{
-			"state":    result,
-			"identity": identityPlan,
-		},
+		Details:    details,
 	}, nil
 }
 
@@ -140,7 +147,7 @@ func (State) Backup(ctx context.Context, planned platform.PlannedStack) (platfor
 	if err != nil {
 		return platform.BackupResult{}, err
 	}
-	return platform.BackupResult{ID: result.ID, Location: result.Prefix}, nil
+	return platform.BackupResult{ID: result.ID, Location: result.Prefix, Objects: result.Objects, Bytes: result.Bytes, ManifestDigest: result.ManifestDigest}, nil
 }
 
 func (State) Restore(ctx context.Context, planned platform.PlannedStack, location string) (platform.RestoreResult, error) {
@@ -152,7 +159,7 @@ func (State) Restore(ctx context.Context, planned platform.PlannedStack, locatio
 	if err != nil {
 		return platform.RestoreResult{}, err
 	}
-	return platform.RestoreResult{ID: result.ID, Location: result.Prefix}, nil
+	return platform.RestoreResult{ID: result.ID, Location: result.Prefix, Objects: result.Objects, Bytes: result.Bytes, ManifestDigest: result.ManifestDigest}, nil
 }
 
 // Secrets implements platform.Secrets for AWS Secrets Manager.
@@ -213,7 +220,14 @@ func (Observe) TailLogs(ctx context.Context, planned platform.PlannedStack, quer
 	}
 	out := make([]platform.LogEvent, 0, len(events))
 	for _, event := range events {
-		out = append(out, platform.LogEvent{Timestamp: event.Timestamp, Message: event.Message})
+		out = append(out, platform.LogEvent{
+			Timestamp:  event.Timestamp,
+			Message:    platform.RedactLogMessage(event.Message),
+			Workload:   workload,
+			Source:     event.LogStream,
+			IngestedAt: event.IngestedAt,
+			EventID:    event.EventID,
+		})
 	}
 	return out, nil
 }
@@ -303,13 +317,30 @@ func (Observe) PrepareExec(ctx context.Context, planned platform.PlannedStack, o
 		"--cluster", cluster,
 		"--task", task.ARN,
 		"--container", container,
-		"--command", strings.Join(command, " "),
+		"--command", shellJoin(command),
 		"--interactive",
 	}
 	return platform.ExecTarget{
 		Launcher: "aws", Args: args,
 		Cluster: cluster, Task: task.ARN, Container: container,
 	}, nil
+}
+
+func shellJoin(args []string) string {
+	quoted := make([]string, 0, len(args))
+	for _, arg := range args {
+		quoted = append(quoted, shellQuote(arg))
+	}
+	return strings.Join(quoted, " ")
+}
+
+const shellUnsafeChars = " \t\r\n'\"\\$;&|<>()[\\]{}*?!~"
+
+func shellQuote(value string) string {
+	if value != "" && !strings.ContainsAny(value, shellUnsafeChars+"\x60") {
+		return value
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 func accountID(planned platform.PlannedStack) string {
