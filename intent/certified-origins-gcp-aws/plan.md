@@ -84,6 +84,16 @@ assert_clean outputs.
   Session CLI pre-built at `/tmp/magelift-gcp-mldp3/magelift`.
 - `.8`/`.9`/`.10` tags stay until `.11` goes green and its
   triple is consumed, then delete all four per box 1.3.
+- Update 2 (devbox, ~15:30Z): `.11` cancelled for speed;
+  slim dialproof config in `5c13afe` (linux/amd64, ~15 min).
+  `.12` GREEN after two infra flakes (cosign 504, Go proxy
+  read); triple installed beside
+  `/tmp/magelift-gcp-mldp3/magelift` (`mode: subprocess`,
+  digest matches lock). Dead tags `.8`/`.9`/`.10`/`.11`
+  deleted (releases plus tags); `.12` stays until the
+  preview run consumes it. Preview `up` launched as `mldp3`
+  (fresh DIR); log shows `using subprocess provider
+  magelift-provider-gcp v0.0.0-dialproof.12`.
 - Names `mldp`, `mldp2` are spent (WIF pools tombstoned 30d);
   next preview run needs a fresh `MAGELIFT_GCP_ACCEPTANCE_NAME`
   (suggest `mldp3`) and a fresh DIR. Seed dump plus crypt key
