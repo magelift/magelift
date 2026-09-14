@@ -42,5 +42,6 @@ skills-lock.json
 
 # Local planning / agent scratch (never commit to the public remote)
 .planning/
+/tasks/
 .wrangler/
 .venv/
