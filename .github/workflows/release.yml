@@ -80,8 +80,10 @@ jobs:
               platform = platform.removesuffix(".exe")
               bundle = asset + ".sigstore.json"
               # Bundles are signed after checksums run, so they are
-              # not in checksums.txt; they must exist in dist/.
-              if not os.path.exists(f"dist/{bundle}"):
+              # not in checksums.txt; and the signature template is
+              # basename-relative, so they land beside dist/, not in
+              # it. Either location proves the sign step ran.
+              if not os.path.exists(f"dist/{bundle}") and not os.path.exists(bundle):
                   print(f"missing bundle for {asset}", file=sys.stderr)
                   sys.exit(1)
               providers.setdefault(platform, {})[name] = {
