@@ -79,7 +79,9 @@ jobs:
               _version, _, platform = tail.partition("_")
               platform = platform.removesuffix(".exe")
               bundle = asset + ".sigstore.json"
-              if bundle not in checksums:
+              # Bundles are signed after checksums run, so they are
+              # not in checksums.txt; they must exist in dist/.
+              if not os.path.exists(f"dist/{bundle}"):
                   print(f"missing bundle for {asset}", file=sys.stderr)
                   sys.exit(1)
               providers.setdefault(platform, {})[name] = {
