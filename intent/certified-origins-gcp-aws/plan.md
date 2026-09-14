@@ -49,3 +49,26 @@ Auto-approved per the standing `/goal` instruction.
 
 Gate log, session transcripts, evidence files, spend lines,
 assert_clean outputs.
+
+## Handover note (2026-09-14, WSL session)
+
+- 1.3: release triple PROVEN on `.8` (binary digest matches lock,
+  `cosign verify-blob` OK, CLI loads `mode: subprocess`). Found
+  and fixed a real bug: `cosignBlobVerifier` swapped
+  bundle/binary (commit `4a1ad48`, regression test added). The
+  `.8`/`.9` CLIs carry the bug; session CLIs are built from the
+  tree. Workflow-green proof rides `.10` (in flight).
+- 1.4: preview blocked at `day2:exec`: `Pulumi output "kubeconfig"
+  must be a non-empty string` via the subprocess path. Next step:
+  find whether exec should stay in-process (docs say day-2 ports
+  stay in-process) or the Execute RPC must plumb kubeconfig.
+  Logs: `/tmp/gcp-preview*.log` (this box only).
+- Names `mldp`, `mldp2` are spent (WIF pools tombstoned 30d);
+  next preview run needs a fresh `MAGELIFT_GCP_ACCEPTANCE_NAME`
+  (suggest `mldp3`) and a fresh DIR. Seed dump plus crypt key
+  live in `/tmp` on this box (NOT in the repo): regenerate via
+  the recipe in the session transcript or copy them over.
+- Account `digital-lab-341608` verified empty (clusters, SQL,
+  nets, secrets, buckets, pools all zero) at handover.
+- `.8`/`.9` ephemeral tags stay until `.10` goes green, then
+  delete all three per box 1.3.
