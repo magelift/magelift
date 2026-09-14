@@ -39,6 +39,10 @@ func TestExecuteRequestValidate(t *testing.T) {
 			},
 		},
 		{
+			name:    "valid redacted outputs",
+			request: ExecuteRequest{Operation: ExecuteRedactedOutputs, Plan: sdk.ModulePlan{StackName: "shop-preview"}},
+		},
+		{
 			name:    "unknown operation",
 			request: ExecuteRequest{Operation: "launch", Plan: sdk.ModulePlan{StackName: "shop-preview"}},
 			wantErr: `execute operation "launch" is not supported`,

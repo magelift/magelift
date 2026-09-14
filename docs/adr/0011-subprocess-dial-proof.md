@@ -19,10 +19,13 @@ provider process.
 - `gcp`/`gke-autopilot` is the v1 proof cell. The CLI uses a verified
   `magelift-provider-gcp` subprocess for it when one is installed beside
   the CLI executable (lockfile plus binary plus Cosign bundle).
-- New `Execute` RPC carries `preview`, `up`, `destroy`, `outputs`, and
-  `validate-request`. The subprocess runs Automation API with its own
-  `gcpstack` program and returns change counts, redacted outputs, and
-  diagnostics. Results stay under 1 MiB; diagnostics truncate with a flag.
+- New `Execute` RPC carries `preview`, `up`, `destroy`, `outputs`,
+  `redacted-outputs`, and `validate-request`. The subprocess runs Automation
+  API with its own `gcpstack` program and returns change counts, outputs,
+  and diagnostics. Results stay under 1 MiB; diagnostics truncate with a
+  flag. The `outputs` op serves secrets decrypted (day-2 consumers need the
+  real kubeconfig, matching in-process `Outputs`); only the
+  `redacted-outputs` op redacts, for `magelift outputs` display.
 - Preview ownership verdicts cross as data, not Go errors. The host
   rebuilds the typed conflict so the Runner classifies it like an
   in-process verdict.
@@ -45,7 +48,9 @@ provider process.
   list` reports the installed provider version, digest, and mode.
 - Day-2 ports (`HasOps`, bootstrap, state, secrets, observe) stay
   in-process for every adapter, including the proof cell. Subprocess
-  execution covers the stack lifecycle only.
+  execution covers the stack lifecycle only; the port code runs in the host
+  and reads its inputs (decrypted outputs, including kubeconfig) back over
+  the `outputs` op on the local mTLS plugin channel.
 - Release checksums cover the provider binaries. The first tag release
   verifies Windows asset naming and bundle upload; the smoke suite cannot
   cover those locally.

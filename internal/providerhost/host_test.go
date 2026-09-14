@@ -273,7 +273,7 @@ func TestDialExecutesOverMockBackend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, operation := range []ExecuteOperation{ExecutePreview, ExecuteUp, ExecuteDestroy, ExecuteOutputs, ExecuteValidateRequest} {
+	for _, operation := range []ExecuteOperation{ExecutePreview, ExecuteUp, ExecuteDestroy, ExecuteOutputs, ExecuteRedactedOutputs, ExecuteValidateRequest} {
 		result, err := session.Execute(context.Background(), ExecuteRequest{
 			Operation:  operation,
 			Plan:       plan,
@@ -310,6 +310,18 @@ func TestDialExecutesOverMockBackend(t *testing.T) {
 	}
 	if outputs.Outputs["mock"] != true {
 		t.Fatalf("outputs = %v", outputs.Outputs)
+	}
+	redacted, err := session.Execute(context.Background(), ExecuteRequest{
+		Operation:  ExecuteRedactedOutputs,
+		Plan:       plan,
+		BackendURL: "test://mock",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	marker, ok := redacted.Outputs["kubeconfig"].(map[string]any)
+	if !ok || marker["secret"] != true {
+		t.Fatalf("redacted outputs = %v", redacted.Outputs)
 	}
 	broken := plan
 	broken.Opaque = "not-a-gcp-spec"

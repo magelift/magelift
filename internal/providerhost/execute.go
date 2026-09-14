@@ -18,6 +18,7 @@ const (
 	ExecuteUp              ExecuteOperation = "up"
 	ExecuteDestroy         ExecuteOperation = "destroy"
 	ExecuteOutputs         ExecuteOperation = "outputs"
+	ExecuteRedactedOutputs ExecuteOperation = "redacted-outputs"
 	ExecuteValidateRequest ExecuteOperation = "validate-request"
 )
 
@@ -51,9 +52,11 @@ type OwnershipConflict struct {
 }
 
 // ExecuteResult is the subprocess answer. Changes serves preview/up/destroy;
-// Outputs serves the outputs op with secrets already redacted by the
-// subprocess; OwnershipConflict is set instead of Changes when the
-// ownership guard refuses the operation.
+// Outputs serves the outputs op with secrets decrypted for in-process day-2
+// consumers (kubeconfig, like in-process Outputs) and the redacted-outputs
+// op with secrets replaced by {"secret": true} for user-facing display;
+// OwnershipConflict is set instead of Changes when the ownership guard
+// refuses the operation.
 type ExecuteResult struct {
 	Operation         ExecuteOperation   `json:"operation"`
 	Changes           map[string]int     `json:"changes,omitempty"`
@@ -70,7 +73,7 @@ type ExecuteResult struct {
 
 func (o ExecuteOperation) valid() bool {
 	switch o {
-	case ExecutePreview, ExecuteUp, ExecuteDestroy, ExecuteOutputs, ExecuteValidateRequest:
+	case ExecutePreview, ExecuteUp, ExecuteDestroy, ExecuteOutputs, ExecuteRedactedOutputs, ExecuteValidateRequest:
 		return true
 	default:
 		return false

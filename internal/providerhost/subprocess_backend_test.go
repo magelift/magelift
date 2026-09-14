@@ -115,6 +115,27 @@ func TestSubprocessBackendOutputs(t *testing.T) {
 	}
 }
 
+func TestSubprocessBackendRedactedOutputs(t *testing.T) {
+	fake := &fakeExecuteAPI{execute: func(request ExecuteRequest) (ExecuteResult, error) {
+		if request.Operation != ExecuteRedactedOutputs {
+			t.Fatalf("operation = %q", request.Operation)
+		}
+		if request.Preview != nil {
+			t.Fatal("redacted outputs must not carry preview metadata")
+		}
+		return ExecuteResult{Operation: request.Operation, Outputs: map[string]any{"kubeconfig": map[string]any{"secret": true}}}, nil
+	}}
+	backend := NewSubprocessBackend(fake, sdk.ModulePlan{StackName: "shop-staging"}, "")
+	outputs, err := backend.RedactedOutputs(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	redacted, ok := outputs["kubeconfig"].(map[string]any)
+	if !ok || redacted["secret"] != true {
+		t.Fatalf("outputs = %v", outputs)
+	}
+}
+
 func TestSubprocessBackendPropagatesErrors(t *testing.T) {
 	boom := errors.New("subprocess boom")
 	fake := &fakeExecuteAPI{execute: func(ExecuteRequest) (ExecuteResult, error) {

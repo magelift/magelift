@@ -208,6 +208,45 @@ func TestExtensionsListShowsProviderProvenance(t *testing.T) {
 	}
 }
 
+// TestOutputsDisplayRedactsThroughSubprocessBackend pins the display
+// boundary: `magelift outputs` through a Dialed session must serve the
+// redacted op, never the decrypted day-2 outputs. SubprocessBackend must
+// keep its RedactedOutputs method or this falls through to decrypted
+// Outputs and leaks kubeconfig to stdout.
+func TestOutputsDisplayRedactsThroughSubprocessBackend(t *testing.T) {
+	path := writeLifecycleConfig(t, "staging", false)
+	var stdout, stderr bytes.Buffer
+	var got []providerhost.ExecuteOperation
+	api := fakeProviderAPI{execute: func(request providerhost.ExecuteRequest) (providerhost.ExecuteResult, error) {
+		got = append(got, request.Operation)
+		if request.Operation == providerhost.ExecuteRedactedOutputs {
+			return providerhost.ExecuteResult{Operation: request.Operation, Outputs: map[string]any{"kubeconfig": map[string]any{"secret": true}}}, nil
+		}
+		return providerhost.ExecuteResult{Operation: request.Operation, Outputs: map[string]any{"kubeconfig": "DECRYPTED-KUBECONFIG-SENTINEL"}}, nil
+	}}
+	o := testOptions(&stdout, &fakeTerminal{interactive: false})
+	o.stderr = &stderr
+	o.configPath, o.environment = path, "staging"
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return providerhost.NewSubprocessBackend(api, sdk.ModulePlan{StackName: "shop-staging"}, ""), nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "outputs"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != providerhost.ExecuteRedactedOutputs {
+		t.Fatalf("operations = %v, want [redacted-outputs]", got)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, `"secret"`) {
+		t.Fatalf("display must carry the redacted marker:\n%s", out)
+	}
+	if strings.Contains(out, "DECRYPTED-KUBECONFIG-SENTINEL") {
+		t.Fatalf("display leaked decrypted kubeconfig:\n%s", out)
+	}
+}
+
 func TestDefaultLoadProviderRefusesWithoutLockfile(t *testing.T) {
 	dir := t.TempDir()
 	o := &options{executable: func() (string, error) { return dir + "/magelift", nil }}

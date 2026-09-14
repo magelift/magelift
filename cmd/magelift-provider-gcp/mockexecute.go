@@ -26,6 +26,8 @@ func mockExecute(request providerhost.ExecuteRequest) providerhost.ExecuteResult
 		result.Changes = map[string]int{"delete": 1}
 	case providerhost.ExecuteOutputs:
 		result.Outputs = map[string]any{"mock": true}
+	case providerhost.ExecuteRedactedOutputs:
+		result.Outputs = map[string]any{"mock": true, "kubeconfig": map[string]any{"secret": true}}
 	case providerhost.ExecuteValidateRequest:
 		// Valid: mock mode carries no persisted ownership record.
 	}
