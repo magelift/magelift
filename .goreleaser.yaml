@@ -97,7 +97,7 @@ homebrew_casks:
     # archive combination since the provider split, and one tap
     # handles a single archive per combination.
     ids:
-      - magelift
+      - cli
     repository:
       owner: magelift
       name: homebrew-tap
@@ -113,7 +113,7 @@ scoops:
   - name: magelift
     # Same single-archive rule as the cask: scoop ships the CLI.
     ids:
-      - magelift
+      - cli
     repository:
       owner: magelift
       name: scoop-bucket
