@@ -34,7 +34,20 @@ jobs:
       # GoReleaser's SBOM cataloging shells out to syft; without it the
       # release fails after the builds (seen on v0.0.0-dialproof.3).
       - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      # Ephemeral dialproof tags take the slim linux/amd64 config (no SBOM,
+      # taps, or attest): same signs/checksum/archive shape, ~5 min, so the
+      # bundle/lockfile debug loop does not pay the 2h full matrix.
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        if: startsWith(github.ref_name, 'v0.0.0-dialproof')
+        with:
+          distribution: goreleaser
+          version: v2.18.1
+          args: release --clean --parallelism 1 --timeout 30m -f .goreleaser.dialproof.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOMAXPROCS: "1"
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
         with:
           distribution: goreleaser
           version: v2.18.1
@@ -171,12 +184,15 @@ jobs:
           --certificate-oidc-issuer https://token.actions.githubusercontent.com
           dist/checksums.txt
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
         with:
           subject-checksums: dist/checksums.txt
   # The cask publishes to the tap during release; this job is the tested
   # macOS install path the readiness doc requires. A failure fails the
   # workflow visibly so the tap file gets fixed forward the same day.
+  # Dialproof tags publish no tap, so there is nothing to verify.
   cask-verify:
+    if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
     needs: [release]
     runs-on: macos-latest
     timeout-minutes: 30

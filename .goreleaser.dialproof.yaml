@@ -1,0 +1,78 @@
+# Ephemeral dialproof config: linux/amd64 only, no SBOM, taps, or attest.
+# Debug loop for provider bundles plus lockfiles (~5 min). Real tags use
+# .goreleaser.yaml. Keep the signs/checksum/archive shape identical so a
+# dialproof green means the same lockfile steps pass on the full matrix.
+version: 2
+
+project_name: magelift
+
+builds:
+  - id: magelift
+    main: ./cmd/magelift
+    binary: magelift
+    goos: [linux]
+    goarch: [amd64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
+      - -X github.com/magelift/magelift/internal/cli.Version={{ .Version }}
+  - id: magelift-provider-gcp
+    main: ./cmd/magelift-provider-gcp
+    binary: magelift-provider-gcp
+    goos: [linux]
+    goarch: [amd64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
+
+archives:
+  - id: cli
+    ids: [magelift]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - agents/README.md
+      - agents/manifest.json
+      - agents/skills/**/SKILL.md
+  - id: provider-gcp
+    ids: [magelift-provider-gcp]
+    formats: [binary]
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+signs:
+  - id: checksum
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+  - id: provider-gcp
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: binary
+    ids: [provider-gcp]
+
+release:
+  preflight:
+    fail_on_error: true
+
+changelog:
+  use: github-native
