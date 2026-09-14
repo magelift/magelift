@@ -30,6 +30,11 @@ Auto-approved per the standing `/goal` instruction.
 - [ ] 1.4 GCP packed session: preview, standard, HA, live Dial
   proof, order-9 GCP search cell, order-10 preview loop —
   verify: evidence plus destroy plus assert_clean plus spend line
+  (preview `mldp3` GREEN via subprocess, evidence committed;
+  standard `mldp3` lost to transient GCP Valkey capacity, retry
+  `mldp4` GREEN, evidence committed; HA `mldp5` 16/16 GREEN,
+  evidence committed. Order-9/10 live runs attach here as order-8
+  legs with shared evidence; their intents formalize at Phase 2.)
 - [ ] 1.5 AWS packed session: preview create-once plus warm
   transitions (queue db, ecs-rabbitmq, amazon-mq; search
   disabled then provisioned per ADR 0012; database rds-mysql
