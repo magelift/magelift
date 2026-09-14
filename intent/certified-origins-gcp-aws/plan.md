@@ -22,9 +22,11 @@ Auto-approved per the standing `/goal` instruction.
 - [x] 1.2 Maintainer unblock: gcloud re-auth plus project confirm
   plus ephemeral-tag permission — verify: `gcloud` identity works
   and the project is named in writing
-- [ ] 1.3 Ephemeral CI bundle (`v0.0.0-dialproof.N`) — verify:
+- [x] 1.3 Ephemeral CI bundle (`v0.0.0-dialproof.N`) — verify:
   workflow green, bundle plus binary downloaded, tag deleted after
-  use
+  use (`.12` slim green, triple consumed by `mldp3`, tags
+  `.8`/`.9`/`.10`/`.11`/`.12` deleted; evidence
+  `gcp-gke-autopilot-magento-live-mldp3-20260914.md`)
 - [ ] 1.4 GCP packed session: preview, standard, HA, live Dial
   proof, order-9 GCP search cell, order-10 preview loop —
   verify: evidence plus destroy plus assert_clean plus spend line
