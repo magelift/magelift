@@ -471,6 +471,20 @@ func TestCoreEnvBindingsConfigureElasticsuite(t *testing.T) {
 	if found[EnvMagentoElasticsuiteServers] != "search.internal:9200" {
 		t.Fatalf("Elasticsuite servers = %q", found[EnvMagentoElasticsuiteServers])
 	}
+	// Magento never resolves #env() under env.php's system section, so the
+	// CONFIG__ bindings carry the same resolved search values through stock
+	// Magento's environment configuration contract (live reindex proof).
+	if found[EnvMagentoSearchConfigEngine] != "opensearch" ||
+		found[EnvMagentoSearchConfigHost] != "search.internal" ||
+		found[EnvMagentoSearchConfigPort] != "9200" ||
+		found[EnvMagentoSearchConfigIndexPrefix] != "magento2" ||
+		found[EnvMagentoSearchConfigEnableAuth] != "0" ||
+		found[EnvMagentoSearchConfigTimeout] != "15" {
+		t.Fatalf("Magento search CONFIG__ bindings = engine %q host %q port %q prefix %q auth %q timeout %q",
+			found[EnvMagentoSearchConfigEngine], found[EnvMagentoSearchConfigHost],
+			found[EnvMagentoSearchConfigPort], found[EnvMagentoSearchConfigIndexPrefix],
+			found[EnvMagentoSearchConfigEnableAuth], found[EnvMagentoSearchConfigTimeout])
+	}
 	wantOverride := `{"system":{"default":{"smile_elasticsuite_core_base_settings":{"es_client":{"servers":"search.internal:9200","enable_https_mode":0,"enable_http_auth":0}}}}}`
 	if found[EnvMagentoDCOverride] != wantOverride {
 		t.Fatalf("Magento deployment override = %q, want %q", found[EnvMagentoDCOverride], wantOverride)
