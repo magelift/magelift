@@ -84,7 +84,7 @@ signs:
       - "${artifact}"
       - "--yes"
     artifacts: binary
-    ids: [magelift-provider-gcp]
+    ids: [provider-gcp]
 
 # Homebrew cask with binary stanzas: goreleaser deprecated brews (formula
 # generation) in v2.16 in favor of homebrew_casks; casks install binaries on
