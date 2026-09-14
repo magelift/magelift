@@ -63,6 +63,27 @@ assert_clean outputs.
   find whether exec should stay in-process (docs say day-2 ports
   stay in-process) or the Execute RPC must plumb kubeconfig.
   Logs: `/tmp/gcp-preview*.log` (this box only).
+
+## Handover note 2 (2026-09-14, devbox session)
+
+- 1.3: `.10` FAILED the same lockfile step as `.9` (`missing
+  bundle`, run `34841348135`). Root cause: binary-format
+  archives are not copied to `dist/`; bundles live in the
+  per-target build dir. Fixed in `a566df3` (lockfile plus
+  verify steps resolve paths via `dist/artifacts.json`; both
+  proven against a local snapshot `dist/`). Retagged `.11`
+  from `a566df3` (run `34854228510`); `.11` also carries the
+  Execute fix, so it is the consumable Dial triple.
+- 1.4: blocker FIXED in `e423031` (`outputs` op serves
+  decrypted for day-2; new `redacted-outputs` op for
+  display; ADR 0011 plus provider guide updated). local-gates
+  green on devbox. Seed regenerated
+  (`/tmp/magento-249-sanitized-definer-free.sql.gz`, validator
+  PASS). Digest `8588b13…` verify OK (identity
+  `devops@…iam.gserviceaccount.com`); no fresh sign needed.
+  Session CLI pre-built at `/tmp/magelift-gcp-mldp3/magelift`.
+- `.8`/`.9`/`.10` tags stay until `.11` goes green and its
+  triple is consumed, then delete all four per box 1.3.
 - Names `mldp`, `mldp2` are spent (WIF pools tombstoned 30d);
   next preview run needs a fresh `MAGELIFT_GCP_ACCEPTANCE_NAME`
   (suggest `mldp3`) and a fresh DIR. Seed dump plus crypt key
