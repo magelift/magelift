@@ -67,6 +67,13 @@ jobs:
                   parts = line.split()
                   if len(parts) == 2:
                       checksums[parts[1]] = parts[0]
+          with open("dist/artifacts.json") as f:
+              artifacts = json.load(f)
+          signature_paths = {
+              artifact["name"]: artifact["path"]
+              for artifact in artifacts
+              if artifact.get("type") == "Signature"
+          }
           providers = {}
           for asset, digest in sorted(checksums.items()):
               if not asset.startswith("magelift-provider-"):
@@ -80,10 +87,12 @@ jobs:
               platform = platform.removesuffix(".exe")
               bundle = asset + ".sigstore.json"
               # Bundles are signed after checksums run, so they are
-              # not in checksums.txt; and the signature template is
-              # basename-relative, so they land beside dist/, not in
-              # it. Either location proves the sign step ran.
-              if not os.path.exists(f"dist/{bundle}") and not os.path.exists(bundle):
+              # not in checksums.txt. Binary-format archives are not
+              # copied to dist/: the signed bytes stay in the
+              # per-target build directory, so resolve the bundle
+              # through artifacts.json instead of guessing paths.
+              bundle_path = signature_paths.get(bundle)
+              if bundle_path is None or not os.path.exists(bundle_path):
                   print(f"missing bundle for {asset}", file=sys.stderr)
                   sys.exit(1)
               providers.setdefault(platform, {})[name] = {
@@ -110,14 +119,47 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          for bin in dist/magelift-provider-*; do
-            case "$bin" in *.sigstore.json|*.sbom.json) continue;; esac
-            cosign verify-blob \
-              --bundle "$bin.sigstore.json" \
-              --certificate-identity "https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/${RELEASE_TAG}" \
-              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-              "$bin"
-          done
+          python3 - "$RELEASE_TAG" <<'PY'
+          import json, subprocess, sys
+          tag = sys.argv[1]
+          identity = f"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/{tag}"
+          issuer = "https://token.actions.githubusercontent.com"
+          checksums = {}
+          with open("dist/checksums.txt") as f:
+              for line in f:
+                  parts = line.split()
+                  if len(parts) == 2:
+                      checksums[parts[1]] = parts[0]
+          with open("dist/artifacts.json") as f:
+              artifacts = json.load(f)
+          paths = {}
+          for artifact in artifacts:
+              if artifact.get("type") in ("Binary", "Signature"):
+                  paths[artifact["name"]] = artifact["path"]
+          verified = 0
+          for asset in sorted(checksums):
+              if not asset.startswith("magelift-provider-"):
+                  continue
+              if asset.endswith(".sigstore.json") or asset.endswith(".sbom.json"):
+                  continue
+              bundle = asset + ".sigstore.json"
+              if asset not in paths or bundle not in paths:
+                  print(f"missing binary or bundle for {asset}", file=sys.stderr)
+                  sys.exit(1)
+              subprocess.run(
+                  ["cosign", "verify-blob",
+                   "--bundle", paths[bundle],
+                   "--certificate-identity", identity,
+                   "--certificate-oidc-issuer", issuer,
+                   paths[asset]],
+                  check=True,
+              )
+              verified += 1
+          if verified == 0:
+              print("no provider bundles verified", file=sys.stderr)
+              sys.exit(1)
+          print(f"verified {verified} provider bundles")
+          PY
       - name: Verify signed checksums
         env:
           RELEASE_TAG: ${{ github.ref_name }}
