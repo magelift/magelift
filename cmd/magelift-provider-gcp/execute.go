@@ -54,8 +54,8 @@ func execute(ctx context.Context, module gcpstack.Module, request providerhost.E
 		result.Changes, err = backend.Update(ctx, autoRequest, &diagnostics)
 	case providerhost.ExecuteDestroy:
 		result.Changes, err = backend.Destroy(ctx, autoRequest, &diagnostics)
-	case providerhost.ExecuteOutputs:
-		result.Outputs, err = backend.RedactedOutputs(ctx)
+	case providerhost.ExecuteOutputs, providerhost.ExecuteRedactedOutputs:
+		result.Outputs, err = executeOutputs(ctx, backend, request.Operation)
 	case providerhost.ExecuteValidateRequest:
 		err = backend.ValidateRequest(ctx, autoRequest)
 	default:
@@ -66,6 +66,22 @@ func execute(ctx context.Context, module gcpstack.Module, request providerhost.E
 	}
 	result.Diagnostics, result.Truncated = collectDiagnostics(&diagnostics)
 	return result, nil
+}
+
+// outputsSource is the narrow backend surface the outputs ops need.
+type outputsSource interface {
+	Outputs(context.Context) (map[string]any, error)
+	RedactedOutputs(context.Context) (map[string]any, error)
+}
+
+// executeOutputs routes the two outputs ops: decrypted for in-process day-2
+// consumers (exec, health, logs, deploy Steps need the real kubeconfig,
+// matching in-process Outputs), redacted for user-facing display.
+func executeOutputs(ctx context.Context, backend outputsSource, operation providerhost.ExecuteOperation) (map[string]any, error) {
+	if operation == providerhost.ExecuteRedactedOutputs {
+		return backend.RedactedOutputs(ctx)
+	}
+	return backend.Outputs(ctx)
 }
 
 // classifyExecuteError maps backend failures onto the wire: ownership

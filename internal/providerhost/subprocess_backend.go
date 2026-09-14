@@ -20,10 +20,12 @@ type OpaqueSpecProvider interface {
 
 // SubprocessBackend adapts a Dialed provider session to automation.Backend
 // plus automation.RequestGuard. Preview/Update/Destroy map to the matching
-// Execute operation; Outputs maps to the outputs op; ValidateRequest maps
-// to the validate-request op. Ownership conflicts arrive as result payloads
-// and are rebuilt into typed errors so the Runner classifies them exactly
-// like in-process verdicts.
+// Execute operation; Outputs maps to the outputs op (secrets decrypted, like
+// in-process Outputs, for day-2 consumers); RedactedOutputs maps to the
+// redacted-outputs op for user-facing display; ValidateRequest maps to the
+// validate-request op. Ownership conflicts arrive as result payloads and are
+// rebuilt into typed errors so the Runner classifies them exactly like
+// in-process verdicts.
 type SubprocessBackend struct {
 	api        API
 	plan       sdk.ModulePlan
@@ -77,6 +79,18 @@ func (b *SubprocessBackend) Destroy(ctx context.Context, request automation.Requ
 }
 
 func (b *SubprocessBackend) Outputs(ctx context.Context) (map[string]any, error) {
+	return b.outputsOp(ctx, ExecuteOutputs)
+}
+
+// RedactedOutputs mirrors PulumiBackend.RedactedOutputs over the Execute RPC
+// for user-facing display: secret values arrive as {"secret": true} and must
+// never feed day-2 consumers. The outputsCommand display path type-asserts
+// this method; without it display would fall through to decrypted Outputs.
+func (b *SubprocessBackend) RedactedOutputs(ctx context.Context) (map[string]any, error) {
+	return b.outputsOp(ctx, ExecuteRedactedOutputs)
+}
+
+func (b *SubprocessBackend) outputsOp(ctx context.Context, operation ExecuteOperation) (map[string]any, error) {
 	if b == nil || b.api == nil {
 		return nil, errors.New("subprocess backend has no provider API")
 	}
@@ -84,7 +98,7 @@ func (b *SubprocessBackend) Outputs(ctx context.Context) (map[string]any, error)
 		ctx = context.Background()
 	}
 	result, err := b.api.Execute(ctx, ExecuteRequest{
-		Operation:  ExecuteOutputs,
+		Operation:  operation,
 		Plan:       b.plan,
 		BackendURL: b.backendURL,
 	})

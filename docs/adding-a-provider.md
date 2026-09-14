@@ -107,8 +107,10 @@ artifact is installed beside the CLI, with an in-process fallback and a
 stderr notice otherwise ([ADR 0011](adr/0011-subprocess-dial-proof.md)).
 `extensions list` reports the installed provider version, digest, and mode.
 Day-2 ports (ops, bootstrap, state, secrets, observe) stay in-process for
-every adapter; subprocess execution covers the stack lifecycle only. Tests and
-Floci suites always load in-process. External providers
+every adapter; subprocess execution covers the stack lifecycle only. The
+`outputs` op returns secrets decrypted so those in-process ports can read
+kubeconfig; only `redacted-outputs` redacts, for `magelift outputs` display.
+Tests and Floci suites always load in-process. External providers
 may still ship as a **compile-time custom binary** that calls
 `cli.NewWithExtensions` (`examples/custom-cli`). There is no Go `plugin.Open`
 ABI and no unsigned remote loader ([ADR 0008](adr/0008-provider-load-path.md)).
