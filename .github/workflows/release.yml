@@ -71,8 +71,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Install the published cask
-        run: |
-          brew tap magelift/homebrew-tap
-          brew install --cask magelift
-          magelift version
+             - name: Install the published cask
+               run: |
+                 brew tap magelift/homebrew-tap
+                 brew trust magelift/tap
+                 brew install --cask magelift
+                 magelift version
