@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/cosign"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
 	sdk "github.com/magelift/magelift/sdk/v1"
@@ -246,5 +247,36 @@ func TestWarnProviderSkew(t *testing.T) {
 				t.Fatalf("stderr = %q, want quiet", stderr.String())
 			}
 		})
+	}
+}
+
+type recordingRunner struct {
+	name string
+	args []string
+}
+
+func (r *recordingRunner) Run(_ context.Context, name string, args ...string) error {
+	r.name = name
+	r.args = append([]string(nil), args...)
+	return nil
+}
+
+// TestCosignBlobVerifierPassesBundleFirst pins the bundle-first
+// argument order through the providerhost verifier into cosign.
+// A swap here makes every subprocess load fail closed with a
+// signature error while manual cosign calls succeed.
+func TestCosignBlobVerifierPassesBundleFirst(t *testing.T) {
+	runner := &recordingRunner{}
+	verifier := cosignBlobVerifier{client: cosign.NewWithRunner(runner)}
+	err := verifier.VerifyBlob(context.Background(), "/tmp/x.sigstore.json", "/tmp/x", cosign.VerifyOptions{
+		CertificateIdentity: "identity",
+		OIDCIssuer:          "https://token.actions.githubusercontent.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"verify-blob", "--bundle", "/tmp/x.sigstore.json", "--certificate-identity", "identity", "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com", "/tmp/x"}
+	if runner.name != "cosign" || strings.Join(runner.args, " ") != strings.Join(want, " ") {
+		t.Fatalf("argv = %s %v, want cosign %v", runner.name, runner.args, want)
 	}
 }

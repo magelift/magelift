@@ -225,7 +225,7 @@ if [[ "${MAGELIFT_GCP_ACCEPTANCE:-}" != "1" ]]; then
 fi
 
 dependency_status="$json_dependency_status"
-acceptance_require_commands gcloud docker pulumi go kubectl curl openssl shasum || dependency_status=1
+acceptance_require_commands gcloud docker pulumi go kubectl gke-gcloud-auth-plugin curl openssl shasum || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
