@@ -25,14 +25,14 @@ const (
 	providerLockFilename    = "magelift.providers.lock"
 )
 
-// cosignBlobVerifier adapts cosign.Client to providerhost.BlobVerifier. The
-// argument orders differ (bundle-first versus binary-first), hence the
-// wrapper rather than a direct method value.
+// cosignBlobVerifier adapts cosign.Client to the providerhost blob
+// verifier. Both sides take bundle-first order, so this is a pure
+// pass-through; the parameter names pin that order.
 type cosignBlobVerifier struct {
 	client *cosign.Client
 }
 
-func (v cosignBlobVerifier) VerifyBlob(ctx context.Context, binaryPath, bundlePath string, options cosign.VerifyOptions) error {
+func (v cosignBlobVerifier) VerifyBlob(ctx context.Context, bundlePath, binaryPath string, options cosign.VerifyOptions) error {
 	if v.client == nil {
 		return cosign.ErrRunnerRequired
 	}
