@@ -376,7 +376,7 @@ func TestRuntimeWiresMagentoOpenSearchEnvFromEndpoint(t *testing.T) {
 	for name, value := range map[string]string{
 		"MAGELIFT_SEARCH_ENDPOINT":                               "https://vpc-shop.eu-west-3.es.amazonaws.com",
 		"MAGENTO_DC_CATALOG__SEARCH__ENGINE":                     "opensearch",
-		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME": "vpc-shop.eu-west-3.es.amazonaws.com",
+		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME": "https://vpc-shop.eu-west-3.es.amazonaws.com",
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":     "443",
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH":     "0",
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX":    "magento2",
