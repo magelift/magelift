@@ -205,7 +205,11 @@ func createProvisioned(ctx *pulumi.Context, name string, args Args, component *C
 		AdvancedSecurityOptions: &opensearch.DomainAdvancedSecurityOptionsArgs{
 			Enabled: pulumi.Bool(false), InternalUserDatabaseEnabled: pulumi.Bool(false),
 		},
-		VpcOptions: &opensearch.DomainVpcOptionsArgs{SubnetIds: args.SubnetIDs, SecurityGroupIds: args.SecurityGroupIDs, VpcId: args.VPCID},
+		// VpcId is deliberately unset: the provider derives the VPC from the
+		// subnets and rejects an explicit value at preview ("Value for
+		// unconfigurable attribute ... vpc_options.0.vpc_id", proven live on
+		// mlaw1 searchMode:provisioned).
+		VpcOptions: &opensearch.DomainVpcOptionsArgs{SubnetIds: args.SubnetIDs, SecurityGroupIds: args.SecurityGroupIDs},
 		Tags:       tags(args.Tags, name, "domain"),
 	}, pulumi.Parent(component))
 	if err != nil {
