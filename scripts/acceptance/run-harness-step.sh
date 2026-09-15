@@ -45,7 +45,9 @@ fi
 cmd_rc=0
 if [[ -n "$timeout_bin" ]]; then
 	set +e
-	"$timeout_bin" --signal=TERM --kill-after=10 "$seconds" -- "$@"
+	# No "--" separator: GNU timeout treats it as the command (uutils
+	# accepts it). Our commands never start with a dash.
+	"$timeout_bin" --signal=TERM --kill-after=10 "$seconds" "$@"
 	cmd_rc=$?
 	set -e
 elif command -v python3 >/dev/null 2>&1; then

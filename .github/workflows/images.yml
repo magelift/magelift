@@ -1,8 +1,9 @@
 name: Release Container Images
 
-# Stable semver tags only (no hyphen prerelease). Four failing v1.0.0-rc.1
-# retries burned ~750 job-minutes on a 12× multi-arch matrix. To publish an
-# RC image matrix, temporarily drop the job `if` or retag without '-'.
+# Stable semver tags only (no hyphen prerelease). A 12x multi-arch RC
+# matrix costs ~750 job-minutes per attempt, so RC images stay manual:
+# to publish an RC image matrix, temporarily drop the job `if` or retag
+# without '-'.
 on:
   push:
     tags: ['v*']

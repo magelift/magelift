@@ -227,11 +227,11 @@ func serviceContract(component, family string, ports []int) ([]LocalCredentialBi
 	switch component {
 	case "database":
 		return []LocalCredentialBinding{
-				{Name: "application-user", Environment: "MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME"},
-				{Name: "application-password", Environment: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD"},
-			}, LocalConnectionShape{
-				Host: "database", Port: 3306, Database: "magento", User: "magento", PasswordEnv: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD",
-			}
+			{Name: "application-user", Environment: "MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME"},
+			{Name: "application-password", Environment: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD"},
+		}, LocalConnectionShape{
+			Host: "database", Port: 3306, Database: "magento", User: "magento", PasswordEnv: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD",
+		}
 	case "cache":
 		return nil, LocalConnectionShape{Host: "cache", Port: 6379}
 	case "search":
@@ -239,22 +239,22 @@ func serviceContract(component, family string, ports []int) ([]LocalCredentialBi
 	case "queue":
 		if family == "artemis" {
 			return []LocalCredentialBinding{
-					{Name: "application-user", Environment: "MAGENTO_DC_QUEUE__STOMP__USER"},
-					{Name: "application-password", Environment: "MAGENTO_DC_QUEUE__STOMP__PASSWORD"},
-				}, LocalConnectionShape{
-					Host: "queue", Port: 61613, ManagementPort: 8161, User: "magento", PasswordEnv: "MAGENTO_DC_QUEUE__STOMP__PASSWORD", Scheme: "stomp",
-				}
+				{Name: "application-user", Environment: "MAGENTO_DC_QUEUE__STOMP__USER"},
+				{Name: "application-password", Environment: "MAGENTO_DC_QUEUE__STOMP__PASSWORD"},
+			}, LocalConnectionShape{
+				Host: "queue", Port: 61613, ManagementPort: 8161, User: "magento", PasswordEnv: "MAGENTO_DC_QUEUE__STOMP__PASSWORD", Scheme: "stomp",
+			}
 		}
 		managementPort := 15672
 		if len(ports) > 1 {
 			managementPort = ports[1]
 		}
 		return []LocalCredentialBinding{
-				{Name: "application-user", Environment: "MAGENTO_DC_QUEUE__AMQP__USERNAME"},
-				{Name: "application-password", Environment: "MAGENTO_DC_QUEUE__AMQP__PASSWORD"},
-			}, LocalConnectionShape{
-				Host: "queue", Port: 5672, ManagementPort: managementPort, User: "magento", PasswordEnv: "MAGENTO_DC_QUEUE__AMQP__PASSWORD", VHost: "/",
-			}
+			{Name: "application-user", Environment: "MAGENTO_DC_QUEUE__AMQP__USERNAME"},
+			{Name: "application-password", Environment: "MAGENTO_DC_QUEUE__AMQP__PASSWORD"},
+		}, LocalConnectionShape{
+			Host: "queue", Port: 5672, ManagementPort: managementPort, User: "magento", PasswordEnv: "MAGENTO_DC_QUEUE__AMQP__PASSWORD", VHost: "/",
+		}
 	default:
 		connection := LocalConnectionShape{Host: component}
 		if len(ports) > 0 {
@@ -736,10 +736,10 @@ func ComposeTemplateFor(plan RuntimePlan) string {
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME":          plan.Search.Connection.Host,
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":              strconv.Itoa(plan.Search.Connection.Port),
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH":              "0",
-		"CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE":                       "opensearch",
-		"CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME":   plan.Search.Connection.Host,
-		"CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":       strconv.Itoa(plan.Search.Connection.Port),
-		"CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH":       "0",
+		"CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE":                        "opensearch",
+		"CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME":    plan.Search.Connection.Host,
+		"CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":        strconv.Itoa(plan.Search.Connection.Port),
+		"CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH":        "0",
 		"MAGENTO_DC_QUEUE__DEFAULT_CONNECTION":                            localQueueConnection(plan.Queue),
 		"MAGENTO_DC_QUEUE__AMQP__HOST":                                    queueAMQPHost,
 		"MAGENTO_DC_QUEUE__AMQP__PORT":                                    strconv.Itoa(queueAMQPPort),

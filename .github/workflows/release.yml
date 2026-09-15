@@ -51,8 +51,8 @@ jobs:
         with:
           distribution: goreleaser
           version: v2.18.1
-          # Parallelism 1: private 7 GB runners lose communication under
-          # concurrent Pulumi-graph cross-compiles (seen on v1.0.0-rc.1).
+          # Parallelism 1: keep the Pulumi-heavy cross-compiles serial;
+          # concurrent runs overwhelm small runners and lose communication.
           # Timeout 150m: twelve serial Pulumi-heavy cross-compiles exceed
           # GoReleaser's default 1h; the job allows 180 minutes.
           args: release --clean --parallelism 1 --timeout 150m
