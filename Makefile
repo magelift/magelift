@@ -89,10 +89,11 @@ local-gates: pulumi-mock-test acceptance-harness-test floci-test-aws floci-gcp-t
 
 # Offline harness steps print a label and die at a ceiling so a stuck child
 # cannot hang `make acceptance-harness-test` with no output. Shape/dry-run
-# checks finish in seconds. evidence_seal builds ./cmd/magelift and can take
-# several minutes on a cold cache (GOMAXPROCS=1).
+# checks finish in seconds. evidence_seal builds ./cmd/magelift serially
+# (GOMAXPROCS=1) with only the module cache warm, which outgrew the old
+# 900s ceiling as the provider graph grew; measured 2026-09-15.
 HARNESS_TEST_TIMEOUT ?= 120
-HARNESS_BUILD_TIMEOUT ?= 900
+HARNESS_BUILD_TIMEOUT ?= 1500
 HARNESS_STEP := bash scripts/acceptance/run-harness-step.sh
 
 acceptance-harness-test: acceptance-dependencies-check ## Run offline acceptance harness shell tests (serial; no AWS)

@@ -147,9 +147,10 @@ func TestDefaultCleanupProviderRejectsIncompleteGCPLedgerBeforeClientLookup(t *t
 	}
 }
 
-func TestDefaultCleanupProviderRejectsGCPWithoutInjectedClient(t *testing.T) {
+func TestDefaultCleanupProviderBuildsGCPFromADC(t *testing.T) {
+	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", filepath.Join(t.TempDir(), "missing.json"))
 	_, err := defaultCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "gcp", Project: "example-gcp"})
-	if err == nil || !strings.Contains(err.Error(), "not configured") {
+	if err == nil || !strings.Contains(err.Error(), "create GCP Cloud SQL cleanup client") {
 		t.Fatalf("error = %v", err)
 	}
 }
