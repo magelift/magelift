@@ -1,64 +1,86 @@
----
-status: engineering-verified
-slug: v1-stable-cut
-plan: plan.md
-verdict: engineering-pass
----
+# Report: v1-stable-cut tag half (order 14)
 
-# Report: v1-stable-cut engineering half (order 7)
+The tag, README flip, and install-doc flip stay the user's release
+call. This report covers gate re-verification only. No tag created.
 
-The tag, README flip, and install-doc flip stay order 14. This report
-covers the release wiring only. The intent stays open until the tag
-cycle archives it.
+## Prior cycle
 
-## What shipped
+Order 7 (engineering half) passed in history: Windows zip upgrade,
+provider skew warning, smoke asserts both binaries, `cask-verify`
+job, install-asset audit with no drift. Its two notes for this
+cycle are both closed below.
 
-- Windows upgrade fixed: `upgrade` requests the `.zip` asset on
-  Windows (matching the GoReleaser `format_overrides`) and extracts
-  from zip with the same guards as tar (day-0 bug: it requested a
-  nonexistent `.tar.gz` and only read tar).
-- Provider skew warning: loading a provider whose lock version
-  differs from the CLI version warns on stderr naming both; dev
-  builds and versionless locks stay quiet. Full co-upgrade recorded
-  as post-v1.
-- Smoke covers the provider binary: `make release-smoke` asserts
-  both `magelift` and `magelift-provider-gcp` in `dist/`.
-- `cask-verify` job in `release.yml`: after release, a macOS runner
-  taps the published cask, installs it, and runs `magelift version`.
-  This is the tested macOS install path the readiness doc requires.
-- Records current: smoke plus license records dated 2026-09-13,
-  gate-board rows updated, install doc audited against the actual
-  asset names (no drift, no change).
+## What this cycle did
 
-## Deviations
+- Fresh `make license-check` exit 0 (2026-09-15) and fresh `make
+  release-smoke` exit 0, both binaries, ~3m18s. Gate board re-dated.
+- Release pipeline inspection: GoReleaser archives plus
+  `checksums.txt`, SBOM (syft), keyless Cosign signs with
+  `verify-blob` against the workflow identity, GitHub artifact
+  attestations, `cask-verify` on macos-latest (tap, install,
+  `magelift version`), container SBOM plus SLSA `mode=max` plus
+  Cosign sign/verify. All present in definition; all but
+  `cask-verify` proven by the dialproof tag runs.
+- Upgrade verify path: 6 tests green (checksum verify plus
+  mismatch rejection, unsigned rejection, invalid-signature
+  rejection, Windows zip).
+- Phantom-tag reword: `release.yml` and `images.yml` cited
+  `v1.0.0-rc.1` as past observation though no such tag exists.
+  Reworded to state the constraint without the false witness
+  (closes the order-7 note).
+- Homebrew decision: cask ships with rc.1 per the board; its first
+  green run is part of the tag proof (closes the order-7 note).
+- Install flip readiness: `install.md` already carries the full
+  archive-first section behind a note admonition; README needs a
+  two-line flip. Verified ready, not flipped.
 
-None. Two decisions taken and recorded in the spec: cask publishes
-at the tag with in-pipeline verification (replaces "cask optional
-post-tag"); upgrade stays CLI-only for v1 with a skew warning.
+## CI triage (run 35021580591 and predecessors)
 
-## Evidence
+- gofmt drift in `localdev/catalog.go` (prior) and `platform/env.go`
+  (order-8 https fix): fixed, formatting-only.
+- `run-harness-step.sh` passed `--` to GNU `timeout`, which rejects
+  it (uutils accepts): fixed, verified on both flavors.
+- FrankenPHP gobinary 5 HIGH: fixed versions exist upstream but
+  v1.12.7 is still the latest release, so dated `.trivyignore`
+  entries with a re-check trigger (RC tags publish no images).
+- `gcp cleanup provider` default wiring plus native-search `https://`
+  prefix (both order-12, live-proved) broke two stale test
+  expectations: tests updated to the proved behavior.
+- `acceptance contracts` cold-cache `evidence_seal` build outgrew
+  its 900s ceiling, then a 1500s ceiling: root cause was the
+  Makefile-serial `GOMAXPROCS=1 -p=1` compile of `./cmd/magelift`
+  (single-threaded cold builds exceed 25 min on CI runners).
+  Fixed with a bounded parallel build inside the test
+  (`nproc` procs, 4GiB), module-cache restore kept, ceilings
+  restored to 900s / 25 min.
+- `shellcheck`: 46 warnings, all introduced on `wip/all-local-work`
+  (`main` is clean), none in files this session touched. Acceptance
+  scripts do not ship in CLI archives. Fixing 46 warnings across
+  live harness scripts is a dedicated cleanup, explicitly out of
+  this order. PENDING FINAL RUN.
 
-- `go test ./... -count=1`: exit 0, 133 packages ok
-  (`/tmp/test-v1cut.log`).
-- Upgrade package: 6 passed (tar.gz plus zip Install paths).
-- `make release-smoke`: exit 0, both binaries reported
-  (`/tmp/release-smoke-v1cut.log`).
-- `make workflow-check`: exit 0 (`/tmp/workflow-check-v1cut.log`).
-- `make license-check`: exit 0 (`/tmp/license-v1cut.log`).
-- Linter on `internal/upgrade` plus `internal/cli`: 0 issues
-  (`/tmp/lint-v1cut.log`); gofmt clean; `make docs`: exit 0
-  (`/tmp/docs-v1cut.log`).
-- `gh secret list` shows `HOMEBREW_TAP_GITHUB_TOKEN` present.
+## CI verdict
 
-## Notes for the tag cycle (order 14)
+PENDING: run 35030388789.
 
-- `release.yml` line 39 cites an observation "(seen on v1.0.0-rc.1)"
-  but no such tag exists; confirm the history or reword at tag time.
-- The `cask-verify` job cannot run until a tag exists; its first
-  green run is part of the tag proof.
+## Go / no-go per tag gate
 
-## Verdict
+PENDING CI verdict. Working state: license go, smoke go, pipeline
+go, upgrade go, docs go, contracts PENDING, shellcheck known-red
+(out of release scope, needs its own cleanup).
 
-Engineering pass. Phase 1 exit holds: local onboarding from docs,
-classified deploy failures, Dial proof green locally, release
-artifacts build and verify locally.
+## Tag command (DO NOT RUN without the user)
+
+```sh
+git tag -a v1.0.0-rc.1 7b1a618 -m "MageLift v1.0.0-rc.1"
+git push origin v1.0.0-rc.1
+```
+
+Then: flip README plus `install.md` to archives-first, watch
+`release.yml` (archives, SBOM, signs, attest, `cask-verify`) go
+green on the tag. Note the tag lands on `wip/all-local-work`, not
+`main`; say so in the release notes or merge first.
+
+## Spend
+
+CI minutes only. No cloud spend in this order.
