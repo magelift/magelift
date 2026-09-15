@@ -58,6 +58,15 @@ The green run needed four fixes found on earlier `mlaw1` attempts:
   `catalog.rabbitMq.instanceType: mq.m7g.large` in the origin YAML
   (preview blanks it), hex cache secret (ElastiCache forbids `/`).
 
+## Search data-plane notes (order-9)
+
+Least privilege for `searchMode:provisioned`: FGAC off, unsigned HTTPS
+in-VPC, security groups as the network gate; no public exposure, TLS
+enforced, KMS encryption at rest. Magento validated the connection
+during `setup:upgrade` on the `databaseEngine:rds-mysql` cell. Explicit
+reindex/query/recycle logs were not collected on AWS (the cell uses
+`--infra-only`); see order-9 report for the experimental close.
+
 ## Destroy
 
 EXIT `magelift destroy --yes` deleted 127 resources in 35m23s, deleted state
