@@ -30,6 +30,9 @@ Auto-approved per the standing `/goal` instruction.
   <€1 inside the $50 cap)
 - [ ] 1.3 OVH live refresh (after 1.2, serialized) — verify: same
   three
+  (PARKED 2026-09-15: 6 attempts, 0 PASS — MKS pools do not converge
+  (PAR b3-8 INSTALLING-stuck, B2 flavors 404, MIL+b3-8 inconclusive);
+  August evidence stands; retry another day per user call)
 - [ ] 1.4 Evidence plus matrix check — verify: docs build green, EU
   rows still experimental
 
