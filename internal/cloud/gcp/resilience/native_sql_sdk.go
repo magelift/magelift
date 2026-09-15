@@ -20,6 +20,13 @@ func newCloudSQLSDK(ctx context.Context) (CloudSQLAPI, error) {
 	return cloudSQLSDK{service: service}, nil
 }
 
+// NewCloudSQLAPI builds the Cloud SQL port from Application Default
+// Credentials. The CLI cleanup provider uses it to inventory and delete
+// ledger-claimed instances and backups.
+func NewCloudSQLAPI(ctx context.Context) (CloudSQLAPI, error) {
+	return newCloudSQLSDK(ctx)
+}
+
 func (s cloudSQLSDK) CreateBackup(ctx context.Context, project, instance, description string, ttlDays int64) (CloudSQLOperation, error) {
 	// Standard Cloud SQL on-demand backups use the documented backupRuns.insert
 	// path in the current service surface. The newer backups.createBackup

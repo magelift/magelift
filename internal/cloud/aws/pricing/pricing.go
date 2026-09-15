@@ -202,12 +202,12 @@ func findOnDemandRate(products []string, usageTypeContains string) (float64, str
 
 func regionLocation(region string) (string, bool) {
 	locations := map[string]string{
-		"eu-west-3":      "Europe (Paris)",
+		"eu-west-3":      "EU (Paris)",
 		"eu-west-1":      "EU (Ireland)",
 		"eu-west-2":      "EU (London)",
 		"eu-central-1":   "EU (Frankfurt)",
 		"eu-north-1":     "EU (Stockholm)",
-		"eu-south-1":     "Europe (Milan)",
+		"eu-south-1":     "EU (Milan)",
 		"us-east-1":      "US East (N. Virginia)",
 		"us-east-2":      "US East (Ohio)",
 		"us-west-1":      "US West (N. California)",

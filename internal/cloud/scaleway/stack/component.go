@@ -25,7 +25,11 @@ type Component struct {
 }
 
 func New(ctx *pulumi.Context, name string, spec Spec, provider *scaleway.Provider, opts ...pulumi.ResourceOption) (*Component, error) {
-	if err := spec.Validate(); err != nil {
+	validate := spec.Validate
+	if spec.AllowExpiredPreview {
+		validate = spec.ValidateAllowExpiredPreview
+	}
+	if err := validate(); err != nil {
 		return nil, fmt.Errorf("validate Scaleway stack plan: %w", err)
 	}
 	if name == "" {

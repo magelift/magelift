@@ -53,6 +53,10 @@ type Spec struct {
 	Policy       NetworkPolicy
 	Catalog      CatalogSelection
 	Dependencies Dependencies
+	// AllowExpiredPreview records that CLI planning already accepted an
+	// expired preview for teardown. The Pulumi program reads it to skip
+	// only the expiry check; deploy planning never sets it.
+	AllowExpiredPreview bool
 }
 
 type Identity struct {
@@ -141,6 +145,17 @@ type Dependencies struct {
 }
 
 func (s Spec) Validate() error {
+	return s.validate(false)
+}
+
+// ValidateAllowExpiredPreview is restricted to teardown planning. It keeps
+// every structural and security check while allowing an already expired
+// preview to be converted into a destroy request.
+func (s Spec) ValidateAllowExpiredPreview() error {
+	return s.validate(true)
+}
+
+func (s Spec) validate(allowExpiredPreview bool) error {
 	var problems []error
 	if !stableName.MatchString(s.Identity.Project) {
 		problems = append(problems, errors.New("project name must be a stable lowercase identifier"))
@@ -269,7 +284,7 @@ func (s Spec) Validate() error {
 	if s.Identity.Preset != sdk.PresetPreview && strings.TrimSpace(s.Dependencies.SessionSecretARN) == "" {
 		problems = append(problems, errors.New("session secret ARN is required outside preview"))
 	}
-	if !s.Lifecycle.ExpiresAt.IsZero() && time.Now().After(s.Lifecycle.ExpiresAt) {
+	if !allowExpiredPreview && !s.Lifecycle.ExpiresAt.IsZero() && time.Now().After(s.Lifecycle.ExpiresAt) {
 		problems = append(problems, errors.New("preview environment has expired"))
 	}
 	return errors.Join(problems...)

@@ -18,6 +18,8 @@ or change the selected environment.
 - Use `magelift health --mode runtime` after deploy, rollback, or a provider change.
 - Treat `outputs` as data. Do not paste secrets into tickets or agent prompts.
 - Use `destroy --yes` only for the exact environment you intend to remove.
+- `exec --service deploy` is rejected by design; read deploy logs instead.
+  Expired previews refuse deploy but always allow destroy.
 - If cleanup fails, keep the evidence and inspect resources by the MageLift run prefix.
 
 ## Useful commands
@@ -30,6 +32,9 @@ magelift --env staging bootstrap
 magelift --env staging deploy --yes
 magelift --env staging health --mode runtime
 magelift --env staging logs --service web
+magelift --env staging exec --service web -- php -v
+magelift --env staging cost --live
+magelift --env staging cleanup plan --dir .magelift/cleanup
 magelift --env staging destroy --yes
 ```
 

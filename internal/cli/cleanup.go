@@ -12,6 +12,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/magelift/magelift/internal/cleanup"
+	gcpresilience "github.com/magelift/magelift/internal/cloud/gcp/resilience"
 	ovhresilience "github.com/magelift/magelift/internal/cloud/ovh/resilience"
 	"github.com/magelift/magelift/internal/cloud/scaleway/resilience"
 	sdk "github.com/magelift/magelift/sdk/v1"
@@ -207,7 +208,11 @@ func defaultCleanupProvider(ctx context.Context, ledger sdk.CleanupLedger) (clea
 		if strings.TrimSpace(ledger.Project) == "" {
 			return nil, errors.New("GCP cleanup ledgers require a project")
 		}
-		return nil, errors.New("GCP cleanup provider is not configured for this CLI")
+		sqlAPI, err := gcpresilience.NewCloudSQLAPI(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("create GCP Cloud SQL cleanup client: %w", err)
+		}
+		return cleanup.GCPCloudSQLProvider{SQL: sqlAPI, Project: strings.TrimSpace(ledger.Project), Marker: ledger.Marker}, nil
 	case "ovh":
 		return newOVHDatabaseCleanupProvider(ctx, ledger)
 	case "scaleway":

@@ -34,7 +34,7 @@ func TestEstimateParsesOnDemandPriceAndRegionFilter(t *testing.T) {
 	if price.MonthlyCents != 14600 || price.Currency != "USD" || price.Basis != "2 vCPU tasks" {
 		t.Fatalf("unexpected price: %#v", price)
 	}
-	if api.input == nil || len(api.input.Filters) != 1 || *api.input.Filters[0].Value != "Europe (Paris)" {
+	if api.input == nil || len(api.input.Filters) != 1 || *api.input.Filters[0].Value != "EU (Paris)" {
 		t.Fatalf("region filter = %#v", api.input)
 	}
 }

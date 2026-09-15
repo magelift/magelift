@@ -158,6 +158,7 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	validate := spec.Validate
 	if options.AllowExpiredPreview && preset == sdk.PresetPreview && !expiresAt.IsZero() && expiresAt.Before(time.Now().UTC()) {
 		validate = spec.ValidateAllowExpiredPreview
+		spec.AllowExpiredPreview = true
 	}
 	if err := validate(); err != nil {
 		return Spec{}, fmt.Errorf("AWS deployment plan is invalid: %w", err)
