@@ -46,6 +46,7 @@ type fakeKMS struct {
 	tagCalls      int
 	tags          []kmstypes.Tag
 	failAliasOnce bool
+	deniedKeyIDs  []string
 }
 
 func (f *fakeKMS) DescribeKey(context.Context, *kms.DescribeKeyInput, ...func(*kms.Options)) (*kms.DescribeKeyOutput, error) {
@@ -82,15 +83,23 @@ func (f *fakeKMS) ListKeys(context.Context, *kms.ListKeysInput, ...func(*kms.Opt
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	output := &kms.ListKeysOutput{}
+	for _, denied := range f.deniedKeyIDs {
+		output.Keys = append(output.Keys, kmstypes.KeyListEntry{KeyId: awssdk.String(denied), KeyArn: awssdk.String("arn:aws:kms:eu-west-3:123456789012:key/" + denied)})
+	}
 	if f.keyExists {
-		output.Keys = []kmstypes.KeyListEntry{{KeyId: awssdk.String("key-1"), KeyArn: awssdk.String("arn:aws:kms:eu-west-3:123456789012:key/key-1")}}
+		output.Keys = append(output.Keys, kmstypes.KeyListEntry{KeyId: awssdk.String("key-1"), KeyArn: awssdk.String("arn:aws:kms:eu-west-3:123456789012:key/key-1")})
 	}
 	return output, nil
 }
 
-func (f *fakeKMS) ListResourceTags(context.Context, *kms.ListResourceTagsInput, ...func(*kms.Options)) (*kms.ListResourceTagsOutput, error) {
+func (f *fakeKMS) ListResourceTags(_ context.Context, input *kms.ListResourceTagsInput, _ ...func(*kms.Options)) (*kms.ListResourceTagsOutput, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	for _, denied := range f.deniedKeyIDs {
+		if awssdk.ToString(input.KeyId) == denied {
+			return nil, &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "not authorized"}
+		}
+	}
 	return &kms.ListResourceTagsOutput{Tags: append([]kmstypes.Tag(nil), f.tags...)}, nil
 }
 
@@ -312,6 +321,29 @@ func TestEnsureRecoversAfterPartialBucketFailure(t *testing.T) {
 	}
 	if s3Client.createCalls != 1 || kmsClient.createCalls != 1 || kmsClient.aliasCalls != 1 || s3Client.logging == nil || s3Client.tagging == nil {
 		t.Fatal("retry recreated resources or did not finish reconciliation")
+	}
+}
+
+func TestEnsureSkipsKMSKeysWithDeniedTagAccess(t *testing.T) {
+	plan := testPlan(t)
+	s3Client := &fakeS3{}
+	kmsClient := &fakeKMS{
+		keyExists:    true,
+		deniedKeyIDs: []string{"aws-managed-key"},
+		tags: []kmstypes.Tag{{
+			TagKey:   awssdk.String("magelift:bootstrap-id"),
+			TagValue: awssdk.String(plan.Tags["magelift:bootstrap-id"]),
+		}},
+	}
+	result, err := New(s3Client, kmsClient).Ensure(context.Background(), plan, "eu-west-3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kmsClient.createCalls != 0 || kmsClient.aliasCalls != 1 {
+		t.Fatalf("owned key not reused: keys=%d aliases=%d", kmsClient.createCalls, kmsClient.aliasCalls)
+	}
+	if !strings.Contains(result.KeyARN, "key-1") {
+		t.Fatalf("aliased key = %q, want key-1", result.KeyARN)
 	}
 }
 

@@ -285,6 +285,12 @@ func (b *Bootstrapper) findUnaliasedKey(ctx context.Context, bootstrapID string)
 		for _, key := range page.Keys {
 			matches, err := b.keyHasBootstrapID(ctx, awssdk.ToString(key.KeyId), bootstrapID)
 			if err != nil {
+				// AWS-managed keys (alias/aws/*) deny ListResourceTags to IAM
+				// users; they can never carry our ownership tag, so skip them
+				// instead of failing the whole bootstrap.
+				if isAccessDenied(err) {
+					continue
+				}
 				return "", "", err
 			}
 			if matches {
@@ -412,6 +418,11 @@ func sortedKeys(tags map[string]string) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func isAccessDenied(err error) bool {
+	var apiError smithy.APIError
+	return errors.As(err, &apiError) && (apiError.ErrorCode() == "AccessDenied" || apiError.ErrorCode() == "AccessDeniedException")
 }
 
 func isNotFound(err error) bool {
