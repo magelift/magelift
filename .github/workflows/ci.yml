@@ -363,7 +363,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       floci:
-        image: floci/floci:1.7.0@sha256:bec9b9f749322444a57fb0f00d3e007ffd49015162361aab84ccecd9b4f5f8ed
+        image: floci/floci:2.1.0@sha256:f5aa8c18302cedb4f2385f5c4e455b3efc77fee6bf7b6e5d1712b2817ba102db
         ports:
           - 4566:4566
         env:
@@ -392,7 +392,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       floci-gcp:
-        image: floci/floci-gcp:0.7.0@sha256:9f1a020fdd5ac8b6ca568b60e793a9a0e88b8df400ae6bd68283ec5208788180
+        image: floci/floci-gcp:0.9.0@sha256:ea29a53b34d04ba05240cdc6833608e43ae2b0a67849e5b97f01a7224e1138ea
         ports:
           - 4588:4588
         env:
