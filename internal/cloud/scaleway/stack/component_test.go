@@ -247,6 +247,13 @@ func TestProgramBuildsMockGraph(t *testing.T) {
 		if registered.TypeToken == "random:index/randomPassword:RandomPassword" && !registered.Inputs[resource.PropertyKey("special")].BoolValue() {
 			t.Fatal("Scaleway managed-service passwords must include a special character")
 		}
+		if registered.TypeToken == "random:index/randomPassword:RandomPassword" && strings.HasSuffix(registered.Name, "-password") {
+			for _, key := range []resource.PropertyKey{"minLower", "minUpper", "minNumeric", "minSpecial"} {
+				if registered.Inputs[key].NumberValue() < 1 {
+					t.Fatalf("Scaleway managed-service password %q must guarantee character class %q: %v", registered.Name, key, registered.Inputs)
+				}
+			}
+		}
 	}
 	for _, token := range wantTokens {
 		if !seen[token] {

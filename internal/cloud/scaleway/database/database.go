@@ -47,7 +47,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, errors.New("database name and master username are required")
 	}
 	if strings.TrimSpace(args.NodeType) == "" {
-		args.NodeType = "DB-DEV-S"
+		args.NodeType = "db-dev-s"
 	}
 	if args.BackupFrequency < 0 || args.BackupRetention < 0 {
 		return nil, errors.New("Scaleway database backup settings cannot be negative")
@@ -72,6 +72,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		Length:          pulumi.Int(32),
 		Special:         pulumi.Bool(true),
 		OverrideSpecial: pulumi.String("!@#%+=-"),
+		// Same managed-password policy as the cache: every
+		// character class must appear at least once.
+		MinLower:   pulumi.Int(2),
+		MinUpper:   pulumi.Int(2),
+		MinNumeric: pulumi.Int(2),
+		MinSpecial: pulumi.Int(2),
 	}, parent)
 	if err != nil {
 		return nil, fmt.Errorf("generate database password: %w", err)
