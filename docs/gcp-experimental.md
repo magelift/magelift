@@ -119,7 +119,7 @@ Record the matrix row as Act-only (or `gcloud` STS dry-run) until hosted minutes
 ## Offline verification
 
 - Pulumi mocks: `go test ./internal/cloud/gcp/...` (preview / standard / HA graphs)
-- floci-gcp (`make floci-gcp-test`): digest-pinned `floci/floci-gcp:0.7.0` on port 4588. Closes GCS, Secret Manager, Pub/Sub publish, Cloud Logging write/list, and Cloud Monitoring time-series write/list against the official Go clients without a GCP project. Does **not** certify Autopilot, Memorystore Valkey 9.0, Cloud Armor, Google-managed TLS, or Magento Cloud SQL PITR.
+- floci-gcp (`make floci-gcp-test`): digest-pinned `floci/floci-gcp:0.9.0` on port 4588. Closes GCS, Secret Manager, Pub/Sub publish, Cloud Logging write/list, and Cloud Monitoring time-series write/list against the official Go clients without a GCP project. Does **not** certify Autopilot, Memorystore Valkey 9.0, Cloud Armor, Google-managed TLS, or Magento Cloud SQL PITR.
 - WIF unit proof: `GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/gcp/bootstrap/ -count=1 -run 'WIF|Identity'`
 - Composer SM: `GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/gcp/secrets/ ./internal/cli/ -count=1 -run 'Secret|Composer|GCP'`
 
