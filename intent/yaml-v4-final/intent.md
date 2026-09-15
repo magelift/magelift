@@ -32,3 +32,8 @@ Migrating shops off YAML. json/v2. Encoding Magento `env.php`.
 ## Open questions
 
 If final v4 changes RC decode behaviour, do we need a `magelift.yaml` schema version bump, or is it a lockfile-only bump?
+
+## Status check 2026-09-15
+
+Proxy still lists `v4.0.0-rc.6` as latest; no final tag. Intent stays
+draft, blocked on upstream. Re-check with the end-of-roadmap sweep.

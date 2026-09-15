@@ -664,6 +664,7 @@ Options:
       --config-out string   write generated YAML to PATH for review (default: --config path)
       --from-acc            generate magelift.yaml from Adobe Commerce Cloud config
       --from-upsun          generate magelift.yaml from Upsun / Platform.sh config
+      --provider string     starter provider: aws or gcp (certified starters only) (default "aws")
 ```
 ## magelift local
 
