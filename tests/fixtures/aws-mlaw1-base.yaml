@@ -1,0 +1,53 @@
+schemaVersion: 1
+project:
+  name: mlaw1
+application:
+  edition: open-source
+  version: "2.4.9"
+  mode: integrated
+  webRuntime: nginx-fpm
+build:
+  php: "8.5"
+  extensions: [intl, pdo_mysql]
+target:
+  provider: aws
+  runtime: ecs-fargate
+  aws:
+    availabilityZones: [eu-west-3a, eu-west-3b, eu-west-3c]
+    vpcCidr: 10.83.0.0/16
+    natMode: fck-nat
+    natTopology: single-az
+    imageDigest: 669890779205.dkr.ecr.eu-west-3.amazonaws.com/magelift-acceptance-20260823ba@sha256:8588b13fc390bc2b733ec3d03a0501ecc82a6ebad7fcca7758c933977fdb2be4
+    databaseName: magento
+    masterUsername: magento
+    encryptionKeySecretArn: arn:aws:secretsmanager:eu-west-3:669890779205:secret:mlaw1-preview-crypt-VIMsLp
+    queueSecretArn: arn:aws:secretsmanager:eu-west-3:669890779205:secret:mlaw1-preview-queue-2LIdY5
+    cacheSecretArn: arn:aws:secretsmanager:eu-west-3:669890779205:secret:mlaw1-preview-cache-PiC82j
+    kmsKeyArn: arn:aws:kms:eu-west-3:669890779205:key/6e929b63-848e-4589-bb7f-42a8acb3f112
+    albCertificateArn: arn:aws:acm:eu-west-3:669890779205:certificate/f19c2d9b-ba34-4230-ae39-84084021016b
+    cloudFrontCertificateArn: arn:aws:acm:us-east-1:669890779205:certificate/ccd9ec24-c569-454a-9259-952d65b0b3ef
+    mediaDomain: ml-aws-media-20260823ba.acourtiol.com
+    catalog:
+      version: v1
+      queueMode: db
+      searchMode: disabled
+      databaseEngine: rds-mysql
+      rabbitMq:
+        instanceType: mq.m7g.large
+      fargate:
+        computeMode: fargate
+defaults:
+  region: eu-west-3
+  preset: preview
+edge:
+  mode: none
+environments:
+  preview:
+    account: "669890779205"
+    class: preview
+    preset: preview
+    domain: mlaw1-preview.example.test
+    expiresAt: "2026-09-15T06:00:00Z"
+    monthlyBudgetCents: 2500
+    seedDump: /tmp/magento-249-sanitized-definer-free.sql.gz
+extensions: {}
