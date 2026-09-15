@@ -206,10 +206,12 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 			EncryptionKeyARN: aws.EncryptionKeySecretARN, DatabaseName: databaseName, MasterUsername: masterUsername,
 		},
 	}
-	if err := spec.Validate(); err != nil {
-		if options.AllowExpiredPreview && strings.Contains(err.Error(), "preview environment has expired") {
-			return spec, nil
-		}
+	spec.AllowExpiredPreview = options.AllowExpiredPreview
+	validate := spec.Validate
+	if options.AllowExpiredPreview {
+		validate = spec.ValidateAllowExpiredPreview
+	}
+	if err := validate(); err != nil {
 		return Spec{}, fmt.Errorf("AWS EKS deployment plan is invalid: %w", err)
 	}
 	return spec, nil

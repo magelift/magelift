@@ -410,21 +410,21 @@ func livePriceQueries(cfg config.Config) []awspricing.Query {
 	if catalog.Fargate.DesiredCount > 0 && catalog.Fargate.CPU > 0 {
 		queries = append(queries, awspricing.Query{
 			Resource: "ECS Fargate vCPU", ServiceCode: "AmazonECS", UsageTypeContains: "Fargate-vCPU-Hours",
-			Filters:  map[string]string{"productFamily": "Compute", "operatingSystem": "Linux", "preInstalledSw": "NA", "capacitystatus": "Used"},
+			Filters:  map[string]string{"productFamily": "Compute"},
 			Quantity: float64(catalog.Fargate.DesiredCount) * float64(catalog.Fargate.CPU) / 1024, Basis: fmt.Sprintf("%d tasks × %.2f vCPU × 730 hours", catalog.Fargate.DesiredCount, float64(catalog.Fargate.CPU)/1024),
 		})
 	}
 	if catalog.Fargate.DesiredCount > 0 && catalog.Fargate.MemoryMiB > 0 {
 		queries = append(queries, awspricing.Query{
 			Resource: "ECS Fargate memory", ServiceCode: "AmazonECS", UsageTypeContains: "Fargate-GB-Hours",
-			Filters:  map[string]string{"productFamily": "Compute", "operatingSystem": "Linux", "preInstalledSw": "NA", "capacitystatus": "Used"},
+			Filters:  map[string]string{"productFamily": "Compute"},
 			Quantity: float64(catalog.Fargate.DesiredCount) * float64(catalog.Fargate.MemoryMiB) / 1024, Basis: fmt.Sprintf("%d tasks × %.2f GiB × 730 hours", catalog.Fargate.DesiredCount, float64(catalog.Fargate.MemoryMiB)/1024),
 		})
 	}
 	if catalog.Valkey.NodeType != "" {
 		queries = append(queries, awspricing.Query{
 			Resource: "ElastiCache Valkey", ServiceCode: "AmazonElastiCache", UsageTypeContains: "NodeUsage",
-			Filters:  map[string]string{"productFamily": "ElastiCache Instance", "cacheEngine": "Valkey", "instanceType": catalog.Valkey.NodeType},
+			Filters:  map[string]string{"productFamily": "Cache Instance", "cacheEngine": "Valkey", "instanceType": catalog.Valkey.NodeType},
 			Quantity: float64(catalog.Valkey.ReplicaCount + 1), Basis: fmt.Sprintf("%d nodes × 730 hours", catalog.Valkey.ReplicaCount+1),
 		})
 	}
@@ -449,8 +449,8 @@ func livePriceQueries(cfg config.Config) []awspricing.Query {
 	}
 	if catalog.Search.InstanceType != "" && catalog.Search.InstanceCount > 0 && catalog.SearchMode != "disabled" {
 		queries = append(queries, awspricing.Query{
-			Resource: "OpenSearch data nodes", ServiceCode: "AmazonES", UsageTypeContains: "InstanceUsage",
-			Filters:  map[string]string{"productFamily": "Amazon OpenSearch Service", "instanceType": catalog.Search.InstanceType},
+			Resource: "OpenSearch data nodes", ServiceCode: "AmazonES", UsageTypeContains: "ESInstance",
+			Filters:  map[string]string{"productFamily": "Amazon OpenSearch Service Instance", "instanceType": catalog.Search.InstanceType},
 			Quantity: float64(catalog.Search.InstanceCount), Basis: fmt.Sprintf("%d data nodes × 730 hours", catalog.Search.InstanceCount),
 		})
 	}
@@ -469,8 +469,8 @@ func livePriceQueries(cfg config.Config) []awspricing.Query {
 		}
 		if mode == "amazon-mq" {
 			queries = append(queries, awspricing.Query{
-				Resource: "Amazon MQ for RabbitMQ", ServiceCode: "AmazonMQ", UsageTypeContains: "BrokerUsage",
-				Filters:  map[string]string{"productFamily": "RabbitMQ Broker", "instanceType": catalog.RabbitMQ.InstanceType},
+				Resource: "Amazon MQ for RabbitMQ", ServiceCode: "AmazonMQ", UsageTypeContains: "RabbitMQ-3-InstanceUsage",
+				Filters:  map[string]string{"productFamily": "Broker Instances", "instanceType": strings.TrimPrefix(catalog.RabbitMQ.InstanceType, "mq.")},
 				Quantity: 3, Basis: "3 brokers × 730 hours",
 			})
 		}

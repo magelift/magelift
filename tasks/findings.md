@@ -337,3 +337,50 @@ PULUMI_CONFIG_PASSPHRASE_FILE=/tmp/magelift-gcp-mldp6-search/pulumi-passphrase.
   provisioning degraded or broken today; MIL+b3-8 still untried.
 - On retry: ONE clean MIL+b3-8 (or PAR+b3-8) run, TTL 7200, DO NOT
   INTERRUPT. 3 interrupts this session caused 3 manual teardowns.
+
+## Order-12: `cost --live` never priced anything (2026-09-15)
+
+- `magelift cost --live` on AWS returned every compute row as
+  "unsupported / no matching AWS price". Cause: FIVE independent
+  filter defects, all proven against the live Price List API:
+- Location map: eu-west-3 "Europe (Paris)" and eu-south-1
+  "Europe (Milan)" match NOTHING; all five queried services
+  (ECS, ElastiCache, RDS, ES, MQ) use the "EU (X)" form.
+  Fixed in `internal/cloud/aws/pricing/pricing.go`.
+- Fargate products carry NO operatingSystem/preInstalledSw/
+  capacitystatus attributes; the ECS queries filtered on all
+  three, so they could never match in ANY region. Dropped to
+  productFamily-only in `internal/cloud/aws/cost/estimate.go`.
+- productFamily values: ElastiCache is "Cache Instance" (not
+  "ElastiCache Instance"); OpenSearch is "Amazon OpenSearch
+  Service Instance" (not "Amazon OpenSearch Service"); MQ is
+  "Broker Instances" (not "RabbitMQ Broker").
+- usagetype substrings: OpenSearch data nodes are "ESInstance"
+  (not "InstanceUsage"); MQ cluster brokers are
+  "RabbitMQ-3-InstanceUsage" (not "BrokerUsage"), fail-closed
+  to honest unavailable on rename. MQ instanceType filter must
+  strip the "mq." prefix (attribute is "m7g.medium" style).
+- After the fix: Fargate vCPU $17.74, memory $3.87, Valkey
+  $10.51/month live on eu-west-3 preview. RDS/OpenSearch/MQ
+  shapes fixed but still await a session that runs them.
+
+## Order-12: `cost --budget` page size (2026-09-15)
+
+- `cost --budget` hard-failed; probe showed
+  DescribeNotificationsForBudget MaxResults=1000 exceeds the API
+  max of 100. Split `awsBudgetNotificationPageSize=100` in
+  `internal/cloud/aws/cost/budget.go`. Preview correctly reports
+  not-configured (no inheritance); staging-class read lists the
+  five account budgets with amounts and the no-ownership notice.
+
+## Order-12: allow-expired forgave everything (2026-09-15)
+
+- The `isOnlyExpirationError` string check matched whenever the
+  expiry error was PRESENT among others, so allow-expired
+  planning forgave all defects at the CLI layer (the program
+  re-check caught them, but only after a confusing plan).
+- Replaced with AWS-style validator selection (`Validate` vs
+  `ValidateAllowExpiredPreview`) in ovh/gcp/scaleway/eksops and
+  deleted the three helpers. New per-provider tests pin:
+  expired+flag plans AND carries the flag, strict still rejects,
+  non-expiry defect still rejected.

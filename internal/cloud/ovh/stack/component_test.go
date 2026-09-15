@@ -392,3 +392,38 @@ func (m *stackMocks) NewResource(args pulumi.MockResourceArgs) (string, resource
 func (m *stackMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
 	return resource.PropertyMap{}, nil
 }
+
+func TestExpiredPreviewCarriesAllowExpiredIntoProgram(t *testing.T) {
+	cfg := config.Config{
+		SchemaVersion: 1,
+		Project:       config.Project{Name: "shop"},
+		Application:   config.Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		Target: config.Target{Provider: "ovh", Runtime: "mks", OVH: &config.OVHTarget{
+			ServiceName: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", Region: "EU-WEST-PAR", NetworkCIDR: "10.91.0.0/16",
+			ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd", DatabaseName: "commerce", MasterUsername: "dbadmin", EncryptionKeySecret: "magento-key",
+			MKSPlan: "standard", NodeFlavor: "b3-8", NodeCount: 1,
+		}},
+		Defaults: config.Defaults{Region: "EU-WEST-PAR", Preset: "preview"}, Class: "preview", Preset: "preview",
+		ExpiresAt: "2020-01-01T00:00:00Z",
+	}
+	if _, err := PlanFromConfig(cfg, "preview"); err == nil || !strings.Contains(err.Error(), "expired") {
+		t.Fatalf("expired preview was accepted for normal planning: %v", err)
+	}
+	spec, err := PlanFromConfigWithOptions(cfg, "preview", PlanOptions{AllowExpiredPreview: true})
+	if err != nil {
+		t.Fatalf("expired preview was not accepted for destroy planning: %v", err)
+	}
+	if !spec.AllowExpiredPreview {
+		t.Fatal("destroy planning did not record AllowExpiredPreview on the spec; the Pulumi program would reject the destroy")
+	}
+	if err := spec.Validate(); err == nil || !strings.Contains(err.Error(), "expired") {
+		t.Fatalf("strict validation stopped rejecting the expired preview: %v", err)
+	}
+	if err := spec.ValidateAllowExpiredPreview(); err != nil {
+		t.Fatalf("teardown validation rejected the expired preview: %v", err)
+	}
+	cfg.Target.OVH.ImageDigest = "not-a-digest"
+	if _, err := PlanFromConfigWithOptions(cfg, "preview", PlanOptions{AllowExpiredPreview: true}); err == nil {
+		t.Fatal("allow-expired planning forgave a non-expiry defect")
+	}
+}

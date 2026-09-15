@@ -21,6 +21,8 @@ import (
 
 const awsBudgetPageSize int32 = 1000
 
+const awsBudgetNotificationPageSize int32 = 100
+
 const awsBudgetListLimit = 1000
 
 var awsAccountIDPattern = regexp.MustCompile(`^[0-9]{12}$`)
@@ -166,7 +168,7 @@ func (r BudgetReader) listNotifications(ctx context.Context, accountID, budgetNa
 	for {
 		page, err := r.describeNotifications(ctx, &budgets.DescribeNotificationsForBudgetInput{
 			AccountId: accountIDPointer(accountID), BudgetName: awssdk.String(budgetName),
-			MaxResults: awssdk.Int32(awsBudgetPageSize), NextToken: token,
+			MaxResults: awssdk.Int32(awsBudgetNotificationPageSize), NextToken: token,
 		})
 		if err != nil {
 			return nil, err

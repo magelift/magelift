@@ -29,6 +29,10 @@ type Spec struct {
 	Dependencies  Dependencies
 	Edge          sdk.EdgeIntent
 	Observability sdk.ObservabilityIntent
+	// AllowExpiredPreview records that CLI planning already accepted an
+	// expired preview for teardown. The Pulumi program reads it to skip
+	// only the expiry check; deploy planning never sets it.
+	AllowExpiredPreview bool
 }
 
 type Identity struct {
@@ -98,6 +102,17 @@ type Dependencies struct {
 }
 
 func (s Spec) Validate() error {
+	return s.validate(false)
+}
+
+// ValidateAllowExpiredPreview is restricted to teardown planning. It keeps
+// every structural and security check while allowing an already expired
+// preview to be converted into a destroy request.
+func (s Spec) ValidateAllowExpiredPreview() error {
+	return s.validate(true)
+}
+
+func (s Spec) validate(allowExpiredPreview bool) error {
 	var problems []error
 	if !stableName.MatchString(s.Identity.Project) {
 		problems = append(problems, errors.New("project name must be a stable lowercase identifier"))
@@ -156,7 +171,7 @@ func (s Spec) Validate() error {
 	if s.Catalog.DesiredWebReplicas < 1 {
 		problems = append(problems, errors.New("desired web replicas must be at least 1"))
 	}
-	if !s.Lifecycle.ExpiresAt.IsZero() && time.Now().After(s.Lifecycle.ExpiresAt) {
+	if !allowExpiredPreview && !s.Lifecycle.ExpiresAt.IsZero() && time.Now().After(s.Lifecycle.ExpiresAt) {
 		problems = append(problems, errors.New("preview environment has expired"))
 	}
 	return errors.Join(problems...)

@@ -30,6 +30,10 @@ type Spec struct {
 	Dependencies  Dependencies
 	Edge          sdk.EdgeIntent
 	Observability sdk.ObservabilityIntent
+	// AllowExpiredPreview records that CLI planning already accepted an
+	// expired preview for teardown. The Pulumi program reads it to skip
+	// only the expiry check; deploy planning never sets it.
+	AllowExpiredPreview bool
 }
 
 type Identity struct {
@@ -176,6 +180,17 @@ func memorystoreAPIEngineVersionForMagento(version, configured string) (string, 
 }
 
 func (s Spec) Validate() error {
+	return s.validate(false)
+}
+
+// ValidateAllowExpiredPreview is restricted to teardown planning. It keeps
+// every structural and security check while allowing an already expired
+// preview to be converted into a destroy request.
+func (s Spec) ValidateAllowExpiredPreview() error {
+	return s.validate(true)
+}
+
+func (s Spec) validate(allowExpiredPreview bool) error {
 	var problems []error
 	databaseVersion, err := s.CloudSQLDatabaseVersion()
 	if err != nil {
@@ -274,7 +289,7 @@ func (s Spec) Validate() error {
 			problems = append(problems, err)
 		}
 	}
-	if !s.Lifecycle.ExpiresAt.IsZero() && time.Now().After(s.Lifecycle.ExpiresAt) {
+	if !allowExpiredPreview && !s.Lifecycle.ExpiresAt.IsZero() && time.Now().After(s.Lifecycle.ExpiresAt) {
 		problems = append(problems, errors.New("preview environment has expired"))
 	}
 	return errors.Join(problems...)

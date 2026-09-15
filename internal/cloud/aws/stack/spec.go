@@ -41,6 +41,10 @@ type Spec struct {
 	Catalog       CatalogSelection
 	Edge          sdk.EdgeIntent
 	Observability sdk.ObservabilityIntent
+	// AllowExpiredPreview records that CLI planning already accepted an
+	// expired preview for teardown. The Pulumi program reads it to skip
+	// only the expiry check; deploy planning never sets it.
+	AllowExpiredPreview bool
 }
 
 type Identity struct {

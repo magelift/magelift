@@ -618,3 +618,31 @@ func serviceAnnotation(m *stackMocks, name, key string) string {
 	}
 	return value.StringValue()
 }
+
+func TestExpiredPreviewCarriesAllowExpiredIntoProgram(t *testing.T) {
+	cfg := eksConfig()
+	cfg.Class = "preview"
+	cfg.Preset = "preview"
+	cfg.Defaults.Preset = "preview"
+	cfg.ExpiresAt = "2020-01-01T00:00:00Z"
+	if _, err := PlanFromConfig(cfg, "preview"); err == nil || !strings.Contains(err.Error(), "expired") {
+		t.Fatalf("expired preview was accepted for normal planning: %v", err)
+	}
+	spec, err := PlanFromConfigWithOptions(cfg, "preview", PlanOptions{AllowExpiredPreview: true})
+	if err != nil {
+		t.Fatalf("expired preview was not accepted for destroy planning: %v", err)
+	}
+	if !spec.AllowExpiredPreview {
+		t.Fatal("destroy planning did not record AllowExpiredPreview on the spec; the Pulumi program would reject the destroy")
+	}
+	if err := spec.Validate(); err == nil || !strings.Contains(err.Error(), "expired") {
+		t.Fatalf("strict validation stopped rejecting the expired preview: %v", err)
+	}
+	if err := spec.ValidateAllowExpiredPreview(); err != nil {
+		t.Fatalf("teardown validation rejected the expired preview: %v", err)
+	}
+	cfg.Target.AWS.ImageDigest = "not-a-digest"
+	if _, err := PlanFromConfigWithOptions(cfg, "preview", PlanOptions{AllowExpiredPreview: true}); err == nil {
+		t.Fatal("allow-expired planning forgave a non-expiry defect")
+	}
+}

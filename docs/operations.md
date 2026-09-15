@@ -291,6 +291,24 @@ already exists, seeding reports that the project is installed and does not run a
 second installation. The password must be at least 16 alphanumeric characters;
 the command never prints it or places it in the Docker command arguments.
 
+## Operator verbs
+
+Five verbs cover run, debug, and spend on certified origins, live-proved
+together on GCP (`mldp8`, 2026-09-15) with AWS creds-only cost reads the
+same day. `health --mode runtime` reports layered checks with observed
+sources and refuses to infer. `logs --service web|cron` streams the
+workload logs. `exec --service web|cron -- <command>` runs inside the
+workload; `--service deploy` is rejected by design with a pointer to the
+deploy logs. `cost` prints capacity inputs and an explicit unpriced list
+in account-free mode; `cost --live` on AWS returns current on-demand
+prices for Fargate, Valkey, and the provisioned data services, and
+`cost --budget` reads account budgets with thresholds while previews
+never inherit them. `cleanup claim|record|plan|reconcile` closes the
+loop on interrupted runs: claim and record build a ledger, plan shows
+what a reconcile would delete, and reconcile with `--yes` deletes only
+ledger-owned live resources in rank order. Expired previews refuse
+deploy and always allow destroy, on every provider.
+
 ## Magento YAML overlays
 
 `application.magento` writes Magento `env.php` / `CONFIG__*` overlays. It does

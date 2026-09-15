@@ -309,10 +309,12 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		Edge:          edge,
 		Observability: observability,
 	}
-	if err := spec.Validate(); err != nil {
-		if options.AllowExpiredPreview && isOnlyExpirationError(err) {
-			return spec, nil
-		}
+	spec.AllowExpiredPreview = options.AllowExpiredPreview
+	validate := spec.Validate
+	if options.AllowExpiredPreview {
+		validate = spec.ValidateAllowExpiredPreview
+	}
+	if err := validate(); err != nil {
 		return Spec{}, fmt.Errorf("GCP deployment plan is invalid: %w", err)
 	}
 	return spec, nil
@@ -327,10 +329,6 @@ func parseExpiration(value string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("expiresAt must be RFC3339: %w", err)
 	}
 	return expiresAt, nil
-}
-
-func isOnlyExpirationError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "preview environment has expired")
 }
 
 func valueOrZero(value *int) int {
