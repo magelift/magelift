@@ -16,11 +16,18 @@ Auto-approved per the standing `/goal` instruction.
 
 ## Order of work
 
-- [ ] 1.1 GCP workload proof inside the GCP packed session —
+- [x] 1.1 GCP workload proof inside the GCP packed session —
   verify: reindex log, query output, recycle plus re-query log
-- [ ] 1.2 AWS provisioned proof inside the AWS packed session —
+  (`mldp6`: reindex exit 0, query HTTP 200, pod recycle + re-query
+  HTTP 200; `gcp-gke-autopilot-magento-search-live-mldp6-20260914.md`)
+- [x] 1.2 AWS provisioned proof inside the AWS packed session —
   verify: same three plus least-privilege notes, spend inside $5
-- [ ] 1.3 Matrix update if statuses change — verify: docs build
+  (CLOSED AS EXPERIMENTAL per the Risk rule: `mlaw1`
+  `searchMode:provisioned` PASS infra-only, Magento connection
+  validated by `setup:upgrade`, least-privilege notes in the mlaw1
+  record; explicit reindex/query/recycle not run, no retry)
+- [x] 1.3 Matrix update if statuses change — verify: docs build
+  (no status changes; `make docs` strict green)
 
 ## Risks
 

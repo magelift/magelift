@@ -27,22 +27,30 @@ Auto-approved per the standing `/goal` instruction.
   use (`.12` slim green, triple consumed by `mldp3`, tags
   `.8`/`.9`/`.10`/`.11`/`.12` deleted; evidence
   `gcp-gke-autopilot-magento-live-mldp3-20260914.md`)
-- [ ] 1.4 GCP packed session: preview, standard, HA, live Dial
+- [x] 1.4 GCP packed session: preview, standard, HA, live Dial
   proof, order-9 GCP search cell, order-10 preview loop —
   verify: evidence plus destroy plus assert_clean plus spend line
   (preview `mldp3` GREEN via subprocess, evidence committed;
   standard `mldp3` lost to transient GCP Valkey capacity, retry
   `mldp4` GREEN, evidence committed; HA `mldp5` 16/16 GREEN,
-  evidence committed. Order-9/10 live runs attach here as order-8
-  legs with shared evidence; their intents formalize at Phase 2.)
-- [ ] 1.5 AWS packed session: preview create-once plus warm
+  evidence committed; order-9 search `mldp6` PROVEN incl. reindex
+  plus query plus recycle, evidence committed after a `CONFIG__`
+  fix; order-10 loop `mldp7` plus `pr-999` lifecycle PROVEN.
+  Order-9/10 live runs attach here as order-8 legs with shared
+  evidence; their intents formalize at Phase 2.)
+- [x] 1.5 AWS packed session: preview create-once plus warm
   transitions (queue db, ecs-rabbitmq, amazon-mq; search
   disabled then provisioned per ADR 0012; database rds-mysql
   then aurora-mysql; ha multi-az; NO serverless apply,
   artemis, or CloudFront — August evidence stands), order-9
   AWS search cell — verify: evidence plus destroy plus
   assert_clean, spend inside $25
-- [ ] 1.6 Matrix plus evidence index update — verify: docs build
+  (`mlaw1` run 15: 9/9 PASS, `HARNESS_EXIT=0`, `assert_clean ok`,
+  evidence `aws-ecs-fargate-packed-keep-mlaw1-20260915.md`; CE
+  showed $0.03 posted at seal time, cap $25 intact)
+- [x] 1.6 Matrix plus evidence index update — verify: docs build
+  (no cell status changes — all stays experimental/certified as
+  before; README row added; `make docs` strict green)
 
 ## Risks
 
