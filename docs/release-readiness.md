@@ -121,7 +121,7 @@ Every public-tag gate is **Closed**, **Deferred**, or **Offline closed** with a 
 | GCP Magento 2.4.9 HA Standard live cell | **Experimental** | [gcha36](evidence/gcp-gke-ha-standard-magento-live-gcha36-20260820.md) catalog PASS including Magento seed-probe after pod, node, and backing-VM zone-loss. Not a certified target. Physical zone outage, regional DR, fencing/failback, and the broader matrix stay open. |
 | NOTICE + license review | **Closed** | `NOTICE`, `LICENSE`, `make license-check` (recorded below) |
 | First ship path | **Closed** | GitHub Release archives first; Homebrew cask publishes at the tag with the `cask-verify` pipeline job as the tested macOS install path; Windows = archive until winget/Scoop owned |
-| Packaging smoke | **Closed** | 2026-09-13 - `make release-smoke` exit 0 (serial single-target host build, both binaries) |
+| Packaging smoke | **Closed** | 2026-09-15 - `make release-smoke` exit 0 (serial single-target host build, both binaries); 2026-09-13 same |
 | Shared Kubernetes day-2 | **Offline closed** | Unit/fake-clientset: `*kube.Observe` + `*kube.Steps` type-identity across gcp/eksops/ovh/scaleway; AES256 DIY state unit proof. **Not** live GKE/OVH/SCW Magento acceptance beyond the GCP certified create-once path. |
 | Cloudflare DNS cutover (MIGRATE-04) | **Closed** | Live `cutover:dns` PASS + `--cleanup` on an operator-owned preview host (2026-08-02); script + Zone.DNS Edit via `cf` CLI. Preview-host rehearsal, not a production storefront cutover. See [evidence](evidence/README.md). |
 | Hosted CI / GitHub Actions | **Closed** | Public repo; hosted workflows run on `main`. Shell/docs/Go path filters green after org move (see Actions). Local Act remains available for offline iteration. |
@@ -172,12 +172,14 @@ smoke; that matrix belongs on CI.
 
 ### Packaging smoke record
 
+- 2026-09-15: `make release-smoke` exit 0 (serial single-target host build; asserts `magelift` plus `magelift-provider-gcp` in `dist/`)
 - 2026-09-13: `make release-smoke` exit 0 (serial single-target host build; asserts `magelift` plus `magelift-provider-gcp` in `dist/`)
 - 2026-07-28: `make release-smoke` exit 0 (serial single-target host build, ~159s)
 - 2026-07-22: `goreleaser check` validated `.goreleaser.yaml`
 
 ### License check record
 
+- 2026-09-15: `make license-check` exit 0
 - 2026-09-13: `make license-check` exit 0
 - `make license-check` green on 2026-07-22 with `--ignore=github.com/ovh/pulumi-ovh`
   (Apache-2.0 at module root; recorded in `NOTICE`).
