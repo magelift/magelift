@@ -38,3 +38,12 @@ CVE-2026-64600
 # Drop when FrankenPHP ships fixed versions; do not ignore MageLift module CVEs here.
 GHSA-r277-6w6q-xmqw
 GHSA-hrxh-6v49-42gf
+# 2026-09-15: 5 HIGH in the frankenphp gobinary, all fixed upstream
+# (kin-openapi 0.141.0/0.142.0, x/crypto 0.55.0, grpc-go 1.83.x) but
+# v1.12.7 is still the latest FrankenPHP release. Nothing to bump to.
+# Re-check on the next FrankenPHP release; RC tags publish no images.
+CVE-2026-76905
+CVE-2026-77354
+CVE-2026-56854
+CVE-2026-84304
+CVE-2026-84445

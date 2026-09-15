@@ -50,12 +50,12 @@ const (
 	EnvMediaURL       = "MAGELIFT_MEDIA_URL"
 	EnvQueueMode      = "MAGELIFT_QUEUE_MODE"
 
-	EnvMagentoSearchEngine        = "MAGENTO_DC_CATALOG__SEARCH__ENGINE"
-	EnvMagentoSearchHost          = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME"
-	EnvMagentoSearchPort          = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT"
-	EnvMagentoSearchIndexPrefix   = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX"
-	EnvMagentoSearchEnableAuth    = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH"
-	EnvMagentoSearchTimeout       = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_TIMEOUT"
+	EnvMagentoSearchEngine      = "MAGENTO_DC_CATALOG__SEARCH__ENGINE"
+	EnvMagentoSearchHost        = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME"
+	EnvMagentoSearchPort        = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT"
+	EnvMagentoSearchIndexPrefix = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX"
+	EnvMagentoSearchEnableAuth  = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH"
+	EnvMagentoSearchTimeout     = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_TIMEOUT"
 	// Magento never resolves #env() placeholders under env.php's system
 	// section, so the MAGENTO_DC search bindings above cannot reach
 	// catalog/search readers (live reindex saw the raw literals). These
@@ -67,10 +67,10 @@ const (
 	EnvMagentoSearchConfigIndexPrefix = "CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX"
 	EnvMagentoSearchConfigEnableAuth  = "CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH"
 	EnvMagentoSearchConfigTimeout     = "CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_SERVER_TIMEOUT"
-	EnvMagentoDCOverride          = "MAGENTO_DC__OVERRIDE"
-	EnvMagentoElasticsuiteServers = "MAGENTO_DC_ELASTICSUITE__ES_CLIENT__SERVERS"
-	EnvMagentoElasticsuiteHTTPS   = "MAGENTO_DC_ELASTICSUITE__ES_CLIENT__ENABLE_HTTPS_MODE"
-	EnvMagentoElasticsuiteAuth    = "MAGENTO_DC_ELASTICSUITE__ES_CLIENT__ENABLE_HTTP_AUTH"
+	EnvMagentoDCOverride              = "MAGENTO_DC__OVERRIDE"
+	EnvMagentoElasticsuiteServers     = "MAGENTO_DC_ELASTICSUITE__ES_CLIENT__SERVERS"
+	EnvMagentoElasticsuiteHTTPS       = "MAGENTO_DC_ELASTICSUITE__ES_CLIENT__ENABLE_HTTPS_MODE"
+	EnvMagentoElasticsuiteAuth        = "MAGENTO_DC_ELASTICSUITE__ES_CLIENT__ENABLE_HTTP_AUTH"
 
 	EnvMagentoQueueHost     = "MAGENTO_DC_QUEUE__AMQP__HOST"
 	EnvMagentoQueuePort     = "MAGENTO_DC_QUEUE__AMQP__PORT"
@@ -172,18 +172,18 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 		}
 		bindings = append(bindings,
 			EnvBinding{Name: EnvSearchEndpoint, Value: endpoints.SearchEndpoint},
-		EnvBinding{Name: EnvMagentoSearchEngine, Value: "opensearch"},
-		EnvBinding{Name: EnvMagentoSearchHost, Value: nativeHost},
-		EnvBinding{Name: EnvMagentoSearchPort, Value: port},
-		EnvBinding{Name: EnvMagentoSearchIndexPrefix, Value: "magento2"},
-		EnvBinding{Name: EnvMagentoSearchEnableAuth, Value: "0"},
-		EnvBinding{Name: EnvMagentoSearchTimeout, Value: "15"},
-		EnvBinding{Name: EnvMagentoSearchConfigEngine, Value: "opensearch"},
-		EnvBinding{Name: EnvMagentoSearchConfigHost, Value: nativeHost},
-		EnvBinding{Name: EnvMagentoSearchConfigPort, Value: port},
-		EnvBinding{Name: EnvMagentoSearchConfigIndexPrefix, Value: "magento2"},
-		EnvBinding{Name: EnvMagentoSearchConfigEnableAuth, Value: "0"},
-		EnvBinding{Name: EnvMagentoSearchConfigTimeout, Value: "15"},
+			EnvBinding{Name: EnvMagentoSearchEngine, Value: "opensearch"},
+			EnvBinding{Name: EnvMagentoSearchHost, Value: nativeHost},
+			EnvBinding{Name: EnvMagentoSearchPort, Value: port},
+			EnvBinding{Name: EnvMagentoSearchIndexPrefix, Value: "magento2"},
+			EnvBinding{Name: EnvMagentoSearchEnableAuth, Value: "0"},
+			EnvBinding{Name: EnvMagentoSearchTimeout, Value: "15"},
+			EnvBinding{Name: EnvMagentoSearchConfigEngine, Value: "opensearch"},
+			EnvBinding{Name: EnvMagentoSearchConfigHost, Value: nativeHost},
+			EnvBinding{Name: EnvMagentoSearchConfigPort, Value: port},
+			EnvBinding{Name: EnvMagentoSearchConfigIndexPrefix, Value: "magento2"},
+			EnvBinding{Name: EnvMagentoSearchConfigEnableAuth, Value: "0"},
+			EnvBinding{Name: EnvMagentoSearchConfigTimeout, Value: "15"},
 			EnvBinding{Name: EnvMagentoElasticsuiteServers, Value: servers},
 			EnvBinding{Name: EnvMagentoElasticsuiteHTTPS, Value: httpsMode},
 			EnvBinding{Name: EnvMagentoElasticsuiteAuth, Value: "0"},
