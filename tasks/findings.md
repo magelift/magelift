@@ -384,3 +384,17 @@ PULUMI_CONFIG_PASSPHRASE_FILE=/tmp/magelift-gcp-mldp6-search/pulumi-passphrase.
   deleted the three helpers. New per-provider tests pin:
   expired+flag plans AND carries the flag, strict still rejects,
   non-expiry defect still rejected.
+
+## Order-14: never checkout-dance mid-session (2026-09-15)
+
+- Compared shellcheck wip-vs-main via `stash; checkout main;
+  checkout wip; stash pop` in one line with output truncated by
+  `head`. The tree came back with 247 files silently absent; only
+  noticed 10 commands later when a fuller `git status` showed the
+  deletions. Recovered with `git checkout -- .` (lost only
+  uncommitted intent-doc rewrites, reproduced after).
+- Rule: compare branches via a disposable `git worktree` or
+  `git show <ref>:<path>`. Never switch branches in a dirty live
+  tree, and never truncate `git status` when verifying tree state.
+- The explicit-path `git add -A -- <paths>` contained the blast
+  radius: the gate-fix commit stayed surgical (6 files).

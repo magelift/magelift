@@ -2,45 +2,40 @@
 status: planned
 slug: v1-stable-cut
 spec: spec.md
-half: engineering
+half: tag
 ---
 
-# Plan: v1-stable-cut engineering half
+# Plan: v1-stable-cut tag half
 
-Auto-approved per the standing `/goal` instruction.
+Auto-approved per the standing `/goal` instruction. Stops before the
+tag (ask-first). Order-7 items stay complete in history.
 
 ## Files that change
 
-- EDIT `internal/upgrade/upgrade.go`: Windows zip asset plus zip
-  extraction.
-- EDIT `internal/upgrade/upgrade_test.go`: zip plus tar.gz Install
-  fixtures.
-- EDIT `internal/cli/subprocess.go`: lock-vs-CLI skew warning.
-- EDIT `internal/cli/subprocess_test.go`: skew warning test.
-- EDIT `scripts/release-smoke-local.sh`: provider binary assertion.
-- EDIT `.github/workflows/release.yml`: macOS cask-verify job.
-- EDIT `docs/release-readiness.md`: fresh smoke plus license records.
-- EDIT `docs/install.md`: only if the asset-name audit finds drift.
-- EDIT `docs/post-beta-roadmap.md`: provider co-upgrade row.
+- EDIT `docs/release-readiness.md`: re-date re-verified rows only.
+- EDIT workflows only for the phantom-tag reword (done).
+- Session only: license-check, release-smoke, CI dispatch, workflow
+  inspection, upgrade-path tests.
 
 ## Order of work
 
-- [x] 1.1 Windows upgrade plus fixtures — verify: upgrade package
-  tests pin zip and tar.gz paths
-- [x] 1.2 Skew warning plus test — verify: CLI test pins the warning
-  text and versions
-- [x] 1.3 Smoke script plus `make release-smoke` — verify: exit 0
-  with both binaries; record the date
-- [x] 1.4 Cask-verify job plus `make workflow-check` — verify: green
-- [x] 1.5 `make license-check`, doc records, co-upgrade row,
-  install audit — verify: docs build green
-- [x] 1.6 Full suite plus lint on touched packages — verify: green
+- [x] 4.1 License check fresh — verify: `make license-check` exit 0
+- [x] 4.2 Release smoke fresh — verify: `make release-smoke` exit 0
+- [ ] 4.3 CI green for the release scope — verify: dispatched run
+  triaged; my failures fixed, the rest evidenced
+- [x] 4.4 Release workflow inspection — verify: archives, checksums,
+  SBOM, SLSA, keyless Sigstore, cask-verify present
+- [x] 4.5 Upgrade verify path — verify: tests green
+- [ ] 4.6 Gate board re-date plus report — verify: report ends with
+  the tag command plus go/no-go, no tag created
 
 ## Risks
 
-- Release smoke is slow on this runner (single-target serial);
-  allow a long block window.
+- The release branch is `wip/all-local-work`, not `main`; the report
+  must say so and the tag command must name the intended ref.
+- Any red gate stops the order at 4.6 with no-go; fixing a gate is
+  an explicit change, not a silent edit.
 
 ## Proof
 
-Package tests, smoke log, workflow-check log, license log, suite.
+Command outputs, workflow excerpts, CI run URLs, report with go/no-go.
