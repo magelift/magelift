@@ -83,7 +83,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		args.DesiredWebReplicas = 1
 	}
 	if strings.TrimSpace(args.KapsuleVersion) == "" {
-		args.KapsuleVersion = "1.36.1"
+		args.KapsuleVersion = "1.36.4"
 	}
 	if strings.TrimSpace(args.NodeType) == "" {
 		args.NodeType = "DEV1-M"

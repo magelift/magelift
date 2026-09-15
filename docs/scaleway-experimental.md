@@ -5,7 +5,7 @@ empty. `scaleway` / `kapsule` stays experimental. Bootstrap remains
 `ErrNotSupported`. Cache family is Redis (`cacheMode: redis`); do not relabel
 it Valkey. Magento runtime is `not-run` until a Magento-compatible digest is
 exercised inside the $50 own-money cap; current proof is
-[infrastructure-only](evidence/scaleway-kapsule-infrastructure-live-2026-08-13.md).
+[infrastructure-only](evidence/scaleway-kapsule-infrastructure-live-2026-09-15.md).
 Live bar is at most one Kapsule preview, then destroy. No KEEP. Vendors attach
 to a GCP origin.
 
@@ -26,8 +26,8 @@ target:
     zones: [fr-par-1, fr-par-2] # one Kapsule pool per listed zone
     networkCidr: 10.40.0.0/16
     cacheMode: redis          # escape hatch: Scaleway has no managed Valkey yet
-    redisVersion: 8.6.3       # query the provider catalog before changing this
-    kapsuleVersion: 1.36.1    # query the provider catalog before changing this
+    redisVersion: 8.6.6       # query the provider catalog before changing this
+    kapsuleVersion: 1.36.4    # query the provider catalog before changing this
     imageDigest: ghcr.io/org/magento@sha256:...
     encryptionKeySecret: magento-crypt-key
 ```
@@ -103,7 +103,7 @@ release-signing certification. When Magento runtime health is enabled, or when
 set, the harness signs if a Cosign identity-token source is configured and
 promotes the digest before `deploy --infra-only`. The full shared Kubernetes
 deploy path is covered offline. See
-[scaleway-kapsule-infrastructure-live-2026-08-13.md](evidence/scaleway-kapsule-infrastructure-live-2026-08-13.md).
+[scaleway-kapsule-infrastructure-live-2026-09-15.md](evidence/scaleway-kapsule-infrastructure-live-2026-09-15.md).
 
 Live runs have a six-hour disposable TTL by default. Set
 `MAGELIFT_ACCEPTANCE_TTL_SECONDS` to a shorter value when the selected shape is

@@ -42,10 +42,10 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, errors.New("Scaleway project ID and zone are required")
 	}
 	if strings.TrimSpace(args.NodeType) == "" {
-		args.NodeType = "RED1-MICRO"
+		args.NodeType = "RED1-micro"
 	}
 	if strings.TrimSpace(args.Version) == "" {
-		args.Version = "8.6.3"
+		args.Version = "8.6.6"
 	}
 	if args.ClusterSize == 0 {
 		args.ClusterSize = 1
@@ -70,6 +70,15 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		Length:          pulumi.Int(32),
 		Special:         pulumi.Bool(true),
 		OverrideSpecial: pulumi.String("!@#%+=-"),
+		// Scaleway rejects managed passwords missing any class
+		// (proven live: "must contain at least one digit, one
+		// uppercase, one lowercase and one special character").
+		// Special:true alone only widens the pool; the minima
+		// below guarantee each class appears.
+		MinLower:   pulumi.Int(2),
+		MinUpper:   pulumi.Int(2),
+		MinNumeric: pulumi.Int(2),
+		MinSpecial: pulumi.Int(2),
 	}, parent)
 	if err != nil {
 		return nil, fmt.Errorf("generate cache password: %w", err)

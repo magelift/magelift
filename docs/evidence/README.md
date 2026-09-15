@@ -33,7 +33,7 @@ emptied the prefix; it still does not replace
 | AWS EKS self-managed Magento 2.4.9, ELB HTTP, teardown | [20260817bf](aws-eks-self-managed-magento-live-20260817bf.md) | Node loss, zone loss, edge, EKS as a certified target |
 | GCP GKE Standard Magento 2.4.9 with Memorystore Valkey 9.0 | [20260815](gcp-gke-standard-magento-valkey90-live-20260815.md) | Public HTTP/TLS, HA, certified target |
 | GCP GKE Standard HA Magento known-content (pod/node/zone loss) | [gcha36](gcp-gke-ha-standard-magento-live-gcha36-20260820.md) | Physical zone outage, regional DR, certified target |
-| Scaleway Kapsule infrastructure-only | [2026-08-13](scaleway-kapsule-infrastructure-live-2026-08-13.md) | Magento runtime (`not-run`), HA |
+| Scaleway Kapsule infrastructure-only | [2026-09-15](scaleway-kapsule-infrastructure-live-2026-09-15.md) | Magento runtime (`not-run`), HA |
 | OVH MKS infrastructure-only | [2026-08-12](ovh-mks-infrastructure-live-2026-08-12.md) | Magento runtime (`not-run`), HA |
 | AWS CloudFront Magento-safe WAF | [2026-08-13](aws-cloudfront-magento-safe-waf-live-2026-08-13.md) | EKS edge |
 | AWS CloudFront alias HTTPS | [2026-08-13](aws-cloudfront-alias-https-live-2026-08-13.md) | Magento origin |
