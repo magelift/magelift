@@ -500,8 +500,11 @@ func TestCoreEnvBindingsAWSOpenSearchUsesHTTPS443(t *testing.T) {
 	for _, binding := range bindings {
 		found[binding.Name] = binding.Value
 	}
-	if found[EnvMagentoSearchHost] != "vpc-shop.eu-west-3.es.amazonaws.com" || found[EnvMagentoSearchPort] != "443" {
+	if found[EnvMagentoSearchHost] != "https://vpc-shop.eu-west-3.es.amazonaws.com" || found[EnvMagentoSearchPort] != "443" {
 		t.Fatalf("AWS OpenSearch host/port = %q:%q", found[EnvMagentoSearchHost], found[EnvMagentoSearchPort])
+	}
+	if found[EnvMagentoSearchConfigHost] != "https://vpc-shop.eu-west-3.es.amazonaws.com" || found[EnvMagentoSearchConfigPort] != "443" {
+		t.Fatalf("AWS OpenSearch CONFIG__ host/port = %q:%q", found[EnvMagentoSearchConfigHost], found[EnvMagentoSearchConfigPort])
 	}
 	if found[EnvMagentoSearchEnableAuth] != "0" || found[EnvMagentoElasticsuiteHTTPS] != "1" {
 		t.Fatalf("AWS OpenSearch auth/https = %q/%q", found[EnvMagentoSearchEnableAuth], found[EnvMagentoElasticsuiteHTTPS])

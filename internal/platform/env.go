@@ -159,16 +159,27 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 	}
 	if endpoints.SearchEndpoint != "" {
 		host, port, httpsMode, servers := magentoSearchTarget(endpoints.SearchEndpoint)
+		// Native Magento derives the OpenSearch scheme from the hostname's own
+		// scheme (SearchClient::buildOSConfig defaults to http). AWS managed
+		// domains are HTTPS-only, so an unprefixed hostname makes Magento dial
+		// http://host:443 and the domain answers 400 (proven live on mlaw1:
+		// setup:upgrade "Unknown 400 error from OpenSearch"). ElasticSuite
+		// takes bare host:port plus a separate HTTPS flag, so only the native
+		// hostname bindings carry the scheme.
+		nativeHost := host
+		if httpsMode == "1" && !strings.HasPrefix(nativeHost, "https://") {
+			nativeHost = "https://" + nativeHost
+		}
 		bindings = append(bindings,
 			EnvBinding{Name: EnvSearchEndpoint, Value: endpoints.SearchEndpoint},
 		EnvBinding{Name: EnvMagentoSearchEngine, Value: "opensearch"},
-		EnvBinding{Name: EnvMagentoSearchHost, Value: host},
+		EnvBinding{Name: EnvMagentoSearchHost, Value: nativeHost},
 		EnvBinding{Name: EnvMagentoSearchPort, Value: port},
 		EnvBinding{Name: EnvMagentoSearchIndexPrefix, Value: "magento2"},
 		EnvBinding{Name: EnvMagentoSearchEnableAuth, Value: "0"},
 		EnvBinding{Name: EnvMagentoSearchTimeout, Value: "15"},
 		EnvBinding{Name: EnvMagentoSearchConfigEngine, Value: "opensearch"},
-		EnvBinding{Name: EnvMagentoSearchConfigHost, Value: host},
+		EnvBinding{Name: EnvMagentoSearchConfigHost, Value: nativeHost},
 		EnvBinding{Name: EnvMagentoSearchConfigPort, Value: port},
 		EnvBinding{Name: EnvMagentoSearchConfigIndexPrefix, Value: "magento2"},
 		EnvBinding{Name: EnvMagentoSearchConfigEnableAuth, Value: "0"},
