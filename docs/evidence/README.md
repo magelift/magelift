@@ -28,6 +28,7 @@ emptied the prefix; it still does not replace
 | AWS ECS Fargate packed KEEP (amazon-mq, AOSS, Aurora, HA), destroy | [awsba](aws-ecs-fargate-packed-keep-awsba-20260823.md) | Certified-row replacement for 20260813ai; Managed Instances; EKS |
 | AWS ECS Fargate packed (amazon-mq, provisioned OpenSearch, Aurora, HA), destroy | [mlaw1](aws-ecs-fargate-packed-keep-mlaw1-20260915.md) | Certified-row replacement for 20260813ai; AOSS/serverless; Managed Instances; EKS |
 | AWS ECS Managed Instances Magento KEEP (`queueMode:db`), destroy | [awsmi](aws-ecs-managed-instances-packed-keep-awsmi-20260823.md) | Certified Managed Instances; mix with Fargate/ASG providers; EKS |
+| GCP GKE Autopilot preview-env loop (base 13/13, `pr-999` lifecycle, guards, teardown) | [mldp7](gcp-gke-autopilot-preview-loop-mldp7-20260915.md) | CI-generated workflow live run; multi-region previews |
 | AWS EKS Auto Mode Magento KEEP (`queueMode:rabbitmq`, search disabled), destroy | [awsek](aws-eks-auto-mode-packed-keep-awsek-20260823.md) | Certified EKS; managed-node-groups / self-managed / EKS Fargate; OpenSearch |
 | AWS EKS self-managed Magento 2.4.9, ELB HTTP, teardown | [20260817bf](aws-eks-self-managed-magento-live-20260817bf.md) | Node loss, zone loss, edge, EKS as a certified target |
 | GCP GKE Standard Magento 2.4.9 with Memorystore Valkey 9.0 | [20260815](gcp-gke-standard-magento-valkey90-live-20260815.md) | Public HTTP/TLS, HA, certified target |
