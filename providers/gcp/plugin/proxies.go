@@ -170,13 +170,17 @@ func (s *Server) resilienceAdapter(ctx context.Context, project string) (sdk.Res
 	return adapter, nil
 }
 
-// proxyError maps adapter errors. Edge capability errors (unsupported action
-// for this adapter) are invalid requests, not upstream failures: the
-// adapter descriptor advertises support precisely so callers can avoid them.
+// proxyError maps adapter errors. Capability errors (unsupported action for
+// this adapter) are invalid requests, not upstream failures: the adapter
+// descriptors advertise support precisely so callers can avoid them.
 func proxyError(err error) *sdk.OperationError {
-	var capability sdk.EdgeCapabilityError
-	if errors.As(err, &capability) {
-		return &sdk.OperationError{Code: sdk.ErrCodeInvalid, Message: capability.Error()}
+	var edgeCapability sdk.EdgeCapabilityError
+	if errors.As(err, &edgeCapability) {
+		return &sdk.OperationError{Code: sdk.ErrCodeInvalid, Message: edgeCapability.Error()}
+	}
+	var resilienceCapability sdk.ResilienceCapabilityError
+	if errors.As(err, &resilienceCapability) {
+		return &sdk.OperationError{Code: sdk.ErrCodeInvalid, Message: resilienceCapability.Error()}
 	}
 	return mapError(err)
 }
