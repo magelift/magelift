@@ -167,6 +167,7 @@ type DescribeResponse struct {
 	ProviderVersion string             `json:"providerVersion"`
 	Operations      []OperationVersion `json:"operations"`
 	Runtimes        []string           `json:"runtimes"`
+	Error           *OperationError    `json:"error,omitempty"`
 }
 
 // Envelope carries core-resolved deployment coordinates. Every plan-scoped
@@ -225,8 +226,10 @@ type PlanResult struct {
 }
 
 // ValidateConfigRequest asks the provider to validate a raw target block.
+// Runtime carries the target runtime (validation is runtime-aware).
 type ValidateConfigRequest struct {
 	ProtocolVersion string `json:"protocolVersion"`
+	Runtime         string `json:"runtime,omitempty"`
 	TargetBlock     []byte `json:"targetBlock"`
 }
 
@@ -248,12 +251,14 @@ type StackCall struct {
 	PreviewMetadataJSON []byte     `json:"previewMetadataJson,omitempty"`
 }
 
-// ChangeSummary counts lifecycle mutations for human output.
+// ChangeSummary counts lifecycle mutations for human output. Replace is
+// reported separately (never folded into create/delete counts).
 type ChangeSummary struct {
-	Create int `json:"create"`
-	Update int `json:"update"`
-	Delete int `json:"delete"`
-	Same   int `json:"same"`
+	Create  int `json:"create"`
+	Update  int `json:"update"`
+	Delete  int `json:"delete"`
+	Replace int `json:"replace"`
+	Same    int `json:"same"`
 }
 
 // LifecycleResult carries apply/destroy outcomes.
@@ -264,9 +269,12 @@ type LifecycleResult struct {
 }
 
 // OutputsResult carries stack outputs as a JSON object. The schema is the
-// provider's exported output map (string keys, JSON values).
+// provider's exported output map (string keys, JSON values). SecretKeys
+// names the keys whose values are secrets so the core can redact for
+// display while machinery keeps the raw values.
 type OutputsResult struct {
 	ValuesJSON []byte          `json:"valuesJson,omitempty"`
+	SecretKeys []string        `json:"secretKeys,omitempty"`
 	Error      *OperationError `json:"error,omitempty"`
 }
 
@@ -426,18 +434,24 @@ type SecretReadResult struct {
 }
 
 // TailLogsCall mirrors RuntimeObserve.TailLogs. QueryJSON encodes a
-// platform.LogQuery; outputs are not needed (the plan locates the cluster).
+// platform.LogQuery; OutputsJSON carries the stack outputs the log client
+// is built from (kubeconfig).
 type TailLogsCall struct {
 	ProtocolVersion string     `json:"protocolVersion"`
 	Envelope        Envelope   `json:"envelope"`
 	Plan            StoredPlan `json:"plan"`
+	OutputsJSON     []byte     `json:"outputsJson,omitempty"`
 	QueryJSON       []byte     `json:"queryJson"`
 }
 
 // TailLogsResult carries the JSON-encoded []platform.LogEvent.
+// FailuresJSON carries JSON-encoded "source: reason" strings when the query
+// succeeded partially; a non-empty failures list is the partial signal
+// (the core reports partial status instead of failing).
 type TailLogsResult struct {
-	EventsJSON []byte          `json:"eventsJson,omitempty"`
-	Error      *OperationError `json:"error,omitempty"`
+	EventsJSON   []byte          `json:"eventsJson,omitempty"`
+	FailuresJSON []byte          `json:"failuresJson,omitempty"`
+	Error        *OperationError `json:"error,omitempty"`
 }
 
 // CheckRuntimeCall mirrors RuntimeObserve.CheckRuntime. OutputsJSON encodes
@@ -493,6 +507,7 @@ type CostInputsRequest struct {
 	ProtocolVersion string   `json:"protocolVersion"`
 	Envelope        Envelope `json:"envelope"`
 	TargetBlock     []byte   `json:"targetBlock"`
+	Runtime         string   `json:"runtime,omitempty"`
 	Live            bool     `json:"live,omitempty"`
 	Budget          bool     `json:"budget,omitempty"`
 }
@@ -518,9 +533,12 @@ type InventoryResult struct {
 }
 
 // DeleteCall mirrors CleanupProvider.Delete. ResourceJSON encodes an
-// sdk.CleanupResource.
+// sdk.CleanupResource; Project and Marker carry the ledger identity the
+// resource alone does not contain.
 type DeleteCall struct {
 	ProtocolVersion string `json:"protocolVersion"`
+	Project         string `json:"project"`
+	Marker          string `json:"marker"`
 	ResourceJSON    []byte `json:"resourceJson"`
 }
 
@@ -554,9 +572,10 @@ type DestroyLeftoverBackupsResult struct {
 // EdgePlanCall forwards an edge adapter Plan call; RequestJSON encodes an
 // EdgePlanRequest.
 type EdgePlanCall struct {
-	ProtocolVersion string   `json:"protocolVersion"`
-	Envelope        Envelope `json:"envelope"`
-	RequestJSON     []byte   `json:"requestJson"`
+	ProtocolVersion string     `json:"protocolVersion"`
+	Envelope        Envelope   `json:"envelope"`
+	Plan            StoredPlan `json:"plan"`
+	RequestJSON     []byte     `json:"requestJson"`
 }
 
 // EdgePlanResult carries the JSON-encoded edge plan.
@@ -568,9 +587,10 @@ type EdgePlanResult struct {
 // EdgeExecuteCall forwards an edge adapter execution; RequestJSON encodes
 // an EdgeExecutionRequest.
 type EdgeExecuteCall struct {
-	ProtocolVersion string   `json:"protocolVersion"`
-	Envelope        Envelope `json:"envelope"`
-	RequestJSON     []byte   `json:"requestJson"`
+	ProtocolVersion string     `json:"protocolVersion"`
+	Envelope        Envelope   `json:"envelope"`
+	Plan            StoredPlan `json:"plan"`
+	RequestJSON     []byte     `json:"requestJson"`
 }
 
 // EdgeExecuteResult carries the JSON-encoded edge execution result.
@@ -582,9 +602,10 @@ type EdgeExecuteResult struct {
 // ResiliencePlanCall forwards a resilience adapter Plan call; RequestJSON
 // encodes a ResiliencePlanRequest.
 type ResiliencePlanCall struct {
-	ProtocolVersion string   `json:"protocolVersion"`
-	Envelope        Envelope `json:"envelope"`
-	RequestJSON     []byte   `json:"requestJson"`
+	ProtocolVersion string     `json:"protocolVersion"`
+	Envelope        Envelope   `json:"envelope"`
+	Plan            StoredPlan `json:"plan"`
+	RequestJSON     []byte     `json:"requestJson"`
 }
 
 // ResiliencePlanResult carries the JSON-encoded resilience plan.
@@ -596,9 +617,10 @@ type ResiliencePlanResult struct {
 // ResilienceExecuteCall forwards a resilience stage execution;
 // RequestJSON encodes a ResilienceExecutionRequest.
 type ResilienceExecuteCall struct {
-	ProtocolVersion string   `json:"protocolVersion"`
-	Envelope        Envelope `json:"envelope"`
-	RequestJSON     []byte   `json:"requestJson"`
+	ProtocolVersion string     `json:"protocolVersion"`
+	Envelope        Envelope   `json:"envelope"`
+	Plan            StoredPlan `json:"plan"`
+	RequestJSON     []byte     `json:"requestJson"`
 }
 
 // ResilienceExecuteResult carries the JSON-encoded stage result.
