@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	gcpobservability "github.com/magelift/magelift/providers/gcp/observability"
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
+	gcpobservability "github.com/magelift/magelift/providers/gcp/observability"
 	"github.com/magelift/magelift/sdk"
 )
 

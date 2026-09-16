@@ -18,8 +18,8 @@ import (
 	"syscall"
 	"time"
 
-	gcpedge "github.com/magelift/magelift/providers/gcp/edge"
 	"github.com/magelift/magelift/internal/edge/waf"
+	gcpedge "github.com/magelift/magelift/providers/gcp/edge"
 	"github.com/magelift/magelift/sdk"
 )
 

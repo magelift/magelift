@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/magelift/magelift/internal/cloud/kube"
-	"github.com/magelift/magelift/providers/gcp/nrdot"
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
+	"github.com/magelift/magelift/providers/gcp/nrdot"
 	"github.com/magelift/magelift/sdk"
 	"k8s.io/client-go/kubernetes"
 )

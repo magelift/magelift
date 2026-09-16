@@ -16,8 +16,8 @@ import (
 	"time"
 
 	pubsub "cloud.google.com/go/pubsub/v2"
-	gcpresilience "github.com/magelift/magelift/providers/gcp/resilience"
 	"github.com/magelift/magelift/internal/provider"
+	gcpresilience "github.com/magelift/magelift/providers/gcp/resilience"
 	"github.com/magelift/magelift/sdk"
 )
 
