@@ -10,8 +10,8 @@ import (
 	"regexp"
 	"strings"
 
-	kubequeue "github.com/magelift/magelift/internal/cloud/gcp/queue"
-	kubesearch "github.com/magelift/magelift/internal/cloud/gcp/search"
+	kubequeue "github.com/magelift/magelift/internal/cloud/kube/queue"
+	kubesearch "github.com/magelift/magelift/internal/cloud/kube/search"
 	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/eks"
