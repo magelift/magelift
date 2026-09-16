@@ -1,123 +1,209 @@
 ---
-status: superseded
+status: specified
 slug: full-deployment-coverage
 intent: intent.md
 ---
 
-> HISTORICAL 2026-09-16: superseded by `intent/audit.md` (F13). Retained for
-> reference; not approval of the rewritten draft scope (reference onboarding).
-> Do not implement from this spec.
-
-# Spec: every resource Magento needs, managed by Magelift (HISTORICAL)
+# Spec: reference onboarding for the alpha recipe
 
 ## Requirements
 
-What the system must do. Testable. Not file paths. One block per requirement,
-each with at least one scenario.
+### Requirement: Alpha recipe template from init
 
-### Requirement: Audit report with triage
+`magelift init --provider gcp` SHALL scaffold the alpha recipe: GCP
+GKE Autopilot preview running Magento 2.4.9 with HTTPS, assets,
+OpenSearch, DB queue, cron, persistent media, baked static content,
+and a commented SMTP block plus prerequisite pointers. The starter
+SHALL pass `config validate` and plan against a scripted plugin
+session without edits beyond project, GCP project, and domains.
 
-The intent SHALL produce an audit enumerating every manual item on the AWS
-deployment path, each triaged as deliberate-BYO or gap-to-close.
+#### Scenario: Starter matches the recipe
 
-#### Scenario: Full triage, zero orphans
+- **WHEN** `magelift init --provider gcp` writes a starter
+- **THEN** it sets provider `gcp`, runtime `gke-autopilot`, Magento
+  `2.4.9`, preset `preview`, static content locales `en_US` with a
+  documented theme, and no `openSearchMode: disabled` pin (omission
+  defaults to the recipe OpenSearch); it carries commented SMTP and
+  prerequisite pointers; `config validate` passes on the output
 
-- **WHEN** the audit report is reviewed
-- **THEN** every researcher-found manual item is dispositioned with file:line evidence
-- **AND** each deliberate-BYO item cites its deciding doc or ADR plus the operator procedure
-- **AND** each gap-to-close is either covered by this spec or filed as a follow-up stub (slug + one-line problem), leaving zero untriaged items
+### Requirement: GCP SMTP wiring for operator relay
 
-### Requirement: Managed SES sending on AWS
+Deploy on GCP SHALL wire `email.mode: smtp` and BYO `email.mode: ses`
+into Magento through Secret Manager references: host, port, username,
+and sender from config, password resolved at deploy from the
+`gcp-secret-manager://` credential reference into a Kubernetes Secret
+consumed as Magento SMTP env. `disabled` SHALL wire nothing.
+Managed `tem`/`ovh` SHALL fail closed at config validation naming
+the unimplemented mode (no silent unwired email).
 
-Deploy SHALL provision the SES identity, DKIM, and SMTP credentials, and
-wire Magento SMTP from managed secrets, with no console steps.
+#### Scenario: Relay env reaches Magento
 
-#### Scenario: Verified identity with wired Magento SMTP
+- **WHEN** a GCP preview deploys with `email.mode: smtp`, host,
+  port, username, sender, and a `gcp-secret-manager://` credential
+- **THEN** the workload env carries `CONFIG__DEFAULT__SYSTEM__SMTP__HOST`,
+  `__PORT`, `__USERNAME`, `__AUTH=LOGIN`, `__SSL=tls`,
+  `__DISABLE=0`, the sender identity, and the password from the
+  referenced secret only (value never in YAML, logs, or evidence)
 
-- **WHEN** a deployment requests managed SES for a verifiable domain
-- **THEN** the SES identity verifies, DKIM records are created in the operator-supplied hosted zone, SMTP credentials land in a MageLift-managed secret, and Magento env receives host, port, username plus the secret reference
-- **AND** sandbox-exit remains an explicit manual step (AWS support request), surfaced pre-deploy, not discovered at first send
+#### Scenario: Unimplemented managed modes fail closed
 
-### Requirement: Managed TEM sending on Scaleway
+- **WHEN** config sets `email.managed` with mode `tem` or `ovh`
+- **THEN** validation fails naming mode `tem`/`ovh` as not
+  implemented for alpha
 
-Deploy SHALL provision the TEM domain, validation, and SMTP credentials for
-fr-par shops.
+### Requirement: Human prerequisites named pre-deploy
 
-#### Scenario: Verified TEM domain with wired Magento SMTP
+`magelift doctor` SHALL guide GCP toolchain readiness (including
+`gcloud` for human login flows, optional under workload identity),
+and the onboarding doc SHALL name every human-action prerequisite
+with a procedure before deploy: GCP billing activation, domain
+ownership and DNS, Adobe licenses, SMTP relay account plus
+credentials, and sandbox/sending-limit exits. F13 corrections hold:
+secret references, DNS, and managed KMS do not imply manual steps
+where MageLift automates them.
 
-- **WHEN** a Scaleway deployment requests managed TEM (Essential tier default)
-- **THEN** `scaleway.tem.Domain` + `DomainValidation` verify, SMTP credentials (Project ID + API secret) land in a managed secret, and Magento env is wired
-- **AND** non-fr-par regions fail closed with the region limit named
+#### Scenario: Prerequisites visible before spend
 
-### Requirement: Managed OVH mailbox sending
+- **WHEN** a new team reads the onboarding doc and runs `doctor`
+  on the GCP starter
+- **THEN** the doc lists billing, domain, license, and relay
+  prerequisites with procedures, and `doctor` reports toolchain
+  status with next actions instead of failing on cloud state it
+  cannot see offline
 
-Deploy SHALL provision a sending mailbox on the operator's existing MX Plan
-domain and wire it, with quota limits recorded.
+### Requirement: Honest cost language end to end
 
-#### Scenario: Mailbox created and wired with honest limits
+Onboarding SHALL report estimates, unpriced lists, alerts, and
+limits with no hard-cap or spend-stopped promise. The remaining
+F10 fallout — design-system copy and the cross-provider budget
+label — SHALL be fixed; `magelift cost` behavior (account-free
+estimates, GCP `--live` refusal, `Enforced: false` budgets) is
+verified, not changed.
 
-- **WHEN** an OVH deployment requests managed email
-- **THEN** `ovh.EmailDomainAccount` is created on the operator-supplied domain and Magento SMTP points at `smtp.mail.ovh.net:465`
-- **AND** the ~200 mails/hour quota and no-bulk limit are recorded in the capability matrix, and the MX Plan service itself stays operator-supplied
+#### Scenario: No cap language remains
 
-### Requirement: Cloudflare and SendGrid stay manual
+- **WHEN** website design copy and the budget field label are reviewed
+- **THEN** neither promises caps nor stopped spend, and the label
+  names a planning input rather than a maximum
 
-Cloudflare Email Sending and SendGrid SHALL stay documented manual steps
-plus their `smtp` recipes: the Pulumi Cloudflare provider (v6.20.0) exposes
-no sending-domain resource, and no stable SendGrid package exists (a
-single-maintainer alpha does not qualify).
+### Requirement: Classified deploy failures
 
-#### Scenario: No hand-rolled sending path
+GCP deploy and destroy failures SHALL print classified causes: plugin
+typed errors map to stable exit codes with next-step guidance
+(invalid input fails input-side, credential faults name
+re-authentication, conflicts name the holder, upstream faults stay
+operational). Raw provider text never surfaces without its class.
 
-- **WHEN** Pulumi coverage is re-checked
-- **THEN** both adapters stay out until a stable package exists; neither the Cloudflare API-only path (`emailSending.subdomains.create`) nor direct SendGrid API calls are hand-rolled behind the backends
+#### Scenario: Credential failure guides recovery
+
+- **WHEN** a deploy fails with a provider credential error
+- **THEN** the CLI exits non-zero naming re-authentication as the
+  next step, and the class is asserted in tests with a scripted
+  plugin session (no cloud)
+
+### Requirement: Skills describe the built CLI
+
+The user skills SHALL match the built CLI on the onboarding path:
+rollback documents its required flags, the migrate sidecar name is
+exact, and the operate skill warns that GCP `cost --live` errors.
+No skill SHALL document a command, flag, or flow the CLI lacks.
+
+#### Scenario: Skills pass their acceptance
+
+- **WHEN** the skills suites run
+- **THEN** every documented command, flag, and flow resolves
+  against the built CLI, including the corrected rollback,
+  sidecar, and cost-live cases
+
+### Requirement: Security docs match the alpha runtime
+
+The onboarding security posture (workload identity, secret
+handling, network exposure) SHALL match the deployed GCP
+manifests. Any F12 remainder touching the alpha recipe is fixed
+in docs; runtime changes belong to their owning intents, not here.
+
+#### Scenario: Posture claims trace to manifests
+
+- **WHEN** each onboarding security claim is traced
+- **THEN** it names the manifest or mechanism that implements it,
+  or the claim is removed
+
+### Requirement: One documented onboarding path
+
+`docs/onboarding.md` SHALL walk install, template, prerequisites,
+validate, deploy, and per-surface verification (HTTPS, assets,
+search, cron/consumers, outbound SMTP, persistent media) on the
+alpha recipe, linked from getting-started. Website install copy
+SHALL point at the same path with honest cost and responsibility
+language. Human docs and website copy go through humanizer, then
+remove-ai-marks.
+
+#### Scenario: Path walks without gaps
+
+- **WHEN** the onboarding doc is followed step by step
+- **THEN** every step names its command, expected output, and
+  failure class, and no step requires an undocumented manual
+  action outside the prerequisites section
 
 ## Design
 
-How it fits the existing codebase: surfaces, data, APIs, ownership.
+Email: `sdk.Application` gains an `Email` settings struct mirroring
+the cloud shape (mode, host, port, username, sender, credential
+reference; no managed block — core guarantees unmanaged for GCP by
+construction plus provider-side mode validation). `PlanRequest`
+carries it; `PlanFromInputs` maps smtp/ses-BYО into `Spec.Email`;
+the stack component resolves the password with a Pulumi
+`secretmanager.GetSecretVersion` data source exactly like
+`resolveEncryptionKey`, marks it secret, and mounts it into the
+workload alongside `CONFIG__DEFAULT__SYSTEM__SMTP__*` env using
+the same key names AWS uses. Preview default (`disabled`) is
+unchanged core behavior. Managed `tem`/`ovh` rejected in
+`validateCloudEmail` with `not implemented for alpha` naming the
+mode. SES files untouched (complete AWS managed path, out of scope).
 
-Adapters land in taxonomy-decided homes after order 16, one provider per
-package, no shared email component. Config surface: the existing `ses` mode
-plus new `tem` and `ovh` modes gain provisioning when requested (exact shape,
-a `managed` block vs provision-by-default, is pinned at plan time against
-the config tests); the Magento SMTP wiring they produce is unchanged. DNS
-records go into operator-supplied zones only: zones themselves stay BYO.
-Preview environments keep email `disabled` unless the audit shows a cheap
-managed-preview path.
+Config: presence of `email.managed` stays provider-routed as today;
+only the tem/ovh rejection is added. `MonthlyBudgetCents` label
+text becomes provider-neutral; `make generate` refreshes derived
+artifacts.
 
-Sequenced after the lean-core trio (ROADMAP orders 16-18): taxonomy first
-decides adapter homes, sever keeps core imports clean, and the module split
-is unaffected (adapters stay in the root module).
+CLI: `internal/cli` maps `*providerhost.PluginError` by code at
+the deploy/destroy boundary (invalid→2 with input guidance,
+credential→3 naming re-authentication, conflict→3 naming the
+holder when present, not-found→3, upstream→1). `magelift doctor`
+adds `gcloud` as guided-optional for GCP targets through the
+existing toolchain spec mechanism. Init GCP starter matches the
+recipe per Requirement 1 (schema-validated in tests).
+
+Docs/skills/website: new `docs/onboarding.md` (F13-corrected
+prerequisites, SMTP relay procedure with a named relay operator,
+verify steps per surface reusing `magelift exec`/`health`/`logs`,
+failure classes, cost honesty). Getting-started links it as the
+alpha path. Website install section points at the same commands;
+design MASTER copy fixed. Skill edits are surgical flag/name/note
+fixes; `magelift-configure` gains no new commands.
 
 ## Gotchas / policy flags
 
-Security, auth, PII, compatibility, contradictions the spec cannot satisfy.
-
-- SES sandbox exit, OVH domain-service purchase, and TEM tier upgrades are
-  human/API steps no adapter can close; each gets a procedure pointer, not
-  silence.
-- Secrets by reference only; Pulumi-created credentials flow through the
-  same secret-ref validation as operator-supplied ones.
-- Nothing is called managed until matrix + evidence say so; each adapter
-  needs a live cell.
-- Brownfield stays untouched: adopted resources are never mutated into
-  managed ones.
-- TEM is fr-par only; OVH sending is quota-bound mailbox SMTP, not a
-  transactional API; both limits are user-visible in validation errors and
-  the matrix, not buried in docs.
+- Secrets by reference only; the deploy-time password resolution
+  returns Pulumi secrets into K8s Secrets, never into logs, plans,
+  or evidence. Tests assert redaction on the SMTP env path.
+- No new CLI commands: verification reuses `exec`/`health`/`logs`.
+- Preview email stays `disabled` by default; the SMTP procedure
+  targets staging/production-shaped environments.
+- SES managed path stays AWS-only and untouched; TEM/OVH stay
+  unimplemented until post-alpha demand with explicit errors.
+- Preview expiry mechanics stay provider-owned; onboarding
+  documents the policy text only.
+- Humanizer then remove-ai-marks on all touched prose; record passes.
 
 ## Open questions carried forward
 
-Unresolved items from intent.md, plus new ones. Each has an owner or a default.
-
-- Managed email on preview/staging, or production-class only? Default:
-  production-class only; previews stay `disabled`. Owner: implementer.
-- TEM tier default (Essential pay-as-you-go vs Scale EUR 80)? Default:
-  Essential. Owner: implementer.
-- OVH: can the provider also create the email domain service, or only
-  accounts on it? Default: accounts only until implementation proves
-  otherwise. Owner: implementer.
-- Non-email gaps (ACM provisioning, hosted zones, KMS, secret ARNs, log
-  bucket, DNS cutover): follow-up intent(s) after this one ships. Default:
-  one intent per gap cluster, sequenced on the ROADMAP. Owner: maintainer.
-- ROADMAP placement: decided order 22, opening Phase 5. Owner: maintainer.
+- SMTP default resolved: operator relay via `smtp` mode (ses-BYО
+  rides the same mechanism). No GCP-native managed path exists;
+  a managed relay would exceed alpha scope. Owner: spec author
+  (decided).
+- SES files resolved: keep untouched (complete AWS path).
+  Owner: spec author (decided).
+- Time-from-clean-workstation target: measure first in
+  `reference-store-acceptance`, set the bar from pilot data.
+  Owner: maintainer.
