@@ -19,6 +19,7 @@ import (
 	gcpops "github.com/magelift/magelift/providers/gcp/ops"
 	gcpresilience "github.com/magelift/magelift/providers/gcp/resilience"
 	gcpstack "github.com/magelift/magelift/providers/gcp/stack"
+	gcpstate "github.com/magelift/magelift/providers/gcp/state"
 	"github.com/magelift/magelift/sdk"
 )
 
@@ -47,6 +48,7 @@ func DefaultTimeouts() map[sdk.Operation]Timeout {
 		sdk.OpDescribe:               {Duration: 15 * time.Second, RetryableOnTimeout: true},
 		sdk.OpValidateConfig:         {Duration: 15 * time.Second, RetryableOnTimeout: true},
 		sdk.OpPlan:                   slowRead,
+		sdk.OpPreview:                {Duration: 10 * time.Minute, RetryableOnTimeout: true},
 		sdk.OpApply:                  {Duration: 60 * time.Minute},
 		sdk.OpOutputs:                {Duration: 2 * time.Minute, RetryableOnTimeout: true},
 		sdk.OpDestroy:                {Duration: 60 * time.Minute},
@@ -175,6 +177,13 @@ func mapError(err error) *sdk.OperationError {
 	message, _ := secretsafe.RedactSensitiveText(err.Error())
 	if automation.IsConcurrentUpdate(err) {
 		return &sdk.OperationError{Code: sdk.ErrCodeConflict, Message: message + " (another update holds the stack; no mutation was applied)", Retryable: true}
+	}
+	var ownershipErr *automation.PreviewOwnershipError
+	if errors.As(err, &ownershipErr) {
+		return &sdk.OperationError{Code: sdk.ErrCodeConflict, Message: message}
+	}
+	if errors.Is(err, gcpstate.ErrLocked) {
+		return &sdk.OperationError{Code: sdk.ErrCodeConflict, Message: message}
 	}
 	var retrieveErr *oauth2.RetrieveError
 	if errors.As(err, &retrieveErr) {

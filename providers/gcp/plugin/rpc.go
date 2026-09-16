@@ -194,6 +194,16 @@ func (s *RPCServer) Plan(req *sdk.PlanRequest, resp *sdk.PlanResult) error {
 	})
 }
 
+func (s *RPCServer) Preview(req *sdk.StackCall, resp *sdk.LifecycleResult) error {
+	version := ""
+	if req != nil {
+		version = req.ProtocolVersion
+	}
+	return dispatch(s, sdk.OpPreview, version, resp, func(ctx context.Context) (*sdk.LifecycleResult, *sdk.OperationError) {
+		return s.server().Preview(ctx, req)
+	})
+}
+
 func (s *RPCServer) Apply(req *sdk.StackCall, resp *sdk.LifecycleResult) error {
 	version := ""
 	if req != nil {

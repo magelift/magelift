@@ -35,8 +35,8 @@ func testEnvelope() sdk.Envelope {
 	return sdk.Envelope{
 		Project: "shop", Environment: "staging", Region: "europe-west1",
 		EnvironmentClass: "staging", StackName: "shop-staging-gcp-gke-autopilot",
-		StateBackendURL: "gs://shop-staging-gcp-state", SecretsProvider: "gcp",
-		Preset: "standard", AppVersion: "2.4.9",
+		StateBackendURL: "gs://shop-staging-gcp-state",
+		Preset:          "standard", AppVersion: "2.4.9",
 	}
 }
 
@@ -70,11 +70,20 @@ func (s stubAdmission) AdmitSpec(_ context.Context, spec gcpstack.Spec) (gcpstac
 }
 
 type stubAutomation struct {
+	preview map[string]int
 	update  map[string]int
 	destroy map[string]int
 	outputs auto.OutputMap
 	err     error
 	calls   []string
+}
+
+func (s *stubAutomation) Preview(_ context.Context, _ automation.Request, _ io.Writer) (map[string]int, error) {
+	s.calls = append(s.calls, "preview")
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.preview, nil
 }
 
 func (s *stubAutomation) Update(_ context.Context, _ automation.Request, _ io.Writer) (map[string]int, error) {
@@ -110,8 +119,8 @@ func TestDescribe(t *testing.T) {
 	if result.ProviderID != "gcp" || result.ProviderVersion != "v1.2.3" || result.ProtocolVersion != sdk.ProtocolV1 {
 		t.Fatalf("identity = %#v", result)
 	}
-	if len(result.Operations) != 29 {
-		t.Fatalf("operations = %d, want 29", len(result.Operations))
+	if len(result.Operations) != 30 {
+		t.Fatalf("operations = %d, want 30", len(result.Operations))
 	}
 	for _, operation := range result.Operations {
 		if operation.Version != "1.0" {
@@ -120,6 +129,19 @@ func TestDescribe(t *testing.T) {
 	}
 	if len(result.Runtimes) != 2 {
 		t.Fatalf("runtimes = %#v", result.Runtimes)
+	}
+	tiers := map[string]sdk.ExtensionCertificationTier{}
+	for _, runtime := range result.Runtimes {
+		tiers[runtime.Runtime] = runtime.Tier
+	}
+	if tiers["gke-autopilot"] != sdk.ExtensionTierCertified || tiers["gke-standard"] != sdk.ExtensionTierExperimental {
+		t.Fatalf("runtime tiers = %#v", tiers)
+	}
+	if len(result.OutputKeys) == 0 {
+		t.Fatal("output keys are empty")
+	}
+	if result.Edge == nil || result.Edge.Provider != "gcp" || result.Resilience == nil || result.Resilience.Provider != "gcp" {
+		t.Fatalf("adapter descriptors = %#v %#v", result.Edge, result.Resilience)
 	}
 }
 
@@ -166,6 +188,9 @@ func TestPlan(t *testing.T) {
 	if result.Plan.StackName == "" || result.Plan.StateBackendURL == "" || len(result.Plan.Opaque) == 0 {
 		t.Fatalf("plan = %#v", result.Plan)
 	}
+	if result.Plan.Tier != sdk.ExtensionTierExperimental {
+		t.Fatalf("standard plan tier = %q, want experimental", result.Plan.Tier)
+	}
 	var spec gcpstack.Spec
 	if err := json.Unmarshal(result.Plan.Opaque, &spec); err != nil {
 		t.Fatal(err)
@@ -202,12 +227,19 @@ func TestPlanRejectsBadBlock(t *testing.T) {
 	}
 }
 
-func TestApplyAndDestroy(t *testing.T) {
+func TestPreviewApplyAndDestroy(t *testing.T) {
 	t.Parallel()
-	backend := &stubAutomation{update: map[string]int{"create": 3, "same": 10}, destroy: map[string]int{"delete": 3}}
+	backend := &stubAutomation{preview: map[string]int{"create": 3}, update: map[string]int{"create": 3, "same": 10}, destroy: map[string]int{"delete": 3}}
 	server := &Server{NewStack: func(context.Context, string, gcpstack.Spec, string) (Automation, error) { return backend, nil }}
 	envelope, plan := testEnvelope(), storedTestPlan(t, testSpec())
 	envelope.StackName = plan.StackName
+	previewed, operr := server.Preview(context.Background(), &sdk.StackCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan})
+	if operr != nil {
+		t.Fatal(operr)
+	}
+	if previewed.Summary.Create != 3 {
+		t.Fatalf("preview summary = %#v", previewed.Summary)
+	}
 	applied, operr := server.Apply(context.Background(), &sdk.StackCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan})
 	if operr != nil {
 		t.Fatal(operr)
@@ -222,7 +254,7 @@ func TestApplyAndDestroy(t *testing.T) {
 	if destroyed.Summary.Delete != 3 {
 		t.Fatalf("summary = %#v", destroyed.Summary)
 	}
-	if len(backend.calls) != 2 || backend.calls[0] != "update" || backend.calls[1] != "destroy" {
+	if len(backend.calls) != 3 || backend.calls[0] != "preview" || backend.calls[1] != "update" || backend.calls[2] != "destroy" {
 		t.Fatalf("calls = %#v", backend.calls)
 	}
 }

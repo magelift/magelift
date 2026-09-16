@@ -13,6 +13,7 @@ import (
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/secretsafe"
 	gcpbootstrap "github.com/magelift/magelift/providers/gcp/bootstrap"
+	gcpedge "github.com/magelift/magelift/providers/gcp/edge"
 	"github.com/magelift/magelift/providers/gcp/naming"
 	gcpops "github.com/magelift/magelift/providers/gcp/ops"
 	gcpresilience "github.com/magelift/magelift/providers/gcp/resilience"
@@ -21,11 +22,12 @@ import (
 	"github.com/magelift/magelift/sdk"
 )
 
-// Automation abstracts the Pulumi stack for apply/destroy/outputs. Update
-// and Destroy route through the shared backend (preview ownership
-// included); Outputs returns the rich output map so the server can report
-// which keys are secrets.
+// Automation abstracts the Pulumi stack for preview/apply/destroy/outputs.
+// Preview, Update, and Destroy route through the shared backend (preview
+// ownership included); Outputs returns the rich output map so the server
+// can report which keys are secrets.
 type Automation interface {
+	Preview(context.Context, automation.Request, io.Writer) (map[string]int, error)
 	Update(context.Context, automation.Request, io.Writer) (map[string]int, error)
 	Destroy(context.Context, automation.Request, io.Writer) (map[string]int, error)
 	Outputs(context.Context) (auto.OutputMap, error)
@@ -34,6 +36,10 @@ type Automation interface {
 type pulumiAutomation struct {
 	backend *automation.PulumiBackend
 	stack   *auto.Stack
+}
+
+func (a pulumiAutomation) Preview(ctx context.Context, request automation.Request, diagnostics io.Writer) (map[string]int, error) {
+	return a.backend.Preview(ctx, request, diagnostics)
 }
 
 func (a pulumiAutomation) Update(ctx context.Context, request automation.Request, diagnostics io.Writer) (map[string]int, error) {
@@ -76,12 +82,21 @@ func (s *Server) Describe(_ context.Context, req *sdk.DescribeRequest) (*sdk.Des
 	if s != nil {
 		version = s.Version
 	}
+	runtimes := make([]sdk.RuntimeAdvertisement, 0, len(Runtimes))
+	for _, runtime := range Runtimes {
+		runtimes = append(runtimes, sdk.RuntimeAdvertisement{Runtime: runtime, Tier: gcpstack.TierForRuntime(sdk.RuntimeID(runtime))})
+	}
+	edge := gcpedge.NativeDescriptor()
+	resilience := gcpresilience.Descriptor()
 	return &sdk.DescribeResponse{
 		ProtocolVersion: sdk.ProtocolV1,
 		ProviderID:      "gcp",
 		ProviderVersion: version,
 		Operations:      operations,
-		Runtimes:        append([]string(nil), Runtimes...),
+		Runtimes:        runtimes,
+		OutputKeys:      gcpstack.OutputKeys(),
+		Edge:            &edge,
+		Resilience:      &resilience,
 	}, nil
 }
 
@@ -151,11 +166,41 @@ func (s *Server) Plan(ctx context.Context, req *sdk.PlanRequest) (*sdk.PlanResul
 		StackName:        planned.StackName(),
 		Provider:         string(planned.Provider()),
 		Runtime:          string(planned.Runtime()),
+		Tier:             admitted.SDKTier(),
 		ImageDigest:      admitted.Artifact.ImageDigest,
 		StateBackendURL:  backendURL,
 		DeployInputsJSON: inputs,
 		Opaque:           opaque,
 	}}, nil
+}
+
+// Preview runs the Pulumi preview for a stored plan.
+func (s *Server) Preview(ctx context.Context, req *sdk.StackCall) (*sdk.LifecycleResult, *sdk.OperationError) {
+	if req == nil {
+		return nil, InvalidError("stack call is required")
+	}
+	spec, operr := loadSpec(req.Plan.Opaque)
+	if operr != nil {
+		return nil, operr
+	}
+	if operr := checkEnvelope(req.Envelope, req.Plan, spec); operr != nil {
+		return nil, operr
+	}
+	metadata, operr := previewMetadata(req.PreviewMetadataJSON)
+	if operr != nil {
+		return nil, operr
+	}
+	backend, err := s.newStack(ctx, req.Plan.StackName, spec, backendURLFor(req.Plan, req.Envelope))
+	if err != nil {
+		return nil, mapError(err)
+	}
+	planned := gcpstack.SpecPlanned{Spec: spec}
+	var diagnostics cappedBuffer
+	changes, err := backend.Preview(ctx, automation.Request{Target: planned.TargetDescriptor(), Preview: metadata}, &diagnostics)
+	if err != nil {
+		return nil, withDiagnostics(mapError(err), diagnostics.lines())
+	}
+	return &sdk.LifecycleResult{Summary: summarizeChanges(changes), Diagnostics: diagnostics.lines()}, nil
 }
 
 // Apply runs the Pulumi update for a stored plan.
