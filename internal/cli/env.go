@@ -14,7 +14,6 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/magelift/magelift/internal/automation"
-	awsendpoint "github.com/magelift/magelift/internal/cloud/aws/endpoint"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/dumpimport"
 	"github.com/magelift/magelift/internal/localdev"
@@ -718,7 +717,7 @@ func (o *options) runMediaSync(ctx context.Context, environment, source string) 
 		if err != nil {
 			return nil, invalid(err)
 		}
-		client, err = newMediaS3Client(ctx, planned.Region())
+		client, err = o.newMediaS3Client(ctx, planned.Region())
 		if err != nil {
 			return nil, err
 		}
@@ -763,10 +762,14 @@ func (o *options) planStackForEnvironment(environment string) (string, platform.
 	return environment, planned, nil
 }
 
-func newMediaS3Client(ctx context.Context, region string) (*s3.Client, error) {
-	endpoint, err := awsendpoint.FromEnv()
-	if err != nil {
-		return nil, invalid(err)
+func (o *options) newMediaS3Client(ctx context.Context, region string) (*s3.Client, error) {
+	endpoint := ""
+	if o.mediaEndpoint != nil {
+		var err error
+		endpoint, err = o.mediaEndpoint()
+		if err != nil {
+			return nil, invalid(err)
+		}
 	}
 	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
 	if err != nil {

@@ -42,6 +42,8 @@ type Hooks struct {
 	NewComposerGCPSecrets      func(context.Context) (ComposerSecretProvider, error)
 	NewLeftoverBackupDestroyer func(context.Context, platform.PlannedStack) (LeftoverBackupDestroyer, error)
 	NewGCPCleanupProvider      func(context.Context, sdk.CleanupLedger) (CleanupProvider, error)
+	NewCleanupProvider         func(context.Context, sdk.CleanupLedger) (CleanupProvider, error)
+	MediaEndpoint              func() (string, error)
 }
 
 type exitError struct {
@@ -117,6 +119,7 @@ type options struct {
 	newLeftoverBackupDestroyer func(context.Context, platform.PlannedStack) (leftoverBackupDestroyer, error)
 	newGCPCleanupProvider      func(context.Context, sdk.CleanupLedger) (cleanupProvider, error)
 	newCleanupProvider         func(context.Context, sdk.CleanupLedger) (cleanupProvider, error)
+	mediaEndpoint              func() (string, error)
 	listPreviewRecords         func(context.Context, string, string) ([]automation.PreviewRecord, error)
 }
 
@@ -231,6 +234,8 @@ func newCommandWithHooks(stdout, stderr io.Writer, modules *platform.ModuleRegis
 		newComposerGCPSecrets:      hooks.NewComposerGCPSecrets,
 		newLeftoverBackupDestroyer: hooks.NewLeftoverBackupDestroyer,
 		newGCPCleanupProvider:      hooks.NewGCPCleanupProvider,
+		newCleanupProvider:         hooks.NewCleanupProvider,
+		mediaEndpoint:              hooks.MediaEndpoint,
 		newUpgrade:                 func() upgradeClient { return mageliftupgrade.New(nil) },
 		newFastly: func(request fastlyedge.Request) (fastlyLifecycle, error) {
 			runner := fastlyedge.ExecRunner{}
