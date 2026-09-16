@@ -86,7 +86,7 @@ Each box carries the check that closes it.
 - [x] 5.1 Implement token-source auth with the four expiry tests (expiry-refresh, refresh-failure typed error, restart statelessness, CI-shaped ADC) plus no-secrets-in-logs asserts — verify: `go test ./providers/gcp/auth/ -count=1` passes
 - [x] 5.2 Apply follower updates (identity, ops, shared, cleanup suites; synthetic missing-required flipped with 4.3) — all absorbed by 4.2/4.3 with updated expectations; verified green here — verify: every suite in the follower list greens with updated expectations
 - [x] 6.1 Wire Makefile targets and forwards; update docs and skill; run humanizer plus marks — verify: `make provider-gcp-build`, `make core-leanness`, and `make docs` exit 0; prose passes recorded
-- [ ] 6.2 Run the full proof matrix — verify: the workspace provider build plus both import-closure gates from the spec pass verbatim, all affected suites green, `git status` shows only listed paths
+- [x] 6.2 Run the full proof matrix — verify: the workspace provider build plus both import-closure gates from the spec pass verbatim, all affected suites green, `git status` shows only listed paths
 
 ## Risks
 

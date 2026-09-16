@@ -9,7 +9,7 @@
 # pending provider cleanup.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
 source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
@@ -160,5 +160,5 @@ fi
 acceptance_prepare_lifecycle
 acceptance_start_ttl_watchdog "$ACCEPTANCE_TTL_SECONDS" "$ttl_marker"
 cleanup_enabled=1
-(cd "$ROOT" && go run ./cmd/gcp-observability-acceptance --project "$project" --marker "$marker" --verify-budget "$verify_budget")
+(cd "$ROOT" && go run ./providers/gcp/cmd/gcp-observability-acceptance --project "$project" --marker "$marker" --verify-budget "$verify_budget")
 printf 'GCP observability acceptance resources cleaned through exact owning-service inventory marker=%s\n' "$marker"

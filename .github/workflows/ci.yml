@@ -478,7 +478,7 @@ jobs:
           SECRET_MANAGER_EMULATOR_HOST: 127.0.0.1:4588
           PUBSUB_EMULATOR_HOST: 127.0.0.1:4588
           GOOGLE_CLOUD_PROJECT: floci-local
-        run: go test -race -tags=floci_gcp ./tests/floci-gcp -count=1
+        run: go test -race -tags=floci_gcp ./providers/gcp/floci/floci-gcp -count=1
 
   release-config:
     needs: changes

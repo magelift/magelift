@@ -51,8 +51,8 @@ acceptance_campaign_require_isolated_backend 's3://this-worktree-state'
 unset PULUMI_BACKEND_URL
 acceptance_campaign_require_isolated_backend ''
 
-for script in aws-acceptance-local.sh gcp-acceptance-local.sh k8s-acceptance-local.sh; do
-	path="$ROOT/scripts/$script"
+for script in scripts/aws-acceptance-local.sh providers/gcp/scripts/gcp-acceptance-local.sh scripts/k8s-acceptance-local.sh; do
+	path="$ROOT/$script"
 	for required in 'lib-campaign-isolation.sh' 'acceptance_campaign_serial_go'; do
 		if ! grep -q "$required" "$path"; then
 			printf '%s missing %s\n' "$script" "$required" >&2
@@ -64,7 +64,7 @@ if ! grep -q 'acceptance_campaign_require_prefix aws' "$ROOT/scripts/aws-accepta
 	printf 'AWS live path must require a unique campaign prefix\n' >&2
 	exit 1
 fi
-if ! grep -q 'acceptance_campaign_require_prefix gcp' "$ROOT/scripts/gcp-acceptance-local.sh"; then
+if ! grep -q 'acceptance_campaign_require_prefix gcp' "$ROOT/providers/gcp/scripts/gcp-acceptance-local.sh"; then
 	printf 'GCP live path must require a unique campaign prefix\n' >&2
 	exit 1
 fi

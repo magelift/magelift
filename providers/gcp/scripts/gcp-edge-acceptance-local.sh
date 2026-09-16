@@ -12,7 +12,7 @@
 # health-gated URL-map failover through distinct origin HTML titles.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
 source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
@@ -465,7 +465,7 @@ armor_data_plane=not-run
 failover_rto=""
 
 go_gcp_edge() {
-	go run ./cmd/gcp-edge-acceptance \
+	go run ./providers/gcp/cmd/gcp-edge-acceptance \
 		--project "$project" \
 		--marker "$marker" \
 		--domain "$domain" \

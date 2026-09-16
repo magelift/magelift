@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
 source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
@@ -76,7 +76,7 @@ gcloud pubsub topics publish "${topic}" \
 	--message="magelift-pubsub:${fixture}:${marker}" \
 	--quiet >/dev/null
 
-go run ./cmd/gcp-pubsub-acceptance \
+go run ./providers/gcp/cmd/gcp-pubsub-acceptance \
 	--project="${project}" \
 	--subscription="${subscription}" \
 	--marker="${marker}" \

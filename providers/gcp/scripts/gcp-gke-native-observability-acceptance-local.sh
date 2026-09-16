@@ -6,7 +6,7 @@
 # delivery evidence.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
 source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh

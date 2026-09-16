@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$ROOT/scripts/gcp-cloudsql-cleanup-ledger-acceptance-local.sh"
+SCRIPT="$ROOT/providers/gcp/scripts/gcp-cloudsql-cleanup-ledger-acceptance-local.sh"
 
 bash -n "$SCRIPT"
 grep -Fq 'source "$ROOT/scripts/acceptance/lib-dependencies.sh"' "$SCRIPT" || {

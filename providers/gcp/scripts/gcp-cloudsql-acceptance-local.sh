@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
 source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
@@ -206,7 +206,7 @@ if [[ "${ready}" != 1 ]]; then
 	exit 1
 fi
 
-(cd "${ROOT}" && MAGELIFT_GCP_CLOUDSQL_ROOT_PASSWORD="${root_password}" MAGELIFT_GCP_CLOUDSQL_MYSQL_IMAGE="${mysql_image}" go run ./cmd/gcp-cloudsql-acceptance \
+(cd "${ROOT}" && MAGELIFT_GCP_CLOUDSQL_ROOT_PASSWORD="${root_password}" MAGELIFT_GCP_CLOUDSQL_MYSQL_IMAGE="${mysql_image}" go run ./providers/gcp/cmd/gcp-cloudsql-acceptance \
 	--project="${project}" \
 	--instance="${instance}" \
 	--marker="${marker}" \

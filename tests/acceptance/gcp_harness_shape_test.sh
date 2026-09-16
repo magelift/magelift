@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$ROOT/scripts/gcp-acceptance-local.sh"
+SCRIPT="$ROOT/providers/gcp/scripts/gcp-acceptance-local.sh"
 CATALOG="$ROOT/scripts/acceptance/cells-gcp-preview.txt"
 HA_CATALOG="$ROOT/scripts/acceptance/cells-gcp-high-availability.txt"
 INFRA_CATALOG="$ROOT/scripts/acceptance/cells-gcp-infra-only.txt"

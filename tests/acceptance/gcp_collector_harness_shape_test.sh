@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$ROOT/scripts/gcp-collector-acceptance-local.sh"
+SCRIPT="$ROOT/providers/gcp/scripts/gcp-collector-acceptance-local.sh"
 
 [[ -x "$SCRIPT" ]] || { printf 'GCP collector acceptance script is not executable\n' >&2; exit 1; }
 bash -n "$SCRIPT"
@@ -21,7 +21,7 @@ grep -Fq 'apiAccessCreateKeys' "$SCRIPT"
 grep -Fq 'apiAccessDeleteKeys' "$SCRIPT"
 grep -Fq 'MAGELIFT_GCP_COLLECTOR_LICENSE_KEY' "$SCRIPT"
 grep -Fq 'MAGELIFT_GCP_COLLECTOR_QUERY_KEY' "$SCRIPT"
-grep -Fq 'go run ./cmd/gcp-collector-acceptance' "$SCRIPT"
+grep -Fq 'go run ./providers/gcp/cmd/gcp-collector-acceptance' "$SCRIPT"
 grep -Fq 'acceptance_start_ttl_watchdog' "$SCRIPT"
 
 trap_line="$(rg -n '^trap cleanup EXIT$' "$SCRIPT" | head -1 | cut -d: -f1)"

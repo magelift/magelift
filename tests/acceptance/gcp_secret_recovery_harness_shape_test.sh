@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$ROOT/scripts/gcp-secret-recovery-acceptance-local.sh"
+SCRIPT="$ROOT/providers/gcp/scripts/gcp-secret-recovery-acceptance-local.sh"
 
 bash -n "$SCRIPT"
 grep -Fq 'MAGELIFT_GCP_SECRET_RECOVERY_DESTINATION' "$SCRIPT" || {

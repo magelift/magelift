@@ -6,7 +6,7 @@
 # Evidence: .magelift/gcp-matrix/matrix-results.md (six-column append_row only; no hand edits).
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 # shellcheck source=acceptance/lib-checkpoint.sh
 source "$ROOT/scripts/acceptance/lib-checkpoint.sh"
 # shellcheck source=acceptance/lib-evidence.sh

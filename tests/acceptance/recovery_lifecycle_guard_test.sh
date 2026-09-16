@@ -10,8 +10,8 @@ wrappers=(
 	 scripts/aws-database-recovery-acceptance-local.sh
 	 scripts/aws-secret-recovery-acceptance-local.sh
 	 scripts/aws-sqs-acceptance-local.sh
-	 scripts/gcp-recovery-acceptance-local.sh
-	 scripts/gcp-secret-recovery-acceptance-local.sh
+	 providers/gcp/scripts/gcp-recovery-acceptance-local.sh
+	 providers/gcp/scripts/gcp-secret-recovery-acceptance-local.sh
 	 scripts/scaleway-recovery-acceptance-local.sh
 	 scripts/scaleway-database-recovery-acceptance-local.sh
 	 scripts/ovh-recovery-acceptance-local.sh
