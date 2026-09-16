@@ -1,5 +1,5 @@
 ---
-status: planned
+status: done
 slug: gcp-autonomous-provider
 spec: spec.md
 ---

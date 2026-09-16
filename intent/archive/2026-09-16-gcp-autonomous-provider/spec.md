@@ -1,5 +1,5 @@
 ---
-status: specified
+status: done
 slug: gcp-autonomous-provider
 intent: intent.md
 ---
