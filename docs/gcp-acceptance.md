@@ -41,7 +41,7 @@ spending credits in dry-run:
 ```sh
 export MAGELIFT_ACCEPTANCE_DRY_RUN=1
 bash tests/acceptance/gcp_harness_shape_test.sh
-# or: ./scripts/gcp-acceptance-local.sh
+# or: ./providers/gcp/scripts/gcp-acceptance-local.sh
 ```
 
 The combined account-free stack is `make local-gates` (Pulumi mocks, harness,
@@ -191,13 +191,13 @@ export MAGELIFT_CERTIFICATE_IDENTITY='…'   # Sigstore subject that signed DIGE
 
 # Run one release and catalog. Change the release, digest, seed dump, or cell
 # catalog for the next compatible run while keeping NAME and DIR unchanged.
-./scripts/gcp-acceptance-local.sh up
+./providers/gcp/scripts/gcp-acceptance-local.sh up
 
 # After the last warm run, unset KEEP and resume the completed checkpoint. This
 # performs the final destroy, orphan scan, and resource assertion.
 export MAGELIFT_GCP_ACCEPTANCE_KEEP=false
 export MAGELIFT_GCP_ACCEPTANCE_RESUME=1
-./scripts/gcp-acceptance-local.sh up
+./providers/gcp/scripts/gcp-acceptance-local.sh up
 ```
 
 The checkpoint now includes a configuration fingerprint. A changed release,
@@ -227,12 +227,12 @@ the provider reject a valid destroy.
 cd /path/to/magelift
 
 # Preview graph (default)
-MAGELIFT_GCP_ACCEPTANCE=1 ./scripts/gcp-acceptance-local.sh preview
+MAGELIFT_GCP_ACCEPTANCE=1 ./providers/gcp/scripts/gcp-acceptance-local.sh preview
 
 # Short-lived real stack + live_cell_loop (destroy on EXIT)
 MAGELIFT_GCP_ACCEPTANCE=1 \
 MAGELIFT_GCP_ACCEPTANCE_DIGEST='ghcr.io/magelift/magento@sha256:…' \
-./scripts/gcp-acceptance-local.sh up
+./providers/gcp/scripts/gcp-acceptance-local.sh up
 ```
 
 Resume after a mid-matrix kill (stack kept with KEEP):
@@ -242,7 +242,7 @@ MAGELIFT_GCP_ACCEPTANCE=1 \
 MAGELIFT_GCP_ACCEPTANCE_KEEP=true \
 MAGELIFT_GCP_ACCEPTANCE_RESUME=1 \
 MAGELIFT_GCP_ACCEPTANCE_DIGEST='ghcr.io/…@sha256:…' \
-./scripts/gcp-acceptance-local.sh up
+./providers/gcp/scripts/gcp-acceptance-local.sh up
 ```
 
 Optional env:
@@ -277,7 +277,7 @@ Optional env:
 ### Native observability routing budget
 
 The disposable native Google Cloud Logging/Monitoring cell is run with
-`scripts/gcp-observability-acceptance-local.sh`. Its default
+`providers/gcp/scripts/gcp-observability-acceptance-local.sh`. Its default
 `MAGELIFT_GCP_OBSERVABILITY_VERIFY_BUDGET=4m` is intentionally a cheap
 configuration-and-delivery probe. A new sink can take substantially longer to
 show matching entries in its destination, so an operator who needs the custom
@@ -293,7 +293,7 @@ long-latency/inconclusive, never as a passing retention-delivery result.
 ### GKE collector delivery
 
 The GKE Contrib collector cell runs through
-`scripts/gcp-collector-acceptance-local.sh` and verifies logs, metrics, and
+`providers/gcp/scripts/gcp-collector-acceptance-local.sh` and verifies logs, metrics, and
 traces through a separate New Relic query credential. The default mode uses an
 existing cluster and never creates one. The live command requires
 `MAGELIFT_GCP_COLLECTOR_ACCEPTANCE=1`.

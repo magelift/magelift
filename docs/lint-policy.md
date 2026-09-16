@@ -30,7 +30,7 @@ six partitions in `.github/workflows/ci.yml`:
 | Partition | Packages | Why separate |
 | --- | --- | --- |
 | `aws` | `./internal/cloud/aws/...` | Largest Pulumi AWS SDK graph |
-| `gcp` | `./internal/cloud/gcp/...` | Independent GCP SDK graph |
+| `gcp` | `./providers/gcp/...` | Independent GCP SDK graph (autonomous plugin module) |
 | `ovh` | `./internal/cloud/ovh/...` | Independent OVH SDK graph |
 | `scaleway` | `./internal/cloud/scaleway/...` | Independent Scaleway SDK graph |
 | `core` | Explicit list of everything else (see workflow) | Go patterns cannot subtract `./internal/cloud/...` from `./internal/...` |

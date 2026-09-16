@@ -8,7 +8,7 @@ export GOMAXPROCS := 1
 export GOFLAGS := -p=1
 export GOMEMLIMIT := 1GiB
 
-.PHONY: help generate generate-check cli-docs cli-docs-check certification-docs certification-docs-check fmt fmt-check test sdk-test lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test pulumi-mock-test floci-test-aws floci-gcp-test local-gates acceptance-dependencies-check acceptance-harness-test aws-acceptance-local aws-recovery-acceptance-local aws-database-recovery-acceptance-local aws-secret-recovery-acceptance-local aws-sqs-acceptance-local aws-cloudwatch-acceptance-local aws-cloudfront-acceptance-local gcp-acceptance-local gcp-collector-acceptance-local gcp-cloudsql-acceptance-local gcp-cloudsql-destroy-retention-acceptance-local gcp-cloudsql-cleanup-ledger-acceptance-local gcp-recovery-acceptance-local gcp-secret-recovery-acceptance-local gcp-pubsub-acceptance-local gcp-observability-acceptance-local gcp-edge-acceptance-local ovh-acceptance-local ovh-recovery-acceptance-local ovh-database-recovery-acceptance-local scaleway-acceptance-local scaleway-recovery-acceptance-local scaleway-secret-recovery-acceptance-local scaleway-observability-acceptance-local fastly-acceptance-local newrelic-acceptance-local newrelic-otlp-acceptance-local skills-test extension-test docs docs-serve workflow-check verify release-smoke ci-act-go
+.PHONY: help generate generate-check cli-docs cli-docs-check certification-docs certification-docs-check fmt fmt-check test sdk-test lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test pulumi-mock-test floci-test-aws floci-gcp-test provider-gcp-build core-leanness local-gates acceptance-dependencies-check acceptance-harness-test aws-acceptance-local aws-recovery-acceptance-local aws-database-recovery-acceptance-local aws-secret-recovery-acceptance-local aws-sqs-acceptance-local aws-cloudwatch-acceptance-local aws-cloudfront-acceptance-local gcp-acceptance-local gcp-collector-acceptance-local gcp-cloudsql-acceptance-local gcp-cloudsql-destroy-retention-acceptance-local gcp-cloudsql-cleanup-ledger-acceptance-local gcp-recovery-acceptance-local gcp-secret-recovery-acceptance-local gcp-pubsub-acceptance-local gcp-observability-acceptance-local gcp-edge-acceptance-local ovh-acceptance-local ovh-recovery-acceptance-local ovh-database-recovery-acceptance-local scaleway-acceptance-local scaleway-recovery-acceptance-local scaleway-secret-recovery-acceptance-local scaleway-observability-acceptance-local fastly-acceptance-local newrelic-acceptance-local newrelic-otlp-acceptance-local skills-test extension-test docs docs-serve workflow-check verify release-smoke ci-act-go
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-36s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -24,6 +24,12 @@ test: ## Run Go tests with the race detector
 
 sdk-test: ## Run the SDK module suite standalone (no workspace)
 	cd sdk && GOWORK=off go test -race ./... -count=1
+
+provider-gcp-build: ## Build the autonomous GCP provider plugin binary
+	go build -o dist/magelift-provider-gcp ./providers/gcp/cmd/magelift-provider-gcp
+
+core-leanness: ## Prove the CLI carries no GCP provider code or cloud SDKs
+	test -z "$$(go list -deps ./cmd/magelift | grep -E 'magelift/providers/|magelift/internal/cloud/gcp|cloud\.google\.com/go|google\.golang\.org/api/')"
 
 lint: ## Run static Go checks
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./...
@@ -86,7 +92,7 @@ floci-test-aws: ## Run account-free AWS contract tests through Floci
 	./scripts/floci-test-aws.sh
 
 floci-gcp-test: ## Run account-free GCP contract tests through floci-gcp
-	./scripts/floci-gcp-test.sh
+	./providers/gcp/scripts/floci-gcp-test.sh
 
 local-gates: pulumi-mock-test acceptance-harness-test floci-test-aws floci-gcp-test ## Account-free stack: Pulumi mocks, harness, Floci AWS/GCP
 
@@ -148,10 +154,10 @@ acceptance-harness-test: acceptance-dependencies-check ## Run offline acceptance
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws-database-recovery-acceptance-local.sh -- bash scripts/aws-database-recovery-acceptance-local.sh
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws-secret-recovery-acceptance-local.sh -- bash scripts/aws-secret-recovery-acceptance-local.sh
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) ovh-recovery-acceptance-local.sh -- bash scripts/ovh-recovery-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp-observability-acceptance-local.sh -- bash scripts/gcp-observability-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp-recovery-acceptance-local.sh -- bash scripts/gcp-recovery-acceptance-local.sh
+	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp-observability-acceptance-local.sh -- bash providers/gcp/scripts/gcp-observability-acceptance-local.sh
+	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp-recovery-acceptance-local.sh -- bash providers/gcp/scripts/gcp-recovery-acceptance-local.sh
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_pubsub_harness_shape_test.sh -- bash tests/acceptance/gcp_pubsub_harness_shape_test.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp-secret-recovery-acceptance-local.sh -- bash scripts/gcp-secret-recovery-acceptance-local.sh
+	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp-secret-recovery-acceptance-local.sh -- bash providers/gcp/scripts/gcp-secret-recovery-acceptance-local.sh
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway-recovery-acceptance-local.sh -- bash scripts/scaleway-recovery-acceptance-local.sh
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway-secret-recovery-acceptance-local.sh -- bash scripts/scaleway-secret-recovery-acceptance-local.sh
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway-observability-acceptance-local.sh -- bash scripts/scaleway-observability-acceptance-local.sh
@@ -188,34 +194,34 @@ aws-cloudfront-acceptance-local: ## Run a disposable real-AWS CloudFront/WAF cel
 	./scripts/aws-cloudfront-acceptance-local.sh
 
 gcp-acceptance-local: ## Run a local real-GCP acceptance pass (experimental; destroys on exit)
-	./scripts/gcp-acceptance-local.sh
+	./providers/gcp/scripts/gcp-acceptance-local.sh
 
 gcp-collector-acceptance-local: ## Run a disposable GKE collector and New Relic signal cell (requires explicit live gate)
-	./scripts/gcp-collector-acceptance-local.sh
+	./providers/gcp/scripts/gcp-collector-acceptance-local.sh
 
 gcp-cloudsql-acceptance-local: ## Run a disposable real-GCP Cloud SQL backup/restore cell (destroys on exit). MAGELIFT_GCP_CLOUDSQL_DESTINATION=in-place for source overwrite.
-	./scripts/gcp-cloudsql-acceptance-local.sh
+	./providers/gcp/scripts/gcp-cloudsql-acceptance-local.sh
 
 gcp-cloudsql-destroy-retention-acceptance-local: ## Run a disposable real-GCP Cloud SQL final-backup leftover deletion cell (destroys on exit).
-	./scripts/gcp-cloudsql-destroy-retention-acceptance-local.sh
+	./providers/gcp/scripts/gcp-cloudsql-destroy-retention-acceptance-local.sh
 
 gcp-cloudsql-cleanup-ledger-acceptance-local: ## Run a disposable real-GCP Cloud SQL interrupt-and-reconcile cell (destroys on exit).
-	./scripts/gcp-cloudsql-cleanup-ledger-acceptance-local.sh
+	./providers/gcp/scripts/gcp-cloudsql-cleanup-ledger-acceptance-local.sh
 
 gcp-pubsub-acceptance-local: ## Run a disposable real-GCP Pub/Sub snapshot/seek cell (destroys on exit). MAGELIFT_GCP_PUBSUB_RECOVERY_DESTINATION=isolated for a new owned subscription.
-	./scripts/gcp-pubsub-acceptance-local.sh
+	./providers/gcp/scripts/gcp-pubsub-acceptance-local.sh
 
 gcp-observability-acceptance-local: ## Run a disposable real-GCP native observability cell (destroys on exit)
-	./scripts/gcp-observability-acceptance-local.sh
+	./providers/gcp/scripts/gcp-observability-acceptance-local.sh
 
 gcp-edge-acceptance-local: ## Run a disposable real-GCP Cloud CDN/Armor cell (destroys on exit)
-	./scripts/gcp-edge-acceptance-local.sh
+	./providers/gcp/scripts/gcp-edge-acceptance-local.sh
 
 gcp-recovery-acceptance-local: ## Run a disposable real-GCP Cloud Storage recovery cell (destroys on exit). MAGELIFT_GCP_RECOVERY_DESTINATION=in-place for source overwrite. MAGELIFT_GCP_RECOVERY_DATA_CLASS=infrastructure-state|audit-evidence|media.
-	./scripts/gcp-recovery-acceptance-local.sh
+	./providers/gcp/scripts/gcp-recovery-acceptance-local.sh
 
 gcp-secret-recovery-acceptance-local: ## Run a disposable real-GCP Secret Manager recovery cell (destroys on exit). MAGELIFT_GCP_SECRET_RECOVERY_DESTINATION=in-place for source overwrite.
-	./scripts/gcp-secret-recovery-acceptance-local.sh
+	./providers/gcp/scripts/gcp-secret-recovery-acceptance-local.sh
 
 ovh-acceptance-local: ## Run a local real-OVH MKS acceptance pass (experimental; destroys on exit)
 	./scripts/ovh-acceptance-local.sh
