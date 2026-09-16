@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -21,7 +22,7 @@ type Options struct {
 	LockPath   string
 	BinaryPath string
 	BundlePath string
-	Verifier   blobVerifier
+	Verifier   BlobVerifier
 }
 
 type Loaded struct {
@@ -63,7 +64,14 @@ func Load(ctx context.Context, opts Options) (Loaded, error) {
 	if err != nil {
 		return Loaded{}, err
 	}
-	if err := VerifyLocal(ctx, artifact, opts.BinaryPath, opts.BundlePath, opts.Verifier); err != nil {
+	bundlePath := opts.BundlePath
+	if strings.TrimSpace(bundlePath) == "" {
+		if strings.TrimSpace(artifact.Cosign.Bundle) == "" {
+			return Loaded{}, fmt.Errorf("%w: %s", ErrUnsigned, provider)
+		}
+		bundlePath = filepath.Join(filepath.Dir(opts.LockPath), artifact.Cosign.Bundle)
+	}
+	if err := VerifyLocal(ctx, artifact, opts.BinaryPath, bundlePath, opts.Verifier); err != nil {
 		return Loaded{}, err
 	}
 	return Loaded{

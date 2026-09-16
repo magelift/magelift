@@ -28,7 +28,7 @@ func TestShimEdgeAdapter(t *testing.T) {
 	if !ok {
 		t.Fatalf("planned = %T", planned)
 	}
-	adapter, err := NewShimEdgeAdapter(shim.module.client, planned)
+	adapter, err := NewShimEdgeAdapter(context.Background(), shim.module.client, planned)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestShimEdgeAdapter(t *testing.T) {
 	if result.OperationID != "op-1" {
 		t.Fatalf("result = %#v", result)
 	}
-	bare, err := NewShimEdgeAdapter(&Client{describe: &sdk.DescribeResponse{}}, planned)
+	bare, err := NewShimEdgeAdapter(context.Background(), &Client{describe: &sdk.DescribeResponse{}}, planned)
 	if err == nil || bare != nil {
 		t.Fatalf("missing descriptor = %v %v", bare, err)
 	}
@@ -76,7 +76,7 @@ func TestShimResilienceAdapter(t *testing.T) {
 	if !ok {
 		t.Fatalf("planned = %T", planned)
 	}
-	adapter, err := NewShimResilienceAdapter(shim.module.client, planned)
+	adapter, err := NewShimResilienceAdapter(context.Background(), shim.module.client, planned)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,6 +7,7 @@ import (
 	"net/rpc"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
@@ -16,6 +17,18 @@ import (
 // rpcCaller abstracts net/rpc for tests. Production uses *rpc.Client.
 type rpcCaller interface {
 	Call(serviceMethod string, args any, reply any) error
+}
+
+// RPCCaller is the exported test seam for scripted v2 sessions. Test
+// binaries in other packages implement it to drive shims and backends
+// without spawning a plugin process.
+type RPCCaller interface {
+	Call(serviceMethod string, args any, reply any) error
+}
+
+// NewTestClient builds a client over a scripted caller for tests.
+func NewTestClient(caller RPCCaller, described *sdk.DescribeResponse) *Client {
+	return &Client{caller: caller, describe: described}
 }
 
 // V2HandshakeConfig gates transport compatibility. It mirrors the plugin
@@ -48,7 +61,12 @@ func (p *v2HostPlugin) Client(_ *plugin.MuxBroker, c *rpc.Client) (any, error) {
 	return p.client, nil
 }
 
+// DialFunc starts and negotiates a v2 provider session.
+type DialFunc func(context.Context) (*Client, error)
+
 // Client is a negotiated v2 provider session. Close kills the subprocess.
+// A lazy client dials on first use; use NewLazyClient for registry-held
+// modules that must exist without credentials or processes.
 type Client struct {
 	caller  rpcCaller
 	process *plugin.Client
@@ -57,6 +75,46 @@ type Client struct {
 	provider        string
 	providerVersion string
 	describe        *sdk.DescribeResponse
+
+	mu       sync.Mutex
+	dial     DialFunc
+	delegate *Client
+}
+
+// NewLazyClient builds a client that dials once on first use and caches
+// the session. The first caller supplies the dial context.
+func NewLazyClient(dial DialFunc) *Client {
+	return &Client{dial: dial}
+}
+
+// ensure dials a lazy client. Connected clients return themselves.
+func (c *Client) ensure(ctx context.Context) (*Client, error) {
+	if c == nil {
+		return nil, errors.New("provider client is required")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.caller != nil {
+		return c, nil
+	}
+	if c.delegate != nil {
+		return c.delegate, nil
+	}
+	if c.dial == nil {
+		return nil, errors.New("provider client is not connected")
+	}
+	delegate, err := c.dial(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if delegate == nil {
+		return nil, errors.New("provider dial returned no client")
+	}
+	c.delegate = delegate
+	return delegate, nil
 }
 
 // DialOptions configures v2 dialing.
@@ -162,7 +220,22 @@ func (c *Client) Describe() *sdk.DescribeResponse {
 	if c == nil {
 		return nil
 	}
+	if c.describe == nil && c.delegate != nil {
+		return c.delegate.describe
+	}
 	return c.describe
+}
+
+// DescribeWith dials a lazy client and returns the negotiation response.
+func (c *Client) DescribeWith(ctx context.Context) (*sdk.DescribeResponse, error) {
+	client, err := c.ensure(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if client.describe == nil {
+		return nil, errors.New("provider client has not negotiated Describe")
+	}
+	return client.describe, nil
 }
 
 // Call invokes one typed operation. The caller checks the typed result
@@ -170,8 +243,9 @@ func (c *Client) Describe() *sdk.DescribeResponse {
 // the operation outcome. Cancelling the context kills the plugin process
 // (client abort).
 func Call[Req any, Resp any](ctx context.Context, c *Client, operation sdk.Operation, req *Req) (*Resp, error) {
-	if c == nil || c.caller == nil {
-		return nil, errors.New("provider client is not connected")
+	client, err := c.ensure(ctx)
+	if err != nil {
+		return nil, err
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -186,7 +260,7 @@ func Call[Req any, Resp any](ctx context.Context, c *Client, operation sdk.Opera
 	}
 	done := make(chan outcome, 1)
 	go func() {
-		done <- outcome{err: c.caller.Call(method, req, resp)}
+		done <- outcome{err: client.caller.Call(method, req, resp)}
 	}()
 	select {
 	case out := <-done:
@@ -195,7 +269,7 @@ func Call[Req any, Resp any](ctx context.Context, c *Client, operation sdk.Opera
 		}
 		return resp, nil
 	case <-ctx.Done():
-		c.Kill()
+		client.Kill()
 		return nil, fmt.Errorf("provider %s: %w", operation, ctx.Err())
 	}
 }
@@ -205,6 +279,9 @@ func (c *Client) ProviderID() string {
 	if c == nil {
 		return ""
 	}
+	if c.provider == "" && c.delegate != nil {
+		return c.delegate.provider
+	}
 	return c.provider
 }
 
@@ -212,6 +289,9 @@ func (c *Client) ProviderID() string {
 func (c *Client) ProviderVersion() string {
 	if c == nil {
 		return ""
+	}
+	if c.providerVersion == "" && c.delegate != nil {
+		return c.delegate.providerVersion
 	}
 	return c.providerVersion
 }
@@ -223,10 +303,16 @@ func (c *Client) Close() {
 
 // Kill terminates the plugin subprocess.
 func (c *Client) Kill() {
-	if c == nil || c.process == nil {
+	if c == nil {
 		return
 	}
-	c.process.Kill()
+	if c.process != nil {
+		c.process.Kill()
+		return
+	}
+	if c.delegate != nil {
+		c.delegate.Kill()
+	}
 }
 
 // PluginError is a typed provider operation failure.

@@ -2,7 +2,6 @@ package registry
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -71,10 +70,13 @@ func TestRegisterHooksCleanupProviderRejectsIncompleteGCPLedgerBeforeClientLooku
 	}
 }
 
-func TestRegisterHooksCleanupProviderBuildsGCPFromADC(t *testing.T) {
-	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", filepath.Join(t.TempDir(), "missing.json"))
-	_, err := RegisterHooks().NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "gcp", Project: "example-gcp"})
-	if err == nil || !strings.Contains(err.Error(), "create GCP Cloud SQL cleanup client") {
-		t.Fatalf("error = %v", err)
+func TestRegisterHooksCleanupProviderDefersGCPDial(t *testing.T) {
+	provider, err := RegisterHooks().NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "gcp", Project: "example-gcp", Marker: "m"})
+	if err != nil {
+		t.Fatalf("construction must not dial: %v", err)
+	}
+	_, err = provider.Inventory(context.Background(), sdk.CleanupInventoryRequest{Marker: "m", Provider: "gcp", Project: "example-gcp"})
+	if err == nil || !strings.Contains(err.Error(), "magelift.providers.lock") {
+		t.Fatalf("use without an installed plugin err = %v", err)
 	}
 }

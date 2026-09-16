@@ -220,14 +220,19 @@ func TestLoadSubprocessRefusesUnsignedVerify(t *testing.T) {
 	if err := os.WriteFile(lockPath, validLockJSON(digest), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	lockWithoutBundle := filepath.Join(dir, "magelift-no-bundle.providers.lock")
+	bundleless := strings.Replace(string(validLockJSON(digest)), `"bundle": "magelift-provider-gcp.sigstore.json"`, `"bundle": ""`, 1)
+	if err := os.WriteFile(lockWithoutBundle, []byte(bundleless), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	cases := []struct {
 		name    string
 		options Options
 	}{
 		{
-			name: "missing bundle path",
+			name: "missing bundle name",
 			options: Options{
-				Mode: ModeSubprocess, Provider: "gcp", LockPath: lockPath,
+				Mode: ModeSubprocess, Provider: "gcp", LockPath: lockWithoutBundle,
 				BinaryPath: binary, BundlePath: "", Verifier: fakeVerifier{},
 			},
 		},
@@ -247,18 +252,4 @@ func TestLoadSubprocessRefusesUnsignedVerify(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCheckAPIVersion(t *testing.T) {
-	if err := checkAPIVersion(SDKAPIVersion); err != nil {
-		t.Fatalf("host version refused: %v", err)
-	}
-	for _, version := range []string{"", "v0", "v2"} {
-		if err := checkAPIVersion(version); !errors.Is(err, ErrUnsupportedAPI) {
-			t.Fatalf("version %q err = %v, want %v", version, err, ErrUnsupportedAPI)
-		}
-	}
-	// Dial enforces checkAPIVersion after Ping; the Dial-level mismatch path
-	// would need a dedicated fake plugin binary, so the helper carries the
-	// contract and TestDialPingsVerifiedProvider covers the accept path.
 }

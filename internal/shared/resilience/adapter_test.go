@@ -7,7 +7,6 @@ import (
 	"time"
 
 	awsresilience "github.com/magelift/magelift/internal/cloud/aws/resilience"
-	gcpresilience "github.com/magelift/magelift/internal/cloud/gcp/resilience"
 	ovhresilience "github.com/magelift/magelift/internal/cloud/ovh/resilience"
 	scwresilience "github.com/magelift/magelift/internal/cloud/scaleway/resilience"
 	cloudresilience "github.com/magelift/magelift/internal/shared/resilience"
@@ -73,7 +72,6 @@ func TestFirstPartyAdaptersUseOneProviderNeutralLifecycle(t *testing.T) {
 		newAdapter func(sdk.ResilienceOperationClient, sdk.ResilienceOperationPolicy) (sdk.ResilienceAdapter, error)
 	}{
 		{name: "aws", provider: "aws", newAdapter: awsresilience.New},
-		{name: "gcp", provider: "gcp", newAdapter: gcpresilience.New},
 		{name: "scaleway", provider: "scaleway", newAdapter: scwresilience.New},
 		{name: "ovh", provider: "ovh", newAdapter: ovhresilience.New},
 	}
@@ -147,7 +145,6 @@ func TestFirstPartyResilienceRowsDoNotClaimUnimplementedProviderClients(t *testi
 		newAdapter func(sdk.ResilienceOperationClient, sdk.ResilienceOperationPolicy) (sdk.ResilienceAdapter, error)
 	}{
 		{name: "aws", newAdapter: awsresilience.New},
-		{name: "gcp", newAdapter: gcpresilience.New},
 		{name: "scaleway", newAdapter: scwresilience.New},
 		{name: "ovh", newAdapter: ovhresilience.New},
 	} {
@@ -200,7 +197,6 @@ func TestFirstPartyNativeConstructorsKeepProviderOperationMappingsSeparate(t *te
 		newClient  func(cloudresilience.NativeOperationAPI) (sdk.ResilienceOperationClient, error)
 	}{
 		{name: "aws", wantPrefix: "aws.rds.backup.database", newClient: awsresilience.NewNativeResilienceClient},
-		{name: "gcp", wantPrefix: "gcp.cloud-sql.backup.database", newClient: gcpresilience.NewNativeResilienceClient},
 		{name: "scaleway", wantPrefix: "scaleway.managed-database.backup.database", newClient: scwresilience.NewNativeResilienceClient},
 		{name: "ovh", wantPrefix: "ovh.managed-database.backup.database", newClient: ovhresilience.NewNativeResilienceClient},
 	}

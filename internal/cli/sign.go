@@ -151,7 +151,7 @@ func (o *options) gcpSigningServiceAccount() string {
 	return gcpCIServiceAccountEmail(effective.Config.Project.Name, environment, effective.Config.Target.GCP.Project)
 }
 
-// gcpCIServiceAccountEmail matches internal/cloud/gcp/bootstrap.BuildIdentityPlan.
+// gcpCIServiceAccountEmail matches providers/gcp/bootstrap.BuildIdentityPlan.
 func gcpCIServiceAccountEmail(project, environment, gcpProject string) string {
 	project = strings.TrimSpace(project)
 	environment = strings.TrimSpace(environment)

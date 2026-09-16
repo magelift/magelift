@@ -25,9 +25,8 @@ import (
 // deliberately exposes no PlanAdmission).
 type ShimModule struct {
 	platform.LifecycleFactories
-	runtime  sdk.RuntimeID
-	client   *Client
-	describe *sdk.DescribeResponse
+	runtime sdk.RuntimeID
+	client  *Client
 }
 
 var (
@@ -40,32 +39,33 @@ var (
 	_ platform.HasRuntimeTunnel  = (*ShimModule)(nil)
 )
 
-// NewShimModule binds a negotiated client to one runtime. The client must
-// have completed Describe negotiation; the runtime must be advertised.
+// NewLazyShimModule binds one runtime to a dialer. Registration spawns no
+// processes and needs no credentials; the first fallible use dials once
+// via the shared lazy client.
+func NewLazyShimModule(runtime sdk.RuntimeID, dial DialFunc) (*ShimModule, error) {
+	if dial == nil {
+		return nil, errors.New("provider dialer is required")
+	}
+	return NewShimModule(runtime, NewLazyClient(dial))
+}
+
+// NewShimModule binds a client to one runtime. Tier and output keys are
+// static pre-dial values matching the retired in-process module; the
+// live-binary tripwire test fails loudly if they ever drift from the
+// advertised values.
 func NewShimModule(runtime sdk.RuntimeID, client *Client) (*ShimModule, error) {
+	if runtime != "gke-autopilot" && runtime != "gke-standard" {
+		return nil, fmt.Errorf("GCP provider shim cannot serve runtime %q", runtime)
+	}
 	if client == nil {
 		return nil, errors.New("provider client is required")
 	}
-	described := client.Describe()
-	if described == nil {
-		return nil, errors.New("provider client has not negotiated Describe")
-	}
-	served := false
-	for _, advertised := range described.Runtimes {
-		if advertised.Runtime == string(runtime) {
-			served = true
-			break
-		}
-	}
-	if !served {
-		return nil, fmt.Errorf("provider %q does not serve runtime %q", described.ProviderID, runtime)
-	}
-	module := &ShimModule{runtime: runtime, client: client, describe: described}
+	module := &ShimModule{runtime: runtime, client: client}
 	module.Edge = func(ctx context.Context, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
-		return NewShimEdgeAdapter(client, planned)
+		return NewShimEdgeAdapter(ctx, client, planned)
 	}
 	module.Resilience = func(ctx context.Context, planned platform.PlannedStack) (sdk.ResilienceAdapter, error) {
-		return NewShimResilienceAdapter(client, planned)
+		return NewShimResilienceAdapter(ctx, client, planned)
 	}
 	return module, nil
 }
@@ -79,13 +79,8 @@ func (m *ShimModule) Descriptor() sdk.TargetDescriptor {
 }
 
 func (m *ShimModule) CertificationTier() platform.CertificationTier {
-	if m == nil || m.describe == nil {
-		return platform.TierExperimental
-	}
-	for _, advertised := range m.describe.Runtimes {
-		if advertised.Runtime == string(m.runtime) {
-			return platformTier(advertised.Tier)
-		}
+	if m != nil && m.runtime == "gke-autopilot" {
+		return platform.TierCertified
 	}
 	return platform.TierExperimental
 }
@@ -261,10 +256,8 @@ func (m *ShimModule) Program(platform.PlannedStack) (pulumi.RunFunc, error) {
 }
 
 func (m *ShimModule) OutputKeys() []string {
-	if m == nil || m.describe == nil {
-		return nil
-	}
-	return append([]string(nil), m.describe.OutputKeys...)
+	keys := append([]string(nil), platform.RequiredOutputKeys()...)
+	return append(keys, "mediaURL", "mediaBucket", platform.OutputSearchEndpoint, platform.OutputQueueHost, platform.OutputQueueReplicas, platform.OutputDatabaseConnectionName, "queueMode", platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, "securityPolicyName")
 }
 
 func (m *ShimModule) Ops() platform.Ops {
@@ -354,6 +347,12 @@ func (p *ShimPlanned) TargetDescriptor() sdk.TargetDescriptor {
 
 // StateBackendURL reports the plan-bound backend URL for CLI backend wiring.
 func (p *ShimPlanned) StateBackendURL() string { return p.stored.StateBackendURL }
+
+// Envelope reports the retained deployment envelope for backend wiring.
+func (p *ShimPlanned) Envelope() sdk.Envelope { return p.inputs.envelope }
+
+// StoredPlan reports the opaque stored plan for backend wiring.
+func (p *ShimPlanned) StoredPlan() sdk.StoredPlan { return p.stored }
 
 // WithImageDigest re-plans with a new image digest in the target block.
 func (p *ShimPlanned) WithImageDigest(digest string) (platform.PlannedStack, error) {

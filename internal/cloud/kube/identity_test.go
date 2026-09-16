@@ -2,6 +2,7 @@ package kube_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/netip"
 	"strings"
@@ -9,18 +10,19 @@ import (
 
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/cloud/aws/eksops"
-	gcpops "github.com/magelift/magelift/internal/cloud/gcp/ops"
-	gcpstack "github.com/magelift/magelift/internal/cloud/gcp/stack"
 	"github.com/magelift/magelift/internal/cloud/kube"
 	ovhstack "github.com/magelift/magelift/internal/cloud/ovh/stack"
 	scwstack "github.com/magelift/magelift/internal/cloud/scaleway/stack"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/sdk"
 )
 
-// TestFourModuleTypeIdentity is the Phase 6 SC1-SC2 offline gate: gcp ops,
-// eksops, ovh stack, and scaleway stack all return the same concrete
-// *kube.Observe and *kube.Steps types (D-01, D-03).
+// TestFourModuleTypeIdentity is the Phase 6 SC1-SC2 offline gate: the
+// in-process modules (eksops, ovh, scaleway) return the same concrete
+// *kube.Observe and *kube.Steps types (D-01, D-03). GCP serves a
+// plugin-backed shim (covered by TestGCPShimObserveTypeIdentity); its
+// deploy steps still build the shared *kube.Steps type.
 func TestFourModuleTypeIdentity(t *testing.T) {
 	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)
 	backend := &identityBackend{}
@@ -30,23 +32,6 @@ func TestFourModuleTypeIdentity(t *testing.T) {
 		observe platform.RuntimeObserve
 		steps   func(t *testing.T) any
 	}{
-		{
-			name:    "gcp",
-			observe: platform.ModuleRuntimeObserve(gcpops.Module{}),
-			steps: func(t *testing.T) any {
-				t.Helper()
-				ops := gcpops.Ops{
-					NewCandidate: identityCandidateFactory,
-					NewRuntime:   identityRuntimeFactory,
-				}
-				planned := gcpstack.Planned{Spec: gcpIdentitySpec(digest)}
-				s, err := ops.NewDeploySteps(context.Background(), backend, planned, io.Discard)
-				if err != nil {
-					t.Fatalf("gcp NewDeploySteps: %v", err)
-				}
-				return s
-			},
-		},
 		{
 			name:    "eksops",
 			observe: platform.ModuleRuntimeObserve(eksops.Module{}),
@@ -116,6 +101,29 @@ func TestFourModuleTypeIdentity(t *testing.T) {
 	}
 }
 
+func TestGCPShimObserveTypeIdentity(t *testing.T) {
+	module, err := providerhost.NewShimModule("gke-autopilot", providerhost.NewLazyClient(func(context.Context) (*providerhost.Client, error) {
+		return nil, errors.New("must not dial")
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	observe := platform.ModuleRuntimeObserve(module)
+	if observe == nil {
+		t.Fatal("RuntimeObserve returned nil")
+	}
+	if _, ok := observe.(*providerhost.ShimObserve); !ok {
+		t.Fatalf("GCP observe type identity: want *providerhost.ShimObserve, got %T", observe)
+	}
+	ops := platform.ModuleOps(module)
+	if ops == nil {
+		t.Fatal("GCP module must expose Ops")
+	}
+	if _, ok := ops.(providerhost.ShimOps); !ok {
+		t.Fatalf("GCP ops type identity: want providerhost.ShimOps, got %T", ops)
+	}
+}
+
 type identityBackend struct{}
 
 func (*identityBackend) Outputs(context.Context) (map[string]any, error) {
@@ -154,20 +162,6 @@ func identityCandidateFactory(context.Context, kube.Backend) (kube.CandidateRunn
 
 func identityRuntimeFactory(context.Context, kube.Backend) (kube.RuntimeChecker, error) {
 	return identityRuntime{}, nil
-}
-
-func gcpIdentitySpec(digest string) gcpstack.Spec {
-	return gcpstack.Spec{
-		Identity: gcpstack.Identity{
-			Project: "shop", GCPProject: "example-gcp-project", Environment: "preview",
-			Region: "europe-west1", EnvironmentClass: "preview", Preset: sdk.PresetPreview,
-		},
-		Application:  gcpstack.Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:     gcpstack.Artifact{ImageDigest: digest},
-		Policy:       gcpstack.NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b"}},
-		Catalog:      gcpstack.CatalogSelection{DesiredWebReplicas: 1, AutopilotCPURequest: "500m", AutopilotMemoryRequest: "1Gi"},
-		Dependencies: gcpstack.Dependencies{DatabaseName: "magento", MasterUsername: "magento"},
-	}
 }
 
 func eksIdentitySpec(digest string) eksops.Spec {
