@@ -90,3 +90,9 @@ func TestQueuePasswordEnvVarsUseSecretKeyRef(t *testing.T) {
 		t.Fatalf("queue password SecretKeyRef = %#v", ref)
 	}
 }
+
+func TestSmtpPasswordSecretNameIsStable(t *testing.T) {
+	if got := SmtpPasswordSecretName("shop-preview-app"); got != "shop-preview-app-smtp-password" {
+		t.Fatalf("smtp password secret name = %q", got)
+	}
+}

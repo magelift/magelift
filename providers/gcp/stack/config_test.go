@@ -333,3 +333,58 @@ func gcpDeploymentInputs() PlanInputs {
 		AllowUnsupported:  true,
 	}
 }
+
+func TestPlanFromInputsMapsEmailRelay(t *testing.T) {
+	t.Parallel()
+	in := gcpDeploymentInputs()
+	in.Application.Email = sdk.EmailSettings{
+		Mode: "smtp", Host: "smtp.example.com", Port: 587, Username: "mailer",
+		From: "shop@example.com", Credential: "gcp-secret-manager://projects/example-gcp-project/secrets/smtp-password/versions/latest",
+	}
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !spec.Email.Enabled() || spec.Email.Host != "smtp.example.com" || spec.Email.Port != 587 {
+		t.Fatalf("email = %#v", spec.Email)
+	}
+	if err := spec.Validate(); err != nil {
+		t.Fatalf("spec with email is invalid: %v", err)
+	}
+}
+
+func TestPlanFromInputsValidatesEmailRelay(t *testing.T) {
+	t.Parallel()
+	valid := sdk.EmailSettings{
+		Mode: "smtp", Host: "smtp.example.com", Port: 587, Username: "mailer",
+		Credential: "gcp-secret-manager://projects/example-gcp-project/secrets/smtp-password/versions/latest",
+	}
+	cases := []struct {
+		name   string
+		mutate func(*sdk.EmailSettings)
+		want   string
+	}{
+		{"bad mode", func(e *sdk.EmailSettings) { e.Mode = "tem" }, "not servable on GCP"},
+		{"missing host", func(e *sdk.EmailSettings) { e.Host = "" }, "email host is required"},
+		{"bad port", func(e *sdk.EmailSettings) { e.Port = 0 }, "email port must be between"},
+		{"missing username", func(e *sdk.EmailSettings) { e.Username = "" }, "email username is required"},
+		{"missing credential", func(e *sdk.EmailSettings) { e.Credential = "" }, "email credential"},
+		{"wrong scheme", func(e *sdk.EmailSettings) { e.Credential = "aws-secrets-manager://smtp" }, "must use gcp-secret-manager"},
+		{"short name", func(e *sdk.EmailSettings) { e.Credential = "gcp-secret-manager://smtp-password" }, "must name projects/"},
+		{"json field", func(e *sdk.EmailSettings) { e.Credential += "?jsonField=password" }, "jsonField extraction is not supported"},
+		{"disabled with fields", func(e *sdk.EmailSettings) { e.Mode = "disabled" }, "require a sending mode"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			email := valid
+			tc.mutate(&email)
+			in := gcpDeploymentInputs()
+			in.Application.Email = email
+			_, err := PlanFromInputs(in)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}

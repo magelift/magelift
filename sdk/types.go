@@ -40,6 +40,20 @@ type Application struct {
 	Mode       string
 	WebRuntime string
 	Magento    MagentoSettings
+	Email      EmailSettings
+}
+
+// EmailSettings mirrors the portable cloud email shape so provider plugins
+// receive it without importing core config. Credential is a secret
+// reference, never a value. Managed provisioning inputs stay core-side:
+// providers receive only modes they can serve.
+type EmailSettings struct {
+	Mode       string
+	Host       string
+	Port       int
+	Username   string
+	From       string
+	Credential string
 }
 
 // MagentoSettings mirrors the portable Magento runtime overlays so provider

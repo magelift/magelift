@@ -8,8 +8,8 @@ spec: spec.md
 
 ## Order of work
 
-- [ ] 1.1 SDK email settings plus plan inputs (extend `sdk.Application` with `Email`, carry through `PlanRequest`, provider-side mode validation) — verify: `GOWORK=off go test ./...` from `sdk/` exits 0
-- [ ] 1.2 GCP SMTP wiring (spec email, deploy-time Secret Manager resolution mirroring `resolveEncryptionKey`, Magento `CONFIG__SMTP__*` env, K8s secret, redaction tests) — verify: `go test ./providers/gcp/stack/ ./providers/gcp/runtime/` green with SMTP cases
+- [x] 1.1 SDK email settings plus plan inputs (extend `sdk.Application` with `Email`, carry through `PlanRequest`, provider-side mode validation) — verify: `GOWORK=off go test ./...` from `sdk/` exits 0
+- [x] 1.2 GCP SMTP wiring (spec email, deploy-time Secret Manager resolution mirroring `resolveEncryptionKey`, Magento `CONFIG__SMTP__*` env, K8s secret, redaction tests) — verify: `go test ./providers/gcp/stack/ ./providers/gcp/runtime/` green with SMTP cases
 - [ ] 2.1 Core tem/ovh rejection plus budget label (validateCloudEmail unimplemented errors, provider-neutral label text, `make generate` + `generate-check` clean) — verify: config suite green, generation gates green
 - [ ] 2.2 Init GCP starter matches alpha (remove search-disabled pin, add staticContent, commented SMTP plus prerequisites, schema-validated) — verify: init starter tests green
 - [ ] 3.1 Doctor gcloud guidance (toolchain spec for GCP targets, next-action text) — verify: doctor suite green

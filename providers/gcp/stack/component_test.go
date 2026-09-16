@@ -732,3 +732,72 @@ func (m *stackMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error
 		return resource.PropertyMap{}, nil
 	}
 }
+
+func TestProgramWiresSmtpRelay(t *testing.T) {
+	spec := Spec{
+		Identity: Identity{
+			Project: "shop", GCPProject: "example-gcp-project", Environment: "preview",
+			Region: "europe-west1", EnvironmentClass: "preview", Preset: "preview",
+			Labels: map[string]string{"magelift-managed-by": "magelift"},
+		},
+		Application: Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		Artifact:    Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Policy:      NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c"}},
+		Catalog: CatalogSelection{
+			CloudSQLTier: "db-perf-optimized-N-2", CloudSQLAvailability: "ZONAL", ValkeyRequirement: "8.1",
+			MemorystoreNodeType: "SHARED_CORE_NANO", AutopilotCPURequest: "500m", AutopilotMemoryRequest: "1Gi",
+			DesiredWebReplicas: 1, SearchMode: "opensearch", SearchReplicas: 1, QueueMode: "database",
+		},
+		Dependencies: Dependencies{DatabaseName: "magento", MasterUsername: "magento", EncryptionKeySecret: "magento-crypt-key"},
+		Email: EmailSelection{
+			Mode: "smtp", Host: "smtp.example.com", Port: 587, Username: "mailer",
+			From: "shop@example.com", Credential: "gcp-secret-manager://projects/example-gcp-project/secrets/smtp-password/versions/latest",
+		},
+	}
+	if err := spec.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-preview", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	sawSecret, sawHost, sawPasswordRef := false, false, false
+	for _, res := range mocks.resources {
+		if res.TypeToken == "kubernetes:core/v1:Secret" && strings.HasSuffix(res.Name, "-smtp-password") {
+			sawSecret = true
+		}
+		if res.TypeToken != "kubernetes:apps/v1:Deployment" {
+			continue
+		}
+		containers := res.Inputs["spec"].ObjectValue()["template"].ObjectValue()["spec"].ObjectValue()["containers"].ArrayValue()
+		for _, container := range containers {
+			envValue, ok := container.ObjectValue()["env"]
+			if !ok || envValue.IsNull() {
+				continue
+			}
+			for _, env := range envValue.ArrayValue() {
+				entry := env.ObjectValue()
+				name := entry["name"].StringValue()
+				switch name {
+				case "CONFIG__DEFAULT__SYSTEM__SMTP__HOST":
+					if value := entry["value"].StringValue(); value != "smtp.example.com" {
+						t.Fatalf("smtp host = %q", value)
+					}
+					sawHost = true
+				case "CONFIG__DEFAULT__SYSTEM__SMTP__PASSWORD":
+					ref := entry["valueFrom"].ObjectValue()["secretKeyRef"].ObjectValue()
+					if key := ref["key"].StringValue(); key != "password" {
+						t.Fatalf("smtp password ref key = %q", key)
+					}
+					if value, ok := entry["value"]; ok && strings.TrimSpace(value.StringValue()) != "" {
+						t.Fatalf("smtp password must not appear as plaintext env: %q", value.StringValue())
+					}
+					sawPasswordRef = true
+				}
+			}
+		}
+	}
+	if !sawSecret || !sawHost || !sawPasswordRef {
+		t.Fatalf("smtp wiring incomplete: secret=%v host=%v passwordRef=%v", sawSecret, sawHost, sawPasswordRef)
+	}
+}
