@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$ROOT/scripts/gcp-cloudsql-destroy-retention-acceptance-local.sh"
+SCRIPT="$ROOT/providers/gcp/scripts/gcp-cloudsql-destroy-retention-acceptance-local.sh"
 
 bash -n "$SCRIPT"
 grep -Fq 'source "$ROOT/scripts/acceptance/lib-dependencies.sh"' "$SCRIPT" || {
@@ -34,7 +34,7 @@ grep -Fq 'gcloud sql instances delete "${instance}"' "$SCRIPT" || {
 	printf 'destroy-retention harness must delete the claimed instance before leftover cleanup\n' >&2
 	exit 1
 }
-grep -Fq 'go run ./cmd/gcp-cloudsql-destroy-retention-acceptance' "$SCRIPT" || {
+grep -Fq 'go run ./providers/gcp/cmd/gcp-cloudsql-destroy-retention-acceptance' "$SCRIPT" || {
 	printf 'destroy-retention harness must invoke the MageLift leftover deleter\n' >&2
 	exit 1
 }
@@ -54,7 +54,7 @@ grep -Fq 'delete_leftover_backups_for_instance' "$SCRIPT" || {
 claim_line="$(grep -n '^instance_claimed=1$' "$SCRIPT" | tail -1 | cut -d: -f1)"
 create_line="$(grep -n 'gcloud sql instances create' "$SCRIPT" | head -1 | cut -d: -f1)"
 delete_line="$(grep -nF 'gcloud sql instances delete "${instance}" --project="${project}" --quiet' "$SCRIPT" | head -1 | cut -d: -f1)"
-run_line="$(grep -nF 'go run ./cmd/gcp-cloudsql-destroy-retention-acceptance' "$SCRIPT" | head -1 | cut -d: -f1)"
+run_line="$(grep -nF 'go run ./providers/gcp/cmd/gcp-cloudsql-destroy-retention-acceptance' "$SCRIPT" | head -1 | cut -d: -f1)"
 if [[ -z "$claim_line" || -z "$create_line" || "$claim_line" -ge "$create_line" ]]; then
 	printf 'destroy-retention source name is not claimed before create (claim=%s create=%s)\n' "$claim_line" "$create_line" >&2
 	exit 1

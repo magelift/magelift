@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
 source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
@@ -191,7 +191,7 @@ if [[ "${leftover_ready}" != 1 ]]; then
 	exit 1
 fi
 
-(cd "${ROOT}" && go run ./cmd/gcp-cloudsql-destroy-retention-acceptance \
+(cd "${ROOT}" && go run ./providers/gcp/cmd/gcp-cloudsql-destroy-retention-acceptance \
 	--project="${project}" \
 	--instance="${instance}")
 

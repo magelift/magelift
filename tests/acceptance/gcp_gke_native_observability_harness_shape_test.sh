@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SCRIPT="$ROOT/scripts/gcp-gke-native-observability-acceptance-local.sh"
+SCRIPT="$ROOT/providers/gcp/scripts/gcp-gke-native-observability-acceptance-local.sh"
 
 [[ -x "$SCRIPT" ]] || { printf 'GCP native observability acceptance script is not executable\n' >&2; exit 1; }
 bash -n "$SCRIPT"

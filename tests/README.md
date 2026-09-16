@@ -14,7 +14,7 @@ Verification layers vs Make targets and CI.
 | PHP Composer package | `build/tests/` | `make php-test` | No |
 | Runtime / Varnish / build e2e | `scripts/*.sh` | `make image-test`, `varnish-test`, `build-e2e-test` | No (Docker) |
 | Real AWS acceptance | `scripts/aws-acceptance-local.sh` | `make aws-acceptance-local` | Yes, light smoke, destroy on exit |
-| Real GCP acceptance | `scripts/gcp-acceptance-local.sh` | `make gcp-acceptance-local` | Yes, thorough E2E, destroy on exit |
+| Real GCP acceptance | `providers/gcp/scripts/gcp-acceptance-local.sh` | `make gcp-acceptance-local` | Yes, thorough E2E, destroy on exit |
 
 ## Daily path
 

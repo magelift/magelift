@@ -5,7 +5,7 @@
 # second exact-name cleanup attempt for interrupted processes.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
 source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
@@ -117,7 +117,7 @@ if gcloud secrets describe "$secret_id" --project="$project" >/dev/null 2>&1; th
 fi
 secret_created=1
 
-(cd "$ROOT" && GOOGLE_CLOUD_PROJECT="$project" go run ./cmd/gcp-secret-recovery-acceptance \
+(cd "$ROOT" && GOOGLE_CLOUD_PROJECT="$project" go run ./providers/gcp/cmd/gcp-secret-recovery-acceptance \
 	--project "$project" \
 	--archive-bucket "$bucket" \
 	--secret-id "$secret_id" \

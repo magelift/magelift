@@ -4,7 +4,7 @@
 # recovery, independent verification, and marker-scoped cleanup.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
 source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
@@ -105,7 +105,7 @@ gcloud storage buckets create "gs://${bucket}" \
 	--public-access-prevention >/dev/null
 bucket_created=1
 
-(cd "$ROOT" && GOOGLE_CLOUD_PROJECT="$project" go run ./cmd/gcp-recovery-acceptance \
+(cd "$ROOT" && GOOGLE_CLOUD_PROJECT="$project" go run ./providers/gcp/cmd/gcp-recovery-acceptance \
 	--project "$project" \
 	--bucket "$bucket" \
 	--marker "$marker" \

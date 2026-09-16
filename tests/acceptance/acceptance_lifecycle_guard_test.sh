@@ -7,10 +7,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 wrappers=(
 	scripts/aws-cloudwatch-acceptance-local.sh
 	scripts/aws-collector-acceptance-local.sh
-	scripts/gcp-collector-acceptance-local.sh
-	scripts/gcp-cloudsql-acceptance-local.sh
-	scripts/gcp-observability-acceptance-local.sh
-	scripts/gcp-pubsub-acceptance-local.sh
+	providers/gcp/scripts/gcp-collector-acceptance-local.sh
+	providers/gcp/scripts/gcp-cloudsql-acceptance-local.sh
+	providers/gcp/scripts/gcp-observability-acceptance-local.sh
+	providers/gcp/scripts/gcp-pubsub-acceptance-local.sh
 	scripts/scaleway-observability-acceptance-local.sh
 	scripts/scaleway-secret-recovery-acceptance-local.sh
 )

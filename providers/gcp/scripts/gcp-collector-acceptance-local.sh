@@ -3,7 +3,7 @@
 # Existing clusters are the default; disposable Standard clusters are opt-in.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
 source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
@@ -291,7 +291,7 @@ KUBECONFIG="$kubeconfig" gcloud container clusters get-credentials "$cluster" --
 KUBECONFIG="$kubeconfig" \
 MAGELIFT_GCP_COLLECTOR_LICENSE_KEY="$license_key" \
 MAGELIFT_GCP_COLLECTOR_QUERY_KEY="$query_key" \
-go run ./cmd/gcp-collector-acceptance \
+go run ./providers/gcp/cmd/gcp-collector-acceptance \
 	--project "$project" \
 	--region "$region" \
 	--cluster "$cluster" \

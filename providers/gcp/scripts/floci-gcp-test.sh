@@ -18,4 +18,4 @@ STORAGE_EMULATOR_HOST="${STORAGE_EMULATOR_HOST:-127.0.0.1:4588}" \
 SECRET_MANAGER_EMULATOR_HOST="${SECRET_MANAGER_EMULATOR_HOST:-127.0.0.1:4588}" \
 PUBSUB_EMULATOR_HOST="${PUBSUB_EMULATOR_HOST:-127.0.0.1:4588}" \
 GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-floci-local}" \
-go test -race -tags=floci_gcp ./tests/floci-gcp -count=1
+go test -race -tags=floci_gcp ./providers/gcp/floci/floci-gcp -count=1
