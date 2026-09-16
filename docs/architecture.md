@@ -166,7 +166,7 @@ extension index), `internal/topology`, and `sdk`. Providers live under
 AWS packages today include `bootstrap`, `secrets`, `target`, `network`,
 `security`, `ingress`, `runtime`, `edge`, `database`, `cache`, `search`, `queue`,
 `storage`, `observability`, `operations`, `deployment`, `stack`, and `state`.
-GCP code mirrors the stack composition boundary under `internal/cloud/gcp/`.
+GCP ships as an autonomous plugin module under `providers/gcp/` (own go.mod, versioned typed net/rpc protocol); the core talks to it through a plugin-backed shim, never in-process.
 
 **CLI deploy path:** `platform.ModuleRegistry` selects a `StackModule` by
 provider + runtime. Magento lock and candidate steps are optional via

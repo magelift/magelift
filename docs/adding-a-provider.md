@@ -20,7 +20,7 @@ strings and shell helpers with no Go adapter package. The full rule is
 
 | Root | Holds | Examples |
 | --- | --- | --- |
-| `internal/cloud/<provider>/` | IaaS topology only: one cloud's network, database, cache, search, queue, runtime, native edge/observability, and stack. Each cloud owns its Pulumi graph; no `if provider ==` switches. | `internal/cloud/aws`, `internal/cloud/gcp`, `internal/cloud/ovh`, `internal/cloud/scaleway` |
+| `internal/cloud/<provider>/` | IaaS topology only: one cloud's network, database, cache, search, queue, runtime, native edge/observability, and stack. Each cloud owns its Pulumi graph; no `if provider ==` switches. | `internal/cloud/aws`, `internal/cloud/ovh`, `internal/cloud/scaleway` (GCP lives in `providers/gcp` as the reference autonomous plugin) |
 | `internal/external/<vendor>/` | SaaS edge/observability adapters behind typed SDK intents. | `internal/external/fastly`, `internal/external/newrelic`, `internal/external/edge` (composition), `internal/external/observability` (composition) |
 | `internal/shared/<port>/` | Provider-neutral durable engines and ports. Stdlib plus `sdk` plus `internal/provider` only; no cloud SDK, no Pulumi. | `internal/shared/recovery`, `internal/shared/resilience`, `internal/shared/statearchive` |
 | `internal/edge/waf/` | Provider-neutral Magento-safe WAF contract every edge adapter translates. | `internal/edge/waf` (`waf/magento-safe`) |
@@ -52,7 +52,7 @@ the specified move; do not start new in-process providers from it.
 4. Optional day-2 ports on the module (`HasOps`, `HasBootstrap`, `HasState`,
    `HasSecrets`, `HasRuntimeObserve`). Return `ErrNotSupported` until ready.
    See [ADR 0004](adr/0004-ports-and-adapters.md). GCP's certified module
-   implements these in `internal/cloud/gcp/ops`.
+   implements these in `providers/gcp/ops`, reached through the plugin protocol.
 5. Optional `sdk.ResilienceAdapter` for backup, restore, integrity, fencing,
    failover, and cleanup. Its descriptor MUST declare each data-class status,
    supported destination, polling requirement, and protection requirement.
@@ -72,7 +72,7 @@ the specified move; do not start new in-process providers from it.
    not import a provider SDK or infer success from a plan.
    First-party native resource graphs follow the same intent: AWS
    `internal/cloud/aws/observability` owns CloudWatch resources, GCP
-   `internal/cloud/gcp/observability` owns GKE collection plus Cloud Monitoring
+   `providers/gcp/observability` owns GKE collection plus Cloud Monitoring
    dashboards and log-based policies, Scaleway
    `internal/cloud/scaleway/observability` owns Cockpit data sources, and OVH
    `internal/cloud/ovh/observability` owns only the documented Kubernetes audit

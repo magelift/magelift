@@ -80,7 +80,8 @@ User track — dogfooding and skills acceptance only:
 | `cmd/magelift` | Production CLI registration |
 | `internal/cli` | Cobra; keep Pulumi SDKs out |
 | `internal/platform` | Cross-provider ports |
-| `internal/cloud/<p>/` | IaaS adapter + Pulumi (aws/gcp/ovh/scaleway only) |
+| `internal/cloud/<p>/` | IaaS adapter + Pulumi (aws/ovh/scaleway only) |
+| `providers/gcp/` | Autonomous GCP plugin (own module, net/rpc protocol) |
 | `internal/external/<v>/` | SaaS edge/observability adapters (fastly/newrelic/edge/observability) |
 | `internal/shared/<port>/` | Provider-neutral ports (recovery/resilience/statearchive; no SDKs) |
 | `sdk` | Typed contracts |
