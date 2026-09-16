@@ -1,0 +1,4 @@
+# Fixture Upsun routes for the skills acceptance run (synthetic).
+"https://preview.example.invalid/":
+  type: upstream
+  upstream: "fixture-upsun-shop:http"

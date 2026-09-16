@@ -1,5 +1,5 @@
 ---
-status: draft
+status: done
 slug: ai-skills-tracks
 ---
 

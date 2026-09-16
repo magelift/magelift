@@ -1,0 +1,14 @@
+# Fixture Upsun app config for the skills acceptance run (synthetic).
+name: fixture-upsun-shop
+type: php:8.5
+relationships:
+  database: "mysql:mysql"
+  redis: "redis:redis"
+  rabbitmq: "rabbitmq:rabbitmq"
+crons:
+  magento:
+    spec: "*/5 * * * *"
+    cmd: "php bin/magento cron:run"
+  shell-backup:
+    spec: "0 2 * * *"
+    cmd: "/usr/local/bin/fixture-backup.sh"

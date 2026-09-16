@@ -98,7 +98,7 @@ func skillsVerifyCommand(o *options) *cobra.Command {
 		scope string
 		names []string
 	)
-	return &cobra.Command{
+	command := &cobra.Command{
 		Use:   "verify",
 		Short: "Verify installed first-party skills without executing them",
 		Args:  cobra.NoArgs,
@@ -120,4 +120,8 @@ func skillsVerifyCommand(o *options) *cobra.Command {
 			return nil
 		},
 	}
+	command.Flags().StringVar(&agent, "agent", "generic", "agent path: codex, claude, cursor, or generic")
+	command.Flags().StringVar(&scope, "scope", "project", "installation scope: project or global")
+	command.Flags().StringSliceVarP(&names, "skill", "s", nil, "verify only the named skill; repeat the flag for more than one")
+	return command
 }

@@ -30,7 +30,7 @@ After the org move, public paths are:
 | Repo | `https://github.com/magelift/magelift` |
 | Cosign release identity | `https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/<tag>` |
 | Cosign images identity | `https://github.com/magelift/magelift/.github/workflows/images.yml@refs/tags/<tag>` |
-| GHCR | `ghcr.io/magelift/magelift-{runtime,builder,frankenphp-classic}` |
+| GHCR | `ghcr.io/magelift/magelift-{nginx,builder,frankenphp-classic}` |
 
 Do not reintroduce `acourtiol/magelift` in workflows or ldflags.
 

@@ -1,0 +1,32 @@
+schemaVersion: 1
+project:
+  name: fixture-shop
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+  webRuntime: nginx-fpm
+  magento:
+    frontName: admin
+build:
+  php: "8.5"
+  composer:
+    version: "2.10"
+target:
+  provider: aws
+  runtime: ecs-fargate
+  aws: {}
+defaults:
+  region: eu-west-3
+  preset: preview
+environments:
+  staging:
+    account: "123456789012"
+    domain: staging.example.invalid
+local:
+  database:
+    family: mariadb
+    version: "11.8"
+  email:
+    mode: mailpit
+extensions: {}
