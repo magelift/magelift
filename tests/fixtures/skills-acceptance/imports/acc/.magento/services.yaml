@@ -1,0 +1,5 @@
+# Fixture ACC services for the skills acceptance run (synthetic).
+mysql:
+  type: mysql:10.6
+redis:
+  type: redis:7.0

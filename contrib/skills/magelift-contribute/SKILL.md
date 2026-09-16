@@ -21,6 +21,9 @@ version: 1.0.0
    the ADR and the human page in the same change. Human docs and website copy
    go through humanizer, then remove-ai-marks.
 5. Layout is the Map in `AGENTS.md`.
+6. When a change adds or alters CLI behavior or `magelift.yaml` keys, update
+   the matching user skill in the same change so skills never drift behind
+   the CLI they describe.
 
 ## Verify before you claim done
 

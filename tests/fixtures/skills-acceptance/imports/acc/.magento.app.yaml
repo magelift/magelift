@@ -1,0 +1,13 @@
+# Fixture ACC app config for the skills acceptance run (synthetic).
+name: fixture-acc-shop
+type: php:8.4
+relationships:
+  database: "mysql:mysql"
+  redis: "redis:redis"
+crons:
+  magento:
+    spec: "*/5 * * * *"
+    cmd: "php bin/magento cron:run"
+hooks:
+  build: |
+    echo "fixture-build-hook-stays-unmapped"
