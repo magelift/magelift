@@ -13,13 +13,9 @@ import (
 	"github.com/magelift/magelift/internal/cosign"
 )
 
-type blobVerifier interface {
-	VerifyBlob(context.Context, string, string, cosign.VerifyOptions) error
-}
-
 // VerifyLocal checks a downloaded subprocess binary against the lockfile
 // digest and Cosign blob signature. It does not execute the file.
-func VerifyLocal(ctx context.Context, artifact Artifact, binaryPath, bundlePath string, verifier blobVerifier) error {
+func VerifyLocal(ctx context.Context, artifact Artifact, binaryPath, bundlePath string, verifier BlobVerifier) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}

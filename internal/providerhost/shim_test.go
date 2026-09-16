@@ -74,8 +74,8 @@ func TestNewShimModule(t *testing.T) {
 	if _, err := NewShimModule("gke-autopilot", nil); err == nil {
 		t.Fatal("nil client was accepted")
 	}
-	if _, err := NewShimModule("gke-autopilot", &Client{}); err == nil {
-		t.Fatal("undescribed client was accepted")
+	if _, err := NewShimModule("gke-autopilot", &Client{}); err != nil {
+		t.Fatalf("lazy client was refused: %v", err)
 	}
 	if _, err := NewShimModule("ecs-fargate", &Client{describe: cannedDescribe()}); err == nil {
 		t.Fatal("unserved runtime was accepted")
@@ -94,8 +94,21 @@ func TestNewShimModule(t *testing.T) {
 	if standard.CertificationTier() != platform.TierExperimental {
 		t.Fatalf("tier = %q", standard.CertificationTier())
 	}
-	if keys := module.OutputKeys(); len(keys) != 2 {
+	keys := module.OutputKeys()
+	if len(keys) < len(platform.RequiredOutputKeys()) {
 		t.Fatalf("output keys = %#v", keys)
+	}
+	for _, want := range []string{"mediaURL", "mediaBucket", platform.OutputDatabaseConnectionName, "securityPolicyName"} {
+		found := false
+		for _, key := range keys {
+			if key == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("output keys = %#v, want %q", keys, want)
+		}
 	}
 	if _, err := module.Program(nil); err == nil {
 		t.Fatal("Program was accepted")

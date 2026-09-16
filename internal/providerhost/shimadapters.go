@@ -25,13 +25,16 @@ var _ sdk.EdgeAdapter = (*ShimEdgeAdapter)(nil)
 
 // NewShimEdgeAdapter builds the edge proxy for a shim plan. The descriptor
 // comes from Describe negotiation, never from a hardcoded copy.
-func NewShimEdgeAdapter(client *Client, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
+func NewShimEdgeAdapter(ctx context.Context, client *Client, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
 	shim, err := shimPlanOf(planned)
 	if err != nil {
 		return nil, err
 	}
-	described := client.Describe()
-	if described == nil || described.Edge == nil {
+	described, err := client.DescribeWith(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if described.Edge == nil {
 		return nil, errors.New("provider did not advertise a native edge adapter")
 	}
 	return &ShimEdgeAdapter{client: client, envelope: shim.inputs.envelope, stored: shim.stored, descriptor: *described.Edge}, nil
@@ -103,13 +106,16 @@ type ShimResilienceAdapter struct {
 var _ sdk.ResilienceAdapter = (*ShimResilienceAdapter)(nil)
 
 // NewShimResilienceAdapter builds the resilience proxy for a shim plan.
-func NewShimResilienceAdapter(client *Client, planned platform.PlannedStack) (sdk.ResilienceAdapter, error) {
+func NewShimResilienceAdapter(ctx context.Context, client *Client, planned platform.PlannedStack) (sdk.ResilienceAdapter, error) {
 	shim, err := shimPlanOf(planned)
 	if err != nil {
 		return nil, err
 	}
-	described := client.Describe()
-	if described == nil || described.Resilience == nil {
+	described, err := client.DescribeWith(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if described.Resilience == nil {
 		return nil, errors.New("provider did not advertise a native resilience adapter")
 	}
 	return &ShimResilienceAdapter{client: client, envelope: shim.inputs.envelope, stored: shim.stored, descriptor: *described.Resilience}, nil

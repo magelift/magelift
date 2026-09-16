@@ -198,3 +198,95 @@ func TestDialV2RefusesMissingOperation(t *testing.T) {
 		t.Fatal("missing operation was accepted")
 	}
 }
+
+func TestLazyClientDialsOnce(t *testing.T) {
+	t.Parallel()
+	dials := 0
+	connected := &Client{caller: &stubCaller{respond: func(string, any) error { return nil }}, describe: cannedDescribe()}
+	lazy := NewLazyClient(func(context.Context) (*Client, error) {
+		dials++
+		return connected, nil
+	})
+	if _, err := Call[sdk.DescribeRequest, sdk.DescribeResponse](context.Background(), lazy, sdk.OpDescribe, &sdk.DescribeRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Call[sdk.DescribeRequest, sdk.DescribeResponse](context.Background(), lazy, sdk.OpDescribe, &sdk.DescribeRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if dials != 1 {
+		t.Fatalf("dials = %d", dials)
+	}
+	if lazy.Describe() != connected.describe {
+		t.Fatal("describe was not delegated")
+	}
+}
+
+func TestLazyClientPropagatesDialFailure(t *testing.T) {
+	t.Parallel()
+	lazy := NewLazyClient(func(context.Context) (*Client, error) {
+		return nil, errors.New("dial boom")
+	})
+	if _, err := Call[sdk.DescribeRequest, sdk.DescribeResponse](context.Background(), lazy, sdk.OpDescribe, &sdk.DescribeRequest{}); err == nil || !strings.Contains(err.Error(), "dial boom") {
+		t.Fatalf("dial error = %v", err)
+	}
+	if _, err := lazy.DescribeWith(context.Background()); err == nil {
+		t.Fatal("DescribeWith succeeded without a session")
+	}
+}
+
+func TestStaticPreDialValuesMatchAdvertised(t *testing.T) {
+	binary := v2ProviderBinary(t)
+	client, err := DialV2(context.Background(), binary, DialOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(client.Close)
+	described := client.Describe()
+	if described == nil {
+		t.Fatal("no describe response")
+	}
+	for _, runtime := range []string{"gke-autopilot", "gke-standard"} {
+		module, err := NewShimModule(sdk.RuntimeID(runtime), client)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var want sdk.ExtensionCertificationTier
+		for _, advertised := range described.Runtimes {
+			if advertised.Runtime == runtime {
+				want = advertised.Tier
+			}
+		}
+		var got sdk.ExtensionCertificationTier = sdk.ExtensionTierExperimental
+		if module.CertificationTier() == "certified" {
+			got = sdk.ExtensionTierCertified
+		}
+		if got != want {
+			t.Fatalf("runtime %q static tier = %q, advertised = %q", runtime, got, want)
+		}
+	}
+	advertised := map[string]bool{}
+	for _, key := range described.OutputKeys {
+		advertised[key] = true
+	}
+	module, err := NewShimModule("gke-autopilot", client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range module.OutputKeys() {
+		if !advertised[key] {
+			t.Fatalf("static key %q is not advertised", key)
+		}
+	}
+	for _, key := range described.OutputKeys {
+		found := false
+		for _, static := range module.OutputKeys() {
+			if static == key {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("advertised key %q is missing statically", key)
+		}
+	}
+}

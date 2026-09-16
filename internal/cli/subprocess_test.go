@@ -9,59 +9,69 @@ import (
 	"testing"
 
 	"github.com/magelift/magelift/internal/automation"
-	"github.com/magelift/magelift/internal/cosign"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/sdk"
 )
 
-type fakeProviderAPI struct {
-	execute func(providerhost.ExecuteRequest) (providerhost.ExecuteResult, error)
+type scriptedCaller struct {
+	respond func(method string, reply any) error
+	calls   []string
 }
 
-func (f fakeProviderAPI) Ping(context.Context) (string, error) {
-	return providerhost.SDKAPIVersion, nil
+func (s *scriptedCaller) Call(method string, _ any, reply any) error {
+	s.calls = append(s.calls, method)
+	return s.respond(method, reply)
 }
 
-func (f fakeProviderAPI) Describe(context.Context) (providerhost.Identity, error) {
-	return providerhost.Identity{APIVersion: providerhost.SDKAPIVersion, Provider: "gcp"}, nil
-}
-
-func (f fakeProviderAPI) Plan(_ context.Context, _ sdk.ModulePlanRequest) (sdk.ModulePlan, error) {
-	return sdk.ModulePlan{}, errors.New("plan not implemented")
-}
-
-func (f fakeProviderAPI) Program(_ context.Context, _ sdk.ModulePlan) (providerhost.ProgramResult, error) {
-	return providerhost.ProgramResult{}, errors.New("program not implemented")
-}
-
-func (f fakeProviderAPI) Execute(_ context.Context, request providerhost.ExecuteRequest) (providerhost.ExecuteResult, error) {
-	if f.execute == nil {
-		return providerhost.ExecuteResult{Operation: request.Operation}, nil
+func testDescribe() *sdk.DescribeResponse {
+	operations := make([]sdk.OperationVersion, 0, len(sdk.PluginMethods))
+	for operation := range sdk.PluginMethods {
+		operations = append(operations, sdk.OperationVersion{Name: string(operation), Version: "1.0"})
 	}
-	return f.execute(request)
-}
-
-type gcpProofPlanned struct {
-	stubPlanned
-	spec any
-}
-
-func (p gcpProofPlanned) OpaquePlanSpec() any { return p.spec }
-
-func testProofPlanned() gcpProofPlanned {
-	return gcpProofPlanned{
-		stubPlanned: stubPlanned{
-			stackName:   "shop-staging",
-			provider:    "gcp",
-			runtime:     "gke-autopilot",
-			project:     "shop",
-			environment: "staging",
-			region:      "europe-west1",
-			envClass:    "staging",
-			tier:        platform.TierCertified,
+	return &sdk.DescribeResponse{
+		ProtocolVersion: sdk.ProtocolV1, ProviderID: "gcp", ProviderVersion: "v0.0.0-test",
+		Operations: operations,
+		Runtimes: []sdk.RuntimeAdvertisement{
+			{Runtime: "gke-autopilot", Tier: sdk.ExtensionTierCertified},
+			{Runtime: "gke-standard", Tier: sdk.ExtensionTierExperimental},
 		},
-		spec: map[string]any{"marker": "proof-spec"},
+	}
+}
+
+func testShimPlan(t *testing.T, client *providerhost.Client) platform.PlannedStack {
+	t.Helper()
+	module, err := providerhost.NewShimModule("gke-autopilot", client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	planned, err := module.Plan(gcpShimConfig(), "staging", platform.PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return planned
+}
+
+func gcpShimConfig() config.Config {
+	return config.Config{
+		SchemaVersion: 1,
+		Project:       config.Project{Name: "shop"},
+		Application:   config.Application{Edition: "open-source", Version: "2.4.9", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		Target: config.Target{
+			Provider: "gcp", Runtime: "gke-autopilot",
+			GCP: &config.GCPTarget{
+				Project:             "example-gcp-project",
+				Region:              "europe-west1",
+				NetworkCIDR:         "10.20.0.0/16",
+				ImageDigest:         "ghcr.io/magelift/magento@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				EncryptionKeySecret: "magento-crypt-key",
+			},
+		},
+		Defaults:  config.Defaults{Region: "europe-west1", Preset: "standard"},
+		Class:     "staging",
+		Preset:    "standard",
+		ExpiresAt: "2027-01-01T00:00:00Z",
 	}
 }
 
@@ -71,53 +81,52 @@ func testLoaded() providerhost.Loaded {
 		Provider: "gcp",
 		Binary:   "/tmp/magelift-provider-gcp",
 		Artifact: providerhost.Artifact{
-			Name:    "magelift-provider-gcp",
-			Version: "0.1.0",
-			Digest:  "sha256:abc",
+			Name:     "magelift-provider-gcp",
+			Version:  "0.1.0",
+			Protocol: "magelift-v2",
+			Digest:   "sha256:abc",
 		},
 	}
 }
 
-func TestDefaultNewBackendUsesSubprocessForProofCell(t *testing.T) {
-	var stderr bytes.Buffer
-	var got providerhost.ExecuteRequest
-	api := fakeProviderAPI{execute: func(request providerhost.ExecuteRequest) (providerhost.ExecuteResult, error) {
-		got = request
-		return providerhost.ExecuteResult{Operation: request.Operation, Changes: map[string]int{"create": 3}}, nil
+func TestDefaultNewBackendUsesPluginForGCP(t *testing.T) {
+	caller := &scriptedCaller{respond: func(method string, reply any) error {
+		switch method {
+		case "Plugin.Plan":
+			*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: sdk.StoredPlan{
+				StackName: "shop-staging", Provider: "gcp", Runtime: "gke-autopilot",
+				ImageDigest: "digest", Opaque: []byte(`{"stored":true}`),
+			}}
+		case "Plugin.Preview":
+			*(reply.(*sdk.LifecycleResult)) = sdk.LifecycleResult{Summary: sdk.ChangeSummary{Create: 3}}
+		default:
+			return errors.New("unexpected method " + method)
+		}
+		return nil
 	}}
+	client := providerhost.NewTestClient(caller, testDescribe())
 	o := &options{
-		stderr:       &stderr,
 		modules:      platform.NewModuleRegistry(),
 		loadProvider: func(context.Context, string) (providerhost.Loaded, error) { return testLoaded(), nil },
-		dialProvider: func(context.Context, string) (providerhost.API, error) { return api, nil },
+		dialProvider: func(context.Context, string) (*providerhost.Client, error) { return client, nil },
 	}
-	backend, err := o.defaultNewBackend(context.Background(), testProofPlanned(), "file:///state")
+	backend, err := o.defaultNewBackend(context.Background(), testShimPlan(t, client), "file:///state")
 	if err != nil {
 		t.Fatal(err)
 	}
-	subprocess, ok := backend.(*providerhost.SubprocessBackend)
-	if !ok {
-		t.Fatalf("backend = %T, want *SubprocessBackend", backend)
-	}
-	if !strings.Contains(stderr.String(), "using subprocess provider magelift-provider-gcp 0.1.0") {
-		t.Fatalf("stderr = %q", stderr.String())
-	}
-	if subprocess.Plan().Opaque.(map[string]any)["marker"] != "proof-spec" {
-		t.Fatalf("plan opaque = %v", subprocess.Plan().Opaque)
-	}
-	if subprocess.Plan().Tier != sdk.ExtensionTierCertified {
-		t.Fatalf("plan tier = %q", subprocess.Plan().Tier)
+	if _, ok := backend.(*providerhost.PluginBackend); !ok {
+		t.Fatalf("backend = %T, want *PluginBackend", backend)
 	}
 	changes, err := backend.Preview(context.Background(), automation.Request{Target: sdk.TargetDescriptor{Provider: "gcp", Runtime: "gke-autopilot"}}, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if changes["create"] != 3 || got.BackendURL != "file:///state" || got.Plan.StackName != "shop-staging" {
-		t.Fatalf("changes = %v, request = %+v", changes, got)
+	if changes["create"] != 3 {
+		t.Fatalf("changes = %v", changes)
 	}
 }
 
-func TestDefaultNewBackendFallsBackWhenProviderMissing(t *testing.T) {
+func TestDefaultNewBackendFailsClosedWhenProviderMissing(t *testing.T) {
 	var stderr bytes.Buffer
 	o := &options{
 		stderr:  &stderr,
@@ -125,31 +134,37 @@ func TestDefaultNewBackendFallsBackWhenProviderMissing(t *testing.T) {
 		loadProvider: func(context.Context, string) (providerhost.Loaded, error) {
 			return providerhost.Loaded{}, errors.New("no lockfile")
 		},
-		dialProvider: func(context.Context, string) (providerhost.API, error) {
+		dialProvider: func(context.Context, string) (*providerhost.Client, error) {
 			t.Fatal("dial must not run when loading fails")
 			return nil, nil
 		},
 	}
-	_, err := o.defaultNewBackend(context.Background(), testProofPlanned(), "file:///state")
-	if err == nil || !strings.Contains(err.Error(), "no stack module") {
-		t.Fatalf("err = %v, want in-process fallback failure (empty registry, no Pulumi)", err)
+	planClient := providerhost.NewTestClient(&scriptedCaller{respond: func(method string, reply any) error {
+		*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: sdk.StoredPlan{
+			StackName: "shop-staging", Provider: "gcp", Runtime: "gke-autopilot", Opaque: []byte(`{}`),
+		}}
+		return nil
+	}}, testDescribe())
+	_, err := o.defaultNewBackend(context.Background(), testShimPlan(t, planClient), "file:///state")
+	if err == nil || !strings.Contains(err.Error(), "no lockfile") {
+		t.Fatalf("err = %v, want load failure (no fallback)", err)
 	}
-	if !strings.Contains(stderr.String(), "subprocess provider magelift-provider-gcp unavailable (no lockfile); using in-process backend") {
-		t.Fatalf("stderr = %q", stderr.String())
+	if strings.Contains(stderr.String(), "using in-process backend") {
+		t.Fatalf("stderr = %q, want no fallback notice", stderr.String())
 	}
 }
 
-func TestDefaultNewBackendSkipsSubprocessForOtherCells(t *testing.T) {
+func TestDefaultNewBackendSkipsPluginForOtherCells(t *testing.T) {
 	var stderr bytes.Buffer
 	o := &options{
 		stderr:  &stderr,
 		modules: platform.NewModuleRegistry(),
 		loadProvider: func(context.Context, string) (providerhost.Loaded, error) {
-			t.Fatal("loader must not run for non-proof cells")
+			t.Fatal("loader must not run for non-GCP cells")
 			return providerhost.Loaded{}, nil
 		},
-		dialProvider: func(context.Context, string) (providerhost.API, error) {
-			t.Fatal("dial must not run for non-proof cells")
+		dialProvider: func(context.Context, string) (*providerhost.Client, error) {
+			t.Fatal("dial must not run for non-GCP cells")
 			return nil, nil
 		},
 	}
@@ -159,7 +174,7 @@ func TestDefaultNewBackendSkipsSubprocessForOtherCells(t *testing.T) {
 		t.Fatalf("err = %v, want in-process path", err)
 	}
 	if stderr.String() != "" {
-		t.Fatalf("stderr = %q, want no subprocess notice", stderr.String())
+		t.Fatalf("stderr = %q, want no plugin notice", stderr.String())
 	}
 }
 
@@ -208,35 +223,39 @@ func TestExtensionsListShowsProviderProvenance(t *testing.T) {
 	}
 }
 
-// TestOutputsDisplayRedactsThroughSubprocessBackend pins the display
-// boundary: `magelift outputs` through a Dialed session must serve the
-// redacted op, never the decrypted day-2 outputs. SubprocessBackend must
-// keep its RedactedOutputs method or this falls through to decrypted
-// Outputs and leaks kubeconfig to stdout.
-func TestOutputsDisplayRedactsThroughSubprocessBackend(t *testing.T) {
+// TestOutputsDisplayRedactsThroughPluginBackend pins the display
+// boundary: `magelift outputs` through a dialed session must serve the
+// secret-flagged op, never decrypted day-2 outputs.
+func TestOutputsDisplayRedactsThroughPluginBackend(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
 	var stdout, stderr bytes.Buffer
-	var got []providerhost.ExecuteOperation
-	api := fakeProviderAPI{execute: func(request providerhost.ExecuteRequest) (providerhost.ExecuteResult, error) {
-		got = append(got, request.Operation)
-		if request.Operation == providerhost.ExecuteRedactedOutputs {
-			return providerhost.ExecuteResult{Operation: request.Operation, Outputs: map[string]any{"kubeconfig": map[string]any{"secret": true}}}, nil
+	var methods []string
+	caller := &scriptedCaller{respond: func(method string, reply any) error {
+		methods = append(methods, method)
+		*(reply.(*sdk.OutputsResult)) = sdk.OutputsResult{
+			ValuesJSON: []byte(`{"kubeconfig":"DECRYPTED-KUBECONFIG-SENTINEL"}`),
+			SecretKeys: []string{"kubeconfig"},
 		}
-		return providerhost.ExecuteResult{Operation: request.Operation, Outputs: map[string]any{"kubeconfig": "DECRYPTED-KUBECONFIG-SENTINEL"}}, nil
+		return nil
 	}}
+	client := providerhost.NewTestClient(caller, testDescribe())
 	o := testOptions(&stdout, &fakeTerminal{interactive: false})
 	o.stderr = &stderr
 	o.configPath, o.environment = path, "staging"
 	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
-		return providerhost.NewSubprocessBackend(api, sdk.ModulePlan{StackName: "shop-staging"}, ""), nil
+		backend, err := providerhost.NewPluginBackend(client, sdk.Envelope{}, sdk.StoredPlan{Opaque: []byte(`{}`)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return backend, nil
 	}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--output", "json", "outputs"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0] != providerhost.ExecuteRedactedOutputs {
-		t.Fatalf("operations = %v, want [redacted-outputs]", got)
+	if len(methods) != 1 || methods[0] != "Plugin.Outputs" {
+		t.Fatalf("methods = %v, want [Plugin.Outputs]", methods)
 	}
 	out := stdout.String()
 	if !strings.Contains(out, `"secret"`) {
@@ -251,71 +270,7 @@ func TestDefaultLoadProviderRefusesWithoutLockfile(t *testing.T) {
 	dir := t.TempDir()
 	o := &options{executable: func() (string, error) { return dir + "/magelift", nil }}
 	_, err := o.defaultLoadProvider(context.Background(), "gcp")
-	if err == nil || !strings.Contains(err.Error(), "lockfile") {
+	if err == nil || !strings.Contains(err.Error(), "magelift.providers.lock") {
 		t.Fatalf("err = %v, want lockfile failure", err)
-	}
-}
-
-func TestWarnProviderSkew(t *testing.T) {
-	previous := Version
-	t.Cleanup(func() { Version = previous })
-	for _, tc := range []struct {
-		name        string
-		cliVersion  string
-		lockVersion string
-		wantWarning bool
-	}{
-		{"skew warns", "v1.0.0-rc.1", "v1.0.0-rc.2", true},
-		{"match quiet", "v1.0.0-rc.1", "v1.0.0-rc.1", false},
-		{"v prefix match quiet", "v1.0.0", "1.0.0", false},
-		{"dev quiet", "dev", "v1.0.0", false},
-		{"versionless lock quiet", "v1.0.0", "", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			Version = tc.cliVersion
-			var stderr bytes.Buffer
-			warnProviderSkew(&stderr, "gcp", tc.lockVersion)
-			if tc.wantWarning {
-				want := "provider gcp version " + tc.lockVersion + " differs from CLI version " + tc.cliVersion
-				if !strings.Contains(stderr.String(), want) {
-					t.Fatalf("stderr = %q, want %q", stderr.String(), want)
-				}
-				return
-			}
-			if stderr.Len() != 0 {
-				t.Fatalf("stderr = %q, want quiet", stderr.String())
-			}
-		})
-	}
-}
-
-type recordingRunner struct {
-	name string
-	args []string
-}
-
-func (r *recordingRunner) Run(_ context.Context, name string, args ...string) error {
-	r.name = name
-	r.args = append([]string(nil), args...)
-	return nil
-}
-
-// TestCosignBlobVerifierPassesBundleFirst pins the bundle-first
-// argument order through the providerhost verifier into cosign.
-// A swap here makes every subprocess load fail closed with a
-// signature error while manual cosign calls succeed.
-func TestCosignBlobVerifierPassesBundleFirst(t *testing.T) {
-	runner := &recordingRunner{}
-	verifier := cosignBlobVerifier{client: cosign.NewWithRunner(runner)}
-	err := verifier.VerifyBlob(context.Background(), "/tmp/x.sigstore.json", "/tmp/x", cosign.VerifyOptions{
-		CertificateIdentity: "identity",
-		OIDCIssuer:          "https://token.actions.githubusercontent.com",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{"verify-blob", "--bundle", "/tmp/x.sigstore.json", "--certificate-identity", "identity", "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com", "/tmp/x"}
-	if runner.name != "cosign" || strings.Join(runner.args, " ") != strings.Join(want, " ") {
-		t.Fatalf("argv = %s %v, want cosign %v", runner.name, runner.args, want)
 	}
 }

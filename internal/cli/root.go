@@ -92,8 +92,8 @@ type options struct {
 	mediaSync               func(context.Context, mediasync.Options) (mediasync.Result, error)
 	newLock                 func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
 	loadProvider            func(context.Context, string) (providerhost.Loaded, error)
-	dialProvider            func(context.Context, string) (providerhost.API, error)
-	providerSessions        []*providerhost.Session
+	dialProvider            func(context.Context, string) (*providerhost.Client, error)
+	providerSessions        []*providerhost.Client
 	runCommand              func(context.Context, string, []string, io.Writer, io.Writer) error
 	runCompose              func(context.Context, string, []string, []string, io.Writer, io.Writer) error
 	dependencyRunner        toolchain.DependencyRunner
