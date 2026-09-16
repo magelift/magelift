@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	gcpruntime "github.com/magelift/magelift/providers/gcp/runtime"
 	"github.com/magelift/magelift/internal/cloud/kube"
+	gcpruntime "github.com/magelift/magelift/providers/gcp/runtime"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
