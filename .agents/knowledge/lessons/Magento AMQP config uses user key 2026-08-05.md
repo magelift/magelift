@@ -24,3 +24,5 @@ runtime `env.php` template must map it to the `user` key.
 Keep a template contract test and a migration Job test for this translation.
 Apply the same check to every provider that runs Magento workloads because the
 failure is in the shared application contract, not in GCP networking.
+
+Sibling trap in search bindings: #env() under env.php system/ never resolves (config:show returns the raw literal). Search host and engine bindings must use CONFIG__DEFAULT__ environment bindings (CoreEnvBindings plus localdev, 6c53304). Proven live: config:show resolved, catalogsearch_fulltext reindex exit 0, storefront query HTTP 200 plus product hit, OpenSearch pod recycle without reindex still HTTP 200 plus hit.

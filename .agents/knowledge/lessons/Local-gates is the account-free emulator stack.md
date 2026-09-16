@@ -19,6 +19,6 @@ Default proof order for MageLift:
 
 `make local-gates` runs 1–3. `make verify` stays the contributor lint/unit/docs gate and does not start Docker emulators.
 
-Live AWS, OVH, Scaleway, Cloudflare, New Relic, SendGrid, and Fastly exist only when an E2E cell is still required to certify. Those accounts run on free credits or free plans: one bounded smoke, then destroy. GCP has unlimited credits and is the thorough Magento-wired live path. Emulators never certify Autopilot, Memorystore, Armor, managed TLS, or Magento Cloud SQL PITR.
+Live AWS, OVH, Scaleway, Cloudflare, New Relic, and Fastly exist only when an E2E cell is still required to certify. Those accounts run on free credits or free plans: one bounded smoke, then destroy. GCP has unlimited credits and is the thorough Magento-wired live path. Emulators never certify Autopilot, Memorystore, Armor, managed TLS, or Magento Cloud SQL PITR.
 
 The AWS Floci Make target is `floci-test-aws` (script `scripts/floci-test-aws.sh`), matching `floci-gcp-test`. Do not run `go test ./tests/floci` without `-tags=floci`.
