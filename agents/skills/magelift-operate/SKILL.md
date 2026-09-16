@@ -20,6 +20,9 @@ or change the selected environment.
 - Use `destroy --yes` only for the exact environment you intend to remove.
 - `exec --service deploy` is rejected by design; read deploy logs instead.
   Expired previews refuse deploy but always allow destroy.
+- Production deploys need `--ack-maintenance-drain` plus the incompatible-schema
+  runbook in `docs/operations.md`; deploy success means the intended rollout
+  plus a passing Magento probe, never scheduler settlement alone.
 - If cleanup fails, keep the evidence and inspect resources by the MageLift run prefix.
 
 ## Useful commands

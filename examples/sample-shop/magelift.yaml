@@ -14,6 +14,9 @@ build:
   composer:
     version: "2.10"
     credentials: aws-secrets-manager://magelift/composer
+  staticContent:
+    locales: [en_US]
+    themes: [Magento/luma]
 target:
   provider: aws
   runtime: ecs-fargate

@@ -1292,3 +1292,15 @@ func TestInfrastructureRefuseAdoptedDatabaseMutation(t *testing.T) {
 		t.Fatalf("refuse error = %v", err)
 	}
 }
+
+func TestDeployRegistersAckMaintenanceDrainFlag(t *testing.T) {
+	out := &bytes.Buffer{}
+	root := newCommandWithOptions(testOptions(out, &fakeTerminal{interactive: false}))
+	found, _, err := root.Find([]string{"deploy"})
+	if err != nil {
+		t.Fatalf("find deploy: %v", err)
+	}
+	if found.Flags().Lookup("ack-maintenance-drain") == nil {
+		t.Fatal("magelift deploy is missing --ack-maintenance-drain")
+	}
+}

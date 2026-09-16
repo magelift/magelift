@@ -114,6 +114,7 @@ type options struct {
 	testRuntimeTunnel          platform.RuntimeTunnel
 	testCostEstimator          platform.CostEstimator
 	infraOnly                  bool
+	ackMaintenanceDrain        bool
 	skipProviderLock           bool
 	destroyBackups             bool
 	newLeftoverBackupDestroyer func(context.Context, platform.PlannedStack) (leftoverBackupDestroyer, error)

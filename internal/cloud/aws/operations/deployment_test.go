@@ -163,6 +163,103 @@ func TestRegisterCandidateRegistersDatabaseGrantDefinition(t *testing.T) {
 	}
 }
 
+func probeTestDefinition() *types.TaskDefinition {
+	return &types.TaskDefinition{
+		Family: awssdk.String("shop-deploy"), Cpu: awssdk.String("512"), Memory: awssdk.String("1024"),
+		NetworkMode: types.NetworkModeAwsvpc, RequiresCompatibilities: []types.Compatibility{types.CompatibilityFargate},
+		ContainerDefinitions: []types.ContainerDefinition{{
+			Name: awssdk.String("deploy"), Image: awssdk.String("ghcr.io/example/shop@sha256:" + strings.Repeat("b", 64)),
+		}},
+	}
+}
+
+func probeTestRequest() CandidateRequest {
+	return CandidateRequest{
+		Cluster: "shop-cluster", TaskDefinitionARN: "arn:aws:ecs:eu-west-3:123:task-definition/shop-deploy:1",
+		ImageDigest:      "ghcr.io/example/shop@sha256:" + strings.Repeat("a", 64),
+		PrivateSubnetIDs: []string{"subnet-a"}, SecurityGroupID: "sg-web", StartedBy: "magelift",
+	}
+}
+
+func TestRunProbeOverridesDeployCommand(t *testing.T) {
+	mock := &deploymentMock{definition: probeTestDefinition()}
+	store, err := NewDeploymentFromClient(mock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.waitInterval = time.Millisecond
+	command := []string{"/bin/sh", "-ec", "bin/magento setup:db:status"}
+	if err := store.RunProbe(context.Background(), probeTestRequest(), command); err != nil {
+		t.Fatalf("RunProbe: %v", err)
+	}
+	if len(mock.registrations) != 1 {
+		t.Fatalf("registrations = %d, want 1 probe task definition", len(mock.registrations))
+	}
+	registered := mock.registrations[0]
+	if got := awssdk.ToString(registered.Family); !strings.Contains(got, "-probe-") {
+		t.Fatalf("probe family = %q", got)
+	}
+	if got := registered.ContainerDefinitions[0].Command; strings.Join(got, " ") != strings.Join(command, " ") {
+		t.Fatalf("probe command = %q", got)
+	}
+	if len(mock.runTaskDefinitions) != 1 || len(mock.deregisteredDefinitions) != 1 {
+		t.Fatalf("run=%v deregistered=%v", mock.runTaskDefinitions, mock.deregisteredDefinitions)
+	}
+}
+
+func TestRunProbeFailurePropagates(t *testing.T) {
+	mock := &deploymentMock{definition: probeTestDefinition()}
+	store, err := NewDeploymentFromClient(failedTaskMock{mock})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.waitInterval = time.Millisecond
+	err = store.RunProbe(context.Background(), probeTestRequest(), []string{"/bin/sh", "-ec", "bin/magento setup:db:status"})
+	if err == nil || !strings.Contains(err.Error(), "magento readiness probe") {
+		t.Fatalf("RunProbe error = %v, want probe failure attached", err)
+	}
+	if len(mock.deregisteredDefinitions) != 1 {
+		t.Fatalf("failed probe task definition was not deregistered: %v", mock.deregisteredDefinitions)
+	}
+}
+
+func TestRunProbeRequiresDeployContainer(t *testing.T) {
+	definition := probeTestDefinition()
+	definition.ContainerDefinitions[0].Name = awssdk.String("web")
+	mock := &deploymentMock{definition: definition}
+	store, err := NewDeploymentFromClient(mock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = store.RunProbe(context.Background(), probeTestRequest(), []string{"/bin/sh", "-ec", "true"})
+	if err == nil || !strings.Contains(err.Error(), "no deploy container") {
+		t.Fatalf("RunProbe error = %v, want missing-deploy-container refusal", err)
+	}
+}
+
+func TestRunProbeTimeoutStopsAndCleansUp(t *testing.T) {
+	if probeWaitTimeout != 5*time.Minute {
+		t.Fatalf("probeWaitTimeout = %s, want 5m", probeWaitTimeout)
+	}
+	mock := &deploymentMock{definition: probeTestDefinition()}
+	store, err := NewDeploymentFromClient(hangingTaskMock{mock})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.waitInterval = time.Millisecond
+	store.probeTimeout = 20 * time.Millisecond
+	err = store.RunProbe(context.Background(), probeTestRequest(), []string{"/bin/sh", "-ec", "sleep 3600"})
+	if err == nil || !strings.Contains(err.Error(), "magento readiness probe") {
+		t.Fatalf("RunProbe error = %v, want bounded probe timeout", err)
+	}
+	if !mock.stopped {
+		t.Error("hung probe task was not stopped on timeout")
+	}
+	if len(mock.deregisteredDefinitions) != 1 {
+		t.Errorf("timed-out probe task definition was not deregistered: %v", mock.deregisteredDefinitions)
+	}
+}
+
 func TestRunMigrationsRunsDatabaseGrantBeforeMigration(t *testing.T) {
 	mock := &deploymentMock{}
 	store, err := NewDeploymentFromClient(mock)

@@ -171,6 +171,22 @@ func TestPrepareRequestAppliesStaticContentStrategyAndThreads(t *testing.T) {
 	}
 }
 
+func TestPrepareRequestRejectsMissingStaticContent(t *testing.T) {
+	input := strings.Replace(buildConfig, "  staticContent:\n    locales: [fr_FR, en_US]\n    themes: [Magento/luma, Magento/blank]\n", "", 1)
+	file, err := config.Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "composer.lock"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = PrepareRequest(file, source.Repository{Root: root, Revision: strings.Repeat("a", 40)}, "/workspace")
+	if err == nil || !strings.Contains(err.Error(), "staticContent.locales and themes are required") {
+		t.Fatalf("expected staticContent-required error, got: %v", err)
+	}
+}
+
 func TestPrepareRequestRejectsInvalidStaticContentStrategy(t *testing.T) {
 	input := strings.Replace(buildConfig, "    themes: [Magento/luma, Magento/blank]\n", "    themes: [Magento/luma, Magento/blank]\n    strategy: turbo\n", 1)
 	file, err := config.Load([]byte(input))

@@ -89,11 +89,13 @@ func infrastructureCommands(o *options) []*cobra.Command {
 func infrastructureCommand(o *options, name, short string, operation func(context.Context, infrastructureBackend, automation.Request) (infrastructureResult, error)) *cobra.Command {
 	var digest string
 	var infraOnly bool
+	var ackMaintenanceDrain bool
 	var skipProviderLock bool
 	var destroyBackups bool
 	command := &cobra.Command{Use: name, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		if name == "deploy" {
 			o.infraOnly = infraOnly
+			o.ackMaintenanceDrain = ackMaintenanceDrain
 		}
 		if name == "destroy" {
 			o.skipProviderLock = skipProviderLock
@@ -108,6 +110,7 @@ func infrastructureCommand(o *options, name, short string, operation func(contex
 	if name == "deploy" {
 		command.Flags().StringVar(&digest, "digest", "", "override the configured immutable image digest")
 		command.Flags().BoolVar(&infraOnly, "infra-only", false, "update the infrastructure graph only (skip Magento migrate/health)")
+		command.Flags().BoolVar(&ackMaintenanceDrain, "ack-maintenance-drain", false, "attest backup, maintenance mode, and drained writers for production schema risk (see docs/operations.md)")
 	}
 	if name == "destroy" {
 		command.Flags().BoolVar(&skipProviderLock, "skip-lock", false, "skip the provider distributed state lock (acceptance cleanup only)")
@@ -251,14 +254,15 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 }
 
 type deploymentOptions struct {
-	rollback                 bool
-	acknowledgeForwardOnlyDB bool
-	infraOnly                bool
-	dependenciesChecked      bool
+	rollback                    bool
+	acknowledgeForwardOnlyDB    bool
+	acknowledgeMaintenanceDrain bool
+	infraOnly                   bool
+	dependenciesChecked         bool
 }
 
 func (o *options) runDeployment(ctx context.Context, environment string, planned platform.PlannedStack, digest string) (infrastructureResult, error) {
-	return o.runDeploymentWithOptions(ctx, environment, planned, digest, deploymentOptions{infraOnly: o.infraOnly, dependenciesChecked: true})
+	return o.runDeploymentWithOptions(ctx, environment, planned, digest, deploymentOptions{infraOnly: o.infraOnly, acknowledgeMaintenanceDrain: o.ackMaintenanceDrain, dependenciesChecked: true})
 }
 
 func (o *options) runDeploymentWithOptions(ctx context.Context, environment string, planned platform.PlannedStack, digest string, deployOptions deploymentOptions) (infrastructureResult, error) {
@@ -321,6 +325,7 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			result, runErr := deployflow.New(cliDeploymentLock{factory: o.newLock, planned: planned}, steps).Run(ctx, deployflow.Request{
 				Target: requestTarget, ImageDigest: digest, Preview: request.Preview, Production: planned.EnvironmentClass() == "production", Approved: o.yes,
 				Rollback: deployOptions.rollback, AcknowledgeForwardOnlyDB: deployOptions.acknowledgeForwardOnlyDB,
+				AcknowledgeMaintenanceDrain: deployOptions.acknowledgeMaintenanceDrain,
 			})
 			if runErr != nil {
 				return infrastructureResult{}, runErr
