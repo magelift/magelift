@@ -41,13 +41,13 @@ magelift --env staging cleanup plan --dir .magelift/cleanup
 magelift --env staging destroy --yes
 ```
 
-AWS bootstrap also needs `--access-log-bucket`. `sign` and `promote` use the
+AWS bootstrap also needs `--access-log-bucket`. `cost --live` errors on GCP targets (live Catalog pricing is not wired there); omit `--live` on GCP. `sign` and `promote` use the
 current cloud or CI login; omit Cosign flags.
 
 ```sh
 magelift sign --digest IMAGE@sha256:...
 magelift --env staging promote --digest IMAGE@sha256:...
-magelift --env staging rollback
+magelift --env staging rollback --ack-forward-only --to-sequence 2
 ```
 
 ## Report

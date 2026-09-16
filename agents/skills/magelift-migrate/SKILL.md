@@ -14,7 +14,7 @@ that every source platform feature has a direct equivalent.
 ## Working rules
 
 - Run `magelift init --from-acc` or `magelift init --from-upsun` into a new file.
-- Review the generated `.unmapped.md` sidecar before changing credentials or DNS.
+- Review the generated unmapped sidecar file (magelift.unmapped.md by default) before changing credentials or DNS.
 - Keep secrets as provider secret references. Never put API tokens, private keys,
   or Composer auth in YAML or evidence.
 - Preserve Fastly service identity, domains, TLS intent, purge behavior, and
