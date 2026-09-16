@@ -1,5 +1,5 @@
 ---
-status: draft
+status: accepted
 slug: gcp-autonomous-provider
 ---
 # Intent: autonomous GCP provider (the first real plugin)
