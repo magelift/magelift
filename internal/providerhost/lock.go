@@ -10,19 +10,25 @@ import (
 )
 
 const (
-	SchemaVersion = 1
+	SchemaVersion = 2
 	SDKAPIVersion = "v1"
+	// ProtocolV2Marker is the required per-entry protocol marker. Only
+	// v2 (typed net/rpc) providers load; schema 1 files are refused with
+	// a re-lock error (nothing versioned shipped pre-alpha, so no
+	// migration path is owed).
+	ProtocolV2Marker = "magelift-v2"
 )
 
 var digestPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 
 var (
-	ErrUnsigned          = errors.New("provider artifact is unsigned")
-	ErrDigestRequired    = errors.New("provider artifact digest is required")
-	ErrChecksumMismatch  = errors.New("provider artifact checksum mismatch")
-	ErrUnsupportedSchema = errors.New("unsupported magelift.providers.lock schema")
-	ErrUnsupportedAPI    = errors.New("unsupported provider SDK API version")
-	ErrUnknownProvider   = errors.New("provider is not in magelift.providers.lock")
+	ErrUnsigned            = errors.New("provider artifact is unsigned")
+	ErrDigestRequired      = errors.New("provider artifact digest is required")
+	ErrChecksumMismatch    = errors.New("provider artifact checksum mismatch")
+	ErrUnsupportedSchema   = errors.New("unsupported magelift.providers.lock schema")
+	ErrUnsupportedAPI      = errors.New("unsupported provider SDK API version")
+	ErrUnknownProvider     = errors.New("provider is not in magelift.providers.lock")
+	ErrUnsupportedProtocol = errors.New("unsupported provider protocol")
 )
 
 // Lockfile is magelift.providers.lock. Digests are sha256 of the subprocess
@@ -34,11 +40,12 @@ type Lockfile struct {
 }
 
 type Artifact struct {
-	Name    string      `json:"name"`
-	Version string      `json:"version"`
-	Digest  string      `json:"digest"`
-	URL     string      `json:"url,omitempty"`
-	Cosign  CosignTrust `json:"cosign"`
+	Name     string      `json:"name"`
+	Version  string      `json:"version"`
+	Protocol string      `json:"protocol"`
+	Digest   string      `json:"digest"`
+	URL      string      `json:"url,omitempty"`
+	Cosign   CosignTrust `json:"cosign"`
 }
 
 type CosignTrust struct {
@@ -58,7 +65,7 @@ func ParseLock(r io.Reader) (Lockfile, error) {
 		return Lockfile{}, fmt.Errorf("decode magelift.providers.lock: %w", err)
 	}
 	if lock.SchemaVersion != SchemaVersion {
-		return Lockfile{}, fmt.Errorf("%w: got %d", ErrUnsupportedSchema, lock.SchemaVersion)
+		return Lockfile{}, fmt.Errorf("%w: got %d (magelift.providers.lock schema 1 is no longer accepted; regenerate the lockfile with protocol %q entries)", ErrUnsupportedSchema, lock.SchemaVersion, ProtocolV2Marker)
 	}
 	if strings.TrimSpace(lock.SDKAPIVersion) != SDKAPIVersion {
 		return Lockfile{}, fmt.Errorf("%w: got %q", ErrUnsupportedAPI, lock.SDKAPIVersion)
@@ -88,6 +95,9 @@ func (a Artifact) validate() error {
 	}
 	if strings.TrimSpace(a.Version) == "" {
 		return errors.New("version is required")
+	}
+	if strings.TrimSpace(a.Protocol) != ProtocolV2Marker {
+		return fmt.Errorf("%w: got %q, want %q", ErrUnsupportedProtocol, a.Protocol, ProtocolV2Marker)
 	}
 	if !digestPattern.MatchString(strings.TrimSpace(a.Digest)) {
 		if strings.TrimSpace(a.Digest) == "" {
