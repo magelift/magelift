@@ -256,7 +256,9 @@ func matchesAny(rel string, excludeRes []*regexp.Regexp) bool {
 func moduleRoot(t *testing.T) string {
 	t.Helper()
 	out := runGo(t, "", "list", "-m", "-f", "{{.Dir}}")
-	root := strings.TrimSpace(out)
+	// In workspace mode go list prints one module dir per line; the root
+	// module comes first.
+	root := strings.TrimSpace(strings.Split(out, "\n")[0])
 	if root == "" {
 		t.Fatal("go list -m returned empty module dir")
 	}
