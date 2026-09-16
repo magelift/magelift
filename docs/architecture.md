@@ -29,6 +29,13 @@ compatibility and certification status.
 - Stable interfaces may exist for config, lifecycle, and capabilities;
   experimental targets must be labeled in docs and CLI output.
 - The CLI orchestrates; Pulumi owns durable infrastructure.
+- The core owns configuration envelopes, command UX, plugin discovery, trust,
+  locking, and orchestration policy. Providers own cloud implementation, stack
+  execution, and operating capabilities, reached over versioned typed
+  operations with explicit negotiation; incompatibility fails closed
+  ([ADR 0013](adr/0013-provider-plugin-contract.md)).
+- Provider subprocesses run with the user's cloud privileges; the process
+  boundary is a deployment and compatibility boundary, not a security sandbox.
 - Artifacts are immutable, signed, built once, and promoted by digest.
   `magelift build --push`, `sign`, and `promote` use the operator's current
   cloud or CI login. Cosign keyless identity remains Sigstore OIDC under the
@@ -38,7 +45,8 @@ compatibility and certification status.
 - Unsupported Magento/service combinations fail before mutate unless an auditable
   override accepts the risk.
 - No shared Pulumi components that switch on provider. Each cloud owns topology
-  under `internal/cloud/<provider>/`.
+  under `internal/cloud/<provider>/` until Order 5 moves providers to nested
+  `providers/<name>/` modules per ADR 0013.
 
 ## System shape
 

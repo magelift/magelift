@@ -15,7 +15,8 @@ Read `docs/adding-a-provider.md` and ADRs 0002, 0004, 0007, 0008 before coding.
 
 - Magento-facing code stays in `sdk`, `internal/platform`, `internal/deploy`,
   `internal/config`
-- VPC, DB, runtime, and Pulumi components stay under `internal/cloud/<provider>/`
+- VPC, DB, runtime, and Pulumi components stay under `internal/cloud/<provider>/` until Order 5 moves providers to nested `providers/<name>/` modules per ADR 0013
+- New providers are specified as out-of-module `providers/<name>/` plugins speaking versioned typed operations with explicit negotiation ([ADR 0013](../../../docs/adr/0013-provider-plugin-contract.md)); the in-process checklist below describes the current tree, not new work
 - SaaS adapters go under `internal/external/<vendor>/`; provider-neutral ports go under `internal/shared/<port>/`; `internal/cloud/kube` is the single ADR-blessed shared K8s helper; SES and Cloudflare are adapter-less by decision
 - Do not share Pulumi Network/Database components behind a provider switch
 
