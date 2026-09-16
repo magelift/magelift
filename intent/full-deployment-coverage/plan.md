@@ -13,7 +13,7 @@ spec: spec.md
 - [x] 2.1 Core tem/ovh rejection plus budget label (validateCloudEmail unimplemented errors, provider-neutral label text, `make generate` + `generate-check` clean) — verify: config suite green, generation gates green
 - [x] 2.2 Init GCP starter matches alpha (remove search-disabled pin, add staticContent, commented SMTP plus prerequisites, schema-validated) — verify: init starter tests green
 - [x] 3.1 Doctor gcloud guidance (toolchain spec for GCP targets, next-action text) — verify: doctor suite green
-- [ ] 3.2 Classified deploy failures (PluginError code mapping at deploy/destroy boundary with scripted-session tests) — verify: cli suite green
+- [x] 3.2 Classified deploy failures (PluginError code mapping at deploy/destroy boundary with scripted-session tests) — verify: cli suite green
 - [ ] 4.1 Skills match CLI (rollback flags, sidecar name, cost-live GCP note) — verify: skills suites green
 - [ ] 4.2 Security posture trace (each onboarding claim pinned to a manifest or removed) — verify: trace recorded in report
 - [ ] 5.1 Onboarding doc plus website pointers (new `docs/onboarding.md`, getting-started link, website install honesty, humanizer plus marks) — verify: `make docs` green, prose passes recorded

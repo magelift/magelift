@@ -12,7 +12,9 @@ import (
 	"github.com/magelift/magelift/internal/cosign"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/internal/usererr"
+	"github.com/magelift/magelift/sdk"
 	"github.com/spf13/cobra"
 )
 
@@ -41,6 +43,33 @@ func mapConcurrentUpdateError(err error) error {
 		return &exitError{code: concurrentUpdateExit, err: err}
 	}
 	return err
+}
+
+// mapPluginError converts typed provider failures into stable exit codes
+// with next-step guidance. Errors that already carry a code pass through,
+// non-plugin errors are untouched, and unmapped plugin codes keep their
+// redacted provider text under the default exit.
+func mapPluginError(err error) error {
+	var exit *exitError
+	if errors.As(err, &exit) {
+		return err
+	}
+	var pluginErr *providerhost.PluginError
+	if !errors.As(err, &pluginErr) {
+		return err
+	}
+	switch pluginErr.Code {
+	case sdk.ErrCodeInvalid:
+		return invalid(usererr.Wrap(err, "provider rejected the request", "fix the flagged input and retry", "docs/onboarding.md"))
+	case sdk.ErrCodeCredential:
+		return &exitError{code: 3, err: usererr.Wrap(err, "provider credentials expired or were revoked", "re-authenticate (gcloud auth login or workload identity), then retry", "docs/onboarding.md#prerequisites")}
+	case sdk.ErrCodeCompatibility:
+		return &exitError{code: 3, err: usererr.Wrap(err, "provider plugin is incompatible", "reinstall the provider artifacts beside the CLI", "docs/onboarding.md#prerequisites")}
+	case sdk.ErrCodeConflict, sdk.ErrCodeNotFound, sdk.ErrCodeIntegrity:
+		return &exitError{code: 3, err: err}
+	default:
+		return err
+	}
 }
 
 func bindLiveQueueReplicas(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack) (platform.PlannedStack, error) {
@@ -103,7 +132,7 @@ func infrastructureCommand(o *options, name, short string, operation func(contex
 		}
 		result, err := o.executeInfrastructure(cmd.Context(), name, operation, digest)
 		if err != nil {
-			return mapConcurrentUpdateError(err)
+			return mapPluginError(mapConcurrentUpdateError(err))
 		}
 		return o.write(result)
 	}}
