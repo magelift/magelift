@@ -28,3 +28,16 @@ func TestCertificationTierFollowsEvidenceTuple(t *testing.T) {
 		t.Fatalf("gke-standard = %s, want experimental", got)
 	}
 }
+
+func TestTierForRuntime(t *testing.T) {
+	t.Parallel()
+	if got := TierForRuntime(gcptarget.RuntimeAutopilotID); got != sdk.ExtensionTierCertified {
+		t.Fatalf("autopilot = %q", got)
+	}
+	if got := TierForRuntime(""); got != sdk.ExtensionTierCertified {
+		t.Fatalf("empty runtime = %q", got)
+	}
+	if got := TierForRuntime(gcptarget.RuntimeStandardID); got != sdk.ExtensionTierExperimental {
+		t.Fatalf("standard = %q", got)
+	}
+}

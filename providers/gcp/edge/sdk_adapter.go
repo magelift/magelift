@@ -20,14 +20,20 @@ func NewLifecycleAdapter(client sdk.EdgeAdapter) (sdk.EdgeAdapter, error) {
 	return client, nil
 }
 
+// NativeDescriptor is the static descriptor of the native GCP edge adapter.
+// The protocol server advertises it without constructing API clients.
+func NativeDescriptor() sdk.EdgeAdapterDescriptor {
+	return sdk.EdgeAdapterDescriptor{
+		APIVersion: sdk.ExtensionAPIVersion, ID: "gcp.edge.native", Provider: sdk.ProviderID("gcp"), Version: "1.0.0",
+		Capabilities: []sdk.EdgeAction{sdk.EdgeApply, sdk.EdgeVerify, sdk.EdgeFailover, sdk.EdgeRollback, sdk.EdgeDestroy, sdk.EdgePurge},
+	}
+}
+
 // NewNativeLifecycleAdapter supplies the reusable SDK lifecycle around a
 // Google Cloud load-balancing/CDN/Armor API translator. Google SDK and GKE
 // resource types remain owned by the injected provider implementation.
 func NewNativeLifecycleAdapter(api sdk.EdgeOperationAPI, policy sdk.EdgeOperationPolicy) (sdk.EdgeAdapter, error) {
-	return sdk.NewOperationBackedEdgeAdapter(sdk.EdgeAdapterDescriptor{
-		APIVersion: sdk.ExtensionAPIVersion, ID: "gcp.edge.native", Provider: sdk.ProviderID("gcp"), Version: "1.0.0",
-		Capabilities: []sdk.EdgeAction{sdk.EdgeApply, sdk.EdgeVerify, sdk.EdgeFailover, sdk.EdgeRollback, sdk.EdgeDestroy, sdk.EdgePurge},
-	}, api, policy)
+	return sdk.NewOperationBackedEdgeAdapter(NativeDescriptor(), api, policy)
 }
 
 // NewNativeSDKLifecycleAdapter wires the shared lifecycle to the official

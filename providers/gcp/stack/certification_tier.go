@@ -32,3 +32,20 @@ func (s Spec) CertificationTier() platform.CertificationTier {
 	}
 	return platform.TierExperimental
 }
+
+// TierForRuntime reports the module-level tier for a runtime: Autopilot is
+// the certified target, every other runtime stays experimental.
+func TierForRuntime(runtime sdk.RuntimeID) sdk.ExtensionCertificationTier {
+	if runtime == "" || runtime == gcptarget.RuntimeAutopilotID {
+		return sdk.ExtensionTierCertified
+	}
+	return sdk.ExtensionTierExperimental
+}
+
+// SDKTier maps a planned spec tier to the wire tier.
+func (s Spec) SDKTier() sdk.ExtensionCertificationTier {
+	if s.CertificationTier() == platform.TierCertified {
+		return sdk.ExtensionTierCertified
+	}
+	return sdk.ExtensionTierExperimental
+}

@@ -7,6 +7,8 @@ import (
 
 	"google.golang.org/api/googleapi"
 
+	"github.com/magelift/magelift/internal/automation"
+	gcpstate "github.com/magelift/magelift/providers/gcp/state"
 	"github.com/magelift/magelift/sdk"
 )
 
@@ -18,6 +20,7 @@ func TestHandlersRejectNilRequests(t *testing.T) {
 		"describe":            func() *sdk.OperationError { _, e := server.Describe(ctx, nil); return e },
 		"validate-config":     func() *sdk.OperationError { _, e := server.ValidateConfig(ctx, nil); return e },
 		"plan":                func() *sdk.OperationError { _, e := server.Plan(ctx, nil); return e },
+		"preview":             func() *sdk.OperationError { _, e := server.Preview(ctx, nil); return e },
 		"apply":               func() *sdk.OperationError { _, e := server.Apply(ctx, nil); return e },
 		"outputs":             func() *sdk.OperationError { _, e := server.Outputs(ctx, nil); return e },
 		"destroy":             func() *sdk.OperationError { _, e := server.Destroy(ctx, nil); return e },
@@ -68,6 +71,8 @@ func TestMapError(t *testing.T) {
 		{"upstream-retryable", &googleapi.Error{Code: 503}, sdk.ErrCodeUpstream, true},
 		{"upstream", &googleapi.Error{Code: 400}, sdk.ErrCodeUpstream, false},
 		{"concurrent", errors.New("[409] Conflict: Another update is currently in progress."), sdk.ErrCodeConflict, true},
+		{"locked", gcpstate.ErrLocked, sdk.ErrCodeConflict, false},
+		{"ownership", &automation.PreviewOwnershipError{}, sdk.ErrCodeConflict, false},
 		{"generic", errors.New("boom"), sdk.ErrCodeUpstream, false},
 	}
 	for _, test := range cases {
