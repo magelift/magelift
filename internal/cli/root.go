@@ -774,7 +774,10 @@ environments:
 extensions: {}
 `
 
-const starterGCPConfig = `schemaVersion: 1
+const starterGCPConfig = `# Alpha recipe starter (GCP GKE Autopilot preview). Fill in your GCP
+# project and domains, then follow docs/onboarding.md (billing, domain,
+# licenses, and SMTP relay prerequisites come first).
+schemaVersion: 1
 project:
   name: example-shop
 application:
@@ -786,14 +789,27 @@ application:
     frontName: admin
 build:
   php: "8.5"
+  staticContent:
+    locales: [en_US]
+    themes: [Magento/luma]
 target:
   provider: gcp
   runtime: gke-autopilot
   gcp:
     project: example-gcp-project
     region: europe-west1
-    # Certified cell: no managed search on first run.
-    openSearchMode: disabled
+    # Search defaults to the recipe OpenSearch; pin openSearchMode: disabled
+    # only to skip search on a first smoke run.
+# Outbound email: uncomment and point at your SMTP relay once the relay
+# account exists (see docs/onboarding.md prerequisites). Preview
+# environments stay disabled unless you set a mode explicitly.
+#email:
+#  mode: smtp
+#  host: smtp.example.com
+#  port: 587
+#  username: mailer
+#  from: shop@example.com
+#  credential: gcp-secret-manager://projects/example-gcp-project/secrets/smtp-password/versions/latest
 defaults:
   region: europe-west1
   preset: preview

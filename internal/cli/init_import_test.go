@@ -485,3 +485,38 @@ func copyTree(t *testing.T, src, dst string) {
 		t.Fatalf("copyTree: %v", err)
 	}
 }
+
+func TestInitGCPStarterMatchesAlphaRecipe(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "magelift.yaml")
+	var out bytes.Buffer
+	cmd := newCommand(&out, &out, nil)
+	cmd.SetArgs([]string{"--config", configPath, "init", "--provider", "gcp"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("init --provider gcp: %v\n%s", err, out.String())
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Contains(text, "\n    openSearchMode: disabled") {
+		t.Fatal("starter pins search off; the alpha recipe serves OpenSearch by default")
+	}
+	for _, want := range []string{"staticContent:", "locales: [en_US]", "#email:", "#  mode: smtp", "docs/onboarding.md"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("starter missing %q", want)
+		}
+	}
+	file, err := config.Load(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective, err := file.Resolve("preview", config.ResolveOptions{})
+	if err != nil {
+		t.Fatalf("preview resolve: %v", err)
+	}
+	if got := effective.Config.Build.StaticContent.Locales; len(got) != 1 || got[0] != "en_US" {
+		t.Fatalf("staticContent locales = %#v", got)
+	}
+}
