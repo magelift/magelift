@@ -88,9 +88,9 @@ alpha scope.
 
 ### Requirement: Provision plus the full day-2 surface in-provider
 
-The provider SHALL serve 29 operations mirroring the module interfaces
+The provider SHALL serve 30 operations mirroring the module interfaces
 1:1, all executed inside the provider process against GCP APIs. Lifecycle:
-Describe, ValidateConfig, Plan, Apply, Outputs, Destroy,
+Describe, ValidateConfig, Plan, Preview, Apply, Outputs, Destroy,
 DestroyLeftoverBackups. Bootstrap:
 BootstrapVerify, BootstrapEnsure. State (Pulumi state, locks, snapshots):
 StateStatus, StateLock, StateUnlock, StateBackup, StateRestore. Secrets:
@@ -101,11 +101,11 @@ provider-side; the launcher runs client-side). Cost: CostInputs (report
 from resolved inputs plus raw target block; no stored plan required).
 Cleanup ledger replay: Inventory, Delete (ledger-carried identity; no
 envelope). Adapter proxies: EdgePlan, EdgeExecute, ResiliencePlan,
-ResilienceExecute. No Preview/Refresh ops (no code referent), no redacted
-Outputs variant (redaction stays core-side), no CredentialRefresh op (the
-contract's cred-refresh is the internal token-source mechanism with its
-own expiry tests). No other operations may be added without a spec
-amendment.
+ResilienceExecute. No Refresh op (no code referent), no redacted Outputs variant (the
+server reports secret-key flags and the core redacts for display), no
+CredentialRefresh op (the contract's cred-refresh is the internal
+token-source mechanism with its own expiry tests). No other operations
+may be added without a spec amendment.
 
 #### Scenario: Each operation independently exercised
 
@@ -212,7 +212,8 @@ core config slimming plus schema regeneration, cost/keys SDK additions.
 
 Protocol operations (unary request/reply; versions explicit): Describe
 (protocol version, provider ID/version, operation versions, runtimes);
-ValidateConfig; Plan; Apply; Outputs (JSON-object values); Destroy;
+ValidateConfig; Plan; Preview; Apply; Outputs (JSON-object values);
+Destroy;
 BootstrapVerify/BootstrapEnsure; StateStatus/StateLock/StateUnlock/
 StateBackup/StateRestore; SecretList/SecretSet/SecretRemove/SecretRead;
 TailLogs/CheckRuntime/PrepareExec; PrepareTunnel; CostInputs;
@@ -266,7 +267,7 @@ Unresolved items from intent.md, plus new ones. Each has an owner or a default.
   minimize new proof; no pilot signal to flip. Owner: maintainer at
   acceptance (confirmed by proceeding).
 - Live-vs-fake split adopted: unit plus fake-client proof here for all
-  29 ops; live proof of the full loop in acceptance. Owner: spec author
+  30 ops; live proof of the full loop in acceptance. Owner: spec author
   (adopted).
 - New: enum removal deferred to `verified-provider-distribution`
   (resolution owner). Owner: Order 7.
