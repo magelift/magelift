@@ -579,7 +579,6 @@ var qualityPatchID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 var observabilityProvider = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
 var sensitiveObservabilityField = regexp.MustCompile(`(?i)(?:password|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)`)
 var arm64NatInstanceType = regexp.MustCompile(`^(?:a1|[a-z0-9]+g[a-z0-9]*)\.[a-z0-9]+$`)
-var gcpKubernetesMinor = regexp.MustCompile(`^1\.[0-9]+$`)
 var awsClockWindow = regexp.MustCompile(`^(?:[01][0-9]|2[0-3]):[0-5][0-9]-(?:[01][0-9]|2[0-3]):[0-5][0-9]$`)
 var awsMaintenanceWindow = regexp.MustCompile(`(?i)^(?:mon|tue|wed|thu|fri|sat|sun):(?:[01][0-9]|2[0-3]):[0-5][0-9]-(?:mon|tue|wed|thu|fri|sat|sun):(?:[01][0-9]|2[0-3]):[0-5][0-9]$`)
 
@@ -947,15 +946,6 @@ func validateCloudEmail(c Config) []string {
 	}
 	problems = append(problems, validateProviderSecretReference("email.credential", email.Credential, c.Target.Provider)...)
 	return problems
-}
-
-func effectiveScalewayRegion(c Config) string {
-	if c.Target.Scaleway != nil {
-		if region := strings.TrimSpace(c.Target.Scaleway.Region); region != "" {
-			return region
-		}
-	}
-	return strings.TrimSpace(c.Defaults.Region)
 }
 
 // validateSingleTargetBlock enforces the generic target-block rule: at most
