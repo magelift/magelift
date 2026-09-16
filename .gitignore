@@ -44,4 +44,5 @@ skills-lock.json
 .planning/
 /tasks/
 .wrangler/
+.cloudflare/
 .venv/
