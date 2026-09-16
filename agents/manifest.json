@@ -33,7 +33,7 @@
     "name": "magelift-migrate",
     "description": "Migrate an Adobe Commerce Cloud, Platform.sh, or Upsun project to MageLift. Use when importing configuration, mapping services, or reviewing unmapped fields.",
     "version": "1.0.0",
-    "digest": "da6ee12bfdde31837f89b8998eea0c3e3fb75db17c12ce05c2c18649ba6a2c2c",
+    "digest": "8e971f6386ec70310adf77dca5ec87799c4fc86c8bde658de47455f1793a25d5",
     "sources": [
       "embedded",
       "skills-cli"
@@ -43,7 +43,7 @@
     "name": "magelift-operate",
     "description": "Operate a MageLift environment after deployment. Use for status, health, logs, safe Magento commands, release promotion, rollback, and teardown.",
     "version": "1.0.0",
-    "digest": "6e0f74b74e1b962ad47adedc3b123a68faa0ca32b123faa6421235e8f6575a92",
+    "digest": "ee0029277ba0a63f9a5d9a1b4a862fcf2704d894fae8a76c659c4a036db4bf41",
     "sources": [
       "embedded",
       "skills-cli"
