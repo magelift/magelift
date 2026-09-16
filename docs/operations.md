@@ -46,6 +46,15 @@ settings.
 AWS. A scheduled cleanup job can run `magelift env sweep --yes`; it destroys only
 expired, unprotected environments with `class: preview`, then removes their
 configuration overlays. Production and protected environments are always skipped.
+MageLift ships the sweep command and the generated hourly workflow step; it does
+not run a hosted expiry scheduler. The customer's scheduler (cron or CI) owns
+the run, sweep authenticates with the operator's configured cloud credentials
+(same as deploy and destroy), and if the scheduler skips or a sweep fails
+partway the expired stacks keep billing until the next successful sweep or an
+explicit destroy. After teardown, state backups (90-day retention), log and
+metric retention, unattached addresses or volumes outside the stack, and
+provider billing delay can all keep costing money; the ledger plus direct
+provider inventory show what remains.
 `magelift login` verifies that the current AWS credentials can access the selected
 account and region. It does not write credentials or change AWS resources.
 `magelift upgrade --check` checks the latest GitHub release without changing the
@@ -136,15 +145,21 @@ provider's `CostEstimator` adapter (same boundary as logs/ops; ADR 0004). AWS EC
 Fargate reports catalog capacity and budget inputs; `magelift cost --live` queries
 the AWS Price List API for on-demand capacity in the selected region and separates
 priced resources from capacity that remains an estimate and products AWS could not
-match. Experimental targets return “not supported yet” until they ship an adapter.
+match. GCP `cost --live` is not wired and returns an error telling the operator
+to use account-free mode (omit `--live`). Experimental targets return
+“not supported yet” until they ship an adapter.
 Data transfer, requests, storage growth, logs, WAF, CloudFront, and NAT processing
 remain unsupported because they depend on real workload measurements. A budget is
 never presented as a forecast. On GCP, `magelift cost --budget` reads only
 budgets scoped exactly to the configured project and reports alert thresholds;
 account-wide or multi-project budgets are omitted. The Cloud Billing Budget API
 does not provide current or forecast spend through this read path, and a budget
-does not block deployments. Spend evidence needs the provider's billing report
-or a configured billing export. The authenticated GCP certification project has
+does not block deployments. Every budget report carries `Enforced: false`:
+MageLift validates the configured budget and reports alert thresholds; it never
+caps or stops spend, and provider billing delay means recently destroyed
+resources can still appear on the next invoice. Spend evidence needs the
+provider's billing report or a configured billing export. The authenticated GCP
+certification project has
 the Budget API enabled, but its current principal lacks `billing.budgets.list`
 on the attached billing account, so live budget proof remains blocked until a
 billing-account reader is granted or another billing evidence source is wired.

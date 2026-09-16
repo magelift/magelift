@@ -15,9 +15,11 @@ Headless in MageLift means Magento `application.mode: headless|integrated`
 (API, CORS, media, edge). Storefront frameworks (Next.js, PWA, etc.) stay outside
 the CLI; wire them with Magento outputs and your usual frontend deploy tool.
 
-OpenSpec `certification-matrix` holds the shared evidence rules. Implemented
-cells belong in the per-provider catalogs below. Tracking those cells only
-inside a packed multi-provider campaign is not enough.
+Shared evidence rules for the `certification-matrix` catalog family live in
+this matrix plus [the evidence pack](evidence/README.md): a cell is certified
+only when both agree. Implemented cells belong in the per-provider catalogs
+below. Tracking those cells only inside a packed multi-provider campaign is
+not enough.
 
 | Catalog spec | Certified subset today | Experimental, withheld, or named gap until tuple evidence |
 | --- | --- | --- |
@@ -90,11 +92,18 @@ signing sidecar; `searchMode: serverless` keeps the SigV4 sidecar.
 
 ## AWS ECS Fargate catalog cells
 
+Certified AWS tuple, exactly: `ecs-fargate` + `fargate` + Magento 2.4.9 +
+`nginx-fpm` + `rds-mysql` + `searchMode: disabled` + queue `db` on preview
+(`ecs-rabbitmq` is the unset standard/HA default) + CloudFront + WAF, proved
+by [20260813ai](evidence/aws-ecs-fargate-magento-live-20260813ai.md). Anything
+else on AWS is experimental, unavailable, or unproven: a certified preview
+cell is not production certification of any other topology.
+
 | Capability | Config | Certified | Experimental / notes |
 | --- | --- | --- | --- |
 | NAT | `target.aws.natMode` + `target.aws.natTopology` + `target.aws.natReplacementMode` + optional `target.aws.natInstanceType` | `nat-gateway`, or `fck-nat` with explicit `single-az`/`multi-az` topology, `none`/`auto-scaling` replacement semantics, and ARM64 Graviton sizing (cost/preview and HA boundaries remain evidence-gated) | - |
 | Database | `catalog.databaseEngine` | `rds-mysql` | `aurora-mysql` (unverifiable on free-tier; not certified apply) |
-| Search | `catalog.searchMode` | `disabled` (preview / free-tier) | `serverless` and provisioned OpenSearch remain experimental. Wiring is covered offline, but MageLift has no certified live Magento search data-plane evidence. |
+| Search | `catalog.searchMode` | `disabled` (preview / free-tier) | `serverless` and provisioned OpenSearch remain experimental. Provisioned passed infrastructure-only in [mlaw1](evidence/aws-ecs-fargate-packed-keep-mlaw1-20260915.md) (reindex/query/recycle logs not collected). MageLift has no certified live Magento search data-plane evidence on AWS. |
 | Cache | managed Valkey | certified shapes per preset | - |
 | Queue | `catalog.queueMode` | `db` (preview default), `ecs-rabbitmq` (unset standard/HA default) | Explicit `amazon-mq` is experimental-warn; `ecs-artemis` has live preview evidence but remains experimental; EKS database/RabbitMQ KEEP `awsek` exists, while Amazon MQ and full EKS certification remain deferred |
 | Web runtime | `application.webRuntime` | `nginx-fpm` on the evidenced AWS preview tuple | Adobe lists nginx on this Magento line. `frankenphp-classic` and `php-apache` are Adobe-unsupported plugins that require `compatibility.allowUnsupported`; neither has an Adobe row or certification. `frankenphp-worker` is unregistered. |
@@ -269,7 +278,7 @@ Armor Magento exclusion, Cloud SQL attach, or Pub/Sub Magento modules.
 | Cloud SQL availability | `ZONAL` / `REGIONAL` | Cloud SQL MySQL intersection is Adobe-gated per patch | implemented | Autopilot preview zonal is the certified runtime path; regional/HA stay experimental |
 | Cloud SQL backup / PITR | `cloudSqlBackupEnabled`, binary log, retention, start time, location | n/a | implemented | experimental except as recorded on the Autopilot tuple |
 | Memorystore | engine `VALKEY_8_0` / `VALKEY_9_0` / `VALKEY_9_1`; mode `CLUSTER` / `CLUSTER_DISABLED`; zone `MULTI_ZONE` / `SINGLE_ZONE` | Adobe Valkey row per Magento patch | implemented | evidenced 9.0 on current 2.4.9 cells; 9.1 is a bounded provision cell |
-| Search | `openSearchMode`: `opensearch` / `disabled` | Magento search | implemented (GKE workload) | Autopilot three-node OpenSearch needs `vm.max_map_count` that Autopilot cannot set; HA OpenSearch stays on Standard |
+| Search | `openSearchMode`: `opensearch` / `disabled` | Magento search | implemented (GKE workload) | One-replica OpenSearch passed the application sequence (reindex, storefront query, recycle with reconnect) in [mldp6](evidence/gcp-gke-autopilot-magento-search-live-mldp6-20260914.md). Autopilot three-node OpenSearch needs `vm.max_map_count` that Autopilot cannot set; HA OpenSearch stays on Standard |
 | Queue | `queueMode`: `database` / `rabbitmq` | Magento messaging | implemented | Autopilot preview uses database; rabbitmq is selectable without switching presets |
 | Standard nodes | type/count/min/max, disk, image, `standardNodeSpot` | n/a | implemented | experimental |
 | Autopilot requests | `autopilotCpuRequest` / `autopilotMemoryRequest` | n/a | implemented | certified path uses preview requests |
@@ -284,7 +293,8 @@ Armor Magento exclusion, Cloud SQL attach, or Pub/Sub Magento modules.
 The certified GCP tier (GCP-06) covers Autopilot evidenced runtime cells.
 Current proof is the [evidence pack](evidence/README.md): Autopilot Magento
 2.4.9 preview [gcap28](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md)
-(sealed JSONL under `evidence/runs/`). 2.4.6-p15 Standard cells used matching
+(sealed JSONL `evidence/runs/gcp-gke-autopilot-magento-gcap28-20260820.sealed.jsonl`).
+2.4.6-p15 Standard cells used matching
 PHP and Composer contracts but Cloud SQL MySQL is not an Adobe-compatible
 database intersection for that patch. See [gcp-acceptance.md](gcp-acceptance.md).
 

@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: done
 slug: release-trust-baseline
 ---
 

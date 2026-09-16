@@ -98,8 +98,10 @@ lifecycle and signal-specific operational evidence remain open.
 
 The web runtime sits on the portable side of this boundary. `nginx-fpm` is the Adobe-aligned default. `frankenphp-classic` and `php-apache` are Adobe-unsupported plugins that require `compatibility.allowUnsupported`; Adobe has no row for either and neither is certified. `frankenphp-worker` is unregistered. The default ECS task uses an nginx HTTP container and a PHP-FPM container built from the same immutable image. Integrated tasks add the pinned Varnish 8.0.2
 sidecar on port 6081 and route the load balancer through it to nginx on port 8080.
-The Varnish root filesystem is read-only; its VSM and transient cache use an
-executable task-scoped tmpfs at `/var/lib/varnish`. Headless tasks route directly to
+The Varnish container uses a writable root like the other Magento containers;
+its VSM lives at `/tmp/varnish` on the image filesystem (`-n /tmp/varnish`),
+not on a Fargate empty volume (those mount root-owned and break Varnish).
+Headless tasks route directly to
 nginx on port 8080. The selected application mode is passed to the application
 container as a runtime contract, so integrated and headless deployments can change
 request wiring without changing the public provider boundary.
@@ -213,11 +215,49 @@ a read-only build role for MageLift-scoped secrets. The state role cannot mutate
 infrastructure; generated CI uses the CI role for Pulumi, ECS, and managed-service
 changes, while the build job uses the build role.
 
-Runtime configuration keeps the root filesystem read-only. The image contains only a
-non-secret `env.php` scaffold. ECS Secrets Manager selectors inject the managed
+Magento containers (php-fpm, web/nginx, Varnish, cron, consumers) use a writable
+root (`ReadonlyRootFilesystem: false`): Magento needs to write `env.php`,
+generated files, and the nginx pid, and Fargate empty volumes mount as
+root-owned, so overlaying `/tmp` or `/app/var` would break the non-root
+runtime. Only the search-proxy sidecar runs with a read-only root. The image
+contains only a non-secret `env.php` scaffold. ECS Secrets Manager selectors inject the managed
 database JSON fields and the stable Magento encryption key, while Adobe's
 `MAGENTO_DC_*` environment configuration supplies capability endpoints and
 credentials at task start.
+
+### Alpha security review (minimum, 2026-09-16)
+
+Reviewed for the alpha recipe; each item names its evidence or stays explicitly
+open. A full security review and penetration test remain outstanding and are
+not claimed here.
+
+- Secret references: reviewed. YAML carries references only; validation
+  rejects plaintext for Composer credentials, Magento variables, email
+  credentials, and edge tokens (`internal/config/config.go`).
+- Log redaction: reviewed within its design boundary. Reference-only config
+  keeps secret values out of YAML, logs, and evidence; `env dump` warns its
+  output is unsanitized unless `--sanitize` (mailbox-address hashing only,
+  not certified anonymization) and database passwords travel via environment
+  variables unprinted (`internal/cli/env.go`). No global log-scanning
+  redactor is claimed.
+- Least-privilege permissions: reviewed. Bootstrap mints a state role that
+  cannot mutate infrastructure, a repository-scoped CI role for Pulumi and
+  service changes, and a read-only build role for MageLift-scoped secrets
+  (`internal/cloud/aws/bootstrap`; see the IAM paragraph above).
+- Network exposure: reviewed for workload isolation. Workload security groups
+  accept ingress only within the VPC CIDR; workloads sit in private subnets
+  with NAT egress (`internal/cloud/aws/network/network.go`). The public
+  surface is the load balancer by storefront design; a rule-by-rule edge
+  audit stays with the full review.
+- Artifact trust: reviewed. Images build once and promote by digest; `magelift
+  upgrade` verifies the keyless Sigstore bundle for `checksums.txt` then the
+  archive SHA-256 before atomic replace (`docs/operations.md`, upgrade
+  command). AWS acceptance requires a signed immutable runtime digest with a
+  matching Cosign identity (`docs/aws-acceptance.md`).
+- Recovery material: reviewed. State backups are versioned snapshots under
+  the deployment lock with 90-day retention; incomplete multipart uploads are
+  removed after seven days; the bootstrap lock object reports its owner
+  (`docs/operations.md`, state commands).
 
 ## Local development
 
