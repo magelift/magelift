@@ -34,13 +34,14 @@ The script creates/uses repo-root `.venv` for MkDocs (do not use system pip).
 
 ## Deploy
 
-```sh
-cd website
-npx wrangler pages deploy dist --project-name=magelift --branch=main
-```
+Push to `main`. `.github/workflows/site.yml` (Public site) rebuilds Astro +
+MkDocs via `website/scripts/build-site.sh` and deploys `website/dist` to
+GitHub Pages with `actions/deploy-pages`. PRs build only; only a `main`
+push deploys.
 
-Custom domains: `magelift.dev`, `www.magelift.dev`. Prefer `/docs/` over a
-separate docs hostname.
+Custom domain: `magelift.dev` (via `website/public/CNAME`); `www` redirects
+to the apex. Docs live at `/docs/` inside the same deploy — there is no
+separate docs host, redirect file, or header file.
 
 ## Copy rules
 
