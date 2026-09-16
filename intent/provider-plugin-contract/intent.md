@@ -1,5 +1,5 @@
 ---
-status: draft
+status: accepted
 slug: provider-plugin-contract
 ---
 # Intent: provider plugin contract (the boundary v1 never had)
