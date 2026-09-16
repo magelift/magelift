@@ -1,4 +1,0 @@
-schema: spec-driven
-created: 2026-08-04
-goal: Let external providers add targets and capability adapters without
-  expanding the core binary or portable YAML unsafely.
