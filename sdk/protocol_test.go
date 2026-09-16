@@ -68,7 +68,7 @@ func TestProtocolOperationsEnumerated(t *testing.T) {
 		OpStateStatus, OpStateLock, OpStateUnlock, OpStateBackup, OpStateRestore,
 		OpSecretList, OpSecretSet, OpSecretRemove, OpSecretRead,
 		OpTailLogs, OpCheckRuntime, OpPrepareExec, OpPrepareTunnel,
-		OpCostInputs, OpInventory, OpDelete,
+		OpCostInputs, OpInventory, OpDelete, OpDestroyLeftoverBackups,
 		OpEdgePlan, OpEdgeExecute, OpResiliencePlan, OpResilienceExecute,
 	} {
 		if strings.TrimSpace(string(operation)) == "" {
@@ -81,59 +81,61 @@ func TestProtocolMessagesGobRoundTrip(t *testing.T) {
 	t.Parallel()
 	envelope := Envelope{Project: "p", Environment: "e", Region: "r", EnvironmentClass: "preview", StackName: "s", StateBackendURL: "gs://b", SecretsProvider: "gcp", Preset: "preview", MonthlyBudgetCents: 1, AppVersion: "2.4.9"}
 	messages := map[string]any{
-		"DescribeRequest":         &DescribeRequest{ProtocolVersion: ProtocolV1},
-		"DescribeResponse":        &DescribeResponse{ProtocolVersion: ProtocolV1, ProviderID: "gcp", ProviderVersion: "v", Operations: []OperationVersion{{Name: "status", Version: "1.0"}}, Runtimes: []string{"r"}},
-		"ValidateConfigRequest":   &ValidateConfigRequest{ProtocolVersion: ProtocolV1, TargetBlock: []byte("a: b")},
-		"ValidateConfigResult":    &ValidateConfigResult{Valid: true, Problems: []string{"p"}},
-		"PlanRequest":             &PlanRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, TargetBlock: []byte("a: b")},
-		"PlanResult":              &PlanResult{Plan: StoredPlan{StackName: "s", Opaque: []byte("o")}},
-		"StackCall":               &StackCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
-		"LifecycleResult":         &LifecycleResult{Summary: ChangeSummary{Create: 1}, Diagnostics: []string{"d"}},
-		"OutputsResult":           &OutputsResult{ValuesJSON: []byte(`{"k":"v"}`)},
-		"BootstrapVerifyCall":     &BootstrapVerifyCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
-		"BootstrapVerifyResult":   &BootstrapVerifyResult{Verified: true},
-		"BootstrapEnsureCall":     &BootstrapEnsureCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, RequestJSON: []byte(`{}`)},
-		"BootstrapEnsureResult":   &BootstrapEnsureResult{ResultJSON: []byte(`{}`)},
-		"StateStatusCall":         &StateStatusCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
-		"StateStatusResult":       &StateStatusResult{Locked: true, InfoJSON: []byte(`{}`), BackendURL: "b"},
-		"StateLockCall":           &StateLockCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, Owner: "o"},
-		"StateLockResult":         &StateLockResult{Locked: true},
-		"StateUnlockCall":         &StateUnlockCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
-		"StateUnlockResult":       &StateUnlockResult{InfoJSON: []byte(`{}`)},
-		"StateBackupCall":         &StateBackupCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
-		"StateBackupResult":       &StateBackupResult{ResultJSON: []byte(`{}`)},
-		"StateRestoreCall":        &StateRestoreCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, Location: "l"},
-		"StateRestoreResult":      &StateRestoreResult{ResultJSON: []byte(`{}`)},
-		"SecretListCall":          &SecretListCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
-		"SecretListResult":        &SecretListResult{SecretsJSON: []byte(`[]`)},
-		"SecretSetCall":           &SecretSetCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, Name: "n", Value: []byte("v")},
-		"SecretSetResult":         &SecretSetResult{Written: true},
-		"SecretRemoveCall":        &SecretRemoveCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, Name: "n"},
-		"SecretRemoveResult":      &SecretRemoveResult{Removed: true},
-		"SecretReadRequest":       &SecretReadRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, Name: "n"},
-		"SecretReadResult":        &SecretReadResult{Value: []byte("v")},
-		"TailLogsCall":            &TailLogsCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, QueryJSON: []byte(`{}`)},
-		"TailLogsResult":          &TailLogsResult{EventsJSON: []byte(`[]`)},
-		"CheckRuntimeCall":        &CheckRuntimeCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, OutputsJSON: []byte(`{}`)},
-		"CheckRuntimeResult":      &CheckRuntimeResult{HealthJSON: []byte(`[]`)},
-		"PrepareExecCall":         &PrepareExecCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, OutputsJSON: []byte(`{}`), QueryJSON: []byte(`{}`)},
-		"PrepareExecResult":       &PrepareExecResult{TargetJSON: []byte(`{}`)},
-		"PrepareTunnelCall":       &PrepareTunnelCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, OutputsJSON: []byte(`{}`), QueryJSON: []byte(`{}`)},
-		"PrepareTunnelResult":     &PrepareTunnelResult{TargetJSON: []byte(`{}`)},
-		"CostInputsRequest":       &CostInputsRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, TargetBlock: []byte("a: b"), Budget: true},
-		"CostInputsResult":        &CostInputsResult{ReportJSON: []byte(`{}`)},
-		"InventoryCall":           &InventoryCall{ProtocolVersion: ProtocolV1, RequestJSON: []byte(`{}`)},
-		"InventoryResult":         &InventoryResult{ResourcesJSON: []byte(`[]`)},
-		"DeleteCall":              &DeleteCall{ProtocolVersion: ProtocolV1, ResourceJSON: []byte(`{}`)},
-		"DeleteResult":            &DeleteResult{Deleted: true},
-		"EdgePlanCall":            &EdgePlanCall{ProtocolVersion: ProtocolV1, Envelope: envelope, RequestJSON: []byte(`{"a":1}`)},
-		"EdgePlanResult":          &EdgePlanResult{PlanJSON: []byte(`{"a":1}`)},
-		"EdgeExecuteCall":         &EdgeExecuteCall{ProtocolVersion: ProtocolV1, Envelope: envelope, RequestJSON: []byte(`{"a":1}`)},
-		"EdgeExecuteResult":       &EdgeExecuteResult{ResultJSON: []byte(`{"a":1}`)},
-		"ResiliencePlanCall":      &ResiliencePlanCall{ProtocolVersion: ProtocolV1, Envelope: envelope, RequestJSON: []byte(`{"a":1}`)},
-		"ResiliencePlanResult":    &ResiliencePlanResult{PlanJSON: []byte(`{"a":1}`)},
-		"ResilienceExecuteCall":   &ResilienceExecuteCall{ProtocolVersion: ProtocolV1, Envelope: envelope, RequestJSON: []byte(`{"a":1}`)},
-		"ResilienceExecuteResult": &ResilienceExecuteResult{ResultJSON: []byte(`{"a":1}`)},
+		"DescribeRequest":              &DescribeRequest{ProtocolVersion: ProtocolV1},
+		"DescribeResponse":             &DescribeResponse{ProtocolVersion: ProtocolV1, ProviderID: "gcp", ProviderVersion: "v", Operations: []OperationVersion{{Name: "status", Version: "1.0"}}, Runtimes: []string{"r"}},
+		"ValidateConfigRequest":        &ValidateConfigRequest{ProtocolVersion: ProtocolV1, TargetBlock: []byte("a: b")},
+		"ValidateConfigResult":         &ValidateConfigResult{Valid: true, Problems: []string{"p"}},
+		"PlanRequest":                  &PlanRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, TargetBlock: []byte("a: b")},
+		"PlanResult":                   &PlanResult{Plan: StoredPlan{StackName: "s", Opaque: []byte("o")}},
+		"StackCall":                    &StackCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
+		"LifecycleResult":              &LifecycleResult{Summary: ChangeSummary{Create: 1}, Diagnostics: []string{"d"}},
+		"OutputsResult":                &OutputsResult{ValuesJSON: []byte(`{"k":"v"}`)},
+		"BootstrapVerifyCall":          &BootstrapVerifyCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
+		"BootstrapVerifyResult":        &BootstrapVerifyResult{Verified: true},
+		"BootstrapEnsureCall":          &BootstrapEnsureCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, RequestJSON: []byte(`{}`)},
+		"BootstrapEnsureResult":        &BootstrapEnsureResult{ResultJSON: []byte(`{}`)},
+		"StateStatusCall":              &StateStatusCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
+		"StateStatusResult":            &StateStatusResult{Locked: true, InfoJSON: []byte(`{}`), BackendURL: "b"},
+		"StateLockCall":                &StateLockCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, Owner: "o"},
+		"StateLockResult":              &StateLockResult{Locked: true},
+		"StateUnlockCall":              &StateUnlockCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
+		"StateUnlockResult":            &StateUnlockResult{InfoJSON: []byte(`{}`)},
+		"StateBackupCall":              &StateBackupCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
+		"StateBackupResult":            &StateBackupResult{ResultJSON: []byte(`{}`)},
+		"StateRestoreCall":             &StateRestoreCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, Location: "l"},
+		"StateRestoreResult":           &StateRestoreResult{ResultJSON: []byte(`{}`)},
+		"SecretListCall":               &SecretListCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
+		"SecretListResult":             &SecretListResult{SecretsJSON: []byte(`[]`)},
+		"SecretSetCall":                &SecretSetCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, Name: "n", Value: []byte("v")},
+		"SecretSetResult":              &SecretSetResult{Written: true},
+		"SecretRemoveCall":             &SecretRemoveCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, Name: "n"},
+		"SecretRemoveResult":           &SecretRemoveResult{Removed: true},
+		"SecretReadRequest":            &SecretReadRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, Name: "n"},
+		"SecretReadResult":             &SecretReadResult{Value: []byte("v")},
+		"TailLogsCall":                 &TailLogsCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, QueryJSON: []byte(`{}`)},
+		"TailLogsResult":               &TailLogsResult{EventsJSON: []byte(`[]`)},
+		"CheckRuntimeCall":             &CheckRuntimeCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, OutputsJSON: []byte(`{}`)},
+		"CheckRuntimeResult":           &CheckRuntimeResult{HealthJSON: []byte(`[]`)},
+		"PrepareExecCall":              &PrepareExecCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, OutputsJSON: []byte(`{}`), QueryJSON: []byte(`{}`)},
+		"PrepareExecResult":            &PrepareExecResult{TargetJSON: []byte(`{}`)},
+		"PrepareTunnelCall":            &PrepareTunnelCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, OutputsJSON: []byte(`{}`), QueryJSON: []byte(`{}`)},
+		"PrepareTunnelResult":          &PrepareTunnelResult{TargetJSON: []byte(`{}`)},
+		"CostInputsRequest":            &CostInputsRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, TargetBlock: []byte("a: b"), Budget: true},
+		"CostInputsResult":             &CostInputsResult{ReportJSON: []byte(`{}`)},
+		"InventoryCall":                &InventoryCall{ProtocolVersion: ProtocolV1, RequestJSON: []byte(`{}`)},
+		"InventoryResult":              &InventoryResult{ResourcesJSON: []byte(`[]`)},
+		"DeleteCall":                   &DeleteCall{ProtocolVersion: ProtocolV1, ResourceJSON: []byte(`{}`)},
+		"DeleteResult":                 &DeleteResult{Deleted: true},
+		"DestroyLeftoverBackupsCall":   &DestroyLeftoverBackupsCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
+		"DestroyLeftoverBackupsResult": &DestroyLeftoverBackupsResult{Destroyed: []string{"b"}},
+		"EdgePlanCall":                 &EdgePlanCall{ProtocolVersion: ProtocolV1, Envelope: envelope, RequestJSON: []byte(`{"a":1}`)},
+		"EdgePlanResult":               &EdgePlanResult{PlanJSON: []byte(`{"a":1}`)},
+		"EdgeExecuteCall":              &EdgeExecuteCall{ProtocolVersion: ProtocolV1, Envelope: envelope, RequestJSON: []byte(`{"a":1}`)},
+		"EdgeExecuteResult":            &EdgeExecuteResult{ResultJSON: []byte(`{"a":1}`)},
+		"ResiliencePlanCall":           &ResiliencePlanCall{ProtocolVersion: ProtocolV1, Envelope: envelope, RequestJSON: []byte(`{"a":1}`)},
+		"ResiliencePlanResult":         &ResiliencePlanResult{PlanJSON: []byte(`{"a":1}`)},
+		"ResilienceExecuteCall":        &ResilienceExecuteCall{ProtocolVersion: ProtocolV1, Envelope: envelope, RequestJSON: []byte(`{"a":1}`)},
+		"ResilienceExecuteResult":      &ResilienceExecuteResult{ResultJSON: []byte(`{"a":1}`)},
 	}
 	for name, message := range messages {
 		var buf bytes.Buffer
@@ -145,5 +147,34 @@ func TestProtocolMessagesGobRoundTrip(t *testing.T) {
 		if err := gob.NewDecoder(&buf).Decode(fresh); err != nil {
 			t.Errorf("%s gob decode: %v", name, err)
 		}
+	}
+}
+
+func TestPluginMethodsCoverAllOperations(t *testing.T) {
+	t.Parallel()
+	operations := []Operation{
+		OpDescribe, OpValidateConfig, OpPlan, OpApply, OpOutputs, OpDestroy,
+		OpBootstrapVerify, OpBootstrapEnsure,
+		OpStateStatus, OpStateLock, OpStateUnlock, OpStateBackup, OpStateRestore,
+		OpSecretList, OpSecretSet, OpSecretRemove, OpSecretRead,
+		OpTailLogs, OpCheckRuntime, OpPrepareExec, OpPrepareTunnel,
+		OpCostInputs, OpInventory, OpDelete, OpDestroyLeftoverBackups,
+		OpEdgePlan, OpEdgeExecute, OpResiliencePlan, OpResilienceExecute,
+	}
+	if len(PluginMethods) != len(operations) {
+		t.Fatalf("PluginMethods has %d entries, want %d", len(PluginMethods), len(operations))
+	}
+	for _, operation := range operations {
+		method, err := PluginMethod(operation)
+		if err != nil {
+			t.Errorf("PluginMethod(%q): %v", operation, err)
+			continue
+		}
+		if !strings.HasPrefix(method, "Plugin.") || strings.ContainsAny(method, "- ") {
+			t.Errorf("method %q for %q is not a valid rpc name", method, operation)
+		}
+	}
+	if _, err := PluginMethod("nope"); err == nil {
+		t.Error("PluginMethod(unknown) succeeded, want error")
 	}
 }

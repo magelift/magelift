@@ -3,7 +3,7 @@ package cleanup
 import (
 	"context"
 
-	"github.com/magelift/magelift/internal/cloud/gcp/resilience"
+	"github.com/magelift/magelift/providers/gcp/resilience"
 	"github.com/magelift/magelift/sdk"
 )
 

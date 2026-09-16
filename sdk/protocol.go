@@ -87,6 +87,21 @@ func (e *OperationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Code, e.Message)
 }
 
+// Handshake values shared by the plugin server and the core client. Both
+// sides build their go-plugin handshake config from these constants so the
+// SDK itself stays dependency-free.
+const (
+	// HandshakeCookieKey and HandshakeCookieValue are the go-plugin magic
+	// cookie proving the subprocess is a MageLift provider.
+	HandshakeCookieKey   = "MAGELIFT_PROVIDER"
+	HandshakeCookieValue = "magelift-provider-v1"
+	// HandshakeProtocolVersion gates transport compatibility before
+	// Describe negotiates operation semantics.
+	HandshakeProtocolVersion = 1
+	// PluginName is the single go-plugin served by provider binaries.
+	PluginName = "magelift-provider"
+)
+
 // Operation names the versioned plugin operations. Server and client must
 // agree on names; unknown operations on either side are unimplemented.
 type Operation string
@@ -124,6 +139,9 @@ const (
 	// Cleanup mirrors cli.CleanupProvider (ledger replay has no plan).
 	OpInventory Operation = "inventory"
 	OpDelete    Operation = "delete"
+	// Leftover backups are GCP Cloud SQL backups deleted after Pulumi
+	// destroy when the operator passes --destroy-backups.
+	OpDestroyLeftoverBackups Operation = "destroy-leftover-backups"
 	// Adapter proxies forward sdk adapter calls (purge, recovery, cert).
 	OpEdgePlan          Operation = "edge-plan"
 	OpEdgeExecute       Operation = "edge-execute"
@@ -221,10 +239,13 @@ type ValidateConfigResult struct {
 
 // StackCall invokes a plan-scoped lifecycle operation (apply, outputs,
 // destroy). The server unmarshals the opaque plan it stored.
+// PreviewMetadataJSON optionally encodes an automation.PreviewMetadata for
+// preview ownership tracking.
 type StackCall struct {
-	ProtocolVersion string     `json:"protocolVersion"`
-	Envelope        Envelope   `json:"envelope"`
-	Plan            StoredPlan `json:"plan"`
+	ProtocolVersion     string     `json:"protocolVersion"`
+	Envelope            Envelope   `json:"envelope"`
+	Plan                StoredPlan `json:"plan"`
+	PreviewMetadataJSON []byte     `json:"previewMetadataJson,omitempty"`
 }
 
 // ChangeSummary counts lifecycle mutations for human output.
@@ -507,6 +528,20 @@ type DeleteCall struct {
 type DeleteResult struct {
 	Deleted bool            `json:"deleted"`
 	Error   *OperationError `json:"error,omitempty"`
+}
+
+// DestroyLeftoverBackupsCall asks the provider to delete Cloud SQL backups
+// left after infrastructure teardown.
+type DestroyLeftoverBackupsCall struct {
+	ProtocolVersion string     `json:"protocolVersion"`
+	Envelope        Envelope   `json:"envelope"`
+	Plan            StoredPlan `json:"plan"`
+}
+
+// DestroyLeftoverBackupsResult lists the deleted backup identities.
+type DestroyLeftoverBackupsResult struct {
+	Destroyed []string        `json:"destroyed,omitempty"`
+	Error     *OperationError `json:"error,omitempty"`
 }
 
 // Adapter proxy calls carry their adapter-defined payloads as JSON bytes
