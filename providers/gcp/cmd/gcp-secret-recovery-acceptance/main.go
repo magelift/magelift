@@ -23,8 +23,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/magelift/magelift/internal/certification"
-	gcpresilience "github.com/magelift/magelift/providers/gcp/resilience"
 	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	gcpresilience "github.com/magelift/magelift/providers/gcp/resilience"
 	"github.com/magelift/magelift/sdk"
 )
 
