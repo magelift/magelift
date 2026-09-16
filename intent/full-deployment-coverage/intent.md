@@ -1,5 +1,5 @@
 ---
-status: draft
+status: accepted
 slug: full-deployment-coverage
 ---
 # Intent: reference onboarding for the alpha recipe
