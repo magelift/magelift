@@ -51,10 +51,12 @@ magelift init --provider gcp    # GCP GKE Autopilot
 ```
 
 What you get: preview runs database-backed queues (`db` on AWS,
-`database` on GCP) and search `disabled`, the certified cell, stated
-explicitly so no default bills you by surprise. Staging and production
-inherit with larger presets. `magelift config effective --env preview`
-shows every resolved value, so no default stays hidden.
+`database` on GCP); GCP serves recipe OpenSearch unless you pin it
+off for a first smoke run. Staging and production inherit with
+larger presets. `magelift config effective --env preview` shows
+every resolved value, so no default stays hidden. New GCP teams
+should follow [GCP onboarding](onboarding.md) instead of assembling
+these steps ad hoc.
 
 Fill the placeholders (accounts or the GCP project, domains, secret
 refs; no plaintext secrets), then:

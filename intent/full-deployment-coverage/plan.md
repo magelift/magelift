@@ -16,7 +16,7 @@ spec: spec.md
 - [x] 3.2 Classified deploy failures (PluginError code mapping at deploy/destroy boundary with scripted-session tests) — verify: cli suite green
 - [x] 4.1 Skills match CLI (rollback flags, sidecar name, cost-live GCP note) — verify: skills suites green
 - [x] 4.2 Security posture trace (each onboarding claim pinned to a manifest or removed) — verify: trace recorded in report
-- [ ] 5.1 Onboarding doc plus website pointers (new `docs/onboarding.md`, getting-started link, website install honesty, humanizer plus marks) — verify: `make docs` green, prose passes recorded
+- [x] 5.1 Onboarding doc plus website pointers (new `docs/onboarding.md`, getting-started link, website install honesty, humanizer plus marks) — verify: `make docs` green, prose passes recorded
 - [ ] 5.2 Full proof (root + sdk + provider + synthetic + harness suites green, gates green) — verify: recorded commands all exit 0
 
 ## Notes
