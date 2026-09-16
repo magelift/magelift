@@ -53,6 +53,9 @@ type CapabilityConfig struct {
 	QueueEndpoint          pulumi.StringInput
 	QueueUsername          pulumi.StringInput
 	MediaBucket            pulumi.StringInput
+	SmtpHost               pulumi.StringInput
+	SmtpUsername           pulumi.StringInput
+	EmailFrom              string
 }
 
 type IdentityArgs struct {
@@ -87,6 +90,7 @@ type Args struct {
 	SearchProxyImage   string
 	DatabaseSecretARN  pulumi.StringInput
 	EncryptionKeyARN   pulumi.StringInput
+	SmtpSecretARN      pulumi.StringInput
 	ContainerPort      int
 	VarnishImage       string
 	TaskCPU            string

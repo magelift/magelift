@@ -3052,7 +3052,7 @@
         "credential": {
           "anyOf": [
             {
-              "description": "SendGrid or SES credential secret reference",
+              "description": "SES credential secret reference",
               "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
               "type": "string"
             },
@@ -3083,6 +3083,17 @@
             }
           ]
         },
+        "managed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/emailManaged",
+              "description": "Managed email provisioning inputs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "mode": {
           "anyOf": [
             {
@@ -3090,8 +3101,9 @@
               "enum": [
                 "disabled",
                 "smtp",
-                "sendgrid",
-                "ses"
+                "ses",
+                "tem",
+                "ovh"
               ],
               "type": "string"
             },
@@ -3132,7 +3144,7 @@
         "credential": {
           "anyOf": [
             {
-              "description": "SendGrid or SES credential secret reference",
+              "description": "SES credential secret reference",
               "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
               "type": "string"
             },
@@ -3163,6 +3175,17 @@
             }
           ]
         },
+        "managed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/emailManagedOverlay",
+              "description": "Managed email provisioning inputs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "mode": {
           "anyOf": [
             {
@@ -3170,8 +3193,9 @@
               "enum": [
                 "disabled",
                 "smtp",
-                "sendgrid",
-                "ses"
+                "ses",
+                "tem",
+                "ovh"
               ],
               "type": "string"
             },
@@ -3196,6 +3220,84 @@
           "anyOf": [
             {
               "description": "SMTP username",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "emailManaged": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "anyOf": [
+            {
+              "description": "Mailbox account name (OVH only)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "domain": {
+          "anyOf": [
+            {
+              "description": "Verified sender domain",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hostedZoneId": {
+          "anyOf": [
+            {
+              "description": "Route 53 hosted zone ID for DKIM records (SES only)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "emailManagedOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "anyOf": [
+            {
+              "description": "Mailbox account name (OVH only)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "domain": {
+          "anyOf": [
+            {
+              "description": "Verified sender domain",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hostedZoneId": {
+          "anyOf": [
+            {
+              "description": "Route 53 hosted zone ID for DKIM records (SES only)",
               "type": "string"
             },
             {
@@ -4641,7 +4743,6 @@
               "enum": [
                 "disabled",
                 "smtp",
-                "sendgrid",
                 "ses",
                 "mailpit"
               ],

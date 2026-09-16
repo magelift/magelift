@@ -20,7 +20,7 @@ practical, not a bit-for-bit copy of AWS.
 | --- | --- | --- |
 | Database | MySQL or MariaDB container from the verified row | Certified: RDS MySQL. Aurora is experimental-warn |
 | Queue | RabbitMQ or Artemis container (when enabled) | Certified: `db`, `ecs-rabbitmq` (unset standard/HA default). Explicit `amazon-mq` is experimental-warn. `ecs-artemis` is experimental |
-| Email | Magento SMTP config for SMTP, SendGrid, or SES; credentials stay in `.magelift/local.env` | provider or extension-owned integration; credentials stay outside YAML |
+| Email | Magento SMTP config for SMTP or SES; credentials stay in `.magelift/local.env` | provider or extension-owned integration; credentials stay outside YAML |
 | PHP settings and extensions | `.magelift/local.php.ini` plus the verified runtime extension baseline | builder/runtime contract and provider deployment settings |
 | Edge / WAF / DNS | none | CloudFront, WAF, Route 53, ACM. Local does not emulate them |
 | Secrets | `.magelift/local.env` (mode 0600) | Secrets Manager / SSM / GCP Secret Manager references |

@@ -267,9 +267,19 @@ images are digest-pinned and can be reviewed or deliberately changed in the
 generated Compose file. Artemis uses Magento's STOMP queue transport and a
 Jolokia-backed broker image contract. Redis remains outside the current Adobe
 rows and requires `compatibility.allowUnsupported: true`; MageLift reports that
-choice as an explicit warning. SMTP, SendGrid, and SES modes write Magento's
-`system.smtp` configuration. SendGrid defaults to `smtp.sendgrid.net:587`; SES
-requires its SMTP host, port, username, and credential environment variable.
+choice as an explicit warning. SMTP and SES modes write Magento's
+`system.smtp` configuration. Both take explicit host, port, username, and a
+credential environment variable; no vendor endpoints are baked in. Point
+`smtp` at any provider relay: OVH mailbox (`smtp.mail.ovh.net`, port 465
+SSL/TLS or 587 STARTTLS, full mailbox address as username, about 200 mails
+per hour and not for bulk), Scaleway TEM (`smtp.tem.scaleway.com`, port 587
+STARTTLS or 465/2465 TLS, Project ID as username, API secret key as password),
+or Cloudflare Email Sending (`smtp.mx.cloudflare.net`, port 465 implicit TLS
+only, username `api_token`, API token with Email Sending permission as
+password; beta), or SendGrid (`smtp.sendgrid.net`, port 587, username
+`apikey`, API key as password; manual-only until a stable Pulumi package
+exists). GCP and Fastly have no native email sending; shops there
+point `smtp` at SES or another relay.
 Put the credential variable in `.magelift/local.env` when the app needs it. The
 resolver reads it inside the container without writing the secret to the
 generated Compose file. `local.email.mode: mailpit` starts a digest-pinned
@@ -356,7 +366,7 @@ talks to a loopback aws-sigv4-proxy sidecar. Unit mocks cover both graphs.
 Live Magento search (index/query/reconnect) remains a paid acceptance
 checklist; Floci does not prove that data-plane. A private Magento-on-AWS shop
 may illustrate the provisioned unsigned path
-([sources/chantelle-opensearch.md](sources/chantelle-opensearch.md)); it is not
+([sources/prior-terraform-opensearch.md](sources/prior-terraform-opensearch.md)); it is not
 certification evidence and not the only supported AWS shape. Aurora Magento
 env uses the writer endpoint plus Secrets Manager JSON, same as RDS. The
 Adobe-gated pin is Aurora 3.11/3.12; unaimed 8.4 fails closed.

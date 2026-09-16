@@ -39,6 +39,13 @@ func appendEncryptionSecret(secrets []SecretReference, encryptionARN string) []S
 	return append(result, SecretReference{Name: platform.EnvMagentoCryptKey, ARN: encryptionARN})
 }
 
+func appendSmtpSecret(secrets []SecretReference, smtpARN string) []SecretReference {
+	if strings.TrimSpace(smtpARN) == "" {
+		return append([]SecretReference(nil), secrets...)
+	}
+	return append(append([]SecretReference(nil), secrets...), SecretReference{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__PASSWORD", ARN: smtpARN, JSONKey: "password"})
+}
+
 func deploymentCommand() []string {
 	return platform.MagentoMigrationShell()
 }
@@ -56,6 +63,7 @@ func capabilityEnvironment(args Args) pulumi.Output {
 	return pulumi.All(
 		capabilities.DatabaseWriterEndpoint, capabilities.DatabaseSecretARN, capabilities.CacheEndpoint, capabilities.SessionEndpoint,
 		capabilities.SearchEndpoint, capabilities.QueueMode, capabilities.QueueEndpoint, capabilities.QueueUsername, capabilities.MediaBucket,
+		smtpHostInput(capabilities), smtpUsernameInput(capabilities),
 	).ApplyT(func(values []interface{}) []containerEnvironment {
 		queueMode := values[5].(string)
 		queueEndpoint := values[6].(string)
@@ -95,8 +103,47 @@ func capabilityEnvironment(args Args) pulumi.Output {
 			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__SSL", Value: queueSSL},
 			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__USERNAME", Value: values[7].(string)},
 		)
+		environment = appendSmtpEnvironment(environment, values[9].(string), values[10].(string), capabilities.EmailFrom)
 		return environment
 	})
+}
+
+func smtpHostInput(capabilities *CapabilityConfig) pulumi.StringInput {
+	if capabilities == nil || capabilities.SmtpHost == nil {
+		return pulumi.String("")
+	}
+	return capabilities.SmtpHost
+}
+
+func smtpUsernameInput(capabilities *CapabilityConfig) pulumi.StringInput {
+	if capabilities == nil || capabilities.SmtpUsername == nil {
+		return pulumi.String("")
+	}
+	return capabilities.SmtpUsername
+}
+
+// appendSmtpEnvironment wires managed SES SMTP into Magento's system/smtp
+// config surface. Values mirror the localdev ses mode (LOGIN/TLS on 587);
+// empty host means unmanaged and appends nothing.
+func appendSmtpEnvironment(environment []containerEnvironment, host, username, from string) []containerEnvironment {
+	if strings.TrimSpace(host) == "" {
+		return environment
+	}
+	environment = append(environment,
+		containerEnvironment{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__TRANSPORT", Value: "smtp"},
+		containerEnvironment{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__HOST", Value: host},
+		containerEnvironment{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__PORT", Value: "587"},
+		containerEnvironment{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__USERNAME", Value: username},
+		containerEnvironment{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__AUTH", Value: "LOGIN"},
+		containerEnvironment{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__SSL", Value: "tls"},
+		containerEnvironment{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__DISABLE", Value: "0"},
+	)
+	if strings.TrimSpace(from) != "" {
+		environment = append(environment,
+			containerEnvironment{Name: "CONFIG__DEFAULT__TRANS_EMAIL__IDENT_GENERAL__EMAIL", Value: from},
+		)
+	}
+	return environment
 }
 
 func containerEnvFromBindings(bindings []platform.EnvBinding) []containerEnvironment {

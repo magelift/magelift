@@ -35,7 +35,7 @@ local:
     mode: mailpit
 ```
 
-`mailpit` starts a digest-pinned SMTP sink on loopback. SMTP, SendGrid, and SES
+`mailpit` starts a digest-pinned SMTP sink on loopback. SMTP and SES
 still take `credentialEnv` names, never secret values in `magelift.yaml`.
 
 Seed a project only after installing its Composer dependencies and supplying a

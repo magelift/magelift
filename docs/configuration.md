@@ -25,10 +25,11 @@ of raw provider SDK arguments. Omitted values resolve to named defaults and appe
 the effective configuration, provenance, plan, and architecture fingerprint.
 
 Cloud transactional email is `email` on the project or an environment overlay.
-`sendgrid` and `ses` require a provider-matching secret reference in `email.credential`;
+`ses` requires a provider-matching secret reference in `email.credential`;
 plaintext is rejected before Magento SMTP is written. Validation success is not certified delivery.
+Modes `tem` and `ovh`, and `ses` with a `managed` block, provision the sender identity, credentials, and DNS through the provider adapter; explicit host, port, username, and credential values are rejected alongside `managed`.
 `local.email` remains the workstation overlay and uses `credentialEnv`. A preview environment that
-omits `email` resolves to `disabled` and does not inherit production SendGrid or SES credentials.
+omits `email` resolves to `disabled` and does not inherit production SES credentials.
 
 Resilience projection targets are optional advanced settings: use `resilience.projection.runtime: ecs` with an ECS `cluster`,
 `service` (preferred) or pinned `task`, and `container`; use `runtime: kubernetes` with `namespace`, `workload`, and an optional
@@ -227,7 +228,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `local.webCache.version` | string or null | no |  | Service version |
 | `local.phpSettings` | object or null | no |  | Local PHP ini settings |
 | `local.email` | object | no |  | Local email delivery mode |
-| `local.email.mode` | string or null | no | disabled, smtp, sendgrid, ses, mailpit | Email mode |
+| `local.email.mode` | string or null | no | disabled, smtp, ses, mailpit | Email mode |
 | `local.email.host` | string or null | no |  | SMTP or local email host |
 | `local.email.port` | integer or null | no |  | SMTP or local email port |
 | `local.email.username` | string or null | no |  | SMTP username |
@@ -509,12 +510,16 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `observability.dashboards` | array or null | no |  | Operational dashboards |
 | `observability.slos` | array or null | no |  | Service-level objectives |
 | `email` | object | no |  | Cloud transactional email |
-| `email.mode` | string or null | no | disabled, smtp, sendgrid, ses | Cloud email mode |
+| `email.mode` | string or null | no | disabled, smtp, ses, tem, ovh | Cloud email mode |
 | `email.host` | string or null | no |  | SMTP host |
 | `email.port` | integer or null | no |  | SMTP port |
 | `email.username` | string or null | no |  | SMTP username |
 | `email.from` | string or null | no |  | Default sender address |
-| `email.credential` | string or null | no |  | SendGrid or SES credential secret reference |
+| `email.credential` | string or null | no |  | SES credential secret reference |
+| `email.managed` | object or null | no |  | Managed email provisioning inputs |
+| `email.managed.domain` | string or null | no |  | Verified sender domain |
+| `email.managed.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID for DKIM records (SES only) |
+| `email.managed.account` | string or null | no |  | Mailbox account name (OVH only) |
 | `resilience` | object | no |  | Availability, backup, and disaster-recovery policy |
 | `resilience.profileId` | string or null | no |  | Named resilience profile |
 | `resilience.availabilityTarget` | string or null | no |  | Availability target |
@@ -874,12 +879,16 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.observability.dashboards` | array or null | no |  | Operational dashboards |
 | `environments.*.observability.slos` | array or null | no |  | Service-level objectives |
 | `environments.*.email` | object or null | no |  |  |
-| `environments.*.email.mode` | string or null | no | disabled, smtp, sendgrid, ses | Cloud email mode |
+| `environments.*.email.mode` | string or null | no | disabled, smtp, ses, tem, ovh | Cloud email mode |
 | `environments.*.email.host` | string or null | no |  | SMTP host |
 | `environments.*.email.port` | integer or null | no |  | SMTP port |
 | `environments.*.email.username` | string or null | no |  | SMTP username |
 | `environments.*.email.from` | string or null | no |  | Default sender address |
-| `environments.*.email.credential` | string or null | no |  | SendGrid or SES credential secret reference |
+| `environments.*.email.credential` | string or null | no |  | SES credential secret reference |
+| `environments.*.email.managed` | object or null | no |  | Managed email provisioning inputs |
+| `environments.*.email.managed.domain` | string or null | no |  | Verified sender domain |
+| `environments.*.email.managed.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID for DKIM records (SES only) |
+| `environments.*.email.managed.account` | string or null | no |  | Mailbox account name (OVH only) |
 | `environments.*.resilience` | object or null | no |  |  |
 | `environments.*.resilience.profileId` | string or null | no |  | Named resilience profile |
 | `environments.*.resilience.availabilityTarget` | string or null | no |  | Availability target |

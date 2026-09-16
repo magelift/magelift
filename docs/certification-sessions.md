@@ -5,7 +5,7 @@ stack per checkbox. See [ADR 0010](adr/0010-live-certification.md).
 
 Prove locally first (`make local-gates`: Pulumi mocks, offline harness, Floci
 AWS, floci-gcp). Use a live cloud only when E2E is required. GCP is the
-thorough Magento path. AWS, OVH, Scaleway, New Relic, SendGrid, Fastly, and
+thorough Magento path. AWS, OVH, Scaleway, New Relic, Fastly, and
 Cloudflare are light smoke: one bounded cell, then destroy. Do not KEEP those
 stacks for dump-retrieve, collectors, or edge extras when GCP already has the
 Magento-wired proof.

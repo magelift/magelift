@@ -10,7 +10,7 @@ import (
 )
 
 func containerDefinitionsInput(args Args, secrets []SecretReference) (pulumi.StringInput, error) {
-	return pulumi.All(capabilityEnvironment(args), args.DatabaseSecretARN, args.EncryptionKeyARN, searchEndpointInput(args)).ApplyT(func(values []interface{}) (string, error) {
+	return pulumi.All(capabilityEnvironment(args), args.DatabaseSecretARN, args.EncryptionKeyARN, searchEndpointInput(args), smtpSecretInput(args)).ApplyT(func(values []interface{}) (string, error) {
 		environment, ok := values[0].([]containerEnvironment)
 		if !ok {
 			return "", errors.New("resolve runtime capability environment")
@@ -27,7 +27,11 @@ func containerDefinitionsInput(args Args, secrets []SecretReference) (pulumi.Str
 		if !ok {
 			return "", errors.New("resolve OpenSearch endpoint for signing proxy")
 		}
-		return containerDefinitions(args, appendEncryptionSecret(secrets, encryptionARN), environment, databaseARN, searchEndpoint)
+		smtpARN, ok := values[4].(string)
+		if !ok {
+			return "", errors.New("resolve SMTP secret reference")
+		}
+		return containerDefinitions(args, appendSmtpSecret(appendEncryptionSecret(secrets, encryptionARN), smtpARN), environment, databaseARN, searchEndpoint)
 	}).(pulumi.StringOutput), nil
 }
 
@@ -36,6 +40,13 @@ func searchEndpointInput(args Args) pulumi.StringInput {
 		return pulumi.String("")
 	}
 	return args.Capabilities.SearchEndpoint
+}
+
+func smtpSecretInput(args Args) pulumi.StringInput {
+	if args.SmtpSecretARN == nil {
+		return pulumi.String("")
+	}
+	return args.SmtpSecretARN
 }
 
 // FrontendPort returns the task port reached by the load balancer. Integrated
@@ -149,7 +160,7 @@ type containerDefinition struct {
 }
 
 func containerDefinitionsForInput(args Args, secrets []SecretReference, name string, command []string, exposePort bool) (pulumi.StringInput, error) {
-	return pulumi.All(capabilityEnvironment(args), args.DatabaseSecretARN, args.EncryptionKeyARN, searchEndpointInput(args)).ApplyT(func(values []interface{}) (string, error) {
+	return pulumi.All(capabilityEnvironment(args), args.DatabaseSecretARN, args.EncryptionKeyARN, searchEndpointInput(args), smtpSecretInput(args)).ApplyT(func(values []interface{}) (string, error) {
 		environment, ok := values[0].([]containerEnvironment)
 		if !ok {
 			return "", errors.New("resolve runtime capability environment")
@@ -166,7 +177,11 @@ func containerDefinitionsForInput(args Args, secrets []SecretReference, name str
 		if !ok {
 			return "", errors.New("resolve OpenSearch endpoint for signing proxy")
 		}
-		return containerDefinitionsFor(args, appendDatabaseSecret(appendEncryptionSecret(secrets, encryptionARN), databaseARN), environment, name, command, exposePort, searchEndpoint)
+		smtpARN, ok := values[4].(string)
+		if !ok {
+			return "", errors.New("resolve SMTP secret reference")
+		}
+		return containerDefinitionsFor(args, appendSmtpSecret(appendDatabaseSecret(appendEncryptionSecret(secrets, encryptionARN), databaseARN), smtpARN), environment, name, command, exposePort, searchEndpoint)
 	}).(pulumi.StringOutput), nil
 }
 

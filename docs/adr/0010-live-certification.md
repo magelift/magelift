@@ -10,7 +10,7 @@ Live Magento create/destroy is slow and expensive. Per-checkbox destroy burns ho
 ## Decision
 
 - Daily CI is account-free: Pulumi mocks, Floci AWS, floci-gcp where the emulator covers the API. Emulators do not certify Autopilot, Memorystore, Cloud Armor, managed TLS, Magento Cloud SQL PITR, or regional DR.
-- Live certification uses packed KEEP sessions, not one stack per checkbox. GCP is the thorough Magento path. AWS, OVH, Scaleway, Cloudflare, New Relic, SendGrid, and Fastly are light smoke: one bounded cell, then destroy.
+- Live certification uses packed KEEP sessions, not one stack per checkbox. GCP is the thorough Magento path. AWS, OVH, Scaleway, Cloudflare, New Relic, and Fastly are light smoke: one bounded cell, then destroy.
 - Destroy on exit. Do not set `MAGELIFT_*_ACCEPTANCE_KEEP=true` unless the operator wants a retained debug cell.
 - No paid multi-cloud GitHub matrix by default. Sparse maintainer runs on acceptance accounts only.
 

@@ -45,6 +45,14 @@ type Spec struct {
 	// expired preview for teardown. The Pulumi program reads it to skip
 	// only the expiry check; deploy planning never sets it.
 	AllowExpiredPreview bool
+	Email               EmailSpec
+}
+
+type EmailSpec struct {
+	Managed      bool
+	Domain       string
+	HostedZoneID string
+	From         string
 }
 
 type Identity struct {

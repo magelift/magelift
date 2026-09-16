@@ -93,7 +93,7 @@ type LocalService struct {
 }
 
 type LocalEmailSettings struct {
-	Mode          string `yaml:"mode,omitempty" json:"mode,omitempty" config:"Email mode" schema:"nullable,enum=disabled|smtp|sendgrid|ses|mailpit"`
+	Mode          string `yaml:"mode,omitempty" json:"mode,omitempty" config:"Email mode" schema:"nullable,enum=disabled|smtp|ses|mailpit"`
 	Host          string `yaml:"host,omitempty" json:"host,omitempty" config:"SMTP or local email host" schema:"nullable"`
 	Port          int    `yaml:"port,omitempty" json:"port,omitempty" config:"SMTP or local email port" schema:"nullable,minimum=1,maximum=65535"`
 	Username      string `yaml:"username,omitempty" json:"username,omitempty" config:"SMTP username" schema:"nullable"`
@@ -104,12 +104,23 @@ type LocalEmailSettings struct {
 // EmailConfig is Magento SMTP on a cloud environment. Credentials are secret
 // references, never plaintext YAML. Validation success is not certified delivery.
 type EmailConfig struct {
-	Mode       string `yaml:"mode,omitempty" json:"mode,omitempty" config:"Cloud email mode" schema:"nullable,enum=disabled|smtp|sendgrid|ses"`
-	Host       string `yaml:"host,omitempty" json:"host,omitempty" config:"SMTP host" schema:"nullable"`
-	Port       int    `yaml:"port,omitempty" json:"port,omitempty" config:"SMTP port" schema:"nullable,minimum=1,maximum=65535"`
-	Username   string `yaml:"username,omitempty" json:"username,omitempty" config:"SMTP username" schema:"nullable"`
-	From       string `yaml:"from,omitempty" json:"from,omitempty" config:"Default sender address" schema:"nullable"`
-	Credential string `yaml:"credential,omitempty" json:"credential,omitempty" config:"SendGrid or SES credential secret reference" schema:"nullable,pattern=^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$"`
+	Mode       string        `yaml:"mode,omitempty" json:"mode,omitempty" config:"Cloud email mode" schema:"nullable,enum=disabled|smtp|ses|tem|ovh"`
+	Host       string        `yaml:"host,omitempty" json:"host,omitempty" config:"SMTP host" schema:"nullable"`
+	Port       int           `yaml:"port,omitempty" json:"port,omitempty" config:"SMTP port" schema:"nullable,minimum=1,maximum=65535"`
+	Username   string        `yaml:"username,omitempty" json:"username,omitempty" config:"SMTP username" schema:"nullable"`
+	From       string        `yaml:"from,omitempty" json:"from,omitempty" config:"Default sender address" schema:"nullable"`
+	Credential string        `yaml:"credential,omitempty" json:"credential,omitempty" config:"SES credential secret reference" schema:"nullable,pattern=^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$"`
+	Managed    *EmailManaged `yaml:"managed,omitempty" json:"managed,omitempty" config:"Managed email provisioning inputs"`
+}
+
+// EmailManaged carries managed-provisioning inputs. When present, MageLift
+// creates the sender identity, credentials, and DNS records for the mode's
+// provider; explicit host/port/username/credential values are rejected
+// alongside it. Absent means operator-supplied endpoints (BYO).
+type EmailManaged struct {
+	Domain       string `yaml:"domain,omitempty" json:"domain,omitempty" config:"Verified sender domain" schema:"nullable"`
+	HostedZoneID string `yaml:"hostedZoneId,omitempty" json:"hostedZoneId,omitempty" config:"Route 53 hosted zone ID for DKIM records (SES only)" schema:"nullable"`
+	Account      string `yaml:"account,omitempty" json:"account,omitempty" config:"Mailbox account name (OVH only)" schema:"nullable"`
 }
 
 // StaticContentSettings configures Magento setup:static-content:deploy.

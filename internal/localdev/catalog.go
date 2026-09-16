@@ -506,27 +506,14 @@ func normalizeEmailSettings(email config.LocalEmailSettings) (config.LocalEmailS
 		if strings.TrimSpace(email.Host) == "" || email.Port == 0 {
 			return config.LocalEmailSettings{}, nil, errors.New("local email mode smtp requires host and port")
 		}
-	case "sendgrid":
-		if email.Host == "" {
-			email.Host = "smtp.sendgrid.net"
-		}
-		if email.Port == 0 {
-			email.Port = 587
-		}
-		if email.Username == "" {
-			email.Username = "apikey"
-		}
-		if email.CredentialEnv == "" {
-			return config.LocalEmailSettings{}, nil, errors.New("local email mode sendgrid requires credentialEnv for the SendGrid API key")
-		}
 	case "ses":
 		if strings.TrimSpace(email.Host) == "" || email.Port == 0 || strings.TrimSpace(email.Username) == "" || email.CredentialEnv == "" {
 			return config.LocalEmailSettings{}, nil, errors.New("local email mode ses requires host, port, username, and credentialEnv for SES SMTP credentials")
 		}
 	default:
-		return config.LocalEmailSettings{}, nil, fmt.Errorf("local email mode %q is not verified; use disabled, mailpit, smtp, sendgrid, or ses", mode)
+		return config.LocalEmailSettings{}, nil, fmt.Errorf("local email mode %q is not verified; use disabled, mailpit, smtp, or ses", mode)
 	}
-	warnings = append(warnings, "local email uses Magento's SMTP transport; delivery is verified as configuration wiring, not as an external SendGrid or SES delivery claim")
+	warnings = append(warnings, "local email uses Magento's SMTP transport; delivery is verified as configuration wiring, not as an external SES delivery claim")
 	return email, warnings, nil
 }
 
@@ -953,7 +940,7 @@ func localEmailRuntimeValues(email config.LocalEmailSettings) map[string]string 
 	if email.Username != "" {
 		values["auth"] = "LOGIN"
 	}
-	if email.Mode == "sendgrid" || email.Mode == "ses" {
+	if email.Mode == "ses" {
 		values["auth"] = "LOGIN"
 		values["ssl"] = "tls"
 	}

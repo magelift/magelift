@@ -155,19 +155,19 @@ func TestPlanNormalizesProviderEmailTransport(t *testing.T) {
 	plan, err := Plan(config.BuildSpec{
 		Application: config.Application{Version: "2.4.9"},
 		Build:       config.Build{PHP: "8.5", Composer: config.Composer{Version: "2.10"}},
-		Local:       config.LocalRuntime{Email: config.LocalEmailSettings{Mode: "sendgrid", CredentialEnv: "SENDGRID_API_KEY", From: "shop@example.test"}},
+		Local:       config.LocalRuntime{Email: config.LocalEmailSettings{Mode: "ses", Host: "email-smtp.eu-west-3.amazonaws.com", Port: 587, Username: "ses-smtp-user", CredentialEnv: "SES_SMTP_PASSWORD", From: "shop@example.test"}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan.Email.Host != "smtp.sendgrid.net" || plan.Email.Port != 587 || plan.Email.Username != "apikey" {
+	if plan.Email.Host != "email-smtp.eu-west-3.amazonaws.com" || plan.Email.Port != 587 || plan.Email.Username != "ses-smtp-user" {
 		t.Fatalf("email = %#v", plan.Email)
 	}
 	compose := ComposeTemplateFor(plan)
 	for _, value := range []string{
-		`MAGELIFT_LOCAL_EMAIL_HOST: "smtp.sendgrid.net"`,
-		`MAGELIFT_LOCAL_EMAIL_USERNAME: "apikey"`,
-		`MAGELIFT_LOCAL_EMAIL_CREDENTIAL_ENV: "SENDGRID_API_KEY"`,
+		`MAGELIFT_LOCAL_EMAIL_HOST: "email-smtp.eu-west-3.amazonaws.com"`,
+		`MAGELIFT_LOCAL_EMAIL_USERNAME: "ses-smtp-user"`,
+		`MAGELIFT_LOCAL_EMAIL_CREDENTIAL_ENV: "SES_SMTP_PASSWORD"`,
 		`MAGELIFT_LOCAL_EMAIL_DISABLE: "0"`,
 		`MAGELIFT_LOCAL_EMAIL_AUTH: "LOGIN"`,
 		`MAGELIFT_LOCAL_EMAIL_SSL: "tls"`,
