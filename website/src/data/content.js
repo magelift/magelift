@@ -80,6 +80,7 @@ export const how = {
   ],
   links: [
     { label: 'Getting started', href: `${docsUrl}getting-started/` },
+    { label: 'GCP onboarding', href: `${docsUrl}onboarding/` },
     { label: 'Leave PaaS in a weekend', href: `${docsUrl}weekend-migrate/` },
   ],
   yaml: [

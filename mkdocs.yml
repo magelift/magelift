@@ -60,6 +60,7 @@ nav:
   - Start:
       - Install: install.md
       - Getting started: getting-started.md
+      - GCP onboarding: onboarding.md
       - Local vs cloud: local-vs-cloud.md
       - Compare to PaaS: compare-paas.md
       - FAQ: faq.md
