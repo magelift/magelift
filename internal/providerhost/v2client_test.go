@@ -256,7 +256,7 @@ func TestStaticPreDialValuesMatchAdvertised(t *testing.T) {
 				want = advertised.Tier
 			}
 		}
-		var got sdk.ExtensionCertificationTier = sdk.ExtensionTierExperimental
+		got := sdk.ExtensionTierExperimental
 		if module.CertificationTier() == "certified" {
 			got = sdk.ExtensionTierCertified
 		}
