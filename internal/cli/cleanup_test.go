@@ -132,25 +132,3 @@ func TestCleanupReconcileRequiresYes(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
-
-func TestDefaultCleanupProviderRejectsIncompleteOVHLedgerBeforeCredentialLookup(t *testing.T) {
-	_, err := defaultCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "ovh"})
-	if err == nil || !strings.Contains(err.Error(), "profile, region, and project") {
-		t.Fatalf("error = %v", err)
-	}
-}
-
-func TestDefaultCleanupProviderRejectsIncompleteGCPLedgerBeforeClientLookup(t *testing.T) {
-	_, err := defaultCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "gcp"})
-	if err == nil || !strings.Contains(err.Error(), "require a project") {
-		t.Fatalf("error = %v", err)
-	}
-}
-
-func TestDefaultCleanupProviderBuildsGCPFromADC(t *testing.T) {
-	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", filepath.Join(t.TempDir(), "missing.json"))
-	_, err := defaultCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "gcp", Project: "example-gcp"})
-	if err == nil || !strings.Contains(err.Error(), "create GCP Cloud SQL cleanup client") {
-		t.Fatalf("error = %v", err)
-	}
-}

@@ -91,10 +91,12 @@ A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`
    no Go adapter package.
 7. `internal/config`: provider block, enums, validation, then `make generate` for schema.
 8. For a first-party provider, register the `StackModule` in
-   `internal/registry`. For a community provider, implement `sdk.Module` and
-   call `cli.NewWithExtensions(...)` from a custom binary. Keep Pulumi SDKs out
-   of `internal/cli` so `gendocs` and CLI unit tests stay linkable on small CI
-   runners.
+   `internal/registry` and construct provider hooks in
+   `registry.RegisterHooks()`. For a community provider, implement `sdk.Module`
+   and call `cli.NewWithExtensions(...)` from a custom binary. Keep Pulumi SDKs
+   out of `internal/cli` so `gendocs` and CLI unit tests stay linkable on small
+   CI runners; non-test code under `cli/` and `internal/cli/` imports zero
+   `internal/cloud/*`.
 9. Mock Pulumi graph tests; docs for experimental vs acceptance.
 10. Later for certification: implement the day-2 ports end-to-end ([ADR 0010](adr/0010-live-certification.md)
     packed sessions; [ADR 0003](adr/0003-portable-contracts-vs-topology.md) layout).

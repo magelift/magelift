@@ -11,6 +11,7 @@ import (
 )
 
 // NewDefault returns the first-party module set used by the released CLI.
+// Provider hook constructors live in hooks.go (RegisterHooks).
 func NewDefault() (*platform.ModuleRegistry, error) {
 	modules := platform.NewModuleRegistry()
 	for _, module := range []platform.StackModule{

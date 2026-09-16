@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/sdk"
+	"github.com/spf13/cobra"
 )
 
 type fakeTerminal struct {
@@ -378,4 +381,119 @@ extensions: {}
 	if !strings.Contains(out.String(), `"queueMode": "ecs-rabbitmq"`) {
 		t.Fatalf("effective missing ecs-rabbitmq default: %s", out.String())
 	}
+}
+
+func TestNewWithModulesAndHooksThreadsCleanupAndMediaHooks(t *testing.T) {
+	newHooksCommand := func(out *bytes.Buffer, hooks Hooks) *cobra.Command {
+		return newCommandWithHooks(out, out, platform.NewModuleRegistry(), hooks)
+	}
+
+	t.Run("zero hooks fall back without provider clients", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "ledger.json")
+		var out bytes.Buffer
+		claim := newHooksCommand(&out, Hooks{})
+		claim.SetArgs([]string{
+			"--output", "json", "cleanup", "claim",
+			"--ledger", path,
+			"--run-id", "run-zero",
+			"--marker", "magelift/unknown/run-zero",
+			"--provider", "unknown-cloud",
+			"--region", "r",
+			"--project", "p",
+			"--kind", "k",
+			"--role", "source",
+			"--name", "n",
+		})
+		if err := claim.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		out.Reset()
+		plan := newHooksCommand(&out, Hooks{})
+		plan.SetArgs([]string{"--output", "json", "cleanup", "plan", "--ledger", path})
+		err := plan.Execute()
+		unsupported := false
+		for unwrapped := err; unwrapped != nil; unwrapped = errors.Unwrap(unwrapped) {
+			if strings.Contains(unwrapped.Error(), `restartable cleanup has no adapter for provider "unknown-cloud"`) {
+				unsupported = true
+				break
+			}
+		}
+		if err == nil || !unsupported {
+			t.Fatalf("plan err = %v", err)
+		}
+	})
+
+	t.Run("set cleanup hook dispatches through cleanupProviderFor", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "ledger.json")
+		provider := &fakeCleanupProvider{resources: []sdk.CleanupInventoryResource{{
+			Kind: "rdb-instance", Role: sdk.CleanupRoleSource, Name: "magelift-rdb-run-hooks", Identity: "instance-1", Owned: true, Live: true,
+		}}}
+		hooks := Hooks{
+			NewCleanupProvider: func(context.Context, sdk.CleanupLedger) (CleanupProvider, error) {
+				return provider, nil
+			},
+			MediaEndpoint: func() (string, error) { return "http://127.0.0.1:4566", nil },
+		}
+		var out bytes.Buffer
+		claim := newHooksCommand(&out, hooks)
+		claim.SetArgs([]string{
+			"--output", "json", "cleanup", "claim",
+			"--ledger", path,
+			"--run-id", "run-hooks",
+			"--marker", "magelift/scaleway/rdb-recovery/run-hooks",
+			"--provider", "scaleway",
+			"--region", "fr-par",
+			"--project", "11111111-1111-1111-1111-111111111111",
+			"--profile", "default",
+			"--kind", "rdb-instance",
+			"--role", "source",
+			"--name", "magelift-rdb-run-hooks",
+		})
+		if err := claim.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		out.Reset()
+		record := newHooksCommand(&out, hooks)
+		record.SetArgs([]string{"--output", "json", "cleanup", "record", "--ledger", path, "--kind", "rdb-instance", "--name", "magelift-rdb-run-hooks", "--identity", "instance-1"})
+		if err := record.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		out.Reset()
+		plan := newHooksCommand(&out, hooks)
+		plan.SetArgs([]string{"--output", "json", "cleanup", "plan", "--ledger", path})
+		if err := plan.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), `"status": "pending"`) {
+			t.Fatalf("plan = %s", out.String())
+		}
+	})
+
+	t.Run("media endpoint defaults without hook", func(t *testing.T) {
+		t.Setenv("MAGELIFT_AWS_ENDPOINT_URL", "")
+		o := &options{}
+		client, err := o.newMediaS3Client(context.Background(), "eu-west-3")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if endpoint := client.Options().BaseEndpoint; endpoint != nil {
+			t.Fatalf("BaseEndpoint = %q, want nil default endpoints", *endpoint)
+		}
+	})
+
+	t.Run("set media hook overrides the endpoint", func(t *testing.T) {
+		o := &options{mediaEndpoint: func() (string, error) { return "http://127.0.0.1:4566", nil }}
+		client, err := o.newMediaS3Client(context.Background(), "eu-west-3")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if endpoint := client.Options().BaseEndpoint; endpoint == nil || *endpoint != "http://127.0.0.1:4566" {
+			t.Fatalf("BaseEndpoint = %v, want the hook override", endpoint)
+		}
+		if !client.Options().UsePathStyle {
+			t.Fatal("UsePathStyle = false, want path style with an endpoint override")
+		}
+	})
 }
