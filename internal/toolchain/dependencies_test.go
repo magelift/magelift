@@ -205,3 +205,23 @@ func contains(values []string, wanted string) bool {
 	}
 	return false
 }
+
+func TestSpecsForTargetGuidesGcloudForGCP(t *testing.T) {
+	var gcloud *DependencySpec
+	for _, spec := range SpecsForTarget("gcp", "gke-autopilot") {
+		if spec.ID == "gcloud" {
+			gcloud = &spec
+		}
+	}
+	if gcloud == nil {
+		t.Fatal("gcp specs lack gcloud guidance")
+	}
+	if gcloud.Requirement != DependencyOptional || gcloud.Installable {
+		t.Fatalf("gcloud spec = %#v, want guided-optional without auto-install", gcloud)
+	}
+	for _, spec := range SpecsForTarget("aws", "ecs-fargate") {
+		if spec.ID == "gcloud" {
+			t.Fatal("aws specs must not include gcloud")
+		}
+	}
+}

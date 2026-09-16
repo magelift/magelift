@@ -296,7 +296,13 @@ func SpecsForTarget(provider, runtimeID string) []DependencySpec {
 		specs = append(specs, DependencySpec{ID: "kubectl", Command: "kubectl", Capability: "Kubernetes exec and private tunnels", Requirement: DependencyOptional, VersionArgs: []string{"version", "--client=true", "--output=yaml"}, InstallPackage: "kubectl", Installable: true})
 	}
 	if provider == "gcp" {
-		specs = append(specs, DependencySpec{ID: "cloud-sql-proxy", Command: "cloud-sql-proxy", Capability: "GCP private database tunnels", Requirement: DependencyOptional, VersionArgs: []string{"--version"}, InstallPackage: "cloud-sql-proxy", Installable: true})
+		specs = append(specs,
+			DependencySpec{ID: "cloud-sql-proxy", Command: "cloud-sql-proxy", Capability: "GCP private database tunnels", Requirement: DependencyOptional, VersionArgs: []string{"--version"}, InstallPackage: "cloud-sql-proxy", Installable: true},
+			// Guided-only: gcloud serves human login flows (gcloud auth
+			// login); workload identity and metadata credentials need no
+			// CLI, and automated install cannot add the Google apt repo.
+			DependencySpec{ID: "gcloud", Command: "gcloud", Capability: "GCP human login flows (not needed under workload identity)", Requirement: DependencyOptional, VersionArgs: []string{"--version"}},
+		)
 	}
 	if provider == "aws" && runtimeID == "ecs-fargate" {
 		specs = append(specs,
