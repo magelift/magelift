@@ -253,8 +253,9 @@ type stubCandidate struct{}
 func (stubCandidate) RegisterCandidate(context.Context, kube.CandidateRequest) (kube.Candidate, error) {
 	return kube.Candidate{}, nil
 }
-func (stubCandidate) RunMigrations(context.Context, kube.Candidate) error { return nil }
-func (stubCandidate) Cleanup(context.Context, kube.Candidate) error       { return nil }
+func (stubCandidate) RunMigrations(context.Context, kube.Candidate) error             { return nil }
+func (stubCandidate) RunProbe(context.Context, kube.CandidateRequest, []string) error { return nil }
+func (stubCandidate) Cleanup(context.Context, kube.Candidate) error                   { return nil }
 
 type stubRuntime struct{}
 

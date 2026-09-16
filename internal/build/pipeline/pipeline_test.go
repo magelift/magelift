@@ -535,7 +535,7 @@ func pipelineRequest(t *testing.T) Request {
 	file, err := config.Load([]byte(`schemaVersion: 1
 project: {name: shop}
 application: {edition: open-source, version: 2.4.9, mode: integrated}
-build: {php: "8.5", extensions: [intl, opcache], composer: {version: "2.10+"}}
+build: {php: "8.5", extensions: [intl, opcache], composer: {version: "2.10+"}, staticContent: {locales: [en_US], themes: [Magento/luma]}}
 target: {provider: aws, runtime: ecs-fargate}
 defaults: {region: eu-west-3, preset: preview}
 environments:
