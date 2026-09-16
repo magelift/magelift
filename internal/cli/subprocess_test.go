@@ -196,7 +196,7 @@ func TestSubprocessProvenance(t *testing.T) {
 		},
 	}
 	provenance = withoutArtifact.subprocessProvenance(context.Background())
-	if len(provenance) != 1 || provenance[0].Mode != "in-process" || provenance[0].Version != "" {
+	if len(provenance) != 1 || provenance[0].Mode != "not-installed" || provenance[0].Version != "" {
 		t.Fatalf("provenance = %v", provenance)
 	}
 }

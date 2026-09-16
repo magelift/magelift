@@ -37,14 +37,15 @@ Single exception: `internal/cloud/kube` stays where it is (see ADR 0003 carve-ou
 
 A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`.
 
-## Checklist (copy GCP)
+## Checklist (copy the GCP plugin)
 
 New providers follow [ADR 0013](adr/0013-provider-plugin-contract.md): a nested
 `providers/<name>/` module built outside the root module against the public
-SDK, speaking versioned typed operations (stack lifecycle plus the seven
-day-2 operations) with explicit negotiation and fail-closed compatibility.
-The in-process checklist below describes the current tree until Order 5 lands
-the specified move; do not start new in-process providers from it.
+SDK, speaking versioned typed operations mirroring the module interfaces
+with explicit negotiation and fail-closed compatibility (`providers/gcp`
+is the reference: 30 operations over go-plugin net/rpc).
+The in-process checklist below describes the remaining in-process tree
+(AWS, OVH, Scaleway); do not start new in-process providers from it.
 
 1. `internal/cloud/<p>/target/`: IDs, `Validate`, optional `Register(*infra.Registry)` for tests.
 2. `internal/cloud/<p>/stack/`: `Spec`, `PlanFromConfig*`, Pulumi `Program` (`ctx.Export` must match `Component.Outputs()`), `component`, and a `StackModule`. If Magento Ops would cycle imports with other packages, put `HasOps` on a thin wrapper (AWS: `internal/cloud/aws/ops`).
