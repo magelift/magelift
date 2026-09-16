@@ -19,7 +19,7 @@ Certified search today is `disabled`. A catalog shop without search is a spike, 
 
 ## Evidence
 
-Capability matrix: `disabled` is the certified preview/free-tier cell; `serverless` (AOSS plus SigV4 sidecar) and `provisioned` (unsigned HTTPS 443 in-VPC) are experimental. `docs/release-readiness.md` rescoped the public-tag gate 2026-07-22 to three substitutes: offline wiring mocks, free-tier matrix, prior Chantelle Terraform ops. It states Chantelle proves ops, not MageLift live search. Paid checklist (index, query, reconnect after recycle, least-privilege task role) is deferred. Unit mocks `TestRuntimeWiresMagentoOpenSearchEnvFromEndpoint` and `TestRuntimeWiresAOSSThroughSigningProxy` cover env wiring only. Live Magento indexing or querying on a MageLift stack: not checked.
+Capability matrix: `disabled` is the certified preview/free-tier cell; `serverless` (AOSS plus SigV4 sidecar) and `provisioned` (unsigned HTTPS 443 in-VPC) are experimental. `docs/release-readiness.md` rescoped the public-tag gate 2026-07-22 to three substitutes: offline wiring mocks, free-tier matrix, prior Terraform ops. It states that work proves ops, not MageLift live search. Paid checklist (index, query, reconnect after recycle, least-privilege task role) is deferred. Unit mocks `TestRuntimeWiresMagentoOpenSearchEnvFromEndpoint` and `TestRuntimeWiresAOSSThroughSigningProxy` cover env wiring only. Live Magento indexing or querying on a MageLift stack: not checked.
 
 ## Proposed outcome
 

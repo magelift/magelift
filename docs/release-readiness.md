@@ -19,9 +19,9 @@ account. It closes with three substitutes:
 
 - **MageLift offline wiring**: Pulumi/unit mocks for Magento search env (`TestRuntimeWiresMagentoOpenSearchEnvFromEndpoint`, `TestRuntimeWiresAOSSThroughSigningProxy`); Magento search env absent when the endpoint is empty
 - **Free-tier AWS matrix**: Applied `searchMode: disabled` + queue cells; preview-only OpenSearch serverless plan (2026-07-21). Re-proven create-once + `db`/`ecs-rabbitmq`/`ecs-artemis` + kill/resume + dual assert_clean (2026-07-29). Evidence: committed samples under [evidence/](evidence/README.md); local re-runs under gitignored `.magelift/`
-- **Chantelle external ops**: Prior Terraform Magento+OpenSearch work at Chantelle (ElasticSuite, no SigV4). See [sources/chantelle-opensearch.md](sources/chantelle-opensearch.md); private repos not named
+- **External ops precedent**: Prior Terraform Magento+OpenSearch work (ElasticSuite, no SigV4). See [sources/prior-terraform-opensearch.md](sources/prior-terraform-opensearch.md); private repos not named
 
-Chantelle proves Magento + AWS OpenSearch *ops*, not MageLift's live search
+That prior work proves Magento + AWS OpenSearch *ops*, not MageLift's live search
 data plane. Do **not** claim "live Magento search on MageLift acceptance is
 green" until a paid pass.
 
@@ -108,7 +108,7 @@ Every public-tag gate is **Closed**, **Deferred**, or **Offline closed** with a 
 | --- | Closed / Deferred / Pending | --- |
 | Trademark / package-name clearance | **Closed** | MageLift / magelift.dev |
 | Contract freeze (`v1.0.0-rc.1`) | **Closed** | [versioning.md](versioning.md); CHANGELOG `[Unreleased]` baseline |
-| OpenSearch public-tag substitute | **Closed** | Offline SigV4 wiring + free-tier matrix + [prior Chantelle Terraform ops](sources/chantelle-opensearch.md) (repos not named) |
+| OpenSearch public-tag substitute | **Closed** | Offline SigV4 wiring + free-tier matrix + [prior Terraform ops](sources/prior-terraform-opensearch.md) (repos not named) |
 | OpenSearch live SigV4 data-plane | **Deferred** | Post-tag / paid acceptance checklist above |
 | Queue matrix (`ecs-rabbitmq` + experimental Artemis) | **Closed** | AWS preview `db` / `ecs-rabbitmq` / `ecs-artemis` PASS 2026-08-06 with direct cleanup; [evidence](evidence/aws-ecs-fargate-magento-live-20260813ai.md) |
 | Measured time-to-preview | **Closed** | ~631s / 10m31s eu-north-1 |

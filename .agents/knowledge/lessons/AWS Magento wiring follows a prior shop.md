@@ -1,7 +1,7 @@
 ---
 type: lesson
-title: AWS Magento wiring follows backend-m2-b2b
-description: backend-m2-b2b is a private Chantelle Magento-on-AWS example. It is not the only architecture and it does not certify MageLift cells.
+title: AWS Magento wiring follows a prior shop
+description: A prior private Magento-on-AWS shop is one field example. It is not the only architecture and it does not certify MageLift cells.
 tags:
 - magento
 - aws
@@ -14,7 +14,7 @@ generated:
 verified: 2026-08-23
 ---
 
-`backend-m2-b2b` is a private sibling Magento Open Source shop on AWS ECS (staging/production). Use it only as one field example of how an agency wired Aurora + provisioned OpenSearch. Do not copy files into MageLift. Do not treat that shop as the only supported AWS shape. Do not use it as certification evidence. MageLift certifies only `docs/capability-matrix.md` plus `docs/evidence/` for the exact MageLift tuple.
+One prior private sibling Magento Open Source shop on AWS ECS (staging/production) shows how an agency wired Aurora + provisioned OpenSearch. Treat it only as one field example. Do not copy files into MageLift. Do not treat that shop as the only supported AWS shape. Do not use it as certification evidence. MageLift certifies only `docs/capability-matrix.md` plus `docs/evidence/` for the exact MageLift tuple.
 
 What that example happens to show (not a certified MageLift pin):
 

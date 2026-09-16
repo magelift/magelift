@@ -13,7 +13,7 @@ Explicitly **after** public beta. Do not block the certified AWS path on these.
 | GitHub org | Move from personal fork to `magelift` org when private quality bar is met |
 | Signed remote plugins | Only after Sigstore allowlists; until then use compiled extension binaries |
 | Provider co-upgrade | `magelift upgrade` replaces the CLI only; v1 warns on CLI/provider version skew. Later: refresh the lockfile plus provider binary plus bundle with the same verify-then-replace flow. |
-| ECS RabbitMQ HA ladder | Adopt Chantelle pattern: EFS+AMQPS single-node → 3-node quorum on Managed Instances; keep Amazon MQ as optional expensive cell; never flip 1↔3 in place |
+| ECS RabbitMQ HA ladder | Adopt prior-ops pattern: EFS+AMQPS single-node → 3-node quorum on Managed Instances; keep Amazon MQ as optional expensive cell; never flip 1↔3 in place |
 | ECS Managed Instances | Optional capacity provider beside Fargate: better $/vCPU with RI/SP once density is known; keep Fargate as the certified easy path. Gate behind catalog (e.g. `launchType: fargate\|managed-instances`) + acceptance |
 | MageLift OpenSearch SigV4 data-plane | Paid AWS acceptance: index/query/reconnect/least-privilege on a real MageLift stack (deferred from public-tag gate; see [release-readiness.md](release-readiness.md)). **Not** on the Community Launch critical path; see [publishing.md](publishing.md). |
 | Cloud SQL / multi-cloud attach | AWS VPC+RDS adopt shipped; Cloud SQL attach stays v1.1+ (same decision as OpenSearch SigV4 for launch) |

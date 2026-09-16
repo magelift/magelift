@@ -5,7 +5,7 @@
 
 ## Provenance (public wording)
 
-Similar Magento-on-AWS work was done at Chantelle with **Terraform** (managed
+Similar Magento-on-AWS work was done on a prior project with **Terraform** (managed
 OpenSearch Service domains, ElasticSuite, VPC networking). Private employer
 repositories are **not** named or linked here.
 
@@ -18,13 +18,13 @@ Magento + AWS OpenSearch domains work outside MageLift.
 
 ## What this does **not** prove
 
-| MageLift path | Prior Chantelle Terraform path |
+| MageLift path | Prior Terraform path |
 | --- | --- |
 | Magento **native OpenSearch** client + ElasticSuite env | **Smile ElasticSuite** client settings |
 | Magento env hostname:443 HTTPS, HTTP auth off | **No SigV4 proxy** on provisioned domains: HTTPS in-VPC, HTTP auth off, domain policy + security groups |
 | MageLift `searchMode:serverless` (AOSS) | Not used in that shop. Magento cannot SigV4; MageLift keeps a local signing proxy for AOSS only. |
 
-Do not claim “Chantelle uses SigV4” or “MageLift live Magento search is proven.”
+Do not claim “that shop uses SigV4” or “MageLift live Magento search is proven.”
 
 ## Patterns carried into MageLift (generic)
 
