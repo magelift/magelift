@@ -34,7 +34,7 @@ export const terminal = {
     { type: 'cmd', text: 'magelift deploy --env preview --yes' },
     { type: 'out', text: 'deployed  https://preview.example.shop', tone: 'ok' },
     { type: 'cmd', text: 'magelift destroy --env preview --yes' },
-    { type: 'out', text: 'destroyed · spend stopped', tone: 'dim' },
+    { type: 'out', text: 'destroyed · teardown reported', tone: 'dim' },
   ],
 };
 
@@ -102,7 +102,7 @@ export const how = {
     { text: '    preset: high-availability' },
     { text: '    protection: true' },
   ],
-  yamlCaption: 'Trimmed from examples/sample-shop/magelift.yaml. Preview environments carry a budget cap and an expiry date.',
+  yamlCaption: 'Trimmed from examples/sample-shop/magelift.yaml. Preview environments carry a validated budget with alerts and an expiry date.',
 };
 
 export const targets = {

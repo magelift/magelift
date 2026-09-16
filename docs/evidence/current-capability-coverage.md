@@ -169,10 +169,20 @@ This section is generated only from sealed JSONL records loaded from `docs/evide
 | Run | State | Records | Cells | PASS cells | Cleanup | Architecture rows | Resilience proofs | Observability proofs | Edge proofs | Generated at | Sources | Reason |
 | --- | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
 | `run-20260820t100542z-15777` | **VALIDATED** | 14 | 13 | 13 | true | 0 | 0 | 0 | 0 | 2026-08-20T11:05:45Z | acceptance-harness |  |
+| `run-20260914t153422z-422805` | **VALIDATED** | 14 | 13 | 13 | true | 0 | 0 | 0 | 0 | 2026-09-14T16:25:38Z | acceptance-harness |  |
+| `run-20260914t171509z-569079` | **VALIDATED** | 14 | 13 | 13 | true | 0 | 0 | 0 | 0 | 2026-09-14T18:02:23Z | acceptance-harness |  |
+| `run-20260914t180332z-649081` | **VALIDATED** | 17 | 16 | 16 | true | 0 | 0 | 0 | 0 | 2026-09-14T18:58:04Z | acceptance-harness |  |
+| `run-20260914t190000z-700001` | **VALIDATED** | 14 | 13 | 13 | true | 0 | 0 | 0 | 0 | 2026-09-14T21:14:19Z | acceptance-harness |  |
+| `run-20260915t182612z-302548` | **BLOCKED** | 14 | 13 | 13 | false | 0 | 0 | 0 | 0 | 2026-09-15T19:10:59Z | acceptance-harness | PASS evidence requires a final cleanup record with no remaining resources |
 
 Validated input files:
 
 - `docs/evidence/runs/gcp-gke-autopilot-magento-gcap28-20260820.sealed.jsonl` (14 records)
+- `docs/evidence/runs/gcp-gke-autopilot-magento-mldp3-20260914.sealed.jsonl` (14 records)
+- `docs/evidence/runs/gcp-gke-autopilot-magento-search-mldp6-20260914.sealed.jsonl` (14 records)
+- `docs/evidence/runs/gcp-gke-ha-standard-magento-mldp5-20260914.sealed.jsonl` (17 records)
+- `docs/evidence/runs/gcp-gke-standard-magento-mldp4-20260914.sealed.jsonl` (14 records)
+- `docs/evidence/runs/gcp-operator-verbs-mldp8-20260915.sealed.jsonl` (14 records)
 
 ## Recovery runbook contract
 

@@ -1,6 +1,7 @@
 # Experimental OVHcloud target (Managed Kubernetes)
 
-Catalog ownership: OpenSpec `certification-ovh`. Certified subset is empty.
+Catalog ownership: `certification-ovh` cells in the [capability matrix](capability-matrix.md)
+plus [evidence](evidence/README.md). Certified subset is empty.
 `ovh` / `mks` stays experimental. Bootstrap and Secrets remain
 `ErrNotSupported`. Magento runtime is `not-run` until a Magento-compatible
 digest is exercised; current proof is [infrastructure-only](evidence/ovh-mks-infrastructure-live-2026-08-12.md).

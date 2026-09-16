@@ -1,7 +1,8 @@
 # Local AWS acceptance
 
-Catalog ownership: OpenSpec `certification-aws`. Shared evidence rules stay in
-`certification-matrix`. Certified AWS Magento today is the ECS Fargate preview
+Catalog ownership: `certification-aws` cells in the [capability matrix](capability-matrix.md)
+plus [evidence](evidence/README.md). Shared evidence rules stay in the matrix.
+Certified AWS Magento today is the ECS Fargate preview
 tuple in the [capability matrix](capability-matrix.md) plus
 [evidence](evidence/README.md). Packed KEEP after this tracker is applied still uses the existing
 harness files. Fargate packed catalog `awsba` is closed (destroy plus

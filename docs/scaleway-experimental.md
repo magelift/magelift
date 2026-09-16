@@ -1,6 +1,7 @@
 # Experimental Scaleway target (Kapsule)
 
-Catalog ownership: OpenSpec `certification-scaleway`. Certified subset is
+Catalog ownership: `certification-scaleway` cells in the [capability matrix](capability-matrix.md)
+plus [evidence](evidence/README.md). Certified subset is
 empty. `scaleway` / `kapsule` stays experimental. Bootstrap remains
 `ErrNotSupported`. Cache family is Redis (`cacheMode: redis`); do not relabel
 it Valkey. Magento runtime is `not-run` until a Magento-compatible digest is

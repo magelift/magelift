@@ -1,6 +1,7 @@
 # GCP acceptance (local, destroy-on-exit)
 
-Catalog ownership: OpenSpec `certification-gcp`. Certified subset is GKE
+Catalog ownership: `certification-gcp` cells in the [capability matrix](capability-matrix.md)
+plus [evidence](evidence/README.md). Certified subset is GKE
 Autopilot evidenced runtime cells. Standard and HA stay experimental.
 `gcap29` KEEP is closed (destroy emptied the prefix). It is not a
 certified-row replacement for `gcap28`. Magento 2.4.8-p5 stays `not-run`

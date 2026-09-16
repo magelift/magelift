@@ -29,7 +29,7 @@ emptied the prefix; it still does not replace
 | AWS ECS Fargate packed (amazon-mq, provisioned OpenSearch, Aurora, HA), destroy | [mlaw1](aws-ecs-fargate-packed-keep-mlaw1-20260915.md) | Certified-row replacement for 20260813ai; AOSS/serverless; Managed Instances; EKS |
 | AWS ECS Managed Instances Magento KEEP (`queueMode:db`), destroy | [awsmi](aws-ecs-managed-instances-packed-keep-awsmi-20260823.md) | Certified Managed Instances; mix with Fargate/ASG providers; EKS |
 | GCP GKE Autopilot preview-env loop (base 13/13, `pr-999` lifecycle, guards, teardown) | [mldp7](gcp-gke-autopilot-preview-loop-mldp7-20260915.md) | CI-generated workflow live run; multi-region previews |
-| GCP operator verbs (health, logs, exec + deploy rejection, cost, reconcile) plus expired-YAML destroy, zero leftovers | [mldp8](gcp-operator-verbs-live-mldp8-20260915.md) | GCP live unit prices; RDS/OpenSearch/MQ live shapes; live SQL delete |
+| GCP operator verbs (health, logs, exec + deploy rejection, cost, reconcile) plus expired-YAML destroy, zero leftovers | [mldp8](gcp-operator-verbs-live-mldp8-20260915.md) | Complete store upgrade (the deploy result was a rejection guard, not a full upgrade); GCP live unit prices; RDS/OpenSearch/MQ live shapes; live SQL delete |
 | AWS EKS Auto Mode Magento KEEP (`queueMode:rabbitmq`, search disabled), destroy | [awsek](aws-eks-auto-mode-packed-keep-awsek-20260823.md) | Certified EKS; managed-node-groups / self-managed / EKS Fargate; OpenSearch |
 | AWS EKS self-managed Magento 2.4.9, ELB HTTP, teardown | [20260817bf](aws-eks-self-managed-magento-live-20260817bf.md) | Node loss, zone loss, edge, EKS as a certified target |
 | GCP GKE Standard Magento 2.4.9 with Memorystore Valkey 9.0 | [20260815](gcp-gke-standard-magento-valkey90-live-20260815.md) | Public HTTP/TLS, HA, certified target |
@@ -52,3 +52,20 @@ emptied the prefix; it still does not replace
 | Cloud Armor GA import drops Magento `requestBodiesToExclude` | [20260813af](gcp-edge-armor-attempt-20260813af.md) |
 | AWS X-Ray Magento traces | typed unsupported: no `ObservabilityAdapter` registers X-Ray; YAML `nativeProvider: xray` is typed unavailable. An EKS IAM snippet is not a Magento cell. |
 | Schema-mismatch rollback refuses when Magento epochs differ | [gcap28 leftover](gcp-gke-autopilot-schema-mismatch-gcap28-20260820.md) |
+
+## Provenance notes
+
+- `runs/gcp-operator-verbs-mldp8-20260915.sealed.jsonl`: the original seal
+  committed in `77ae916` (Order-12) was void on 2026-09-16. Forensics found
+  all 13 cell `recordDigest` values invalid at commit (the line-14 cleanup
+  record verified; the other five sealed bundles verify; the sealing code
+  is unchanged since). No field-subset variant reproduces the recorded
+  digests, so the original seal inputs are unrecoverable. Content was
+  corroborated against the independent live-run record: artifact digest
+  `sha256:8588b13f…fdb2be4`, seed
+  `magento-249-sanitized-definer-free.sql.gz`, and the 13 PASS / 1 SKIP
+  counts in [mldp8](gcp-operator-verbs-live-mldp8-20260915.md) and the
+  Order-12 verification report. The bundle was re-attested with
+  `magelift certification seal` (`SealJSONL`); only the 13 stale digests
+  changed. The original attestation is void. This reseal is a new
+  attestation over verified content, not a blessing of the original seal.
