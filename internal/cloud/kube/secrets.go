@@ -17,6 +17,7 @@ const (
 	databaseAdminCredentialsSecretSuffix = "-db-admin-credentials"
 	encryptionKeySecretSuffix            = "-encryption-key"
 	queuePasswordSecretSuffix            = "-queue-password"
+	smtpPasswordSecretSuffix             = "-smtp-password"
 )
 
 // DatabaseCredentialsSecretName returns the stable Kubernetes Secret name used
@@ -41,6 +42,12 @@ func EncryptionKeySecretName(runtimeName string) string {
 // RabbitMQ workloads and migration Jobs in a runtime namespace.
 func QueuePasswordSecretName(runtimeName string) string {
 	return runtimeName + queuePasswordSecretSuffix
+}
+
+// SmtpPasswordSecretName returns the stable Kubernetes Secret name used by
+// Magento SMTP relay workloads in a runtime namespace.
+func SmtpPasswordSecretName(runtimeName string) string {
+	return runtimeName + smtpPasswordSecretSuffix
 }
 
 // NewDatabaseCredentialsSecret keeps the database password in Kubernetes
@@ -232,6 +239,32 @@ func AppendEncryptionKeyEnv(env pulumicorev1.EnvVarArrayOutput, secretName strin
 	}).(pulumicorev1.EnvVarArrayOutput)
 }
 
+// NewSmtpPasswordSecret keeps the SMTP relay password in Kubernetes.
+func NewSmtpPasswordSecret(
+	ctx *pulumi.Context,
+	runtimeName string,
+	password pulumi.StringInput,
+	opts ...pulumi.ResourceOption,
+) (*pulumicorev1.Secret, error) {
+	if ctx == nil {
+		return nil, errors.New("Pulumi context is required")
+	}
+	if strings.TrimSpace(runtimeName) == "" {
+		return nil, errors.New("runtime name is required")
+	}
+	if password == nil {
+		return nil, errors.New("SMTP password is required")
+	}
+	return pulumicorev1.NewSecret(ctx, runtimeName+"-smtp-password", &pulumicorev1.SecretArgs{
+		Metadata: &pulumimetav1.ObjectMetaArgs{
+			Name:        pulumi.String(SmtpPasswordSecretName(runtimeName)),
+			Annotations: SkipAwaitAnnotations(),
+		},
+		StringData: pulumi.StringMap{"password": password},
+		Type:       pulumi.String("Opaque"),
+	}, opts...)
+}
+
 // AppendQueuePasswordEnv adds the RabbitMQ password SecretKeyRef to a runtime
 // environment output.
 func AppendQueuePasswordEnv(env pulumicorev1.EnvVarArrayOutput, secretName string) pulumicorev1.EnvVarArrayOutput {
@@ -313,4 +346,23 @@ func QueuePasswordEnvVars(secretName string) []clientcorev1.EnvVar {
 			},
 		},
 	}}
+}
+
+// AppendSmtpPasswordEnv adds the SMTP relay password SecretKeyRef to a
+// runtime environment output.
+func AppendSmtpPasswordEnv(env pulumicorev1.EnvVarArrayOutput, secretName string) pulumicorev1.EnvVarArrayOutput {
+	if strings.TrimSpace(secretName) == "" {
+		return env
+	}
+	return env.ApplyT(func(values []pulumicorev1.EnvVar) []pulumicorev1.EnvVar {
+		result := append([]pulumicorev1.EnvVar(nil), values...)
+		secret := secretName
+		result = append(result, pulumicorev1.EnvVar{
+			Name: "CONFIG__DEFAULT__SYSTEM__SMTP__PASSWORD",
+			ValueFrom: &pulumicorev1.EnvVarSource{
+				SecretKeyRef: &pulumicorev1.SecretKeySelector{Name: &secret, Key: "password"},
+			},
+		})
+		return result
+	}).(pulumicorev1.EnvVarArrayOutput)
 }

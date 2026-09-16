@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/secretref"
 	"github.com/magelift/magelift/providers/gcp/cache"
 	"github.com/magelift/magelift/providers/gcp/database"
 	"github.com/magelift/magelift/providers/gcp/edge"
@@ -13,7 +15,6 @@ import (
 	"github.com/magelift/magelift/providers/gcp/observability"
 	"github.com/magelift/magelift/providers/gcp/runtime"
 	"github.com/magelift/magelift/providers/gcp/storage"
-	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/secretmanager"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -64,6 +65,10 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 	encryptionKey, err := resolveEncryptionKey(ctx, name, spec.Identity.GCPProject, spec.Dependencies.EncryptionKeySecret, provider)
 	if err != nil {
 		return nil, fmt.Errorf("resolve Magento encryption key: %w", err)
+	}
+	smtpPassword, err := resolveSmtpPassword(ctx, name, spec.Email, provider)
+	if err != nil {
+		return nil, fmt.Errorf("resolve SMTP relay password: %w", err)
 	}
 
 	component.Network, err = network.New(ctx, naming.Resource(spec.Identity.Project, spec.Identity.Environment, "net"), network.Args{
@@ -141,7 +146,9 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 		QueueImage:  spec.Catalog.RabbitMQImage,
 		MediaBucket: component.Storage.BucketName, MediaURL: component.Storage.MediaURL,
 		EncryptionKey: encryptionKey,
-		CPURequest:    spec.Catalog.AutopilotCPURequest, MemoryRequest: spec.Catalog.AutopilotMemoryRequest,
+		SmtpHost:      spec.Email.Host, SmtpPort: spec.Email.Port, SmtpUsername: spec.Email.Username,
+		SmtpFrom: spec.Email.From, SmtpPassword: smtpPassword,
+		CPURequest: spec.Catalog.AutopilotCPURequest, MemoryRequest: spec.Catalog.AutopilotMemoryRequest,
 		DesiredWebReplicas: spec.Catalog.DesiredWebReplicas, QueueConsumerCount: spec.Catalog.QueueConsumerCount,
 		Labels:                      spec.Identity.Labels,
 		NativeObservability:         spec.Observability.NativeProvider == "google-cloud-operations",
@@ -191,6 +198,35 @@ func resolveEncryptionKey(ctx *pulumi.Context, name, project, secretID string, p
 		return *value, nil
 	}).(pulumi.StringOutput)
 	return pulumi.ToSecret(key).(pulumi.StringOutput), nil
+}
+
+// resolveSmtpPassword reads the relay password from Secret Manager when
+// email is enabled. It mirrors resolveEncryptionKey: the reference was
+// validated at plan time, the value stays a Pulumi secret end to end.
+func resolveSmtpPassword(ctx *pulumi.Context, name string, email EmailSelection, provider *gcp.Provider) (pulumi.StringInput, error) {
+	if !email.Enabled() {
+		return nil, nil
+	}
+	reference, err := secretref.Parse(strings.TrimSpace(email.Credential))
+	if err != nil {
+		return nil, err
+	}
+	readOpts := make([]pulumi.ResourceOption, 0, 1)
+	if provider != nil {
+		readOpts = append(readOpts, pulumi.Provider(provider).(pulumi.ResourceOption))
+	}
+	version, err := secretmanager.GetSecretVersion(ctx, name+"-smtp-password-version",
+		pulumi.ID(reference.ID), nil, readOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("read Secret Manager secret %q: %w", reference.ID, err)
+	}
+	password := version.SecretData.ApplyT(func(value *string) (string, error) {
+		if value == nil || strings.TrimSpace(*value) == "" {
+			return "", errors.New("Secret Manager SMTP password is empty")
+		}
+		return *value, nil
+	}).(pulumi.StringOutput)
+	return pulumi.ToSecret(password).(pulumi.StringOutput), nil
 }
 
 func (c *Component) Outputs() pulumi.Map {

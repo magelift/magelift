@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/secretref"
 	"github.com/magelift/magelift/providers/gcp/database"
 	"github.com/magelift/magelift/sdk"
 )
@@ -27,6 +28,7 @@ type Spec struct {
 	Policy        NetworkPolicy
 	Catalog       CatalogSelection
 	Dependencies  Dependencies
+	Email         EmailSelection
 	Edge          sdk.EdgeIntent
 	Observability sdk.ObservabilityIntent
 	// AllowExpiredPreview records that CLI planning already accepted an
@@ -122,6 +124,65 @@ type Dependencies struct {
 	EncryptionKeySecret string
 }
 
+// EmailSelection carries the Magento SMTP relay inputs. Only operator
+// relay modes are servable: managed provisioning does not exist on GCP.
+type EmailSelection struct {
+	Mode       string
+	Host       string
+	Port       int
+	Username   string
+	From       string
+	Credential string
+}
+
+// Enabled reports whether outbound SMTP is configured.
+func (e EmailSelection) Enabled() bool {
+	return e.Mode == "smtp" || e.Mode == "ses"
+}
+
+var gcpSecretVersionPattern = regexp.MustCompile(`^projects/[^/]+/secrets/[^/]+/versions/[^/]+$`)
+
+// validate enforces the relay contract: smtp and BYO ses need a complete
+// relay plus a full Secret Manager version name; anything else must leave
+// email unset.
+func (e EmailSelection) validate() []error {
+	mode := strings.TrimSpace(e.Mode)
+	if mode == "" || mode == "disabled" {
+		if strings.TrimSpace(e.Host) != "" || e.Port != 0 || strings.TrimSpace(e.Username) != "" || strings.TrimSpace(e.Credential) != "" {
+			return []error{errors.New("email fields require a sending mode (smtp or ses)")}
+		}
+		return nil
+	}
+	if mode != "smtp" && mode != "ses" {
+		return []error{fmt.Errorf("email mode %q is not servable on GCP; want smtp, ses, or disabled", mode)}
+	}
+	var problems []error
+	if strings.TrimSpace(e.Host) == "" {
+		problems = append(problems, errors.New("email host is required"))
+	}
+	if e.Port < 1 || e.Port > 65535 {
+		problems = append(problems, errors.New("email port must be between 1 and 65535"))
+	}
+	if strings.TrimSpace(e.Username) == "" {
+		problems = append(problems, errors.New("email username is required"))
+	}
+	reference, err := secretref.Parse(strings.TrimSpace(e.Credential))
+	if err != nil {
+		problems = append(problems, fmt.Errorf("email credential: %w", err))
+	} else {
+		if reference.Kind != secretref.GCPSecretManager {
+			problems = append(problems, fmt.Errorf("email credential must use gcp-secret-manager://, got %q", reference.Kind))
+		}
+		if !gcpSecretVersionPattern.MatchString(reference.ID) {
+			problems = append(problems, fmt.Errorf("email credential must name projects/{project}/secrets/{secret}/versions/{version}, got %q", reference.ID))
+		}
+		if strings.TrimSpace(reference.JSONField) != "" {
+			problems = append(problems, errors.New("email credential must be a raw password value; jsonField extraction is not supported for SMTP"))
+		}
+	}
+	return problems
+}
+
 // CloudSQLDatabaseVersion returns the release-aware Cloud SQL version. A
 // manually constructed Spec may omit the catalog field, so derive the same
 // value used by PlanFromInputs instead of falling back to an old default.
@@ -189,6 +250,7 @@ func (s Spec) ValidateAllowExpiredPreview() error {
 
 func (s Spec) validate(allowExpiredPreview bool) error {
 	var problems []error
+	problems = append(problems, s.Email.validate()...)
 	databaseVersion, err := s.CloudSQLDatabaseVersion()
 	if err != nil {
 		problems = append(problems, fmt.Errorf("Cloud SQL database version: %w", err))

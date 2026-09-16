@@ -216,11 +216,20 @@ func buildEnvelope(cfg config.Config, environment string) sdk.Envelope {
 
 func buildApplication(cfg config.Config) sdk.Application {
 	magento := cfg.Application.Magento
+	email := cfg.Email
 	return sdk.Application{
 		Edition:    cfg.Application.Edition,
 		Version:    cfg.Application.Version,
 		Mode:       cfg.Application.Mode,
 		WebRuntime: cfg.Application.WebRuntime,
+		Email: sdk.EmailSettings{
+			Mode:       email.Mode,
+			Host:       email.Host,
+			Port:       email.Port,
+			Username:   email.Username,
+			From:       email.From,
+			Credential: email.Credential,
+		},
 		Magento: sdk.MagentoSettings{
 			FrontName:        magento.FrontName,
 			CookieDomain:     magento.CookieDomain,

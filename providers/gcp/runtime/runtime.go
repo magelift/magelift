@@ -3,13 +3,14 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/magelift/magelift/providers/gcp/naming"
+	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/cloud/kube/queue"
 	"github.com/magelift/magelift/internal/cloud/kube/search"
-	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/providers/gcp/naming"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/container"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/organizations"
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
@@ -77,6 +78,11 @@ type Args struct {
 	NativeEdgeBackendConfigName pulumi.StringInput
 	Labels                      map[string]string
 	Magento                     platform.MagentoOverlays
+	SmtpHost                    string
+	SmtpPort                    int
+	SmtpUsername                string
+	SmtpFrom                    string
+	SmtpPassword                pulumi.StringInput
 }
 
 type Component struct {
@@ -314,6 +320,17 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("create database admin credentials Secret: %w", err)
 	}
 	databaseAdminSecretName := kube.DatabaseAdminCredentialsSecretName(name)
+	smtpPasswordSecretName := ""
+	var smtpPasswordSecret pulumi.Resource
+	if args.SmtpPassword != nil {
+		var err error
+		smtpPasswordSecret, err = kube.NewSmtpPasswordSecret(ctx, name, args.SmtpPassword, k8sOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("create SMTP password Secret: %w", err)
+		}
+		smtpPasswordSecretName = kube.SmtpPasswordSecretName(name)
+		env = kube.AppendSmtpPasswordEnv(env, smtpPasswordSecretName)
+	}
 	queuePasswordSecretName := ""
 	var queuePasswordSecret pulumi.Resource
 	if args.QueueMode == "rabbitmq" {
@@ -340,6 +357,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	workloadOpts := append(k8sOpts, pulumi.DependsOn([]pulumi.Resource{databaseSecret, databaseGrant, encryptionKeySecret}))
 	if queuePasswordSecret != nil {
 		workloadOpts = append(workloadOpts, pulumi.DependsOn([]pulumi.Resource{queuePasswordSecret}))
+	}
+	if smtpPasswordSecret != nil {
+		workloadOpts = append(workloadOpts, pulumi.DependsOn([]pulumi.Resource{smtpPasswordSecret}))
 	}
 
 	webContainers, err := kube.WebRuntimeContainers(args.WebRuntime, args.Image, env, args.CPURequest, args.MemoryRequest)
@@ -496,7 +516,7 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 		if session == "" {
 			session = values[1].(string)
 		}
-		bindings := platform.CoreEnvBindings(platform.CapabilityEndpoints{
+		bindings := appendSmtpBindings(platform.CoreEnvBindings(platform.CapabilityEndpoints{
 			ApplicationMode:    args.ApplicationMode,
 			ApplicationVersion: args.ApplicationVersion,
 			WebRuntime:         args.WebRuntime,
@@ -511,9 +531,34 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 			MediaBucket:        values[5].(string),
 			MediaURL:           values[6].(string),
 			Magento:            args.Magento,
-		})
+		}), args)
 		return kube.EnvVars(bindings)
 	}).(corev1.EnvVarArrayOutput)
+}
+
+// appendSmtpBindings wires operator-relay SMTP into Magento's system/smtp
+// config surface. Keys mirror the AWS managed-SES wiring; empty host means
+// unmanaged and appends nothing. The password travels via SecretKeyRef,
+// never as a plain binding.
+func appendSmtpBindings(bindings []platform.EnvBinding, args Args) []platform.EnvBinding {
+	if strings.TrimSpace(args.SmtpHost) == "" {
+		return bindings
+	}
+	bindings = append(bindings,
+		platform.EnvBinding{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__TRANSPORT", Value: "smtp"},
+		platform.EnvBinding{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__HOST", Value: args.SmtpHost},
+		platform.EnvBinding{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__PORT", Value: strconv.Itoa(args.SmtpPort)},
+		platform.EnvBinding{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__USERNAME", Value: args.SmtpUsername},
+		platform.EnvBinding{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__AUTH", Value: "LOGIN"},
+		platform.EnvBinding{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__SSL", Value: "tls"},
+		platform.EnvBinding{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__DISABLE", Value: "0"},
+	)
+	if strings.TrimSpace(args.SmtpFrom) != "" {
+		bindings = append(bindings,
+			platform.EnvBinding{Name: "CONFIG__DEFAULT__TRANS_EMAIL__IDENT_GENERAL__EMAIL", Value: args.SmtpFrom},
+		)
+	}
+	return bindings
 }
 
 func generateKubeconfig(ctx *pulumi.Context, project string, name, endpoint pulumi.StringOutput, auth container.ClusterMasterAuthOutput) pulumi.StringOutput {

@@ -85,7 +85,7 @@ func TestProtocolMessagesGobRoundTrip(t *testing.T) {
 		"DescribeResponse":             &DescribeResponse{ProtocolVersion: ProtocolV1, ProviderID: "gcp", ProviderVersion: "v", Operations: []OperationVersion{{Name: "status", Version: "1.0"}}, Runtimes: []RuntimeAdvertisement{{Runtime: "r", Tier: ExtensionTierCertified}}, OutputKeys: []string{"k"}, Edge: &EdgeAdapterDescriptor{ID: "e"}, Resilience: &ResilienceAdapterDescriptor{ID: "r"}},
 		"ValidateConfigRequest":        &ValidateConfigRequest{ProtocolVersion: ProtocolV1, TargetBlock: []byte("a: b")},
 		"ValidateConfigResult":         &ValidateConfigResult{Valid: true, Problems: []string{"p"}},
-		"PlanRequest":                  &PlanRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, TargetBlock: []byte("a: b")},
+		"PlanRequest":                  &PlanRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, Application: Application{Edition: "e", Magento: MagentoSettings{FrontName: "a"}, Email: EmailSettings{Mode: "smtp", Host: "h", Port: 587}}, TargetBlock: []byte("a: b")},
 		"PlanResult":                   &PlanResult{Plan: StoredPlan{StackName: "s", Opaque: []byte("o")}},
 		"StackCall":                    &StackCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}},
 		"LifecycleResult":              &LifecycleResult{Summary: ChangeSummary{Create: 1, Replace: 2}, Diagnostics: []string{"d"}},

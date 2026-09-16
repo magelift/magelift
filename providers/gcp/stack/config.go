@@ -299,6 +299,11 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 		Dependencies: Dependencies{
 			DatabaseName: databaseName, MasterUsername: masterUsername, EncryptionKeySecret: gcp.EncryptionKeySecret,
 		},
+		Email: EmailSelection{
+			Mode: in.Application.Email.Mode, Host: strings.TrimSpace(in.Application.Email.Host),
+			Port: in.Application.Email.Port, Username: strings.TrimSpace(in.Application.Email.Username),
+			From: strings.TrimSpace(in.Application.Email.From), Credential: strings.TrimSpace(in.Application.Email.Credential),
+		},
 		Edge:          edge,
 		Observability: observability,
 	}

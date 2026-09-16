@@ -24,6 +24,10 @@ func shimTestConfig() config.Config {
 			Edition: "open-source", Version: "2.4.9", Mode: "integrated", WebRuntime: "nginx-fpm",
 			Magento: config.MagentoRuntime{FrontName: "admin_abc", Consumers: config.MagentoConsumers{Mode: "processes"}},
 		},
+		Email: config.EmailConfig{
+			Mode: "smtp", Host: "smtp.example.com", Port: 587, Username: "mailer",
+			From: "shop@example.com", Credential: "gcp-secret-manager://projects/example-gcp-project/secrets/smtp/versions/latest",
+		},
 		Target: config.Target{
 			Provider: "gcp", Runtime: "gke-autopilot",
 			GCP: &config.GCPTarget{
@@ -148,6 +152,9 @@ func TestShimPlan(t *testing.T) {
 	}
 	if captured.Envelope.Project != "shop" || captured.Envelope.Preset != "standard" || captured.Envelope.AppVersion != "2.4.9" {
 		t.Fatalf("envelope = %#v", captured.Envelope)
+	}
+	if captured.Application.Email.Mode != "smtp" || captured.Application.Email.Host != "smtp.example.com" || captured.Application.Email.Port != 587 || captured.Application.Email.Credential == "" {
+		t.Fatalf("email = %#v", captured.Application.Email)
 	}
 	if captured.Application.Magento.FrontName != "admin_abc" || captured.Application.Magento.ConsumersMode != "processes" {
 		t.Fatalf("application = %#v", captured.Application)

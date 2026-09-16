@@ -3,8 +3,8 @@ package stack
 import (
 	"errors"
 
-	gcptarget "github.com/magelift/magelift/providers/gcp/target"
 	"github.com/magelift/magelift/internal/platform"
+	gcptarget "github.com/magelift/magelift/providers/gcp/target"
 	"github.com/magelift/magelift/sdk"
 )
 
