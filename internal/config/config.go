@@ -937,37 +937,9 @@ func validateCloudEmail(c Config) []string {
 			problems = append(problems, "email.managed.account applies only to ovh mode")
 		}
 	case "tem":
-		if !managed || managedDomain == "" {
-			problems = append(problems, "email.tem requires a managed block with domain")
-		}
-		if provider != "scaleway" {
-			problems = append(problems, "email.tem is only supported on scaleway targets")
-		}
-		if region := effectiveScalewayRegion(c); region != "fr-par" {
-			problems = append(problems, fmt.Sprintf("email.tem is only available in fr-par (got %q)", region))
-		}
-		if byoSet {
-			problems = append(problems, "email.tem does not take explicit host, port, username, or credential (managed only)")
-		}
-		if managedZone != "" {
-			problems = append(problems, "email.managed.hostedZoneId applies only to ses mode")
-		}
-		if managedAccount != "" {
-			problems = append(problems, "email.managed.account applies only to ovh mode")
-		}
+		problems = append(problems, "email.tem managed mode is not implemented for alpha; use email.mode smtp with an explicit relay")
 	case "ovh":
-		if !managed || managedDomain == "" || managedAccount == "" {
-			problems = append(problems, "email.ovh requires a managed block with domain and account")
-		}
-		if provider != "ovh" {
-			problems = append(problems, "email.ovh is only supported on ovh targets")
-		}
-		if byoSet {
-			problems = append(problems, "email.ovh does not take explicit host, port, username, or credential (managed only)")
-		}
-		if managedZone != "" {
-			problems = append(problems, "email.managed.hostedZoneId applies only to ses mode")
-		}
+		problems = append(problems, "email.ovh managed mode is not implemented for alpha; use email.mode smtp with an explicit relay")
 	case "smtp":
 		if strings.TrimSpace(email.Host) == "" || email.Port == 0 {
 			problems = append(problems, "email.smtp requires host and port")
