@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: done
 slug: mocked-shop-scenarios
 ---
 # Intent: synthetic scenario foundation (mocks prove contracts, not stores)

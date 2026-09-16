@@ -1,0 +1,27 @@
+schemaVersion: 1
+project:
+  name: synthetic-shop
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+  webRuntime: nginx-fpm
+  magento:
+    frontName: admin
+build:
+  php: "8.5"
+  composer:
+    version: "2.10"
+target:
+  provider: atlantis
+  runtime: trench-cluster
+defaults:
+  region: nowhere-1
+  preset: preview
+environments:
+  preview:
+    class: preview
+    preset: preview
+    domain: preview.example.test
+local: {}
+extensions: {}

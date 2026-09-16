@@ -1,0 +1,6 @@
+"https://shop.example.test/":
+  type: upstream
+  upstream: syntheticupsun:http
+"https://{default}/":
+  type: upstream
+  upstream: syntheticupsun:http

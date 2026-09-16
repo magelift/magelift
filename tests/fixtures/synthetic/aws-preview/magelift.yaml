@@ -1,0 +1,53 @@
+schemaVersion: 1
+project:
+  name: synthetic-shop-aws
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+  webRuntime: nginx-fpm
+  magento:
+    frontName: admin
+build:
+  php: "8.5"
+  composer:
+    version: "2.10"
+target:
+  provider: aws
+  runtime: ecs-fargate
+  aws:
+    imageDigest: registry.example.invalid/synthetic/app@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    kmsKeyArn: arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000
+    hostedZoneId: Z000000000000000000000
+    cloudFrontCertificateArn: arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000
+    albCertificateArn: arn:aws:acm:eu-west-3:123456789012:certificate/00000000-0000-0000-0000-000000000000
+    cacheSecretArn: arn:aws:secretsmanager:eu-west-3:123456789012:secret:example-invalid-cache-000000
+    encryptionKeySecretArn: arn:aws:secretsmanager:eu-west-3:123456789012:secret:example-invalid-crypt-000000
+    databaseName: magento
+    masterUsername: magento
+    vpcCidr: 10.42.0.0/16
+    availabilityZones: [eu-west-3a, eu-west-3b]
+    mediaDomain: media.example.test
+    catalog:
+      version: v1
+      databaseEngine: rds-mysql
+      searchMode: disabled
+      queueMode: db
+defaults:
+  region: eu-west-3
+  preset: preview
+environments:
+  preview:
+    account: "123456789012"
+    class: preview
+    preset: preview
+    domain: preview.example.test
+    expiresAt: "2027-12-31T23:59:59Z"
+    monthlyBudgetCents: 5000
+local:
+  database:
+    family: mariadb
+    version: "11.8"
+  email:
+    mode: mailpit
+extensions: {}
