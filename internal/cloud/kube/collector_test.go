@@ -8,7 +8,7 @@ import (
 	"time"
 
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

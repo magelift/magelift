@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cloudwatchlogtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	"github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type fakeCloudWatchLogs struct {
@@ -231,8 +231,8 @@ func TestCloudWatchBackendUsesOfficialSDKSurfaceAndOwnsOnlyMarkerResources(t *te
 			{Signal: "logs", Destination: "cloudwatch", Mode: "native", OwnershipMarker: "magelift/aws/observability-test", RetentionDays: 30},
 			{Signal: "metrics", Destination: "cloudwatch", Mode: "native", OwnershipMarker: "magelift/aws/observability-test"},
 		},
-		Dashboards: []v1.DashboardIntent{{ID: "runtime", Signals: []string{"metrics"}}},
-		Alerts:     []v1.AlertIntent{{ID: "runtime-health", Signal: "metrics", Severity: "warning", Operator: "gt", Threshold: 1, WindowSeconds: 60, Owner: "platform-oncall", RunbookURL: "https://runbooks.example/runtime-health", DeduplicationKey: "runtime-health"}},
+		Dashboards: []sdk.DashboardIntent{{ID: "runtime", Signals: []string{"metrics"}}},
+		Alerts:     []sdk.AlertIntent{{ID: "runtime-health", Signal: "metrics", Severity: "warning", Operator: "gt", Threshold: 1, WindowSeconds: 60, Owner: "platform-oncall", RunbookURL: "https://runbooks.example/runtime-health", DeduplicationKey: "runtime-health"}},
 	}
 	result, err := backend.Apply(context.Background(), plan)
 	if err != nil {
@@ -287,13 +287,13 @@ func TestCloudWatchAlarmSettingsMapsSupportedOperatorsAndRejectsEquality(t *test
 		{operator: "lte", want: cloudwatchtypes.ComparisonOperatorLessThanOrEqualToThreshold},
 	} {
 		t.Run(test.operator, func(t *testing.T) {
-			got, periods, err := cloudWatchAlarmSettings(v1.AlertIntent{ID: "test", Operator: test.operator, WindowSeconds: 5 * 60})
+			got, periods, err := cloudWatchAlarmSettings(sdk.AlertIntent{ID: "test", Operator: test.operator, WindowSeconds: 5 * 60})
 			if err != nil || got != test.want || periods != 5 {
 				t.Fatalf("settings = %q, %d, %v; want %q, 5, nil", got, periods, err, test.want)
 			}
 		})
 	}
-	for _, intent := range []v1.AlertIntent{
+	for _, intent := range []sdk.AlertIntent{
 		{ID: "equality", Operator: "eq", WindowSeconds: 60},
 		{ID: "partial-minute", Operator: "gt", WindowSeconds: 61},
 		{ID: "too-long", Operator: "gt", WindowSeconds: 7*24*60*60 + 60},
@@ -354,7 +354,7 @@ func TestCloudWatchBackendRefusesSameNameForeignResources(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = backend.Apply(context.Background(), providerobservability.Plan{OwnershipMarker: marker, Dashboards: []v1.DashboardIntent{{ID: "runtime", Signals: []string{"metrics"}}}})
+		_, err = backend.Apply(context.Background(), providerobservability.Plan{OwnershipMarker: marker, Dashboards: []sdk.DashboardIntent{{ID: "runtime", Signals: []string{"metrics"}}}})
 		if err == nil || !strings.Contains(err.Error(), "unowned") {
 			t.Fatalf("apply error = %v, want foreign dashboard refusal", err)
 		}
@@ -372,7 +372,7 @@ func TestCloudWatchBackendRefusesSameNameForeignResources(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = backend.Apply(context.Background(), providerobservability.Plan{OwnershipMarker: marker, Alerts: []v1.AlertIntent{{ID: "runtime-health", Signal: "metrics", Severity: "warning", Operator: "gt", Threshold: 1, WindowSeconds: 60, Owner: "platform-oncall", RunbookURL: "https://runbooks.example/runtime-health", DeduplicationKey: "runtime-health"}}})
+		_, err = backend.Apply(context.Background(), providerobservability.Plan{OwnershipMarker: marker, Alerts: []sdk.AlertIntent{{ID: "runtime-health", Signal: "metrics", Severity: "warning", Operator: "gt", Threshold: 1, WindowSeconds: 60, Owner: "platform-oncall", RunbookURL: "https://runbooks.example/runtime-health", DeduplicationKey: "runtime-health"}}})
 		if err == nil || !strings.Contains(err.Error(), "unowned") {
 			t.Fatalf("apply error = %v, want foreign alarm refusal", err)
 		}

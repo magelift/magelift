@@ -15,8 +15,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	cloudresilience "github.com/magelift/magelift/internal/cloud/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudresilience "github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestNativeAPIObjectRecoveryIsIdempotentResumableAndOwned(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsresilience "github.com/magelift/magelift/internal/cloud/aws/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestRunValidatesArgumentsBeforeCreatingClients(t *testing.T) {

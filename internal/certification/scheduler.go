@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ScheduleCell is the scheduler's provider-neutral input. A provider adapter

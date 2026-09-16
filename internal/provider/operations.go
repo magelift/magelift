@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // NativeOperationObservation is the small translation target used by a

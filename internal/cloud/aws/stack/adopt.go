@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // AdoptEntry is one operator-visible adopted resource (D-01 / ATTACH-01).

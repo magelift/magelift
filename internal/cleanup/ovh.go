@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/magelift/magelift/internal/cloud/ovh/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // OVHDatabaseProvider inventories and deletes ledger-claimed Managed Database

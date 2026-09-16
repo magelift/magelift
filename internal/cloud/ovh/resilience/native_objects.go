@@ -20,10 +20,10 @@ import (
 	"github.com/ovh/go-ovh/ovh"
 	"github.com/ovh/okms-sdk-go"
 
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
-	cloudresilience "github.com/magelift/magelift/internal/cloud/resilience"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	cloudresilience "github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (
@@ -94,7 +94,7 @@ type NativeAPIConfig struct {
 
 // NativeAPI translates the provider-neutral object recovery lifecycle to the
 // OVHcloud S3-compatible Object Storage API. The archive algorithm is shared
-// with AWS and other S3-compatible providers through cloud/recovery.
+// with AWS and other S3-compatible providers through internal/shared/recovery.
 type NativeAPI struct {
 	objects  ObjectAPI
 	database DatabaseAPI

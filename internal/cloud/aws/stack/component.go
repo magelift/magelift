@@ -21,7 +21,7 @@ import (
 	"github.com/magelift/magelift/internal/cloud/aws/storage"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/secretref"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/iam"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )

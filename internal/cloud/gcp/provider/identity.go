@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/option"
 )

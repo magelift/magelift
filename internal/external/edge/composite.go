@@ -15,7 +15,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // CompositeAdapter fans a portable edge intent out to the selected native and

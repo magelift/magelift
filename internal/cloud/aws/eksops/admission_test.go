@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/magelift/magelift/internal/cloud/aws/network"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestSelectionFromSpecCoversEKSComputeAndFckNat(t *testing.T) {

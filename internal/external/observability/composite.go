@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // CompositeLifecycleClient fans one portable plan out to destination-owned

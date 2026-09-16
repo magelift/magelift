@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	account "github.com/scaleway/scaleway-sdk-go/api/account/v3"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 )

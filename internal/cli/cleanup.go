@@ -15,7 +15,7 @@ import (
 	gcpresilience "github.com/magelift/magelift/internal/cloud/gcp/resilience"
 	ovhresilience "github.com/magelift/magelift/internal/cloud/ovh/resilience"
 	"github.com/magelift/magelift/internal/cloud/scaleway/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	"github.com/spf13/cobra"
 )

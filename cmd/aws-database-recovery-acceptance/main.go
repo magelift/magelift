@@ -26,7 +26,7 @@ import (
 
 	"github.com/magelift/magelift/internal/certification"
 	awsresilience "github.com/magelift/magelift/internal/cloud/aws/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (

@@ -12,7 +12,7 @@ import (
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/topology"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type PlanOptions struct {

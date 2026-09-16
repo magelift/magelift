@@ -13,10 +13,10 @@ import (
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	gcpstorage "cloud.google.com/go/storage"
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
-	cloudresilience "github.com/magelift/magelift/internal/cloud/resilience"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	cloudresilience "github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 	"google.golang.org/api/iterator"
 )
 

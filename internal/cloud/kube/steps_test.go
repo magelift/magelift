@@ -11,7 +11,7 @@ import (
 	"github.com/magelift/magelift/internal/automation"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"

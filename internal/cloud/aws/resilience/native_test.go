@@ -18,9 +18,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	secretstypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
-	cloudresilience "github.com/magelift/magelift/internal/cloud/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	cloudresilience "github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestNativeAPIObjectRecoveryIsIdempotentAndResumable(t *testing.T) {

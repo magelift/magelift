@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
-	cloudresilience "github.com/magelift/magelift/internal/cloud/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	cloudresilience "github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 )
 
 type scalewayProjectionBackend struct{}

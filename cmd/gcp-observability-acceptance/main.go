@@ -14,7 +14,7 @@ import (
 
 	gcpobservability "github.com/magelift/magelift/internal/cloud/gcp/observability"
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	"github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const defaultVerifyBudget = 4 * time.Minute
@@ -123,11 +123,11 @@ func acceptancePlan(marker string) providerobservability.Plan {
 			{Signal: "logs", Destination: "google-cloud-operations", Mode: "native", OwnershipMarker: marker, RetentionDays: 1},
 			{Signal: "metrics", Destination: "google-cloud-operations", Mode: "native", OwnershipMarker: marker},
 		},
-		Alerts: []v1.AlertIntent{{
+		Alerts: []sdk.AlertIntent{{
 			ID: "delivery", Signal: "metrics", Severity: "warning", Operator: "gt", Threshold: 0, WindowSeconds: 60,
 			Owner: "platform-oncall", RunbookURL: "https://github.com/magelift/magelift/blob/main/docs/operations/ownership-and-escalation.md", DeduplicationKey: "gcp-observability-live/delivery",
 		}},
-		Dashboards: []v1.DashboardIntent{{ID: "delivery", Signals: []string{"logs", "metrics"}, Owner: "platform-oncall"}},
+		Dashboards: []sdk.DashboardIntent{{ID: "delivery", Signals: []string{"logs", "metrics"}, Owner: "platform-oncall"}},
 	}
 }
 

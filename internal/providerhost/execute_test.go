@@ -8,7 +8,7 @@ import (
 
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/providerhost/hostproto"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestExecuteRequestValidate(t *testing.T) {

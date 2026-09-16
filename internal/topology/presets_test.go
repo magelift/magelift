@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestPresetTopologiesAreDeterministicAndValid(t *testing.T) {

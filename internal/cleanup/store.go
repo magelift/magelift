@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // DefaultDir is the restartable cleanup ledger directory relative to a

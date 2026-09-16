@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ObjectRecoveryFixture is a scrubbed known-content object used by the

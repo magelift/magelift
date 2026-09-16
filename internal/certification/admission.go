@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // AdmissionInput is the provider-neutral evidence required before a

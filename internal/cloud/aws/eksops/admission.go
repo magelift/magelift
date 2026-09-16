@@ -9,7 +9,7 @@ import (
 	"github.com/magelift/magelift/internal/cloud/aws/network"
 	awsprovider "github.com/magelift/magelift/internal/cloud/aws/provider"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // RegionAdmission performs the AWS account, EKS, EC2, database, and cache

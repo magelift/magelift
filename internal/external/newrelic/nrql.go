@@ -10,7 +10,7 @@ import (
 	"time"
 
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // MarkerQueryRequest identifies one OTLP probe without carrying a provider

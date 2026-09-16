@@ -8,7 +8,7 @@ import (
 	"time"
 
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
 )
 
 func TestCleanupOwnedRemovesOnlyRecoveryOutputsAcrossScalewayServices(t *testing.T) {

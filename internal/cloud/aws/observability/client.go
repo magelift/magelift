@@ -17,7 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	cloudwatchlogtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	"github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const cloudWatchOwnershipTagKey = "magelift-ownership"
@@ -447,7 +447,7 @@ func (backend *CloudWatchBackend) putDashboard(ctx context.Context, plan provide
 	return errors.New("CloudWatch dashboard response has no taggable ARN")
 }
 
-func (backend *CloudWatchBackend) putAlarm(ctx context.Context, plan providerobservability.Plan, alert v1.AlertIntent) error {
+func (backend *CloudWatchBackend) putAlarm(ctx context.Context, plan providerobservability.Plan, alert sdk.AlertIntent) error {
 	if strings.TrimSpace(alert.ID) == "" {
 		return errors.New("CloudWatch alert ID is required")
 	}
@@ -496,7 +496,7 @@ func foundAlarm(alarms []cloudwatchtypes.MetricAlarm, name string) (cloudwatchty
 	return cloudwatchtypes.MetricAlarm{}, false
 }
 
-func (backend *CloudWatchBackend) cloudWatchAlarmMatches(ctx context.Context, alarm cloudwatchtypes.MetricAlarm, marker string, intent v1.AlertIntent) (bool, error) {
+func (backend *CloudWatchBackend) cloudWatchAlarmMatches(ctx context.Context, alarm cloudwatchtypes.MetricAlarm, marker string, intent sdk.AlertIntent) (bool, error) {
 	if alarm.AlarmArn == nil || strings.TrimSpace(aws.ToString(alarm.AlarmArn)) == "" {
 		return false, nil
 	}
@@ -520,7 +520,7 @@ func (backend *CloudWatchBackend) cloudWatchAlarmMatches(ctx context.Context, al
 	return true, nil
 }
 
-func cloudWatchAlertTags(marker string, intent v1.AlertIntent) ([]cloudwatchtypes.Tag, error) {
+func cloudWatchAlertTags(marker string, intent sdk.AlertIntent) ([]cloudwatchtypes.Tag, error) {
 	values, err := cloudWatchAlertTagMap(marker, intent)
 	if err != nil {
 		return nil, err
@@ -537,7 +537,7 @@ func cloudWatchAlertTags(marker string, intent v1.AlertIntent) ([]cloudwatchtype
 	return tags, nil
 }
 
-func cloudWatchAlertTagMap(marker string, intent v1.AlertIntent) (map[string]string, error) {
+func cloudWatchAlertTagMap(marker string, intent sdk.AlertIntent) (map[string]string, error) {
 	metadata := map[string]string{
 		cloudWatchOwnershipTagKey: marker,
 		"magelift-owner":          intent.Owner,
@@ -556,7 +556,7 @@ func cloudWatchAlertTagMap(marker string, intent v1.AlertIntent) (map[string]str
 	return metadata, nil
 }
 
-func cloudWatchAlarmSettings(intent v1.AlertIntent) (cloudwatchtypes.ComparisonOperator, int32, error) {
+func cloudWatchAlarmSettings(intent sdk.AlertIntent) (cloudwatchtypes.ComparisonOperator, int32, error) {
 	if intent.WindowSeconds <= 0 || intent.WindowSeconds%60 != 0 || intent.WindowSeconds > 7*24*60*60 {
 		return "", 0, fmt.Errorf("CloudWatch alert %q window must be a positive whole number of minutes no greater than seven days", intent.ID)
 	}
@@ -578,7 +578,7 @@ func cloudWatchAlarmSettings(intent v1.AlertIntent) (cloudwatchtypes.ComparisonO
 	return comparison, int32(intent.WindowSeconds / 60), nil
 }
 
-func cloudWatchAlarmDescription(intent v1.AlertIntent) string {
+func cloudWatchAlarmDescription(intent sdk.AlertIntent) string {
 	return fmt.Sprintf("MageLift alert %s; owner=%s; severity=%s; deduplication=%s; runbook=%s", intent.ID, intent.Owner, intent.Severity, intent.DeduplicationKey, intent.RunbookURL)
 }
 
@@ -651,7 +651,7 @@ func validateBindings(plan providerobservability.Plan) error {
 		}
 	}
 	for _, alert := range plan.Alerts {
-		if err := v1.ValidateObservabilityIntent(v1.ObservabilityIntent{NativeProvider: "cloudwatch", OwnershipMarker: plan.OwnershipMarker, Signals: []string{alert.Signal}, Alerts: []v1.AlertIntent{alert}}); err != nil {
+		if err := sdk.ValidateObservabilityIntent(sdk.ObservabilityIntent{NativeProvider: "cloudwatch", OwnershipMarker: plan.OwnershipMarker, Signals: []string{alert.Signal}, Alerts: []sdk.AlertIntent{alert}}); err != nil {
 			return fmt.Errorf("validate CloudWatch alert %q: %w", alert.ID, err)
 		}
 		if _, _, err := cloudWatchAlarmSettings(alert); err != nil {

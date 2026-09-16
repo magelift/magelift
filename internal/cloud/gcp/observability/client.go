@@ -18,7 +18,7 @@ import (
 	"google.golang.org/api/option"
 
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	"github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const googleCloudOperationsDestination = "google-cloud-operations"
@@ -1196,7 +1196,7 @@ func (backend *GoogleCloudOperationsBackend) listLogProbesInResource(ctx context
 	}
 }
 
-func (backend *GoogleCloudOperationsBackend) ensureDashboard(ctx context.Context, marker string, intent v1.DashboardIntent) (*monitoringv1.Dashboard, error) {
+func (backend *GoogleCloudOperationsBackend) ensureDashboard(ctx context.Context, marker string, intent sdk.DashboardIntent) (*monitoringv1.Dashboard, error) {
 	dashboards, err := backend.dashboards.ListDashboards(ctx, backend.project)
 	if err != nil {
 		return nil, errors.New("inventory Google Cloud dashboards before apply failed")
@@ -1204,7 +1204,7 @@ func (backend *GoogleCloudOperationsBackend) ensureDashboard(ctx context.Context
 	if existing := findDashboard(dashboards, marker, intent.ID); existing != nil {
 		return existing, nil
 	}
-	dashboard := &monitoringv1.Dashboard{DisplayName: dashboardName(marker, intent.ID), Labels: ownershipLabels(marker), GridLayout: &monitoringv1.GridLayout{Columns: 1, Widgets: []*monitoringv1.Widget{{Title: "MageLift observability", Text: &monitoringv1.Text{Content: "Signals: " + strings.Join(v1.SortedStrings(intent.Signals), ", "), Format: "MARKDOWN"}}}}}
+	dashboard := &monitoringv1.Dashboard{DisplayName: dashboardName(marker, intent.ID), Labels: ownershipLabels(marker), GridLayout: &monitoringv1.GridLayout{Columns: 1, Widgets: []*monitoringv1.Widget{{Title: "MageLift observability", Text: &monitoringv1.Text{Content: "Signals: " + strings.Join(sdk.SortedStrings(intent.Signals), ", "), Format: "MARKDOWN"}}}}}
 	created, err := backend.dashboards.CreateDashboard(ctx, backend.project, dashboard)
 	if err != nil {
 		return nil, errors.New("create Google Cloud dashboard failed")
@@ -1212,7 +1212,7 @@ func (backend *GoogleCloudOperationsBackend) ensureDashboard(ctx context.Context
 	return created, nil
 }
 
-func (backend *GoogleCloudOperationsBackend) ensureAlertPolicy(ctx context.Context, marker string, intent v1.AlertIntent) (*monitoringv3.AlertPolicy, error) {
+func (backend *GoogleCloudOperationsBackend) ensureAlertPolicy(ctx context.Context, marker string, intent sdk.AlertIntent) (*monitoringv3.AlertPolicy, error) {
 	policies, err := backend.monitoring.ListAlertPolicies(ctx, backend.project)
 	if err != nil {
 		return nil, errors.New("inventory Google Cloud alert policies before apply failed")
@@ -1235,7 +1235,7 @@ func (backend *GoogleCloudOperationsBackend) ensureAlertPolicy(ctx context.Conte
 	return created, nil
 }
 
-func (backend *GoogleCloudOperationsBackend) ensureSLO(ctx context.Context, parent, marker string, intent v1.SLOIntent) (*monitoringv3.ServiceLevelObjective, error) {
+func (backend *GoogleCloudOperationsBackend) ensureSLO(ctx context.Context, parent, marker string, intent sdk.SLOIntent) (*monitoringv3.ServiceLevelObjective, error) {
 	if backend.slos == nil {
 		return nil, errors.New("Google Cloud SLO lifecycle requires the Service Monitoring API")
 	}
@@ -1275,7 +1275,7 @@ func (backend *GoogleCloudOperationsBackend) ensureSLO(ctx context.Context, pare
 	return created, nil
 }
 
-func validateGoogleSLO(intent v1.SLOIntent) error {
+func validateGoogleSLO(intent sdk.SLOIntent) error {
 	if intent.Signal != "application-health" {
 		return fmt.Errorf("Google Cloud SLO %q supports only application-health", intent.ID)
 	}
@@ -1303,7 +1303,7 @@ func googleSLOServiceID(project, parent string) (string, error) {
 	return parts[3], nil
 }
 
-func googleSLOObjective(marker string, intent v1.SLOIntent) *monitoringv3.ServiceLevelObjective {
+func googleSLOObjective(marker string, intent sdk.SLOIntent) *monitoringv3.ServiceLevelObjective {
 	return &monitoringv3.ServiceLevelObjective{
 		DisplayName:           googleSLODisplayName(marker, intent.ID),
 		Goal:                  intent.Target,
@@ -1322,7 +1322,7 @@ func findSLO(slos []*monitoringv3.ServiceLevelObjective, marker, id string) *mon
 	return nil
 }
 
-func googleSLOMatches(slo *monitoringv3.ServiceLevelObjective, parent, marker string, intent v1.SLOIntent) bool {
+func googleSLOMatches(slo *monitoringv3.ServiceLevelObjective, parent, marker string, intent sdk.SLOIntent) bool {
 	if slo == nil || !ownedSLO(slo, marker) || slo.DisplayName != googleSLODisplayName(marker, intent.ID) || slo.Name != googleSLOResourceName(parent, marker, intent.ID) {
 		return false
 	}
@@ -1359,7 +1359,7 @@ func googleSLODisplayName(marker, id string) string {
 	return "MageLift " + markerDigest(marker) + " SLO " + markerDigest(id)
 }
 
-func alertCondition(marker string, intent v1.AlertIntent) (*monitoringv3.Condition, error) {
+func alertCondition(marker string, intent sdk.AlertIntent) (*monitoringv3.Condition, error) {
 	if intent.WindowSeconds <= 0 || intent.WindowSeconds%60 != 0 {
 		return nil, fmt.Errorf("Google Cloud alert %q window must be a whole number of minutes", intent.ID)
 	}
@@ -1425,7 +1425,7 @@ func (backend *GoogleCloudOperationsBackend) validatePlan(ctx context.Context, p
 		}
 	}
 	for _, intent := range plan.Alerts {
-		if err := v1.ValidateObservabilityIntent(v1.ObservabilityIntent{NativeProvider: googleCloudOperationsDestination, OwnershipMarker: plan.OwnershipMarker, Signals: []string{intent.Signal}, Alerts: []v1.AlertIntent{intent}}); err != nil {
+		if err := sdk.ValidateObservabilityIntent(sdk.ObservabilityIntent{NativeProvider: googleCloudOperationsDestination, OwnershipMarker: plan.OwnershipMarker, Signals: []string{intent.Signal}, Alerts: []sdk.AlertIntent{intent}}); err != nil {
 			return fmt.Errorf("validate Google Cloud alert %q: %w", intent.ID, err)
 		}
 		if _, err := alertCondition(plan.OwnershipMarker, intent); err != nil {
@@ -1461,7 +1461,7 @@ func ownedAlertPolicy(policy *monitoringv3.AlertPolicy, marker string) bool {
 	return policy != nil && policy.UserLabels[ownershipLabel] == markerDigest(marker)
 }
 
-func googleAlertLabels(marker string, intent v1.AlertIntent) map[string]string {
+func googleAlertLabels(marker string, intent sdk.AlertIntent) map[string]string {
 	labels := ownershipLabels(marker)
 	labels["magelift_owner"] = googleLabelValue(intent.Owner)
 	labels["magelift_deduplication"] = googleLabelValue(intent.DeduplicationKey)
@@ -1488,7 +1488,7 @@ func googleLabelValue(value string) string {
 	return value[:46] + "-" + markerDigest(value)
 }
 
-func googleAlertDocumentation(intent v1.AlertIntent) *monitoringv3.Documentation {
+func googleAlertDocumentation(intent sdk.AlertIntent) *monitoringv3.Documentation {
 	documentation := &monitoringv3.Documentation{Content: fmt.Sprintf("MageLift alert %s. Owner: %s. Deduplication key: %s.", intent.ID, intent.Owner, intent.DeduplicationKey), MimeType: "text/markdown"}
 	if intent.RunbookURL != "" {
 		documentation.Links = []*monitoringv3.Link{{DisplayName: "runbook", Url: intent.RunbookURL}}
@@ -1496,7 +1496,7 @@ func googleAlertDocumentation(intent v1.AlertIntent) *monitoringv3.Documentation
 	return documentation
 }
 
-func googleAlertPolicyMatches(policy *monitoringv3.AlertPolicy, marker string, intent v1.AlertIntent) bool {
+func googleAlertPolicyMatches(policy *monitoringv3.AlertPolicy, marker string, intent sdk.AlertIntent) bool {
 	if !ownedAlertPolicy(policy, marker) || policy.Severity != googleAlertSeverity(intent.Severity) {
 		return false
 	}

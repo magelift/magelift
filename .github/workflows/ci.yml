@@ -28,6 +28,7 @@ jobs:
       pull-requests: read
     outputs:
       go: ${{ steps.filter.outputs.go == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      sdk: ${{ steps.filter.outputs.sdk == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
       docs: ${{ steps.filter.outputs.docs == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
       php: ${{ steps.filter.outputs.php == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
       images: ${{ steps.filter.outputs.images == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
@@ -49,6 +50,10 @@ jobs:
               - '**/*.go'
               - 'go.mod'
               - 'go.sum'
+              - 'sdk/go.mod'
+              - 'sdk/go.sum'
+              - 'go.work'
+              - 'go.work.sum'
               - 'schema/**'
               - 'Makefile'
               - '.golangci.yml'
@@ -56,6 +61,12 @@ jobs:
               - '.github/workflows/ci.yml'
               - 'docker-compose.floci.yml'
               - 'docker-compose.floci-gcp.yml'
+            sdk:
+              - 'sdk/**/*.go'
+              - 'sdk/go.mod'
+              - 'sdk/go.sum'
+              - 'go.work'
+              - 'go.work.sum'
             docs:
               - 'docs/**'
               - 'mkdocs.yml'
@@ -95,9 +106,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-
             go-prime-${{ runner.os }}-
           lookup-only: true
       - name: Warm module cache
@@ -112,7 +123,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-${{ github.sha }}
 
   lint:
     name: lint
@@ -188,6 +199,58 @@ jobs:
           go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown \
             --ignore=github.com/ovh/pulumi-ovh \
             --ignore=github.com/ovh/okms-sdk-go
+
+  sdk-verify:
+    needs: [changes, cache-prime]
+    # Standalone SDK module gate (GOWORK=off hermeticity proves the module needs
+    # no workspace). Cheap: runs for Dependabot too, unlike lint.
+    if: ${{ always() && !cancelled() && needs.changes.outputs.sdk == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-
+      - run: GOWORK=off go build ./...
+        working-directory: sdk
+        env:
+          GOFLAGS: -p=1
+          GOMAXPROCS: "1"
+      - run: GOWORK=off go vet ./...
+        working-directory: sdk
+        env:
+          GOFLAGS: -p=1
+          GOMAXPROCS: "1"
+      - run: GOWORK=off go test -race ./... -count=1
+        working-directory: sdk
+        env:
+          GOFLAGS: -p=1
+          GOMAXPROCS: "1"
+      - run: GOWORK=off go mod tidy && git diff --exit-code -- go.mod go.sum
+        working-directory: sdk
+      - name: golangci-lint (SDK module)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13.2
+          args: ./...
+          working-directory: sdk
+      - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          go-version-file: go.mod
+          go-package: ./...
+          work-dir: sdk
 
   docs:
     needs: changes
@@ -508,6 +571,7 @@ jobs:
       - lint
       - go-verify
       - docs
+      - sdk-verify
       - php
       - container
       - frankenphp

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/magelift/magelift/internal/cloud/kube"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type sdkEdgeStub struct{ descriptor sdk.EdgeAdapterDescriptor }

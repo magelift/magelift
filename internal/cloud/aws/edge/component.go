@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	awsprovider "github.com/pulumi/pulumi-aws/sdk/v7/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/cloudfront"
 	"github.com/pulumi/pulumi-aws/sdk/v7/go/aws/route53"

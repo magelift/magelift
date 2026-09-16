@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/magelift/magelift/internal/cloud/gcp/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // GCPCloudSQLProvider inventories and deletes ledger-claimed Cloud SQL

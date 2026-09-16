@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func testStoreLedger() sdk.CleanupLedger {

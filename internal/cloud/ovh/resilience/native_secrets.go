@@ -11,9 +11,9 @@ import (
 	"sort"
 	"strings"
 
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (

@@ -57,7 +57,7 @@ Layout:
 
 - `cmd/`: CLI and generators
 - `internal/`: CLI, config, deploy, automation, `platform`, `cloud/<provider>`
-- `sdk/v1/`: portable Target / Capability / Hook types
+- `sdk/`: portable Target / Capability / Hook types
 - `build/`: Composer Magento package (not the Go build tree)
 - `images/`: PHP-FPM + nginx runtime (FrankenPHP classic remains in-tree for provenance; schema rejects it as `application.webRuntime`)
 - `schema/`: generated JSON Schema for `magelift.yaml`

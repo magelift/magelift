@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestObjectRecoveryCellRunsPortableSequenceAndCleansExactFixture(t *testing.T) {

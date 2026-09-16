@@ -8,7 +8,7 @@ export GOMAXPROCS := 1
 export GOFLAGS := -p=1
 export GOMEMLIMIT := 1GiB
 
-.PHONY: help generate generate-check cli-docs cli-docs-check certification-docs certification-docs-check fmt fmt-check test lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test pulumi-mock-test floci-test-aws floci-gcp-test local-gates acceptance-dependencies-check acceptance-harness-test aws-acceptance-local aws-recovery-acceptance-local aws-database-recovery-acceptance-local aws-secret-recovery-acceptance-local aws-sqs-acceptance-local aws-cloudwatch-acceptance-local aws-cloudfront-acceptance-local gcp-acceptance-local gcp-collector-acceptance-local gcp-cloudsql-acceptance-local gcp-cloudsql-destroy-retention-acceptance-local gcp-cloudsql-cleanup-ledger-acceptance-local gcp-recovery-acceptance-local gcp-secret-recovery-acceptance-local gcp-pubsub-acceptance-local gcp-observability-acceptance-local gcp-edge-acceptance-local ovh-acceptance-local ovh-recovery-acceptance-local ovh-database-recovery-acceptance-local scaleway-acceptance-local scaleway-recovery-acceptance-local scaleway-secret-recovery-acceptance-local scaleway-observability-acceptance-local fastly-acceptance-local newrelic-acceptance-local newrelic-otlp-acceptance-local skills-test extension-test docs docs-serve workflow-check verify release-smoke ci-act-go
+.PHONY: help generate generate-check cli-docs cli-docs-check certification-docs certification-docs-check fmt fmt-check test sdk-test lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test pulumi-mock-test floci-test-aws floci-gcp-test local-gates acceptance-dependencies-check acceptance-harness-test aws-acceptance-local aws-recovery-acceptance-local aws-database-recovery-acceptance-local aws-secret-recovery-acceptance-local aws-sqs-acceptance-local aws-cloudwatch-acceptance-local aws-cloudfront-acceptance-local gcp-acceptance-local gcp-collector-acceptance-local gcp-cloudsql-acceptance-local gcp-cloudsql-destroy-retention-acceptance-local gcp-cloudsql-cleanup-ledger-acceptance-local gcp-recovery-acceptance-local gcp-secret-recovery-acceptance-local gcp-pubsub-acceptance-local gcp-observability-acceptance-local gcp-edge-acceptance-local ovh-acceptance-local ovh-recovery-acceptance-local ovh-database-recovery-acceptance-local scaleway-acceptance-local scaleway-recovery-acceptance-local scaleway-secret-recovery-acceptance-local scaleway-observability-acceptance-local fastly-acceptance-local newrelic-acceptance-local newrelic-otlp-acceptance-local skills-test extension-test docs docs-serve workflow-check verify release-smoke ci-act-go
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-36s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -21,6 +21,9 @@ fmt-check: ## Check Go formatting without changing files
 
 test: ## Run Go tests with the race detector
 	go test -race ./...
+
+sdk-test: ## Run the SDK module suite standalone (no workspace)
+	cd sdk && GOWORK=off go test -race ./... -count=1
 
 lint: ## Run static Go checks
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./...
@@ -261,7 +264,7 @@ workflow-check: ## Validate GitHub Actions workflow syntax and expressions
 		tests/fixtures/ci/aws/.github/workflows/*.yml \
 		tests/fixtures/ci/gcp/.github/workflows/*.yml
 
-verify: generate-check cli-docs-check fmt-check lint test license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
+verify: generate-check cli-docs-check fmt-check lint test sdk-test license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
 generate: certification-docs ## Generate configuration, certification, reference, and skill artifacts
 	go generate ./internal/config ./agents
 

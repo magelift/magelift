@@ -1,7 +1,7 @@
 package webruntime
 
 import (
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const pluginVersion = "0.1.0"

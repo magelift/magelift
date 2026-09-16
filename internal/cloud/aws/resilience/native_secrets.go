@@ -11,9 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	secretstypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	"github.com/magelift/magelift/sdk"
 )
 
 type secretArchive = cloudrecovery.SecretArchive

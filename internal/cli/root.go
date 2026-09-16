@@ -27,7 +27,7 @@ import (
 	"github.com/magelift/magelift/internal/toolchain"
 	mageliftupgrade "github.com/magelift/magelift/internal/upgrade"
 	"github.com/magelift/magelift/internal/usererr"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 )

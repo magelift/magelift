@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	gcptarget "github.com/magelift/magelift/internal/cloud/gcp/target"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestSelectionFromSpecUsesReleaseAwareCloudSQLAndGCPCatalog(t *testing.T) {

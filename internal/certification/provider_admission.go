@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // AdmissionFact is a redacted provider-side result for one prerequisite.

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/magelift/magelift/internal/certification"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // CertificationExecutorFor resolves the provider-owned certification port and

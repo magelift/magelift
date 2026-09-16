@@ -4,7 +4,7 @@ Verification layers vs Make targets and CI.
 
 | Layer | Location | How to run | Cloud account? |
 | --- | --- | --- | --- |
-| Go unit / package | `internal/**`, `sdk/v1/**` | `make test` | No |
+| Go unit / package | `internal/**`, `sdk/**` | `make test` + `make sdk-test` | No |
 | Pulumi mock graphs | `internal/cloud/**` | `make pulumi-mock-test` | No |
 | Offline harness | `tests/acceptance/` | `make acceptance-harness-test` | No |
 | Account-free stack | mocks + harness + Floci | `make local-gates` | No (Docker for Floci) |

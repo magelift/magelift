@@ -5,9 +5,9 @@ import (
 	"errors"
 	"strings"
 
-	cloudresilience "github.com/magelift/magelift/internal/cloud/resilience"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudresilience "github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 )
 
 func (api *NativeAPI) startProjectionClass(ctx context.Context, state operationState, _ string) (provider.NativeOperationObservation, error) {

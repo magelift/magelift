@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ResilienceScenarioMode states who can safely execute a failure exercise.

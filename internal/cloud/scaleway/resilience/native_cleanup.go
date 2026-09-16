@@ -10,9 +10,9 @@ import (
 
 	aws "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ScalewayCleanupPendingError means that cleanup reached a provider retention

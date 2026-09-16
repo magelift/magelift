@@ -24,7 +24,7 @@ Breaking changes to any of the following require a documented RC break note
 Experimental cells and providers may still return `ErrNotSupported` or change
 without a bump when clearly labeled experimental.
 
-## RC stability statement (`sdk/v1` and `platform.StackModule`)
+## RC stability statement (`sdk` and `platform.StackModule`)
 
 `v1.0.0-rc.1` is a SemVer pre-release. The following are **stable during the RC
 series** unless a documented RC break note lands in CHANGELOG / this document:
@@ -36,7 +36,7 @@ series** unless a documented RC break note lands in CHANGELOG / this document:
 | Documented exit codes | Stay stable |
 | Provider ID strings | `aws` / `gcp` / `ovh` / `scaleway` |
 | Certified AWS ECS honesty labels | OpenSearch / free-tier labels in the capability matrix |
-| `sdk/v1` | `Target` / `Capability` / `Hook` shapes stay |
+| `sdk` | `Target` / `Capability` / `Hook` shapes stay |
 | `platform.StackModule` | Module registration and core stack-module contract stay, subject to the shared-Kubernetes reservation below |
 | Provider extension boundary | Lockfile schema `1`, SDK API `"v1"`, `Execute` operation names and result shape stay |
 
@@ -59,8 +59,8 @@ frozen for the full RC series.
 - **Certified free-tier cell:** `searchMode: disabled`.
 - **Not claimed green on MageLift acceptance:** live Magento search data-plane
   (index/query/reconnect/IAM) until a paid pass; see [release-readiness.md](release-readiness.md).
-- External ops evidence: prior Terraform Magento+OpenSearch work at Chantelle
-  ([sources/chantelle-opensearch.md](sources/chantelle-opensearch.md)); private
+- External ops evidence: prior Terraform Magento+OpenSearch work
+  ([sources/prior-terraform-opensearch.md](sources/prior-terraform-opensearch.md)); private
   employer repos are not named.
 
 ## Changelog

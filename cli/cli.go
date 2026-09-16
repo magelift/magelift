@@ -16,7 +16,7 @@ import (
 	gcpstack "github.com/magelift/magelift/internal/cloud/gcp/stack"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/registry"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/spf13/cobra"
 )
 

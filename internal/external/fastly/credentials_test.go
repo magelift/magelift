@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type fakeTokenAPI struct {

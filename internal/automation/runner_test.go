@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 var validRequest = Request{Target: sdk.TargetDescriptor{ID: "aws.ecs-fargate", Provider: "aws", Runtime: "ecs-fargate"}}

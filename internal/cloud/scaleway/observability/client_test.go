@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	v1 "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type fakeCockpit struct {
@@ -173,7 +173,7 @@ func TestScalewayCockpitBackendRejectsUnsafeExistingSourceAndUnsupportedOperatio
 		t.Fatalf("provider mutated after collision: creates=%d", api.creates)
 	}
 
-	_, err = backend.Apply(context.Background(), providerobservability.Plan{OwnershipMarker: marker, Alerts: []v1.AlertIntent{{ID: "alert", Signal: "metrics", Severity: "warning", Operator: "gt", Threshold: 1, WindowSeconds: 60, Owner: "oncall", RunbookURL: "https://runbooks.example/alert", DeduplicationKey: "alert"}}})
+	_, err = backend.Apply(context.Background(), providerobservability.Plan{OwnershipMarker: marker, Alerts: []sdk.AlertIntent{{ID: "alert", Signal: "metrics", Severity: "warning", Operator: "gt", Threshold: 1, WindowSeconds: 60, Owner: "oncall", RunbookURL: "https://runbooks.example/alert", DeduplicationKey: "alert"}}})
 	if err == nil {
 		t.Fatal("unsupported alert lifecycle was accepted")
 	}

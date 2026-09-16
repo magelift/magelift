@@ -20,7 +20,7 @@ import (
 
 	gcpedge "github.com/magelift/magelift/internal/cloud/gcp/edge"
 	"github.com/magelift/magelift/internal/edge/waf"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (

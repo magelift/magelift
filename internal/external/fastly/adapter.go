@@ -22,7 +22,7 @@ import (
 
 	"github.com/magelift/magelift/internal/edge/waf"
 	"github.com/magelift/magelift/internal/secretref"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const ownershipPrefix = "magelift/"

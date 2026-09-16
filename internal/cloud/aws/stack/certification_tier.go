@@ -3,7 +3,7 @@ package stack
 import (
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // awsPreviewFargateMagentoCertified is the evidenced Magento cell in

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 )

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/magelift/magelift/internal/config"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // EdgeIntentFromConfig is the single portable mapping from first-party

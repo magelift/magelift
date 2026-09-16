@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )

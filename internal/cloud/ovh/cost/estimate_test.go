@@ -9,7 +9,7 @@ import (
 	ovhcost "github.com/magelift/magelift/internal/cloud/ovh/cost"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type fakePlanned struct {

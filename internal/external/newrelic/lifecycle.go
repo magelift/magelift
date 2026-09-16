@@ -10,7 +10,7 @@ import (
 	"time"
 
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	logsv1 "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	metricsv1 "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
 	tracesv1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"

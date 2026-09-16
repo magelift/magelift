@@ -10,7 +10,7 @@ import (
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // Magento cells stay on the in-process GCP module. The CLI is not wired to Dial.

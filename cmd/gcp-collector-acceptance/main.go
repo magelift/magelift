@@ -21,7 +21,7 @@ import (
 	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/external/newrelic"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // CertificationPlan is the side-effect-free execution plan printed before a

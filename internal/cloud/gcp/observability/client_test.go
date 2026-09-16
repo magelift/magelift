@@ -13,7 +13,7 @@ import (
 	monitoringv3 "google.golang.org/api/monitoring/v3"
 
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	"github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type fakeGoogleMonitoring struct {
@@ -23,7 +23,7 @@ type fakeGoogleMonitoring struct {
 }
 
 func TestGoogleMetricAlertFilterIncludesRequiredResourceRestriction(t *testing.T) {
-	condition, err := alertCondition("marker", v1.AlertIntent{ID: "delivery", Signal: "metrics", Operator: "gt", Threshold: 0, WindowSeconds: 60})
+	condition, err := alertCondition("marker", sdk.AlertIntent{ID: "delivery", Signal: "metrics", Operator: "gt", Threshold: 0, WindowSeconds: 60})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestGoogleCloudAlertValidationRejectsUnsupportedOperatorBeforeMutation(t *t
 	_, err := backend.Apply(context.Background(), providerobservability.Plan{
 		OwnershipMarker: marker,
 		Bindings:        []providerobservability.SignalBinding{{Signal: "metrics", Destination: googleCloudOperationsDestination, OwnershipMarker: marker}},
-		Alerts:          []v1.AlertIntent{{ID: "equality", Signal: "metrics", Severity: "warning", Operator: "eq", Threshold: 1, WindowSeconds: 60, Owner: "platform-oncall", RunbookURL: "https://runbooks.example/equality", DeduplicationKey: "equality"}},
+		Alerts:          []sdk.AlertIntent{{ID: "equality", Signal: "metrics", Severity: "warning", Operator: "eq", Threshold: 1, WindowSeconds: 60, Owner: "platform-oncall", RunbookURL: "https://runbooks.example/equality", DeduplicationKey: "equality"}},
 	})
 	if err == nil || !strings.Contains(err.Error(), "operator") {
 		t.Fatalf("apply error = %v, want unsupported operator", err)
@@ -329,8 +329,8 @@ func TestGoogleCloudOperationsBackendUsesOfficialSDKModelsAndIsIdempotent(t *tes
 			{Signal: "logs", Destination: googleCloudOperationsDestination, Mode: "native", OwnershipMarker: marker},
 			{Signal: "metrics", Destination: googleCloudOperationsDestination, Mode: "native", OwnershipMarker: marker},
 		},
-		Dashboards: []v1.DashboardIntent{{ID: "runtime", Signals: []string{"metrics"}, Owner: "oncall"}},
-		Alerts: []v1.AlertIntent{
+		Dashboards: []sdk.DashboardIntent{{ID: "runtime", Signals: []string{"metrics"}, Owner: "oncall"}},
+		Alerts: []sdk.AlertIntent{
 			{ID: "runtime-log", Signal: "logs", Severity: "critical", Operator: "gt", WindowSeconds: 60, Owner: "oncall", RunbookURL: "https://runbooks.example/logs", DeduplicationKey: "runtime-log"},
 			{ID: "runtime-metric", Signal: "metrics", Severity: "warning", Operator: "lt", Threshold: 1, WindowSeconds: 60, Owner: "oncall", RunbookURL: "https://runbooks.example/metrics", DeduplicationKey: "runtime-metric"},
 		},
@@ -353,7 +353,7 @@ func TestGoogleCloudOperationsBackendUsesOfficialSDKModelsAndIsIdempotent(t *tes
 		t.Fatalf("provider resources = dashboards=%d policies=%d", len(dashboards.dashboards), len(monitoring.policies))
 	}
 	for _, policy := range monitoring.policies {
-		var intent v1.AlertIntent
+		var intent sdk.AlertIntent
 		for _, candidate := range plan.Alerts {
 			if policy.DisplayName == alertPolicyName(marker, candidate.ID) {
 				intent = candidate
@@ -594,7 +594,7 @@ func TestGoogleCloudOperationsBackendManagesSLOsThroughScopedNativeReference(t *
 	plan := providerobservability.Plan{
 		NativeReference: parent,
 		OwnershipMarker: marker,
-		SLOs:            []v1.SLOIntent{{ID: "availability", Signal: "application-health", Target: 0.999, WindowSeconds: 7 * 24 * 60 * 60, Owner: "oncall", RunbookURL: "https://runbooks.example/availability", ErrorBudgetPolicy: "page-on-burn"}},
+		SLOs:            []sdk.SLOIntent{{ID: "availability", Signal: "application-health", Target: 0.999, WindowSeconds: 7 * 24 * 60 * 60, Owner: "oncall", RunbookURL: "https://runbooks.example/availability", ErrorBudgetPolicy: "page-on-burn"}},
 	}
 	first, err := backend.Apply(context.Background(), plan)
 	if err != nil {
@@ -646,7 +646,7 @@ func TestGoogleCloudOperationsBackendRejectsForeignSLOCollisionBeforeMutation(t 
 	_, err = backend.Apply(context.Background(), providerobservability.Plan{
 		NativeReference: "projects/project/services/checkout",
 		OwnershipMarker: "magelift/gcp/slo-collision",
-		SLOs:            []v1.SLOIntent{{ID: "availability", Signal: "application-health", Target: 0.999, WindowSeconds: 86400, Owner: "oncall", RunbookURL: "https://runbooks.example/availability", ErrorBudgetPolicy: "page-on-burn"}},
+		SLOs:            []sdk.SLOIntent{{ID: "availability", Signal: "application-health", Target: 0.999, WindowSeconds: 86400, Owner: "oncall", RunbookURL: "https://runbooks.example/availability", ErrorBudgetPolicy: "page-on-burn"}},
 	})
 	if err == nil || !strings.Contains(err.Error(), "unowned resource") {
 		t.Fatalf("foreign SLO collision error = %v", err)
@@ -660,7 +660,7 @@ func TestGoogleCloudOperationsBackendRejectsSLOFromDifferentServiceParent(t *tes
 	monitoring := &fakeGoogleMonitoring{}
 	dashboards := &fakeGoogleDashboards{}
 	logging := &fakeGoogleLogging{}
-	intent := v1.SLOIntent{ID: "availability", Signal: "application-health", Target: 0.999, WindowSeconds: 24 * 60 * 60}
+	intent := sdk.SLOIntent{ID: "availability", Signal: "application-health", Target: 0.999, WindowSeconds: 24 * 60 * 60}
 	parent := "projects/project/services/checkout"
 	foreignParent := "projects/project/services/other"
 	slos := &fakeGoogleSLOs{slos: []*monitoringv3.ServiceLevelObjective{{
@@ -675,7 +675,7 @@ func TestGoogleCloudOperationsBackendRejectsSLOFromDifferentServiceParent(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan := providerobservability.Plan{NativeReference: parent, OwnershipMarker: "magelift/test", SLOs: []v1.SLOIntent{intent}}
+	plan := providerobservability.Plan{NativeReference: parent, OwnershipMarker: "magelift/test", SLOs: []sdk.SLOIntent{intent}}
 	operations, err := backend.VerifyOperations(context.Background(), plan)
 	if err != nil {
 		t.Fatalf("VerifyOperations() error = %v", err)
@@ -690,7 +690,7 @@ func TestGoogleCloudOperationsBackendRequiresSLOAPIBeforeMutation(t *testing.T) 
 	_, err := backend.Apply(context.Background(), providerobservability.Plan{
 		NativeReference: "projects/project/services/checkout",
 		OwnershipMarker: "magelift/gcp/slo-missing-api",
-		SLOs:            []v1.SLOIntent{{ID: "availability", Signal: "application-health", Target: 0.999, WindowSeconds: 86400, Owner: "oncall", RunbookURL: "https://runbooks.example/availability", ErrorBudgetPolicy: "page-on-burn"}},
+		SLOs:            []sdk.SLOIntent{{ID: "availability", Signal: "application-health", Target: 0.999, WindowSeconds: 86400, Owner: "oncall", RunbookURL: "https://runbooks.example/availability", ErrorBudgetPolicy: "page-on-burn"}},
 	})
 	if err == nil || !strings.Contains(err.Error(), "Service Monitoring API") {
 		t.Fatalf("missing SLO API error = %v", err)

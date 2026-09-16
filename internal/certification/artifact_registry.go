@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 var artifactCompatibilityFingerprintPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)

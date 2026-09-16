@@ -8,7 +8,7 @@ import (
 	composedge "github.com/magelift/magelift/internal/external/edge"
 	"github.com/magelift/magelift/internal/platform"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // NewLifecycleAdapter validates an injected AWS SDK edge adapter at the

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestFormatStackNameIncludesProviderAndRuntime(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"github.com/magelift/magelift/internal/automation"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"

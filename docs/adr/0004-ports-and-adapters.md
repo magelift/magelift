@@ -11,7 +11,7 @@ Magento orchestration must not be copied into every `internal/cloud/<p>` package
 
 MageLift uses ports and adapters:
 
-1. **Ports** live in `internal/platform` (and `sdk/v1`). They own stack module registration, stable output keys, Magento workloads, and env binding names. They do not import cloud SDKs beyond the Pulumi `RunFunc` handed to Automation API.
+1. **Ports** live in `internal/platform` (and `sdk`). They own stack module registration, stable output keys, Magento workloads, and env binding names. They do not import cloud SDKs beyond the Pulumi `RunFunc` handed to Automation API.
 2. **Adapters** live in `internal/cloud/<provider>/`. Each owns topology, catalogs, and `target.<provider>` YAML.
 3. The CLI selects a `StackModule` by `target.provider` + `target.runtime` through `cmd/magelift` / `platform.ModuleRegistry`. `infra.RegisterTarget` alone does not ship `magelift deploy`.
 4. Day-2 hangs off the same module via small `Has*` interfaces: `HasOps`, `HasBootstrap`, `HasState`, `HasSecrets`, `HasRuntimeObserve`. An omitted port or `ErrNotSupported` keeps that surface experimental.

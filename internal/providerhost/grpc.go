@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 	"github.com/magelift/magelift/internal/providerhost/hostproto"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"google.golang.org/grpc"
 )
 

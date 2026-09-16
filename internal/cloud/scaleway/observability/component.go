@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumiverse/pulumi-scaleway/sdk/go/scaleway/observability"
 )

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // Workload identifies the instrumentation boundary. ECS, Kubernetes, and a
@@ -84,7 +84,7 @@ func PlanIntegration(request IntegrationRequest) (IntegrationPlan, error) {
 	if request.Mode != IntegrationNative && request.Mode != IntegrationOTLP {
 		return IntegrationPlan{}, fmt.Errorf("unsupported New Relic integration mode %q", request.Mode)
 	}
-	if err := v1.ValidateCredentialReference(request.CredentialRef); err != nil {
+	if err := sdk.ValidateCredentialReference(request.CredentialRef); err != nil {
 		return IntegrationPlan{}, fmt.Errorf("New Relic credential reference: %w", err)
 	}
 	if err := validateOwnershipMarker(request.OwnershipMarker); err != nil {
@@ -188,10 +188,10 @@ func isNRDOTKubernetesTarget(provider, runtime string) bool {
 }
 
 func validateNewRelicTarget(provider, runtime string) error {
-	if err := v1.ValidateTargetDescriptor(v1.TargetDescriptor{
+	if err := sdk.ValidateTargetDescriptor(sdk.TargetDescriptor{
 		ID:       "newrelic.integration",
-		Provider: v1.ProviderID(provider),
-		Runtime:  v1.RuntimeID(runtime),
+		Provider: sdk.ProviderID(provider),
+		Runtime:  sdk.RuntimeID(runtime),
 	}); err != nil {
 		return fmt.Errorf("New Relic target identity: %w", err)
 	}

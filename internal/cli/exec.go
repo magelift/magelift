@@ -11,7 +11,7 @@ import (
 
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/toolchain"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/spf13/cobra"
 )
 

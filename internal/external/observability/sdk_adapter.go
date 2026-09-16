@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"sort"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // LifecycleResult is the provider-neutral result returned by an injected

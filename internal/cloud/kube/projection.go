@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	"github.com/magelift/magelift/sdk"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

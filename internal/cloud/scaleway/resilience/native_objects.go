@@ -17,10 +17,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
-	cloudresilience "github.com/magelift/magelift/internal/cloud/resilience"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	cloudresilience "github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (
@@ -73,7 +73,7 @@ type NativeAPIConfig struct {
 
 // NativeAPI translates the provider-neutral object recovery lifecycle to
 // Scaleway's official S3-compatible Object Storage API. The archive algorithm
-// and manifest protocol live in internal/cloud/recovery and are reused by all
+// and manifest protocol live in internal/shared/recovery and are reused by all
 // providers that expose the S3 protocol.
 type NativeAPI struct {
 	objects  ObjectAPI
