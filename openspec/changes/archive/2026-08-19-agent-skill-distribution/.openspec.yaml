@@ -1,4 +1,0 @@
-schema: spec-driven
-created: 2026-08-04
-goal: Add a MageLift CLI command that installs verified skills locally or
-  globally while keeping the tracked bundle human-maintained.
