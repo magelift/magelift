@@ -97,7 +97,9 @@ func (o *options) pluginBackend(ctx context.Context, planned platform.PlannedSta
 
 // providerProvenance describes one plugin provider for `extensions list`.
 // Mode is "subprocess" when a verified artifact is installed beside the CLI
-// and "in-process" otherwise; no subprocess starts to answer the listing.
+// and "not-installed" otherwise (GCP has no in-process implementation, so
+// there is nothing to fall back to); no subprocess starts to answer the
+// listing.
 type providerProvenance struct {
 	Name    string `json:"name" yaml:"name"`
 	Version string `json:"version,omitempty" yaml:"version,omitempty"`
@@ -107,7 +109,7 @@ type providerProvenance struct {
 
 func (o *options) subprocessProvenance(ctx context.Context) []providerProvenance {
 	name := providerhost.ExtractName(gcpProviderID)
-	provenance := providerProvenance{Name: name, Mode: "in-process"}
+	provenance := providerProvenance{Name: name, Mode: "not-installed"}
 	if o.loadProvider == nil {
 		return []providerProvenance{provenance}
 	}
