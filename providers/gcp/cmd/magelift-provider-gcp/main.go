@@ -1,13 +1,16 @@
 // Command magelift-provider-gcp is the autonomous GCP provider plugin. It
-// serves the versioned typed operations over go-plugin net/rpc. The full
-// server wires up as the provider implementation lands; this skeleton
-// establishes the module, the binary name, and version reporting.
+// serves the versioned typed operations over go-plugin net/rpc.
 package main
 
 import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
+
+	gcpplugin "github.com/magelift/magelift/providers/gcp/plugin"
 )
 
 // Version is set by the release build. The development default identifies
@@ -21,6 +24,9 @@ func main() {
 		fmt.Println(Version)
 		return
 	}
-	fmt.Fprintln(os.Stderr, "magelift-provider-gcp: plugin server not yet wired")
-	os.Exit(2)
+	plugin.Serve(&plugin.ServeConfig{
+		HandshakeConfig: gcpplugin.HandshakeConfig,
+		Plugins:         gcpplugin.PluginMap(&gcpplugin.Server{Version: Version}),
+		Logger:          hclog.New(&hclog.LoggerOptions{Level: hclog.Warn, Output: os.Stderr}),
+	})
 }

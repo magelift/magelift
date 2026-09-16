@@ -17,6 +17,12 @@ type Tunnel struct {
 	observe *kube.Observe
 }
 
+// NewTunnel builds a Tunnel over an explicit observer. The zero Tunnel
+// lazily builds the production observer on first use.
+func NewTunnel(observe *kube.Observe) Tunnel {
+	return Tunnel{observe: observe}
+}
+
 func (t Tunnel) PrepareTunnel(ctx context.Context, spec gcpstack.Spec, outputs map[string]any, query platform.TunnelQuery) (platform.ExecTarget, error) {
 	target, err := platform.NormalizeTunnelTarget(query.Target)
 	if err != nil {
