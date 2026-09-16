@@ -2,7 +2,7 @@
 
 The released `magelift` binary only registers first-party modules. Community and
 experimental providers ship as compile-time custom binaries that call the
-public `github.com/magelift/magelift/cli` and `sdk/v1` packages. There is no Go
+public `github.com/magelift/magelift/cli` and `sdk` packages. There is no Go
 `plugin` ABI and no unsigned auto-download loader in RC1.
 
 ## Clean-cache verification

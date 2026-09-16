@@ -5,7 +5,7 @@ import (
 
 	gcptarget "github.com/magelift/magelift/internal/cloud/gcp/target"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestCertificationTierFollowsEvidenceTuple(t *testing.T) {

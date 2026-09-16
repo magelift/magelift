@@ -28,7 +28,7 @@ import (
 
 	"github.com/magelift/magelift/internal/certification"
 	ovhresilience "github.com/magelift/magelift/internal/cloud/ovh/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (

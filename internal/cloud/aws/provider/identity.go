@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	awsendpoint "github.com/magelift/magelift/internal/cloud/aws/endpoint"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // STSAPI is the smallest AWS surface needed for account identity admission.

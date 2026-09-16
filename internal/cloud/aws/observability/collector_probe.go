@@ -8,7 +8,7 @@ import (
 
 	"github.com/magelift/magelift/internal/external/newrelic"
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ECSNewRelicSignalProbe verifies markers emitted by the target ECS task

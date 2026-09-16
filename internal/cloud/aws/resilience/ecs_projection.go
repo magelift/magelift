@@ -19,8 +19,8 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	awsendpoint "github.com/magelift/magelift/internal/cloud/aws/endpoint"
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ECSProjectionAPI is the smallest AWS ECS control-plane surface required by

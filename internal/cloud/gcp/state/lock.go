@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	archivecore "github.com/magelift/magelift/internal/cloud/statearchive"
+	archivecore "github.com/magelift/magelift/internal/shared/statearchive"
 	"google.golang.org/api/iterator"
 )
 

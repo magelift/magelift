@@ -13,9 +13,10 @@ Read `docs/adding-a-provider.md` and ADRs 0002, 0004, 0007, 0008 before coding.
 
 ## Boundary
 
-- Magento-facing code stays in `sdk/v1`, `internal/platform`, `internal/deploy`,
+- Magento-facing code stays in `sdk`, `internal/platform`, `internal/deploy`,
   `internal/config`
 - VPC, DB, runtime, and Pulumi components stay under `internal/cloud/<provider>/`
+- SaaS adapters go under `internal/external/<vendor>/`; provider-neutral ports go under `internal/shared/<port>/`; `internal/cloud/kube` is the single ADR-blessed shared K8s helper; SES and Cloudflare are adapter-less by decision
 - Do not share Pulumi Network/Database components behind a provider switch
 
 ## Registration seams
@@ -53,6 +54,6 @@ Experimental providers are fine. Selling them as production-supported is not.
 
 ## Leave behind
 
-- Provider-specific Pulumi code under internal/cloud/<provider>/.
+- Provider-specific Pulumi code under internal/cloud/<provider>/; SaaS code under internal/external/<vendor>/; shared ports under internal/shared/<port>/.
 - Mock coverage and a capability-matrix row.
 - A real acceptance row before changing a cell to certified.

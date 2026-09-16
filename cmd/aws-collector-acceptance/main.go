@@ -19,7 +19,7 @@ import (
 	awsobservability "github.com/magelift/magelift/internal/cloud/aws/observability"
 	"github.com/magelift/magelift/internal/external/newrelic"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/magelift/magelift/internal/config"
-	"github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestPlanFromConfigMapsExplicitAWSInputs(t *testing.T) {
@@ -29,7 +29,7 @@ func TestPlanFromConfigMapsExplicitAWSInputs(t *testing.T) {
 	if err := spec.Validate(); err != nil {
 		t.Fatalf("planned spec is invalid: %v", err)
 	}
-	if spec.Identity.Preset != v1.PresetStandard || spec.Identity.AccountID != cfg.Account {
+	if spec.Identity.Preset != sdk.PresetStandard || spec.Identity.AccountID != cfg.Account {
 		t.Fatalf("identity was not mapped: %#v", spec.Identity)
 	}
 	if spec.Artifact.ImageDigest != cfg.Target.AWS.ImageDigest {
@@ -214,7 +214,7 @@ func TestPlanFromConfigMapsExistingDatabaseInputs(t *testing.T) {
 	if spec.Existing.Database == nil {
 		t.Fatal("existing database was not mapped")
 	}
-	if spec.Existing.Database.Kind != v1.ExistingDatabase || spec.Existing.Database.Provider != "aws" {
+	if spec.Existing.Database.Kind != sdk.ExistingDatabase || spec.Existing.Database.Provider != "aws" {
 		t.Fatalf("database ref kind/provider = %#v", spec.Existing.Database)
 	}
 	if spec.Existing.Database.ExternalID != "db-magento-prod" {
@@ -370,7 +370,7 @@ func TestPlanFromConfigUsesResolvedDefaultPresetWhenEnvironmentDoesNotOverride(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spec.Identity.Preset != v1.PresetStandard {
+	if spec.Identity.Preset != sdk.PresetStandard {
 		t.Fatalf("preset = %q", spec.Identity.Preset)
 	}
 }

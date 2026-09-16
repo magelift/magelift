@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"github.com/magelift/magelift/internal/secretsafe"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 var (

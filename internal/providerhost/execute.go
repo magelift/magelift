@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/magelift/magelift/internal/automation"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ExecuteOperation is a stack lifecycle operation the host asks a provider

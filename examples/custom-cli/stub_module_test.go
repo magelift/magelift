@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	magecli "github.com/magelift/magelift/cli"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestStubModuleRegistersAlongsideFirstParty(t *testing.T) {

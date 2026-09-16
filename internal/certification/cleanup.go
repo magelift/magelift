@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // CleanupProofFromDeletionObservation converts an owning-service inventory
 // observation into the evidence shape. The conversion is deliberately pure:
-// polling, retries, and provider API translation stay in sdk/v1 or the
+// polling, retries, and provider API translation stay in sdk or the
 // provider adapter, while every provider gets the same cleanup truth rules.
 func CleanupProofFromDeletionObservation(prefix, ownershipMarker string, observation sdk.DeletionObservation, checkedAt time.Time, latency time.Duration) (CleanupProof, error) {
 	if strings.TrimSpace(prefix) == "" || strings.ContainsAny(prefix, "\r\n\x00") {

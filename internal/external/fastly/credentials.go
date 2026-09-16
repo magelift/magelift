@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // CredentialLifecycleClient manages Fastly API tokens through an injected

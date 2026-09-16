@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // DefaultID is the first-party Adobe-supported Magento HTTP frontend.

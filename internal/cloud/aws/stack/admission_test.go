@@ -5,7 +5,7 @@ import (
 
 	"github.com/magelift/magelift/internal/cloud/aws/network"
 	"github.com/magelift/magelift/internal/cloud/aws/runtime"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestSelectionFromSpecCoversIndependentAWSInstanceShapes(t *testing.T) {

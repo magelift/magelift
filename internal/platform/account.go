@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // BootstrapRequest is Magento-shaped account preparation input.

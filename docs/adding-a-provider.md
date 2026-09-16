@@ -1,9 +1,26 @@
 # Adding a provider
 
 New clouds are adapters. Do not share Pulumi `Network`/`Database` components with
-a provider switch ([ADR 0003](adr/0003-portable-contracts-vs-topology.md), [ADR 0004](adr/0004-ports-and-adapters.md)). Magento-facing code stays in `sdk/v1`,
+a provider switch ([ADR 0003](adr/0003-portable-contracts-vs-topology.md), [ADR 0004](adr/0004-ports-and-adapters.md)). Magento-facing code stays in `sdk`,
 `internal/platform`, `internal/deploy`, and `internal/config`. VPC, DB, and
-runtime stay under `internal/cloud/<provider>/`.
+runtime stay under `internal/cloud/<provider>/`. SaaS edge and observability
+adapters live under `internal/external/`, provider-neutral ports under
+`internal/shared/`, and the Magento-safe WAF contract under `internal/edge/waf`.
+SES (`email.mode`) and Cloudflare DNS are adapter-less by decision: config
+strings and shell helpers with no Go adapter package. The full rule is
+§ Provider roots below.
+
+## Provider roots
+
+| Root | Holds | Examples |
+| --- | --- | --- |
+| `internal/cloud/<provider>/` | IaaS topology only: one cloud's network, database, cache, search, queue, runtime, native edge/observability, and stack. Each cloud owns its Pulumi graph; no `if provider ==` switches. | `internal/cloud/aws`, `internal/cloud/gcp`, `internal/cloud/ovh`, `internal/cloud/scaleway` |
+| `internal/external/<vendor>/` | SaaS edge/observability adapters behind typed SDK intents. | `internal/external/fastly`, `internal/external/newrelic`, `internal/external/edge` (composition), `internal/external/observability` (composition) |
+| `internal/shared/<port>/` | Provider-neutral durable engines and ports. Stdlib plus `sdk` plus `internal/provider` only; no cloud SDK, no Pulumi. | `internal/shared/recovery`, `internal/shared/resilience`, `internal/shared/statearchive` |
+| `internal/edge/waf/` | Provider-neutral Magento-safe WAF contract every edge adapter translates. | `internal/edge/waf` (`waf/magento-safe`) |
+| Adapter-less (not a provider root) | Config strings or shell helpers with no Go adapter package. | `email.mode: ses` in `internal/config` (SMTP settings plus secret references; validation only, delivery uncertified); Cloudflare DNS shell helpers (`scripts/acceptance/lib-cloudflare-dns.sh`, `scripts/cutover-dns-cloudflare.sh`, `tests/acceptance/cloudflare_dns_helper_test.sh`; DNS cutover only, no CDN/WAF claim) |
+
+Single exception: `internal/cloud/kube` stays where it is (see ADR 0003 carve-out). Nothing else shared lives under `internal/cloud/`.
 
 ## Registration (read first)
 
@@ -60,6 +77,18 @@ A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`
    independent from the origin target and they run through the typed edge or
    observability plan request rather than being mislabeled as native target
    adapters.
+   SaaS homes: Fastly lives in `internal/external/fastly`, New Relic in
+   `internal/external/newrelic`, shared edge and observability composition in
+   `internal/external/edge` and `internal/external/observability`, and every
+   edge adapter translates the Magento-safe WAF contract in `internal/edge/waf`.
+   SES is adapter-less by decision: `email.mode: ses` in `internal/config`
+   carries SMTP settings plus secret references with validation only, delivery
+   uncertified, and no Go adapter package. Cloudflare is adapter-less by
+   decision: DNS cutover runs through shell helpers
+   (`scripts/acceptance/lib-cloudflare-dns.sh`,
+   `scripts/cutover-dns-cloudflare.sh`,
+   `tests/acceptance/cloudflare_dns_helper_test.sh`) with no CDN/WAF claim and
+   no Go adapter package.
 7. `internal/config`: provider block, enums, validation, then `make generate` for schema.
 8. For a first-party provider, register the `StackModule` in
    `internal/registry`. For a community provider, implement `sdk.Module` and
@@ -143,6 +172,19 @@ provider-owned destination; it is not a provider selector, SDK object, or
 credential field. The
 `provider` fields on `target` and existing-resource identity remain identity
 data and are not part of this cleanup.
+
+### SDK pinning
+
+Extensions pin the SDK module, not the monolith:
+
+```text
+require github.com/magelift/magelift/sdk vX.Y.Z
+```
+
+SDK tags look like `sdk/vX.Y.Z` (nested module at `sdk/`, lockstep with the
+CLI version for v1). Do not add a `replace` directive: local development
+resolves `./sdk` through the committed `go.work`, and registry builds resolve
+the tag.
 
 ### Extension build verification (RELEASE-03)
 

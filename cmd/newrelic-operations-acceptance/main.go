@@ -13,7 +13,7 @@ import (
 	"github.com/magelift/magelift/internal/external/newrelic"
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const operationsCredentialReference = "newrelic-acceptance://user-key"

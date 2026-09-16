@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestCompileResiliencePlanIsolatedSameRegionDoesNotRequireFence(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 
 	scwprovider "github.com/magelift/magelift/internal/cloud/scaleway/provider"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type fakeCapabilityAPI struct {

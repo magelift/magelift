@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ClientRequest is safe to persist and log. CredentialRefs are opaque

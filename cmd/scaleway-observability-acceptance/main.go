@@ -14,7 +14,7 @@ import (
 
 	scalewayobservability "github.com/magelift/magelift/internal/cloud/scaleway/observability"
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	"github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const defaultVerifyBudget = 4 * time.Minute
@@ -105,8 +105,8 @@ func acceptancePlan(marker string) providerobservability.Plan {
 			{Signal: "logs", Destination: "scaleway-cockpit", Mode: "native", OwnershipMarker: marker, RetentionDays: 1},
 			{Signal: "metrics", Destination: "scaleway-cockpit", Mode: "native", OwnershipMarker: marker, RetentionDays: 1},
 		},
-		Alerts:     []v1.AlertIntent{},
-		Dashboards: []v1.DashboardIntent{},
+		Alerts:     []sdk.AlertIntent{},
+		Dashboards: []sdk.DashboardIntent{},
 	}
 }
 

@@ -24,7 +24,7 @@ import (
 
 	"github.com/magelift/magelift/internal/certification"
 	gcpresilience "github.com/magelift/magelift/internal/cloud/gcp/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (

@@ -7,7 +7,7 @@ import (
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
 	"github.com/magelift/magelift/internal/platform"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // NewLifecycleAdapter exposes the OVHcloud MKS audit-subscription translator

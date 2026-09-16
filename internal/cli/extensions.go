@@ -2,12 +2,12 @@ package cli
 
 import (
 	"github.com/magelift/magelift/internal/webruntime"
-	v1 "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/spf13/cobra"
 )
 
 type extensionInventory struct {
-	Modules     []v1.ExtensionDescriptor  `json:"modules" yaml:"modules"`
+	Modules     []sdk.ExtensionDescriptor `json:"modules" yaml:"modules"`
 	WebRuntimes []webruntime.ListedPlugin `json:"webRuntimes" yaml:"webRuntimes"`
 	Providers   []providerProvenance      `json:"providers" yaml:"providers"`
 }

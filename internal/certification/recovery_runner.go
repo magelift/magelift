@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // RecoveryCheckpoint is the durable, provider-neutral state of one recovery

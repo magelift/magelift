@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ValidateClientRequestForProvider adds the provider identity check that the

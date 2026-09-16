@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
-	cloudresilience "github.com/magelift/magelift/internal/cloud/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudresilience "github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestNativeAPISQSExportRestoreIntegrityAndCleanup(t *testing.T) {

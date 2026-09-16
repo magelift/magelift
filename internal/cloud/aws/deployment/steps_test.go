@@ -12,7 +12,7 @@ import (
 	awsoperations "github.com/magelift/magelift/internal/cloud/aws/operations"
 	awsstack "github.com/magelift/magelift/internal/cloud/aws/stack"
 	deployflow "github.com/magelift/magelift/internal/deploy"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type stepsBackend struct {

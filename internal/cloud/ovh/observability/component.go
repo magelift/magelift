@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/ovh/pulumi-ovh/sdk/v2/go/ovh"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )

@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	awsobservability "github.com/magelift/magelift/internal/cloud/aws/observability"
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	"github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (
@@ -119,11 +119,11 @@ func acceptancePlan(marker string, retention int) providerobservability.Plan {
 		TargetRuntime:   "cloudwatch-live-cell",
 		OwnershipMarker: marker,
 		Bindings:        bindings,
-		Alerts: []v1.AlertIntent{{
+		Alerts: []sdk.AlertIntent{{
 			ID: "delivery", Signal: "metrics", Severity: "warning", Operator: "gt", Threshold: 0, WindowSeconds: 60,
 			Owner: "platform-oncall", RunbookURL: "https://github.com/magelift/magelift/blob/main/docs/operations/ownership-and-escalation.md", DeduplicationKey: "aws-cloudwatch-live/delivery",
 		}},
-		Dashboards: []v1.DashboardIntent{{ID: "delivery", Signals: []string{"logs", "metrics"}, Owner: "platform-oncall"}},
+		Dashboards: []sdk.DashboardIntent{{ID: "delivery", Signals: []string{"logs", "metrics"}, Owner: "platform-oncall"}},
 	}
 }
 

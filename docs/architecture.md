@@ -105,7 +105,7 @@ container as a runtime contract, so integrated and headless deployments can chan
 request wiring without changing the public provider boundary.
 
 Certified v1 targets are AWS ECS Fargate and GCP GKE Autopilot. Other runtimes and
-clouds implement `sdk/v1` Target contracts and register a `platform.StackModule`.
+clouds implement `sdk` Target contracts and register a `platform.StackModule`.
 Each provider keeps capabilities explicit and must pass the shared Magento
 acceptance suite before certification. Portable YAML is not a lowest-common-denominator
 cloud catalog.
@@ -150,7 +150,7 @@ See [ADR 0003](adr/0003-portable-contracts-vs-topology.md) and
 
 Provider-neutral code: `internal/platform` (stack modules, Magento output keys,
 env bindings), `internal/automation`, `internal/deploy`, `internal/infra` (SDK
-extension index), `internal/topology`, and `sdk/v1`. Providers live under
+extension index), `internal/topology`, and `sdk`. Providers live under
 `internal/cloud/<provider>/`.
 
 AWS packages today include `bootstrap`, `secrets`, `target`, `network`,

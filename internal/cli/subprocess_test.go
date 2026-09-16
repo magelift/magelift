@@ -12,7 +12,7 @@ import (
 	"github.com/magelift/magelift/internal/cosign"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type fakeProviderAPI struct {

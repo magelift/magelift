@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	awsendpoint "github.com/magelift/magelift/internal/cloud/aws/endpoint"
-	archivecore "github.com/magelift/magelift/internal/cloud/statearchive"
+	archivecore "github.com/magelift/magelift/internal/shared/statearchive"
 )
 
 const stateBackupPrefix = "backups/"

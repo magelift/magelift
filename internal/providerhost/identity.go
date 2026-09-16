@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"slices"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

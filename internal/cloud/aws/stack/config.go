@@ -13,7 +13,7 @@ import (
 	"github.com/magelift/magelift/internal/edge/waf"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/topology"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // PlanOptions controls validation exceptions that are safe only for a specific

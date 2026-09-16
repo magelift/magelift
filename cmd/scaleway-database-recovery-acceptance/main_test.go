@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/magelift/magelift/internal/cloud/scaleway/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	rdb "github.com/scaleway/scaleway-sdk-go/api/rdb/v1"
 )
 

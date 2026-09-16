@@ -1,5 +1,5 @@
 // Package observability provisions the GKE-facing part of Google Cloud
-// Observability. The portable signal intent stays in sdk/v1; this package is
+// Observability. The portable signal intent stays in sdk; this package is
 // the provider adapter for GKE collection and Google Cloud Observability
 // resources.
 package observability
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/logging"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/monitoring"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"

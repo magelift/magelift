@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestShellJoinPreservesCommandArgumentBoundaries(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 var _ sdk.Module = exampleModule{}

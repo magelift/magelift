@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	cloudrecovery "github.com/magelift/magelift/internal/cloud/recovery"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	cloudrecovery "github.com/magelift/magelift/internal/shared/recovery"
+	"github.com/magelift/magelift/sdk"
 )
 
 // CloudSQLBackup is the provider-local observation of a Cloud SQL backup.

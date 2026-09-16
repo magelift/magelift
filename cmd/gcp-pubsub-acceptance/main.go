@@ -18,7 +18,7 @@ import (
 	pubsub "cloud.google.com/go/pubsub/v2"
 	gcpresilience "github.com/magelift/magelift/internal/cloud/gcp/resilience"
 	"github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (

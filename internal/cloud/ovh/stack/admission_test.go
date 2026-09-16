@@ -8,7 +8,7 @@ import (
 
 	ovhprovider "github.com/magelift/magelift/internal/cloud/ovh/provider"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type admissionAPIFunc func(context.Context, string, interface{}) error

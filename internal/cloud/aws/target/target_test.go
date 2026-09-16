@@ -7,7 +7,7 @@ import (
 
 	"github.com/magelift/magelift/internal/infra"
 	"github.com/magelift/magelift/internal/topology"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestRegisterMakesAWSTargetSelectable(t *testing.T) {

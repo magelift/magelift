@@ -25,7 +25,7 @@ import (
 
 	"github.com/magelift/magelift/internal/certification"
 	gcprecovery "github.com/magelift/magelift/internal/cloud/gcp/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const defaultTimeout = 10 * time.Minute

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // SDKAdapter exposes the existing Fastly implementation through the public

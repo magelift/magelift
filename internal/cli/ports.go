@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func (o *options) resolveModule() (platform.StackModule, error) {

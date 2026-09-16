@@ -6,6 +6,7 @@ name: Release Container Images
 # without '-'.
 on:
   push:
+    # `sdk/v*` module tags never match: `v*` anchors at the start of the ref name.
     tags: ['v*']
 
 concurrency:

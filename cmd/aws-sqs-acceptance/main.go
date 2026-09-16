@@ -21,7 +21,7 @@ import (
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
 	awsresilience "github.com/magelift/magelift/internal/cloud/aws/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const defaultTimeout = 5 * time.Minute

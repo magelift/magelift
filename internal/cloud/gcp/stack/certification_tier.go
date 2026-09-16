@@ -2,7 +2,7 @@ package stack
 
 import (
 	gcptarget "github.com/magelift/magelift/internal/cloud/gcp/target"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // gcpAutopilotPreviewMagentoCertified is the evidenced Magento cell:

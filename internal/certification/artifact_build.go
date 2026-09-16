@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	buildpipeline "github.com/magelift/magelift/internal/build/pipeline"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // PipelineBuildFunc runs the existing isolated application build. It is

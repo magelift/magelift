@@ -15,7 +15,7 @@ import (
 	ovhstack "github.com/magelift/magelift/internal/cloud/ovh/stack"
 	scwstack "github.com/magelift/magelift/internal/cloud/scaleway/stack"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // TestFourModuleTypeIdentity is the Phase 6 SC1-SC2 offline gate: gcp ops,

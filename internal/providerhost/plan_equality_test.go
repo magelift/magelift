@@ -10,7 +10,7 @@ import (
 	gcpstack "github.com/magelift/magelift/internal/cloud/gcp/stack"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // dialEqualityConfig mirrors the gcp stack package's deployment fixture. It

@@ -323,9 +323,9 @@ cells use the same command with `MAGELIFT_GCP_COLLECTOR_CREATE_CLUSTER=0`.
 Logs: `/tmp/magelift-gcp-wt/logs/*.log`. Grep those files; do not rely on
 shell scrollback.
 
-The live script builds `cmd/magelift-gcp`, which links only the GCP adapter and
-keeps local certification memory bounded. Set `MAGELIFT_GCP_ACCEPTANCE_BIN` to
-an already built provider-specific binary to avoid rebuilding during a resume.
+The live script builds `cmd/magelift` (the shipped CLI). Set
+`MAGELIFT_GCP_ACCEPTANCE_BIN` to an already built binary to avoid rebuilding
+during a resume.
 
 Auth note: long Ups must use Application Default Credentials (refreshable).
 A static `GOOGLE_OAUTH_ACCESS_TOKEN` expires (~40-60m) and fails GKE/Memorystore

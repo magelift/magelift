@@ -9,10 +9,10 @@ package resilience
 import (
 	"context"
 
-	"github.com/magelift/magelift/internal/cloud/resilience"
 	"github.com/magelift/magelift/internal/platform"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 )
 
 const AdapterID = "ovh.resilience"

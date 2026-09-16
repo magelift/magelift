@@ -13,7 +13,7 @@ import (
 
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // NerdGraphOperations owns only the New Relic operational objects declared by

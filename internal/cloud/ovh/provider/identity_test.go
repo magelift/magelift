@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type apiFunc func(context.Context, string, interface{}) error

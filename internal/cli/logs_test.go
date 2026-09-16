@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 type recordingObserve struct {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/config"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func (o *options) resolveEnvironment(file *config.File, environment string) (config.Effective, string, error) {

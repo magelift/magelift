@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/magelift/magelift/internal/cloud/kube"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 func TestBuildNRDOTKubernetesValuesUsesDocumentedSecretAndSignalKeys(t *testing.T) {

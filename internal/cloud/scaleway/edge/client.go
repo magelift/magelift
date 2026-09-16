@@ -16,7 +16,7 @@ import (
 	"github.com/scaleway/scaleway-sdk-go/scw"
 
 	"github.com/magelift/magelift/internal/edge/waf"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (

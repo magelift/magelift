@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/magelift/magelift/internal/cloud/scaleway/resilience"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // ScalewayDatabaseProvider inventories and deletes ledger-claimed Managed

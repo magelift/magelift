@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 const defaultNerdGraphEndpoint = "https://api.newrelic.com/graphql"

@@ -6,7 +6,7 @@ import (
 	awsbootstrap "github.com/magelift/magelift/internal/cloud/aws/bootstrap"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

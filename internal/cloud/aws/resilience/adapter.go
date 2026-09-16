@@ -2,16 +2,16 @@
 //
 // AWS-specific clients translate these semantic operations to RDS/Aurora,
 // S3, Secrets Manager, SQS or the selected self-hosted service APIs. The
-// portable ordering, polling, ownership, and evidence rules live in sdk/v1.
+// portable ordering, polling, ownership, and evidence rules live in sdk.
 package resilience
 
 import (
 	"context"
 
-	"github.com/magelift/magelift/internal/cloud/resilience"
 	"github.com/magelift/magelift/internal/platform"
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/internal/shared/resilience"
+	"github.com/magelift/magelift/sdk"
 )
 
 const AdapterID = "aws.resilience"

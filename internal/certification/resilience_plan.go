@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // BuildResiliencePlan delegates deterministic recovery graph construction to

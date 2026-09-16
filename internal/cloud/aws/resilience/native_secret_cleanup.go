@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
 	provider "github.com/magelift/magelift/internal/provider"
-	sdk "github.com/magelift/magelift/sdk/v1"
+	"github.com/magelift/magelift/sdk"
 )
 
 // cleanupSecretClass removes only the archive objects and isolated restore
