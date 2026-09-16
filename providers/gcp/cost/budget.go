@@ -30,6 +30,15 @@ type BudgetReader struct {
 	listBudgets   func(context.Context, string, string) ([]*billingbudgets.GoogleCloudBillingBudgetsV1Budget, error)
 }
 
+// NewBudgetReaderFromFuncs injects fake billing backends for tests.
+func NewBudgetReaderFromFuncs(
+	billingInfo func(context.Context, string) (*cloudbilling.ProjectBillingInfo, error),
+	projectNumber func(context.Context, string) (int64, error),
+	listBudgets func(context.Context, string, string) ([]*billingbudgets.GoogleCloudBillingBudgetsV1Budget, error),
+) BudgetReader {
+	return BudgetReader{billingInfo: billingInfo, projectNumber: projectNumber, listBudgets: listBudgets}
+}
+
 // NewBudgetReader creates a read-only Cloud Billing and Budget API adapter.
 func NewBudgetReader(ctx context.Context) (BudgetReader, error) {
 	if ctx == nil {

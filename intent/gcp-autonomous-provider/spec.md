@@ -88,9 +88,10 @@ alpha scope.
 
 ### Requirement: Provision plus the full day-2 surface in-provider
 
-The provider SHALL serve 28 operations mirroring the module interfaces
+The provider SHALL serve 29 operations mirroring the module interfaces
 1:1, all executed inside the provider process against GCP APIs. Lifecycle:
-Describe, ValidateConfig, Plan, Apply, Outputs, Destroy. Bootstrap:
+Describe, ValidateConfig, Plan, Apply, Outputs, Destroy,
+DestroyLeftoverBackups. Bootstrap:
 BootstrapVerify, BootstrapEnsure. State (Pulumi state, locks, snapshots):
 StateStatus, StateLock, StateUnlock, StateBackup, StateRestore. Secrets:
 SecretList, SecretSet, SecretRemove, SecretRead (secretref value
@@ -265,7 +266,7 @@ Unresolved items from intent.md, plus new ones. Each has an owner or a default.
   minimize new proof; no pilot signal to flip. Owner: maintainer at
   acceptance (confirmed by proceeding).
 - Live-vs-fake split adopted: unit plus fake-client proof here for all
-  28 ops; live proof of the full loop in acceptance. Owner: spec author
+  29 ops; live proof of the full loop in acceptance. Owner: spec author
   (adopted).
 - New: enum removal deferred to `verified-provider-distribution`
   (resolution owner). Owner: Order 7.
