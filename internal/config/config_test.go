@@ -295,7 +295,7 @@ environments: {staging: {}}
 	}
 }
 
-func TestResolveRejectsDisabledRegionalCloudSQLBackups(t *testing.T) {
+func TestResolveAcceptsGCPTargetSemanticsForProviderValidation(t *testing.T) {
 	input := `schemaVersion: 1
 project: {name: shop}
 application: {edition: open-source, version: 2.4.8-p5, mode: integrated}
@@ -311,8 +311,10 @@ environments: {staging: {}}
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Resolve("staging", ResolveOptions{}); err == nil || !strings.Contains(err.Error(), "cloudSqlBackupEnabled cannot be false") {
-		t.Fatalf("disabled regional Cloud SQL backups were accepted: %v", err)
+	// Structural presence passes core validation; the provider's
+	// ValidateConfig rejects disabled regional backups (schema suite).
+	if _, err := f.Resolve("staging", ResolveOptions{}); err != nil {
+		t.Fatalf("core rejected provider-owned semantics: %v", err)
 	}
 }
 
@@ -365,7 +367,7 @@ func TestResolveMaterializesNamedGCPBackupDefaults(t *testing.T) {
 	})
 }
 
-func TestResolveRejectsCloudSQLRetentionThatCannotCoverTransactionLogs(t *testing.T) {
+func TestResolveAcceptsCloudSQLRetentionForProviderValidation(t *testing.T) {
 	input := strings.Replace(base, "aws-secrets-manager://composer/auth", "gcp-secret-manager://composer/auth", 1)
 	input = strings.Replace(input, "target: {provider: aws, runtime: ecs-fargate}", `target:
   provider: gcp
@@ -381,8 +383,10 @@ func TestResolveRejectsCloudSQLRetentionThatCannotCoverTransactionLogs(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := file.Resolve("staging", ResolveOptions{}); err == nil || !strings.Contains(err.Error(), "cannot exceed cloudSqlBackupRetentionCount") {
-		t.Fatalf("invalid Cloud SQL retention relationship was accepted: %v", err)
+	// Structural presence passes core validation; the provider's
+	// ValidateConfig rejects uncovered transaction logs (schema suite).
+	if _, err := file.Resolve("staging", ResolveOptions{}); err != nil {
+		t.Fatalf("core rejected provider-owned semantics: %v", err)
 	}
 }
 
@@ -2050,5 +2054,55 @@ func TestTEMRejectsHostedZoneID(t *testing.T) {
 	_, err = f.Resolve("staging", ResolveOptions{})
 	if err == nil || !strings.Contains(err.Error(), "applies only to ses") {
 		t.Fatalf("misplaced hostedZoneId was accepted: %v", err)
+	}
+}
+
+func TestResolveEnforcesStructuralGCPPresence(t *testing.T) {
+	t.Parallel()
+	input := `schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: 2.4.9, mode: integrated}
+build: {php: "8.5"}
+target: {provider: gcp, runtime: gke-autopilot}
+defaults: {region: europe-west1, preset: preview}
+environments: {staging: {class: preview}}
+`
+	file, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.Resolve("staging", ResolveOptions{}); err == nil || !strings.Contains(err.Error(), "target.gcp is required") {
+		t.Fatalf("missing gcp block error = %v", err)
+	}
+}
+
+func TestResolveEnforcesSingleTargetBlock(t *testing.T) {
+	t.Parallel()
+	input := `schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: 2.4.9, mode: integrated}
+build: {php: "8.5"}
+target:
+  provider: gcp
+  runtime: gke-autopilot
+  gcp: {project: example-gcp-project}
+  aws: {hostedZoneId: Z1234567890}
+defaults: {region: europe-west1, preset: preview}
+environments: {staging: {class: preview}}
+`
+	file, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.Resolve("staging", ResolveOptions{}); err == nil || !strings.Contains(err.Error(), "only one target block") {
+		t.Fatalf("two blocks error = %v", err)
+	}
+	mismatched := strings.Replace(input, "  gcp: {project: example-gcp-project}\n", "", 1)
+	file, err = Load([]byte(mismatched))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.Resolve("staging", ResolveOptions{}); err == nil || !strings.Contains(err.Error(), "target.aws is not valid when provider is gcp") {
+		t.Fatalf("mismatched block error = %v", err)
 	}
 }

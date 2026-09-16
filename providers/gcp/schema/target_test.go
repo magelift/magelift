@@ -19,6 +19,16 @@ func TestValidate(t *testing.T) {
 		{"missing project", func(g *GCPTarget) { g.Project = "" }, "gke-autopilot", "target.gcp.project is required"},
 		{"bad runtime", func(*GCPTarget) {}, "gke-nano", "target.runtime must be gke-autopilot or gke-standard"},
 		{"bad availability", func(g *GCPTarget) { g.CloudSQLAvailability = "GLOBAL" }, "gke-autopilot", "cloudSqlAvailability must be ZONAL or REGIONAL"},
+		{"disabled regional backups", func(g *GCPTarget) {
+			g.CloudSQLAvailability = "REGIONAL"
+			disabled := false
+			g.CloudSQLBackupEnabled = &disabled
+		}, "gke-autopilot", "cloudSqlBackupEnabled cannot be false"},
+		{"retention exceeds backup count", func(g *GCPTarget) {
+			count, days := 3, 7
+			g.CloudSQLBackupRetentionCount = &count
+			g.CloudSQLTransactionLogRetention = &days
+		}, "gke-autopilot", "cannot exceed cloudSqlBackupRetentionCount"},
 		{"bad search mode", func(g *GCPTarget) { g.OpenSearchMode = "solr" }, "gke-autopilot", "openSearchMode must be opensearch or disabled"},
 		{"bad queue mode", func(g *GCPTarget) { g.QueueMode = "nats" }, "gke-autopilot", "queueMode must be database or rabbitmq"},
 	}
