@@ -62,10 +62,13 @@ func TestRegisterCandidateUsesPlatformMigrationContract(t *testing.T) {
 	}
 	container := job.Spec.Template.Spec.Containers[0]
 	cmd := strings.Join(container.Command, " ")
-	for _, want := range []string{"app:config:import", "setup:upgrade", "setup:static-content:deploy", "cache:clean"} {
+	for _, want := range []string{"app:config:import", "setup:upgrade --keep-generated", "cache:clean", "cache:flush"} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("command missing %q: %v", want, container.Command)
 		}
+	}
+	if strings.Contains(cmd, "setup:static-content:deploy") {
+		t.Fatalf("migration must not regenerate static content at deploy time: %v", container.Command)
 	}
 	foundDBHost := false
 	for _, env := range container.Env {

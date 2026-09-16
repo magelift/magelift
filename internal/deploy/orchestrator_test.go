@@ -186,6 +186,17 @@ func TestProductionAndRollbackGuards(t *testing.T) {
 	if _, err := New(&fakeLock{}, &fakeSteps{}).Run(context.Background(), request); !errors.Is(err, ErrForwardOnlyRollbackAck) {
 		t.Fatalf("rollback error = %v", err)
 	}
+	request = validRequest()
+	request.Production = true
+	request.Approved = true
+	if _, err := New(&fakeLock{}, &fakeSteps{}).Run(context.Background(), request); !errors.Is(err, ErrMaintenanceDrainAck) {
+		t.Fatalf("maintenance-drain error = %v", err)
+	}
+	request.AcknowledgeMaintenanceDrain = true
+	order := []string{}
+	if _, err := New(&fakeLock{order: &order}, &fakeSteps{order: &order}).Run(context.Background(), request); err != nil {
+		t.Fatalf("production run with attestation: %v", err)
+	}
 }
 
 func TestRejectsUnpinnedDigest(t *testing.T) {

@@ -233,6 +233,20 @@ database JSON fields and the stable Magento encryption key, while Adobe's
 `MAGENTO_DC_*` environment configuration supplies capability endpoints and
 credentials at task start.
 
+### Runtime storage (definitive writable set, 2026-09-16)
+
+Baked into the immutable image (read at runtime, never written): application
+code, DI output (`setup:di:compile`), and static content for the configured
+locales plus themes (`build.staticContent` is required). Written at runtime:
+`app/etc/env.php` (generated from Secrets Manager selectors plus
+`MAGENTO_DC_*` values), disposable `var/` (cache, page cache, logs, tmp),
+and `/tmp` (nginx pid, Varnish VSM at `/tmp/varnish`, probe scratch).
+Durable state lives outside the container filesystem: media in buckets,
+sessions in Valkey, secrets in Secrets Manager, state in versioned
+backups. Writable root is the deliberate alpha answer for this set
+(`internal/cloud/aws/runtime/containers.go`); no read-only flip is planned
+until a writable-storage design proves itself against these requirements.
+
 ### Alpha security review (minimum, 2026-09-16)
 
 Reviewed for the alpha recipe; each item names its evidence or stays explicitly

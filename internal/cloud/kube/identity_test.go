@@ -138,6 +138,9 @@ func (identityCandidate) RegisterCandidate(context.Context, kube.CandidateReques
 }
 func (identityCandidate) RunMigrations(context.Context, kube.Candidate) error { return nil }
 func (identityCandidate) Cleanup(context.Context, kube.Candidate) error       { return nil }
+func (identityCandidate) RunProbe(context.Context, kube.CandidateRequest, []string) error {
+	return nil
+}
 
 type identityRuntime struct{}
 

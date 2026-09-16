@@ -159,6 +159,9 @@ func staticContent(settings config.StaticContentSettings) ([]buildrunner.StaticC
 	if (len(locales) == 0) != (len(themes) == 0) {
 		return nil, errors.New("build.staticContent.locales and themes must be configured together")
 	}
+	if len(locales) == 0 {
+		return nil, errors.New("build.staticContent.locales and themes are required; static content bakes into the image at build, never at deploy")
+	}
 	strategy, err := staticContentStrategy(settings.Strategy)
 	if err != nil {
 		return nil, err

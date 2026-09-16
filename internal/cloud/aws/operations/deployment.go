@@ -57,6 +57,7 @@ type DeploymentStore struct {
 	client       DeploymentAPI
 	waitInterval time.Duration
 	waitTimeout  time.Duration
+	probeTimeout time.Duration // test override; non-positive means probeWaitTimeout
 }
 
 func NewDeployment(ctx context.Context, region string) (*DeploymentStore, error) {
@@ -325,6 +326,112 @@ func (s *DeploymentStore) runTask(ctx context.Context, candidate Candidate, task
 	return s.waitForTask(ctx, candidate, label)
 }
 
+func (s *DeploymentStore) runTaskTimeout(ctx context.Context, candidate Candidate, taskDefinitionARN, label string, timeout time.Duration) error {
+	run, err := s.client.RunTask(ctx, &ecs.RunTaskInput{
+		Cluster:        awssdk.String(candidate.Cluster),
+		TaskDefinition: awssdk.String(taskDefinitionARN),
+		StartedBy:      awssdk.String(candidate.StartedBy),
+		LaunchType:     types.LaunchTypeFargate,
+		Count:          awssdk.Int32(1),
+		NetworkConfiguration: &types.NetworkConfiguration{AwsvpcConfiguration: &types.AwsVpcConfiguration{
+			AssignPublicIp: types.AssignPublicIpDisabled,
+			Subnets:        append([]string(nil), candidate.PrivateSubnetIDs...),
+			SecurityGroups: []string{candidate.SecurityGroupID},
+		}},
+	})
+	if err != nil {
+		return fmt.Errorf("run %s task: %w", label, err)
+	}
+	if run == nil {
+		return fmt.Errorf("run %s task returned no response", label)
+	}
+	if len(run.Failures) > 0 {
+		return fmt.Errorf("run %s task failed: %s", label, failureMessage(run.Failures))
+	}
+	if len(run.Tasks) != 1 || run.Tasks[0].TaskArn == nil {
+		return fmt.Errorf("run %s task returned no task ARN", label)
+	}
+	candidate.TaskARN = awssdk.ToString(run.Tasks[0].TaskArn)
+	return s.waitForTaskTimeout(ctx, candidate, label, timeout)
+}
+
+// probeWaitTimeout bounds the Magento readiness probe. Probes fail fast by
+// design: unlike migrations, a probe must never run for half an hour.
+const probeWaitTimeout = 5 * time.Minute
+
+// RunProbe executes command as a one-shot probe task and deregisters the
+// ephemeral task definition afterwards. It mirrors the migration candidate
+// flow (deploy taskdef copy, release image, private subnets) with the probe
+// command overriding the deploy container. Probe failure output is attached
+// to the returned error.
+func (s *DeploymentStore) RunProbe(ctx context.Context, request CandidateRequest, command []string) error {
+	if s == nil || s.client == nil {
+		return errors.New("AWS ECS deployment client is required")
+	}
+	if len(command) == 0 {
+		return errors.New("probe command is required")
+	}
+	if err := validateCandidateRequest(request); err != nil {
+		return err
+	}
+	described, err := s.client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+		TaskDefinition: awssdk.String(request.TaskDefinitionARN),
+		Include:        []types.TaskDefinitionField{types.TaskDefinitionFieldTags},
+	})
+	if err != nil {
+		return fmt.Errorf("describe deploy task definition: %w", err)
+	}
+	if described == nil || described.TaskDefinition == nil || len(described.TaskDefinition.ContainerDefinitions) == 0 {
+		return errors.New("deploy task definition has no container definition")
+	}
+	definition := *described.TaskDefinition
+	containers := append([]types.ContainerDefinition(nil), definition.ContainerDefinitions...)
+	tags := append([]types.Tag(nil), described.Tags...)
+	replaceApplicationImages(containers, request.ImageDigest)
+	if err := overrideDeployCommand(containers, command); err != nil {
+		return err
+	}
+	baseFamily := awssdk.ToString(definition.Family)
+	if baseFamily == "" {
+		return errors.New("deploy task definition has no family")
+	}
+	family := baseFamily + "-probe-" + time.Now().UTC().Format("20060102T150405000000000")
+	probeARN, err := registerTaskDefinition(ctx, s.client, definition, family, containers, tags)
+	if err != nil {
+		return fmt.Errorf("register probe task definition: %w", err)
+	}
+	probe := Candidate{Cluster: request.Cluster, TaskDefinitionARN: probeARN, PrivateSubnetIDs: append([]string(nil), request.PrivateSubnetIDs...), SecurityGroupID: request.SecurityGroupID, StartedBy: request.StartedBy}
+	if strings.TrimSpace(probe.StartedBy) == "" {
+		probe.StartedBy = "magelift"
+	}
+	timeout := s.probeTimeout
+	if timeout <= 0 {
+		timeout = probeWaitTimeout
+	}
+	runErr := s.runTaskTimeout(ctx, probe, probeARN, "readiness probe", timeout)
+	_, deregErr := s.client.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{TaskDefinition: awssdk.String(probeARN)})
+	if runErr != nil {
+		return fmt.Errorf("magento readiness probe: %w", runErr)
+	}
+	if deregErr != nil {
+		return fmt.Errorf("deregister probe task definition: %w", deregErr)
+	}
+	return nil
+}
+
+// overrideDeployCommand replaces the deploy container command with the probe
+// command. A deploy task definition without a deploy container fails loudly:
+// the probe must never run an unintended entrypoint.
+func overrideDeployCommand(containers []types.ContainerDefinition, command []string) error {
+	for i := range containers {
+		if awssdk.ToString(containers[i].Name) == "deploy" {
+			containers[i].Command = append([]string(nil), command...)
+			return nil
+		}
+	}
+	return errors.New("deploy task definition has no deploy container for the probe command")
+}
+
 func (s *DeploymentStore) Cleanup(ctx context.Context, candidate Candidate) error {
 	if s == nil || s.client == nil {
 		return errors.New("AWS ECS deployment client is required")
@@ -350,7 +457,15 @@ func (s *DeploymentStore) Cleanup(ctx context.Context, candidate Candidate) erro
 }
 
 func (s *DeploymentStore) waitForTask(ctx context.Context, candidate Candidate, label string) error {
-	interval, timeout := s.waitInterval, s.waitTimeout
+	timeout := s.waitTimeout
+	if timeout <= 0 {
+		timeout = 30 * time.Minute
+	}
+	return s.waitForTaskTimeout(ctx, candidate, label, timeout)
+}
+
+func (s *DeploymentStore) waitForTaskTimeout(ctx context.Context, candidate Candidate, label string, timeout time.Duration) error {
+	interval := s.waitInterval
 	if interval <= 0 {
 		interval = 2 * time.Second
 	}

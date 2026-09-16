@@ -32,6 +32,7 @@ type CandidateStore struct {
 	jobs               JobAPI // test override; when set, ignores newJobsFromOutputs
 	waitTimeout        time.Duration
 	pollInterval       time.Duration
+	probeTimeout       time.Duration // test override; non-positive means probeWaitTimeout
 }
 
 // CandidateRequest describes a Magento migrate Job to register.
@@ -145,6 +146,49 @@ func (s *CandidateStore) RunMigrations(ctx context.Context, candidate Candidate)
 		timeout = 30 * time.Minute
 	}
 	return jobs.WaitJob(ctx, candidate.Namespace, candidate.JobName, timeout)
+}
+
+// probeWaitTimeout bounds the Magento readiness probe. Probes fail fast by
+// design: unlike migrations, a probe must never run for half an hour.
+const probeWaitTimeout = 5 * time.Minute
+
+// RunProbe executes command as a one-shot probe Job and removes the Job
+// afterwards. It reuses the migration Job shape (image, env, resources) with
+// no retries: probe failure is a deterministic deploy-gate signal.
+func (s *CandidateStore) RunProbe(ctx context.Context, request CandidateRequest, command []string) error {
+	if s == nil {
+		return errors.New("kubernetes candidate store is required")
+	}
+	if len(command) == 0 {
+		return errors.New("probe command is required")
+	}
+	if err := validateCandidateRequest(request); err != nil {
+		return err
+	}
+	jobs, err := s.jobsFor(request)
+	if err != nil {
+		return err
+	}
+	namespace := request.Namespace
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
+	name := "magelift-probe-" + time.Now().UTC().Format("20060102t150405")
+	if _, err := jobs.CreateJob(ctx, namespace, probeJob(name, request, command)); err != nil {
+		return err
+	}
+	timeout := s.probeTimeout
+	if timeout <= 0 {
+		timeout = probeWaitTimeout
+	}
+	waitErr := jobs.WaitJob(ctx, namespace, name, timeout)
+	if err := jobs.DeleteJob(ctx, namespace, name); err != nil {
+		return fmt.Errorf("delete probe Job: %w", err)
+	}
+	if waitErr != nil {
+		return fmt.Errorf("magento readiness probe: %w", waitErr)
+	}
+	return nil
 }
 
 func (s *CandidateStore) Cleanup(ctx context.Context, candidate Candidate) error {
@@ -288,6 +332,20 @@ func (k k8sJobs) DeleteJob(ctx context.Context, namespace, name string) error {
 		return fmt.Errorf("delete migrate Job: %w", err)
 	}
 	return nil
+}
+
+// probeJob mirrors migrationJob with the probe command, no retries, and a
+// hard active deadline: a stuck probe must die on its own.
+func probeJob(name string, request CandidateRequest, command []string) *batchv1.Job {
+	job := migrationJob(name, request)
+	job.Labels["magelift.io/workload"] = "probe"
+	backoff := int32(0)
+	job.Spec.BackoffLimit = &backoff
+	deadline := int64(300)
+	job.Spec.ActiveDeadlineSeconds = &deadline
+	job.Spec.Template.Spec.Containers[0].Name = "probe"
+	job.Spec.Template.Spec.Containers[0].Command = command
+	return job
 }
 
 func migrationJob(name string, request CandidateRequest) *batchv1.Job {

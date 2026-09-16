@@ -14,6 +14,7 @@ import (
 	awsoperations "github.com/magelift/magelift/internal/cloud/aws/operations"
 	awsstack "github.com/magelift/magelift/internal/cloud/aws/stack"
 	deployflow "github.com/magelift/magelift/internal/deploy"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/sdk"
 )
 
@@ -28,31 +29,44 @@ type CandidateRunner interface {
 	Cleanup(context.Context, awsoperations.Candidate) error
 }
 
+// ProbeRunner executes the bounded Magento readiness probe as a one-shot
+// task. Runners that cannot probe fail Steps construction: Health must
+// never silently skip the Magento signal.
+type ProbeRunner interface {
+	RunProbe(ctx context.Context, request awsoperations.CandidateRequest, command []string) error
+}
+
 type RuntimeChecker interface {
 	Check(context.Context, string, string) (awsoperations.ServiceHealth, error)
 }
 
 type Steps struct {
-	backend       Backend
-	spec          awsstack.Spec
-	candidate     CandidateRunner
-	runtime       RuntimeChecker
-	diagnostics   io.Writer
-	waitInterval  time.Duration
-	waitTimeout   time.Duration
-	registered    awsoperations.Candidate
-	registeredSet bool
-	record        func(context.Context, deployflow.Request, deployflow.Result) error
+	backend        Backend
+	spec           awsstack.Spec
+	candidate      CandidateRunner
+	probe          ProbeRunner
+	candidateImage string
+	runtime        RuntimeChecker
+	diagnostics    io.Writer
+	waitInterval   time.Duration
+	waitTimeout    time.Duration
+	registered     awsoperations.Candidate
+	registeredSet  bool
+	record         func(context.Context, deployflow.Request, deployflow.Result) error
 }
 
 func New(backend Backend, spec awsstack.Spec, candidate CandidateRunner, runtime RuntimeChecker, diagnostics io.Writer, record func(context.Context, deployflow.Request, deployflow.Result) error) (*Steps, error) {
 	if backend == nil || candidate == nil || runtime == nil || diagnostics == nil {
 		return nil, errors.New("AWS deployment backend, candidate runner, runtime checker, and diagnostics are required")
 	}
+	probe, ok := candidate.(ProbeRunner)
+	if !ok {
+		return nil, errors.New("AWS deployment candidate runner does not support Magento probes")
+	}
 	if err := spec.Validate(); err != nil {
 		return nil, fmt.Errorf("validate AWS deployment spec: %w", err)
 	}
-	return &Steps{backend: backend, spec: spec, candidate: candidate, runtime: runtime, diagnostics: diagnostics, waitInterval: 5 * time.Second, waitTimeout: 30 * time.Minute, record: record}, nil
+	return &Steps{backend: backend, spec: spec, candidate: candidate, probe: probe, runtime: runtime, diagnostics: diagnostics, waitInterval: 5 * time.Second, waitTimeout: 30 * time.Minute, record: record}, nil
 }
 
 func (s *Steps) Validate(_ context.Context, request deployflow.Request) error {
@@ -106,6 +120,9 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 	}
 	s.registered, err = s.candidate.RegisterCandidate(ctx, awsoperations.CandidateRequest{Cluster: cluster, TaskDefinitionARN: definition, ImageDigest: request.ImageDigest, PrivateSubnetIDs: subnets, SecurityGroupID: securityGroup, StartedBy: "magelift"})
 	s.registeredSet = err == nil
+	if err == nil {
+		s.candidateImage = request.ImageDigest
+	}
 	return err
 }
 
@@ -147,8 +164,121 @@ func (s *Steps) Stabilize(ctx context.Context, _ deployflow.Request) error {
 	return s.waitForHealthyService(ctx)
 }
 
-func (s *Steps) Health(ctx context.Context, _ deployflow.Request) error {
-	return s.waitForHealthyService(ctx)
+func (s *Steps) Health(ctx context.Context, request deployflow.Request) error {
+	health, err := s.waitForIntendedRollout(ctx)
+	if err != nil {
+		return err
+	}
+	if s.candidateImage == "" {
+		return errors.New("migration candidate image was not recorded; refusing to declare a healthy deploy")
+	}
+	for _, digest := range health.ServedImageDigests {
+		if digest != s.candidateImage {
+			return fmt.Errorf("migration candidate image %q does not match served image %q", s.candidateImage, digest)
+		}
+	}
+	outputs, err := s.backend.Outputs(ctx)
+	if err != nil {
+		return fmt.Errorf("read ECS deployment outputs: %w", err)
+	}
+	cluster, err := requiredString(outputs, "clusterName")
+	if err != nil {
+		return err
+	}
+	definition, err := requiredString(outputs, "deployTaskDefinitionArn")
+	if err != nil {
+		return err
+	}
+	securityGroup, err := requiredString(outputs, "securityGroupId")
+	if err != nil {
+		return err
+	}
+	subnets, err := requiredStrings(outputs, "privateSubnetIds")
+	if err != nil {
+		return err
+	}
+	searchEndpoint := optionalString(outputs, "searchEndpoint")
+	// SigV4-only serverless search skips unsigned reachability: curl without
+	// signing would fail a working shop. Wiring is still asserted.
+	reachable := searchEndpoint != "" && string(s.spec.Catalog.SearchMode) != string(awsstack.SearchModeServerless)
+	command := platform.MagentoProbeShell(searchEndpoint, reachable)
+	return s.probe.RunProbe(ctx, awsoperations.CandidateRequest{
+		Cluster: cluster, TaskDefinitionARN: definition, ImageDigest: request.ImageDigest,
+		PrivateSubnetIDs: subnets, SecurityGroupID: securityGroup, StartedBy: "magelift",
+	}, command)
+}
+
+func optionalString(outputs map[string]any, key string) string {
+	value, ok := outputs[key]
+	if !ok {
+		return ""
+	}
+	resolved, _ := value.(string)
+	return resolved
+}
+
+// waitForIntendedRollout passes only when the intended revision is serving:
+// the primary deployment reports COMPLETED with running tasks at desired
+// count, and every served image digest matches the release. Stale running
+// tasks from a previous revision fail.
+func (s *Steps) waitForIntendedRollout(ctx context.Context) (awsoperations.ServiceHealth, error) {
+	outputs, err := s.backend.Outputs(ctx)
+	if err != nil {
+		return awsoperations.ServiceHealth{}, fmt.Errorf("read ECS runtime outputs: %w", err)
+	}
+	cluster, err := requiredString(outputs, "clusterName")
+	if err != nil {
+		return awsoperations.ServiceHealth{}, err
+	}
+	service, err := requiredString(outputs, "serviceName")
+	if err != nil {
+		return awsoperations.ServiceHealth{}, err
+	}
+	interval, timeout := s.waitInterval, s.waitTimeout
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+	if timeout <= 0 {
+		timeout = 30 * time.Minute
+	}
+	waitContext, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		health, checkErr := s.runtime.Check(waitContext, cluster, service)
+		if checkErr == nil && intendedRollout(health, s.spec.Artifact.ImageDigest) {
+			return health, nil
+		}
+		select {
+		case <-waitContext.Done():
+			if checkErr != nil {
+				return awsoperations.ServiceHealth{}, fmt.Errorf("wait for ECS intended rollout: %w", checkErr)
+			}
+			return awsoperations.ServiceHealth{}, fmt.Errorf(
+				"wait for ECS intended rollout: desired=%d running=%d rollout=%s digests=%v",
+				health.PrimaryDesiredCount, health.PrimaryRunningCount, health.PrimaryRollout, health.ServedImageDigests,
+			)
+		case <-ticker.C:
+		}
+	}
+}
+
+func intendedRollout(health awsoperations.ServiceHealth, wantDigest string) bool {
+	if health.PrimaryDesiredCount <= 0 ||
+		health.PrimaryRunningCount < health.PrimaryDesiredCount ||
+		health.PrimaryRollout != "COMPLETED" {
+		return false
+	}
+	if len(health.ServedImageDigests) == 0 {
+		return false
+	}
+	for _, digest := range health.ServedImageDigests {
+		if digest != wantDigest {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Steps) Record(ctx context.Context, request deployflow.Request, result deployflow.Result) error {

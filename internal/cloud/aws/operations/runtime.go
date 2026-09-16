@@ -36,6 +36,14 @@ type ServiceHealth struct {
 	Deployments    int          `json:"deployments" yaml:"deployments"`
 	PrimaryRollout string       `json:"primaryRollout,omitempty" yaml:"primaryRollout,omitempty"`
 	Tasks          []TaskHealth `json:"tasks" yaml:"tasks"`
+	// PrimaryTaskDefinition, PrimaryDesiredCount, PrimaryRunningCount, and
+	// ServedImageDigests carry rollout identity: Health requires the
+	// intended revision serving the intended digest, not merely running
+	// tasks from any revision.
+	PrimaryTaskDefinition string   `json:"primaryTaskDefinition,omitempty" yaml:"primaryTaskDefinition,omitempty"`
+	PrimaryDesiredCount   int32    `json:"primaryDesiredCount,omitempty" yaml:"primaryDesiredCount,omitempty"`
+	PrimaryRunningCount   int32    `json:"primaryRunningCount,omitempty" yaml:"primaryRunningCount,omitempty"`
+	ServedImageDigests    []string `json:"servedImageDigests,omitempty" yaml:"servedImageDigests,omitempty"`
 }
 
 type RuntimeStore struct {
@@ -99,6 +107,9 @@ func (s *RuntimeStore) Check(ctx context.Context, cluster, service string) (Serv
 	for _, deployment := range value.Deployments {
 		if awssdk.ToString(deployment.Status) == "PRIMARY" {
 			result.PrimaryRollout = string(deployment.RolloutState)
+			result.PrimaryTaskDefinition = awssdk.ToString(deployment.TaskDefinition)
+			result.PrimaryDesiredCount = deployment.DesiredCount
+			result.PrimaryRunningCount = deployment.RunningCount
 			break
 		}
 	}
@@ -122,5 +133,28 @@ func (s *RuntimeStore) Check(ctx context.Context, cluster, service string) (Serv
 		result.Tasks = append(result.Tasks, TaskHealth{ARN: awssdk.ToString(task.TaskArn), LastStatus: awssdk.ToString(task.LastStatus), HealthStatus: string(task.HealthStatus)})
 	}
 	sort.Slice(result.Tasks, func(i, j int) bool { return result.Tasks[i].ARN < result.Tasks[j].ARN })
+	result.ServedImageDigests = servedDigests(described.Tasks)
 	return result, nil
+}
+
+// servedDigests returns the sorted distinct image digests across running
+// task containers. Empty digests are dropped: tasks that have not reported
+// container detail yet must not satisfy digest identity.
+func servedDigests(tasks []types.Task) []string {
+	seen := map[string]struct{}{}
+	for _, task := range tasks {
+		for _, container := range task.Containers {
+			digest := awssdk.ToString(container.ImageDigest)
+			if strings.TrimSpace(digest) == "" {
+				continue
+			}
+			seen[digest] = struct{}{}
+		}
+	}
+	digests := make([]string, 0, len(seen))
+	for digest := range seen {
+		digests = append(digests, digest)
+	}
+	sort.Strings(digests)
+	return digests
 }

@@ -24,6 +24,30 @@ issuer before any infrastructure mutation. A rollback is another forward deploym
 MageLift does not attempt to reverse database migrations, so rollback commands require
 an explicit acknowledgement of that limitation.
 
+## Incompatible schema changes (runbook)
+
+Static content is baked into the image at build (the PHP lifecycle plan owns
+it); deploy-time migration runs config import, schema upgrade, and cache
+operations only, and serving containers receive baked assets by image-digest
+identity. Deploy success means the intended rollout plus a passing bounded
+Magento probe — scheduler settlement alone never reports success.
+
+Old pods keep serving while the migration candidate runs, so incompatible
+(destructive or irreversible) schema changes always ride maintenance mode.
+Zero-downtime incompatible schema changes are explicitly not promised. For
+any production deploy that may carry one:
+
+1. Take a fresh backup (database plus media manifest) and confirm it restores.
+2. Enable maintenance mode (`bin/magento maintenance:enable`).
+3. Drain writers: stop cron and queue consumers; confirm no active writers.
+4. Deploy with `--ack-maintenance-drain`, attesting steps 1–3.
+5. Verify health output, then disable maintenance mode.
+6. Scale consumers and cron back; watch the first scheduled runs.
+
+A digest rollback never reverses a migration: rolled-back code on a migrated
+schema is a forward fix (compatible follow-up migration), never a downgrade.
+Rollback commands keep their forward-only acknowledgement for the same reason.
+
 Preview environments must have a TTL and budget before infrastructure is created.
 Protected environments reject destroy requests until protection is removed.
 

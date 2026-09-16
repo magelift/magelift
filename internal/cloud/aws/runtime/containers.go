@@ -234,10 +234,13 @@ func baseContainer(args Args, secrets []SecretReference, environment []container
 	for index, value := range secrets {
 		selected[index] = containerSecret{Name: value.Name, ValueFrom: value.ValueFrom()}
 	}
-	// Magento needs a writable root (env.php, generated files, nginx pid under
-	// /tmp). Fargate empty volumes mount as root:root, so overlaying /tmp or
-	// /app/var breaks non-root nginx/php; match prior Magento-on-AWS practice (writable root,
-	// no bind-mount overlays) until EFS access points own the paths.
+	// Magento needs a writable root: env.php generation, disposable var/,
+	// /tmp (nginx pid, Varnish VSM), and generated files. Fargate empty
+	// volumes mount as root:root, so overlaying /tmp or /app/var breaks
+	// non-root nginx/php. Writable root with no bind-mount overlays is the
+	// deliberate alpha answer, not a placeholder: durable state lives in
+	// managed services (Secrets Manager, buckets, Valkey), never on the
+	// container filesystem. See docs/architecture.md (runtime storage).
 	container := containerDefinition{
 		Name: name, Image: args.Image, Command: command, Essential: true, User: "10001:10001",
 		ReadonlyRootFilesystem: false, LinuxParameters: containerLinux{InitProcessEnabled: true},

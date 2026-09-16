@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/netip"
 	"strings"
@@ -62,8 +63,134 @@ func TestWaitForHealthyServiceUsesRuntimeEvidence(t *testing.T) {
 	}
 }
 
+type fixedRuntime struct {
+	health awsoperations.ServiceHealth
+}
+
+func (f fixedRuntime) Check(context.Context, string, string) (awsoperations.ServiceHealth, error) {
+	return f.health, nil
+}
+
+func TestHealthRejectsStaleTasks(t *testing.T) {
+	spec := testSpec(t)
+	want := spec.Artifact.ImageDigest
+	steps := &Steps{
+		backend:      &stepsBackend{outputs: map[string]any{"clusterName": "shop-cluster", "serviceName": "shop-web-service"}},
+		spec:         spec,
+		runtime:      fixedRuntime{health: awsoperations.ServiceHealth{DesiredCount: 1, RunningCount: 1, PrimaryRollout: "COMPLETED", PrimaryDesiredCount: 1, PrimaryRunningCount: 1, ServedImageDigests: []string{"ghcr.io/magelift/shop@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}}},
+		waitInterval: time.Millisecond,
+		waitTimeout:  20 * time.Millisecond,
+	}
+	err := steps.Health(context.Background(), deployRequest(want))
+	if err == nil || !strings.Contains(err.Error(), "intended rollout") {
+		t.Fatalf("Health with stale tasks = %v, want intended-rollout refusal", err)
+	}
+}
+
+func intendedProbeSteps(t *testing.T, searchMode string, searchEndpoint string, candidate *recordingCandidate) *Steps {
+	t.Helper()
+	spec := testSpec(t)
+	spec.Catalog.SearchMode = searchMode
+	outputs := map[string]any{
+		"clusterName": "shop-cluster", "serviceName": "shop-web-service",
+		"deployTaskDefinitionArn": "arn:aws:ecs:eu-west-3:123:task-definition/deploy:1",
+		"securityGroupId":         "sg-web",
+		"privateSubnetIds":        []any{"subnet-a", "subnet-b"},
+	}
+	if searchEndpoint != "" {
+		outputs["searchEndpoint"] = searchEndpoint
+	}
+	health := awsoperations.ServiceHealth{DesiredCount: 1, RunningCount: 1, PrimaryRollout: "COMPLETED",
+		PrimaryDesiredCount: 1, PrimaryRunningCount: 1, ServedImageDigests: []string{spec.Artifact.ImageDigest}}
+	return &Steps{
+		backend: backendWithOutputs(outputs), spec: spec, candidate: candidate,
+		probe: candidate, candidateImage: spec.Artifact.ImageDigest, runtime: fixedRuntime{health: health},
+		waitInterval: time.Millisecond, waitTimeout: time.Second,
+	}
+}
+
+func backendWithOutputs(outputs map[string]any) *stepsBackend {
+	return &stepsBackend{outputs: outputs}
+}
+
+func TestHealthRunsMagentoProbe(t *testing.T) {
+	spec := testSpec(t)
+	candidate := &recordingCandidate{}
+	steps := intendedProbeSteps(t, awsstack.SearchModeProvisioned, "https://search.internal:9200", candidate)
+	if err := steps.Health(context.Background(), deployRequest(spec.Artifact.ImageDigest)); err != nil {
+		t.Fatalf("Health: %v", err)
+	}
+	if len(candidate.probes) != 1 {
+		t.Fatalf("probe runs = %d, want 1", len(candidate.probes))
+	}
+	joined := strings.Join(candidate.probes[0], " ")
+	for _, want := range []string{"setup:db:status", "config:show catalog/search/engine", "curl -fsS"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("probe command = %q, want %q", joined, want)
+		}
+	}
+}
+
+func TestHealthProbeSkipsUnsignedReachabilityOnServerless(t *testing.T) {
+	spec := testSpec(t)
+	candidate := &recordingCandidate{}
+	steps := intendedProbeSteps(t, awsstack.SearchModeServerless, "https://search.internal:443", candidate)
+	if err := steps.Health(context.Background(), deployRequest(spec.Artifact.ImageDigest)); err != nil {
+		t.Fatalf("Health: %v", err)
+	}
+	if len(candidate.probes) != 1 {
+		t.Fatalf("probe runs = %d, want 1", len(candidate.probes))
+	}
+	joined := strings.Join(candidate.probes[0], " ")
+	if !strings.Contains(joined, "config:show catalog/search/engine") {
+		t.Errorf("probe command = %q, want search wiring check", joined)
+	}
+	if strings.Contains(joined, "curl -fsS") {
+		t.Errorf("probe command = %q, want no unsigned curl against serverless", joined)
+	}
+}
+
+func TestHealthProbeFailureFailsDeploy(t *testing.T) {
+	spec := testSpec(t)
+	cases := map[string]string{
+		"bootstrap":   "php fatal error during Magento bootstrap",
+		"unreachable": "SQLSTATE connection refused on db.internal",
+		"search":      "curl: (7) failed to connect to search.internal",
+	}
+	for name, output := range cases {
+		candidate := &recordingCandidate{failProbe: true, probeError: output}
+		steps := intendedProbeSteps(t, awsstack.SearchModeDisabled, "", candidate)
+		err := steps.Health(context.Background(), deployRequest(spec.Artifact.ImageDigest))
+		if err == nil || !strings.Contains(err.Error(), output) {
+			t.Errorf("%s: Health error = %v, want probe output attached", name, err)
+		}
+	}
+}
+
+func TestHealthRejectsCandidateServingMismatch(t *testing.T) {
+	spec := testSpec(t)
+	steps := intendedProbeSteps(t, awsstack.SearchModeDisabled, "", &recordingCandidate{})
+	steps.candidateImage = "ghcr.io/magelift/shop@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+	err := steps.Health(context.Background(), deployRequest(spec.Artifact.ImageDigest))
+	if err == nil || !strings.Contains(err.Error(), "does not match served image") {
+		t.Fatalf("Health with split candidate/serving images = %v, want mismatch refusal", err)
+	}
+}
+
+func TestHealthAcceptsIntendedRollout(t *testing.T) {
+	spec := testSpec(t)
+	want := spec.Artifact.ImageDigest
+	steps := intendedProbeSteps(t, awsstack.SearchModeDisabled, "", &recordingCandidate{})
+	if err := steps.Health(context.Background(), deployRequest(want)); err != nil {
+		t.Fatalf("Health with intended rollout: %v", err)
+	}
+}
+
 type recordingCandidate struct {
-	requests []awsoperations.CandidateRequest
+	requests   []awsoperations.CandidateRequest
+	probes     [][]string
+	failProbe  bool
+	probeError string
 }
 
 func (c *recordingCandidate) RegisterCandidate(_ context.Context, request awsoperations.CandidateRequest) (awsoperations.Candidate, error) {
@@ -72,6 +199,17 @@ func (c *recordingCandidate) RegisterCandidate(_ context.Context, request awsope
 }
 func (*recordingCandidate) RunMigrations(context.Context, awsoperations.Candidate) error { return nil }
 func (*recordingCandidate) Cleanup(context.Context, awsoperations.Candidate) error       { return nil }
+
+func (c *recordingCandidate) RunProbe(_ context.Context, _ awsoperations.CandidateRequest, command []string) error {
+	c.probes = append(c.probes, command)
+	if c.failProbe {
+		if c.probeError == "" {
+			c.probeError = "setup:db:status failed"
+		}
+		return errors.New(c.probeError)
+	}
+	return nil
+}
 
 func TestRegisterCandidateBootstrapsGreenfieldStack(t *testing.T) {
 	backend := &stepsBackend{

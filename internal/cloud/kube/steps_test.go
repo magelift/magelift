@@ -41,8 +41,11 @@ func (*stepsBackend) Destroy(context.Context, automation.Request, io.Writer) (ma
 }
 
 type recordingCandidate struct {
-	requests []CandidateRequest
-	failRun  bool
+	requests    []CandidateRequest
+	probes      [][]string
+	failRun     bool
+	failProbe   bool
+	probeOutput string
 }
 
 func (c *recordingCandidate) RegisterCandidate(_ context.Context, request CandidateRequest) (Candidate, error) {
@@ -56,6 +59,17 @@ func (c *recordingCandidate) RunMigrations(context.Context, Candidate) error {
 	return nil
 }
 func (*recordingCandidate) Cleanup(context.Context, Candidate) error { return nil }
+
+func (c *recordingCandidate) RunProbe(_ context.Context, _ CandidateRequest, command []string) error {
+	c.probes = append(c.probes, command)
+	if c.failProbe {
+		if c.probeOutput == "" {
+			c.probeOutput = "setup:db:status failed"
+		}
+		return errors.New(c.probeOutput)
+	}
+	return nil
+}
 
 type stepsRuntime struct{}
 
@@ -91,10 +105,17 @@ func TestStepsSequence(t *testing.T) {
 	}
 	replicas := int32(1)
 	cs := fake.NewClientset(&appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default"},
-		Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
+		ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default", Generation: 3},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "web", Image: digest}}},
+			},
+		},
 		Status: appsv1.DeploymentStatus{
-			ReadyReplicas: 1,
+			ObservedGeneration: 3,
+			UpdatedReplicas:    1,
+			ReadyReplicas:      1,
 			Conditions: []appsv1.DeploymentCondition{{
 				Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue,
 			}},
@@ -184,6 +205,138 @@ func TestStepsSequence(t *testing.T) {
 	}
 	if !recorded {
 		t.Fatal("Record hook was not invoked")
+	}
+}
+
+func TestHealthRejectsStaleReplicas(t *testing.T) {
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("b", 64)
+	stale := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)
+	replicas := int32(1)
+	cs := fake.NewClientset(&appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default", Generation: 4},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "web", Image: stale}}},
+			},
+		},
+		Status: appsv1.DeploymentStatus{
+			ObservedGeneration: 3,
+			UpdatedReplicas:    0,
+			ReadyReplicas:      1,
+			Conditions: []appsv1.DeploymentCondition{{
+				Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue,
+			}},
+		},
+	})
+	runtime, err := NewRuntimeFromClient(cs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &stepsBackend{outputs: map[string]any{
+		platform.OutputClusterName: "shop-gke",
+		platform.OutputServiceName: "shop-web",
+	}}
+	steps, err := New(backend, testDeploySpec(digest), &recordingCandidate{}, runtime, io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps.waitInterval = time.Millisecond
+	steps.waitTimeout = 20 * time.Millisecond
+	err = steps.Health(context.Background(), deployRequest(digest))
+	if err == nil || !strings.Contains(err.Error(), "intended rollout") {
+		t.Fatalf("Health with stale replicas = %v, want intended-rollout refusal", err)
+	}
+}
+
+func intendedRolloutSteps(t *testing.T, digest string, candidate *recordingCandidate) *Steps {
+	t.Helper()
+	replicas := int32(1)
+	cs := fake.NewClientset(&appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default", Generation: 3},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "web", Image: digest}}},
+			},
+		},
+		Status: appsv1.DeploymentStatus{
+			ObservedGeneration: 3,
+			UpdatedReplicas:    1,
+			ReadyReplicas:      1,
+			Conditions: []appsv1.DeploymentCondition{{
+				Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue,
+			}},
+		},
+	})
+	runtime, err := NewRuntimeFromClient(cs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &stepsBackend{outputs: map[string]any{
+		platform.OutputClusterName:             "shop-gke",
+		platform.OutputServiceName:             "shop-web",
+		platform.OutputDatabaseWriter:          "10.0.0.1",
+		platform.OutputCacheEndpoint:           "10.0.0.2",
+		platform.OutputDatabaseSecretName:      "shop-preview-app-db-credentials",
+		platform.OutputEncryptionKeySecretName: "shop-preview-app-encryption-key",
+	}}
+	steps, err := New(backend, testDeploySpec(digest), candidate, runtime, io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps.waitInterval = time.Millisecond
+	steps.waitTimeout = time.Second
+	steps.candidateImage = digest
+	return steps
+}
+
+func TestHealthRunsMagentoProbe(t *testing.T) {
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("c", 64)
+	candidate := &recordingCandidate{}
+	steps := intendedRolloutSteps(t, digest, candidate)
+	if err := steps.Health(context.Background(), deployRequest(digest)); err != nil {
+		t.Fatalf("Health: %v", err)
+	}
+	if len(candidate.probes) != 1 {
+		t.Fatalf("probe runs = %d, want 1", len(candidate.probes))
+	}
+	joined := strings.Join(candidate.probes[0], " ")
+	if !strings.Contains(joined, "setup:db:status") {
+		t.Fatalf("probe command = %q, want the Magento readiness probe", joined)
+	}
+}
+
+func TestHealthProbeFailureFailsDeploy(t *testing.T) {
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("d", 64)
+	cases := map[string]string{
+		"bootstrap":   "php fatal error during Magento bootstrap",
+		"unreachable": "SQLSTATE connection refused on db.internal",
+		"search":      "curl: (7) failed to connect to search.internal",
+	}
+	for name, output := range cases {
+		candidate := &recordingCandidate{failProbe: true, probeOutput: output}
+		steps := intendedRolloutSteps(t, digest, candidate)
+		err := steps.Health(context.Background(), deployRequest(digest))
+		if err == nil || !strings.Contains(err.Error(), output) {
+			t.Errorf("%s: Health error = %v, want probe output attached", name, err)
+		}
+	}
+}
+
+func TestHealthRejectsCandidateServingMismatch(t *testing.T) {
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("e", 64)
+	other := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("f", 64)
+	candidate := &recordingCandidate{}
+	steps := intendedRolloutSteps(t, digest, candidate)
+	steps.candidateImage = other
+	err := steps.Health(context.Background(), deployRequest(digest))
+	if err == nil || !strings.Contains(err.Error(), "does not match served image") {
+		t.Fatalf("Health with split candidate/serving images = %v, want mismatch refusal", err)
+	}
+	steps.candidateImage = ""
+	if err := steps.Health(context.Background(), deployRequest(digest)); err == nil || !strings.Contains(err.Error(), "was not recorded") {
+		t.Fatalf("Health without a recorded candidate = %v, want refusal", err)
 	}
 }
 

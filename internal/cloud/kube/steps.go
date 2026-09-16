@@ -30,11 +30,25 @@ type CandidateRunner interface {
 	Cleanup(context.Context, Candidate) error
 }
 
+// ProbeRunner executes the bounded Magento readiness probe as a one-shot
+// workload. Runners that cannot probe fail Steps construction: Health must
+// never silently skip the Magento signal.
+type ProbeRunner interface {
+	RunProbe(ctx context.Context, request CandidateRequest, command []string) error
+}
+
 // ServiceHealth is a Deployment readiness snapshot for Stabilize/Health.
+// Generation, ObservedGeneration, UpdatedReplicas, and ImageDigest carry
+// rollout identity: Health requires the intended revision, not merely
+// healthy replicas from any revision.
 type ServiceHealth struct {
-	DesiredReplicas int
-	ReadyReplicas   int
-	Available       bool
+	DesiredReplicas    int
+	ReadyReplicas      int
+	Available          bool
+	Generation         int64
+	ObservedGeneration int64
+	UpdatedReplicas    int
+	ImageDigest        string
 }
 
 // RuntimeChecker reports Magento web Deployment health.
@@ -69,16 +83,18 @@ func (s DeploySpec) Validate() error {
 
 // Steps implements deployflow.Steps for Magento on Kubernetes (D-03, KUBE-04).
 type Steps struct {
-	backend       Backend
-	spec          DeploySpec
-	candidate     CandidateRunner
-	runtime       RuntimeChecker
-	diagnostics   io.Writer
-	waitInterval  time.Duration
-	waitTimeout   time.Duration
-	registered    Candidate
-	registeredSet bool
-	record        func(context.Context, deployflow.Request, deployflow.Result) error
+	backend        Backend
+	spec           DeploySpec
+	candidate      CandidateRunner
+	probe          ProbeRunner
+	candidateImage string
+	runtime        RuntimeChecker
+	diagnostics    io.Writer
+	waitInterval   time.Duration
+	waitTimeout    time.Duration
+	registered     Candidate
+	registeredSet  bool
+	record         func(context.Context, deployflow.Request, deployflow.Result) error
 }
 
 // New constructs shared Kubernetes Magento deploy Steps.
@@ -93,11 +109,15 @@ func New(
 	if backend == nil || candidate == nil || runtime == nil || diagnostics == nil {
 		return nil, errors.New("kube deployment backend, candidate runner, runtime checker, and diagnostics are required")
 	}
+	probe, ok := candidate.(ProbeRunner)
+	if !ok {
+		return nil, errors.New("kube deployment candidate runner does not support Magento probes")
+	}
 	if err := spec.Validate(); err != nil {
 		return nil, fmt.Errorf("validate kube deployment spec: %w", err)
 	}
 	return &Steps{
-		backend: backend, spec: spec, candidate: candidate, runtime: runtime,
+		backend: backend, spec: spec, candidate: candidate, probe: probe, runtime: runtime,
 		diagnostics: diagnostics, waitInterval: 5 * time.Second, waitTimeout: 30 * time.Minute,
 		record: record,
 	}, nil
@@ -135,27 +155,40 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 			return fmt.Errorf("read kubernetes deployment outputs after initial create: %w", err)
 		}
 	}
-	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
+	candidateRequest, err := candidateRequestFromOutputs(outputs, s.spec, request)
 	if err != nil {
 		return err
+	}
+	s.registered, err = s.candidate.RegisterCandidate(ctx, candidateRequest)
+	s.registeredSet = err == nil
+	if err == nil {
+		s.candidateImage = request.ImageDigest
+	}
+	return err
+}
+
+func candidateRequestFromOutputs(outputs map[string]any, spec DeploySpec, request deployflow.Request) (CandidateRequest, error) {
+	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
+	if err != nil {
+		return CandidateRequest{}, err
 	}
 	service, err := platform.RequireStringOutput(outputs, platform.OutputServiceName)
 	if err != nil {
-		return err
+		return CandidateRequest{}, err
 	}
 	databaseWriter, err := platform.RequireStringOutput(outputs, platform.OutputDatabaseWriter)
 	if err != nil {
-		return err
+		return CandidateRequest{}, err
 	}
 	cacheEndpoint, err := platform.RequireStringOutput(outputs, platform.OutputCacheEndpoint)
 	if err != nil {
-		return err
+		return CandidateRequest{}, err
 	}
 	queueMode := "database"
 	if value, ok := outputs["queueMode"]; ok {
 		resolved, valid := value.(string)
 		if !valid {
-			return fmt.Errorf("Pulumi output %q must be a string", "queueMode")
+			return CandidateRequest{}, fmt.Errorf("Pulumi output %q must be a string", "queueMode")
 		}
 		if strings.TrimSpace(resolved) != "" {
 			queueMode = resolved
@@ -165,7 +198,7 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 	if value, ok := outputs["queueHost"]; ok {
 		resolved, valid := value.(string)
 		if !valid {
-			return fmt.Errorf("Pulumi output %q must be a string", "queueHost")
+			return CandidateRequest{}, fmt.Errorf("Pulumi output %q must be a string", "queueHost")
 		}
 		queueHost = resolved
 	}
@@ -173,7 +206,7 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 	if value, ok := outputs[platform.OutputSearchEndpoint]; ok {
 		resolved, valid := value.(string)
 		if !valid {
-			return fmt.Errorf("Pulumi output %q must be a string", platform.OutputSearchEndpoint)
+			return CandidateRequest{}, fmt.Errorf("Pulumi output %q must be a string", platform.OutputSearchEndpoint)
 		}
 		searchEndpoint = resolved
 	}
@@ -181,31 +214,31 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 	if queueMode == "rabbitmq" {
 		queuePasswordSecretName, err = platform.RequireStringOutput(outputs, platform.OutputQueuePasswordSecretName)
 		if err != nil {
-			return err
+			return CandidateRequest{}, err
 		}
 	}
 	databaseSecretName, err := platform.RequireStringOutput(outputs, platform.OutputDatabaseSecretName)
 	if err != nil {
-		return err
+		return CandidateRequest{}, err
 	}
 	value, ok := outputs[platform.OutputEncryptionKeySecretName]
 	if !ok {
-		return fmt.Errorf("Pulumi output %q is required for Kubernetes deployments", platform.OutputEncryptionKeySecretName)
+		return CandidateRequest{}, fmt.Errorf("Pulumi output %q is required for Kubernetes deployments", platform.OutputEncryptionKeySecretName)
 	}
 	var valid bool
 	encryptionKeySecretName, valid := value.(string)
 	if !valid || strings.TrimSpace(encryptionKeySecretName) == "" {
-		return fmt.Errorf("Pulumi output %q must be a non-empty string", platform.OutputEncryptionKeySecretName)
+		return CandidateRequest{}, fmt.Errorf("Pulumi output %q must be a non-empty string", platform.OutputEncryptionKeySecretName)
 	}
-	s.registered, err = s.candidate.RegisterCandidate(ctx, CandidateRequest{
-		Project:                 s.spec.CloudProject,
-		Region:                  s.spec.Region,
+	return CandidateRequest{
+		Project:                 spec.CloudProject,
+		Region:                  spec.Region,
 		Cluster:                 cluster,
 		Namespace:               defaultNamespace,
 		ServiceName:             service,
 		ImageDigest:             request.ImageDigest,
 		DatabaseWriter:          databaseWriter,
-		DatabaseName:            s.spec.DatabaseName,
+		DatabaseName:            spec.DatabaseName,
 		DatabaseSecretName:      databaseSecretName,
 		EncryptionKeySecretName: encryptionKeySecretName,
 		QueuePasswordSecretName: queuePasswordSecretName,
@@ -214,16 +247,14 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 		QueueMode:               queueMode,
 		QueueHost:               queueHost,
 		QueueUsername:           "magento",
-		ApplicationMode:         s.spec.ApplicationMode,
-		ApplicationVersion:      s.spec.ApplicationVersion,
-		WebRuntime:              s.spec.WebRuntime,
-		Magento:                 s.spec.Magento,
-		CPURequest:              s.spec.CPURequest,
-		MemoryRequest:           s.spec.MemoryRequest,
+		ApplicationMode:         spec.ApplicationMode,
+		ApplicationVersion:      spec.ApplicationVersion,
+		WebRuntime:              spec.WebRuntime,
+		Magento:                 spec.Magento,
+		CPURequest:              spec.CPURequest,
+		MemoryRequest:           spec.MemoryRequest,
 		Outputs:                 outputs,
-	})
-	s.registeredSet = err == nil
-	return err
+	}, nil
 }
 
 func (s *Steps) RunMigrations(ctx context.Context, _ deployflow.Request) error {
@@ -264,8 +295,85 @@ func (s *Steps) Stabilize(ctx context.Context, _ deployflow.Request) error {
 	return s.waitForHealthyService(ctx)
 }
 
-func (s *Steps) Health(ctx context.Context, _ deployflow.Request) error {
-	return s.waitForHealthyService(ctx)
+func (s *Steps) Health(ctx context.Context, request deployflow.Request) error {
+	health, err := s.waitForIntendedRollout(ctx)
+	if err != nil {
+		return err
+	}
+	if s.candidateImage == "" {
+		return errors.New("migration candidate image was not recorded; refusing to declare a healthy deploy")
+	}
+	if health.ImageDigest != s.candidateImage {
+		return fmt.Errorf("migration candidate image %q does not match served image %q", s.candidateImage, health.ImageDigest)
+	}
+	outputs, err := s.backend.Outputs(ctx)
+	if err != nil {
+		return fmt.Errorf("read kubernetes deployment outputs: %w", err)
+	}
+	probeRequest, err := candidateRequestFromOutputs(outputs, s.spec, request)
+	if err != nil {
+		return err
+	}
+	command := platform.MagentoProbeShell(probeRequest.SearchEndpoint, probeRequest.SearchEndpoint != "")
+	return s.probe.RunProbe(ctx, probeRequest, command)
+}
+
+// waitForIntendedRollout passes only when the intended revision is serving:
+// the controller has observed the latest generation, every desired replica
+// runs the updated template, the deployment is available, and the served
+// image digest matches the release. Stale healthy replicas fail.
+func (s *Steps) waitForIntendedRollout(ctx context.Context) (ServiceHealth, error) {
+	outputs, err := s.backend.Outputs(ctx)
+	if err != nil {
+		return ServiceHealth{}, fmt.Errorf("read kubernetes runtime outputs: %w", err)
+	}
+	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
+	if err != nil {
+		return ServiceHealth{}, err
+	}
+	service, err := platform.RequireStringOutput(outputs, platform.OutputServiceName)
+	if err != nil {
+		return ServiceHealth{}, err
+	}
+	interval, timeout := s.waitInterval, s.waitTimeout
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+	if timeout <= 0 {
+		timeout = 30 * time.Minute
+	}
+	waitContext, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		health, checkErr := s.runtime.Check(waitContext, cluster, service)
+		if checkErr == nil && intendedRollout(health, s.spec.ImageDigest) {
+			return health, nil
+		}
+		select {
+		case <-waitContext.Done():
+			if checkErr != nil {
+				return ServiceHealth{}, fmt.Errorf("wait for kubernetes intended rollout: %w", checkErr)
+			}
+			return ServiceHealth{}, fmt.Errorf(
+				"wait for kubernetes intended rollout: desired=%d ready=%d updated=%d generation=%d observed=%d available=%v digestMatch=%v",
+				health.DesiredReplicas, health.ReadyReplicas, health.UpdatedReplicas,
+				health.Generation, health.ObservedGeneration, health.Available,
+				health.ImageDigest == s.spec.ImageDigest,
+			)
+		case <-ticker.C:
+		}
+	}
+}
+
+func intendedRollout(health ServiceHealth, wantDigest string) bool {
+	return health.DesiredReplicas > 0 &&
+		health.ReadyReplicas >= health.DesiredReplicas &&
+		health.UpdatedReplicas >= health.DesiredReplicas &&
+		health.Available &&
+		health.ObservedGeneration == health.Generation &&
+		health.ImageDigest == wantDigest
 }
 
 func (s *Steps) Record(ctx context.Context, request deployflow.Request, result deployflow.Result) error {
@@ -405,9 +513,17 @@ func deploymentHealth(ctx context.Context, client kubernetes.Interface, namespac
 			break
 		}
 	}
+	served := ""
+	if containers := dep.Spec.Template.Spec.Containers; len(containers) > 0 {
+		served = containers[0].Image
+	}
 	return ServiceHealth{
-		DesiredReplicas: desired,
-		ReadyReplicas:   int(dep.Status.ReadyReplicas),
-		Available:       available,
+		DesiredReplicas:    desired,
+		ReadyReplicas:      int(dep.Status.ReadyReplicas),
+		Available:          available,
+		Generation:         dep.ObjectMeta.Generation,
+		ObservedGeneration: dep.Status.ObservedGeneration,
+		UpdatedReplicas:    int(dep.Status.UpdatedReplicas),
+		ImageDigest:        served,
 	}, nil
 }

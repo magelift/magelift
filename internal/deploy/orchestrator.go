@@ -15,6 +15,7 @@ var (
 	ErrApprovalRequired       = errors.New("production deployment approval is required")
 	ErrDigestRequired         = errors.New("deployment requires an immutable image digest")
 	ErrForwardOnlyRollbackAck = errors.New("rollback requires acknowledgement that database migrations are forward-only")
+	ErrMaintenanceDrainAck    = errors.New("production deployment requires --ack-maintenance-drain: attest a fresh backup, maintenance mode, and drained writers per docs/operations.md (incompatible migrations)")
 	ErrLockRelease            = errors.New("deployment lock release failed")
 )
 
@@ -26,15 +27,16 @@ const (
 var digestPattern = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
 
 type Request struct {
-	Target                   sdk.TargetDescriptor
-	Preview                  *automation.PreviewMetadata
-	ImageDigest              string
-	Application              sdk.Application
-	Artifact                 sdk.BuildArtifact
-	Production               bool
-	Approved                 bool
-	Rollback                 bool
-	AcknowledgeForwardOnlyDB bool
+	Target                      sdk.TargetDescriptor
+	Preview                     *automation.PreviewMetadata
+	ImageDigest                 string
+	Application                 sdk.Application
+	Artifact                    sdk.BuildArtifact
+	Production                  bool
+	Approved                    bool
+	Rollback                    bool
+	AcknowledgeForwardOnlyDB    bool
+	AcknowledgeMaintenanceDrain bool
 }
 
 type Lock interface {
@@ -88,6 +90,9 @@ func (o *Orchestrator) Run(ctx context.Context, request Request) (result Result,
 	}
 	if request.Rollback && !request.AcknowledgeForwardOnlyDB {
 		return Result{}, ErrForwardOnlyRollbackAck
+	}
+	if request.Production && !request.Rollback && !request.AcknowledgeMaintenanceDrain {
+		return Result{}, ErrMaintenanceDrainAck
 	}
 	if err := sdk.ValidateTargetDescriptor(request.Target); err != nil {
 		return Result{}, err
