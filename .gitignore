@@ -15,6 +15,8 @@
 /website/dist/
 /website/.astro/
 /website/public/docs/
+/website/public/sitemap.txt
+/website/public/sitemap.xml
 
 # Local state and credentials
 .env
