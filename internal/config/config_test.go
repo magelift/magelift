@@ -1941,95 +1941,27 @@ func TestManagedSESRejectsOVHAccount(t *testing.T) {
 	}
 }
 
-func TestTEMAcceptsFrParDomain(t *testing.T) {
+func TestTEMManagedIsUnimplementedForAlpha(t *testing.T) {
 	input := strings.Replace(managedEmailScalewayBase, "environments: {staging: {}}", "email: {mode: tem, from: shop@example.invalid, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)
 	}
-	effective, err := f.Resolve("staging", ResolveOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if effective.Config.Email.Managed == nil || effective.Config.Email.Managed.Domain != "example.invalid" {
-		t.Fatalf("managed = %#v", effective.Config.Email.Managed)
-	}
-}
-
-func TestTEMRequiresManagedBlock(t *testing.T) {
-	input := strings.Replace(managedEmailScalewayBase, "environments: {staging: {}}", "email: {mode: tem}\nenvironments: {staging: {}}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
 	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "requires a managed block") {
-		t.Fatalf("unmanaged TEM was accepted: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "email.tem managed mode is not implemented") {
+		t.Fatalf("unimplemented TEM was accepted: %v", err)
 	}
 }
 
-func TestTEMRejectsNonFrParRegion(t *testing.T) {
-	input := strings.Replace(managedEmailScalewayBase, "defaults: {region: fr-par, preset: standard}", "defaults: {region: nl-1, preset: standard}", 1)
-	input = strings.Replace(input, "environments: {staging: {}}", "email: {mode: tem, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "only available in fr-par") {
-		t.Fatalf("non-fr-par TEM was accepted: %v", err)
-	}
-}
-
-func TestTEMRequiresScalewayProvider(t *testing.T) {
-	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: tem, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "only supported on scaleway") {
-		t.Fatalf("TEM off Scaleway was accepted: %v", err)
-	}
-}
-
-func TestOVHMailboxAcceptsDomainAndAccount(t *testing.T) {
+func TestOVHManagedIsUnimplementedForAlpha(t *testing.T) {
 	input := strings.Replace(managedEmailOVHBase, "environments: {staging: {}}", "email: {mode: ovh, from: shop@example.invalid, managed: {domain: example.invalid, account: shop}}\nenvironments: {staging: {}}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)
 	}
-	effective, err := f.Resolve("staging", ResolveOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	managed := effective.Config.Email.Managed
-	if managed == nil || managed.Domain != "example.invalid" || managed.Account != "shop" {
-		t.Fatalf("managed = %#v", effective.Config.Email.Managed)
-	}
-}
-
-func TestOVHRequiresAccount(t *testing.T) {
-	input := strings.Replace(managedEmailOVHBase, "environments: {staging: {}}", "email: {mode: ovh, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
 	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "domain and account") {
-		t.Fatalf("accountless OVH was accepted: %v", err)
-	}
-}
-
-func TestOVHRequiresOVHProvider(t *testing.T) {
-	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: ovh, managed: {domain: example.invalid, account: shop}}\nenvironments: {staging: {}}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "only supported on ovh") {
-		t.Fatalf("OVH mail off OVH was accepted: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "email.ovh managed mode is not implemented") {
+		t.Fatalf("unimplemented OVH mail was accepted: %v", err)
 	}
 }
 
@@ -2042,18 +1974,6 @@ func TestManagedBlockRejectedOnSMTP(t *testing.T) {
 	_, err = f.Resolve("staging", ResolveOptions{})
 	if err == nil || !strings.Contains(err.Error(), "requires mode ses, tem, or ovh") {
 		t.Fatalf("managed block on smtp was accepted: %v", err)
-	}
-}
-
-func TestTEMRejectsHostedZoneID(t *testing.T) {
-	input := strings.Replace(managedEmailScalewayBase, "environments: {staging: {}}", "email: {mode: tem, managed: {domain: example.invalid, hostedZoneId: Z123}}\nenvironments: {staging: {}}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "applies only to ses") {
-		t.Fatalf("misplaced hostedZoneId was accepted: %v", err)
 	}
 }
 

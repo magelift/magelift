@@ -34,7 +34,7 @@
 - **Body:** Source Sans 3 400-600  
 - **Mono / terminal:** IBM Plex Mono 400-500  
 
-**Signature:** Full-bleed cool dock atmosphere photo + left brand/headline + right live CLI outcome panel (destroy → spend stopped). Brand mark: isometric ink **M** with teal lift accent (`/media/logo.png`); flat SVG favicon for tabs.
+**Signature:** Full-bleed cool dock atmosphere photo + left brand/headline + right live CLI outcome panel (destroy → teardown reported). Brand mark: isometric ink **M** with teal lift accent (`/media/logo.png`); flat SVG favicon for tabs.
 
 ## Motion
 

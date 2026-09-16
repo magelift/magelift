@@ -553,7 +553,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.domain` | string or null | no |  | Environment domain |
 | `environments.*.protection` | boolean or null | no |  | Protect against destructive commands |
 | `environments.*.expiresAt` | string or null | no |  | Preview expiration as RFC3339 |
-| `environments.*.monthlyBudgetCents` | integer or null | no |  | Maximum monthly AWS budget in cents |
+| `environments.*.monthlyBudgetCents` | integer or null | no |  | Monthly budget planning input in cents (alerts only, never enforced) |
 | `environments.*.branches` | array or null | no |  | Git branches mapped to this environment |
 | `environments.*.seedDump` | string or null | no |  | Local MySQL dump path seeded after first deploy |
 | `environments.*.project` | object or null | no |  |  |

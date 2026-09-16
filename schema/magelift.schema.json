@@ -3440,7 +3440,7 @@
         "monthlyBudgetCents": {
           "anyOf": [
             {
-              "description": "Maximum monthly AWS budget in cents",
+              "description": "Monthly budget planning input in cents (alerts only, never enforced)",
               "type": "integer"
             },
             {
