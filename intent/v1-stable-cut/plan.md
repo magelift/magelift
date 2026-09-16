@@ -1,9 +1,12 @@
 ---
-status: planned
+status: superseded
 slug: v1-stable-cut
 spec: spec.md
 half: tag
 ---
+
+> HISTORICAL 2026-09-16: superseded by `intent/audit.md` (stable cut deferred
+> past alpha). Retained for reference. Do not implement from this plan.
 
 # Plan: v1-stable-cut tag half
 

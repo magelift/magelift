@@ -1,4 +1,9 @@
-# Spec: eu-providers-experimental (order 11)
+> HISTORICAL 2026-09-16: retained as-is. Superseded as an active plan by
+> `intent/audit.md` — EU work is deferred past alpha with evidence kept
+> (Scaleway GREEN, OVH PARKED). Resume here, do not treat as the current
+> queue.
+
+# Spec: eu-providers-experimental (order 11) (HISTORICAL)
 
 ## Decision
 
