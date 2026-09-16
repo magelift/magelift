@@ -63,7 +63,7 @@ func TestOperationErrorText(t *testing.T) {
 func TestProtocolOperationsEnumerated(t *testing.T) {
 	t.Parallel()
 	for _, operation := range []Operation{
-		OpDescribe, OpValidateConfig, OpPlan, OpApply, OpOutputs, OpDestroy,
+		OpDescribe, OpValidateConfig, OpPlan, OpPreview, OpApply, OpOutputs, OpDestroy,
 		OpBootstrapVerify, OpBootstrapEnsure,
 		OpStateStatus, OpStateLock, OpStateUnlock, OpStateBackup, OpStateRestore,
 		OpSecretList, OpSecretSet, OpSecretRemove, OpSecretRead,
@@ -79,10 +79,10 @@ func TestProtocolOperationsEnumerated(t *testing.T) {
 
 func TestProtocolMessagesGobRoundTrip(t *testing.T) {
 	t.Parallel()
-	envelope := Envelope{Project: "p", Environment: "e", Region: "r", EnvironmentClass: "preview", StackName: "s", StateBackendURL: "gs://b", SecretsProvider: "gcp", Preset: "preview", MonthlyBudgetCents: 1, AppVersion: "2.4.9"}
+	envelope := Envelope{Project: "p", Environment: "e", Region: "r", EnvironmentClass: "preview", StackName: "s", StateBackendURL: "gs://b", Preset: "preview", MonthlyBudgetCents: 1, AppVersion: "2.4.9"}
 	messages := map[string]any{
 		"DescribeRequest":              &DescribeRequest{ProtocolVersion: ProtocolV1},
-		"DescribeResponse":             &DescribeResponse{ProtocolVersion: ProtocolV1, ProviderID: "gcp", ProviderVersion: "v", Operations: []OperationVersion{{Name: "status", Version: "1.0"}}, Runtimes: []string{"r"}},
+		"DescribeResponse":             &DescribeResponse{ProtocolVersion: ProtocolV1, ProviderID: "gcp", ProviderVersion: "v", Operations: []OperationVersion{{Name: "status", Version: "1.0"}}, Runtimes: []RuntimeAdvertisement{{Runtime: "r", Tier: ExtensionTierCertified}}, OutputKeys: []string{"k"}, Edge: &EdgeAdapterDescriptor{ID: "e"}, Resilience: &ResilienceAdapterDescriptor{ID: "r"}},
 		"ValidateConfigRequest":        &ValidateConfigRequest{ProtocolVersion: ProtocolV1, TargetBlock: []byte("a: b")},
 		"ValidateConfigResult":         &ValidateConfigResult{Valid: true, Problems: []string{"p"}},
 		"PlanRequest":                  &PlanRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, TargetBlock: []byte("a: b")},
@@ -153,7 +153,7 @@ func TestProtocolMessagesGobRoundTrip(t *testing.T) {
 func TestPluginMethodsCoverAllOperations(t *testing.T) {
 	t.Parallel()
 	operations := []Operation{
-		OpDescribe, OpValidateConfig, OpPlan, OpApply, OpOutputs, OpDestroy,
+		OpDescribe, OpValidateConfig, OpPlan, OpPreview, OpApply, OpOutputs, OpDestroy,
 		OpBootstrapVerify, OpBootstrapEnsure,
 		OpStateStatus, OpStateLock, OpStateUnlock, OpStateBackup, OpStateRestore,
 		OpSecretList, OpSecretSet, OpSecretRemove, OpSecretRead,
