@@ -108,6 +108,20 @@ func TestResilienceProxyRoundTrip(t *testing.T) {
 	}
 }
 
+func TestResilienceProxyCapabilityErrorIsInvalid(t *testing.T) {
+	t.Parallel()
+	adapter := stubResilienceAdapter{err: sdk.ResilienceCapabilityError{AdapterID: "gcp.resilience", Operation: sdk.ResilienceFence, Status: sdk.ResilienceCapabilityUnsupported, Reason: "no fence"}}
+	server := &Server{NewResilienceAdapter: func(context.Context, string) (sdk.ResilienceAdapter, error) { return adapter, nil }}
+	envelope, plan := planCall(testEnvelope(), storedTestPlan(t, testSpec()))
+	planReq, err := json.Marshal(sdk.ResiliencePlanRequest{OwnershipMarker: "magelift/test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, operr := server.ResiliencePlan(context.Background(), &sdk.ResiliencePlanCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan, RequestJSON: planReq}); operr == nil || operr.Code != sdk.ErrCodeInvalid {
+		t.Fatalf("capability error = %v", operr)
+	}
+}
+
 func TestProxyRequiresProject(t *testing.T) {
 	t.Parallel()
 	server := &Server{}
