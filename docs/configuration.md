@@ -1,5 +1,7 @@
 # Configuration reference
 
+This page is generated from the MageLift configuration schema. Do not edit it by hand.
+
 `magelift.yaml` uses schema version 1. Unknown fields are rejected.
 
 When a provider target block is present, the resolver applies the selected preset's

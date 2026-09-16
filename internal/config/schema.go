@@ -31,7 +31,9 @@ func SchemaJSON() ([]byte, error) {
 // ReferenceMarkdown returns the concise configuration reference derived from the YAML model.
 func ReferenceMarkdown() []byte {
 	var out bytes.Buffer
-	out.WriteString("# Configuration reference\n\n`magelift.yaml` uses schema version 1. Unknown fields are rejected.\n\n")
+	out.WriteString("# Configuration reference\n\n")
+	out.WriteString("This page is generated from the MageLift configuration schema. Do not edit it by hand.\n\n")
+	out.WriteString("`magelift.yaml` uses schema version 1. Unknown fields are rejected.\n\n")
 	out.WriteString("When a provider target block is present, the resolver applies the selected preset's\n")
 	out.WriteString("safe provider shape defaults and the service versions from the Magento compatibility catalog.\n")
 	out.WriteString("Project and environment values override them. The defaults do not create secrets,\n")
