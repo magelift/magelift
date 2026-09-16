@@ -1,0 +1,29 @@
+schemaVersion: 1
+project:
+  name: synthetic-shop
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+  webRuntime: nginx-fpm
+  magento:
+    frontName: admin
+build:
+  php: "8.5"
+  composer:
+    version: "2.10"
+target:
+  provider: gcp
+  runtime: gke-autopilot
+  gcp:
+    region: europe-west1
+defaults:
+  region: europe-west1
+  preset: preview
+environments:
+  preview:
+    class: preview
+    preset: preview
+    domain: preview.example.test
+local: {}
+extensions: {}

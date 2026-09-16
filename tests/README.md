@@ -8,6 +8,7 @@ Verification layers vs Make targets and CI.
 | Pulumi mock graphs | `internal/cloud/**` | `make pulumi-mock-test` | No |
 | Offline harness | `tests/acceptance/` | `make acceptance-harness-test` | No |
 | Account-free stack | mocks + harness + Floci | `make local-gates` | No (Docker for Floci) |
+| Synthetic offline | `tests/synthetic/` (`//go:build synthetic`) | `go test -tags synthetic ./tests/synthetic/ -count=1` | No (refuses credentials) |
 | Floci (AWS emulator) | `tests/floci/` (`//go:build floci`) | `make floci-test-aws` | No (Docker) |
 | floci-gcp | `tests/floci-gcp/` (`//go:build floci_gcp`) | `make floci-gcp-test` | No (Docker) |
 | PHP Composer package | `build/tests/` | `make php-test` | No |

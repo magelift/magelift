@@ -1,0 +1,16 @@
+name: syntheticsite
+type: php:8.5
+relationships:
+  database: "mysql:mysql"
+  redis: "redis:redis"
+  search: "opensearch:http"
+  analytics: "custom:tcp"
+crons:
+  synthetic_cron:
+    spec: "*/5 * * * *"
+    cmd: "php bin/magento cron:run"
+hooks:
+  build: |
+    set -e
+    composer install --no-dev
+custom_stage: synthetic-marker
