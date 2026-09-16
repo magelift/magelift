@@ -468,3 +468,34 @@ func deploymentConfig() config.Config {
 		MonthlyBudgetCents: 250000,
 	}
 }
+
+func TestPlanFromConfigMapsManagedSESEmail(t *testing.T) {
+	cfg := deploymentConfig()
+	cfg.Email = config.EmailConfig{
+		Mode: "ses",
+		From: "shop@example.invalid",
+		Managed: &config.EmailManaged{
+			Domain:       "example.invalid",
+			HostedZoneID: "Z1234567890ABC",
+		},
+	}
+	spec, err := PlanFromConfig(cfg, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !spec.Email.Managed || spec.Email.Domain != "example.invalid" || spec.Email.HostedZoneID != "Z1234567890ABC" || spec.Email.From != "shop@example.invalid" {
+		t.Fatalf("managed SES email was not mapped: %#v", spec.Email)
+	}
+}
+
+func TestPlanFromConfigLeavesBYOEmailUnmanaged(t *testing.T) {
+	cfg := deploymentConfig()
+	cfg.Email = config.EmailConfig{Mode: "smtp", From: "shop@example.invalid", Host: "smtp.example.invalid", Port: 587}
+	spec, err := PlanFromConfig(cfg, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Email.Managed {
+		t.Fatalf("BYO email must not provision managed sending: %#v", spec.Email)
+	}
+}

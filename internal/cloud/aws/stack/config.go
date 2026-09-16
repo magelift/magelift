@@ -154,6 +154,7 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		Catalog:       catalogFromConfig(aws.Catalog, preset),
 		Edge:          edgeIntent,
 		Observability: observability,
+		Email:         emailSpecFromConfig(cfg),
 	}
 	validate := spec.Validate
 	if options.AllowExpiredPreview && preset == sdk.PresetPreview && !expiresAt.IsZero() && expiresAt.Before(time.Now().UTC()) {
@@ -164,6 +165,21 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		return Spec{}, fmt.Errorf("AWS deployment plan is invalid: %w", err)
 	}
 	return spec, nil
+}
+
+// emailSpecFromConfig maps managed SES config to the stack. Only mode ses
+// with a managed block provisions; BYO modes leave Managed false and the
+// stack wires nothing.
+func emailSpecFromConfig(cfg config.Config) EmailSpec {
+	if strings.ToLower(strings.TrimSpace(cfg.Email.Mode)) != "ses" || cfg.Email.Managed == nil {
+		return EmailSpec{}
+	}
+	return EmailSpec{
+		Managed:      true,
+		Domain:       cfg.Email.Managed.Domain,
+		HostedZoneID: cfg.Email.Managed.HostedZoneID,
+		From:         cfg.Email.From,
+	}
 }
 
 func defaultAWSEdgeIntent(intent sdk.EdgeIntent, domain string) sdk.EdgeIntent {

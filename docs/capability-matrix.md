@@ -201,7 +201,7 @@ gateway routing from `privateNetworkRoutingAsDefault`.
 Certified subset: empty. `scaleway` / `kapsule` stays experimental. Magento is
 not certified by account-free cost or kube.Steps. Cache family is Redis
 (`cacheMode: redis`); do not relabel it Valkey. The live bar is one Kapsule
-preview inside the $50 own-money cap shared with Cloudflare, SendGrid, Fastly,
+preview inside the $50 own-money cap shared with Cloudflare, Fastly,
 and New Relic; destroy always; no KEEP. Vendors attach to a GCP origin.
 Magento runtime stays `not-run` if that cap is spent elsewhere. Current proof
 is infrastructure-only.
@@ -337,8 +337,9 @@ outputs, and cleanup.
 | CloudWatch | first-party AWS adapter | CloudWatch logs are separate from X-Ray. Exact signal coverage and live delivery remain evidence dimensions; an EKS IAM policy does not establish Magento X-Ray evidence. |
 | X-Ray | typed unavailable without an `ObservabilityAdapter` plugin | Magento-origin X-Ray is typed unsupported. An EKS IAM snippet is not a Magento X-Ray runtime cell. |
 | Google Cloud Operations | first-party GCP adapter | GKE system/workload logging and monitoring plus dashboard/log-presence alert resources; trace instrumentation and live delivery evidence remain explicit open dimensions |
-| Cloudflare | DNS cutover only | Cloudflare DNS evidence is not CDN or WAF certification. |
-| SES / SendGrid | configuration validation | SMTP settings and secret references do not prove Magento delivery. SendGrid delivery needs Magento-origin evidence; SES stays configuration-only until delivery is evidenced. |
+| Cloudflare | DNS cutover only | Cloudflare DNS evidence is not CDN or WAF certification. Shell helpers only; no Go adapter. |
+| SES | configuration validation | SMTP settings and secret references do not prove Magento delivery. SES stays configuration-only until Magento-origin delivery is evidenced. Home: `email.mode` in `internal/config`; no Go adapter. |
+| SendGrid | manual only | No named mode and no Pulumi provisioning; point `smtp` at `smtp.sendgrid.net:587` with username `apikey` until a stable Pulumi package exists. |
 | Scaleway Cockpit | first-party Scaleway adapter | Cockpit log/metric/trace sources with retention; unsupported audit/alert semantics remain visible rather than inferred |
 | OVHcloud Logs Data Platform | first-party OVH adapter | MKS audit-log subscription only when an existing stream is supplied through opaque `nativeReference`; workload log/metric/trace delivery remains explicit and open |
 | Datadog / New Relic (`internal/external/newrelic`) / OTLP | extension boundary | Typed intents, secret-safe OTLP export, provider-neutral New Relic ECS Contrib and Kubernetes NRDOT mappings for EKS/GKE/Kapsule/MKS, an injectable provider-owned NerdGraph/NRQL marker verifier, a bounded authenticated New Relic CLI marker/NRQL probe, live GKE Autopilot and GKE Standard Contrib collector paths with separate ingest/query credentials and logs/metrics/traces delivery, and one AWS ECS Contrib sidecar exercise with eventual three-signal delivery exist. The AWS verifier budget was exceeded before the trace became queryable, so broader collector lifecycle, credential rotation, native composition, retention/alerting, and provider-wide cleanup evidence remain open |

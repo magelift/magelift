@@ -23,7 +23,7 @@
     "name": "magelift-local-runtime",
     "description": "Create and operate MageLift's local Magento Docker environment with the release-specific PHP, Composer, database, cache, search, and queue contract. Use when starting local development or checking a local compatibility gap.",
     "version": "1.0.0",
-    "digest": "4b4623c8317f4df1d88f3c331d7b3518e3edc19af343ac2d30142f4cf1b3d293",
+    "digest": "85a1bd7b449835c852da966ac1016a81e4cf8565886de3f0f7ad19ba73a45f0e",
     "sources": [
       "embedded",
       "skills-cli"

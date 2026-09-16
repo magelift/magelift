@@ -58,6 +58,10 @@ type IdentityPlan struct {
 	CIBoundaryARN       string `json:"ciBoundaryArn" yaml:"ciBoundaryArn"`
 	CITrustPolicy       string `json:"ciTrustPolicy" yaml:"ciTrustPolicy"`
 	CIPermissionsPolicy string `json:"ciPermissionsPolicy" yaml:"ciPermissionsPolicy"`
+	// CIEmailPermissionsPolicy is a second inline policy on the CI role for
+	// managed SES sending. Split out because the main inline document sits at
+	// ~88% of the 10,240-character PutRolePolicy quota.
+	CIEmailPermissionsPolicy string `json:"ciEmailPermissionsPolicy" yaml:"ciEmailPermissionsPolicy"`
 
 	// BuildRole* is assumed only by the immutable image build job. It can read
 	// MageLift-scoped Composer and build secrets, but cannot mutate infrastructure.
@@ -129,6 +133,10 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 	if err != nil {
 		return IdentityPlan{}, err
 	}
+	ciEmailPolicy, err := ciEmailPermissionsPolicy(partition, spec.AccountID, spec.Region)
+	if err != nil {
+		return IdentityPlan{}, err
+	}
 	buildTrust, err := githubTrustPolicy(providerARN, spec.GitHubOwner, spec.GitHubRepo, spec.Environment)
 	if err != nil {
 		return IdentityPlan{}, err
@@ -141,7 +149,7 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 	return IdentityPlan{
 		OIDCProviderARN: providerARN,
 		StateRoleName:   stateRoleName, StateRoleARN: stateRoleARN, StateBoundaryName: stateBoundaryName, StateBoundaryARN: stateBoundaryARN, StatePermissionsPolicy: statePolicy,
-		CIRoleName: ciRoleName, CIRoleARN: ciRoleARN, CIBoundaryName: ciBoundaryName, CIBoundaryARN: ciBoundaryARN, CITrustPolicy: trust, CIPermissionsPolicy: ciPolicy,
+		CIRoleName: ciRoleName, CIRoleARN: ciRoleARN, CIBoundaryName: ciBoundaryName, CIBoundaryARN: ciBoundaryARN, CITrustPolicy: trust, CIPermissionsPolicy: ciPolicy, CIEmailPermissionsPolicy: ciEmailPolicy,
 		BuildRoleName: buildRoleName, BuildRoleARN: buildRoleARN, BuildBoundaryName: buildBoundaryName, BuildBoundaryARN: buildBoundaryARN, BuildTrustPolicy: buildTrust, BuildPermissionsPolicy: buildPolicy,
 		MetadataParameter: parameter, Tags: tags, Region: spec.Region, StateBucket: spec.StateBucket, KMSKeyARN: spec.KMSKeyARN,
 		RoleName: stateRoleName, RoleARN: stateRoleARN, BoundaryName: stateBoundaryName, BoundaryARN: stateBoundaryARN, TrustPolicy: trust, PermissionsPolicy: statePolicy,
@@ -283,7 +291,18 @@ func (b *IdentityBootstrapper) ensureCIBoundary(ctx context.Context, plan Identi
 }
 
 func (b *IdentityBootstrapper) ensureCIRole(ctx context.Context, plan IdentityPlan) error {
-	return b.ensureRoleSpec(ctx, plan.CIRoleName, plan.CITrustPolicy, plan.CIBoundaryARN, "magelift-ci", plan.CIPermissionsPolicy, plan.Tags)
+	if err := b.ensureRoleSpec(ctx, plan.CIRoleName, plan.CITrustPolicy, plan.CIBoundaryARN, "magelift-ci", plan.CIPermissionsPolicy, plan.Tags); err != nil {
+		return err
+	}
+	return b.ensureInlinePolicy(ctx, plan.CIRoleName, "magelift-ci-email", plan.CIEmailPermissionsPolicy)
+}
+
+func (b *IdentityBootstrapper) ensureInlinePolicy(ctx context.Context, roleName, policyName, policy string) error {
+	if strings.TrimSpace(policy) == "" {
+		return errors.New("inline policy document is required")
+	}
+	_, err := b.iam.PutRolePolicy(ctx, &iam.PutRolePolicyInput{RoleName: awssdk.String(roleName), PolicyName: awssdk.String(policyName), PolicyDocument: awssdk.String(policy)})
+	return err
 }
 
 func (b *IdentityBootstrapper) ensureBuildBoundary(ctx context.Context, plan IdentityPlan) error {

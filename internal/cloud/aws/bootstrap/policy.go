@@ -67,7 +67,7 @@ func ciPermissionsBoundaryPolicy() (string, error) {
 			"sts:GetCallerIdentity",
 			"acm:*", "aoss:*", "cloudfront:*", "cloudwatch:*", "ec2:*", "ecr:*", "ecs:*",
 			"elasticache:*", "elasticloadbalancing:*", "es:*", "iam:*", "kms:*", "logs:*",
-			"mq:*", "rds:*", "route53:*", "s3:*", "secretsmanager:*", "ssm:*", "synthetics:*", "wafv2:*",
+			"mq:*", "rds:*", "route53:*", "s3:*", "secretsmanager:*", "ses:*", "ssm:*", "synthetics:*", "wafv2:*",
 		},
 		"Resource": "*",
 	}})
@@ -124,9 +124,25 @@ func ciPermissionsPolicy(partition, account, region, providerARN, stateBucket, k
 		map[string]any{"Effect": "Allow", "Action": []string{"iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy", "iam:GetPolicyVersion", "iam:ListPolicyVersions", "iam:CreatePolicyVersion", "iam:DeletePolicyVersion", "iam:SetDefaultPolicyVersion", "iam:TagPolicy", "iam:UntagPolicy"}, "Resource": policyARN},
 		map[string]any{"Effect": "Allow", "Action": []string{"iam:CreateServiceLinkedRole"}, "Resource": "*", "Condition": map[string]any{"StringEquals": map[string][]string{"iam:AWSServiceName": {"aoss.amazonaws.com", "cloudfront.amazonaws.com", "ecs.amazonaws.com", "ecs.application-autoscaling.amazonaws.com", "elasticache.amazonaws.com", "elasticloadbalancing.amazonaws.com", "es.amazonaws.com", "mq.amazonaws.com", "rds.amazonaws.com", "synthetics.amazonaws.com", "wafv2.amazonaws.com"}}}},
 		map[string]any{"Effect": "Allow", "Action": []string{"kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey"}, "Resource": kmsARN},
-		map[string]any{"Effect": "Allow", "Action": []string{"ssm:GetParameter", "ssm:PutParameter"}, "Resource": []string{metadataARN, "arn:" + partition + ":ssm:" + region + ":" + account + ":parameter/magelift/*"}},
+		map[string]any{"Effect": "Allow", "Action": []string{"ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"}, "Resource": []string{metadataARN, "arn:" + partition + ":ssm:" + region + ":" + account + ":parameter/magelift/*"}},
 		map[string]any{"Effect": "Allow", "Action": []string{"iam:ListOpenIDConnectProviders", "iam:GetOpenIDConnectProvider"}, "Resource": providerARN},
 	)
+	return policyJSON(statements)
+}
+
+// ciEmailPermissionsPolicy grants the CI role managed SES sending: identity
+// lifecycle plus the per-environment SMTP user, key, and sending policy.
+// A separate inline document because the main CI policy sits near the
+// PutRolePolicy size quota; Route 53 DKIM and SSM credential storage stay in
+// the main document on their existing statements.
+func ciEmailPermissionsPolicy(partition, account, region string) (string, error) {
+	identityARN := "arn:" + partition + ":ses:" + region + ":" + account + ":identity/*"
+	userARN := "arn:" + partition + ":iam::" + account + ":user/magelift-*"
+	statements := []map[string]any{
+		map[string]any{"Effect": "Allow", "Action": []string{"ses:CreateEmailIdentity", "ses:ListEmailIdentities"}, "Resource": "*"},
+		map[string]any{"Effect": "Allow", "Action": []string{"ses:GetEmailIdentity", "ses:DeleteEmailIdentity", "ses:TagResource", "ses:UntagResource"}, "Resource": identityARN},
+		map[string]any{"Effect": "Allow", "Action": []string{"iam:CreateUser", "iam:DeleteUser", "iam:GetUser", "iam:TagUser", "iam:UntagUser", "iam:CreateAccessKey", "iam:DeleteAccessKey", "iam:GetAccessKey", "iam:PutUserPolicy", "iam:DeleteUserPolicy", "iam:GetUserPolicy"}, "Resource": userARN},
+	}
 	return policyJSON(statements)
 }
 

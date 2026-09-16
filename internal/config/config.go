@@ -809,8 +809,8 @@ func validateLocalRuntime(local LocalRuntime) []string {
 	}
 	email := local.Email
 	mode := strings.TrimSpace(email.Mode)
-	if mode != "" && !containsString([]string{"disabled", "mailpit", "sendgrid", "ses", "smtp"}, mode) {
-		problems = append(problems, "local.email.mode must be disabled, mailpit, sendgrid, ses, or smtp")
+	if mode != "" && !containsString([]string{"disabled", "mailpit", "ses", "smtp"}, mode) {
+		problems = append(problems, "local.email.mode must be disabled, mailpit, ses, or smtp")
 	}
 	if email.Port < 0 || email.Port > 65535 {
 		problems = append(problems, "local.email.port must be between 1 and 65535 when set")
@@ -902,18 +902,6 @@ func normalizeCloudEmail(cfg *Config) {
 	}
 	mode := strings.ToLower(strings.TrimSpace(cfg.Email.Mode))
 	cfg.Email.Mode = mode
-	if mode != "sendgrid" {
-		return
-	}
-	if strings.TrimSpace(cfg.Email.Host) == "" {
-		cfg.Email.Host = "smtp.sendgrid.net"
-	}
-	if cfg.Email.Port == 0 {
-		cfg.Email.Port = 587
-	}
-	if strings.TrimSpace(cfg.Email.Username) == "" {
-		cfg.Email.Username = "apikey"
-	}
 }
 
 func validateProviderSecretReference(field, value, provider string) []string {
@@ -940,9 +928,14 @@ func validateProviderSecretReference(field, value, provider string) []string {
 func validateCloudEmail(c Config) []string {
 	email := c.Email
 	mode := strings.ToLower(strings.TrimSpace(email.Mode))
+	provider := strings.ToLower(strings.TrimSpace(c.Target.Provider))
+	managed := email.Managed != nil
 	var problems []string
-	if mode != "" && !containsString([]string{"disabled", "smtp", "sendgrid", "ses"}, mode) {
-		problems = append(problems, "email.mode must be disabled, smtp, sendgrid, or ses")
+	if mode != "" && !containsString([]string{"disabled", "smtp", "ses", "tem", "ovh"}, mode) {
+		problems = append(problems, "email.mode must be disabled, smtp, ses, tem, or ovh")
+	}
+	if managed && mode != "ses" && mode != "tem" && mode != "ovh" {
+		problems = append(problems, "email.managed requires mode ses, tem, or ovh")
 	}
 	if email.Port < 0 || email.Port > 65535 {
 		problems = append(problems, "email.port must be between 1 and 65535 when set")
@@ -950,14 +943,64 @@ func validateCloudEmail(c Config) []string {
 	if strings.ContainsAny(email.Host+email.Username+email.From, "\x00\r\n$") {
 		problems = append(problems, "email host, username, and from values contain a forbidden character")
 	}
+	byoSet := strings.TrimSpace(email.Host) != "" || email.Port != 0 || strings.TrimSpace(email.Username) != "" || strings.TrimSpace(email.Credential) != ""
+	var managedDomain, managedZone, managedAccount string
+	if email.Managed != nil {
+		managedDomain = strings.TrimSpace(email.Managed.Domain)
+		managedZone = strings.TrimSpace(email.Managed.HostedZoneID)
+		managedAccount = strings.TrimSpace(email.Managed.Account)
+	}
 	switch mode {
-	case "sendgrid":
-		if strings.TrimSpace(email.Credential) == "" {
-			problems = append(problems, "email.credential is required for sendgrid and must be a secret reference")
-		}
 	case "ses":
-		if strings.TrimSpace(email.Host) == "" || email.Port == 0 || strings.TrimSpace(email.Username) == "" || strings.TrimSpace(email.Credential) == "" {
-			problems = append(problems, "email.ses requires host, port, username, and a credential secret reference")
+		if !managed {
+			if strings.TrimSpace(email.Host) == "" || email.Port == 0 || strings.TrimSpace(email.Username) == "" || strings.TrimSpace(email.Credential) == "" {
+				problems = append(problems, "email.ses requires host, port, username, and a credential secret reference")
+			}
+			break
+		}
+		if provider != "aws" {
+			problems = append(problems, "email.ses managed mode requires target.provider aws")
+		}
+		if managedDomain == "" || managedZone == "" {
+			problems = append(problems, "email.ses managed mode requires managed.domain and managed.hostedZoneId")
+		}
+		if byoSet {
+			problems = append(problems, "email.ses managed mode cannot be combined with explicit host, port, username, or credential")
+		}
+		if managedAccount != "" {
+			problems = append(problems, "email.managed.account applies only to ovh mode")
+		}
+	case "tem":
+		if !managed || managedDomain == "" {
+			problems = append(problems, "email.tem requires a managed block with domain")
+		}
+		if provider != "scaleway" {
+			problems = append(problems, "email.tem is only supported on scaleway targets")
+		}
+		if region := effectiveScalewayRegion(c); region != "fr-par" {
+			problems = append(problems, fmt.Sprintf("email.tem is only available in fr-par (got %q)", region))
+		}
+		if byoSet {
+			problems = append(problems, "email.tem does not take explicit host, port, username, or credential (managed only)")
+		}
+		if managedZone != "" {
+			problems = append(problems, "email.managed.hostedZoneId applies only to ses mode")
+		}
+		if managedAccount != "" {
+			problems = append(problems, "email.managed.account applies only to ovh mode")
+		}
+	case "ovh":
+		if !managed || managedDomain == "" || managedAccount == "" {
+			problems = append(problems, "email.ovh requires a managed block with domain and account")
+		}
+		if provider != "ovh" {
+			problems = append(problems, "email.ovh is only supported on ovh targets")
+		}
+		if byoSet {
+			problems = append(problems, "email.ovh does not take explicit host, port, username, or credential (managed only)")
+		}
+		if managedZone != "" {
+			problems = append(problems, "email.managed.hostedZoneId applies only to ses mode")
 		}
 	case "smtp":
 		if strings.TrimSpace(email.Host) == "" || email.Port == 0 {
@@ -966,6 +1009,15 @@ func validateCloudEmail(c Config) []string {
 	}
 	problems = append(problems, validateProviderSecretReference("email.credential", email.Credential, c.Target.Provider)...)
 	return problems
+}
+
+func effectiveScalewayRegion(c Config) string {
+	if c.Target.Scaleway != nil {
+		if region := strings.TrimSpace(c.Target.Scaleway.Region); region != "" {
+			return region
+		}
+	}
+	return strings.TrimSpace(c.Defaults.Region)
 }
 
 func validateGCPTarget(c Config) []string {

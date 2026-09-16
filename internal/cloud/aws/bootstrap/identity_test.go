@@ -296,6 +296,12 @@ func TestIdentityPolicyDocumentsStayUnderIAMQuotas(t *testing.T) {
 			remedy: "split actions across additional scoped policies or shrink the allowlist",
 		},
 		{
+			name:   "CI email inline role policy",
+			doc:    plan.CIEmailPermissionsPolicy,
+			quota:  inlinePolicyQuota,
+			remedy: "split actions across additional scoped policies or shrink the allowlist",
+		},
+		{
 			name:   "state inline role policy",
 			doc:    plan.StatePermissionsPolicy,
 			quota:  inlinePolicyQuota,
@@ -353,7 +359,7 @@ func TestIdentityEnsureIsIdempotent(t *testing.T) {
 	if iamClient.createProviderCalls != 1 || iamClient.createPolicyCalls != 3 || iamClient.createRoleCalls != 3 {
 		t.Fatalf("identity resources recreated: %#v", iamClient)
 	}
-	if iamClient.updateTrustCalls != 3 || iamClient.putBoundaryCalls != 6 || iamClient.putRolePolicyCalls != 6 || iamClient.listPolicyVersionCalls != 0 || iamClient.createPolicyVersionCalls != 0 || len(ssmClient.inputs) != 2 {
+	if iamClient.updateTrustCalls != 3 || iamClient.putBoundaryCalls != 6 || iamClient.putRolePolicyCalls != 8 || iamClient.listPolicyVersionCalls != 0 || iamClient.createPolicyVersionCalls != 0 || len(ssmClient.inputs) != 2 {
 		t.Fatal("existing identity settings were not reconciled")
 	}
 	for _, input := range ssmClient.inputs {
@@ -380,7 +386,7 @@ func TestIdentityEnsureRecoversAfterPartialRoleFailure(t *testing.T) {
 	if err := bootstrapper.Ensure(context.Background(), plan); err != nil {
 		t.Fatal(err)
 	}
-	if iamClient.createRoleCalls != 3 || iamClient.putRolePolicyCalls != 4 || len(ssmClient.inputs) != 1 {
+	if iamClient.createRoleCalls != 3 || iamClient.putRolePolicyCalls != 5 || len(ssmClient.inputs) != 1 {
 		t.Fatal("partial role failure was not resumed safely")
 	}
 }

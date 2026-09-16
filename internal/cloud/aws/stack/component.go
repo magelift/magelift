@@ -11,6 +11,7 @@ import (
 	"github.com/magelift/magelift/internal/cloud/aws/cache"
 	"github.com/magelift/magelift/internal/cloud/aws/database"
 	"github.com/magelift/magelift/internal/cloud/aws/edge"
+	"github.com/magelift/magelift/internal/cloud/aws/email"
 	"github.com/magelift/magelift/internal/cloud/aws/ingress"
 	"github.com/magelift/magelift/internal/cloud/aws/network"
 	"github.com/magelift/magelift/internal/cloud/aws/observability"
@@ -40,6 +41,7 @@ type Component struct {
 	Search          *search.Component
 	Queue           *queue.Component
 	Storage         *storage.Component
+	Email           *email.Component
 	Edge            *edge.Component
 	Observability   *observability.Component
 }
@@ -215,12 +217,30 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	if err != nil {
 		return nil, fmt.Errorf("create AWS media storage: %w", err)
 	}
+	smtpHost := pulumi.String("").ToStringOutput()
+	smtpUsername := pulumi.String("").ToStringOutput()
+	smtpSecretARN := pulumi.String("").ToStringOutput()
+	if spec.Email.Managed {
+		emailComponent, err := email.New(ctx, name+"-email", email.Args{
+			Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+			Domain: spec.Email.Domain, HostedZoneID: spec.Email.HostedZoneID,
+			Region: spec.Identity.Region, RegionalProvider: providers.Regional, Tags: tags,
+		}, regional...)
+		if err != nil {
+			return nil, fmt.Errorf("create AWS SES email: %w", err)
+		}
+		component.Email = emailComponent
+		smtpHost = emailComponent.SmtpHost
+		smtpUsername = emailComponent.SmtpUsername
+		smtpSecretARN = emailComponent.SecretARN
+	}
 	capabilityConfig := &runtime.CapabilityConfig{
 		DatabaseWriterEndpoint: component.Database.WriterEndpoint, DatabaseName: spec.Dependencies.DatabaseName, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN),
 		CacheEndpoint: component.Cache.CachePrimaryEndpoint, SessionEndpoint: component.Cache.SessionPrimaryEndpoint,
 		SearchEndpoint: searchEndpoint, QueueMode: component.Queue.QueueMode, QueueEndpoint: component.Queue.AMQPEndpoint,
 		QueueUsername: pulumi.String(spec.Dependencies.MasterUsername),
 		MediaBucket:   component.Storage.BucketName,
+		SmtpHost:      smtpHost, SmtpUsername: smtpUsername, EmailFrom: spec.Email.From,
 	}
 	logGroups, err := observability.NewLogGroups(ctx, name+"-observability", observability.Args{
 		Region: spec.Identity.Region, EnvironmentClass: spec.Identity.EnvironmentClass, LogGroupPrefix: logGroupPrefix,
@@ -236,7 +256,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		ComputeMode: spec.Catalog.Fargate.ComputeMode, InstanceType: spec.Catalog.Fargate.InstanceType, InstanceAMI: spec.Catalog.Fargate.InstanceAMI, MinCapacity: spec.Catalog.Fargate.MinCapacity, MaxCapacity: spec.Catalog.Fargate.MaxCapacity,
 		ApplicationMode: spec.Application.Mode, ApplicationVersion: spec.Application.Version, WebRuntime: spec.Application.WebRuntime, Magento: spec.Application.Magento,
 		Region: spec.Identity.Region, VpcID: component.Network.VpcID.ToStringOutput(), PrivateSubnetIDs: privateSubnets,
-		Image: spec.Artifact.ImageDigest, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN), ContainerPort: frontendPort, VarnishImage: varnishImageFor(spec.Application.Mode), TaskCPU: strconv.Itoa(spec.Catalog.Fargate.CPU), TaskMemory: strconv.Itoa(spec.Catalog.Fargate.MemoryMiB), DesiredCount: spec.Catalog.Fargate.DesiredCount, QueueConsumerCount: queueConsumerCount(spec),
+		Image: spec.Artifact.ImageDigest, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN), ContainerPort: frontendPort, VarnishImage: varnishImageFor(spec.Application.Mode), TaskCPU: strconv.Itoa(spec.Catalog.Fargate.CPU), TaskMemory: strconv.Itoa(spec.Catalog.Fargate.MemoryMiB), DesiredCount: spec.Catalog.Fargate.DesiredCount, QueueConsumerCount: queueConsumerCount(spec), SmtpSecretARN: smtpSecretARN,
 		WebSecurityGroupID: component.Security.WebSecurityGroupID, TargetGroupARN: component.Ingress.TargetGroupARN,
 		Secrets: runtimeSecrets(spec), Identity: component.RuntimeIdentity,
 		Capabilities:     capabilityConfig,
@@ -488,6 +508,11 @@ func runtimeSecrets(spec Spec) []runtime.SecretReference {
 		runtime.SecretReference{Name: "MAGENTO_DC_SESSION__REDIS_PASSWORD", ARN: sessionSecret},
 		runtime.SecretReference{Name: "MAGENTO_DC_CRYPT__KEY", ARN: spec.Dependencies.EncryptionKeyARN},
 	)
+	if spec.Email.Managed {
+		secrets = append(secrets,
+			runtime.SecretReference{Name: "CONFIG__DEFAULT__SYSTEM__SMTP__PASSWORD", ARN: email.SmtpParameterARN(spec.Identity.Region, spec.Identity.AccountID, spec.Identity.Project, spec.Identity.Environment), JSONKey: "password"},
+		)
+	}
 	secrets = append(secrets, magentoAWSSecretOverlays(spec.Application.Magento)...)
 	return secrets
 }

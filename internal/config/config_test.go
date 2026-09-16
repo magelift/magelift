@@ -1567,67 +1567,34 @@ func TestInheritanceCycle(t *testing.T) {
 	}
 }
 
-func TestCloudSendGridRequiresCredentialSecret(t *testing.T) {
-	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: sendgrid}\ndefaults: {region: eu-west-3, preset: preview}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "email.credential") {
-		t.Fatalf("sendgrid without credential was accepted: %v", err)
-	}
-}
-
-func TestCloudSendGridRejectsPlaintextCredential(t *testing.T) {
-	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: sendgrid, credential: SG.not-a-secret}\ndefaults: {region: eu-west-3, preset: preview}", 1)
+func TestCloudSESRejectsPlaintextCredential(t *testing.T) {
+	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: ses, host: email-smtp.eu-west-3.amazonaws.com, port: 587, username: ses-smtp-user, credential: not-a-secret-ref}\ndefaults: {region: eu-west-3, preset: preview}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = f.Resolve("staging", ResolveOptions{})
 	if err == nil || !strings.Contains(err.Error(), "plaintext") {
-		t.Fatalf("plaintext SendGrid credential was accepted: %v", err)
+		t.Fatalf("plaintext SES credential was accepted: %v", err)
 	}
 }
 
-func TestCloudSendGridValidatesSecretReference(t *testing.T) {
-	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: sendgrid, credential: aws-secrets-manager://magelift/sendgrid}\ndefaults: {region: eu-west-3, preset: preview}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	effective, err := f.Resolve("staging", ResolveOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if effective.Config.Email.Mode != "sendgrid" {
-		t.Fatalf("mode = %q", effective.Config.Email.Mode)
-	}
-	if effective.Config.Email.Host != "smtp.sendgrid.net" || effective.Config.Email.Port != 587 || effective.Config.Email.Username != "apikey" {
-		t.Fatalf("sendgrid SMTP defaults = %+v", effective.Config.Email)
-	}
-	if effective.Config.Email.Credential != "aws-secrets-manager://magelift/sendgrid" {
-		t.Fatalf("credential = %q", effective.Config.Email.Credential)
-	}
-}
-
-func TestCloudSendGridRejectsGCPSecretOnAWS(t *testing.T) {
-	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: sendgrid, credential: gcp-secret-manager://projects/p/secrets/sendgrid/versions/latest}\ndefaults: {region: eu-west-3, preset: preview}", 1)
+func TestCloudSESRejectsGCPSecretOnAWS(t *testing.T) {
+	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: ses, host: email-smtp.eu-west-3.amazonaws.com, port: 587, username: ses-smtp-user, credential: gcp-secret-manager://projects/p/secrets/ses-smtp/versions/latest}\ndefaults: {region: eu-west-3, preset: preview}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = f.Resolve("staging", ResolveOptions{})
 	if err == nil || !strings.Contains(err.Error(), "aws-secrets-manager:// or ssm://") {
-		t.Fatalf("GCP SendGrid secret on AWS was accepted: %v", err)
+		t.Fatalf("GCP SES secret on AWS was accepted: %v", err)
 	}
 }
 
-func TestCloudSendGridAcceptsGCPSecretOnGCP(t *testing.T) {
+func TestCloudSESAcceptsGCPSecretOnGCP(t *testing.T) {
 	input := strings.Replace(base, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: gcp, runtime: gke-autopilot, gcp: {project: p, region: europe-west1}}", 1)
 	input = strings.Replace(input, "aws-secrets-manager://composer/auth", "gcp-secret-manager://projects/p/secrets/composer/versions/latest", 1)
-	input = strings.Replace(input, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: sendgrid, credential: gcp-secret-manager://projects/p/secrets/sendgrid/versions/latest}\ndefaults: {region: eu-west-3, preset: preview}", 1)
+	input = strings.Replace(input, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: ses, host: email-smtp.europe-west1.amazonaws.com, port: 587, username: ses-smtp-user, credential: gcp-secret-manager://projects/p/secrets/ses-smtp/versions/latest}\ndefaults: {region: eu-west-3, preset: preview}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)
@@ -1667,8 +1634,8 @@ func TestCloudSESValidatesSecretReference(t *testing.T) {
 	}
 }
 
-func TestPreviewOmitsEmailDoesNotReuseProductionSendGrid(t *testing.T) {
-	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: sendgrid, credential: aws-secrets-manager://magelift/sendgrid}\ndefaults: {region: eu-west-3, preset: preview}", 1)
+func TestPreviewOmitsEmailDoesNotReuseProductionSES(t *testing.T) {
+	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: ses, host: email-smtp.eu-west-3.amazonaws.com, port: 587, username: ses-smtp-user, credential: aws-secrets-manager://magelift/ses-smtp}\ndefaults: {region: eu-west-3, preset: preview}", 1)
 	input = strings.Replace(input, "extensions:", "  production:\n    class: production\n    account: \"123\"\n  preview:\n    inherits: production\n    class: preview\nextensions:", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
@@ -1678,7 +1645,7 @@ func TestPreviewOmitsEmailDoesNotReuseProductionSendGrid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("production: %v", err)
 	}
-	if production.Config.Email.Mode != "sendgrid" || production.Config.Email.Credential != "aws-secrets-manager://magelift/sendgrid" {
+	if production.Config.Email.Mode != "ses" || production.Config.Email.Credential != "aws-secrets-manager://magelift/ses-smtp" {
 		t.Fatalf("production email = %+v", production.Config.Email)
 	}
 	preview, err := f.Resolve("preview", ResolveOptions{})
@@ -1693,9 +1660,9 @@ func TestPreviewOmitsEmailDoesNotReuseProductionSendGrid(t *testing.T) {
 	}
 }
 
-func TestPreviewExplicitSendGridKeepsSecretReference(t *testing.T) {
-	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: sendgrid, credential: aws-secrets-manager://magelift/sendgrid-prod}\ndefaults: {region: eu-west-3, preset: preview}", 1)
-	input = strings.Replace(input, "extensions:", "  preview:\n    class: preview\n    email: {mode: sendgrid, credential: aws-secrets-manager://magelift/sendgrid-preview}\nextensions:", 1)
+func TestPreviewExplicitSESKeepsSecretReference(t *testing.T) {
+	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "email: {mode: ses, host: email-smtp.eu-west-3.amazonaws.com, port: 587, username: ses-smtp-user, credential: aws-secrets-manager://magelift/ses-prod}\ndefaults: {region: eu-west-3, preset: preview}", 1)
+	input = strings.Replace(input, "extensions:", "  preview:\n    class: preview\n    email: {mode: ses, host: email-smtp.eu-west-3.amazonaws.com, port: 587, username: ses-smtp-user, credential: aws-secrets-manager://magelift/ses-preview}\nextensions:", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)
@@ -1704,7 +1671,7 @@ func TestPreviewExplicitSendGridKeepsSecretReference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if effective.Config.Email.Credential != "aws-secrets-manager://magelift/sendgrid-preview" {
+	if effective.Config.Email.Credential != "aws-secrets-manager://magelift/ses-preview" {
 		t.Fatalf("preview email = %+v", effective.Config.Email)
 	}
 }
@@ -1868,5 +1835,220 @@ func TestSQSWithLockedComposerPackageIsAllowed(t *testing.T) {
 	}
 	if effective.Config.Application.Magento.QueueTransport != "sqs" || effective.Config.Application.Magento.QueueModule != "magelift/module-queue-sqs" {
 		t.Fatalf("queue integration = %#v", effective.Config.Application.Magento)
+	}
+}
+
+const managedEmailAWSBase = `schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: 2.4.8-p5, mode: integrated}
+build: {php: "8.3"}
+target: {provider: aws, runtime: ecs-fargate}
+defaults: {region: eu-west-3, preset: preview}
+environments: {staging: {}}
+`
+
+const managedEmailScalewayBase = `schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: 2.4.8-p5, mode: integrated}
+build: {php: "8.3"}
+target:
+  provider: scaleway
+  runtime: kapsule
+  scaleway:
+    projectId: 11111111-1111-1111-1111-111111111111
+defaults: {region: fr-par, preset: standard}
+environments: {staging: {}}
+`
+
+const managedEmailOVHBase = `schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: 2.4.8-p5, mode: integrated}
+build: {php: "8.3"}
+target:
+  provider: ovh
+  runtime: mks
+  ovh:
+    serviceName: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+defaults: {region: GRA9, preset: standard}
+environments: {staging: {}}
+`
+
+func TestManagedSESAcceptsDomainAndZone(t *testing.T) {
+	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: ses, from: shop@example.invalid, managed: {domain: example.invalid, hostedZoneId: Z1234567890ABC}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective, err := f.Resolve("staging", ResolveOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	managed := effective.Config.Email.Managed
+	if managed == nil || managed.Domain != "example.invalid" || managed.HostedZoneID != "Z1234567890ABC" {
+		t.Fatalf("managed = %#v", effective.Config.Email.Managed)
+	}
+}
+
+func TestManagedSESRequiresZone(t *testing.T) {
+	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: ses, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "managed.hostedZoneId") {
+		t.Fatalf("missing zone was accepted: %v", err)
+	}
+}
+
+func TestManagedSESRejectsBYOMix(t *testing.T) {
+	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: ses, host: email-smtp.eu-west-3.amazonaws.com, managed: {domain: example.invalid, hostedZoneId: Z123}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "cannot be combined") {
+		t.Fatalf("BYO/managed mix was accepted: %v", err)
+	}
+}
+
+func TestManagedSESRequiresAWSProvider(t *testing.T) {
+	input := strings.Replace(managedEmailScalewayBase, "environments: {staging: {}}", "email: {mode: ses, managed: {domain: example.invalid, hostedZoneId: Z123}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "requires target.provider aws") {
+		t.Fatalf("managed SES off AWS was accepted: %v", err)
+	}
+}
+
+func TestManagedSESRejectsOVHAccount(t *testing.T) {
+	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: ses, managed: {domain: example.invalid, hostedZoneId: Z123, account: shop}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "applies only to ovh") {
+		t.Fatalf("misplaced account was accepted: %v", err)
+	}
+}
+
+func TestTEMAcceptsFrParDomain(t *testing.T) {
+	input := strings.Replace(managedEmailScalewayBase, "environments: {staging: {}}", "email: {mode: tem, from: shop@example.invalid, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective, err := f.Resolve("staging", ResolveOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if effective.Config.Email.Managed == nil || effective.Config.Email.Managed.Domain != "example.invalid" {
+		t.Fatalf("managed = %#v", effective.Config.Email.Managed)
+	}
+}
+
+func TestTEMRequiresManagedBlock(t *testing.T) {
+	input := strings.Replace(managedEmailScalewayBase, "environments: {staging: {}}", "email: {mode: tem}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "requires a managed block") {
+		t.Fatalf("unmanaged TEM was accepted: %v", err)
+	}
+}
+
+func TestTEMRejectsNonFrParRegion(t *testing.T) {
+	input := strings.Replace(managedEmailScalewayBase, "defaults: {region: fr-par, preset: standard}", "defaults: {region: nl-1, preset: standard}", 1)
+	input = strings.Replace(input, "environments: {staging: {}}", "email: {mode: tem, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "only available in fr-par") {
+		t.Fatalf("non-fr-par TEM was accepted: %v", err)
+	}
+}
+
+func TestTEMRequiresScalewayProvider(t *testing.T) {
+	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: tem, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "only supported on scaleway") {
+		t.Fatalf("TEM off Scaleway was accepted: %v", err)
+	}
+}
+
+func TestOVHMailboxAcceptsDomainAndAccount(t *testing.T) {
+	input := strings.Replace(managedEmailOVHBase, "environments: {staging: {}}", "email: {mode: ovh, from: shop@example.invalid, managed: {domain: example.invalid, account: shop}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective, err := f.Resolve("staging", ResolveOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	managed := effective.Config.Email.Managed
+	if managed == nil || managed.Domain != "example.invalid" || managed.Account != "shop" {
+		t.Fatalf("managed = %#v", effective.Config.Email.Managed)
+	}
+}
+
+func TestOVHRequiresAccount(t *testing.T) {
+	input := strings.Replace(managedEmailOVHBase, "environments: {staging: {}}", "email: {mode: ovh, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "domain and account") {
+		t.Fatalf("accountless OVH was accepted: %v", err)
+	}
+}
+
+func TestOVHRequiresOVHProvider(t *testing.T) {
+	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: ovh, managed: {domain: example.invalid, account: shop}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "only supported on ovh") {
+		t.Fatalf("OVH mail off OVH was accepted: %v", err)
+	}
+}
+
+func TestManagedBlockRejectedOnSMTP(t *testing.T) {
+	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: smtp, host: mail.example.invalid, port: 2525, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "requires mode ses, tem, or ovh") {
+		t.Fatalf("managed block on smtp was accepted: %v", err)
+	}
+}
+
+func TestTEMRejectsHostedZoneID(t *testing.T) {
+	input := strings.Replace(managedEmailScalewayBase, "environments: {staging: {}}", "email: {mode: tem, managed: {domain: example.invalid, hostedZoneId: Z123}}\nenvironments: {staging: {}}", 1)
+	f, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.Resolve("staging", ResolveOptions{})
+	if err == nil || !strings.Contains(err.Error(), "applies only to ses") {
+		t.Fatalf("misplaced hostedZoneId was accepted: %v", err)
 	}
 }
