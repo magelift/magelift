@@ -35,9 +35,27 @@ const (
 )
 
 type Application struct {
-	Edition string
-	Version string
-	Mode    string
+	Edition    string
+	Version    string
+	Mode       string
+	WebRuntime string
+	Magento    MagentoSettings
+}
+
+// MagentoSettings mirrors the portable Magento runtime overlays so provider
+// plugins receive them without importing core config.
+type MagentoSettings struct {
+	FrontName        string
+	CookieDomain     string
+	UnsecureBaseURL  string
+	SecureBaseURL    string
+	CORSOrigins      []string
+	StorefrontOrigin string
+	ConsumersMode    string
+	ConsumerNames    []string
+	QueueTransport   string
+	QueueModule      string
+	Variables        map[string]string
 }
 
 // EdgeHealthIntent is the provider-neutral safety policy for an edge route.
