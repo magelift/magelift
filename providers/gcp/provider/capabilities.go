@@ -14,8 +14,8 @@ import (
 
 	container "cloud.google.com/go/container/apiv1"
 	containerpb "cloud.google.com/go/container/apiv1/containerpb"
+	"github.com/magelift/magelift/providers/gcp/auth"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	cloudbilling "google.golang.org/api/cloudbilling/v1"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/compute/v1"
@@ -75,9 +75,9 @@ func NewCapabilityClient(ctx context.Context) (*SDKCapabilityClient, error) {
 	if err != nil {
 		return nil, errors.New("create GCP Cloud SQL capability client failed")
 	}
-	tokenSource, err := google.DefaultTokenSource(ctx, "https://www.googleapis.com/auth/cloud-platform")
+	tokenSource, err := auth.DefaultTokenSource(ctx)
 	if err != nil {
-		return nil, errors.New("create GCP capability token source failed")
+		return nil, fmt.Errorf("create GCP capability token source: %w", err)
 	}
 	valkey := NewValkeyRESTClient(oauth2.NewClient(ctx, tokenSource), defaultValkeyBaseURL)
 	billing, err := cloudbilling.NewService(ctx, scopes)

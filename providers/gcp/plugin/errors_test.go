@@ -3,8 +3,10 @@ package plugin
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
+	"golang.org/x/oauth2"
 	"google.golang.org/api/googleapi"
 
 	"github.com/magelift/magelift/internal/automation"
@@ -71,6 +73,7 @@ func TestMapError(t *testing.T) {
 		{"upstream-retryable", &googleapi.Error{Code: 503}, sdk.ErrCodeUpstream, true},
 		{"upstream", &googleapi.Error{Code: 400}, sdk.ErrCodeUpstream, false},
 		{"concurrent", errors.New("[409] Conflict: Another update is currently in progress."), sdk.ErrCodeConflict, true},
+		{"refresh-failure", &oauth2.RetrieveError{ErrorCode: "invalid_grant"}, sdk.ErrCodeCredential, false},
 		{"locked", gcpstate.ErrLocked, sdk.ErrCodeConflict, false},
 		{"ownership", &automation.PreviewOwnershipError{}, sdk.ErrCodeConflict, false},
 		{"generic", errors.New("boom"), sdk.ErrCodeUpstream, false},
@@ -79,6 +82,9 @@ func TestMapError(t *testing.T) {
 		if operr := mapError(test.err); operr == nil || operr.Code != test.code || operr.Retryable != test.retryable {
 			t.Errorf("%s: error = %v", test.name, operr)
 		}
+	}
+	if operr := mapError(&oauth2.RetrieveError{ErrorCode: "invalid_grant"}); !strings.Contains(operr.Message, "re-authenticate") {
+		t.Errorf("refresh failure message = %q, want re-authentication guidance", operr.Message)
 	}
 	if mapError(nil) != nil {
 		t.Error("mapError(nil) is not nil")

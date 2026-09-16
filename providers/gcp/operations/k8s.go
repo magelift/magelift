@@ -10,8 +10,8 @@ import (
 
 	container "cloud.google.com/go/container/apiv1"
 	containerpb "cloud.google.com/go/container/apiv1/containerpb"
+	"github.com/magelift/magelift/providers/gcp/auth"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -33,9 +33,9 @@ func newGKEClientset(ctx context.Context, project, region, cluster string) (kube
 }
 
 func restConfigForGKE(ctx context.Context, project, region, cluster string) (*rest.Config, error) {
-	ts, err := google.DefaultTokenSource(ctx, "https://www.googleapis.com/auth/cloud-platform")
+	ts, err := auth.DefaultTokenSource(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("GCP token source: %w", err)
+		return nil, err
 	}
 	client, err := container.NewClusterManagerClient(ctx)
 	if err != nil {
