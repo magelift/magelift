@@ -12,6 +12,7 @@ var PluginMethods = map[Operation]string{
 	OpDescribe:               "Plugin.Describe",
 	OpValidateConfig:         "Plugin.ValidateConfig",
 	OpPlan:                   "Plugin.Plan",
+	OpPreview:                "Plugin.Preview",
 	OpApply:                  "Plugin.Apply",
 	OpOutputs:                "Plugin.Outputs",
 	OpDestroy:                "Plugin.Destroy",

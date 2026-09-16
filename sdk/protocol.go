@@ -111,6 +111,7 @@ const (
 	OpDescribe       Operation = "describe"
 	OpValidateConfig Operation = "validate-config"
 	OpPlan           Operation = "plan"
+	OpPreview        Operation = "preview"
 	OpApply          Operation = "apply"
 	OpOutputs        Operation = "outputs"
 	OpDestroy        Operation = "destroy"
@@ -160,14 +161,26 @@ type DescribeRequest struct {
 	ProtocolVersion string `json:"protocolVersion"`
 }
 
+// RuntimeAdvertisement names one served runtime and its certification tier.
+type RuntimeAdvertisement struct {
+	Runtime string                     `json:"runtime"`
+	Tier    ExtensionCertificationTier `json:"tier"`
+}
+
 // DescribeResponse carries the plugin identity and operation versions.
+// OutputKeys advertises the stack output keys so the core never duplicates
+// the provider list. Edge and Resilience advertise the native adapter
+// descriptors (nil when the provider has none).
 type DescribeResponse struct {
-	ProtocolVersion string             `json:"protocolVersion"`
-	ProviderID      string             `json:"providerId"`
-	ProviderVersion string             `json:"providerVersion"`
-	Operations      []OperationVersion `json:"operations"`
-	Runtimes        []string           `json:"runtimes"`
-	Error           *OperationError    `json:"error,omitempty"`
+	ProtocolVersion string                       `json:"protocolVersion"`
+	ProviderID      string                       `json:"providerId"`
+	ProviderVersion string                       `json:"providerVersion"`
+	Operations      []OperationVersion           `json:"operations"`
+	Runtimes        []RuntimeAdvertisement       `json:"runtimes"`
+	OutputKeys      []string                     `json:"outputKeys,omitempty"`
+	Edge            *EdgeAdapterDescriptor       `json:"edge,omitempty"`
+	Resilience      *ResilienceAdapterDescriptor `json:"resilience,omitempty"`
+	Error           *OperationError              `json:"error,omitempty"`
 }
 
 // Envelope carries core-resolved deployment coordinates. Every plan-scoped
@@ -179,7 +192,6 @@ type Envelope struct {
 	EnvironmentClass   string `json:"environmentClass"`
 	StackName          string `json:"stackName"`
 	StateBackendURL    string `json:"stateBackendUrl"`
-	SecretsProvider    string `json:"secretsProvider"`
 	Preset             string `json:"preset,omitempty"`
 	MonthlyBudgetCents int64  `json:"monthlyBudgetCents,omitempty"`
 	AppVersion         string `json:"appVersion,omitempty"`
@@ -191,11 +203,12 @@ type Envelope struct {
 // StoredPlan is a provider plan: stable identity fields the core may read
 // plus opaque bytes the core stores uninspected and returns verbatim.
 type StoredPlan struct {
-	StackName       string `json:"stackName"`
-	Provider        string `json:"provider"`
-	Runtime         string `json:"runtime"`
-	ImageDigest     string `json:"imageDigest"`
-	StateBackendURL string `json:"stateBackendUrl,omitempty"`
+	StackName       string                     `json:"stackName"`
+	Provider        string                     `json:"provider"`
+	Runtime         string                     `json:"runtime"`
+	Tier            ExtensionCertificationTier `json:"tier,omitempty"`
+	ImageDigest     string                     `json:"imageDigest"`
+	StateBackendURL string                     `json:"stateBackendUrl,omitempty"`
 	// DeployInputsJSON carries the JSON-encoded provider deploy inputs
 	// (for GCP, a kube.DeploySpec) so the core can construct deploy
 	// steps without reading the opaque plan.
@@ -240,8 +253,8 @@ type ValidateConfigResult struct {
 	Error    *OperationError `json:"error,omitempty"`
 }
 
-// StackCall invokes a plan-scoped lifecycle operation (apply, outputs,
-// destroy). The server unmarshals the opaque plan it stored.
+// StackCall invokes a plan-scoped lifecycle operation (preview, apply,
+// outputs, destroy). The server unmarshals the opaque plan it stored.
 // PreviewMetadataJSON optionally encodes an automation.PreviewMetadata for
 // preview ownership tracking.
 type StackCall struct {
@@ -261,7 +274,7 @@ type ChangeSummary struct {
 	Same    int `json:"same"`
 }
 
-// LifecycleResult carries apply/destroy outcomes.
+// LifecycleResult carries preview/apply/destroy outcomes.
 type LifecycleResult struct {
 	Summary     ChangeSummary   `json:"summary"`
 	Diagnostics []string        `json:"diagnostics,omitempty"`
