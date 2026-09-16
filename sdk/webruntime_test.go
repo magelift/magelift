@@ -94,7 +94,7 @@ func nginxWebRuntimeDescriptor() WebRuntimeDescriptor {
 		Tier:            ExtensionTierExperimental,
 		Adobe:           AdobeSupported,
 		MagentoReleases: []string{"2.4.6", "2.4.7", "2.4.8", "2.4.9"},
-		LocalCompose:    WebRuntimeComposeHints{ImageFamily: "php-runtime", HealthPath: WebRuntimeHealthPath},
+		LocalCompose:    WebRuntimeComposeHints{ImageFamily: "php-nginx", HealthPath: WebRuntimeHealthPath},
 		Cloud:           WebRuntimeCloudHints{Ports: []int{8080}, Placement: WebRuntimePlacementSidecar},
 	}
 }

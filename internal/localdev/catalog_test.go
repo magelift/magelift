@@ -50,7 +50,7 @@ func TestPlanSupportsArtemisNginxAndVarnishContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan.AppImage != "magelift/php-runtime:8.5-local" || plan.WebServer.Family != "nginx" {
+	if plan.AppImage != "magelift/php-nginx:8.5-local" || plan.WebServer.Family != "nginx" {
 		t.Fatalf("web runtime = %#v app=%q", plan.WebServer, plan.AppImage)
 	}
 	if plan.Queue.Family != "artemis" || plan.Queue.Connection.Scheme != "stomp" || plan.Queue.Connection.Port != 61613 {
@@ -89,7 +89,7 @@ func TestPlanFollowsRegisteredWebRuntime(t *testing.T) {
 		image      string
 		command    string
 	}{
-		{webRuntime: "nginx-fpm", family: "nginx", image: "magelift/php-runtime:8.5-local", command: "php-fpm --daemonize && exec nginx"},
+		{webRuntime: "nginx-fpm", family: "nginx", image: "magelift/php-nginx:8.5-local", command: "php-fpm --daemonize && exec nginx"},
 		{webRuntime: "frankenphp-classic", family: "frankenphp-classic", image: "magelift/frankenphp-classic:8.5-local", command: `command: ["frankenphp", "run"]`},
 		{webRuntime: "php-apache", family: "php-apache", image: "magelift/php-apache:8.5-local", command: "php-fpm --daemonize && exec apache2ctl -D FOREGROUND"},
 	} {

@@ -1,6 +1,6 @@
 # Container images
 
-`php-runtime` is the common PHP-FPM and nginx base for Magento application images. The
+`php-nginx` is the common PHP-FPM and nginx base for Magento application images. The
 certified matrix covers PHP 8.2 through 8.5 on Debian Trixie. PHP 8.2 and 8.3
 receive security fixes from PHP upstream, while PHP 8.4 and 8.5 receive active
 support. Magento release lines still tied to PHP 8.1 are not available because
@@ -32,7 +32,7 @@ send the load balancer there; headless tasks send traffic directly to nginx on
 port 8080. Both nginx and FrankenPHP short-circuit `GET /health` with `200 OK`
 (no Magento bootstrap). Integrated ALB health checks hit Varnish, which must
 pass `/health` through to that short-circuit (see `images/varnish/default.vcl`).
-Acceptance digests must be MageLift runtime images (`php-runtime` or
+Acceptance digests must be MageLift runtime images (`php-nginx` or
 `frankenphp-classic`). A bare Magento app image without `/health` will flap ALB
 targets. Runtime images include `curl` for the ECS container health check.
 Varnish keeps its root filesystem read-only and receives only a
@@ -44,7 +44,7 @@ storage when the root filesystem is read-only.
 Build the local PHP 8.5 image:
 
 ```sh
-docker buildx bake php-runtime --load
+docker buildx bake php-nginx --load
 ```
 
 The integrated Varnish sidecar contract can be checked without an AWS account:
@@ -68,7 +68,7 @@ docker buildx bake php-apache --load
 Build the supported multi-platform matrix for a registry exporter:
 
 ```sh
-docker buildx bake php-runtime-supported php-builder-supported --push
+docker buildx bake php-nginx-supported php-builder-supported --push
 ```
 
 Registry builds attach an SPDX SBOM and SLSA v1 provenance. Max provenance records
@@ -78,10 +78,18 @@ digest after registry publication. Pull-request jobs neither push nor request an
 token.
 
 Tagged releases publish the supported matrix to GHCR as
-`ghcr.io/magelift/magelift-runtime`, `ghcr.io/magelift/magelift-builder`, and
+`ghcr.io/magelift/magelift-nginx`, `ghcr.io/magelift/magelift-builder`, and
 `ghcr.io/magelift/magelift-frankenphp-classic`. Each PHP branch receives a stable
 branch tag and a release tag. Deployments should pin the digest printed by the
 release workflow; tags are convenience aliases, not release identity.
+
+## Default image policy
+
+Local builds and tests resolve the `:local` bake tags (for example
+`magelift/php-nginx:local`). CLI defaults move to GHCR-versioned digests only
+after the first stable tag, in a separate change; this change implements no
+GHCR pull. The nginx GHCR repo is `ghcr.io/magelift/magelift-nginx`. The
+Varnish sidecar stays pinned to `docker.io/library/varnish:8.0.2@sha256:4b595728592a5b9709c9aac15368ca492e9742fb269ed12466b434a62b2c1b63`.
 
 The base contains no Magento source or credentials. A later application-image stage
 will copy the validated build output and artifact manifest into this runtime.

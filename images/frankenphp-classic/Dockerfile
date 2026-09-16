@@ -49,12 +49,12 @@ RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
     && rm -rf /tmp/pear \
     && rm -rf /var/lib/apt/lists/*
 
-COPY images/php-runtime/php.ini /usr/local/etc/php/conf.d/zz-magelift.ini
+COPY images/php-nginx/php.ini /usr/local/etc/php/conf.d/zz-magelift.ini
 COPY images/frankenphp-classic/Caddyfile /etc/frankenphp/Caddyfile
 RUN install -d -o root -g root /usr/local/lib/magelift
-COPY images/php-runtime/deployment-config.php /usr/local/lib/magelift/deployment-config.php
+COPY images/php-nginx/deployment-config.php /usr/local/lib/magelift/deployment-config.php
 RUN install -d -o magelift -g magelift /app/app/etc
-COPY --chown=magelift:magelift images/php-runtime/env.php /app/app/etc/env.php
+COPY --chown=magelift:magelift images/php-nginx/env.php /app/app/etc/env.php
 
 WORKDIR /app
 USER magelift

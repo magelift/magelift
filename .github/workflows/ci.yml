@@ -316,7 +316,7 @@ jobs:
       - name: Build runtime and builder
         run: >-
           docker buildx bake
-          php-runtime-${{ matrix.php.target }}
+          php-nginx-${{ matrix.php.target }}
           php-builder-${{ matrix.php.target }}
           --load
           --provenance=false
@@ -326,11 +326,12 @@ jobs:
         env:
           PHP_BRANCH: ${{ matrix.php.branch }}
         run: |
-          image="magelift/php-runtime:${PHP_BRANCH}-local"
+          image="magelift/php-nginx:${PHP_BRANCH}-local"
           test "$(docker run --rm "$image" id -u)" = 10001
           test "$(docker run --rm "$image" php -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" = "$PHP_BRANCH"
           test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.php.branch" }}')" = "$PHP_BRANCH"
           test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.nginx.version" }}')" = "1.30.4"
+          test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.web-runtime" }}')" = "php-nginx"
           docker run --rm "$image" php-fpm --test
           test "$(docker run --rm --entrypoint nginx "$image" -v 2>&1)" = "nginx version: nginx/1.30.4"
           docker run --rm --entrypoint nginx "$image" -t -c /etc/nginx/nginx.conf
@@ -341,7 +342,7 @@ jobs:
           PHP_BRANCH: ${{ matrix.php.branch }}
         run: |
           image="magelift/php-builder:${PHP_BRANCH}-local"
-          runtime="magelift/php-runtime:${PHP_BRANCH}-local"
+          runtime="magelift/php-nginx:${PHP_BRANCH}-local"
           test "$(docker run --rm --entrypoint id "$image" -u)" = 10001
           test "$(docker run --rm --entrypoint php "$image" -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" = "$PHP_BRANCH"
           test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.php.base" }}')" = "$(docker image inspect "$runtime" --format '{{ index .Config.Labels "io.magelift.php.base" }}')"
@@ -349,7 +350,7 @@ jobs:
       - name: Scan runtime image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: magelift/php-runtime:${{ matrix.php.branch }}-local
+          image-ref: magelift/php-nginx:${{ matrix.php.branch }}-local
           format: table
           ignore-unfixed: true
           severity: CRITICAL,HIGH
@@ -570,8 +571,8 @@ jobs:
       - cache-prime
       - lint
       - go-verify
-      - docs
       - sdk-verify
+      - docs
       - php
       - container
       - frankenphp

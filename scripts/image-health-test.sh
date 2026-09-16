@@ -10,7 +10,7 @@ trap cleanup EXIT
 
 case "$mode" in
 nginx)
-	image="${MAGELIFT_PHP_RUNTIME_IMAGE:-magelift/php-runtime:local}"
+	image="${MAGELIFT_PHP_NGINX_IMAGE:-magelift/php-nginx:local}"
 	docker run -d --name "$name" -p "127.0.0.1:${port}:8080" --entrypoint nginx \
 		"$image" -g 'daemon off;' -c /etc/nginx/nginx.conf >/dev/null
 	;;

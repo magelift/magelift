@@ -59,6 +59,7 @@ ARG NGINX_BASE
 LABEL io.magelift.php.branch="${PHP_BRANCH}" \
       io.magelift.php.base="${PHP_BASE}" \
       io.magelift.nginx.version="1.30.4" \
+      io.magelift.web-runtime="php-nginx" \
       io.magelift.base.family="debian-trixie"
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -83,17 +84,17 @@ COPY --from=nginx /etc/nginx/mime.types /etc/nginx/mime.types
 COPY --from=nginx /etc/nginx/fastcgi_params /etc/nginx/fastcgi_params
 COPY --from=extensions /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 COPY --from=extensions /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
-COPY images/php-runtime/php.ini /usr/local/etc/php/conf.d/zz-magelift.ini
-COPY images/php-runtime/www.conf /usr/local/etc/php-fpm.d/zz-magelift.conf
-COPY images/php-runtime/nginx.conf /etc/nginx/nginx.conf
+COPY images/php-nginx/php.ini /usr/local/etc/php/conf.d/zz-magelift.ini
+COPY images/php-nginx/www.conf /usr/local/etc/php-fpm.d/zz-magelift.conf
+COPY images/php-nginx/nginx.conf /etc/nginx/nginx.conf
 
 RUN install -d -o magelift -g magelift /var/cache/nginx /var/log/nginx
 
 RUN install -d -o root -g root /usr/local/lib/magelift
-COPY images/php-runtime/deployment-config.php /usr/local/lib/magelift/deployment-config.php
+COPY images/php-nginx/deployment-config.php /usr/local/lib/magelift/deployment-config.php
 
 RUN install -d -o magelift -g magelift /app/app/etc
-COPY --chown=magelift:magelift images/php-runtime/env.php /app/app/etc/env.php
+COPY --chown=magelift:magelift images/php-nginx/env.php /app/app/etc/env.php
 
 WORKDIR /app
 USER magelift

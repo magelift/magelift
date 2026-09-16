@@ -64,7 +64,7 @@ __MAGELIFT_SESSION_SERVICE__
 __MAGELIFT_MAILPIT_SERVICE__
   app:
     profiles: ["app"]
-    image: ${MAGELIFT_LOCAL_APP_IMAGE:-magelift/php-runtime:8.5-local}
+    image: ${MAGELIFT_LOCAL_APP_IMAGE:-magelift/php-nginx:8.5-local}
     env_file:
       - local.env
     environment:

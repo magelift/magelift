@@ -22,7 +22,7 @@ A pushed build requires registry digests for both MageLift base images. Tags are
 magelift build --push \
   --image ghcr.io/example/shop:candidate \
   --builder-image ghcr.io/magelift/magelift-builder@sha256:BUILDER_DIGEST \
-  --runtime-image ghcr.io/magelift/magelift-runtime@sha256:RUNTIME_DIGEST
+  --runtime-image ghcr.io/magelift/magelift-nginx@sha256:RUNTIME_DIGEST
 ```
 
 MageLift builds `linux/amd64` and `linux/arm64` by default. Use `--platform` to choose a smaller tested set.
@@ -34,7 +34,7 @@ magelift build --push \
   --source-url https://github.com/example/shop.git \
   --image ghcr.io/example/shop:candidate \
   --builder-image ghcr.io/magelift/magelift-builder@sha256:BUILDER_DIGEST \
-  --runtime-image ghcr.io/magelift/magelift-runtime@sha256:RUNTIME_DIGEST
+  --runtime-image ghcr.io/magelift/magelift-nginx@sha256:RUNTIME_DIGEST
 ```
 
 The CLI adds the full inspected commit checksum to the provenance URL. It rejects URL credentials and unrelated query parameters so they cannot enter image labels or attestations.

@@ -11,7 +11,7 @@ import (
 func TestResolveUsesDefaultTagsAndExactInspectArgv(t *testing.T) {
 	idA := "sha256:" + strings.Repeat("a", 64)
 	idB := "sha256:" + strings.Repeat("b", 64)
-	runtimeReference := "magelift/php-runtime@" + idB
+	runtimeReference := "magelift/php-nginx@" + idB
 	command := &fakeCommand{results: []commandResult{{output: idA + "\n"}, {output: idB + "\r\n"}, {output: runtimeReference + "\n"}}}
 
 	images, err := NewResolver(command, DefaultBuilderTag, DefaultRuntimeTag).Resolve(context.Background())
