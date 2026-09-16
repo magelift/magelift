@@ -18,7 +18,7 @@ func TestRegisterDefaultsExposesNginxAndAdobeFlags(t *testing.T) {
 	if descriptor.ID != sdk.WebRuntimeNginxFPM || descriptor.Adobe != sdk.AdobeSupported || descriptor.Version == "" {
 		t.Fatalf("nginx-fpm descriptor = %#v", descriptor)
 	}
-	if descriptor.LocalCompose.ImageFamily != "php-runtime" || descriptor.Cloud.Placement != sdk.WebRuntimePlacementSidecar {
+	if descriptor.LocalCompose.ImageFamily != "php-nginx" || descriptor.Cloud.Placement != sdk.WebRuntimePlacementSidecar {
 		t.Fatalf("nginx-fpm contract = %#v", descriptor)
 	}
 

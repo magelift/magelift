@@ -29,7 +29,7 @@ func nginxFPM() sdk.WebRuntime {
 		Tier:            sdk.ExtensionTierCertified,
 		Adobe:           sdk.AdobeSupported,
 		MagentoReleases: append([]string(nil), firstPartyMagentoReleases...),
-		LocalCompose:    sdk.WebRuntimeComposeHints{ImageFamily: "php-runtime", HealthPath: sdk.WebRuntimeHealthPath},
+		LocalCompose:    sdk.WebRuntimeComposeHints{ImageFamily: "php-nginx", HealthPath: sdk.WebRuntimeHealthPath},
 		Cloud:           sdk.WebRuntimeCloudHints{Ports: []int{8080}, Placement: sdk.WebRuntimePlacementSidecar},
 	}}
 }

@@ -25,7 +25,7 @@ func TestBuildPipelineRequestCreatesReleaseRequest(t *testing.T) {
 		Push:           true,
 		ImageReference: "ghcr.io/magelift/shop:revision",
 		BuilderImage:   "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("b", 64),
-		RuntimeImage:   "ghcr.io/magelift/magelift-runtime@sha256:" + strings.Repeat("c", 64),
+		RuntimeImage:   "ghcr.io/magelift/magelift-nginx@sha256:" + strings.Repeat("c", 64),
 		Repository: source.Repository{
 			Revision:  revision,
 			OriginURL: "https://github.com/acourtiol/shop.git",

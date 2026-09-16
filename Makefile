@@ -50,13 +50,13 @@ php-test: ## Validate and test the Composer package
 	php build/vendor/bin/phpunit -c build/phpunit.xml --fail-on-deprecation --fail-on-notice --fail-on-warning
 
 image-test: ## Build and inspect the local PHP runtime image
-	docker buildx bake php-runtime --load
-	test "$$(docker run --rm magelift/php-runtime:local id -u)" = 10001
-	docker run --rm magelift/php-runtime:local php-fpm --test
-	test "$$(docker run --rm --entrypoint nginx magelift/php-runtime:local -v 2>&1)" = "nginx version: nginx/1.30.4"
-	docker run --rm --entrypoint nginx magelift/php-runtime:local -t -c /etc/nginx/nginx.conf
-	docker run --rm --read-only --tmpfs /tmp:uid=10001,gid=10001 magelift/php-runtime:local php -r 'file_put_contents(sys_get_temp_dir()."/probe", "ok");'
-	docker run --rm magelift/php-runtime:local php -r '$$required = ["apcu", "bcmath", "ftp", "gd", "intl", "mbstring", "pdo_mysql", "redis", "soap", "sockets", "sodium", "xsl", "zip", "Zend OPcache"]; $$missing = array_values(array_filter($$required, fn(string $$extension): bool => !extension_loaded($$extension))); if ($$missing !== []) { fwrite(STDERR, "Missing PHP extensions: " . implode(", ", $$missing) . PHP_EOL); exit(1); }'
+	docker buildx bake php-nginx --load
+	test "$$(docker run --rm magelift/php-nginx:local id -u)" = 10001
+	docker run --rm magelift/php-nginx:local php-fpm --test
+	test "$$(docker run --rm --entrypoint nginx magelift/php-nginx:local -v 2>&1)" = "nginx version: nginx/1.30.4"
+	docker run --rm --entrypoint nginx magelift/php-nginx:local -t -c /etc/nginx/nginx.conf
+	docker run --rm --read-only --tmpfs /tmp:uid=10001,gid=10001 magelift/php-nginx:local php -r 'file_put_contents(sys_get_temp_dir()."/probe", "ok");'
+	docker run --rm magelift/php-nginx:local php -r '$$required = ["apcu", "bcmath", "ftp", "gd", "intl", "mbstring", "pdo_mysql", "redis", "soap", "sockets", "sodium", "xsl", "zip", "Zend OPcache"]; $$missing = array_values(array_filter($$required, fn(string $$extension): bool => !extension_loaded($$extension))); if ($$missing !== []) { fwrite(STDERR, "Missing PHP extensions: " . implode(", ", $$missing) . PHP_EOL); exit(1); }'
 	./scripts/image-health-test.sh nginx
 
 frankenphp-image-test: ## Build and inspect the FrankenPHP classic adapter

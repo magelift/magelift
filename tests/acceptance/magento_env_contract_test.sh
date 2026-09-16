@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-env_file="$repo_root/images/php-runtime/env.php"
-fpm_pool_file="$repo_root/images/php-runtime/www.conf"
+env_file="$repo_root/images/php-nginx/env.php"
+fpm_pool_file="$repo_root/images/php-nginx/www.conf"
 
 grep -Fq "'user' => '#env(MAGENTO_DC_QUEUE__AMQP__USERNAME, \"magento\")'" "$env_file"
 grep -Fq "'password' => '#env(MAGENTO_DC_QUEUE__AMQP__PASSWORD)'" "$env_file"

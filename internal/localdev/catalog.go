@@ -447,7 +447,7 @@ func chooseWebServer(requested config.LocalService, webRuntime, php string) (Loc
 	var expectedFamily, version, image string
 	switch webRuntime {
 	case "nginx-fpm":
-		expectedFamily, version, image = "nginx", "1.30", "magelift/php-runtime:"+phpBranch(php)+"-local"
+		expectedFamily, version, image = "nginx", "1.30", "magelift/php-nginx:"+phpBranch(php)+"-local"
 	case "frankenphp-classic":
 		expectedFamily, version, image = "frankenphp-classic", "1.12.7", "magelift/frankenphp-classic:"+phpBranch(php)+"-local"
 	case "php-apache":
@@ -667,7 +667,7 @@ func ComposeTemplateFor(plan RuntimePlan) string {
 	template = strings.Replace(template, localMySQL84Image, plan.Database.Image, 1)
 	template = strings.Replace(template, localValkey9Image, plan.Cache.Image, 1)
 	template = strings.Replace(template, localOpenSearch3Image, plan.Search.Image, 1)
-	template = strings.Replace(template, "magelift/php-runtime:8.5-local", plan.AppImage, 1)
+	template = strings.Replace(template, "magelift/php-nginx:8.5-local", plan.AppImage, 1)
 	template = strings.Replace(template, "__MAGELIFT_QUEUE_SERVICE__", composeQueueService(plan.Queue), 1)
 	template = strings.Replace(template, "__MAGELIFT_SESSION_SERVICE__", composeSessionService(plan), 1)
 	template = strings.Replace(template, "__MAGELIFT_MAILPIT_SERVICE__", composeMailpitService(plan.Email), 1)

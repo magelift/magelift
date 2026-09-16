@@ -146,7 +146,7 @@ for the shared `jq`/Mike Farah `yq` v4 preflight and the no-auto-install policy.
 - Secrets Manager ARNs referenced by config, especially
   `target.aws.encryptionKeySecretArn`
 - A signed immutable image digest and matching Cosign identity. **Must** be a
-  MageLift runtime image (`php-runtime`, nginx + PHP-FPM) so `GET /health`
+  MageLift runtime image (`php-nginx`, nginx + PHP-FPM) so `GET /health`
   returns 200 without Magento bootstrap (ALB + ECS container health)
 - A `magelift.yaml` environment named for the profile you will run (`preview`
   recommended)

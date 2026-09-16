@@ -1,22 +1,22 @@
 group "default" {
-  targets = ["php-runtime"]
+  targets = ["php-nginx"]
 }
 
-target "php-runtime" {
+target "php-nginx" {
   context    = "."
-  dockerfile = "images/php-runtime/Dockerfile"
+  dockerfile = "images/php-nginx/Dockerfile"
   target     = "runtime"
-  tags       = ["magelift/php-runtime:local"]
+  tags       = ["magelift/php-nginx:local"]
 }
 
 target "php-builder" {
-  inherits = ["php-runtime"]
+  inherits = ["php-nginx"]
   target   = "builder"
   tags     = ["magelift/php-builder:local"]
 }
 
-target "php-runtime-supported" {
-  inherits = ["php-runtime"]
+target "php-nginx-supported" {
+  inherits = ["php-nginx"]
   platforms = ["linux/amd64", "linux/arm64"]
   attest = [
     "type=sbom",
@@ -30,16 +30,16 @@ target "php-runtime-supported" {
       { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:70076c1cae0cd0ba6761832417e3a1df3e5560f0544eb0fe40357373e54420fe" },
     ]
   }
-  name = "php-runtime-${replace(php.branch, ".", "-")}"
+  name = "php-nginx-${replace(php.branch, ".", "-")}"
   args = {
     PHP_BASE = php.base
     PHP_BRANCH = php.branch
   }
-  tags = ["magelift/php-runtime:${php.branch}-local"]
+  tags = ["magelift/php-nginx:${php.branch}-local"]
 }
 
 target "php-builder-supported" {
-  inherits = ["php-runtime"]
+  inherits = ["php-nginx"]
   platforms = ["linux/amd64", "linux/arm64"]
   attest = [
     "type=sbom",

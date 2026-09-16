@@ -11,7 +11,7 @@ import (
 
 const (
 	DefaultBuilderTag = "magelift/php-builder:local"
-	DefaultRuntimeTag = "magelift/php-runtime:local"
+	DefaultRuntimeTag = "magelift/php-nginx:local"
 	maxImageIDBytes   = 80
 )
 

@@ -89,7 +89,21 @@ updates:
       prefix: chore
       include: scope
   - package-ecosystem: docker
-    directory: /images/php-runtime
+    directory: /images/php-nginx
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 2
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      docker-base-images:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /images/php-apache
     schedule:
       interval: weekly
     cooldown:
