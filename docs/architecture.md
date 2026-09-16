@@ -224,14 +224,19 @@ infrastructure; generated CI uses the CI role for Pulumi, ECS, and managed-servi
 changes, while the build job uses the build role.
 
 Magento containers (php-fpm, web/nginx, Varnish, cron, consumers) use a writable
-root (`ReadonlyRootFilesystem: false`): Magento needs to write `env.php`,
-generated files, and the nginx pid, and Fargate empty volumes mount as
-root-owned, so overlaying `/tmp` or `/app/var` would break the non-root
-runtime. Only the search-proxy sidecar runs with a read-only root. The image
-contains only a non-secret `env.php` scaffold. ECS Secrets Manager selectors inject the managed
-database JSON fields and the stable Magento encryption key, while Adobe's
-`MAGENTO_DC_*` environment configuration supplies capability endpoints and
-credentials at task start.
+root. On ECS the flag is explicit (`ReadonlyRootFilesystem: false`):
+Magento needs to write `env.php`, generated files, and the nginx pid, and
+Fargate empty volumes mount as root-owned, so overlaying `/tmp` or
+`/app/var` would break the non-root runtime. On GKE the workload
+specifiers set no `SecurityContext`, so the same writable default holds
+for the same writable set (`internal/cloud/kube/web.go`,
+`providers/gcp/runtime/runtime.go`). Only the search-proxy sidecar runs
+with a read-only root. The image contains only a non-secret `env.php`
+scaffold. ECS Secrets Manager selectors inject the managed database JSON
+fields and the stable Magento encryption key; GKE mounts Secret Manager
+values through Kubernetes Secrets consumed by `SecretKeyRef` only
+(`internal/cloud/kube/secrets.go`). Adobe's `MAGENTO_DC_*` environment
+configuration supplies capability endpoints and credentials at task start.
 
 ### Runtime storage (definitive writable set, 2026-09-16)
 
@@ -242,10 +247,12 @@ locales plus themes (`build.staticContent` is required). Written at runtime:
 `MAGENTO_DC_*` values), disposable `var/` (cache, page cache, logs, tmp),
 and `/tmp` (nginx pid, Varnish VSM at `/tmp/varnish`, probe scratch).
 Durable state lives outside the container filesystem: media in buckets,
-sessions in Valkey, secrets in Secrets Manager, state in versioned
+sessions in Valkey, secrets in the cloud secret store, state in versioned
 backups. Writable root is the deliberate alpha answer for this set
-(`internal/cloud/aws/runtime/containers.go`); no read-only flip is planned
-until a writable-storage design proves itself against these requirements.
+(`internal/cloud/aws/runtime/containers.go`, GKE unset container
+`SecurityContext` in `internal/cloud/kube/web.go`); no read-only flip is
+planned until a writable-storage design proves itself against these
+requirements.
 
 ### Alpha security review (minimum, 2026-09-16)
 
@@ -255,31 +262,50 @@ not claimed here.
 
 - Secret references: reviewed. YAML carries references only; validation
   rejects plaintext for Composer credentials, Magento variables, email
-  credentials, and edge tokens (`internal/config/config.go`).
+  credentials, and edge tokens (`internal/config/config.go`). GCP consumes
+  Secret Manager values through Kubernetes Secrets referenced by `SecretKeyRef`
+  only, and plugin errors pass a credential redactor before crossing the
+  wire (`internal/cloud/kube/secrets.go`,
+  `providers/gcp/plugin/server.go`).
 - Log redaction: reviewed within its design boundary. Reference-only config
   keeps secret values out of YAML, logs, and evidence; `env dump` warns its
   output is unsanitized unless `--sanitize` (mailbox-address hashing only,
   not certified anonymization) and database passwords travel via environment
   variables unprinted (`internal/cli/env.go`). No global log-scanning
   redactor is claimed.
-- Least-privilege permissions: reviewed. Bootstrap mints a state role that
-  cannot mutate infrastructure, a repository-scoped CI role for Pulumi and
-  service changes, and a read-only build role for MageLift-scoped secrets
-  (`internal/cloud/aws/bootstrap`; see the IAM paragraph above).
-- Network exposure: reviewed for workload isolation. Workload security groups
-  accept ingress only within the VPC CIDR; workloads sit in private subnets
-  with NAT egress (`internal/cloud/aws/network/network.go`). The public
-  surface is the load balancer by storefront design; a rule-by-rule edge
-  audit stays with the full review.
+- Least-privilege permissions: reviewed per provider. AWS bootstrap mints
+  a state role that cannot mutate infrastructure, a repository-scoped CI
+  role for Pulumi and service changes, and a read-only build role for
+  MageLift-scoped secrets (`internal/cloud/aws/bootstrap`; see the IAM
+  paragraph above). GCP bootstrap mints the pool, provider, and service
+  account plus the repository-scoped impersonation binding only
+  (`providers/gcp/bootstrap/identity.go`); API roles on the CI service
+  account stay an operator step (see `docs/onboarding.md`), and the
+  state bucket is private with versioning plus soft-delete by default.
+- Network exposure: reviewed for workload isolation. On AWS, workload
+  security groups accept ingress only within the VPC CIDR; workloads sit
+  in private subnets with NAT egress
+  (`internal/cloud/aws/network/network.go`). On GCP, the cluster is
+  VPC-native on private subnets with private Standard nodes
+  (`providers/gcp/runtime/runtime.go`); the control-plane endpoint
+  stays public by default and no Kubernetes network policies are
+  installed — stated here as the shipped posture, not as a claim of
+  hardening. The public surface is the load balancer by storefront
+  design; a rule-by-rule edge audit stays with the full review.
 - Artifact trust: reviewed. Images build once and promote by digest; `magelift
   upgrade` verifies the keyless Sigstore bundle for `checksums.txt` then the
   archive SHA-256 before atomic replace (`docs/operations.md`, upgrade
   command). AWS acceptance requires a signed immutable runtime digest with a
-  matching Cosign identity (`docs/aws-acceptance.md`).
+  matching Cosign identity (`docs/aws-acceptance.md`); GCP plan validation
+  requires `repository@sha256:` digests and the CLI verifies the plugin
+  binary digest plus Cosign bundle before spawn
+  (`providers/gcp/stack/spec.go`, `internal/providerhost`).
 - Recovery material: reviewed. State backups are versioned snapshots under
-  the deployment lock with 90-day retention; incomplete multipart uploads are
-  removed after seven days; the bootstrap lock object reports its owner
-  (`docs/operations.md`, state commands).
+  the deployment lock and the bootstrap lock object reports its owner
+  (`docs/operations.md`, state commands). AWS keeps 90-day retention and
+  removes incomplete multipart uploads after seven days; GCP keeps bucket
+  versioning with seven-day soft-delete
+  (`providers/gcp/bootstrap/bootstrap.go`).
 
 ## Local development
 
