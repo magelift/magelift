@@ -1,4 +1,8 @@
-# Report: v1-stable-cut tag half (order 14)
+> HISTORICAL 2026-09-16: PENDING report retained as-is. Superseded by
+> `intent/audit.md` — the stable cut is deferred past alpha, the tag ref is
+> stale, and this report is not approval of any current scope.
+
+# Report: v1-stable-cut tag half (order 14) (HISTORICAL, PENDING)
 
 The tag, README flip, and install-doc flip stay the user's release
 call. This report covers gate re-verification only. No tag created.

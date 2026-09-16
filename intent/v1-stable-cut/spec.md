@@ -1,9 +1,13 @@
 ---
-status: specified
+status: superseded
 slug: v1-stable-cut
 intent: intent.md
 half: tag (engineering half passed as order 7; see git history)
 ---
+
+> HISTORICAL 2026-09-16: superseded by `intent/audit.md` (stable cut deferred
+> past alpha). Retained for reference; the tag gates and phantom-tag notes are
+> history, not the current release plan. Do not implement from this spec.
 
 # Spec: v1-stable-cut tag half
 

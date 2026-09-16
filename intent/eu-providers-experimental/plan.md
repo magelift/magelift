@@ -1,8 +1,12 @@
 ---
-status: planned
+status: superseded
 slug: eu-providers-experimental
 spec: spec.md
 ---
+
+> HISTORICAL 2026-09-16: retained as-is (Scaleway GREEN, OVH PARKED).
+> Superseded as an active plan by `intent/audit.md` — EU work is deferred
+> past alpha. Resume here.
 
 # Plan: honest EU provider path without draining the card
 

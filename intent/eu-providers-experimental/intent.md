@@ -1,34 +1,65 @@
 ---
-status: accepted
+status: deferred
 slug: eu-providers-experimental
 ---
-
-# Intent: honest EU provider path without draining the card
+# Intent: EU providers experimental (DEFERRED past alpha)
 
 ## Problem
 
-EU companies ask for Magento on EU cloud providers, and Scaleway plus OVH are pay-as-you-use on the maintainer's credit card. Full Magento certification on both before v1 would cost money the project does not have and delay the stable cut. The alternative to slow, honest experimental support is claiming support that was never proved.
+DEFERRED 2026-09-16 by `intent/audit.md`: neither OVH nor Scaleway is
+necessary to prove the first supported release. The alpha proves one complete
+GCP Autopilot path; breadth before that proof multiplies upgrade, recovery,
+compatibility, and support obligations without validating that anyone trusts
+the product with a storefront. EU work resumes after alpha on the same public
+provider protocol — it does not gate the alpha tag.
 
 ## Evidence
 
-Capability matrix: `certification-ovh` and `certification-scaleway` certified subsets are empty; every cell experimental. OVH Bootstrap/Secrets return `ErrNotSupported`; Scaleway Bootstrap returns `ErrNotSupported`, cache family is Redis not Valkey. Live proof is infrastructure-only (`ovh-mks-infrastructure-live-2026-08-12`, `scaleway-kapsule-infrastructure-live-2026-08-13`); Magento runtime is `not-run`. `openspec` caps live Scaleway plus vendor cells at a shared $50 own-money budget, one serialized preview each, no KEEP, destroy always. EU residency interest from companies: stated by maintainer, individual requests not checked in this session.
+Prior `plan.md` in this directory: Scaleway live refresh GREEN (`scw915`
+nl-ams-1, exit 0, <€1 inside cap); OVH PARKED 2026-09-15 after 6 attempts, 0
+PASS (MKS pools stuck INSTALLING, flavors 404, MIL inconclusive). August OVH
+evidence stands; retry is another-day work per maintainer call, not an alpha
+gate.
+
+Capability matrix: EU certified subsets stay empty; every cell experimental.
+Live proof is infrastructure-only; Magento runtime is `not-run`. Retained, not
+erased.
 
 ## Proposed outcome
 
-For v1, OVH MKS and Scaleway Kapsule ship as complete first-party adapters with Magento explicitly experimental: infra-only live proof refreshed as needed, unavailable cells fail closed with the exact boundary named (e.g. Scaleway Redis versus Valkey, OVH native CDN), day-2 gaps stay typed `ErrNotSupported` instead of stubs. One serialized destroy-on-exit preview per provider proves the adapter still applies; Magento certification waits for post-v1 budget. EU shops can evaluate on real EU infrastructure with no false production promise.
+After alpha: OVH MKS and Scaleway Kapsule return as explicit experimental
+adapters on the public provider protocol, with refreshed infra-only live proof
+as needed, unavailable cells failing closed with the exact boundary named, and
+day-2 gaps as typed `ErrNotSupported`. Magento certification on either waits
+for post-alpha budget and demand. EU shops can evaluate on real EU
+infrastructure with no false production promise.
 
 ## Affected users and systems
 
-EU shops evaluating non-US clouds. `internal/cloud/ovh`, `internal/cloud/scaleway`, shared `internal/cloud/kube` observe/steps, capability matrix EU rows, evidence pack, `docs/ovh-experimental.md`, `docs/scaleway-experimental.md`.
+EU shops evaluating non-US clouds. `internal/cloud/ovh`,
+`internal/cloud/scaleway` (or their post-contract homes), capability matrix EU
+rows, evidence pack, EU experimental docs.
 
 ## Constraints
 
-Shared $50 own-money cap for Scaleway plus vendor cells; equivalent restraint for OVH. One preview at a time per provider, serialized, destroy on exit, no KEEP. Minimum SKUs (OVH essential/discovery, smallest viable Kapsule/RDB/Redis). Magento stays `not-run`/experimental until a Magento-compatible digest is exercised live. Account-free cost capacity stays; live provider pricing stays unwired until verified.
+- Shared own-money cap discipline holds whenever live EU work resumes:
+  serialized, destroy on exit, no KEEP, minimum SKUs, six-hour-or-shorter TTL.
+- Magento stays `not-run`/experimental until a Magento-compatible digest is
+  exercised live.
+- Post-contract, EU adapters follow the same public protocol as GCP/AWS; no
+  bespoke core coupling.
 
 ## Out of scope
 
-Magento certification on either provider, HA, managed search on EU providers, Redis cluster mode until the Magento connector carries discovery endpoints, OVH/Scaleway database attach.
+- Magento certification on either provider, HA, managed search on EU
+  providers, Redis cluster mode until the connector carries discovery
+  endpoints, OVH/Scaleway database attach.
+- Any alpha gate: this intent cannot block `reference-store-acceptance`.
 
 ## Open questions
 
-Do we refresh infra-only live proof for both providers before v1, or is the August 2026 evidence plus mock/Floci coverage enough for an experimental label? Which single preview shape per provider is the documented evaluation path?
+- When pools converge, which single preview shape per provider is the
+  documented evaluation path (Scaleway nl-ams-1 shape held; OVH PAR vs MIL)?
+  Owner: maintainer at resume time.
+- Does EU resume before or after `aws-provider-parity`? Default: after AWS
+  parity, unless a pilot pays for EU first. Owner: maintainer.
