@@ -20,3 +20,5 @@ The Scaleway Managed Database cell `live-rdb-20260813g` created source instance 
 # MageLift
 
 Use `magelift cleanup claim` (or the acceptance helper) before mutation, `magelift cleanup record` after the provider identity exists, and `magelift cleanup reconcile --dir .magelift/cleanup --yes` to finish interrupted runs. Reconcile unions the ledger with a direct owning-service inventory, deletes only exact owned identities in rank order, and treats tombstones as pending rather than success.
+
+Live runs: do not interrupt. Two 2026-09-15 interrupts (Scaleway 8 minutes in, OVH 25/30 minutes in) both orphaned billable resources: the EXIT-trap destroy races workdir cleanup and loses, so manual ordered teardown was required both times. Launch live EU runs with a 60-minute window and do not touch them. If interrupted anyway, sweep immediately via owning-service inventory.

@@ -26,3 +26,5 @@ reuses it when `MAGELIFT_ACCEPTANCE_RUN_ID` is unset. Prefix-scoped checkpoint
 directories keep runs apart. Fingerprint mismatch still resets the file.
 
 Do not seal SKIP KEEP-cleanup. Do not rewrite historical SKIP rows.
+
+Opposite direction: isolate stack vars between runs. A persistent shell exported mldp6's PULUMI_CONFIG_PASSPHRASE_FILE into the mldp7 KEEP run, so mldp7's stack secrets were sealed under mldp6's passphrase file. Rule: unset stack-specific vars between runs; later stack ops must export the correct file explicitly.
