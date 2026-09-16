@@ -655,6 +655,7 @@ func validate(c Config) (CompatibilityAssessment, error) {
 		problems = append(problems, "application.mode must be integrated or headless")
 	}
 	problems = append(problems, validateMagentoRuntime(c.Application)...)
+	problems = append(problems, validateSingleTargetBlock(c)...)
 	switch c.Target.Provider {
 	case "aws":
 		switch c.Target.Runtime {
@@ -662,46 +663,20 @@ func validate(c Config) (CompatibilityAssessment, error) {
 		default:
 			problems = append(problems, "target.runtime must be ecs-fargate or eks when provider is aws")
 		}
-		if c.Target.GCP != nil {
-			problems = append(problems, "target.gcp is not valid when provider is aws")
-		}
-		if c.Target.OVH != nil {
-			problems = append(problems, "target.ovh is not valid when provider is aws")
-		}
-		if c.Target.Scaleway != nil {
-			problems = append(problems, "target.scaleway is not valid when provider is aws")
-		}
 		problems = append(problems, validateAWSTarget(c)...)
 		problems = append(problems, validateAWSRuntimeCatalog(c)...)
 	case "gcp":
 		if c.Target.Runtime != "gke-autopilot" && c.Target.Runtime != "gke-standard" {
 			problems = append(problems, "target.runtime must be gke-autopilot or gke-standard when provider is gcp")
 		}
-		if c.Target.AWS != nil {
-			problems = append(problems, "target.aws is not valid when provider is gcp")
+		if c.Target.GCP == nil {
+			problems = append(problems, "target.gcp is required when provider is gcp")
 		}
-		if c.Target.OVH != nil {
-			problems = append(problems, "target.ovh is not valid when provider is gcp")
-		}
-		if c.Target.Scaleway != nil {
-			problems = append(problems, "target.scaleway is not valid when provider is gcp")
-		}
-		if c.Target.GCP == nil || c.Target.GCP.Project == "" {
-			problems = append(problems, "target.gcp.project is required when provider is gcp")
-		}
-		problems = append(problems, validateGCPTarget(c)...)
+		// Target semantics validate provider-side (ValidateConfig); the
+		// core keeps structural presence only.
 	case "ovh":
 		if c.Target.Runtime != "mks" {
 			problems = append(problems, "target.runtime must be mks when provider is ovh")
-		}
-		if c.Target.AWS != nil {
-			problems = append(problems, "target.aws is not valid when provider is ovh")
-		}
-		if c.Target.GCP != nil {
-			problems = append(problems, "target.gcp is not valid when provider is ovh")
-		}
-		if c.Target.Scaleway != nil {
-			problems = append(problems, "target.scaleway is not valid when provider is ovh")
 		}
 		if c.Target.OVH == nil || c.Target.OVH.ServiceName == "" {
 			problems = append(problems, "target.ovh.serviceName is required when provider is ovh")
@@ -719,15 +694,6 @@ func validate(c Config) (CompatibilityAssessment, error) {
 	case "scaleway":
 		if c.Target.Runtime != "kapsule" {
 			problems = append(problems, "target.runtime must be kapsule when provider is scaleway")
-		}
-		if c.Target.AWS != nil {
-			problems = append(problems, "target.aws is not valid when provider is scaleway")
-		}
-		if c.Target.GCP != nil {
-			problems = append(problems, "target.gcp is not valid when provider is scaleway")
-		}
-		if c.Target.OVH != nil {
-			problems = append(problems, "target.ovh is not valid when provider is scaleway")
 		}
 		if c.Target.Scaleway == nil || c.Target.Scaleway.ProjectID == "" {
 			problems = append(problems, "target.scaleway.projectId is required when provider is scaleway")
@@ -1020,104 +986,35 @@ func effectiveScalewayRegion(c Config) string {
 	return strings.TrimSpace(c.Defaults.Region)
 }
 
-func validateGCPTarget(c Config) []string {
-	if c.Target.GCP == nil {
-		return nil
+// validateSingleTargetBlock enforces the generic target-block rule: at most
+// one target.* block may be set, and the block must match the provider.
+// Provider-specific semantics validate provider-side; this stays structural.
+func validateSingleTargetBlock(c Config) []string {
+	var set []string
+	if c.Target.AWS != nil {
+		set = append(set, "target.aws")
 	}
-	gcp := c.Target.GCP
-	var problems []string
-	if value := strings.TrimSpace(gcp.CloudSQLAvailability); value != "" && value != "ZONAL" && value != "REGIONAL" {
-		problems = append(problems, "target.gcp.cloudSqlAvailability must be ZONAL or REGIONAL")
+	if c.Target.GCP != nil {
+		set = append(set, "target.gcp")
 	}
-	if gcp.CloudSQLBackupRetentionCount != nil && *gcp.CloudSQLBackupRetentionCount < 1 {
-		problems = append(problems, "target.gcp.cloudSqlBackupRetentionCount must be at least 1")
+	if c.Target.OVH != nil {
+		set = append(set, "target.ovh")
 	}
-	if gcp.CloudSQLTransactionLogRetention != nil && (*gcp.CloudSQLTransactionLogRetention < 1 || *gcp.CloudSQLTransactionLogRetention > 7) {
-		problems = append(problems, "target.gcp.cloudSqlTransactionLogRetentionDays must be between 1 and 7")
+	if c.Target.Scaleway != nil {
+		set = append(set, "target.scaleway")
 	}
-	if gcp.CloudSQLBackupRetentionCount != nil && gcp.CloudSQLTransactionLogRetention != nil && *gcp.CloudSQLTransactionLogRetention > *gcp.CloudSQLBackupRetentionCount {
-		problems = append(problems, "target.gcp.cloudSqlTransactionLogRetentionDays cannot exceed cloudSqlBackupRetentionCount")
+	if len(set) > 1 {
+		sort.Strings(set)
+		return []string{fmt.Sprintf("only one target block may be set; found %s", strings.Join(set, ", "))}
 	}
-	if gcp.CloudSQLBackupStartTime != "" && !validClockTime(gcp.CloudSQLBackupStartTime) {
-		problems = append(problems, "target.gcp.cloudSqlBackupStartTime must use HH:MM")
-	}
-	for name, value := range map[string]string{
-		"cloudSqlBackupStartTime": gcp.CloudSQLBackupStartTime,
-		"cloudSqlBackupLocation":  gcp.CloudSQLBackupLocation,
-	} {
-		if strings.ContainsAny(value, "\r\n\x00") {
-			problems = append(problems, fmt.Sprintf("target.gcp.%s must not contain control characters", name))
+	if len(set) == 1 {
+		want := map[string]string{"aws": "target.aws", "gcp": "target.gcp", "ovh": "target.ovh", "scaleway": "target.scaleway"}[c.Target.Provider]
+		if want != "" && set[0] != want {
+			return []string{fmt.Sprintf("%s is not valid when provider is %s", set[0], c.Target.Provider)}
 		}
 	}
-	if strings.TrimSpace(gcp.CloudSQLAvailability) == "REGIONAL" {
-		if gcp.CloudSQLBackupEnabled != nil && !*gcp.CloudSQLBackupEnabled {
-			problems = append(problems, "target.gcp.cloudSqlBackupEnabled cannot be false for REGIONAL Cloud SQL")
-		}
-		if gcp.CloudSQLBinaryLogEnabled != nil && !*gcp.CloudSQLBinaryLogEnabled {
-			problems = append(problems, "target.gcp.cloudSqlBinaryLogEnabled cannot be false for REGIONAL MySQL Cloud SQL")
-		}
-	}
-	if gcp.CloudSQLBackupEnabled != nil && !*gcp.CloudSQLBackupEnabled && (gcp.CloudSQLBackupRetentionCount != nil || gcp.CloudSQLTransactionLogRetention != nil || gcp.CloudSQLBackupStartTime != "" || gcp.CloudSQLBackupLocation != "") {
-		problems = append(problems, "target.gcp Cloud SQL backup retention, schedule, and location settings require cloudSqlBackupEnabled")
-	}
-	if gcp.CloudSQLBinaryLogEnabled != nil && !*gcp.CloudSQLBinaryLogEnabled && gcp.CloudSQLTransactionLogRetention != nil {
-		problems = append(problems, "target.gcp.cloudSqlTransactionLogRetentionDays requires cloudSqlBinaryLogEnabled")
-	}
-	if gcp.MemorystorePSCConnectionLimit != nil && *gcp.MemorystorePSCConnectionLimit < 1 {
-		problems = append(problems, "target.gcp.memorystorePscConnectionLimit must be at least 1")
-	}
-	if value := strings.TrimSpace(gcp.OpenSearchMode); value != "" && value != "opensearch" && value != "disabled" {
-		problems = append(problems, "target.gcp.openSearchMode must be opensearch or disabled")
-	}
-	if value := strings.TrimSpace(gcp.QueueMode); value != "" && value != "database" && value != "rabbitmq" {
-		problems = append(problems, "target.gcp.queueMode must be database or rabbitmq")
-	}
-	if value := strings.TrimSpace(gcp.ReleaseChannel); value != "" && value != "RAPID" && value != "REGULAR" && value != "STABLE" {
-		problems = append(problems, "target.gcp.releaseChannel must be RAPID, REGULAR, or STABLE")
-	}
-	for name, value := range map[string]string{
-		"kubernetesVersion": gcp.KubernetesVersion,
-		"clusterIpv4Cidr":   gcp.ClusterIPv4CIDR,
-		"servicesIpv4Cidr":  gcp.ServicesIPv4CIDR,
-	} {
-		if strings.ContainsAny(value, "\r\n\x00") {
-			problems = append(problems, fmt.Sprintf("target.gcp.%s must not contain control characters", name))
-		}
-	}
-	if value := strings.TrimSpace(gcp.KubernetesVersion); value != "" && !gcpKubernetesMinor.MatchString(value) {
-		problems = append(problems, "target.gcp.kubernetesVersion must be a Kubernetes minor such as 1.32")
-	}
-	if (gcp.MemorystoreShardCount != nil && *gcp.MemorystoreShardCount < 1) || (gcp.MemorystoreReplicas != nil && (*gcp.MemorystoreReplicas < 0 || *gcp.MemorystoreReplicas > 5)) || gcp.OpenSearchReplicas < 0 || gcp.QueueReplicas < 0 || gcp.DesiredWebReplicas < 0 || gcp.QueueConsumerCount < 0 {
-		problems = append(problems, "target.gcp replica and count settings cannot be negative")
-	}
-	if value := strings.TrimSpace(gcp.MemorystoreMode); value != "" && value != "CLUSTER" && value != "CLUSTER_DISABLED" {
-		problems = append(problems, "target.gcp.memorystoreMode must be CLUSTER or CLUSTER_DISABLED")
-	}
-	if value := strings.TrimSpace(gcp.MemorystoreZoneDistributionMode); value != "" && value != "MULTI_ZONE" && value != "SINGLE_ZONE" {
-		problems = append(problems, "target.gcp.memorystoreZoneDistributionMode must be MULTI_ZONE or SINGLE_ZONE")
-	}
-	if gcp.MemorystoreMode == "CLUSTER_DISABLED" && gcp.MemorystoreShardCount != nil && *gcp.MemorystoreShardCount > 1 {
-		problems = append(problems, "target.gcp.memorystoreShardCount must be 1 when memorystoreMode is CLUSTER_DISABLED")
-	}
-	if gcp.MemorystoreZoneDistributionMode == "SINGLE_ZONE" && strings.TrimSpace(gcp.MemorystoreZone) == "" {
-		problems = append(problems, "target.gcp.memorystoreZone is required for SINGLE_ZONE distribution")
-	}
-	if gcp.StandardNodeCount < 0 || gcp.StandardNodeMinCount < 0 || gcp.StandardNodeMaxCount < 0 || gcp.StandardNodeDiskSizeGiB < 0 {
-		problems = append(problems, "target.gcp Standard node settings cannot be negative")
-	}
-	if gcp.StandardNodeMaxCount > 0 && gcp.StandardNodeMinCount > gcp.StandardNodeMaxCount {
-		problems = append(problems, "target.gcp standard node minimum cannot exceed maximum")
-	}
-	if gcp.StandardNodeCount > 0 && ((gcp.StandardNodeMinCount > 0 && gcp.StandardNodeCount < gcp.StandardNodeMinCount) || (gcp.StandardNodeMaxCount > 0 && gcp.StandardNodeCount > gcp.StandardNodeMaxCount)) {
-		problems = append(problems, "target.gcp standard node count must be between minimum and maximum")
-	}
-	if c.Target.Runtime != "gke-standard" && (gcp.StandardNodeType != "" || gcp.StandardNodeCount > 0 || gcp.StandardNodeMinCount > 0 || gcp.StandardNodeMaxCount > 0 || gcp.StandardNodeDiskType != "" || gcp.StandardNodeDiskSizeGiB > 0 || gcp.StandardNodeImageType != "" || gcp.StandardNodeSpot) {
-		problems = append(problems, "target.gcp Standard node settings require runtime gke-standard")
-	}
-	sort.Strings(problems)
-	return problems
+	return nil
 }
-
 func validateScalewayBackupSettings(target ScalewayTarget) []string {
 	var problems []string
 	if target.DatabaseBackupFrequency != nil && *target.DatabaseBackupFrequency < 1 {
@@ -1602,6 +1499,9 @@ func validateDataResidency(c Config) []string {
 	if region != "" && !regionHonorsResidency(declared, region) {
 		problems = append(problems, fmt.Sprintf("resilience.dataRegion %q refuses defaults.region %q", declared, region))
 	}
+	// Residency is a cross-cutting core policy over already-parsed data, not
+	// target validation: the provider never receives dataRegion, so only
+	// the core can enforce it. Kept deliberately during the GCP slimming.
 	if c.Target.GCP != nil {
 		location := strings.TrimSpace(c.Target.GCP.CloudSQLBackupLocation)
 		if location != "" && !regionHonorsResidency(declared, location) {

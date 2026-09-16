@@ -6,7 +6,10 @@
 //
 //   - Fixture load/validate: real internal/config Load plus Resolve.
 //   - Routing: real platform.ModuleRegistry dispatch plus real first-party
-//     module Plan (spec build and validation only; no Pulumi execution).
+//     module Plan for in-process targets (spec build and validation only;
+//     no Pulumi execution). GCP dispatches to the plugin shim; planning
+//     dials the plugin, so the offline suite proves dispatch plus typed
+//     error surfacing with scripted sessions.
 //   - Contracts: fake sdk.Module implementations through the real
 //     RegisterPublicModule bridge plus descriptor validation.
 //   - Importer: real paasimport.MapACC/MapUpsun over synthetic inputs; the
@@ -22,6 +25,7 @@ package synthetic_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,6 +36,7 @@ import (
 	"github.com/magelift/magelift/internal/localdev"
 	"github.com/magelift/magelift/internal/paasimport"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/internal/registry"
 	"github.com/magelift/magelift/sdk"
 )
@@ -128,20 +133,39 @@ func TestGaps(t *testing.T) {
 
 func TestRouting_ValidFixturesPlan(t *testing.T) {
 	t.Parallel()
-	for _, rel := range []string{"gcp-preview/magelift.yaml", "aws-preview/magelift.yaml"} {
-		cfg := resolveFixture(t, rel, "preview")
-		modules, err := registry.NewDefault()
-		if err != nil {
-			t.Fatal(err)
-		}
-		module, _, err := modules.Plan(cfg, "preview", platform.PlanOptions{})
-		if err != nil {
-			t.Fatalf("plan %s: %v", rel, err)
-		}
-		if got := string(module.Descriptor().Provider); got != cfg.Target.Provider {
-			t.Errorf("plan %s dispatched to provider %q, want %q", rel, got, cfg.Target.Provider)
-		}
+	cfg := resolveFixture(t, "aws-preview/magelift.yaml", "preview")
+	modules, err := registry.NewDefault()
+	if err != nil {
+		t.Fatal(err)
 	}
+	module, _, err := modules.Plan(cfg, "preview", platform.PlanOptions{})
+	if err != nil {
+		t.Fatalf("plan aws-preview: %v", err)
+	}
+	if got := string(module.Descriptor().Provider); got != cfg.Target.Provider {
+		t.Errorf("plan aws-preview dispatched to provider %q, want %q", got, cfg.Target.Provider)
+	}
+}
+
+func TestRouting_GCPDispatchesToPluginShim(t *testing.T) {
+	t.Parallel()
+	cfg := resolveFixture(t, "gcp-preview/magelift.yaml", "preview")
+	modules, err := registry.NewDefault()
+	if err != nil {
+		t.Fatal(err)
+	}
+	module, found := modules.Module("gcp", "gke-autopilot")
+	if !found {
+		t.Fatal("gcp/gke-autopilot module is not registered")
+	}
+	if _, ok := module.(*providerhost.ShimModule); !ok {
+		t.Fatalf("gcp module = %T, want *providerhost.ShimModule", module)
+	}
+	if got := string(module.Descriptor().Provider); got != cfg.Target.Provider {
+		t.Errorf("gcp dispatched to provider %q, want %q", got, cfg.Target.Provider)
+	}
+	// Planning dials the plugin; the offline suite proves dispatch only.
+	// Provider plan behavior is covered provider-side with fakes.
 }
 
 func TestRouting_UnknownTargetFailsClosed(t *testing.T) {
@@ -254,7 +278,6 @@ func TestFailure_InvalidFixtures(t *testing.T) {
 	}{
 		{"invalid/unknown-provider.yaml", "target.provider must be aws, gcp, ovh, or scaleway"},
 		{"invalid/unsupported-version.yaml", "must be an exact Magento release"},
-		{"invalid/missing-required.yaml", "target.gcp.project is required"},
 	}
 	for _, tc := range cases {
 		data, err := os.ReadFile(fixturePath(t, tc.rel))
@@ -272,17 +295,50 @@ func TestFailure_InvalidFixtures(t *testing.T) {
 	}
 }
 
-func TestFailure_ExpiredPreviewRefusesPlan(t *testing.T) {
+func TestCoreAcceptsSemanticallyEmptyGCPTarget(t *testing.T) {
 	t.Parallel()
-	cfg := resolveFixture(t, "invalid/expired-preview.yaml", "preview")
-	modules, err := registry.NewDefault()
+	// Split enforcement: core config accepts structural presence; the
+	// provider's ValidateConfig rejects the missing project (provider
+	// schema suite covers the rejection on the equivalent target).
+	data, err := os.ReadFile(fixturePath(t, "invalid/missing-required.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = modules.Plan(cfg, "preview", platform.PlanOptions{})
+	file, err := config.Load(data)
+	if err != nil {
+		t.Fatalf("load error = %v", err)
+	}
+	if _, err := file.ResolveBuild(); err != nil {
+		t.Fatalf("core rejected provider-owned semantics: %v", err)
+	}
+}
+
+func TestFailure_ExpiredPreviewRefusesPlan(t *testing.T) {
+	t.Parallel()
+	cfg := resolveFixture(t, "invalid/expired-preview.yaml", "preview")
+	// The plugin refuses expired previews server-side; the shim surfaces
+	// the typed refusal without interpreting it.
+	client := providerhost.NewTestClient(scriptedCaller(func(method string, reply any) error {
+		if method != "Plugin.Plan" {
+			return errors.New("unexpected method " + method)
+		}
+		*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Error: &sdk.OperationError{Code: sdk.ErrCodeInvalid, Message: "preview expired at 2020-01-01"}}
+		return nil
+	}), nil)
+	module, err := providerhost.NewShimModule("gke-autopilot", client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = module.Plan(cfg, "preview", platform.PlanOptions{})
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "expired") {
 		t.Fatalf("expired preview plan error = %v, want expiry refusal", err)
 	}
+}
+
+type scriptedCaller func(method string, reply any) error
+
+func (f scriptedCaller) Call(method string, _ any, reply any) error {
+	return f(method, reply)
 }
 
 func unmappedPaths(t *testing.T, keys []paasimport.UnmappedKey) map[string]bool {

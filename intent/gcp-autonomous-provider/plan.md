@@ -82,9 +82,9 @@ Each box carries the check that closes it.
 - [x] 3.2 Implement the net/rpc protocol server plus all 30 operations (lifecycle, bootstrap, state, secrets, observe, tunnel, cost, cleanup, leftover destroy, adapter proxies) with per-operation timeouts — verify: `go test ./providers/gcp/...` (module tests) pass with fakes for every operation
 - [x] 4.1 Implement the core v2 client (lockfile v2 discovery, digest plus Cosign verify, dial, Describe negotiation, fail-closed errors, selected-implementation logging, plugin-backed module shim) — verify: unit tests prove tamper refusal, version-mismatch refusal, dial-failure refusal, v1-lockfile refusal, shim dispatch, and the selection log line
 - [x] 4.2 Replace the CLI GCP path (registry drop, subprocess replacement, hooks slimming) and delete the dead JSON path on zero references — verify: `go build ./...` from root exits 0, `go list` over `cmd/magelift` shows no provider SDKs, and grep finds no live references to the deleted symbols
-- [ ] 4.3 Slim core GCP config (presence plus single-block rule), regenerate schema, update config tests — verify: config suite green and `make generate-check` (or the brief substitute) green
+- [x] 4.3 Slim core GCP config (presence plus single-block rule), regenerate schema, update config tests — verify: config suite green and `make generate-check` (or the brief substitute) green
 - [ ] 5.1 Implement token-source auth with the four expiry tests (expiry-refresh, refresh-failure typed error, restart statelessness, CI-shaped ADC) plus no-secrets-in-logs asserts — verify: `go test ./providers/gcp/auth/ -count=1` passes
-- [ ] 5.2 Apply follower updates (synthetic, identity, ops, shared, cleanup suites) — verify: every suite in the follower list greens with updated expectations
+- [ ] 5.2 Apply follower updates (identity, ops, shared, cleanup suites; synthetic missing-required flipped with 4.3) — verify: every suite in the follower list greens with updated expectations
 - [ ] 6.1 Wire Makefile targets and forwards; update docs and skill; run humanizer plus marks — verify: `make provider-gcp-build`, `make core-leanness`, and `make docs` exit 0; prose passes recorded
 - [ ] 6.2 Run the full proof matrix — verify: the workspace provider build plus both import-closure gates from the spec pass verbatim, all affected suites green, `git status` shows only listed paths
 
