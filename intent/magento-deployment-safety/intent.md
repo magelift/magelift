@@ -1,5 +1,5 @@
 ---
-status: draft
+status: accepted
 slug: magento-deployment-safety
 ---
 # Intent: Magento deployment safety (health that means Magento, one lifecycle)
