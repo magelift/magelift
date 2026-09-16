@@ -399,8 +399,9 @@ magelift deploy [flags]
 Options:
 
 ```text
-      --digest string   override the configured immutable image digest
-      --infra-only      update the infrastructure graph only (skip Magento migrate/health)
+      --ack-maintenance-drain   attest backup, maintenance mode, and drained writers for production schema risk (see docs/operations.md)
+      --digest string           override the configured immutable image digest
+      --infra-only              update the infrastructure graph only (skip Magento migrate/health)
 ```
 ## magelift destroy
 
@@ -925,7 +926,15 @@ magelift skills list
 Verify installed first-party skills without executing them
 
 ```text
-magelift skills verify
+magelift skills verify [flags]
+```
+
+Options:
+
+```text
+      --agent string    agent path: codex, claude, cursor, or generic (default "generic")
+      --scope string    installation scope: project or global (default "project")
+  -s, --skill strings   verify only the named skill; repeat the flag for more than one
 ```
 ## magelift ssh
 
