@@ -1,9 +1,15 @@
 # Adding a provider
 
 New clouds are adapters. Do not share Pulumi `Network`/`Database` components with
-a provider switch ([ADR 0003](adr/0003-portable-contracts-vs-topology.md), [ADR 0004](adr/0004-ports-and-adapters.md)). Magento-facing code stays in `sdk`,
-`internal/platform`, `internal/deploy`, and `internal/config`. VPC, DB, and
-runtime stay under `internal/cloud/<provider>/`. SaaS edge and observability
+a provider switch ([ADR 0003](adr/0003-portable-contracts-vs-topology.md), [ADR 0004](adr/0004-ports-and-adapters.md)). The core owns configuration envelopes,
+command UX, plugin discovery, trust, locking, and orchestration policy; the
+provider owns its cloud implementation, stack execution, and operating
+capabilities ([ADR 0013](adr/0013-provider-plugin-contract.md)). Magento-facing
+code stays in `sdk`, `internal/platform`, `internal/deploy`, and
+`internal/config`. VPC, DB, and runtime stay under `internal/cloud/<provider>/`
+until Order 5 moves providers to nested `providers/<name>/` modules; new
+providers are specified as out-of-module plugins, not in-process copies.
+SaaS edge and observability
 adapters live under `internal/external/`, provider-neutral ports under
 `internal/shared/`, and the Magento-safe WAF contract under `internal/edge/waf`.
 SES (`email.mode`) and Cloudflare DNS are adapter-less by decision: config
@@ -32,6 +38,13 @@ Single exception: `internal/cloud/kube` stays where it is (see ADR 0003 carve-ou
 A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`.
 
 ## Checklist (copy GCP)
+
+New providers follow [ADR 0013](adr/0013-provider-plugin-contract.md): a nested
+`providers/<name>/` module built outside the root module against the public
+SDK, speaking versioned typed operations (stack lifecycle plus the seven
+day-2 operations) with explicit negotiation and fail-closed compatibility.
+The in-process checklist below describes the current tree until Order 5 lands
+the specified move; do not start new in-process providers from it.
 
 1. `internal/cloud/<p>/target/`: IDs, `Validate`, optional `Register(*infra.Registry)` for tests.
 2. `internal/cloud/<p>/stack/`: `Spec`, `PlanFromConfig*`, Pulumi `Program` (`ctx.Export` must match `Component.Outputs()`), `component`, and a `StackModule`. If Magento Ops would cycle imports with other packages, put `HasOps` on a thin wrapper (AWS: `internal/cloud/aws/ops`).
@@ -126,31 +139,35 @@ on AWS is not every SKU.
 
 ## Community binary
 
-The released `magelift` binary loads the proof adapter as a signed
-subprocess artifact (`magelift.providers.lock`, Cosign, HashiCorp go-plugin).
+The released `magelift` binary loads providers as signed subprocess
+artifacts (`magelift.providers.lock`, Cosign, HashiCorp go-plugin).
 `internal/providerhost` refuses unsigned or digest-mismatched lock entries,
-then `Dial` starts a gRPC subprocess (`cmd/magelift-provider-gcp`) that
-serves Ping, GCP Autopilot `Describe`, `sdk.Module` Plan/Program JSON RPCs,
-and the `Execute` RPC that runs the stack lifecycle inside the provider
-process. `Dial` refuses SDK API versions other than the host version.
-`gcp`/`gke-autopilot` deploys through the subprocess when a verified
-artifact is installed beside the CLI, with an in-process fallback and a
-stderr notice otherwise ([ADR 0011](adr/0011-subprocess-dial-proof.md)).
+then `Dial` starts a gRPC subprocess that serves the versioned typed
+operations: Describe (negotiation), ValidateConfig, stack lifecycle (plan,
+preview, apply, destroy, refresh, outputs with a redacted variant), and the
+seven day-2 operations ([ADR 0013](adr/0013-provider-plugin-contract.md)).
+`Dial` negotiates protocol versions and fails closed on incompatibility or
+integrity failure; there is no silent fallback to embedded execution (an
+explicit `--migration-mode` flag is the only sanctioned fallback).
 `extensions list` reports the installed provider version, digest, and mode.
-Day-2 ports (ops, bootstrap, state, secrets, observe) stay in-process for
-every adapter; subprocess execution covers the stack lifecycle only. The
-`outputs` op returns secrets decrypted so those in-process ports can read
-kubeconfig; only `redacted-outputs` redacts, for `magelift outputs` display.
+Day-2 operations run inside the provider; the `outputs` op returns secrets
+decrypted for day-2 consumers while `redacted-outputs` redacts for display.
+The provider subprocess runs with the user's cloud privileges: the process
+boundary is a deployment and compatibility boundary, not a security sandbox.
 Tests and Floci suites always load in-process. External providers
 may still ship as a **compile-time custom binary** that calls
 `cli.NewWithExtensions` (`examples/custom-cli`). There is no Go `plugin.Open`
 ABI and no unsigned remote loader ([ADR 0008](adr/0008-provider-load-path.md)).
-Post-v1 extraction order: AWS ECS Fargate next, then the experimental
-providers, then community plugin onboarding.
+Current code still speaks the single-version JSON proof with exact-version
+equality and in-process day-2 ports ([ADR 0011](adr/0011-subprocess-dial-proof.md));
+Order 5 implements the contract above. Post-alpha extraction order: AWS ECS
+Fargate next, then the experimental providers, then community plugin onboarding.
 
 The public extension boundary avoids `internal/` imports. An extension implements
-`sdk.Module`, returns provider-neutral plan data, and returns its concrete Pulumi
-program from `Program`; MageLift validates that program at the lifecycle boundary.
+the versioned provider operations, returns provider-neutral plan data, and
+executes its own Pulumi stacks inside the provider process; only typed results
+cross to the core. The opaque `Program`-returns-`any` shape is retired: stack
+work runs provider-side and the core never sees a Pulumi program.
 The plan request includes typed `sdk.EdgeIntent` and `sdk.ObservabilityIntent`
 values. This lets an extension implement Fastly, a telemetry vendor, or a cloud
 native destination without making the core configuration depend on that vendor.
@@ -184,7 +201,10 @@ require github.com/magelift/magelift/sdk vX.Y.Z
 ```
 
 SDK tags look like `sdk/vX.Y.Z` (nested module at `sdk/`, lockstep with the
-CLI version for v1). Do not add a `replace` directive: local development
+CLI version for v1). Provider modules tag as `providers/<name>/vX.Y.Z`,
+lockstep with core and SDK for alpha; independent cadence rules are specified
+in [ADR 0013](adr/0013-provider-plugin-contract.md) and activate post-alpha.
+Do not add a `replace` directive: local development
 resolves `./sdk` through the committed `go.work`, and registry builds resolve
 the tag.
 

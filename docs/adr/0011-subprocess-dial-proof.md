@@ -75,3 +75,17 @@ provider process.
 subprocess wiring, `.goreleaser.yaml`. GoReleaser customization docs
 (sign, binary archive format). Live Dial proof on GCP is Phase 2 and is
 explicitly not claimed here.
+
+## Scope note (ADR 0013, 2026-09-16)
+
+Standing: provider-side Pulumi execution ("Stack work has to run inside the
+provider process"), operations crossing as data, HashiCorp go-plugin
+transport, and Dial-version pinging as the negotiation ancestor. Superseded
+as target rules by ADR 0013: "Single-version v1: the provider artifact
+version equals the CLI version", "A failed subprocess attempt falls back to
+the in-process backend with a stderr notice. It never fails the command.",
+and "Day-2 ports stay in-process for every adapter". Those lines stand as
+the single-version current-state description; explicit negotiation,
+fail-closed compatibility, and in-provider day-2 operations per 0013 are the
+rule from acceptance forward, implemented by the follower intents (current
+code still behaves the old way until Order 5 lands).

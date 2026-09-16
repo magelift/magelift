@@ -28,3 +28,16 @@ Homebrew can ship core while a GCP-only project downloads `magelift-provider-gcp
 ## Provenance
 
 `internal/providerhost`. HashiCorp go-plugin and Cosign public docs.
+
+## Scope note (ADR 0013, 2026-09-16)
+
+Standing: no unsigned downloads, HashiCorp go-plugin transport with
+`plugin.Open` forbidden, lockfile digest plus Cosign identity verification
+before spawn, in-process loading for tests and Floci, and compile-time
+community binaries. Superseded as target rules by ADR 0013: "Magento deploy
+still needs the AWS and GCP adapters in the same process as the CLI for RC1",
+"adapters may stay in-process for one RC1 release if extract lags", and
+"every other Magento cell stays in-process until its extraction lands". Those
+lines stand as the single-version current-state description; the extraction
+contract in 0013 is the rule from acceptance forward, implemented by the
+follower intents.
