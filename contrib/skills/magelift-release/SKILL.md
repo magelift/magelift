@@ -47,25 +47,30 @@ first, push every tag at once, then request nothing for five
 minutes. Order matters; never move a tag:
 
 1. Full local gates green on HEAD, working tree clean.
-2. Bump requires to `<v>` (root: SDK; provider: SDK plus root).
-3. Stage a file proxy from the tree
-   (`go run ./cmd/modproxy --root . --version <v> --out /tmp/proxy`)
+2. Build the staging tool first
+   (`go build -o /tmp/modproxy ./cmd/modproxy`): after the
+   bump, requires name nonexistent versions and nothing in
+   the root module compiles, including the tool.
+3. Bump requires to `<v>` (root: SDK; provider: SDK plus root).
+4. Stage a file proxy from the tree
+   (`/tmp/modproxy --root . --version <v> --out /tmp/proxy`)
    and download the sums from it with
    `GOPROXY=file:///tmp/proxy GOSUMDB=off` (staged zips are
    content-identical to the tags, so the sums match exactly).
-   Verify the root and provider build `GOWORK=off`, commit.
-4. Tag `sdk/<v>`, `<v>`, and `providers/gcp/<v>` at that commit
+   Verify the root and provider build `GOWORK=off` against
+   the staged proxy, commit.
+5. Tag `sdk/<v>`, `<v>`, and `providers/gcp/<v>` at that commit
    and push all three in one `git push`. The release starts; its
    visibility-wait sleeps first, then polls.
-5. Wait five minutes in silence (no proxy, sumdb, or CI requests:
+6. Wait five minutes in silence (no proxy, sumdb, or CI requests:
    an early 404 seeds a 30-minute negative). Then one primer per
    module (`go mod download <module>@<v>` with default proxy and
    sumdb); all three must pass.
-6. Only then dispatch full CI on the release tag
+7. Only then dispatch full CI on the release tag
    (`gh workflow run ci.yml --ref <v> -f all=true`); the publish
    gate requires actual success on the tag commit, and CI jobs
    fail the same visibility race when dispatched too early.
-7. Verify the pristine consumer before trusting the candidate:
+8. Verify the pristine consumer before trusting the candidate:
    `go install` the CLI and provider mains at `<v>` plus an SDK
    scratch build, all `GOWORK=off` from the proxy. The release
    pipeline repeats this before publish; run it locally too.
