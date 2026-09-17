@@ -96,10 +96,13 @@ cache. URL semantics (backward compatible):
 - `Cosign.Bundle` https: bundle downloaded from that URL.
 
 Cache layout: `~/.magelift/providers/<id>/<version>/<binary>`
-(XDG `XDG_CACHE_HOME` honored when set; Windows uses
-`%LocalAppData%`). Load order: beside-CLI first, then cache.
-Every load re-checks the digest; bundle verification happens
-at install time. Compatibility stays on the existing checks
+plus the bundle beside it (`os.UserCacheDir` honors
+`XDG_CACHE_HOME` on POSIX and `LocalAppData` on Windows).
+Load order: beside-CLI first, then cache. Every load runs the
+existing full verification (digest plus bundle) on whichever
+copy loads: uniform and stronger than digest-only cache
+checks, at the same per-load cost the beside-CLI path
+already pays. Compatibility stays on the existing checks
 (lockfile schema/API/protocol plus Describe negotiation).
 
 ### R7 — The release pipeline ships the sequence
