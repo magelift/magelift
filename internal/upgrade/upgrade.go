@@ -295,7 +295,7 @@ func (c *Client) Install(ctx context.Context, release Release, executable string
 	}
 	if err := c.checkInstalled(ctx, executable); err != nil {
 		if backup == "" {
-			ops.Remove(executable)
+			_ = ops.Remove(executable)
 			return fmt.Errorf("new binary failed its self-check: %w", err)
 		}
 		if restoreErr := ops.Rename(backup, executable); restoreErr != nil {
