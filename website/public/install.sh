@@ -8,8 +8,11 @@
 # https://github.com/sigstore/cosign/releases/download/<version>/cosign_checksums.txt
 # (cosign-<os>-<arch> lines). Never bump one without the other.
 #
+# Channels: without MAGELIFT_VERSION the script installs the latest stable
+# release. Prereleases (rc, alpha, beta) never become latest; install one
+# with an explicit MAGELIFT_VERSION.
 # Usage: curl -fsSL https://magelift.dev/install.sh | sh
-# Optional: MAGELIFT_INSTALL_DIR=/custom/bin MAGELIFT_VERSION=v1.2.3 sh
+# Optional: MAGELIFT_INSTALL_DIR=/custom/bin MAGELIFT_VERSION=v0.1.0-alpha.1-rc.2 sh
 # Test-only overrides: MAGELIFT_RELEASE_BASE, MAGELIFT_COSIGN_BASE,
 # MAGELIFT_COSIGN_VERSION, MAGELIFT_COSIGN_PIN.
 set -eu
@@ -50,7 +53,7 @@ else
   need sed
   TAG="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" |
     sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')"
-  [ -n "$TAG" ] || fail "could not resolve the latest release tag (no release yet?)"
+  [ -n "$TAG" ] || fail "no stable release published yet (or network unreachable); set MAGELIFT_VERSION to an explicit tag"
 fi
 
 VERSION="${TAG#v}"

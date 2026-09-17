@@ -34,6 +34,8 @@ var (
 	ErrNoReleaseAsset   = errors.New("release does not contain a compatible MageLift archive")
 	ErrChecksum         = errors.New("release checksum verification failed")
 	ErrReleaseSignature = errors.New("release checksum signature verification failed")
+	ErrNoStableRelease  = errors.New("no stable release published yet; install a specific tag with --version")
+	errReleaseNotFound  = errors.New("release not found")
 )
 
 var releaseTagPattern = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
@@ -86,8 +88,18 @@ func New(httpClient HTTPClient) *Client {
 	return &Client{httpClient: httpClient, apiBase: base, goos: runtime.GOOS, goarch: runtime.GOARCH, verifier: cosign.New()}
 }
 
+// Latest resolves the stable channel (/releases/latest skips drafts and
+// prereleases). Before the first stable release it fails cleanly with
+// ErrNoStableRelease; prereleases install via Tagged with an explicit tag.
 func (c *Client) Latest(ctx context.Context) (Release, error) {
-	return c.release(ctx, c.apiBase+"/releases/latest")
+	release, err := c.release(ctx, c.apiBase+"/releases/latest")
+	if err != nil {
+		if errors.Is(err, errReleaseNotFound) {
+			return Release{}, ErrNoStableRelease
+		}
+		return Release{}, err
+	}
+	return release, nil
 }
 
 func (c *Client) Tagged(ctx context.Context, tag string) (Release, error) {
@@ -113,6 +125,9 @@ func (c *Client) release(ctx context.Context, endpoint string) (Release, error) 
 		return Release{}, fmt.Errorf("fetch MageLift release: %w", err)
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusNotFound {
+		return Release{}, errReleaseNotFound
+	}
 	if response.StatusCode != http.StatusOK {
 		return Release{}, fmt.Errorf("fetch MageLift release: HTTP %s", response.Status)
 	}

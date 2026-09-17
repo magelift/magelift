@@ -133,6 +133,15 @@ release:
   # (missing token, or an immutable release that cannot be updated).
   preflight:
     fail_on_error: true
+  # Channels: every release stays draft until the workflow verifies the full
+  # artifact set (bundles, checksums, lockfiles) and publishes it. Every
+  # release is a prerelease and never "latest": hyphen tags (rc, alpha,
+  # beta) must not become the default install channel. Flip prerelease and
+  # make_latest only for the first stable release, and update install.sh,
+  # the upgrade channel, and docs/install.md together.
+  draft: true
+  prerelease: true
+  make_latest: false
 
 changelog:
   use: github-native
