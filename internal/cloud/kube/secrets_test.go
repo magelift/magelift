@@ -96,3 +96,9 @@ func TestSmtpPasswordSecretNameIsStable(t *testing.T) {
 		t.Fatalf("smtp password secret name = %q", got)
 	}
 }
+
+func TestMediaHmacSecretNameIsStable(t *testing.T) {
+	if got := MediaHmacSecretName("shop-preview-app"); got != "shop-preview-app-media-hmac" {
+		t.Fatalf("media hmac secret name = %q", got)
+	}
+}

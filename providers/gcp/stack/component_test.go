@@ -698,6 +698,11 @@ func (m *stackMocks) NewResource(args pulumi.MockResourceArgs) (string, resource
 	case "gcp:storage/bucket:Bucket":
 		state["name"] = resource.NewStringProperty(args.Name)
 		state["url"] = resource.NewStringProperty("gs://" + args.Name)
+	case "gcp:storage/hmacKey:HmacKey":
+		state["accessId"] = resource.NewStringProperty("GOOGMOCKACCESSID")
+		state["secret"] = resource.MakeSecret(resource.NewStringProperty("mock-hmac-secret"))
+	case "gcp:serviceaccount/account:Account":
+		state["email"] = resource.NewStringProperty(args.Name + "@example-gcp-project.iam.gserviceaccount.com")
 	case "gcp:compute/securityPolicy:SecurityPolicy":
 		state["name"] = resource.NewStringProperty(args.Name)
 	case "kubernetes:core/v1:Service":
@@ -799,5 +804,96 @@ func TestProgramWiresSmtpRelay(t *testing.T) {
 	}
 	if !sawSecret || !sawHost || !sawPasswordRef {
 		t.Fatalf("smtp wiring incomplete: secret=%v host=%v passwordRef=%v", sawSecret, sawHost, sawPasswordRef)
+	}
+}
+
+func TestProgramWiresMediaRemoteStorage(t *testing.T) {
+	spec := Spec{
+		Identity: Identity{
+			Project: "shop", GCPProject: "example-gcp-project", Environment: "preview",
+			Region: "europe-west1", EnvironmentClass: "preview", Preset: "preview",
+			Labels: map[string]string{"magelift-managed-by": "magelift"},
+		},
+		Application: Application{Edition: "open-source", Version: "2.4.9", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		Artifact:    Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Policy:      NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c"}},
+		Catalog: CatalogSelection{
+			CloudSQLTier: "db-perf-optimized-N-2", CloudSQLAvailability: "ZONAL", ValkeyRequirement: "9",
+			MemorystoreEngineVersion: "VALKEY_9_0", MemorystoreNodeType: "SHARED_CORE_NANO",
+			AutopilotCPURequest: "500m", AutopilotMemoryRequest: "1Gi",
+			DesiredWebReplicas: 1, SearchMode: "opensearch", SearchReplicas: 1, QueueMode: "database",
+		},
+		Dependencies: Dependencies{DatabaseName: "magento", MasterUsername: "magento", EncryptionKeySecret: "magento-crypt-key"},
+	}
+	if err := spec.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-preview", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	sawHMAC, sawSA, sawWriterGrant, sawPublicGrant := false, false, false, false
+	sawSecret, sawKey, sawEndpoint, sawSecretRef := false, false, false, false
+	for _, res := range mocks.resources {
+		switch res.TypeToken {
+		case "gcp:storage/hmacKey:HmacKey":
+			sawHMAC = true
+		case "gcp:serviceaccount/account:Account":
+			if strings.Contains(res.Name, "media") {
+				sawSA = true
+			}
+		case "gcp:storage/bucketIAMMember:BucketIAMMember":
+			role := res.Inputs["role"].StringValue()
+			member := res.Inputs["member"].StringValue()
+			if role == "roles/storage.objectAdmin" && strings.HasPrefix(member, "serviceAccount:") {
+				sawWriterGrant = true
+			}
+			if role == "roles/storage.objectViewer" && member == "allUsers" {
+				condition := res.Inputs["condition"].ObjectValue()["expression"].StringValue()
+				if !strings.Contains(condition, "/objects/media/") {
+					t.Fatalf("public grant is not prefix-scoped: %q", condition)
+				}
+				sawPublicGrant = true
+			}
+		case "kubernetes:core/v1:Secret":
+			if strings.HasSuffix(res.Name, "-media-hmac") {
+				sawSecret = true
+			}
+		case "kubernetes:apps/v1:Deployment":
+			containers := res.Inputs["spec"].ObjectValue()["template"].ObjectValue()["spec"].ObjectValue()["containers"].ArrayValue()
+			for _, container := range containers {
+				envValue, ok := container.ObjectValue()["env"]
+				if !ok || envValue.IsNull() {
+					continue
+				}
+				for _, env := range envValue.ArrayValue() {
+					entry := env.ObjectValue()
+					switch entry["name"].StringValue() {
+					case "MAGELIFT_MEDIA_S3_KEY":
+						if value := entry["value"].StringValue(); value != "GOOGMOCKACCESSID" {
+							t.Fatalf("media key = %q", value)
+						}
+						sawKey = true
+					case "MAGELIFT_MEDIA_S3_ENDPOINT":
+						sawEndpoint = true
+					case "MAGELIFT_MEDIA_S3_SECRET":
+						ref := entry["valueFrom"].ObjectValue()["secretKeyRef"].ObjectValue()
+						if key := ref["key"].StringValue(); key != "secret" {
+							t.Fatalf("media secret ref key = %q", key)
+						}
+						if value, ok := entry["value"]; ok && strings.TrimSpace(value.StringValue()) != "" {
+							t.Fatalf("media secret must not appear as plaintext env: %q", value.StringValue())
+						}
+						sawSecretRef = true
+					}
+				}
+			}
+		}
+	}
+	if !sawHMAC || !sawSA || !sawWriterGrant || !sawPublicGrant {
+		t.Fatalf("media IAM incomplete: hmac=%v sa=%v writer=%v public=%v", sawHMAC, sawSA, sawWriterGrant, sawPublicGrant)
+	}
+	if !sawSecret || !sawKey || !sawEndpoint || !sawSecretRef {
+		t.Fatalf("media env incomplete: secret=%v key=%v endpoint=%v secretRef=%v", sawSecret, sawKey, sawEndpoint, sawSecretRef)
 	}
 }
