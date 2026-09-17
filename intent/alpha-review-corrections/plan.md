@@ -27,9 +27,13 @@
   suites green
 - [x] 2.3 Timeout policy (R10: reclassify by effect,
   assert all mutations) — verify: plugin suite green
-- [ ] 2.4 Real publication (R06: coherent fixtures, full
-  provider compile `GOWORK=off`, require-bump to rc.1)
-  — verify: distribution suite green, proxy proof recorded
+- [x] 2.4 Real publication mechanics (R06: coherent fixtures,
+  full provider compile `GOWORK=off` against synthetic
+  modules) — verify: distribution suite green
+- [ ] 2.5 Require-bump plus real verification (R06: bump
+  requires to rc.2 after tagging, record proxy sums,
+  verify `GOWORK=off` root plus provider builds) — needs
+  rc.2 tags; runs with the rc.2 release
 - [ ] 3.1 Media reality (R03: GCS mechanism, provider
   media ops, key continuity; live-verified or changed)
   — verify: unit suites green, live proof in order 8

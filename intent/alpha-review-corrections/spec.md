@@ -111,10 +111,13 @@ narrowed only where noted with reasoning.
   provider with `GOWORK=off`: file proxy carries the
   synthetic magelift modules, upstream carries
   third-party (documented network use).
-- Require-bump to the published rc.1 module versions lands
-  as a real commit (pre-release versions are valid
-  requires); rc.2 tags later verify the full sequence.
-  Published tags are never rewritten.
+- The first require-bump lands WITH rc.2 (requires name rc.2,
+  matching that tree). Bumping to rc.1 was attempted and
+  reverted: the tree is already ahead of rc.1's SDK, so rc.1
+  requires help nothing. After rc.2 tags: bump root plus
+  provider requires to rc.2, record sums from the proxy, and
+  verify `GOWORK=off` root plus provider builds. Published
+  tags are never rewritten.
 
 ## R07 — Honest release channels
 
