@@ -130,7 +130,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.HmacSecret = hmac.Secret
 	component.MediaAccount = account.Email
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"bucketName": component.BucketName,
+		"bucketName":   component.BucketName,
 		"hmacAccessId": component.HmacAccessID, "mediaAccount": component.MediaAccount,
 	}); err != nil {
 		return nil, err
