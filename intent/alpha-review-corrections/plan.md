@@ -8,8 +8,10 @@
 - [ ] 1.2 Connected installation (R01: URLs in lockfiles,
   pinned publisher, shared resolver, metadata bootstrap,
   verifier persistence, CI provider step)
-  — verify: providerhost plus cli plus registry suites,
-  clean-machine proof on a GCE VM (destroyed after)
+  — verify: providerhost plus cli plus registry suites
+  green; clean-machine GCE proof deferred to rc.2
+  artifacts (no release exists since the rc.1 cancel),
+  recorded in the box report before ticking
 - [ ] 1.3 Crash-safe updater (R11: copy backup, injectable
   transitions, fault tests, Windows note) — verify:
   `go test ./internal/upgrade/ -count=1`

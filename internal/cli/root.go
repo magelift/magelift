@@ -113,6 +113,8 @@ type options struct {
 	testRuntimeObserve         platform.RuntimeObserve
 	testRuntimeTunnel          platform.RuntimeTunnel
 	testCostEstimator          platform.CostEstimator
+	fetchProviderLock          func(context.Context, string) (providerhost.Lockfile, error)
+	ensureProviderVerifier     func(context.Context, string) (string, error)
 	infraOnly                  bool
 	ackMaintenanceDrain        bool
 	skipProviderLock           bool

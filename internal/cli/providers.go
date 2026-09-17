@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -23,7 +25,7 @@ func providersCommand(o *options) *cobra.Command {
 }
 
 func providersInstallCommand(o *options) *cobra.Command {
-	var lockPath, cacheDir string
+	var lockPath, cacheDir, version string
 	command := &cobra.Command{
 		Use:   "install",
 		Short: "Download and verify the providers named by magelift.yaml",
@@ -37,21 +39,66 @@ func providersInstallCommand(o *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-		executable := ""
-		if o.executable != nil {
-			if path, err := o.executable(); err == nil {
-				executable = path
+			executable := ""
+			if o.executable != nil {
+				if path, err := o.executable(); err == nil {
+					executable = path
+				}
 			}
-		}
-		lockFile, lock, _, err := providerhost.ResolveLock(providerhost.ResolveOptions{ExecutablePath: executable, LockPath: strings.TrimSpace(lockPath), CacheDir: strings.TrimSpace(cacheDir)})
-		if err != nil {
-			return err
-		}
-		downloader := &providerhost.Downloader{
-			Verifier: providerhost.NewCosignVerifier(),
-			CacheDir: strings.TrimSpace(cacheDir),
-			LockDir:  filepath.Dir(lockFile),
-		}
+			opts := providerhost.ResolveOptions{ExecutablePath: executable, LockPath: strings.TrimSpace(lockPath), CacheDir: strings.TrimSpace(cacheDir)}
+			lockFile, lock, _, err := providerhost.ResolveLock(opts)
+			bootstrapped := false
+			if err != nil {
+				if strings.TrimSpace(lockPath) != "" {
+					return err
+				}
+				want := strings.TrimSpace(version)
+				if want == "" {
+					want = strings.TrimSpace(Version)
+				}
+				if !providerhost.ValidReleaseTag(want) {
+					return &exitError{code: 3, err: fmt.Errorf("no provider lockfile and no release version to bootstrap from (running %q): pass --version vX.Y.Z", Version)}
+				}
+				fetch := o.fetchProviderLock
+				if fetch == nil {
+					fetch = func(ctx context.Context, v string) (providerhost.Lockfile, error) {
+						return providerhost.FetchLock(ctx, v, "", nil)
+					}
+				}
+				fetched, ferr := fetch(cmd.Context(), want)
+				if ferr != nil {
+					return &exitError{code: 3, err: ferr}
+				}
+				encoded, ferr := json.MarshalIndent(fetched, "", "  ")
+				if ferr != nil {
+					return &exitError{code: 3, err: ferr}
+				}
+				if ferr := os.WriteFile("magelift.providers.lock", append(encoded, '\n'), 0o644); ferr != nil {
+					return &exitError{code: 3, err: fmt.Errorf("write bootstrapped lockfile: %w", ferr)}
+				}
+				lockFile, lock, bootstrapped = "magelift.providers.lock", fetched, true
+			} else if strings.TrimSpace(version) != "" {
+				return &exitError{code: 3, err: fmt.Errorf("provider lockfile %s already exists; remove it to re-bootstrap at --version %s", lockFile, strings.TrimSpace(version))}
+			}
+			cacheResolved, err := providerhost.EffectiveCacheDir(strings.TrimSpace(cacheDir))
+			if err != nil {
+				return &exitError{code: 3, err: err}
+			}
+			ensure := o.ensureProviderVerifier
+			if ensure == nil {
+				ensure = func(ctx context.Context, dir string) (string, error) {
+					return (&providerhost.VerifierInstaller{CacheDir: dir}).Ensure(ctx)
+				}
+			}
+			verifierPath, err := ensure(cmd.Context(), cacheResolved)
+			if err != nil {
+				return &exitError{code: 3, err: err}
+			}
+			downloader := &providerhost.Downloader{
+				Verifier: providerhost.NewPreferredVerifier(cacheResolved),
+				CacheDir: cacheResolved,
+				LockDir:  filepath.Dir(lockFile),
+			}
 			type result struct {
 				Provider string `json:"provider"`
 				Version  string `json:"version"`
@@ -79,11 +126,12 @@ func providersInstallCommand(o *options) *cobra.Command {
 				}
 				results = append(results, result{Provider: installed.Provider, Version: installed.Version, Binary: installed.Binary, Cached: installed.Cached})
 			}
-			return o.write(map[string]any{"providers": results})
+			return o.write(map[string]any{"providers": results, "bootstrapped": bootstrapped, "verifier": verifierPath})
 		},
 	}
 	command.Flags().StringVar(&lockPath, "lockfile", "", "provider lockfile path (default: ./magelift.providers.lock, then beside the CLI)")
 	command.Flags().StringVar(&cacheDir, "cache-dir", "", "provider cache directory (default: user cache)")
+	command.Flags().StringVar(&version, "version", "", "release tag to bootstrap the lockfile from when none exists (default: the CLI version)")
 	return command
 }
 

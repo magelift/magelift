@@ -193,6 +193,7 @@ func renderWorkflow(configFile, version string, environments []string, generator
 	workflow.WriteString("    steps:\n")
 	workflow.WriteString("      - uses: " + checkoutAction + "\n")
 	writeVerifiedInstall(&workflow, version, true)
+	writeProviderInstall(&workflow)
 	workflow.WriteString("      - name: Validate configuration\n        run: magelift --config " + shellQuote(configFile) + " --no-interaction config validate\n")
 	workflow.WriteString("      - name: Resolve environment\n        run: magelift --config " + shellQuote(configFile) + " --env \"${{ matrix.environment }}\" --no-interaction --output json config effective > /dev/null\n")
 	workflow.WriteString("\n  build:\n    name: Build and sign immutable image\n    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'\n    needs: validate\n    runs-on: ubuntu-latest\n")
@@ -205,6 +206,7 @@ func renderWorkflow(configFile, version string, environments []string, generator
 	workflow.WriteString("      - uses: " + dockerLoginAction + "\n        with:\n          registry: ghcr.io\n          username: ${{ github.actor }}\n          password: ${{ secrets.GITHUB_TOKEN }}\n")
 	generator.WriteBuildAuth(&workflow)
 	writeVerifiedInstall(&workflow, version, false)
+	writeProviderInstall(&workflow)
 	workflow.WriteString("      - name: Build and sign image\n        id: build\n        env:\n          MAGELIFT_RELEASE_IMAGE: ${{ vars.MAGELIFT_RELEASE_IMAGE }}\n          MAGELIFT_BUILDER_IMAGE: ${{ vars.MAGELIFT_BUILDER_IMAGE }}\n          MAGELIFT_RUNTIME_IMAGE: ${{ vars.MAGELIFT_RUNTIME_IMAGE }}\n        run: |\n          set -eu\n          for required in MAGELIFT_RELEASE_IMAGE MAGELIFT_BUILDER_IMAGE MAGELIFT_RUNTIME_IMAGE; do\n            test -n \"${!required}\"\n          done\n          magelift --config " + shellQuote(configFile) + " --no-interaction --output json build --push \\\n            --image \"$MAGELIFT_RELEASE_IMAGE\" \\\n            --builder-image \"$MAGELIFT_BUILDER_IMAGE\" \\\n            --runtime-image \"$MAGELIFT_RUNTIME_IMAGE\" > build-result.json\n          digest=\"$(jq -er '.image.imageReference + \"@\" + .image.digest' build-result.json)\"\n          printf 'digest=%s\\n' \"$digest\" >> \"$GITHUB_OUTPUT\"\n")
 	if containsEnvironment(environments, "preview") {
 		workflow.WriteString("\n  preview:\n    name: Preview infrastructure\n    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'magelift-preview')\n    needs: validate\n    runs-on: ubuntu-latest\n    environment: preview\n    concurrency:\n      group: magelift-preview-${{ github.repository }}-${{ github.event.pull_request.number }}\n      cancel-in-progress: false\n    permissions:\n      contents: read\n      id-token: write\n    steps:\n")
@@ -292,6 +294,15 @@ func writeGCPAuth(workflow *strings.Builder) {
 func writeWorkflowCheckoutAndInstall(workflow *strings.Builder, version string) {
 	workflow.WriteString("      - uses: " + checkoutAction + "\n        with:\n          persist-credentials: false\n")
 	writeVerifiedInstall(workflow, version, true)
+	writeProviderInstall(workflow)
+}
+
+// writeProviderInstall fetches the verified provider plugin after the CLI
+// is on PATH. A committed magelift.providers.lock pins the version;
+// otherwise install bootstraps the CLI's release version. The step runs
+// everywhere the CLI install runs: no job may assume a provider.
+func writeProviderInstall(workflow *strings.Builder) {
+	workflow.WriteString("      - name: Install MageLift provider\n        run: magelift providers install\n")
 }
 
 // writeVerifiedInstall installs the pinned release binary: Sigstore bundle

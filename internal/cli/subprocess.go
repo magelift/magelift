@@ -35,7 +35,7 @@ func (o *options) defaultLoadProvider(ctx context.Context, provider string) (pro
 		LockPath:   resolved.LockPath,
 		BinaryPath: resolved.Binary,
 		BundlePath: resolved.Bundle,
-		Verifier:   providerhost.NewCosignVerifier(),
+		Verifier:   providerhost.NewPreferredVerifier(""),
 	})
 }
 
