@@ -297,6 +297,8 @@ github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.2 h1:TAk5DXAbc5oax8AkmE1CUtF9
 github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.2/go.mod h1:GRqTY85PGvLnxrPXble82sjL8dlw19mf2n+oZSH19iQ=
 github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.3 h1:ZbqcdDfW30zXBiMIq3Y2aQu+pX7EaDpro4uHWKw007U=
 github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.3/go.mod h1:GRqTY85PGvLnxrPXble82sjL8dlw19mf2n+oZSH19iQ=
+github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.4 h1:i5XYibj97e1UtmaM7xgnTcIMSMPqXAGe0fFCPzgapus=
+github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.4/go.mod h1:GRqTY85PGvLnxrPXble82sjL8dlw19mf2n+oZSH19iQ=
 github.com/mattn/go-colorable v0.1.9/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=
 github.com/mattn/go-colorable v0.1.12/go.mod h1:u5H1YNBxpqRaxsYJYSkiCWKzEfiAb1Gb520KVy5xxl4=
 github.com/mattn/go-colorable v0.1.15 h1:+u9SLTRGnXv73cEsnsmoZBom+dMU88B2M0aDcWy0/jY=
