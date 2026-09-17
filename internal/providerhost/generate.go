@@ -55,7 +55,7 @@ func GenerateLockfiles(distDir, tag string) (map[string]Lockfile, error) {
 		artifact := Artifact{
 			Name:     "magelift-provider-" + name,
 			Version:  strings.TrimSpace(tag),
-			Protocol: ProtocolV2Marker,
+			Protocol: ProtocolV1Marker,
 			Digest:   "sha256:" + checksums[asset],
 			Cosign: CosignTrust{
 				Identity: generatorIdentityBase + strings.TrimSpace(tag),

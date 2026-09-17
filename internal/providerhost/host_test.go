@@ -21,13 +21,13 @@ func validLockJSON(digest string) []byte {
 		digest = testDigest
 	}
 	return []byte(`{
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "sdkAPIVersion": "v1",
   "providers": {
     "gcp": {
       "name": "magelift-provider-gcp",
       "version": "0.1.0",
-      "protocol": "magelift-v2",
+      "protocol": "magelift-v1",
       "digest": "` + digest + `",
       "url": "https://github.com/magelift/magelift/releases/download/v0.1.0/magelift-provider-gcp",
       "cosign": {
@@ -73,22 +73,22 @@ func TestParseLockfileRefuses(t *testing.T) {
 		},
 		{
 			name:    "bad schema",
-			body:    strings.Replace(string(validLockJSON("")), `"schemaVersion": 2`, `"schemaVersion": 3`, 1),
+			body:    strings.Replace(string(validLockJSON("")), `"schemaVersion": 1`, `"schemaVersion": 2`, 1),
 			wantErr: ErrUnsupportedSchema,
 		},
 		{
-			name:    "schema v1 refused",
-			body:    strings.Replace(string(validLockJSON("")), `"schemaVersion": 2`, `"schemaVersion": 1`, 1),
+			name:    "schema zero refused",
+			body:    strings.Replace(string(validLockJSON("")), `"schemaVersion": 1`, `"schemaVersion": 0`, 1),
 			wantErr: ErrUnsupportedSchema,
 		},
 		{
 			name:    "missing protocol",
-			body:    strings.Replace(string(validLockJSON("")), `"protocol": "magelift-v2",`, ``, 1),
+			body:    strings.Replace(string(validLockJSON("")), `"protocol": "magelift-v1",`, ``, 1),
 			wantErr: ErrUnsupportedProtocol,
 		},
 		{
 			name:    "wrong protocol",
-			body:    strings.Replace(string(validLockJSON("")), `"protocol": "magelift-v2"`, `"protocol": "magelift-v1"`, 1),
+			body:    strings.Replace(string(validLockJSON("")), `"protocol": "magelift-v1"`, `"protocol": "not-a-protocol"`, 1),
 			wantErr: ErrUnsupportedProtocol,
 		},
 		{

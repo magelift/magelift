@@ -64,5 +64,5 @@ func dialGCP(ctx context.Context) (*providerhost.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return providerhost.DialV2(ctx, loaded.Binary, providerhost.DialOptions{})
+	return providerhost.Dial(ctx, loaded.Binary, providerhost.DialOptions{})
 }

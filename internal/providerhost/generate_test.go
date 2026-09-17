@@ -61,7 +61,7 @@ func TestGenerateLockfilesEmitsLoadableSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Artifact: %v", err)
 	}
-	if artifact.Protocol != ProtocolV2Marker || artifact.Version != "v1.2.3" {
+	if artifact.Protocol != ProtocolV1Marker || artifact.Version != "v1.2.3" {
 		t.Fatalf("artifact = %+v", artifact)
 	}
 	if !strings.HasSuffix(artifact.Cosign.Identity, "@refs/tags/v1.2.3") {

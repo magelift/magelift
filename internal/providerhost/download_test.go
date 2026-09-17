@@ -53,7 +53,7 @@ func downloadTestArtifact(serverURL string, binary []byte) Artifact {
 	return Artifact{
 		Name:     "magelift-provider-gcp",
 		Version:  "v0.0.0-test.1",
-		Protocol: ProtocolV2Marker,
+		Protocol: ProtocolV1Marker,
 		Digest:   "sha256:" + hex.EncodeToString(sum[:]),
 		URL:      serverURL + "/magelift-provider-gcp",
 		Cosign: CosignTrust{
@@ -134,7 +134,7 @@ func TestDownloadInstallRefusesBadSignature(t *testing.T) {
 }
 
 func TestDownloadInstallRefusesUnsignedEntry(t *testing.T) {
-	artifact := Artifact{Name: "magelift-provider-gcp", Version: "v1", Protocol: ProtocolV2Marker, Digest: "sha256:" + strings.Repeat("a", 64)}
+	artifact := Artifact{Name: "magelift-provider-gcp", Version: "v1", Protocol: ProtocolV1Marker, Digest: "sha256:" + strings.Repeat("a", 64)}
 	downloader := &Downloader{Verifier: stubVerifier{}, CacheDir: t.TempDir()}
 	_, err := downloader.Install(context.Background(), "gcp", artifact)
 	if !errors.Is(err, ErrUnsigned) {
@@ -145,7 +145,7 @@ func TestDownloadInstallRefusesUnsignedEntry(t *testing.T) {
 func TestDownloadInstallRefusesMissingURL(t *testing.T) {
 	sum := sha256.Sum256([]byte("x"))
 	artifact := Artifact{
-		Name: "magelift-provider-gcp", Version: "v1", Protocol: ProtocolV2Marker,
+		Name: "magelift-provider-gcp", Version: "v1", Protocol: ProtocolV1Marker,
 		Digest: "sha256:" + hex.EncodeToString(sum[:]),
 		Cosign: CosignTrust{Identity: "id", Issuer: "iss", Bundle: "bundle.json"},
 	}
@@ -158,7 +158,7 @@ func TestDownloadInstallRefusesMissingURL(t *testing.T) {
 
 func TestDownloadInstallRefusesUnsafeVersion(t *testing.T) {
 	artifact := Artifact{
-		Name: "magelift-provider-gcp", Version: "../escape", Protocol: ProtocolV2Marker,
+		Name: "magelift-provider-gcp", Version: "../escape", Protocol: ProtocolV1Marker,
 		Digest: "sha256:" + strings.Repeat("a", 64), URL: "https://example.invalid/x",
 		Cosign: CosignTrust{Identity: "id", Issuer: "iss", Bundle: "https://example.invalid/x.sigstore.json"},
 	}
@@ -194,7 +194,7 @@ func TestDownloadInstallAcceptsLockfileRelativeBundle(t *testing.T) {
 func TestDownloadInstallRefusesHTTPURL(t *testing.T) {
 	sum := sha256.Sum256([]byte("x"))
 	artifact := Artifact{
-		Name: "magelift-provider-gcp", Version: "v1", Protocol: ProtocolV2Marker,
+		Name: "magelift-provider-gcp", Version: "v1", Protocol: ProtocolV1Marker,
 		Digest: "sha256:" + hex.EncodeToString(sum[:]), URL: "http://example.invalid/x",
 		Cosign: CosignTrust{Identity: "id", Issuer: "iss", Bundle: "https://example.invalid/x.sigstore.json"},
 	}
@@ -217,7 +217,7 @@ func TestResolveCachedFindsInstalledEntry(t *testing.T) {
 	}
 	lockDir := t.TempDir()
 	lockPath := filepath.Join(lockDir, "magelift.providers.lock")
-	lockJSON := `{"schemaVersion":2,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"` + artifact.Version + `","protocol":"magelift-v2","digest":"` + artifact.Digest + `","url":"` + artifact.URL + `","cosign":{"identity":"test-identity","issuer":"test-issuer","bundle":"` + artifact.Cosign.Bundle + `"}}}}`
+	lockJSON := `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"` + artifact.Version + `","protocol":"magelift-v1","digest":"` + artifact.Digest + `","url":"` + artifact.URL + `","cosign":{"identity":"test-identity","issuer":"test-issuer","bundle":"` + artifact.Cosign.Bundle + `"}}}}`
 	if err := os.WriteFile(lockPath, []byte(lockJSON), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestResolveCachedFindsInstalledEntry(t *testing.T) {
 func TestResolveCachedMissingEntryIsNotExist(t *testing.T) {
 	lockDir := t.TempDir()
 	lockPath := filepath.Join(lockDir, "magelift.providers.lock")
-	lockJSON := `{"schemaVersion":2,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"v9","protocol":"magelift-v2","digest":"sha256:` + strings.Repeat("b", 64) + `","cosign":{"identity":"id","issuer":"iss","bundle":"bundle.json"}}}}`
+	lockJSON := `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"v9","protocol":"magelift-v1","digest":"sha256:` + strings.Repeat("b", 64) + `","cosign":{"identity":"id","issuer":"iss","bundle":"bundle.json"}}}}`
 	if err := os.WriteFile(lockPath, []byte(lockJSON), 0o600); err != nil {
 		t.Fatal(err)
 	}

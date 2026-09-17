@@ -1,5 +1,9 @@
 # Plan: reference-store acceptance
 
+- [x] 0.1 Renumber to first version (lockfile schema plus
+  protocol marker plus dial path; fixtures; no shims) —
+  verify: providerhost plus cli plus registry suites
+  green, `magelift-v2` unfindable outside archives
 - [x] 1.1 Sweep residual block (hoist retained backups into a
   top-level `residual` entry with billing-honest framing plus
   `residualUnknown`; unit tests) — verify:
