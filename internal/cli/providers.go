@@ -37,15 +37,21 @@ func providersInstallCommand(o *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			lock, lockDir, err := loadProviderLock(lockPath, o)
-			if err != nil {
-				return err
+		executable := ""
+		if o.executable != nil {
+			if path, err := o.executable(); err == nil {
+				executable = path
 			}
-			downloader := &providerhost.Downloader{
-				Verifier: providerhost.NewCosignVerifier(),
-				CacheDir: strings.TrimSpace(cacheDir),
-				LockDir:  lockDir,
-			}
+		}
+		lockFile, lock, _, err := providerhost.ResolveLock(providerhost.ResolveOptions{ExecutablePath: executable, LockPath: strings.TrimSpace(lockPath), CacheDir: strings.TrimSpace(cacheDir)})
+		if err != nil {
+			return err
+		}
+		downloader := &providerhost.Downloader{
+			Verifier: providerhost.NewCosignVerifier(),
+			CacheDir: strings.TrimSpace(cacheDir),
+			LockDir:  filepath.Dir(lockFile),
+		}
 			type result struct {
 				Provider string `json:"provider"`
 				Version  string `json:"version"`
@@ -110,44 +116,6 @@ func configProviders(file *config.File) ([]string, error) {
 	}
 	sort.Strings(providers)
 	return providers, nil
-}
-
-func loadProviderLock(flag string, o *options) (providerhost.Lockfile, string, error) {
-	candidates := []string{}
-	if trimmed := strings.TrimSpace(flag); trimmed != "" {
-		candidates = append(candidates, trimmed)
-	} else {
-		candidates = append(candidates, "magelift.providers.lock")
-		executable := ""
-		if o.executable != nil {
-			if path, err := o.executable(); err == nil {
-				executable = path
-			}
-		}
-		dir := "."
-		if executable != "" {
-			dir = filepath.Dir(executable)
-		}
-		candidates = append(candidates, filepath.Join(dir, "magelift.providers.lock"))
-	}
-	var lastErr error
-	for _, candidate := range candidates {
-		file, err := os.Open(candidate)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		lock, parseErr := providerhost.ParseLock(file)
-		file.Close()
-		if parseErr != nil {
-			return providerhost.Lockfile{}, "", parseErr
-		}
-		return lock, filepath.Dir(candidate), nil
-	}
-	if strings.TrimSpace(flag) != "" {
-		return providerhost.Lockfile{}, "", fmt.Errorf("open %s: %w", strings.TrimSpace(flag), lastErr)
-	}
-	return providerhost.Lockfile{}, "", fmt.Errorf("no magelift.providers.lock in the project or beside the CLI: %w", lastErr)
 }
 
 func bundledProviderBinary(o *options, provider string) (string, bool) {

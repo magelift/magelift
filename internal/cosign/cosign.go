@@ -32,6 +32,21 @@ type CommandRunner interface {
 
 type Client struct {
 	runner CommandRunner
+	// Binary overrides the cosign executable (absolute path to a cached
+	// bootstrap). Empty means "cosign" resolved from PATH.
+	Binary string
+}
+
+// NewWithBinary builds a client pinned to an explicit executable.
+func NewWithBinary(binary string) *Client {
+	return &Client{runner: execRunner{}, Binary: binary}
+}
+
+func (c *Client) binary() string {
+	if c != nil && strings.TrimSpace(c.Binary) != "" {
+		return strings.TrimSpace(c.Binary)
+	}
+	return "cosign"
 }
 
 type SignOptions struct {
@@ -80,7 +95,7 @@ func (c *Client) SignWithOptions(ctx context.Context, reference string, options 
 		args = append(args, "--identity-token", options.IdentityTokenPath)
 	}
 	args = append(args, reference)
-	if err := c.runner.Run(ctx, "cosign", args...); err != nil {
+	if err := c.runner.Run(ctx, c.binary(), args...); err != nil {
 		if cause := context.Cause(ctx); cause != nil {
 			return cause
 		}
@@ -109,7 +124,7 @@ func (c *Client) Verify(ctx context.Context, reference string, options VerifyOpt
 		return cause
 	}
 	if err := c.runner.Run(ctx,
-		"cosign", "verify",
+		c.binary(), "verify",
 		"--certificate-identity", options.CertificateIdentity,
 		"--certificate-oidc-issuer", options.OIDCIssuer,
 		reference,
@@ -152,7 +167,7 @@ func (c *Client) VerifyBlob(ctx context.Context, bundlePath, artifactPath string
 		return cause
 	}
 	if err := c.runner.Run(ctx,
-		"cosign", "verify-blob",
+		c.binary(), "verify-blob",
 		"--bundle", bundlePath,
 		"--certificate-identity", options.CertificateIdentity,
 		"--certificate-oidc-issuer", options.OIDCIssuer,

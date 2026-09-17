@@ -15,6 +15,13 @@ const (
 	// ProtocolV1Marker is the required per-entry protocol marker. Only
 	// typed net/rpc providers load; anything else is refused.
 	ProtocolV1Marker = "magelift-v1"
+	// FirstPartyIdentityPrefix and FirstPartyIssuer pin the only
+	// publisher this CLI trusts: the release workflow on any tag.
+	// Downloaded lockfiles can never redefine the trusted publisher;
+	// entries naming anyone else are refused. A multi-publisher trust
+	// store replaces this pin if third-party providers ever ship.
+	FirstPartyIdentityPrefix = "https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/"
+	FirstPartyIssuer         = "https://token.actions.githubusercontent.com"
 )
 
 var digestPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
@@ -107,6 +114,9 @@ func (a Artifact) validate() error {
 	}
 	if strings.TrimSpace(a.Cosign.Identity) == "" || strings.TrimSpace(a.Cosign.Issuer) == "" {
 		return ErrUnsigned
+	}
+	if !strings.HasPrefix(strings.TrimSpace(a.Cosign.Identity), FirstPartyIdentityPrefix) || strings.TrimSpace(a.Cosign.Issuer) != FirstPartyIssuer {
+		return fmt.Errorf("%w: %s", ErrUnsigned, "lockfile publisher is not the pinned first-party release workflow")
 	}
 	return nil
 }

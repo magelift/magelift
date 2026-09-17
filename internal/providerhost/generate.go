@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	// generatorIdentityBase pins lockfile entries to the release workflow
-	// that signs them. The tag is appended per release.
-	generatorIdentityBase = "https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/"
-	generatorIssuer       = "https://token.actions.githubusercontent.com"
+	// generatorDownloadBase serves release assets. Generated entries carry
+	// absolute binary and bundle URLs so providers install can fetch them
+	// with no beside-CLI bundle.
+	generatorDownloadBase = "https://github.com/magelift/magelift/releases/download/"
 )
 
 // GenerateLockfiles builds one lockfile per platform from a GoReleaser
@@ -57,10 +57,11 @@ func GenerateLockfiles(distDir, tag string) (map[string]Lockfile, error) {
 			Version:  strings.TrimSpace(tag),
 			Protocol: ProtocolV1Marker,
 			Digest:   "sha256:" + checksums[asset],
+			URL:      generatorDownloadBase + strings.TrimSpace(tag) + "/" + asset,
 			Cosign: CosignTrust{
-				Identity: generatorIdentityBase + strings.TrimSpace(tag),
-				Issuer:   generatorIssuer,
-				Bundle:   bundle,
+				Identity: FirstPartyIdentityPrefix + strings.TrimSpace(tag),
+				Issuer:   FirstPartyIssuer,
+				Bundle:   generatorDownloadBase + strings.TrimSpace(tag) + "/" + bundle,
 			},
 		}
 		if err := artifact.validate(); err != nil {

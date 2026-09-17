@@ -45,20 +45,26 @@ func NewDefault() (*platform.ModuleRegistry, error) {
 	return modules, nil
 }
 
-// dialGCP loads, verifies, and dials the installed GCP provider plugin.
-// There is no fallback: with no embedded GCP implementation left, a
-// missing or tampered plugin is a hard error naming the failed check.
+// dialGCP loads, verifies, and dials the installed GCP provider plugin
+// through the shared resolver (project locks control the version from
+// the cache; the beside-CLI lock loads the beside-CLI binary). There is
+// no fallback: with no embedded GCP implementation left, a missing or
+// tampered plugin is a hard error naming the failed check.
 func dialGCP(ctx context.Context) (*providerhost.Client, error) {
 	executable, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("locate CLI executable for provider discovery: %w", err)
 	}
-	paths := providerhost.DiscoverArtifactPaths(executable, "gcp")
+	resolved, err := providerhost.Resolve("gcp", providerhost.ResolveOptions{ExecutablePath: executable})
+	if err != nil {
+		return nil, err
+	}
 	loaded, err := providerhost.Load(ctx, providerhost.Options{
 		Mode:       providerhost.ModeSubprocess,
 		Provider:   "gcp",
-		LockPath:   paths.Lock,
-		BinaryPath: paths.Binary,
+		LockPath:   resolved.LockPath,
+		BinaryPath: resolved.Binary,
+		BundlePath: resolved.Bundle,
 		Verifier:   providerhost.NewCosignVerifier(),
 	})
 	if err != nil {
