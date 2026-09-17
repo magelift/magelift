@@ -39,6 +39,18 @@ func (r *recordingRunner) command(t *testing.T) recordedCommand {
 	return r.commands[0]
 }
 
+func TestBinaryOverrideReplacesPATHLookup(t *testing.T) {
+	runner := &recordingRunner{}
+	client := NewWithRunner(runner)
+	client.Binary = "/cache/_verifier/cosign-v3.1.3"
+	if err := client.Sign(context.Background(), testReference); err != nil {
+		t.Fatal(err)
+	}
+	if command := runner.command(t); command.name != "/cache/_verifier/cosign-v3.1.3" {
+		t.Fatalf("command = %#v", command)
+	}
+}
+
 func TestSignUsesDigestOnlyArgv(t *testing.T) {
 	runner := &recordingRunner{}
 	client := NewWithRunner(runner)

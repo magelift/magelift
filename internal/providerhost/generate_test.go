@@ -67,6 +67,13 @@ func TestGenerateLockfilesEmitsLoadableSchema(t *testing.T) {
 	if !strings.HasSuffix(artifact.Cosign.Identity, "@refs/tags/v1.2.3") {
 		t.Fatalf("identity = %q", artifact.Cosign.Identity)
 	}
+	wantBase := "https://github.com/magelift/magelift/releases/download/v1.2.3/magelift-provider-gcp_1.2.3_linux_amd64"
+	if artifact.URL != wantBase {
+		t.Fatalf("URL = %q, want %q", artifact.URL, wantBase)
+	}
+	if artifact.Cosign.Bundle != wantBase+".sigstore.json" {
+		t.Fatalf("bundle = %q", artifact.Cosign.Bundle)
+	}
 	// The emitted lockfile parses under the loader's own rules.
 	encoded, err := json.Marshal(lock)
 	if err != nil {

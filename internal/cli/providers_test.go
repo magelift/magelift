@@ -31,7 +31,7 @@ environments:
 extensions: {}
 `
 
-const providersTestLock = `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"aws":{"name":"magelift-provider-aws","version":"v0.0.0-test","protocol":"magelift-v1","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cosign":{"identity":"id","issuer":"iss","bundle":"bundle.json"}}}}`
+const providersTestLock = `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"aws":{"name":"magelift-provider-aws","version":"v0.0.0-test","protocol":"magelift-v1","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cosign":{"identity":"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v0.0.0-test","issuer":"https://token.actions.githubusercontent.com","bundle":"bundle.json"}}}}`
 
 func writeProvidersFixture(t *testing.T) (configPath, lockPath string) {
 	t.Helper()

@@ -57,8 +57,8 @@ func downloadTestArtifact(serverURL string, binary []byte) Artifact {
 		Digest:   "sha256:" + hex.EncodeToString(sum[:]),
 		URL:      serverURL + "/magelift-provider-gcp",
 		Cosign: CosignTrust{
-			Identity: "test-identity",
-			Issuer:   "test-issuer",
+			Identity: FirstPartyIdentityPrefix + "v0.0.0-test",
+			Issuer:   FirstPartyIssuer,
 			Bundle:   serverURL + "/magelift-provider-gcp.sigstore.json",
 		},
 	}
@@ -147,7 +147,7 @@ func TestDownloadInstallRefusesMissingURL(t *testing.T) {
 	artifact := Artifact{
 		Name: "magelift-provider-gcp", Version: "v1", Protocol: ProtocolV1Marker,
 		Digest: "sha256:" + hex.EncodeToString(sum[:]),
-		Cosign: CosignTrust{Identity: "id", Issuer: "iss", Bundle: "bundle.json"},
+		Cosign: CosignTrust{Identity: FirstPartyIdentityPrefix + "v0.0.0-test", Issuer: FirstPartyIssuer, Bundle: "bundle.json"},
 	}
 	downloader := &Downloader{Verifier: stubVerifier{}, CacheDir: t.TempDir()}
 	_, err := downloader.Install(context.Background(), "gcp", artifact)
@@ -160,7 +160,7 @@ func TestDownloadInstallRefusesUnsafeVersion(t *testing.T) {
 	artifact := Artifact{
 		Name: "magelift-provider-gcp", Version: "../escape", Protocol: ProtocolV1Marker,
 		Digest: "sha256:" + strings.Repeat("a", 64), URL: "https://example.invalid/x",
-		Cosign: CosignTrust{Identity: "id", Issuer: "iss", Bundle: "https://example.invalid/x.sigstore.json"},
+		Cosign: CosignTrust{Identity: FirstPartyIdentityPrefix + "v0.0.0-test", Issuer: FirstPartyIssuer, Bundle: "https://example.invalid/x.sigstore.json"},
 	}
 	downloader := &Downloader{Verifier: stubVerifier{}, CacheDir: t.TempDir()}
 	_, err := downloader.Install(context.Background(), "gcp", artifact)
@@ -196,7 +196,7 @@ func TestDownloadInstallRefusesHTTPURL(t *testing.T) {
 	artifact := Artifact{
 		Name: "magelift-provider-gcp", Version: "v1", Protocol: ProtocolV1Marker,
 		Digest: "sha256:" + hex.EncodeToString(sum[:]), URL: "http://example.invalid/x",
-		Cosign: CosignTrust{Identity: "id", Issuer: "iss", Bundle: "https://example.invalid/x.sigstore.json"},
+		Cosign: CosignTrust{Identity: FirstPartyIdentityPrefix + "v0.0.0-test", Issuer: FirstPartyIssuer, Bundle: "https://example.invalid/x.sigstore.json"},
 	}
 	downloader := &Downloader{Verifier: stubVerifier{}, CacheDir: t.TempDir()}
 	_, err := downloader.Install(context.Background(), "gcp", artifact)
@@ -217,7 +217,7 @@ func TestResolveCachedFindsInstalledEntry(t *testing.T) {
 	}
 	lockDir := t.TempDir()
 	lockPath := filepath.Join(lockDir, "magelift.providers.lock")
-	lockJSON := `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"` + artifact.Version + `","protocol":"magelift-v1","digest":"` + artifact.Digest + `","url":"` + artifact.URL + `","cosign":{"identity":"test-identity","issuer":"test-issuer","bundle":"` + artifact.Cosign.Bundle + `"}}}}`
+	lockJSON := `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"` + artifact.Version + `","protocol":"magelift-v1","digest":"` + artifact.Digest + `","url":"` + artifact.URL + `","cosign":{"identity":"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v0.0.0-test","issuer":"https://token.actions.githubusercontent.com","bundle":"` + artifact.Cosign.Bundle + `"}}}}`
 	if err := os.WriteFile(lockPath, []byte(lockJSON), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestResolveCachedFindsInstalledEntry(t *testing.T) {
 func TestResolveCachedMissingEntryIsNotExist(t *testing.T) {
 	lockDir := t.TempDir()
 	lockPath := filepath.Join(lockDir, "magelift.providers.lock")
-	lockJSON := `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"v9","protocol":"magelift-v1","digest":"sha256:` + strings.Repeat("b", 64) + `","cosign":{"identity":"id","issuer":"iss","bundle":"bundle.json"}}}}`
+	lockJSON := `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"v9","protocol":"magelift-v1","digest":"sha256:` + strings.Repeat("b", 64) + `","cosign":{"identity":"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v0.0.0-test","issuer":"https://token.actions.githubusercontent.com","bundle":"bundle.json"}}}}`
 	if err := os.WriteFile(lockPath, []byte(lockJSON), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -67,6 +67,11 @@ func TestParseLockfileRefuses(t *testing.T) {
 			wantErr: ErrUnsigned,
 		},
 		{
+			name:    "foreign publisher refused",
+			body:    strings.Replace(string(validLockJSON("")), `"identity": "https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v0.1.0"`, `"identity": "https://github.com/evil/fork/.github/workflows/release.yml@refs/tags/v0.1.0"`, 1),
+			wantErr: ErrUnsigned,
+		},
+		{
 			name:    "missing digest",
 			body:    strings.Replace(string(validLockJSON("")), `"digest": "`+testDigest+`"`, `"digest": ""`, 1),
 			wantErr: ErrDigestRequired,

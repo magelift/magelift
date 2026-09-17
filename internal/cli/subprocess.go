@@ -2,9 +2,7 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/platform"
@@ -16,11 +14,10 @@ import (
 // plugin, and dial failure fails the command (no fallback).
 const gcpProviderID = "gcp"
 
-// defaultLoadProvider verifies the installed provider artifact: the lockfile
-// plus the provider binary plus its Cosign bundle, either beside the CLI
-// executable (release bundles ship together) or in the user cache (fetched
-// by `magelift providers install`). Verification failures stay loud; only a
-// binary missing in both places names the install command.
+// defaultLoadProvider verifies the installed provider artifact through the
+// shared resolver: project locks control the version run (cache), the
+// beside-CLI lock loads the beside-CLI binary. Verification failures stay
+// loud; only a missing binary names the install command.
 func (o *options) defaultLoadProvider(ctx context.Context, provider string) (providerhost.Loaded, error) {
 	executable := ""
 	if o.executable != nil {
@@ -28,26 +25,18 @@ func (o *options) defaultLoadProvider(ctx context.Context, provider string) (pro
 			executable = path
 		}
 	}
-	paths := providerhost.DiscoverArtifactPaths(executable, provider)
-	load := func(lockPath, binaryPath, bundlePath string) (providerhost.Loaded, error) {
-		return providerhost.Load(ctx, providerhost.Options{
-			Mode:       providerhost.ModeSubprocess,
-			Provider:   provider,
-			LockPath:   lockPath,
-			BinaryPath: binaryPath,
-			BundlePath: bundlePath,
-			Verifier:   providerhost.NewCosignVerifier(),
-		})
+	resolved, err := providerhost.Resolve(provider, providerhost.ResolveOptions{ExecutablePath: executable})
+	if err != nil {
+		return providerhost.Loaded{}, err
 	}
-	if info, err := os.Stat(paths.Binary); err == nil && !info.IsDir() {
-		return load(paths.Lock, paths.Binary, "")
-	}
-	if binary, bundle, err := providerhost.ResolveCached(paths.Lock, provider, ""); err == nil {
-		return load(paths.Lock, binary, bundle)
-	} else if errors.Is(err, providerhost.ErrCacheMiss) {
-		return providerhost.Loaded{}, fmt.Errorf("provider %q is not installed beside the CLI or in the cache: run `magelift providers install` to download the locked version", provider)
-	}
-	return load(paths.Lock, paths.Binary, "")
+	return providerhost.Load(ctx, providerhost.Options{
+		Mode:       providerhost.ModeSubprocess,
+		Provider:   provider,
+		LockPath:   resolved.LockPath,
+		BinaryPath: resolved.Binary,
+		BundlePath: resolved.Bundle,
+		Verifier:   providerhost.NewCosignVerifier(),
+	})
 }
 
 // defaultDialProvider starts the verified provider subprocess and tracks the
