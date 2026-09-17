@@ -49,7 +49,7 @@
 - [x] 4.1 CI coverage (R09: module jobs, filters, cache
   keys, promotion gate on checks) — verify: actionlint,
   gate-script failure demo
-- [ ] 4.2 Onboarding truth (reopened: second review finding 10) (R12: shipped-path rewrite,
+- [x] 4.2 Onboarding truth (R12: shipped-path rewrite,
   ADC, mail recipient; recipe fixture pending loop
   evidence) — verify: docs green, humanizer plus marks
 - [ ] 5.1 Amendments plus gates (dated report notes,

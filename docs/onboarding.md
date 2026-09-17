@@ -31,9 +31,19 @@ needs you (or your registrar, Google billing, Adobe account team).
   mints the workload identity pool, provider, and service account
   plus the repository impersonation binding. Granting the service
   account API roles on your project stays an operator IAM step;
-  cover at least the services admission checks (compute, container,
-  sqladmin, secretmanager, storage, serviceusage, plus billing
-  read and logging/monitoring for observability).
+  cover at least the services admission checks (artifactregistry,
+  compute, container, sqladmin, secretmanager, storage,
+  serviceusage, plus billing read and logging/monitoring for
+  observability).
+- **Your Magento 2.4.9 tree in git.** Builds inspect the git
+  checkout holding `magelift.yaml` and refuse detached or
+  uncommitted trees; the shop needs a remote for provenance
+  and a committed `composer.lock`.
+- **Docker with buildx on the build host.** `docker buildx version`
+  must answer; base images build for `linux/amd64`.
+- **A registry you can push to.** The step below creates an
+  Artifact Registry repository; adapt the commands if you use
+  another registry.
 - **Domain ownership and DNS.** The zone and its records stay
   operator-managed: nothing in the stack creates DNS. After deploy,
   point your names at the load balancer address from
@@ -64,7 +74,7 @@ No stable release exists yet, so install an explicit prerelease.
 Pick the tag from [Releases](https://github.com/magelift/magelift/releases):
 
 ```sh
-curl -fsSL https://magelift.dev/install.sh | MAGELIFT_VERSION=v0.1.0-alpha.1-rc.2 sh
+curl -fsSL https://magelift.dev/install.sh | MAGELIFT_VERSION=v0.1.0-alpha.1-rc.3 sh
 magelift version
 ```
 
@@ -73,14 +83,20 @@ before installing; see [Install](install.md) for the full story.
 
 ### 2. Template
 
+Run the `magelift` steps from your shop checkout (here `~/shop`);
+the base-image build later runs from a separate MageLift tree
+(`~/magelift-src`).
+
 ```sh
+cd ~/shop
 magelift init --provider gcp
 ```
 
 Fill in your GCP project and domains in `magelift.yaml`. The
 starter matches the alpha recipe (preview preset, baked static
 content, recipe search); staging and production inherit with
-larger presets.
+larger presets. Commit the result: builds refuse uncommitted
+trees.
 
 ### 3. Validate
 
@@ -108,6 +124,19 @@ version into a reviewable `magelift.providers.lock`.
 
 ### 5. Bootstrap
 
+Admission checks that the project APIs are enabled; enable them
+first (one command, idempotent):
+
+```sh
+gcloud services enable artifactregistry.googleapis.com \
+  compute.googleapis.com container.googleapis.com \
+  cloudbilling.googleapis.com memorystore.googleapis.com \
+  secretmanager.googleapis.com serviceusage.googleapis.com \
+  sqladmin.googleapis.com storage.googleapis.com \
+  logging.googleapis.com monitoring.googleapis.com \
+  --project=PROJECT_ID
+```
+
 ```sh
 magelift bootstrap --env preview
 ```
@@ -118,10 +147,30 @@ flag (that one is AWS-only).
 
 ### 6. Build the application image
 
-Releases never publish base images for prerelease tags, so build
-yours once and push them to your registry, recording the digests:
+Releases never publish base images for prerelease tags, so fetch
+the pinned MageLift tree from the release tarball and build
+yours once (the installer ships a binary; sources come
+separately):
 
 ```sh
+TAG=v0.1.0-alpha.1-rc.3
+mkdir -p ~/magelift-src
+curl -fsSL "https://github.com/magelift/magelift/archive/refs/tags/$TAG.tar.gz" \
+  | tar -xz -C ~/magelift-src --strip-components=1
+cd ~/magelift-src
+```
+
+Create the registry repositories and authenticate Docker, then
+build and push the bases:
+
+```sh
+gcloud artifacts repositories create shop-bases \
+  --repository-format=docker --location=europe-west1 \
+  --project=PROJECT_ID
+gcloud artifacts repositories create shop \
+  --repository-format=docker --location=europe-west1 \
+  --project=PROJECT_ID
+gcloud auth configure-docker europe-west1-docker.pkg.dev
 REG=europe-west1-docker.pkg.dev/PROJECT_ID/shop-bases
 docker buildx build --platform linux/amd64 -f images/php-nginx/Dockerfile \
   --target builder -t $REG/magelift-builder:8.5 --push .
@@ -129,10 +178,19 @@ docker buildx build --platform linux/amd64 -f images/php-nginx/Dockerfile \
   --target runtime -t $REG/magelift-nginx:8.5 --push .
 ```
 
-Then build and push the immutable shop image (from your clean
-Magento 2.4.9 tree with its lock file committed):
+Record the pushed digests:
 
 ```sh
+gcloud artifacts docker images list \
+  $REG/magelift-builder --include-tags --project=PROJECT_ID
+gcloud artifacts docker images list \
+  $REG/magelift-nginx --include-tags --project=PROJECT_ID
+```
+
+Back in the shop tree, build and push the immutable shop image:
+
+```sh
+cd ~/shop
 magelift build --push \
   --image europe-west1-docker.pkg.dev/PROJECT_ID/shop/shop:preview \
   --builder-image "$REG/magelift-builder@sha256:BUILDER_DIGEST" \
