@@ -1,0 +1,23 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use MageLift\Build\Lifecycle\Phase;
+use MageLift\Build\Magento\LifecyclePlan;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+// Emits the authoritative deploy/post-deploy command sequence as JSON for
+// the Go migration shell golden (internal/platform/testdata).
+// Regenerate: make lifecycle-golden. CI fails on drift.
+$plan = new LifecyclePlan();
+$out = [];
+foreach ([Phase::Deploy, Phase::PostDeploy] as $phase) {
+    $key = $phase === Phase::Deploy ? 'deploy' : 'postDeploy';
+    $out[$key] = array_map(
+        static fn ($command): array => $command->argv(),
+        $plan->commandsFor($phase)
+    );
+}
+echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";

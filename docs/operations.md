@@ -29,17 +29,22 @@ an explicit acknowledgement of that limitation.
 Static content is baked into the image at build (the PHP lifecycle plan owns
 it); deploy-time migration runs config import, schema upgrade, and cache
 operations only, and serving containers receive baked assets by image-digest
-identity. Deploy success means the intended rollout plus a passing bounded
-Magento probe — scheduler settlement alone never reports success.
+identity. Deploy success means the intended rollout plus a passing serving
+request and bounded Magento probe — scheduler settlement alone never
+reports success.
 
-Old pods keep serving while the migration candidate runs, so incompatible
-(destructive or irreversible) schema changes always ride maintenance mode.
-Zero-downtime incompatible schema changes are explicitly not promised. For
-any production deploy that may carry one:
+The preview alpha supports compatible migrations only (additive,
+reversible schema changes). Incompatible (destructive or irreversible)
+changes on production ride an operator-attested manual procedure: the
+flag records human judgement, not automated verification. MageLift does
+not verify maintenance state, stop cron or consumers itself, share the
+maintenance flag across replicas, or protect pods the rollout creates.
+Zero-downtime incompatible schema changes are explicitly not promised.
+For any production deploy that may carry one:
 
-1. Take a fresh backup (database plus media manifest) and confirm it restores.
+1. Take a fresh backup (database plus media export) and confirm it restores.
 2. Enable maintenance mode (`bin/magento maintenance:enable`).
-3. Drain writers: stop cron and queue consumers; confirm no active writers.
+3. Drain writers yourself: stop cron and queue consumers; confirm no active writers.
 4. Deploy with `--ack-maintenance-drain`, attesting steps 1–3.
 5. Verify health output, then disable maintenance mode.
 6. Scale consumers and cron back; watch the first scheduled runs.

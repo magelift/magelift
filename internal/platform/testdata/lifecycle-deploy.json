@@ -1,0 +1,25 @@
+{
+    "deploy": [
+        [
+            "bin/magento",
+            "app:config:import",
+            "--no-interaction"
+        ],
+        [
+            "bin/magento",
+            "setup:upgrade",
+            "--keep-generated",
+            "--no-interaction"
+        ],
+        [
+            "bin/magento",
+            "cache:clean"
+        ]
+    ],
+    "postDeploy": [
+        [
+            "bin/magento",
+            "cache:flush"
+        ]
+    ]
+}

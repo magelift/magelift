@@ -1,6 +1,9 @@
 package platform
 
 import (
+	_ "embed"
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 )
@@ -8,18 +11,48 @@ import (
 // Magento workload shell contracts. Cloud adapters pass these into ECS tasks /
 // GKE Jobs/Deployments; they must not invent alternate Magento CLI sequences.
 
-// MagentoMigrationShell is the pre-traffic migrate candidate command. It
-// matches the PHP lifecycle Deploy plus PostDeploy sequence exactly: static
-// content is baked into the immutable image at build time (the single
-// authority) and is never regenerated in the disposable candidate, whose
-// filesystem never reaches serving containers.
+// lifecycleDeployGolden is the PHP lifecycle plan's deploy plus post-deploy
+// sequence, emitted by build/bin/magelift-lifecycle-export. The PHP plan is
+// the single authority; Go renders it. Regenerate with
+// `make lifecycle-golden`; CI fails on drift.
+//
+//go:embed testdata/lifecycle-deploy.json
+var lifecycleDeployGolden []byte
+
+// MagentoMigrationShell is the pre-traffic migrate candidate command,
+// rendered from the PHP lifecycle golden: deploy steps then post-deploy
+// steps joined for the single-shell candidate job. Static content is baked
+// into the immutable image at build time and is never regenerated in the
+// disposable candidate, whose filesystem never reaches serving containers.
 func MagentoMigrationShell() []string {
-	return []string{
-		"/bin/sh", "-ec",
-		"bin/magento app:config:import --no-interaction && " +
-			"bin/magento setup:upgrade --keep-generated --no-interaction && " +
-			"bin/magento cache:clean && bin/magento cache:flush",
+	var golden struct {
+		Deploy     [][]string `json:"deploy"`
+		PostDeploy [][]string `json:"postDeploy"`
 	}
+	if err := json.Unmarshal(lifecycleDeployGolden, &golden); err != nil {
+		panic(fmt.Sprintf("decode lifecycle golden: %v", err))
+	}
+	var parts []string
+	for _, command := range append(append([][]string{}, golden.Deploy...), golden.PostDeploy...) {
+		if len(command) == 0 {
+			panic("lifecycle golden holds an empty command")
+		}
+		switch command[0] {
+		case "bin/magento", "composer":
+		default:
+			panic(fmt.Sprintf("lifecycle golden executable %q is not allowed", command[0]))
+		}
+		for _, arg := range command[1:] {
+			if strings.TrimSpace(arg) == "" || strings.ContainsAny(arg, " \t\n\"'") {
+				panic(fmt.Sprintf("lifecycle golden argument %q needs quoting support", arg))
+			}
+		}
+		parts = append(parts, strings.Join(command, " "))
+	}
+	if len(parts) == 0 {
+		panic("lifecycle golden holds no commands")
+	}
+	return []string{"/bin/sh", "-ec", strings.Join(parts, " && ")}
 }
 
 // MagentoCronShell is the long-running cron loop used by certified runtimes.
