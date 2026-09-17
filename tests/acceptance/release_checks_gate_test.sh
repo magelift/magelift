@@ -178,4 +178,41 @@ grep -q "check-runs?per_page=100&filter=all" "$GATE" || {
 	exit 1
 }
 
+# 12. The release run itself does not count as active CI.
+python3 - "$WORK/self.json" <<'PY'
+import json
+import sys
+
+runs = [
+    {"name": "lint", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:01:00Z", "id": 1, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/1"},
+    {"name": "go-verify", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:05:00Z", "id": 2, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/2"},
+    {"name": "sdk-verify", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:06:00Z", "id": 3, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/3"},
+    {"name": "provider-verify", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:07:00Z", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"},
+    {"name": "floci-gcp", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:08:00Z", "id": 5, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/5"},
+    {"name": "php", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:09:00Z", "id": 6, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/6"},
+    {"name": "release", "status": "in_progress", "conclusion": None, "started_at": "2026-09-17T11:00:00Z", "id": 7, "html_url": "https://github.com/magelift/magelift/actions/runs/200/job/7"},
+]
+with open(sys.argv[1], "w") as handle:
+    json.dump({"check_runs": runs}, handle)
+PY
+if ! "$GATE" --sha abc123 --checks-json "$WORK/self.json" --exclude-run 200 >"$WORK/self.out" 2>&1; then
+	cat "$WORK/self.out" >&2
+	printf 'gate waited on its own release run\n' >&2
+	exit 1
+fi
+
+# 13. Missing checks with only the excluded run active fail fast
+# instead of polling the timeout (the stuck-publish shape).
+python3 -c "import json; json.dump({'check_runs': [{'name': 'release', 'status': 'in_progress', 'conclusion': None, 'started_at': '2026-09-17T11:00:00Z', 'id': 7, 'html_url': 'https://github.com/magelift/magelift/actions/runs/200/job/7'}]}, open('$WORK/selfonly.json', 'w'))"
+code=0
+"$GATE" --sha abc123 --checks-json "$WORK/selfonly.json" --exclude-run 200 >"$WORK/selfonly.out" 2>&1 || code="$?"
+if [[ "$code" != "1" ]]; then
+	printf 'gate exit = %s, want 1 (missing with only self active)\n' "$code" >&2
+	exit 1
+fi
+grep -q "BLOCKED  provider-verify: no check run" "$WORK/selfonly.out" || {
+	printf 'gate did not fail fast on missing checks\n' >&2
+	exit 1
+}
+
 printf 'release checks gate ok\n'

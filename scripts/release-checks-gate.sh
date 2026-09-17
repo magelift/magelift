@@ -6,16 +6,19 @@
 # required check (gh workflow run ci.yml --ref <tag> -f all=true).
 #
 # Usage: release-checks-gate.sh --sha <sha> [--repo owner/name]
-#        [--checks-json FILE] [check...]
+#        [--checks-json FILE] [--exclude-run ID] [check...]
 # Default checks: lint go-verify sdk-verify provider-verify floci-gcp php.
 # --checks-json evaluates one canned check-runs payload (tests):
 # exit 0 pass, 1 blocked, 2 still pending. Without it, the gate polls
 # the API until every required check completes or the timeout expires.
+# --exclude-run ignores check runs from one workflow run (the release
+# itself) when deciding whether CI is still active.
 set -Eeuo pipefail
 
 REPO="magelift/magelift"
 SHA=""
 CHECKS_JSON=""
+EXCLUDE_RUN=""
 CHECKS=(lint go-verify sdk-verify provider-verify floci-gcp php)
 POLL_SECONDS="${GATE_POLL_SECONDS:-60}"
 TIMEOUT_SECONDS="${GATE_TIMEOUT_SECONDS:-1800}"
@@ -32,6 +35,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--checks-json)
 		CHECKS_JSON="${2:?--checks-json needs a value}"
+		shift 2
+		;;
+	--exclude-run)
+		EXCLUDE_RUN="${2:?--exclude-run needs a value}"
 		shift 2
 		;;
 	-h | --help)
@@ -58,9 +65,11 @@ fi
 evaluate() {
 	export GATE_PAYLOAD="$1"
 	export GATE_CHECKS="${CHECKS[*]}"
+	export GATE_EXCLUDE_RUN="$EXCLUDE_RUN"
 	python3 - <<'PY'
 import json
 import os
+import re
 import sys
 
 try:
@@ -84,7 +93,20 @@ for run in runs:
     if name not in latest or key >= latest[name][0]:
         latest[name] = (key, run)
 
-active = any(run.get("status", "") != "completed" for run in runs)
+exclude = os.environ.get("GATE_EXCLUDE_RUN", "").strip()
+run_id_pattern = re.compile(r"/actions/runs/(\d+)/")
+
+
+def own_run(run):
+    if not exclude:
+        return False
+    match = run_id_pattern.search(run.get("html_url") or "")
+    return match is not None and match.group(1) == exclude
+
+
+active = any(
+    run.get("status", "") != "completed" and not own_run(run) for run in runs
+)
 code = 0
 for name in wanted:
     entry = latest.get(name)
