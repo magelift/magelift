@@ -29,7 +29,7 @@ func TestWireRoundTripOverNetRPC(t *testing.T) {
 	if err := client.Call("Plugin.Describe", &sdk.DescribeRequest{ProtocolVersion: sdk.ProtocolV1}, &described); err != nil {
 		t.Fatal(err)
 	}
-	if described.ProviderVersion != "wire-test" || len(described.Operations) != 31 || described.Error != nil {
+	if described.ProviderVersion != "wire-test" || len(described.Operations) != 33 || described.Error != nil {
 		t.Fatalf("describe = %#v", described)
 	}
 	method, err := sdk.PluginMethod(sdk.OpDescribe)

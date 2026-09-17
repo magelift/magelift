@@ -99,3 +99,23 @@ type DeployAppPhaseResult struct {
 	Message   string          `json:"message,omitempty"`
 	Error     *OperationError `json:"error,omitempty"`
 }
+
+// MediaTransferCall moves the media tree between the provider bucket and
+// operator disk. OutputsJSON carries the stack outputs (the media bucket
+// name); LocalDir is an operator-local directory the plugin reads or
+// writes. Direction is implied by the operation.
+type MediaTransferCall struct {
+	ProtocolVersion string     `json:"protocolVersion"`
+	Envelope        Envelope   `json:"envelope"`
+	Plan            StoredPlan `json:"plan"`
+	OutputsJSON     []byte     `json:"outputsJson,omitempty"`
+	LocalDir        string     `json:"localDir"`
+}
+
+// MediaTransferResult reports a completed transfer.
+type MediaTransferResult struct {
+	FileCount int64           `json:"fileCount"`
+	ByteCount int64           `json:"byteCount"`
+	LocalDir  string          `json:"localDir"`
+	Error     *OperationError `json:"error,omitempty"`
+}

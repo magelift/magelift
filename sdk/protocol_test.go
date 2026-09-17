@@ -71,6 +71,7 @@ func TestProtocolOperationsEnumerated(t *testing.T) {
 		OpCostInputs, OpInventory, OpDelete, OpDestroyLeftoverBackups,
 		OpEdgePlan, OpEdgeExecute, OpResiliencePlan, OpResilienceExecute,
 		OpDeployAppPhase,
+		OpMediaExport, OpMediaImport,
 	} {
 		if strings.TrimSpace(string(operation)) == "" {
 			t.Errorf("empty operation name in protocol set")
@@ -139,6 +140,8 @@ func TestProtocolMessagesGobRoundTrip(t *testing.T) {
 		"ResilienceExecuteResult":      &ResilienceExecuteResult{ResultJSON: []byte(`{"a":1}`)},
 		"DeployAppPhaseCall":           &DeployAppPhaseCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, Phase: DeployPhaseMigrate, ImageDigest: "img@sha256:abc", OutputsJSON: []byte(`{"k":"v"}`), StateJSON: []byte(`{"s":1}`)},
 		"DeployAppPhaseResult":         &DeployAppPhaseResult{StateJSON: []byte(`{"s":2}`), Message: "migrated"},
+		"MediaTransferCall":            &MediaTransferCall{ProtocolVersion: ProtocolV1, Envelope: envelope, Plan: StoredPlan{StackName: "s"}, OutputsJSON: []byte(`{"k":"v"}`), LocalDir: "/tmp/media"},
+		"MediaTransferResult":          &MediaTransferResult{FileCount: 3, ByteCount: 42, LocalDir: "/tmp/media"},
 	}
 	for name, message := range messages {
 		var buf bytes.Buffer
@@ -164,6 +167,7 @@ func TestPluginMethodsCoverAllOperations(t *testing.T) {
 		OpCostInputs, OpInventory, OpDelete, OpDestroyLeftoverBackups,
 		OpEdgePlan, OpEdgeExecute, OpResiliencePlan, OpResilienceExecute,
 		OpDeployAppPhase,
+		OpMediaExport, OpMediaImport,
 	}
 	if len(PluginMethods) != len(operations) {
 		t.Fatalf("PluginMethods has %d entries, want %d", len(PluginMethods), len(operations))

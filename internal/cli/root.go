@@ -659,7 +659,7 @@ func completionCommand(root *cobra.Command) *cobra.Command {
 
 func commandGroups(o *options) []*cobra.Command {
 	groups := map[string][]string{
-		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "create", "status", "dump", "import-dump", "media-sync", "destroy", "protect", "sweep", "ui"},
+		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "create", "status", "dump", "import-dump", "media-sync", "media-export", "destroy", "protect", "sweep", "ui"},
 		"secret": {"set", "list", "remove"},
 	}
 	var commands []*cobra.Command
@@ -682,6 +682,8 @@ func commandGroups(o *options) []*cobra.Command {
 				group.AddCommand(envImportDumpCommand(o))
 			} else if groupName == "env" && name == "media-sync" {
 				group.AddCommand(envMediaSyncCommand(o))
+			} else if groupName == "env" && name == "media-export" {
+				group.AddCommand(envMediaExportCommand(o))
 			} else if groupName == "env" && name == "destroy" {
 				group.AddCommand(envDestroyCommand(o))
 			} else if groupName == "env" && name == "protect" {

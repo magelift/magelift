@@ -119,8 +119,8 @@ func TestDescribe(t *testing.T) {
 	if result.ProviderID != "gcp" || result.ProviderVersion != "v1.2.3" || result.ProtocolVersion != sdk.ProtocolV1 {
 		t.Fatalf("identity = %#v", result)
 	}
-	if len(result.Operations) != 31 {
-		t.Fatalf("operations = %d, want 31", len(result.Operations))
+	if len(result.Operations) != 33 {
+		t.Fatalf("operations = %d, want 33", len(result.Operations))
 	}
 	advertised := false
 	for _, operation := range result.Operations {

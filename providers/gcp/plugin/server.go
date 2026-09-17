@@ -82,10 +82,12 @@ func DefaultTimeouts() map[sdk.Operation]Timeout {
 		sdk.OpResiliencePlan:         {Duration: 2 * time.Minute, RetryableOnTimeout: true},
 		sdk.OpResilienceExecute:      mutation,
 		sdk.OpDeployAppPhase:         {Duration: 45 * time.Minute},
+		sdk.OpMediaExport:            {Duration: 30 * time.Minute, RetryableOnTimeout: true},
+		sdk.OpMediaImport:            {Duration: 30 * time.Minute},
 	}
 }
 
-// Server implements the 30 plugin operations. Nil seam fields select
+// Server implements the 33 plugin operations. Nil seam fields select
 // production wiring; tests inject fakes.
 type Server struct {
 	Version string
@@ -96,6 +98,8 @@ type Server struct {
 	// ExecTokens mints fresh bearers for exec/tunnel launch kubeconfigs.
 	// Nil uses ambient ADC. Tests stub it; production leaves it nil.
 	ExecTokens kube.TokenSource
+	// NewMediaStore builds the media object store. Nil uses GCS.
+	NewMediaStore func() objectStore
 
 	Admission stackRegionAdmission
 	Bootstrap gcpops.Bootstrap

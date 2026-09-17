@@ -109,7 +109,7 @@ func TestDefaultTimeoutsCoverAllOperations(t *testing.T) {
 		sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpStateBackup, sdk.OpStateRestore,
 		sdk.OpSecretSet, sdk.OpSecretRemove,
 		sdk.OpDelete, sdk.OpEdgeExecute, sdk.OpResilienceExecute,
-		sdk.OpDeployAppPhase,
+		sdk.OpDeployAppPhase, sdk.OpMediaImport,
 	}
 	for _, operation := range mutations {
 		if timeouts[operation].RetryableOnTimeout {
@@ -123,6 +123,7 @@ func TestDefaultTimeoutsCoverAllOperations(t *testing.T) {
 		sdk.OpTailLogs, sdk.OpCheckRuntime, sdk.OpPrepareExec, sdk.OpPrepareTunnel,
 		sdk.OpCostInputs, sdk.OpInventory,
 		sdk.OpEdgePlan, sdk.OpResiliencePlan,
+		sdk.OpMediaExport,
 	}
 	for _, operation := range reads {
 		if !timeouts[operation].RetryableOnTimeout {

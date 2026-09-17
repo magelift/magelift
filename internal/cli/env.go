@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -19,8 +20,10 @@ import (
 	"github.com/magelift/magelift/internal/localdev"
 	"github.com/magelift/magelift/internal/mediasync"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/internal/seeddump"
 	"github.com/magelift/magelift/internal/toolchain"
+	"github.com/magelift/magelift/sdk"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
 )
@@ -706,6 +709,114 @@ Does not auto-run after deploy; seedMedia auto-seed is a follow-on.
 	return command
 }
 
+func envMediaExportCommand(o *options) *cobra.Command {
+	var dest string
+	command := &cobra.Command{
+		Use:   "media-export <environment>",
+		Short: "Download the environment media bucket tree to a local directory",
+		Long: strings.TrimSpace(`
+Download files from the environment's media object-storage bucket into --dest,
+preserving keys relative to the media prefix. GCP only: other providers fail
+closed until their export path is implemented.
+`),
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			if !environmentName.MatchString(name) {
+				return invalid(errors.New("environment name must be a lowercase stable name"))
+			}
+			if strings.TrimSpace(dest) == "" {
+				return invalid(errors.New("--dest is required"))
+			}
+			result, err := o.runMediaExport(cmd.Context(), name, dest)
+			if err != nil {
+				return err
+			}
+			return o.write(result)
+		},
+	}
+	command.Flags().StringVar(&dest, "dest", "", "local directory to download into (required)")
+	_ = command.MarkFlagRequired("dest")
+	return command
+}
+
+func (o *options) runMediaExport(ctx context.Context, environment, dest string) (map[string]any, error) {
+	environmentName, planned, err := o.planStackForEnvironment(environment)
+	if err != nil {
+		return nil, err
+	}
+	_ = environmentName
+	if planned.Provider() != "gcp" {
+		return nil, invalid(fmt.Errorf("%s", notSupportedForPlanned(planned, "media export")))
+	}
+	if err := requireTargetDependencies(ctx, o, planned); err != nil {
+		return nil, err
+	}
+	if o.newBackend == nil {
+		return nil, errors.New("infrastructure backend factory is required")
+	}
+	backend, err := o.newBackend(ctx, planned, o.infrastructureBackendURL(planned))
+	if err != nil {
+		return nil, fmt.Errorf("create infrastructure backend: %w", err)
+	}
+	defer o.closeProviderSessions()
+	outputs, err := backend.Outputs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read infrastructure outputs: %w", err)
+	}
+	if _, err := platform.RequireStringOutput(outputs, platform.OutputMediaBucket); err != nil {
+		return nil, invalid(err)
+	}
+	return o.runGCPMediaTransfer(ctx, planned, outputs, sdk.OpMediaExport, environment, dest)
+}
+
+// runGCPMediaTransfer moves the media tree through the provider plugin
+// (never a direct cloud client in core). Direction follows the operation:
+// import uploads, export downloads.
+func (o *options) runGCPMediaTransfer(ctx context.Context, planned platform.PlannedStack, outputs map[string]any, operation sdk.Operation, environment, localDir string) (map[string]any, error) {
+	shim, ok := providerhost.AsEnvelopePlan(planned)
+	if !ok {
+		return nil, fmt.Errorf("GCP media transfer requires a plugin-backed plan, got %T", planned)
+	}
+	if o.loadProvider == nil || o.dialProvider == nil {
+		return nil, errors.New("GCP provider loading is not configured")
+	}
+	absolute, err := filepath.Abs(localDir)
+	if err != nil {
+		return nil, invalid(fmt.Errorf("resolve local directory: %w", err))
+	}
+	encoded, err := json.Marshal(outputs)
+	if err != nil {
+		return nil, fmt.Errorf("encode outputs: %w", err)
+	}
+	loaded, err := o.loadProvider(ctx, string(planned.Provider()))
+	if err != nil {
+		return nil, err
+	}
+	client, err := o.dialProvider(ctx, loaded.Binary)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := providerhost.Call[sdk.MediaTransferCall, sdk.MediaTransferResult](ctx, client, operation, &sdk.MediaTransferCall{
+		ProtocolVersion: sdk.ProtocolV1, Envelope: shim.Envelope(), Plan: shim.StoredPlan(),
+		OutputsJSON: encoded, LocalDir: absolute,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp.Error != nil {
+		return nil, providerhost.AsPluginError(operation, resp.Error)
+	}
+	bucket, _ := platform.RequireStringOutput(outputs, platform.OutputMediaBucket)
+	return map[string]any{
+		"environment": environment,
+		"bucket":      bucket,
+		"files":       resp.FileCount,
+		"bytes":       resp.ByteCount,
+		"localDir":    resp.LocalDir,
+	}, nil
+}
+
 func (o *options) runMediaSync(ctx context.Context, environment, source string) (map[string]any, error) {
 	syncFn := o.mediaSync
 	bucket := ""
@@ -735,6 +846,9 @@ func (o *options) runMediaSync(ctx context.Context, environment, source string) 
 		bucket, err = platform.RequireStringOutput(outputs, platform.OutputMediaBucket)
 		if err != nil {
 			return nil, invalid(err)
+		}
+		if planned.Provider() == "gcp" {
+			return o.runGCPMediaTransfer(ctx, planned, outputs, sdk.OpMediaImport, environment, source)
 		}
 		client, err = o.newMediaS3Client(ctx, planned.Region())
 		if err != nil {
