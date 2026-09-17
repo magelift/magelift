@@ -137,6 +137,26 @@ jobs:
         if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
         with:
           subject-checksums: dist/checksums.txt
+      # Pristine consumer proof: the published modules resolve and
+      # compile exactly as tagged, without manifest edits. @version
+      # installs ignore the checkout and build from the proxy with
+      # sumdb verification; the release fails before publish otherwise.
+      - name: Verify published modules
+        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GOWORK: "off"
+          GOMAXPROCS: "1"
+        run: |
+          go install "github.com/magelift/magelift/cmd/magelift@${RELEASE_TAG}"
+          go install "github.com/magelift/magelift/providers/gcp/cmd/magelift-provider-gcp@${RELEASE_TAG}"
+          work="$(mktemp -d)"
+          cd "$work"
+          go mod init magelift-sdk-verify >/dev/null
+          go mod edit "-require=github.com/magelift/magelift/sdk@${RELEASE_TAG}"
+          printf 'package main\nimport _ "github.com/magelift/magelift/sdk"\nfunc main() {}\n' > main.go
+          GOWORK=off go mod tidy
+          GOWORK=off go build -o /dev/null .
       # The release stays draft until every verification above passes.
       # Lockfiles upload outside the signed checksum set by construction
       # (bundles postdate checksums); their authentication policy is the
