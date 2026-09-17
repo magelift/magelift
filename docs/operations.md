@@ -422,3 +422,25 @@ Floci AWS 1.7.0 does close IAM Create/Get/Tag OpenID Connect Provider
 See [Local AWS acceptance](aws-acceptance.md). The composed Pulumi target is tested
 separately with provider mocks, including preview, standard, and high-availability
 resource graphs.
+
+## Store loop runbooks (alpha)
+
+Proved end to end on the [alpha recipe](alpha-recipe.md) during
+reference-store acceptance. Each runbook below lists the exact commands
+executed, in order; shells marked unproved are filled when the loop runs.
+
+### Deploy the recipe (unproved)
+
+<!-- Filled from the executed loop in reference-store-acceptance 2.1. -->
+
+### Recover a failed release (unproved)
+
+<!-- Filled from the executed loop in reference-store-acceptance 2.2. -->
+
+### Back up and restore (unproved)
+
+<!-- Filled from the executed loop in reference-store-acceptance 2.2. -->
+
+### Expire a preview (unproved)
+
+<!-- Filled from the executed loop in reference-store-acceptance 2.3. -->

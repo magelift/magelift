@@ -74,6 +74,7 @@ nav:
       - CLI reference: cli-reference.md
       - Secrets: secrets.md
       - Day-2 operations: operations.md
+      - Alpha recipe: alpha-recipe.md
       - Application builds: builds.md
       - Storefront recipes: storefront-recipes.md
       - Compatibility: compatibility.md
