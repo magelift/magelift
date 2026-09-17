@@ -8,7 +8,11 @@ slug: aws-provider-parity
 
 DRAFT for post-alpha sequencing; not on the alpha path. After the alpha
 proves one autonomous GCP provider on the public protocol, AWS ECS must follow
-through the same protocol — not as a second bespoke core coupling. The AWS
+through the same protocol — not as a second bespoke core coupling. Hard
+prerequisite, from the alpha review corrections: remove the deferred
+import coupling first (GCP provider off root-internal helpers, core off
+deferred-provider SDKs, both proved by dependency listing). The second
+provider must not clone the alpha coupling. The AWS
 side additionally carries onboarding gaps (certificates, notification topic,
 logging inputs) and search evidence that today proves infrastructure without
 the full application-level sequence GCP already demonstrated.

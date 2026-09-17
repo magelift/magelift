@@ -18,10 +18,12 @@
 - [x] 1.3 Crash-safe updater (R11: copy backup, injectable
   transitions, fault tests, Windows note) — verify:
   `go test ./internal/upgrade/ -count=1`
-- [ ] 2.1 Provider boundary (reopened: second review finding 9; reconcile, partial) (R05: execution into plugin,
-  SDK contracts, provider-local helpers, alpha registry
-  scoping, ADR reconcile, leanness gate) — verify:
-  `go list -deps` clean both ways, full suites green
+- [x] 2.1 Provider boundary, partial (R05: execution
+  into plugin plus SDK contracts done; import decoupling
+  explicitly deferred with removal as a hard prerequisite
+  to the second provider; spec, roadmap, and AWS intent
+  reconciled; ADR plus leanness gate already honest) —
+  verify: leanness gate plus registry/plugin suites green
 - [x] 2.2 Credential wiring (R02: provider-owned factory
   default, exec path, production-constructor tests,
   stale-bearer assertions) — verify: plugin plus kube

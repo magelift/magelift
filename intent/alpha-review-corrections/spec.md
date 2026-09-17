@@ -98,15 +98,23 @@ narrowed only where noted with reasoning.
   become provider-local (duplication consciously chosen
   over coupling for one provider; a versioned support
   module stays a noted future option).
-- Alpha core registration omits deferred providers
-  (AWS/EKS/OVH/Scaleway) behind an explicit opt-in; the
-  default registry is GCP plus local. Harnesses and tests
-  are moved to the opt-in explicitly.
+- Alpha core registration is GCP plus AWS ECS Fargate;
+  EKS, OVH, and Scaleway register behind
+  `MAGELIFT_EXPERIMENTAL_PROVIDERS`. Cleanup/recovery
+  providers stay available (recovery reads old ledgers).
 - ADR 0013 reconciled with the as-built boundary; the
-  leanness gate matches the ADR wording.
-- Proof: `go list -deps` shows no provider SDKs and no
-  deferred-provider packages in the default alpha binary;
-  plugin builds with no root-internal imports.
+  leanness gate matches the ADR wording (no GCP provider
+  code or GCP SDKs in the CLI; AWS/OVH/Scaleway SDKs stay
+  linked by design until parity).
+- Import decoupling explicitly deferred: the provider
+  still imports root-internal helpers and the core still
+  links deferred-provider SDKs. Removing that coupling is
+  a hard prerequisite to adding the second autonomous
+  provider (recorded in `aws-provider-parity`). Neither
+  the core nor the provider is described as SDK-free.
+- Proof: `make core-leanness` green; registry plus plugin
+  suites green; no claim of full SDK independence in
+  shipped docs.
 
 ## R06 — Real provider publication
 
