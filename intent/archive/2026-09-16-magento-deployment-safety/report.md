@@ -134,3 +134,14 @@ read-only flip, no new cloud calls in unit scope.
 Pass. Deploys establish the intended rollout and bounded Magento readiness
 with one lifecycle authority and a conservative migration policy. No
 CRITICAL findings.
+
+## Correction (2026-09-17, alpha review R04/R08)
+
+The pass verdict overstated readiness and lifecycle authority. R04: the
+probe now asserts Magento's effective search host/engine and deploy
+health gates on a bounded serving-path request plus all-images rollout
+identity. R08: the PHP plan emits the deploy sequence as checked-in
+JSON that Go renders (single authority with CI drift check); the
+incompatible-schema runbook is scoped to operator-attested manual steps
+with explicitly unverified parts. Fixed in intent/alpha-review-corrections
+(boxes 3.2, 3.3).

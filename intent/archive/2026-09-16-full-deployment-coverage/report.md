@@ -47,3 +47,15 @@ verdict: pass
 ## Follow-ups
 
 None. Next: Order 7 verified-provider-distribution.
+
+## Correction (2026-09-17, alpha review R03/R12)
+
+The recipe was documented, not demonstrated. R03: GCS media is now
+real (HMAC service account, prefix-scoped reads, Magento AwsS3
+remote-storage config via env template, provider export/import ops,
+CLI routed through the provider); live upload/view/replace/restore
+proof lands in the order-8 re-run. R12: onboarding rewritten to the
+shipped path (installer, provider install, image build), ADC-first
+credentials with doctor detection, test-customer mail procedure, and
+scheduled expiry; the pin sheet stays proposed until loop evidence
+lands. Fixed in intent/alpha-review-corrections (boxes 3.1, 4.2).
