@@ -59,6 +59,12 @@ php-test: ## Validate and test the Composer package
 	composer psalm --working-dir=build
 	php build/vendor/bin/phpunit -c build/phpunit.xml --fail-on-deprecation --fail-on-notice --fail-on-warning
 
+lifecycle-golden: ## Regenerate the Go migration-shell golden from the PHP lifecycle plan
+	php build/bin/magelift-lifecycle-export > internal/platform/testdata/lifecycle-deploy.json
+
+lifecycle-golden-check: ## Fail when the committed golden differs from the PHP plan
+	php build/bin/magelift-lifecycle-export | diff -u internal/platform/testdata/lifecycle-deploy.json -
+
 image-test: ## Build and inspect the local PHP runtime image
 	docker buildx bake php-nginx --load
 	test "$$(docker run --rm magelift/php-nginx:local id -u)" = 10001

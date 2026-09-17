@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -20,15 +21,27 @@ func TestMagentoQueueArgsForNamedConsumers(t *testing.T) {
 	}
 }
 
-func TestMagentoMigrationShellMatchesPHPDeploySequence(t *testing.T) {
-	joined := strings.Join(MagentoMigrationShell(), " ")
-	for _, want := range []string{"app:config:import", "setup:upgrade --keep-generated", "cache:clean", "cache:flush"} {
-		if !strings.Contains(joined, want) {
-			t.Errorf("migration shell = %q, want %q", joined, want)
-		}
+func TestMagentoMigrationShellRendersGoldenSequence(t *testing.T) {
+	shell := MagentoMigrationShell()
+	if len(shell) != 3 || shell[0] != "/bin/sh" || shell[1] != "-ec" {
+		t.Fatalf("migration shell = %#v", shell)
 	}
-	if strings.Contains(joined, "setup:static-content:deploy") {
-		t.Errorf("migration shell = %q, want no deploy-time static-content deploy", joined)
+	var golden struct {
+		Deploy     [][]string `json:"deploy"`
+		PostDeploy [][]string `json:"postDeploy"`
+	}
+	if err := json.Unmarshal(lifecycleDeployGolden, &golden); err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for _, command := range append(append([][]string{}, golden.Deploy...), golden.PostDeploy...) {
+		want = append(want, strings.Join(command, " "))
+	}
+	if shell[2] != strings.Join(want, " && ") {
+		t.Fatalf("migration shell = %q, want golden render %q", shell[2], strings.Join(want, " && "))
+	}
+	if strings.Contains(shell[2], "setup:static-content:deploy") {
+		t.Fatalf("migration shell = %q, want no deploy-time static-content deploy", shell[2])
 	}
 }
 

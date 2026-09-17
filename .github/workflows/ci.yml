@@ -72,6 +72,7 @@ jobs:
               - 'mkdocs.yml'
             php:
               - 'build/**'
+              - 'internal/platform/testdata/lifecycle-deploy.json'
             images:
               - 'images/**'
               - 'docker-bake.hcl'
@@ -295,6 +296,7 @@ jobs:
       - run: composer analyse
       - run: composer psalm
       - run: vendor/bin/phpunit --fail-on-deprecation --fail-on-notice --fail-on-warning
+      - run: php bin/magelift-lifecycle-export | diff -u ../internal/platform/testdata/lifecycle-deploy.json -
 
   container:
     needs: changes

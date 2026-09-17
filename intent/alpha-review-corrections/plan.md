@@ -40,7 +40,7 @@
 - [x] 3.2 Serving health (R04: serving-path probe,
   effective-config search, image scope, negative tests)
   — verify: kube plus platform suites green
-- [ ] 3.3 Lifecycle authority (R08: PHP-emitted sequence,
+- [x] 3.3 Lifecycle authority (R08: PHP-emitted sequence,
   golden plus regen target, scope docs) — verify:
   golden test green, phpunit green if php present
 - [ ] 4.1 CI coverage (R09: module jobs, filters, cache
