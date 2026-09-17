@@ -76,6 +76,11 @@ Before cutting a public tag, read `docs/release-readiness.md` and
 `docs/publishing.md`. Do not claim hosted CI green while Actions minutes are
 deferred without saying so.
 
+Workflow `run` blocks execute under `bash -e`: never end a loop body
+with a bare `&&` list — when the test is false it becomes the step's
+exit code and fails a step that actually succeeded (seen on rc.5).
+Use a plain `if`.
+
 ## Homebrew
 
 Cask publish stays optional until `magelift/homebrew-tap` and

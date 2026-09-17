@@ -78,7 +78,12 @@ jobs:
                 echo "module $module@$RELEASE_TAG never became visible" >&2
                 exit 1
               fi
-              [[ "$stable" -lt 2 ]] && sleep 60
+              # Plain if, not a trailing && list: a false && tail would
+              # become the loop's (and the step's) exit code and fail a
+              # wait that actually succeeded.
+              if [[ "$stable" -lt 2 ]]; then
+                sleep 60
+              fi
             done
           done
       # Forensics: workspace resolution is what keeps tag builds local;
