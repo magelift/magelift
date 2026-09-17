@@ -36,6 +36,28 @@ jobs:
       # GoReleaser's SBOM cataloging shells out to syft; without it the
       # release fails after the builds (seen on v0.0.0-dialproof.3).
       - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      # Module tags need proxy plus sumdb visibility before packaging:
+      # the provider build resolves its magelift requirements from the
+      # network, and a fresh tag 404s for minutes (seen on rc.3).
+      - name: Wait for module visibility
+        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GOWORK: "off"
+        run: |
+          deadline=$((SECONDS + 1800))
+          for module in "github.com/magelift/magelift" "github.com/magelift/magelift/sdk" "github.com/magelift/magelift/providers/gcp"; do
+            while true; do
+              if go list -m "$module@$RELEASE_TAG" >/dev/null 2>&1; then
+                break
+              fi
+              if [[ "$SECONDS" -ge "$deadline" ]]; then
+                echo "module $module@$RELEASE_TAG never became visible" >&2
+                exit 1
+              fi
+              sleep 60
+            done
+          done
       # Ephemeral dialproof tags take the slim linux/amd64 config (no SBOM,
       # taps, or attest): same signs/checksum/archive shape, ~5 min, so the
       # bundle/lockfile debug loop does not pay the 2h full matrix.
