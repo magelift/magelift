@@ -117,23 +117,24 @@ return [
         'document_root_is_pub' => true,
     ],
     // Remote media storage (Magento RemoteStorage + AwsS3 driver). The
-    // driver activates only when MAGELIFT_MEDIA_DRIVER names it; the
+    // driver activates only when MAGENTO_DC_MEDIA__DRIVER names it; the
     // 'file' default keeps local media for runtimes without object
     // storage configured. GCP sets aws-s3 with GCS S3-interop endpoint
     // and HMAC credentials; every value defaults so an unset variable
     // can never break a runtime that does not use remote storage, while
     // a selected driver with empty bucket or credentials still fails
-    // closed in the driver factory.
+    // closed in the driver factory. Markers use MAGENTO_DC_* names:
+    // the application image build rejects anything else here.
     'remote_storage' => [
-        'driver' => '#env(MAGELIFT_MEDIA_DRIVER, "file")',
-        'prefix' => '#env(MAGELIFT_MEDIA_S3_PREFIX, "media/")',
+        'driver' => '#env(MAGENTO_DC_MEDIA__DRIVER, "file")',
+        'prefix' => '#env(MAGENTO_DC_MEDIA__PREFIX, "media/")',
         'config' => [
-            'bucket' => '#env(MAGELIFT_MEDIA_BUCKET, "")',
-            'region' => '#env(MAGELIFT_MEDIA_S3_REGION, "")',
-            'endpoint' => '#env(MAGELIFT_MEDIA_S3_ENDPOINT, "https://storage.googleapis.com")',
+            'bucket' => '#env(MAGENTO_DC_MEDIA__BUCKET, "")',
+            'region' => '#env(MAGENTO_DC_MEDIA__REGION, "")',
+            'endpoint' => '#env(MAGENTO_DC_MEDIA__ENDPOINT, "https://storage.googleapis.com")',
             'credentials' => [
-                'key' => '#env(MAGELIFT_MEDIA_S3_KEY, "")',
-                'secret' => '#env(MAGELIFT_MEDIA_S3_SECRET, "")',
+                'key' => '#env(MAGENTO_DC_MEDIA__KEY, "")',
+                'secret' => '#env(MAGENTO_DC_MEDIA__SECRET, "")',
             ],
         ],
     ],

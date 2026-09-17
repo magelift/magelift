@@ -531,15 +531,11 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 	if mediaBucket == nil {
 		mediaBucket = pulumi.String("")
 	}
-	mediaURL := args.MediaURL
-	if mediaURL == nil {
-		mediaURL = pulumi.String("")
-	}
 	mediaHmacAccessID := args.MediaHmacAccessID
 	if mediaHmacAccessID == nil {
 		mediaHmacAccessID = pulumi.String("")
 	}
-	return pulumi.All(args.DatabaseWriter, args.CacheEndpoint, args.SessionEndpoint, searchEndpoint, queueHost, mediaBucket, mediaURL, mediaHmacAccessID).ApplyT(func(values []interface{}) []corev1.EnvVar {
+	return pulumi.All(args.DatabaseWriter, args.CacheEndpoint, args.SessionEndpoint, searchEndpoint, queueHost, mediaBucket, mediaHmacAccessID).ApplyT(func(values []interface{}) []corev1.EnvVar {
 		session := values[2].(string)
 		if session == "" {
 			session = values[1].(string)
@@ -556,17 +552,32 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 			QueueMode:          args.QueueMode,
 			QueueHost:          values[4].(string),
 			QueueUsername:      queueUser,
-			MediaBucket:        values[5].(string),
-			MediaURL:           values[6].(string),
-			MediaDriver:        mediaDriver,
-			MediaS3Key:         values[7].(string),
-			MediaS3Endpoint:    mediaS3Endpoint,
-			MediaS3Region:      args.Region,
-			MediaS3Prefix:      args.MediaS3Prefix,
 			Magento:            args.Magento,
 		}), args)
+		bindings = appendMediaDCBindings(bindings, values[5].(string), values[6].(string), args.Region, args.MediaS3Prefix)
 		return kube.EnvVars(bindings)
 	}).(corev1.EnvVarArrayOutput)
+}
+
+// appendMediaDCBindings renders the env.php remote_storage section.
+// Markers use MAGENTO_DC_* names (the application image build rejects
+// MAGELIFT markers in env.php); the secret arrives separately via
+// SecretKeyRef. Empty inputs append nothing.
+func appendMediaDCBindings(bindings []platform.EnvBinding, bucket, keyID, region, prefix string) []platform.EnvBinding {
+	if strings.TrimSpace(bucket) == "" {
+		return bindings
+	}
+	bindings = append(bindings,
+		platform.EnvBinding{Name: platform.EnvMagentoMediaDriver, Value: mediaDriver},
+		platform.EnvBinding{Name: platform.EnvMagentoMediaPrefix, Value: prefix},
+		platform.EnvBinding{Name: platform.EnvMagentoMediaBucket, Value: bucket},
+		platform.EnvBinding{Name: platform.EnvMagentoMediaRegion, Value: region},
+		platform.EnvBinding{Name: platform.EnvMagentoMediaEndpoint, Value: mediaS3Endpoint},
+	)
+	if strings.TrimSpace(keyID) != "" {
+		bindings = append(bindings, platform.EnvBinding{Name: platform.EnvMagentoMediaKey, Value: keyID})
+	}
+	return bindings
 }
 
 // appendSmtpBindings wires operator-relay SMTP into Magento's system/smtp

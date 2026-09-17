@@ -401,7 +401,8 @@ func NewMediaHmacSecret(
 }
 
 // AppendMediaHmacSecretEnv adds the media HMAC secret SecretKeyRef to a
-// runtime environment output for the PHP lifecycle remote-storage writer.
+// runtime environment output. The template marker is a MAGENTO_DC_* name
+// (the application image build rejects MAGELIFT markers in env.php).
 func AppendMediaHmacSecretEnv(env pulumicorev1.EnvVarArrayOutput, secretName string) pulumicorev1.EnvVarArrayOutput {
 	if strings.TrimSpace(secretName) == "" {
 		return env
@@ -410,7 +411,7 @@ func AppendMediaHmacSecretEnv(env pulumicorev1.EnvVarArrayOutput, secretName str
 		result := append([]pulumicorev1.EnvVar(nil), values...)
 		secret := secretName
 		result = append(result, pulumicorev1.EnvVar{
-			Name: "MAGELIFT_MEDIA_S3_SECRET",
+			Name: platform.EnvMagentoMediaSecret,
 			ValueFrom: &pulumicorev1.EnvVarSource{
 				SecretKeyRef: &pulumicorev1.SecretKeySelector{Name: &secret, Key: "secret"},
 			},

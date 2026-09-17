@@ -15,15 +15,15 @@ final class RuntimeEnvTemplateTest extends TestCase
     {
         $env = require dirname(__DIR__, 3) . '/images/php-nginx/env.php';
 
-        self::assertSame('#env(MAGELIFT_MEDIA_DRIVER, "file")', $env['remote_storage']['driver']);
-        self::assertSame('#env(MAGELIFT_MEDIA_S3_PREFIX, "media/")', $env['remote_storage']['prefix']);
-        self::assertSame('#env(MAGELIFT_MEDIA_BUCKET, "")', $env['remote_storage']['config']['bucket']);
-        self::assertSame('#env(MAGELIFT_MEDIA_S3_REGION, "")', $env['remote_storage']['config']['region']);
+        self::assertSame('#env(MAGENTO_DC_MEDIA__DRIVER, "file")', $env['remote_storage']['driver']);
+        self::assertSame('#env(MAGENTO_DC_MEDIA__PREFIX, "media/")', $env['remote_storage']['prefix']);
+        self::assertSame('#env(MAGENTO_DC_MEDIA__BUCKET, "")', $env['remote_storage']['config']['bucket']);
+        self::assertSame('#env(MAGENTO_DC_MEDIA__REGION, "")', $env['remote_storage']['config']['region']);
         self::assertSame(
-            '#env(MAGELIFT_MEDIA_S3_ENDPOINT, "https://storage.googleapis.com")',
+            '#env(MAGENTO_DC_MEDIA__ENDPOINT, "https://storage.googleapis.com")',
             $env['remote_storage']['config']['endpoint']
         );
-        self::assertSame('#env(MAGELIFT_MEDIA_S3_KEY, "")', $env['remote_storage']['config']['credentials']['key']);
-        self::assertSame('#env(MAGELIFT_MEDIA_S3_SECRET, "")', $env['remote_storage']['config']['credentials']['secret']);
+        self::assertSame('#env(MAGENTO_DC_MEDIA__KEY, "")', $env['remote_storage']['config']['credentials']['key']);
+        self::assertSame('#env(MAGENTO_DC_MEDIA__SECRET, "")', $env['remote_storage']['config']['credentials']['secret']);
     }
 }
