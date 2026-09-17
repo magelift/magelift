@@ -2,10 +2,13 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/magelift/magelift/internal/providerhost"
 )
 
 const providersTestConfig = `schemaVersion: 1
@@ -58,6 +61,7 @@ func TestProvidersInstallReportsBundledBinary(t *testing.T) {
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
+	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/cache/cosign", nil }
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install", "--lockfile", lockPath})
 	if err := cmd.Execute(); err != nil {
@@ -82,6 +86,7 @@ func TestProvidersInstallRefusesUnknownProvider(t *testing.T) {
 
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/cache/cosign", nil }
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", configPath, "providers", "install", "--lockfile", lockPath})
 	err := cmd.Execute()
@@ -111,6 +116,74 @@ func TestProvidersInstallRequiresLockfile(t *testing.T) {
 	}
 }
 
+func TestProvidersInstallBootstrapsMissingLockfile(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	binDir := t.TempDir()
+	binary := filepath.Join(binDir, "magelift-provider-aws")
+	if err := os.WriteFile(binary, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
+	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/cache/cosign", nil }
+	o.fetchProviderLock = func(_ context.Context, version string) (providerhost.Lockfile, error) {
+		if version != "v9.9.9" {
+			t.Fatalf("version = %q", version)
+		}
+		return providerhost.ParseLock(strings.NewReader(providersTestLock))
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install", "--version", "v9.9.9"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"bootstrapped": true`) {
+		t.Fatalf("output lacks bootstrap flag: %s", out.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "magelift.providers.lock")); err != nil {
+		t.Fatalf("bootstrapped lockfile missing: %v", err)
+	}
+}
+
+func TestProvidersInstallRefusesRebootstrapOverExistingLock(t *testing.T) {
+	configPath, lockPath := writeProvidersFixture(t)
+
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "providers", "install", "--lockfile", lockPath, "--version", "v9.9.9"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestProvidersInstallNeedsVersionWithoutLock(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.executable = func() (string, error) { return filepath.Join(t.TempDir(), "magelift"), nil }
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "providers", "install"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "--version") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestProvidersInstallRegistersFlags(t *testing.T) {
 	out := &bytes.Buffer{}
 	root := newCommandWithOptions(testOptions(out, &fakeTerminal{interactive: false}))
@@ -118,7 +191,7 @@ func TestProvidersInstallRegistersFlags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find providers install: %v", err)
 	}
-	for _, name := range []string{"lockfile", "cache-dir"} {
+	for _, name := range []string{"lockfile", "cache-dir", "version"} {
 		if found.Flags().Lookup(name) == nil {
 			t.Errorf("providers install is missing --%s", name)
 		}

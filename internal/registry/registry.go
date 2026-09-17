@@ -65,7 +65,7 @@ func dialGCP(ctx context.Context) (*providerhost.Client, error) {
 		LockPath:   resolved.LockPath,
 		BinaryPath: resolved.Binary,
 		BundlePath: resolved.Bundle,
-		Verifier:   providerhost.NewCosignVerifier(),
+		Verifier:   providerhost.NewPreferredVerifier(""),
 	})
 	if err != nil {
 		return nil, err

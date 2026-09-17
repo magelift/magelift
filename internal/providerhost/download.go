@@ -132,10 +132,7 @@ func (d *Downloader) client() *http.Client {
 }
 
 func (d *Downloader) cacheDir() (string, error) {
-	if strings.TrimSpace(d.CacheDir) != "" {
-		return d.CacheDir, nil
-	}
-	return DefaultCacheDir()
+	return EffectiveCacheDir(d.CacheDir)
 }
 
 // Install verifies the lockfile entry and ensures it exists in the cache.

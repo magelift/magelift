@@ -51,6 +51,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Validate configuration
         run: magelift --config 'magelift.yaml' --no-interaction config validate
       - name: Resolve environment
@@ -106,6 +108,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Build and sign image
         id: build
         env:
@@ -160,6 +164,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
@@ -222,6 +228,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
@@ -281,6 +289,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
@@ -325,6 +335,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:

@@ -51,6 +51,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Validate configuration
         run: magelift --config 'magelift.yaml' --no-interaction config validate
       - name: Resolve environment
@@ -123,6 +125,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Build and sign image
         id: build
         env:
@@ -177,6 +181,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Validate GCP deployment variables
         env:
           GCP_PROJECT_ID: ${{ vars.MAGELIFT_GCP_PROJECT_ID }}
@@ -259,6 +265,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Validate GCP deployment variables
         env:
           GCP_PROJECT_ID: ${{ vars.MAGELIFT_GCP_PROJECT_ID }}
@@ -338,6 +346,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Validate GCP deployment variables
         env:
           GCP_PROJECT_ID: ${{ vars.MAGELIFT_GCP_PROJECT_ID }}
@@ -404,6 +414,8 @@ jobs:
           tar -xzf "$tmp/$archive" -C "$tmp" magelift
           sudo install -m 0755 "$tmp/magelift" /usr/local/bin/magelift
           magelift version
+      - name: Install MageLift provider
+        run: magelift providers install
       - name: Validate GCP deployment variables
         env:
           GCP_PROJECT_ID: ${{ vars.MAGELIFT_GCP_PROJECT_ID }}
