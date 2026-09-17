@@ -1,6 +1,6 @@
 # Plan: verified provider distribution
 
-- [ ] 1.1 Provider download plus cache plus install command
+- [x] 1.1 Provider download plus cache plus install command
   (`internal/providerhost/download.go`, `internal/cli/providers.go`,
   URL semantics, atomic cache install, digest re-check on load;
   httptest tamper/missing/compat tests) — verify:

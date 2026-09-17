@@ -29,6 +29,8 @@ var (
 	ErrUnsupportedAPI      = errors.New("unsupported provider SDK API version")
 	ErrUnknownProvider     = errors.New("provider is not in magelift.providers.lock")
 	ErrUnsupportedProtocol = errors.New("unsupported provider protocol")
+	ErrNotDownloadable     = errors.New("provider artifact has no download URL")
+	ErrCacheMiss           = errors.New("provider artifact is not in the cache")
 )
 
 // Lockfile is magelift.providers.lock. Digests are sha256 of the subprocess
