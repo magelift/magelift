@@ -869,19 +869,19 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 				for _, env := range envValue.ArrayValue() {
 					entry := env.ObjectValue()
 					switch entry["name"].StringValue() {
-					case "MAGELIFT_MEDIA_S3_KEY":
+					case "MAGENTO_DC_MEDIA__KEY":
 						if value := entry["value"].StringValue(); value != "GOOGMOCKACCESSID" {
 							t.Fatalf("media key = %q", value)
 						}
 						sawKey = true
-					case "MAGELIFT_MEDIA_S3_ENDPOINT":
+					case "MAGENTO_DC_MEDIA__ENDPOINT":
 						sawEndpoint = true
-					case "MAGELIFT_MEDIA_DRIVER":
+					case "MAGENTO_DC_MEDIA__DRIVER":
 						if value := entry["value"].StringValue(); value != "aws-s3" {
 							t.Fatalf("media driver = %q", value)
 						}
 						sawDriver = true
-					case "MAGELIFT_MEDIA_S3_SECRET":
+					case "MAGENTO_DC_MEDIA__SECRET":
 						ref := entry["valueFrom"].ObjectValue()["secretKeyRef"].ObjectValue()
 						if key := ref["key"].StringValue(); key != "secret" {
 							t.Fatalf("media secret ref key = %q", key)

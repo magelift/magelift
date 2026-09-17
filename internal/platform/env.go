@@ -45,6 +45,17 @@ const (
 
 	EnvMagentoCryptKey = "MAGENTO_DC_CRYPT__KEY"
 
+	// EnvMagentoMedia* renders the env.php remote_storage section.
+	// Template markers must use MAGENTO_DC_* names: the application
+	// image build rejects any MAGELIFT marker left in env.php.
+	EnvMagentoMediaDriver   = "MAGENTO_DC_MEDIA__DRIVER"
+	EnvMagentoMediaPrefix   = "MAGENTO_DC_MEDIA__PREFIX"
+	EnvMagentoMediaBucket   = "MAGENTO_DC_MEDIA__BUCKET"
+	EnvMagentoMediaRegion   = "MAGENTO_DC_MEDIA__REGION"
+	EnvMagentoMediaEndpoint = "MAGENTO_DC_MEDIA__ENDPOINT"
+	EnvMagentoMediaKey      = "MAGENTO_DC_MEDIA__KEY"
+	EnvMagentoMediaSecret   = "MAGENTO_DC_MEDIA__SECRET"
+
 	EnvSearchEndpoint = "MAGELIFT_SEARCH_ENDPOINT"
 	EnvMediaBucket    = "MAGELIFT_MEDIA_BUCKET"
 	EnvMediaURL       = "MAGELIFT_MEDIA_URL"
