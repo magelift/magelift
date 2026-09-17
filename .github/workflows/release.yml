@@ -52,15 +52,17 @@ jobs:
       - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
       # Module tags need proxy plus sumdb visibility before packaging:
       # workspace builds still verify requirement .mod files over the
-      # network on cold caches. Fresh tags take minutes to hours to
-      # propagate (rc.4's root needed ~1.5h); two consecutive downloads
-      # prove the entries are serveable and stable, not flapping.
+      # network on cold caches. The proxy negative-caches unknown
+      # revisions for ~30 minutes, so the first request waits out tag
+      # propagation instead of seeding a miss; two consecutive
+      # downloads then prove the entries are serveable and stable.
       - name: Wait for module visibility
         if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           GOWORK: "off"
         run: |
+          sleep 300
           deadline=$((SECONDS + 7200))
           for module in "github.com/magelift/magelift" "github.com/magelift/magelift/sdk" "github.com/magelift/magelift/providers/gcp"; do
             stable=0

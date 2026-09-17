@@ -41,25 +41,27 @@ Stable semver tags only unless that `if` is intentionally changed.
 
 ## Candidate tag sequence
 
-Requires must name tags that exist with complete manifests, but sums
-need the tags first. Order matters; never move a tag:
+The proxy negative-caches unknown revisions for ~30 minutes, so
+staggered tag-then-request poisons fresh versions. Stage sums
+first, push every tag at once, then request nothing for five
+minutes. Order matters; never move a tag:
 
 1. Full local gates green on HEAD, working tree clean.
-2. Tag and push `sdk/<v>` at HEAD (the SDK has no MageLift
-   requires, so its content is final).
-3. Bump requires to `<v>` (root: SDK; provider: SDK plus root),
-   download the SDK sums, verify the root builds `GOWORK=off`,
-   commit.
-4. Tag and push `<v>` at that commit. The release starts; its
-   visibility-wait step polls the proxy and sumdb before packaging
-   (fresh tags 404 for minutes).
-5. Download the root sums into the provider, commit, tag and push
-   `providers/gcp/<v>`. Module tags may point at different commits;
-   each module version is immutable and complete on its own.
-6. Poll module visibility until two consecutive
-   `go mod download <module>@<v>` passes 60s apart for all three
-   modules (fresh tags 404 for minutes and flap into view).
-   Only then dispatch full CI on the release tag
+2. Bump requires to `<v>` (root: SDK; provider: SDK plus root).
+3. Stage a file proxy from the tree
+   (`go run ./cmd/modproxy --root . --version <v> --out /tmp/proxy`)
+   and download the sums from it with
+   `GOPROXY=file:///tmp/proxy GOSUMDB=off` (staged zips are
+   content-identical to the tags, so the sums match exactly).
+   Verify the root and provider build `GOWORK=off`, commit.
+4. Tag `sdk/<v>`, `<v>`, and `providers/gcp/<v>` at that commit
+   and push all three in one `git push`. The release starts; its
+   visibility-wait sleeps first, then polls.
+5. Wait five minutes in silence (no proxy, sumdb, or CI requests:
+   an early 404 seeds a 30-minute negative). Then one primer per
+   module (`go mod download <module>@<v>` with default proxy and
+   sumdb); all three must pass.
+6. Only then dispatch full CI on the release tag
    (`gh workflow run ci.yml --ref <v> -f all=true`); the publish
    gate requires actual success on the tag commit, and CI jobs
    fail the same visibility race when dispatched too early.
