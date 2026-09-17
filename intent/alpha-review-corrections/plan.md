@@ -5,13 +5,15 @@
   behavior, lockfile auth note, upgrade 404 channel,
   harness TMPDIR) — verify: actionlint, upgrade tests,
   installer harness green
-- [ ] 1.2 Connected installation (R01: URLs in lockfiles,
+- [x] 1.2 Connected installation (R01: URLs in lockfiles,
   pinned publisher, shared resolver, metadata bootstrap,
   verifier persistence, CI provider step)
-  — verify: providerhost plus cli plus registry suites
-  green; clean-machine GCE proof deferred to rc.2
-  artifacts (no release exists since the rc.1 cancel),
-  recorded in the box report before ticking
+  — verify: providerhost plus cli plus registry suites green
+- [ ] 1.4 Clean-machine proof (R01: fresh GCE micro VM,
+  published script, GCP YAML, provider install, real
+  command via production registry; project-pinned and
+  generated-CI repeats; VM destroyed after) — needs
+  rc.2 artifacts; runs before the order-8 re-run
 - [ ] 1.3 Crash-safe updater (R11: copy backup, injectable
   transitions, fault tests, Windows note) — verify:
   `go test ./internal/upgrade/ -count=1`
