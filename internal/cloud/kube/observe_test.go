@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -272,6 +273,79 @@ func (s *staticHTTP) Do(req *http.Request) (*http.Response, error) {
 		Body:       io.NopCloser(strings.NewReader("ok")),
 		Request:    req,
 	}, nil
+}
+
+func TestResolveStorefrontURLPrefersLiveService(t *testing.T) {
+	cs := fake.NewClientset(&corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default"},
+		Status: corev1.ServiceStatus{
+			LoadBalancer: corev1.LoadBalancerStatus{
+				Ingress: []corev1.LoadBalancerIngress{{IP: "203.0.113.10"}},
+			},
+		},
+	})
+	got, err := ResolveStorefrontURL(context.Background(), cs, "", map[string]any{
+		platform.OutputServiceName:    "shop-web",
+		platform.OutputApplicationURL: "https://stale.example.com/",
+	}, "shop-web")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "http://203.0.113.10/" {
+		t.Fatalf("storefront = %q", got)
+	}
+}
+
+func TestResolveStorefrontURLFallsBackAndEmpty(t *testing.T) {
+	cs := fake.NewClientset()
+	got, err := ResolveStorefrontURL(context.Background(), cs, "", map[string]any{
+		platform.OutputServiceName:    "shop-web",
+		platform.OutputApplicationURL: "https://shop.example.com/",
+	}, "shop-web")
+	if err != nil || got != "https://shop.example.com/" {
+		t.Fatalf("storefront = %q, err = %v", got, err)
+	}
+	got, err = ResolveStorefrontURL(context.Background(), cs, "", map[string]any{
+		platform.OutputServiceName: "shop-web",
+	}, "shop-web")
+	if err != nil || got != "" {
+		t.Fatalf("storefront = %q, err = %v, want empty", got, err)
+	}
+	if _, err := ResolveStorefrontURL(context.Background(), cs, "", map[string]any{
+		platform.OutputServiceName:    "shop-web",
+		platform.OutputApplicationURL: "http://[::1",
+	}, "shop-web"); err == nil {
+		t.Fatal("unusable applicationURL accepted")
+	}
+}
+
+func TestProbeStorefrontHTTPBounds(t *testing.T) {
+	ok := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte("store"))
+	}))
+	t.Cleanup(ok.Close)
+	if err := ProbeStorefrontHTTP(context.Background(), nil, ok.URL); err != nil {
+		t.Fatalf("healthy storefront refused: %v", err)
+	}
+	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	t.Cleanup(broken.Close)
+	if err := ProbeStorefrontHTTP(context.Background(), nil, broken.URL); err == nil {
+		t.Fatal("502 storefront accepted")
+	}
+	redirect := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "http://localhost:8080/")
+		w.WriteHeader(http.StatusFound)
+		_ = r
+	}))
+	t.Cleanup(redirect.Close)
+	if err := ProbeStorefrontHTTP(context.Background(), nil, redirect.URL); err == nil {
+		t.Fatal("localhost redirect accepted")
+	}
+	if err := ProbeStorefrontHTTP(context.Background(), nil, ""); err == nil {
+		t.Fatal("empty storefront accepted")
+	}
 }
 
 func TestObserveCheckRuntimeMagentoHTTPFromLoadBalancer(t *testing.T) {

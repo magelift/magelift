@@ -29,7 +29,9 @@ const (
 	magentoHTTPMaxBody    = 1 << 20
 )
 
-type httpDoer interface {
+// HTTPDoer performs storefront requests. Providers stub it in tests;
+// production passes nil for the bounded default client.
+type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
@@ -44,7 +46,7 @@ type Observe struct {
 	factory     ClientFactory
 	namespace   string
 	serviceName string // OutputServiceName cached by BindOutputs for TailLogs
-	httpDoer    httpDoer
+	httpDoer    HTTPDoer
 	tokens      TokenSource
 }
 
@@ -324,43 +326,80 @@ func (o *Observe) CheckRuntime(ctx context.Context, _ platform.PlannedStack, out
 
 func (o *Observe) checkMagentoHTTP(ctx context.Context, client kubernetes.Interface, outputs map[string]any, service string) (platform.RuntimeHealth, bool) {
 	unhealthy := platform.RuntimeHealth{ID: "runtime.web", Service: service, Status: "unhealthy", Detail: "Magento HTTP probe failed"}
+	storefront, err := ResolveStorefrontURL(ctx, client, o.ns(), outputs, service)
+	if err != nil {
+		unhealthy.Detail = err.Error()
+		return unhealthy, true
+	}
+	if storefront == "" {
+		return platform.RuntimeHealth{}, false
+	}
+	return o.probeMagentoHTTP(ctx, service, storefront), true
+}
+
+// ResolveStorefrontURL prefers the live Service load-balancer host, else
+// the stack applicationURL. Empty means no storefront is known (callers
+// checking runtime health omit the leg; deploy gates fail closed).
+func ResolveStorefrontURL(ctx context.Context, client kubernetes.Interface, namespace string, outputs map[string]any, service string) (string, error) {
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
 	// skipAwait freezes stack applicationURL on the first LoadBalancer hostname.
 	// Auto Mode NLB replacement (internal → internet-facing) is only visible on
 	// the live Service, so probe that first when Kubernetes can answer.
-	if storefront, err := magentoLoadBalancerURL(ctx, client, o.ns(), service); err == nil && storefront != "" {
-		return o.probeMagentoHTTP(ctx, service, storefront), true
+	if storefront, err := magentoLoadBalancerURL(ctx, client, namespace, service); err == nil && storefront != "" {
+		return storefront, nil
 	}
-	if raw, _ := outputs[platform.OutputApplicationURL].(string); strings.TrimSpace(raw) != "" {
-		storefront, err := validateMagentoStorefrontURL(raw)
-		if err != nil {
-			unhealthy.Detail = "Magento applicationURL is not a usable storefront URL"
-			return unhealthy, true
-		}
-		return o.probeMagentoHTTP(ctx, service, storefront), true
+	raw, _ := outputs[platform.OutputApplicationURL].(string)
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
 	}
-	return platform.RuntimeHealth{}, false
+	storefront, err := validateMagentoStorefrontURL(raw)
+	if err != nil {
+		return "", fmt.Errorf("Magento applicationURL is not a usable storefront URL")
+	}
+	return storefront, nil
 }
 
-func (o *Observe) probeMagentoHTTP(ctx context.Context, service, storefront string) platform.RuntimeHealth {
-	check := platform.RuntimeHealth{ID: "runtime.web", Service: service, Status: "unhealthy", Detail: "Magento HTTP probe failed"}
+// ProbeStorefrontHTTP GETs the serving storefront through the full serving
+// path (load balancer, ingress, nginx, PHP-FPM, Magento). Only HTTP 200
+// passes; localhost redirects fail. A nil doer uses the bounded default
+// client. Deploy health gates on this; runtime checks report it.
+func ProbeStorefrontHTTP(ctx context.Context, doer HTTPDoer, storefront string) error {
+	if strings.TrimSpace(storefront) == "" {
+		return fmt.Errorf("storefront URL is required")
+	}
+	if doer == nil {
+		doer = &http.Client{
+			Timeout: magentoHTTPTimeout,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, storefront, nil)
 	if err != nil {
-		check.Detail = "Magento HTTP probe could not build request"
-		return check
+		return fmt.Errorf("Magento HTTP probe could not build request")
 	}
-	resp, err := o.http().Do(req)
+	resp, err := doer.Do(req)
 	if err != nil {
-		check.Detail = "Magento HTTP probe did not complete"
-		return check
+		return fmt.Errorf("Magento HTTP probe did not complete")
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, magentoHTTPMaxBody))
 	if isLoopbackHTTPLocation(resp.Header.Get("Location")) {
-		check.Detail = "Magento HTTP redirected to localhost"
-		return check
+		return fmt.Errorf("Magento HTTP redirected to localhost")
 	}
 	if resp.StatusCode != http.StatusOK {
-		check.Detail = fmt.Sprintf("Magento HTTP status %d, want 200", resp.StatusCode)
+		return fmt.Errorf("Magento HTTP status %d, want 200", resp.StatusCode)
+	}
+	return nil
+}
+
+func (o *Observe) probeMagentoHTTP(ctx context.Context, service, storefront string) platform.RuntimeHealth {
+	check := platform.RuntimeHealth{ID: "runtime.web", Service: service, Status: "unhealthy", Detail: "Magento HTTP probe failed"}
+	if err := ProbeStorefrontHTTP(ctx, o.http(), storefront); err != nil {
+		check.Detail = err.Error()
 		return check
 	}
 	check.Status = "healthy"
@@ -368,7 +407,7 @@ func (o *Observe) probeMagentoHTTP(ctx context.Context, service, storefront stri
 	return check
 }
 
-func (o *Observe) http() httpDoer {
+func (o *Observe) http() HTTPDoer {
 	if o != nil && o.httpDoer != nil {
 		return o.httpDoer
 	}

@@ -100,6 +100,9 @@ type Server struct {
 	ExecTokens kube.TokenSource
 	// NewMediaStore builds the media object store. Nil uses GCS.
 	NewMediaStore func() objectStore
+	// HTTPDoer performs serving storefront requests. Nil uses the
+	// bounded default client. Tests stub it; production leaves it nil.
+	HTTPDoer kube.HTTPDoer
 
 	Admission stackRegionAdmission
 	Bootstrap gcpops.Bootstrap
