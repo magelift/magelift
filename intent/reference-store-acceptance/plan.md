@@ -1,6 +1,6 @@
 # Plan: reference-store acceptance
 
-- [ ] 1.1 Sweep residual block (hoist retained backups into a
+- [x] 1.1 Sweep residual block (hoist retained backups into a
   top-level `residual` entry with billing-honest framing plus
   `residualUnknown`; unit tests) — verify:
   `go test ./internal/cli/ -run TestSweep -count=1`

@@ -201,6 +201,23 @@ type environmentSweepEntry struct {
 	Action      string    `json:"action" yaml:"action"`
 	Reason      string    `json:"reason,omitempty" yaml:"reason,omitempty"`
 	Result      any       `json:"result,omitempty" yaml:"result,omitempty"`
+	// Residual hoists what destroy kept (retained backups with their
+	// retention horizon). Amounts are never estimated here: provider
+	// billing is the source of truth for what survivors cost.
+	Residual []config.RetainedBackup `json:"residual,omitempty" yaml:"residual,omitempty"`
+	// ResidualUnknown reports that the destroy result could not be
+	// inventoried. Unknown is visible, never silent.
+	ResidualUnknown bool `json:"residualUnknown,omitempty" yaml:"residualUnknown,omitempty"`
+}
+
+// sweepResidual hoists retained backups from a destroy result map. A
+// foreign shape reports unknown instead of guessing.
+func sweepResidual(result map[string]any) ([]config.RetainedBackup, bool) {
+	destroyed, ok := result["destroyed"].(infrastructureResult)
+	if !ok {
+		return nil, true
+	}
+	return destroyed.RetainedBackups, false
 }
 
 func envSweepCommand(o *options) *cobra.Command {
@@ -260,6 +277,7 @@ func envSweepCommand(o *options) *cobra.Command {
 					}
 					entry.Action = "destroyed"
 					entry.Result = result
+					entry.Residual, entry.ResidualUnknown = sweepResidual(result)
 				}
 				entries = append(entries, entry)
 				if !dryRun {
@@ -342,6 +360,7 @@ func (o *options) runPreviewSweep(ctx context.Context, file *config.File, cutoff
 			}
 			entry.Action = "destroyed"
 			entry.Result = result
+			entry.Residual, entry.ResidualUnknown = sweepResidual(result)
 		}
 		entries = append(entries, entry)
 	}
