@@ -32,7 +32,8 @@ var Runtimes = []string{"gke-autopilot", "gke-standard"}
 
 // Timeout bounds one operation. RetryableOnTimeout reports whether a client
 // may safely retry after a timeout: true only when the operation provably
-// performed no mutation.
+// performs no remote mutation (local temp files excluded: PrepareExec and
+// PrepareTunnel write launch-only kubeconfigs with no remote effect).
 type Timeout struct {
 	Duration           time.Duration
 	RetryableOnTimeout bool
@@ -44,6 +45,11 @@ func DefaultTimeouts() map[sdk.Operation]Timeout {
 	fastRead := Timeout{Duration: 60 * time.Second, RetryableOnTimeout: true}
 	slowRead := Timeout{Duration: 5 * time.Minute, RetryableOnTimeout: true}
 	mutation := Timeout{Duration: 10 * time.Minute}
+	// fastMutate: remote state changes that complete quickly when healthy.
+	// Locks, secrets, and similar mutations are never retryable: a timeout
+	// after commit must reconcile, not replay (an unlock replay could
+	// release another owner's lock).
+	fastMutate := Timeout{Duration: 60 * time.Second}
 	return map[sdk.Operation]Timeout{
 		sdk.OpDescribe:               {Duration: 15 * time.Second, RetryableOnTimeout: true},
 		sdk.OpValidateConfig:         {Duration: 15 * time.Second, RetryableOnTimeout: true},
@@ -56,13 +62,13 @@ func DefaultTimeouts() map[sdk.Operation]Timeout {
 		sdk.OpBootstrapVerify:        fastRead,
 		sdk.OpBootstrapEnsure:        mutation,
 		sdk.OpStateStatus:            fastRead,
-		sdk.OpStateLock:              fastRead,
-		sdk.OpStateUnlock:            fastRead,
+		sdk.OpStateLock:              fastMutate,
+		sdk.OpStateUnlock:            fastMutate,
 		sdk.OpStateBackup:            {Duration: 15 * time.Minute},
 		sdk.OpStateRestore:           {Duration: 15 * time.Minute},
 		sdk.OpSecretList:             fastRead,
-		sdk.OpSecretSet:              fastRead,
-		sdk.OpSecretRemove:           fastRead,
+		sdk.OpSecretSet:              fastMutate,
+		sdk.OpSecretRemove:           fastMutate,
 		sdk.OpSecretRead:             fastRead,
 		sdk.OpTailLogs:               {Duration: 2 * time.Minute, RetryableOnTimeout: true},
 		sdk.OpCheckRuntime:           {Duration: 2 * time.Minute, RetryableOnTimeout: true},
