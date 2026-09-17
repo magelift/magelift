@@ -13,11 +13,16 @@
   executes the published onboarding literally end to end —
   install, provider, build, deploy, per-surface verify,
   destroy — plus project-pinned and generated-CI repeats;
-  media proof includes a real upload, app-relative image
-  URL, fresh-pod retrieval, replacement, export/import
-  round trip, and the negative test (unauthenticated
-  import/export paths fail); VM destroyed after) — needs
-  rc.4 artifacts; runs before the order-8 re-run
+  media proof includes a real upload (proves driver ACL
+  plus HMAC plus prefix on a real bucket), app-relative
+  image URL with zero storage hosts in storefront HTML,
+  retrieval on a fresh web pod (get.php plus
+  Synchronizer, not warm cache), replacement,
+  export/import round trip, and the negative test
+  (unauthenticated import/export paths fail; stock
+  denies hold for customer/downloadable/import/
+  custom_options); VM destroyed after) — needs rc.4
+  artifacts; runs before the order-8 re-run
 - [x] 1.3 Crash-safe updater (R11: copy backup, injectable
   transitions, fault tests, Windows note) — verify:
   `go test ./internal/upgrade/ -count=1`
