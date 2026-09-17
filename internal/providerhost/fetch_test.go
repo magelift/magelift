@@ -79,3 +79,24 @@ func TestEffectiveCacheDirPrefersFlagThenEnv(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestNormalizeReleaseTagRestoresGoReleaserPrefix(t *testing.T) {
+	t.Parallel()
+	for _, kase := range []struct{ in, want string }{
+		{"v0.1.0-alpha.1-rc.2", "v0.1.0-alpha.1-rc.2"},
+		{"0.1.0-alpha.1-rc.2", "v0.1.0-alpha.1-rc.2"},
+		{"  v1.2.3  ", "v1.2.3"},
+		{"1.2.3", "v1.2.3"},
+		{"1.2.3+build.5", "v1.2.3+build.5"},
+	} {
+		tag, err := NormalizeReleaseTag(kase.in)
+		if err != nil || tag != kase.want {
+			t.Errorf("NormalizeReleaseTag(%q) = %q, %v; want %q", kase.in, tag, err, kase.want)
+		}
+	}
+	for _, bad := range []string{"", "dev", "main", "latest", "v1.2", "1.2", "v1.2.3-../escape", "release/v1.2.3"} {
+		if tag, err := NormalizeReleaseTag(bad); err == nil {
+			t.Errorf("NormalizeReleaseTag(%q) = %q, want error", bad, tag)
+		}
+	}
+}

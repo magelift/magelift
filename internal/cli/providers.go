@@ -49,14 +49,15 @@ func providersInstallCommand(o *options) *cobra.Command {
 			lockFile, lock, _, err := providerhost.ResolveLock(opts)
 			bootstrapped := false
 			if err != nil {
-				if strings.TrimSpace(lockPath) != "" {
+				if !errors.Is(err, providerhost.ErrNoLockfile) {
 					return err
 				}
 				want := strings.TrimSpace(version)
 				if want == "" {
 					want = strings.TrimSpace(Version)
 				}
-				if !providerhost.ValidReleaseTag(want) {
+				tag, terr := providerhost.NormalizeReleaseTag(want)
+				if terr != nil {
 					return &exitError{code: 3, err: fmt.Errorf("no provider lockfile and no release version to bootstrap from (running %q): pass --version vX.Y.Z", Version)}
 				}
 				fetch := o.fetchProviderLock
@@ -65,7 +66,7 @@ func providersInstallCommand(o *options) *cobra.Command {
 						return providerhost.FetchLock(ctx, v, "", nil)
 					}
 				}
-				fetched, ferr := fetch(cmd.Context(), want)
+				fetched, ferr := fetch(cmd.Context(), tag)
 				if ferr != nil {
 					return &exitError{code: 3, err: ferr}
 				}
