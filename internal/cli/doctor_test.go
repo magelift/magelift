@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,6 +59,109 @@ func TestDoctorPrintsFailedChecksAndUsesStableExitCode(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), `"next": "magelift config validate"`) {
 		t.Fatalf("doctor did not name the fix: %s", out.String())
+	}
+}
+
+func TestDoctorCredentialsGCPMintsToken(t *testing.T) {
+	path := writeGCPLifecycleConfig(t, "preview")
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath, o.output = path, "json"
+	o.dependencyRunner = &fakeDependencyRunner{}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"id": "credentials.gcp"`) || !strings.Contains(out.String(), "ADC mints tokens") {
+		t.Fatalf("doctor lacks the ADC check: %s", out.String())
+	}
+}
+
+func TestDoctorCredentialsGCPExplainsLoginGap(t *testing.T) {
+	path := writeGCPLifecycleConfig(t, "preview")
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath, o.output = path, "json"
+	o.dependencyRunner = &fakeDependencyRunner{fail: map[string]error{"gcloud auth application-default print-access-token": errors.New("exit 1")}}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
+	err := cmd.Execute()
+	if err == nil || ExitCode(err) != doctorExitUnhealthy {
+		t.Fatalf("doctor error/code = %v/%d", err, ExitCode(err))
+	}
+	for _, want := range []string{`"id": "credentials.gcp"`, "gcloud auth login alone is not enough", `"next": "gcloud auth application-default login"`} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("doctor output missing %q: %s", want, out.String())
+		}
+	}
+}
+
+func TestDoctorCredentialsGCPUsesADCFileWithoutGcloud(t *testing.T) {
+	path := writeGCPLifecycleConfig(t, "preview")
+	adc := filepath.Join(t.TempDir(), "adc.json")
+	if err := os.WriteFile(adc, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath, o.output = path, "json"
+	o.getenv = func(key string) string {
+		if key == "GOOGLE_APPLICATION_CREDENTIALS" {
+			return adc
+		}
+		return ""
+	}
+	o.dependencyRunner = &fakeDependencyRunner{missing: map[string]bool{"gcloud": true}}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "ADC file present") {
+		t.Fatalf("doctor output: %s", out.String())
+	}
+}
+
+func TestDoctorCredentialsGCPSkipsOnCI(t *testing.T) {
+	path := writeGCPLifecycleConfig(t, "preview")
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath, o.output = path, "json"
+	o.getenv = func(key string) string {
+		if key == "CI" {
+			return "true"
+		}
+		return ""
+	}
+	o.dependencyRunner = &fakeDependencyRunner{missing: map[string]bool{"gcloud": true}}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"status": "skipped"`) || !strings.Contains(out.String(), "workload identity") {
+		t.Fatalf("doctor output: %s", out.String())
+	}
+}
+
+func TestDoctorOmitsCredentialsForNonGCP(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath, o.output = path, "json"
+	o.dependencyRunner = &fakeDependencyRunner{}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), `"id": "credentials.`) {
+		t.Fatalf("non-GCP report carries credential checks: %s", out.String())
 	}
 }
 

@@ -9,11 +9,12 @@
   pinned publisher, shared resolver, metadata bootstrap,
   verifier persistence, CI provider step)
   — verify: providerhost plus cli plus registry suites green
-- [ ] 1.4 Clean-machine proof (R01: fresh GCE micro VM,
-  published script, GCP YAML, provider install, real
-  command via production registry; project-pinned and
-  generated-CI repeats; VM destroyed after) — needs
-  rc.2 artifacts; runs before the order-8 re-run
+- [ ] 1.4 Clean-machine proof (R01/R12: fresh GCE micro VM
+  executes the published onboarding literally end to end —
+  install, provider, build, deploy, per-surface verify,
+  destroy — plus project-pinned and generated-CI repeats;
+  VM destroyed after) — needs rc.2 artifacts; runs before
+  the order-8 re-run
 - [x] 1.3 Crash-safe updater (R11: copy backup, injectable
   transitions, fault tests, Windows note) — verify:
   `go test ./internal/upgrade/ -count=1`
@@ -46,7 +47,7 @@
 - [x] 4.1 CI coverage (R09: module jobs, filters, cache
   keys, promotion gate on checks) — verify: actionlint,
   gate-script failure demo
-- [ ] 4.2 Onboarding truth (R12: shipped-path rewrite,
+- [x] 4.2 Onboarding truth (R12: shipped-path rewrite,
   ADC, mail recipient; recipe fixture pending loop
   evidence) — verify: docs green, humanizer plus marks
 - [ ] 5.1 Amendments plus gates (dated report notes,
