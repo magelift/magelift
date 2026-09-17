@@ -1,13 +1,14 @@
-// Package distribution proves the publication mechanics before any tag: an
-// SDK consumer and the provider module resolve through a module proxy with
-// GOWORK=off, using synthetic versions served from a file proxy staged from
-// the working tree. No network beyond file:// is used.
+// Package distribution proves publication with GOWORK=off: an SDK consumer
+// builds against a file proxy, and the real provider module resolves its
+// full graph and compiles. Magelift modules resolve only from the file
+// proxy (synthetic versions staged from the working tree); third-party
+// modules resolve upstream for the provider build.
 package distribution
 
 import (
+	"archive/zip"
 	"bytes"
-	"encoding/json"
-	"io/fs"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,12 +17,13 @@ import (
 	"testing"
 
 	"golang.org/x/mod/module"
-	"golang.org/x/mod/zip"
+	modzip "golang.org/x/mod/zip"
 )
 
 const (
 	sdkModule      = "github.com/magelift/magelift/sdk"
 	providerModule = "github.com/magelift/magelift/providers/gcp"
+	rootModule     = "github.com/magelift/magelift"
 	proofVersion   = "v0.7.0-distproof"
 )
 
@@ -34,36 +36,27 @@ func repositoryRoot(t *testing.T) string {
 	return filepath.Clean(filepath.Join(filepath.Dir(sourceFile), "..", ".."))
 }
 
-// proxyEnv stages a hermetic Go environment: GOWORK=off, GOPROXY pointed at
-// dir/proxy, and scratch cache, GOPATH, and HOME so the proof never touches
-// the developer's module cache. The read-only module cache needs a
-// permission-restoring cleanup for t.TempDir removal.
-func proxyEnv(t *testing.T, dir string) (proxy string, env []string) {
+// proxyEnv stages a hermetic-resolution Go environment: GOWORK=off,
+// GOPROXY pointed at dir/proxy (plus upstream for third-party when
+// allowed), sumdb off, local toolchain. Magelift modules resolve only
+// from the file proxy. Build and module caches stay shared: they affect
+// speed, never resolution, and keep provider compiles affordable.
+func proxyEnv(t *testing.T, dir string, upstream bool) (proxy string, env []string) {
 	t.Helper()
 	proxy = filepath.Join(dir, "proxy")
-	home := filepath.Join(dir, "home")
-	cache := filepath.Join(dir, "gocache")
-	gopath := filepath.Join(dir, "gopath")
-	for _, path := range []string{proxy, home, cache, gopath} {
-		if err := os.MkdirAll(path, 0o755); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.MkdirAll(proxy, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		filepath.WalkDir(dir, func(path string, _ fs.DirEntry, _ error) error {
-			_ = os.Chmod(path, 0o700)
-			return nil
-		})
-	})
+	proxyURL := "file://" + filepath.ToSlash(proxy)
+	if upstream {
+		proxyURL += ",https://proxy.golang.org"
+	}
 	base := os.Environ()
 	overrides := map[string]string{
 		"GOWORK":      "off",
-		"GOPROXY":     "file://" + filepath.ToSlash(proxy),
+		"GOPROXY":     proxyURL,
 		"GOSUMDB":     "off",
 		"GOTOOLCHAIN": "local",
-		"GOCACHE":     cache,
-		"GOPATH":      gopath,
-		"HOME":        home,
 		"GOFLAGS":     "-mod=readonly",
 	}
 	env = []string{}
@@ -83,7 +76,7 @@ func proxyEnv(t *testing.T, dir string) (proxy string, env []string) {
 	return proxy, env
 }
 
-func publishModule(t *testing.T, proxy, modulePath, version, srcDir string, rewriteGoMod func([]byte) []byte) {
+func publishModule(t *testing.T, proxy, modulePath, version, srcDir string) {
 	t.Helper()
 	escaped, err := module.EscapePath(modulePath)
 	if err != nil {
@@ -100,8 +93,10 @@ func publishModule(t *testing.T, proxy, modulePath, version, srcDir string, rewr
 	if err := os.WriteFile(filepath.Join(atDir, escapedVersion+".info"), []byte(`{"Version":"`+version+`"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// The zip and the .mod come from the same source tree, so a published
+	// module can never carry divergent manifests.
 	var archive bytes.Buffer
-	if err := zip.CreateFromDir(&archive, module.Version{Path: modulePath, Version: version}, srcDir); err != nil {
+	if err := modzip.CreateFromDir(&archive, module.Version{Path: modulePath, Version: version}, srcDir); err != nil {
 		t.Fatalf("zip %s: %v", modulePath, err)
 	}
 	if err := os.WriteFile(filepath.Join(atDir, escapedVersion+".zip"), archive.Bytes(), 0o644); err != nil {
@@ -111,12 +106,52 @@ func publishModule(t *testing.T, proxy, modulePath, version, srcDir string, rewr
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rewriteGoMod != nil {
-		goMod = rewriteGoMod(goMod)
-	}
 	if err := os.WriteFile(filepath.Join(atDir, escapedVersion+".mod"), goMod, 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// assertProxyCoherent verifies the served .mod matches the go.mod inside
+// the served zip: identical manifest content on both paths.
+func assertProxyCoherent(t *testing.T, proxy, modulePath, version string) {
+	t.Helper()
+	escaped, err := module.EscapePath(modulePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	escapedVersion, err := module.EscapeVersion(version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	atDir := filepath.Join(proxy, filepath.FromSlash(escaped), "@v")
+	servedMod, err := os.ReadFile(filepath.Join(atDir, escapedVersion+".mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive, err := zip.OpenReader(filepath.Join(atDir, escapedVersion+".zip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	for _, file := range archive.File {
+		if !strings.HasSuffix(file.Name, "/go.mod") {
+			continue
+		}
+		opened, err := file.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		zipped, err := io.ReadAll(opened)
+		opened.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(zipped) != string(servedMod) {
+			t.Fatal("served .mod differs from the zipped go.mod")
+		}
+		return
+	}
+	t.Fatal("zipped go.mod not found")
 }
 
 func runGo(t *testing.T, dir string, env []string, args ...string) string {
@@ -135,6 +170,11 @@ func runGo(t *testing.T, dir string, env []string, args ...string) string {
 
 func copyDir(t *testing.T, src, dst string) {
 	t.Helper()
+	copyDirSkipping(t, src, dst, map[string]bool{})
+}
+
+func copyDirSkipping(t *testing.T, src, dst string, skip map[string]bool) {
+	t.Helper()
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		t.Fatal(err)
@@ -143,10 +183,17 @@ func copyDir(t *testing.T, src, dst string) {
 		t.Fatal(err)
 	}
 	for _, entry := range entries {
+		if skip[entry.Name()] {
+			continue
+		}
 		from := filepath.Join(src, entry.Name())
 		to := filepath.Join(dst, entry.Name())
 		if entry.IsDir() {
-			copyDir(t, from, to)
+			copyDirSkipping(t, from, to, skip)
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() {
 			continue
 		}
 		body, err := os.ReadFile(from)
@@ -162,8 +209,9 @@ func copyDir(t *testing.T, src, dst string) {
 func TestSDKConsumerBuildsOutsideWorkspace(t *testing.T) {
 	root := repositoryRoot(t)
 	work := t.TempDir()
-	proxy, env := proxyEnv(t, work)
-	publishModule(t, proxy, sdkModule, proofVersion, filepath.Join(root, "sdk"), nil)
+	proxy, env := proxyEnv(t, work, false)
+	publishModule(t, proxy, sdkModule, proofVersion, filepath.Join(root, "sdk"))
+	assertProxyCoherent(t, proxy, sdkModule, proofVersion)
 
 	consumer := filepath.Join(work, "consumer")
 	if err := os.MkdirAll(consumer, 0o755); err != nil {
@@ -203,40 +251,60 @@ func TestSDKConsumerBuildsOutsideWorkspace(t *testing.T) {
 	}
 }
 
-func TestProviderModuleIsProxyServable(t *testing.T) {
+func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	root := repositoryRoot(t)
 	work := t.TempDir()
-	proxy, env := proxyEnv(t, work)
+	// Magelift modules resolve from the file proxy; third-party modules
+	// resolve upstream (documented network use: the claim under test is
+	// magelift-module resolution plus compilation, not offline vendoring).
+	proxy, env := proxyEnv(t, work, true)
+	publishModule(t, proxy, sdkModule, proofVersion, filepath.Join(root, "sdk"))
+	assertProxyCoherent(t, proxy, sdkModule, proofVersion)
 
-	// Post-tag shape: the provider go.mod carries a versioned SDK require
-	// (applied to a temp copy; the tree keeps its pre-tag workspace form).
+	// Post-tag shape: staged copies carry versioned magelift requires
+	// (the tree keeps its pre-tag workspace form until the
+	// require-bump commit). The provider under test is the main module
+	// on disk; SDK and root resolve from the proxy.
+	rootCopy := filepath.Join(work, "root")
+	copyDirSkipping(t, root, rootCopy, map[string]bool{
+		"providers": true, "sdk": true, ".git": true, "dist": true,
+		".venv": true, "node_modules": true, "website": true,
+	})
+	appendRequire(t, filepath.Join(rootCopy, "go.mod"), sdkModule, proofVersion)
+	publishModule(t, proxy, rootModule, proofVersion, rootCopy)
+	assertProxyCoherent(t, proxy, rootModule, proofVersion)
+
 	copied := filepath.Join(work, "provider")
 	copyDir(t, filepath.Join(root, "providers", "gcp"), copied)
-	publishModule(t, proxy, providerModule, proofVersion, copied, func(goMod []byte) []byte {
-		return append(goMod, "\nrequire "+sdkModule+" "+proofVersion+"\n"...)
-	})
+	appendRequire(t, filepath.Join(copied, "go.mod"), sdkModule, proofVersion)
+	appendRequire(t, filepath.Join(copied, "go.mod"), rootModule, proofVersion)
 
-	empty := filepath.Join(work, "empty")
-	if err := os.MkdirAll(empty, 0o755); err != nil {
-		t.Fatal(err)
+	// Resolve the full graph, then compile the real provider: every
+	// package including the plugin binary. GOWORK=off throughout.
+	tidyEnv := append([]string{}, env...)
+	for i, entry := range tidyEnv {
+		if strings.HasPrefix(entry, "GOFLAGS=") {
+			tidyEnv[i] = "GOFLAGS=-mod=mod"
+		}
 	}
-	downloaded := runGo(t, empty, env, "mod", "download", "-json", providerModule+"@"+proofVersion)
-	var fetched struct {
-		Path    string
-		Version string
-		GoMod   string
+	runGo(t, copied, tidyEnv, "mod", "tidy")
+	listed := runGo(t, copied, env, "list", "-m", "all")
+	for _, want := range []string{sdkModule + " " + proofVersion, rootModule + " " + proofVersion} {
+		if !strings.Contains(listed, want) {
+			t.Fatalf("module graph lacks %s", want)
+		}
 	}
-	if err := json.Unmarshal([]byte(downloaded), &fetched); err != nil {
-		t.Fatal(err)
-	}
-	if fetched.Path != providerModule || fetched.Version != proofVersion {
-		t.Fatalf("downloaded = %+v", fetched)
-	}
-	served, err := os.ReadFile(fetched.GoMod)
+	runGo(t, copied, env, "build", "./...")
+}
+
+func appendRequire(t *testing.T, goModPath, modulePath, version string) {
+	t.Helper()
+	goMod, err := os.ReadFile(goModPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(served), "require "+sdkModule+" "+proofVersion) {
-		t.Fatalf("served provider go.mod lacks the SDK require:\n%s", served)
+	goMod = append(goMod, "\nrequire "+modulePath+" "+version+"\n"...)
+	if err := os.WriteFile(goModPath, goMod, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
