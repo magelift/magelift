@@ -160,9 +160,32 @@ noted; Order 5 implements this contract, and behavior changes land there.
 - Silent migration mode: rejected (a rejected checksum must never change the
   selected implementation quietly).
 
+## Alpha reconciliation (2026-09-17)
+
+The 0.1.0 alpha review (R05) found the as-built boundary narrower than
+this ADR's letter. Reconciled position for the alpha:
+
+- HELD: deploy-step execution lives in the plugin behind the typed
+  `deploy-app-phase` operation; deploy inputs are an SDK-governed
+  contract the core passes through without decoding; the GCP provider
+  ships as a separate module and process with no core fallback.
+- HELD: the alpha core registers GCP plus AWS ECS Fargate only. EKS,
+  OVH, and Scaleway register behind `MAGELIFT_EXPERIMENTAL_PROVIDERS`.
+  Cleanup/recovery providers stay available regardless (recovery must
+  read old ledgers).
+- DEFERRED with trigger: the provider still imports root-internal
+  implementation helpers (kube execution primitives, automation,
+  platform types). Full SDK-plus-support-module independence lands
+  with `aws-provider-parity` at the latest: the second provider must
+  not clone the coupling. The leanness gate pins the GCP boundary
+  today, not full SDK independence.
+- DROPPED: nothing. The autonomous-provider goal stands; this section
+  records what alpha proves versus what parity completes.
+
 ## Provenance
 
-`intent/audit.md` F01–F03/F15, `intent/provider-plugin-contract/spec.md`,
+`intent/audit.md` F01–F03/F15, `intent/0.1.0-alpha-review.md` R05,
+`intent/alpha-review-corrections/spec.md`, `intent/provider-plugin-contract/spec.md`,
 `sdk/modules.go`, `internal/platform/public_module.go`,
 `internal/providerhost/hostproto/ping.proto`, `internal/config`,
 `internal/registry/registry.go`, ADRs 0003/0004/0008/0011.

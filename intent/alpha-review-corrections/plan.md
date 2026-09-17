@@ -17,7 +17,7 @@
 - [x] 1.3 Crash-safe updater (R11: copy backup, injectable
   transitions, fault tests, Windows note) — verify:
   `go test ./internal/upgrade/ -count=1`
-- [ ] 2.1 Provider boundary (R05: execution into plugin,
+- [x] 2.1 Provider boundary (R05: execution into plugin,
   SDK contracts, provider-local helpers, alpha registry
   scoping, ADR reconcile, leanness gate) — verify:
   `go list -deps` clean both ways, full suites green
