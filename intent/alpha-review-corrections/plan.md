@@ -37,7 +37,7 @@
 - [x] 3.1 Media reality (R03: GCS mechanism, provider
   media ops, key continuity; live-verified or changed)
   — verify: unit suites green, live proof in order 8
-- [ ] 3.2 Serving health (R04: serving-path probe,
+- [x] 3.2 Serving health (R04: serving-path probe,
   effective-config search, image scope, negative tests)
   — verify: kube plus platform suites green
 - [ ] 3.3 Lifecycle authority (R08: PHP-emitted sequence,

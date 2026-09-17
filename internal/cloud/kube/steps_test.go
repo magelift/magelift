@@ -291,6 +291,68 @@ func intendedRolloutSteps(t *testing.T, digest string, candidate *recordingCandi
 	return steps
 }
 
+func TestAllImagesMatchRequiresEveryContainer(t *testing.T) {
+	t.Parallel()
+	digest := "img@sha256:" + strings.Repeat("a", 64)
+	if !allImagesMatch([]string{digest}, digest) {
+		t.Fatal("single matching image refused")
+	}
+	if !allImagesMatch([]string{digest, digest}, digest) {
+		t.Fatal("uniform images refused")
+	}
+	if allImagesMatch([]string{digest, "other:tag"}, digest) {
+		t.Fatal("lagging sidecar accepted")
+	}
+	if allImagesMatch(nil, digest) {
+		t.Fatal("empty image list accepted")
+	}
+}
+
+func TestHealthRejectsLaggingSidecar(t *testing.T) {
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("c", 64)
+	stale := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("d", 64)
+	replicas := int32(1)
+	cs := fake.NewClientset(&appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default", Generation: 3},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{Containers: []corev1.Container{
+					{Name: "web", Image: digest},
+					{Name: "sidecar", Image: stale},
+				}},
+			},
+		},
+		Status: appsv1.DeploymentStatus{
+			ObservedGeneration: 3,
+			UpdatedReplicas:    1,
+			ReadyReplicas:      1,
+			Conditions: []appsv1.DeploymentCondition{{
+				Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue,
+			}},
+		},
+	})
+	runtime, err := NewRuntimeFromClient(cs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &stepsBackend{outputs: map[string]any{
+		platform.OutputClusterName: "shop-gke",
+		platform.OutputServiceName: "shop-web",
+	}}
+	steps, err := New(backend, testDeploySpec(digest), &recordingCandidate{}, runtime, io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps.waitInterval = time.Millisecond
+	steps.waitTimeout = 20 * time.Millisecond
+	steps.candidateImage = digest
+	err = steps.Health(context.Background(), deployRequest(digest))
+	if err == nil || !strings.Contains(err.Error(), "intended rollout") {
+		t.Fatalf("Health with lagging sidecar = %v, want intended-rollout refusal", err)
+	}
+}
+
 func TestHealthRunsMagentoProbe(t *testing.T) {
 	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("c", 64)
 	candidate := &recordingCandidate{}

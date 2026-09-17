@@ -9,6 +9,7 @@ import (
 	"github.com/magelift/magelift/internal/platform"
 	gcpauth "github.com/magelift/magelift/providers/gcp/auth"
 	"github.com/magelift/magelift/sdk"
+	"k8s.io/client-go/kubernetes"
 )
 
 // deployPhaseTimeouts bound each stabilize/health wait inside a phase call.
@@ -84,15 +85,7 @@ func (s *Server) deployStores(outputs map[string]any) (*kube.CandidateStore, *ku
 		}
 		return candidate, runtime, nil
 	}
-	var factory kube.ClientFactory
-	if s != nil {
-		factory = s.KubeClients
-	}
-	if factory == nil {
-		factory = gcpauth.NewClientFactory()
-	}
-	candidate := kube.NewCandidateFromFactory(factory)
-	client, err := factory(outputs)
+	client, err := s.deployClient(outputs)
 	if err != nil {
 		return nil, nil, mapError(err)
 	}
@@ -100,7 +93,21 @@ func (s *Server) deployStores(outputs map[string]any) (*kube.CandidateStore, *ku
 	if err != nil {
 		return nil, nil, mapError(err)
 	}
-	return candidate, runtime, nil
+	return kube.NewCandidateFromFactory(s.deployFactory()), runtime, nil
+}
+
+// deployFactory resolves the client factory: injected fakes win, else the
+// provider's fresh-credential factory. Saved kubeconfigs never authenticate
+// deploy execution.
+func (s *Server) deployFactory() kube.ClientFactory {
+	if s != nil && s.KubeClients != nil {
+		return s.KubeClients
+	}
+	return gcpauth.NewClientFactory()
+}
+
+func (s *Server) deployClient(outputs map[string]any) (kubernetes.Interface, error) {
+	return s.deployFactory()(outputs)
 }
 
 func (s *Server) deployRegister(ctx context.Context, candidate *kube.CandidateStore, outputs map[string]any, inputs sdk.DeployInputs, imageDigest string) (*sdk.DeployAppPhaseResult, *sdk.OperationError) {
@@ -163,6 +170,27 @@ func (s *Server) deployHealth(ctx context.Context, candidate *kube.CandidateStor
 	request, err := kube.CandidateRequestFromOutputs(outputs, inputs, imageDigest)
 	if err != nil {
 		return nil, mapError(err)
+	}
+	// Bounded request through the serving path first: a broken PHP-FPM or
+	// upstream route fails here even when jobs and scheduler counters look
+	// healthy. The probe job then asserts database and search specifics.
+	client, err := s.deployClient(outputs)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	storefront, err := kube.ResolveStorefrontURL(ctx, client, "", outputs, request.ServiceName)
+	if err != nil {
+		return nil, InvalidError(err.Error())
+	}
+	if storefront == "" {
+		return nil, InvalidError("serving storefront URL cannot be determined; refusing to declare a healthy deploy")
+	}
+	var doer kube.HTTPDoer
+	if s != nil {
+		doer = s.HTTPDoer
+	}
+	if err := kube.ProbeStorefrontHTTP(ctx, doer, storefront); err != nil {
+		return nil, mapError(fmt.Errorf("serving path unhealthy: %w", err))
 	}
 	command := platform.MagentoProbeShell(request.SearchEndpoint, request.SearchEndpoint != "", engine)
 	if err := candidate.RunProbe(ctx, request, command); err != nil {

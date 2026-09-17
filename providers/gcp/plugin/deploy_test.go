@@ -3,6 +3,8 @@ package plugin
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -53,16 +55,25 @@ func deployTestInputs() sdk.DeployInputs {
 
 func deployTestOutputs(t *testing.T) []byte {
 	t.Helper()
-	outputs, err := json.Marshal(map[string]any{
+	return deployTestOutputsWithURL(t, "")
+}
+
+func deployTestOutputsWithURL(t *testing.T, appURL string) []byte {
+	t.Helper()
+	outputs := map[string]any{
 		"clusterName": "shop-cluster", "serviceName": "shop-web",
 		"databaseWriter": "10.0.0.1", "cacheEndpoint": "10.0.0.2:6379",
 		"databaseSecretName": "db-secret", "encryptionKeySecretName": "crypt-secret",
 		"searchEndpoint": "http://search.internal:9200",
-	})
+	}
+	if appURL != "" {
+		outputs["applicationURL"] = appURL
+	}
+	encoded, err := json.Marshal(outputs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return outputs
+	return encoded
 }
 
 func deployTestPlan(t *testing.T) sdk.StoredPlan {
@@ -78,14 +89,32 @@ func deployTestPlan(t *testing.T) sdk.StoredPlan {
 	return plan
 }
 
+type stubHTTPDoer struct {
+	status int
+	sawURL string
+}
+
+func (s *stubHTTPDoer) Do(request *http.Request) (*http.Response, error) {
+	s.sawURL = request.URL.String()
+	return &http.Response{
+		StatusCode: s.status,
+		Body:       io.NopCloser(strings.NewReader("store")),
+		Header:     http.Header{},
+		Request:    request,
+	}, nil
+}
+
 func deployTestServer(jobs *recordingJobs, objects ...k8sruntime.Object) *Server {
+	clientset := k8sfake.NewClientset(objects...)
 	return &Server{
+		KubeClients: fakeKubeFactory(clientset),
+		HTTPDoer:    &stubHTTPDoer{status: http.StatusOK},
 		NewDeployStores: func(kube.ClientFactory, map[string]any) (*kube.CandidateStore, *kube.DeploymentRuntime, error) {
 			candidate, err := kube.NewCandidateFromClient(jobs)
 			if err != nil {
 				return nil, nil, err
 			}
-			runtime, err := kube.NewRuntimeFromClient(k8sfake.NewClientset(objects...))
+			runtime, err := kube.NewRuntimeFromClient(clientset)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -172,7 +201,7 @@ func TestDeployStabilizeAndHealthPassOnReadyRollout(t *testing.T) {
 	jobs := &recordingJobs{}
 	server := deployTestServer(jobs, deployReadyDeployment())
 	plan := deployTestPlan(t)
-	outputs := deployTestOutputs(t)
+	outputs := deployTestOutputsWithURL(t, "https://shop.example.com/")
 	if _, operr := server.DeployAppPhase(context.Background(), deployPhaseCall(sdk.DeployPhaseStabilize, plan, outputs, nil)); operr != nil {
 		t.Fatal(operr)
 	}
@@ -188,6 +217,33 @@ func TestDeployStabilizeAndHealthPassOnReadyRollout(t *testing.T) {
 		if !strings.Contains(script, want) {
 			t.Fatalf("probe command = %q, want %q", script, want)
 		}
+	}
+}
+
+func TestDeployHealthFailsOnBrokenServingPath(t *testing.T) {
+	t.Parallel()
+	jobs := &recordingJobs{}
+	server := deployTestServer(jobs, deployReadyDeployment())
+	server.HTTPDoer = &stubHTTPDoer{status: http.StatusBadGateway}
+	plan := deployTestPlan(t)
+	outputs := deployTestOutputsWithURL(t, "https://shop.example.com/")
+	_, operr := server.DeployAppPhase(context.Background(), deployPhaseCall(sdk.DeployPhaseHealth, plan, outputs, nil))
+	if operr == nil || !strings.Contains(operr.Message, "serving path unhealthy") {
+		t.Fatalf("operr = %+v, want serving-path failure", operr)
+	}
+	if len(jobs.created) != 0 {
+		t.Fatalf("probe ran despite broken serving path: %v", jobs.created)
+	}
+}
+
+func TestDeployHealthRefusesWithoutStorefront(t *testing.T) {
+	t.Parallel()
+	jobs := &recordingJobs{}
+	server := deployTestServer(jobs, deployReadyDeployment())
+	plan := deployTestPlan(t)
+	_, operr := server.DeployAppPhase(context.Background(), deployPhaseCall(sdk.DeployPhaseHealth, plan, deployTestOutputs(t), nil))
+	if operr == nil || !strings.Contains(operr.Message, "cannot be determined") {
+		t.Fatalf("operr = %+v, want storefront refusal", operr)
 	}
 }
 

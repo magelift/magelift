@@ -38,9 +38,11 @@ type ProbeRunner interface {
 }
 
 // ServiceHealth is a Deployment readiness snapshot for Stabilize/Health.
-// Generation, ObservedGeneration, UpdatedReplicas, and ImageDigest carry
+// Generation, ObservedGeneration, UpdatedReplicas, and Images carry
 // rollout identity: Health requires the intended revision, not merely
-// healthy replicas from any revision.
+// healthy replicas from any revision. ImageDigest is the first
+// container's image (legacy display); Images holds every served
+// container image and is what rollout identity compares.
 type ServiceHealth struct {
 	DesiredReplicas    int
 	ReadyReplicas      int
@@ -49,6 +51,7 @@ type ServiceHealth struct {
 	ObservedGeneration int64
 	UpdatedReplicas    int
 	ImageDigest        string
+	Images             []string
 }
 
 // RuntimeChecker reports Magento web Deployment health.
@@ -353,7 +356,7 @@ func WaitForIntendedRollout(ctx context.Context, outputs map[string]any, wantDig
 				"wait for kubernetes intended rollout: desired=%d ready=%d updated=%d generation=%d observed=%d available=%v digestMatch=%v",
 				health.DesiredReplicas, health.ReadyReplicas, health.UpdatedReplicas,
 				health.Generation, health.ObservedGeneration, health.Available,
-				health.ImageDigest == wantDigest,
+				allImagesMatch(health.Images, wantDigest),
 			)
 		case <-ticker.C:
 		}
@@ -366,7 +369,22 @@ func intendedRollout(health ServiceHealth, wantDigest string) bool {
 		health.UpdatedReplicas >= health.DesiredReplicas &&
 		health.Available &&
 		health.ObservedGeneration == health.Generation &&
-		health.ImageDigest == wantDigest
+		allImagesMatch(health.Images, wantDigest)
+}
+
+// allImagesMatch requires every served container image to equal the release
+// digest. A deployment whose first container matches but a sidecar lags is
+// not the intended revision.
+func allImagesMatch(images []string, wantDigest string) bool {
+	if len(images) == 0 {
+		return false
+	}
+	for _, image := range images {
+		if image != wantDigest {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Steps) Record(ctx context.Context, request deployflow.Request, result deployflow.Result) error {
@@ -516,8 +534,12 @@ func deploymentHealth(ctx context.Context, client kubernetes.Interface, namespac
 		}
 	}
 	served := ""
-	if containers := dep.Spec.Template.Spec.Containers; len(containers) > 0 {
-		served = containers[0].Image
+	var images []string
+	for _, container := range dep.Spec.Template.Spec.Containers {
+		images = append(images, container.Image)
+	}
+	if len(images) > 0 {
+		served = images[0]
 	}
 	return ServiceHealth{
 		DesiredReplicas:    desired,
@@ -527,5 +549,6 @@ func deploymentHealth(ctx context.Context, client kubernetes.Interface, namespac
 		ObservedGeneration: dep.Status.ObservedGeneration,
 		UpdatedReplicas:    int(dep.Status.UpdatedReplicas),
 		ImageDigest:        served,
+		Images:             images,
 	}, nil
 }
