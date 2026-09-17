@@ -24,7 +24,7 @@
   `GOWORK=off` SDK consumer plus provider resolve test under
   `tests/distribution/`, tag-then-require sequence documented) —
   verify: `go test ./tests/distribution/ -count=1`
-- [ ] 4.1 Trust docs (ADR 0014, install.md rewrite, pointers;
+- [x] 4.1 Trust docs (ADR 0014, install.md rewrite, pointers;
   humanizer plus marks) — verify: `make docs` green, prose
   passes recorded
 - [ ] 4.2 Full proof (root, SDK, provider, synthetic, harness,
