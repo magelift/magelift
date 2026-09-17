@@ -145,6 +145,8 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 		QueueMode:   spec.Catalog.QueueMode, QueueReplicas: spec.Catalog.QueueReplicas,
 		QueueImage:  spec.Catalog.RabbitMQImage,
 		MediaBucket: component.Storage.BucketName, MediaURL: component.Storage.MediaURL,
+		MediaHmacAccessID: component.Storage.HmacAccessID, MediaHmacSecret: component.Storage.HmacSecret,
+		MediaS3Prefix: storage.MediaPrefix,
 		EncryptionKey: encryptionKey,
 		SmtpHost:      spec.Email.Host, SmtpPort: spec.Email.Port, SmtpUsername: spec.Email.Username,
 		SmtpFrom: spec.Email.From, SmtpPassword: smtpPassword,

@@ -24,6 +24,9 @@ const (
 	TypeToken                       = "magelift:gcp:GKERuntime"
 	ApplicationPort                 = 8080
 	DefaultApplicationMemoryRequest = kube.DefaultApplicationMemoryRequest
+	// mediaS3Endpoint is the GCS S3-interop endpoint Magento's AwsS3
+	// driver talks to with the media HMAC credentials.
+	mediaS3Endpoint = "https://storage.googleapis.com"
 )
 
 type Args struct {
@@ -69,6 +72,9 @@ type Args struct {
 	QueueImage                  string
 	MediaBucket                 pulumi.StringInput
 	MediaURL                    pulumi.StringInput
+	MediaHmacAccessID           pulumi.StringInput
+	MediaHmacSecret             pulumi.StringInput
+	MediaS3Prefix               string
 	CPURequest                  string
 	MemoryRequest               string
 	DesiredWebReplicas          int
@@ -331,6 +337,17 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		smtpPasswordSecretName = kube.SmtpPasswordSecretName(name)
 		env = kube.AppendSmtpPasswordEnv(env, smtpPasswordSecretName)
 	}
+	mediaHmacSecretName := ""
+	var mediaHmacSecret pulumi.Resource
+	if args.MediaHmacSecret != nil {
+		var err error
+		mediaHmacSecret, err = kube.NewMediaHmacSecret(ctx, name, args.MediaHmacSecret, k8sOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("create media HMAC Secret: %w", err)
+		}
+		mediaHmacSecretName = kube.MediaHmacSecretName(name)
+		env = kube.AppendMediaHmacSecretEnv(env, mediaHmacSecretName)
+	}
 	queuePasswordSecretName := ""
 	var queuePasswordSecret pulumi.Resource
 	if args.QueueMode == "rabbitmq" {
@@ -360,6 +377,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	if smtpPasswordSecret != nil {
 		workloadOpts = append(workloadOpts, pulumi.DependsOn([]pulumi.Resource{smtpPasswordSecret}))
+	}
+	if mediaHmacSecret != nil {
+		workloadOpts = append(workloadOpts, pulumi.DependsOn([]pulumi.Resource{mediaHmacSecret}))
 	}
 
 	webContainers, err := kube.WebRuntimeContainers(args.WebRuntime, args.Image, env, args.CPURequest, args.MemoryRequest)
@@ -511,7 +531,11 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 	if mediaURL == nil {
 		mediaURL = pulumi.String("")
 	}
-	return pulumi.All(args.DatabaseWriter, args.CacheEndpoint, args.SessionEndpoint, searchEndpoint, queueHost, mediaBucket, mediaURL).ApplyT(func(values []interface{}) []corev1.EnvVar {
+	mediaHmacAccessID := args.MediaHmacAccessID
+	if mediaHmacAccessID == nil {
+		mediaHmacAccessID = pulumi.String("")
+	}
+	return pulumi.All(args.DatabaseWriter, args.CacheEndpoint, args.SessionEndpoint, searchEndpoint, queueHost, mediaBucket, mediaURL, mediaHmacAccessID).ApplyT(func(values []interface{}) []corev1.EnvVar {
 		session := values[2].(string)
 		if session == "" {
 			session = values[1].(string)
@@ -530,6 +554,10 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 			QueueUsername:      queueUser,
 			MediaBucket:        values[5].(string),
 			MediaURL:           values[6].(string),
+			MediaS3Key:         values[7].(string),
+			MediaS3Endpoint:    mediaS3Endpoint,
+			MediaS3Region:      args.Region,
+			MediaS3Prefix:      args.MediaS3Prefix,
 			Magento:            args.Magento,
 		}), args)
 		return kube.EnvVars(bindings)

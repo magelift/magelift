@@ -48,7 +48,14 @@ const (
 	EnvSearchEndpoint = "MAGELIFT_SEARCH_ENDPOINT"
 	EnvMediaBucket    = "MAGELIFT_MEDIA_BUCKET"
 	EnvMediaURL       = "MAGELIFT_MEDIA_URL"
-	EnvQueueMode      = "MAGELIFT_QUEUE_MODE"
+	// EnvMediaS3* feeds the PHP lifecycle remote-storage writer. The
+	// secret travels only via SecretKeyRef (MAGELIFT_MEDIA_S3_SECRET),
+	// never as a plain binding.
+	EnvMediaS3Key      = "MAGELIFT_MEDIA_S3_KEY"
+	EnvMediaS3Endpoint = "MAGELIFT_MEDIA_S3_ENDPOINT"
+	EnvMediaS3Region   = "MAGELIFT_MEDIA_S3_REGION"
+	EnvMediaS3Prefix   = "MAGELIFT_MEDIA_S3_PREFIX"
+	EnvQueueMode       = "MAGELIFT_QUEUE_MODE"
 
 	EnvMagentoSearchEngine      = "MAGENTO_DC_CATALOG__SEARCH__ENGINE"
 	EnvMagentoSearchHost        = "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME"
@@ -109,6 +116,10 @@ type CapabilityEndpoints struct {
 	QueueUsername      string
 	MediaBucket        string
 	MediaURL           string
+	MediaS3Key         string
+	MediaS3Endpoint    string
+	MediaS3Region      string
+	MediaS3Prefix      string
 	Magento            MagentoOverlays
 }
 
@@ -218,6 +229,18 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 	}
 	if endpoints.MediaURL != "" {
 		bindings = append(bindings, EnvBinding{Name: EnvMediaURL, Value: endpoints.MediaURL})
+	}
+	if endpoints.MediaS3Key != "" {
+		bindings = append(bindings, EnvBinding{Name: EnvMediaS3Key, Value: endpoints.MediaS3Key})
+	}
+	if endpoints.MediaS3Endpoint != "" {
+		bindings = append(bindings, EnvBinding{Name: EnvMediaS3Endpoint, Value: endpoints.MediaS3Endpoint})
+	}
+	if endpoints.MediaS3Region != "" {
+		bindings = append(bindings, EnvBinding{Name: EnvMediaS3Region, Value: endpoints.MediaS3Region})
+	}
+	if endpoints.MediaS3Prefix != "" {
+		bindings = append(bindings, EnvBinding{Name: EnvMediaS3Prefix, Value: endpoints.MediaS3Prefix})
 	}
 	override := ""
 	if endpoints.SearchEndpoint != "" {

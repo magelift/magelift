@@ -18,6 +18,7 @@ const (
 	encryptionKeySecretSuffix            = "-encryption-key"
 	queuePasswordSecretSuffix            = "-queue-password"
 	smtpPasswordSecretSuffix             = "-smtp-password"
+	mediaHmacSecretSuffix                = "-media-hmac"
 )
 
 // DatabaseCredentialsSecretName returns the stable Kubernetes Secret name used
@@ -48,6 +49,12 @@ func QueuePasswordSecretName(runtimeName string) string {
 // Magento SMTP relay workloads in a runtime namespace.
 func SmtpPasswordSecretName(runtimeName string) string {
 	return runtimeName + smtpPasswordSecretSuffix
+}
+
+// MediaHmacSecretName returns the stable Kubernetes Secret name holding the
+// media storage HMAC secret for Magento remote-storage workloads.
+func MediaHmacSecretName(runtimeName string) string {
+	return runtimeName + mediaHmacSecretSuffix
 }
 
 // NewDatabaseCredentialsSecret keeps the database password in Kubernetes
@@ -361,6 +368,51 @@ func AppendSmtpPasswordEnv(env pulumicorev1.EnvVarArrayOutput, secretName string
 			Name: "CONFIG__DEFAULT__SYSTEM__SMTP__PASSWORD",
 			ValueFrom: &pulumicorev1.EnvVarSource{
 				SecretKeyRef: &pulumicorev1.SecretKeySelector{Name: &secret, Key: "password"},
+			},
+		})
+		return result
+	}).(pulumicorev1.EnvVarArrayOutput)
+}
+
+// NewMediaHmacSecret keeps the media storage HMAC secret in Kubernetes.
+func NewMediaHmacSecret(
+	ctx *pulumi.Context,
+	runtimeName string,
+	secret pulumi.StringInput,
+	opts ...pulumi.ResourceOption,
+) (*pulumicorev1.Secret, error) {
+	if ctx == nil {
+		return nil, errors.New("Pulumi context is required")
+	}
+	if strings.TrimSpace(runtimeName) == "" {
+		return nil, errors.New("runtime name is required")
+	}
+	if secret == nil {
+		return nil, errors.New("media HMAC secret is required")
+	}
+	return pulumicorev1.NewSecret(ctx, runtimeName+"-media-hmac", &pulumicorev1.SecretArgs{
+		Metadata: &pulumimetav1.ObjectMetaArgs{
+			Name:        pulumi.String(MediaHmacSecretName(runtimeName)),
+			Annotations: SkipAwaitAnnotations(),
+		},
+		StringData: pulumi.StringMap{"secret": secret},
+		Type:       pulumi.String("Opaque"),
+	}, opts...)
+}
+
+// AppendMediaHmacSecretEnv adds the media HMAC secret SecretKeyRef to a
+// runtime environment output for the PHP lifecycle remote-storage writer.
+func AppendMediaHmacSecretEnv(env pulumicorev1.EnvVarArrayOutput, secretName string) pulumicorev1.EnvVarArrayOutput {
+	if strings.TrimSpace(secretName) == "" {
+		return env
+	}
+	return env.ApplyT(func(values []pulumicorev1.EnvVar) []pulumicorev1.EnvVar {
+		result := append([]pulumicorev1.EnvVar(nil), values...)
+		secret := secretName
+		result = append(result, pulumicorev1.EnvVar{
+			Name: "MAGELIFT_MEDIA_S3_SECRET",
+			ValueFrom: &pulumicorev1.EnvVarSource{
+				SecretKeyRef: &pulumicorev1.SecretKeySelector{Name: &secret, Key: "secret"},
 			},
 		})
 		return result
