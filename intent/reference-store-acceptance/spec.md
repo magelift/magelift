@@ -81,6 +81,18 @@ and actual monthly cost, recorded per pilot in a fixed
 table. The format is defined in the report; intake itself
 begins after the alpha tag.
 
+### R0 — First release reads as first version
+
+Nothing ever shipped, so nothing is version two. Before the RC
+tag, host-side pre-release numbering is renumbered to first
+version: lockfile schema 2 becomes 1, the `magelift-v2`
+protocol marker becomes `magelift-v1`, `DialV2` becomes the
+unversioned `Dial` (it is the only dial path). No migration
+and no compat shims: there are no users to migrate. Third-party
+versions (Go modules, toolchains, cloud APIs) and generic
+semver prose are untouched, as are historical records under
+`intent/archive/` and `docs/evidence/`.
+
 ## Design notes
 
 - Live account: the disposable GCP acceptance project,

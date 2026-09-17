@@ -118,17 +118,17 @@ func TestAsPluginError(t *testing.T) {
 	}
 }
 
-func TestDialV2RefusesBadBinary(t *testing.T) {
+func TestDialRefusesBadBinary(t *testing.T) {
 	t.Parallel()
-	if _, err := DialV2(context.Background(), "", DialOptions{}); err == nil {
+	if _, err := Dial(context.Background(), "", DialOptions{}); err == nil {
 		t.Fatal("empty binary was accepted")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := DialV2(ctx, "/bin/false", DialOptions{}); !errors.Is(err, context.Canceled) {
+	if _, err := Dial(ctx, "/bin/false", DialOptions{}); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled dial error = %v", err)
 	}
-	if _, err := DialV2(context.Background(), "/bin/false", DialOptions{}); err == nil {
+	if _, err := Dial(context.Background(), "/bin/false", DialOptions{}); err == nil {
 		t.Fatal("exiting binary was accepted")
 	}
 }
@@ -159,11 +159,11 @@ func v2ProviderBinary(t *testing.T) string {
 	return v2BinaryPath
 }
 
-func TestDialV2NegotiatesLivePlugin(t *testing.T) {
+func TestDialNegotiatesLivePlugin(t *testing.T) {
 	binary := v2ProviderBinary(t)
 	var logs bytes.Buffer
 	logger := hclog.New(&hclog.LoggerOptions{Level: hclog.Info, Output: &logs})
-	client, err := DialV2(context.Background(), binary, DialOptions{Logger: logger})
+	client, err := Dial(context.Background(), binary, DialOptions{Logger: logger})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,9 +192,9 @@ func TestDialV2NegotiatesLivePlugin(t *testing.T) {
 	}
 }
 
-func TestDialV2RefusesMissingOperation(t *testing.T) {
+func TestDialRefusesMissingOperation(t *testing.T) {
 	binary := v2ProviderBinary(t)
-	if _, err := DialV2(context.Background(), binary, DialOptions{Required: []sdk.Operation{"nope"}}); err == nil {
+	if _, err := Dial(context.Background(), binary, DialOptions{Required: []sdk.Operation{"nope"}}); err == nil {
 		t.Fatal("missing operation was accepted")
 	}
 }
@@ -236,7 +236,7 @@ func TestLazyClientPropagatesDialFailure(t *testing.T) {
 
 func TestStaticPreDialValuesMatchAdvertised(t *testing.T) {
 	binary := v2ProviderBinary(t)
-	client, err := DialV2(context.Background(), binary, DialOptions{})
+	client, err := Dial(context.Background(), binary, DialOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

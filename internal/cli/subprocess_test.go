@@ -83,7 +83,7 @@ func testLoaded() providerhost.Loaded {
 		Artifact: providerhost.Artifact{
 			Name:     "magelift-provider-gcp",
 			Version:  "0.1.0",
-			Protocol: "magelift-v2",
+			Protocol: "magelift-v1",
 			Digest:   "sha256:abc",
 		},
 	}

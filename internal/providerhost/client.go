@@ -126,12 +126,12 @@ type DialOptions struct {
 	Required []sdk.Operation
 }
 
-// DialV2 starts a verified v2 provider subprocess and negotiates the
+// Dial starts a verified provider subprocess and negotiates the
 // protocol: handshake transport compat, then Describe semantics (protocol
 // major plus required operations). Callers must verify the binary with
 // Load/VerifyLocal first. Every failure kills the subprocess; nothing
 // falls back.
-func DialV2(ctx context.Context, binaryPath string, opts DialOptions) (*Client, error) {
+func Dial(ctx context.Context, binaryPath string, opts DialOptions) (*Client, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}

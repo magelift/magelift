@@ -10,13 +10,11 @@ import (
 )
 
 const (
-	SchemaVersion = 2
+	SchemaVersion = 1
 	SDKAPIVersion = "v1"
-	// ProtocolV2Marker is the required per-entry protocol marker. Only
-	// v2 (typed net/rpc) providers load; schema 1 files are refused with
-	// a re-lock error (nothing versioned shipped pre-alpha, so no
-	// migration path is owed).
-	ProtocolV2Marker = "magelift-v2"
+	// ProtocolV1Marker is the required per-entry protocol marker. Only
+	// typed net/rpc providers load; anything else is refused.
+	ProtocolV1Marker = "magelift-v1"
 )
 
 var digestPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
@@ -67,7 +65,7 @@ func ParseLock(r io.Reader) (Lockfile, error) {
 		return Lockfile{}, fmt.Errorf("decode magelift.providers.lock: %w", err)
 	}
 	if lock.SchemaVersion != SchemaVersion {
-		return Lockfile{}, fmt.Errorf("%w: got %d (magelift.providers.lock schema 1 is no longer accepted; regenerate the lockfile with protocol %q entries)", ErrUnsupportedSchema, lock.SchemaVersion, ProtocolV2Marker)
+		return Lockfile{}, fmt.Errorf("%w: got %d, want %d (regenerate the lockfile with protocol %q entries)", ErrUnsupportedSchema, lock.SchemaVersion, SchemaVersion, ProtocolV1Marker)
 	}
 	if strings.TrimSpace(lock.SDKAPIVersion) != SDKAPIVersion {
 		return Lockfile{}, fmt.Errorf("%w: got %q", ErrUnsupportedAPI, lock.SDKAPIVersion)
@@ -98,8 +96,8 @@ func (a Artifact) validate() error {
 	if strings.TrimSpace(a.Version) == "" {
 		return errors.New("version is required")
 	}
-	if strings.TrimSpace(a.Protocol) != ProtocolV2Marker {
-		return fmt.Errorf("%w: got %q, want %q", ErrUnsupportedProtocol, a.Protocol, ProtocolV2Marker)
+	if strings.TrimSpace(a.Protocol) != ProtocolV1Marker {
+		return fmt.Errorf("%w: got %q, want %q", ErrUnsupportedProtocol, a.Protocol, ProtocolV1Marker)
 	}
 	if !digestPattern.MatchString(strings.TrimSpace(a.Digest)) {
 		if strings.TrimSpace(a.Digest) == "" {

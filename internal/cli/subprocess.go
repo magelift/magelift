@@ -54,7 +54,7 @@ func (o *options) defaultLoadProvider(ctx context.Context, provider string) (pro
 // session for closeProviderSessions. Callers defer closeProviderSessions
 // after newBackend returns.
 func (o *options) defaultDialProvider(ctx context.Context, binary string) (*providerhost.Client, error) {
-	client, err := providerhost.DialV2(ctx, binary, providerhost.DialOptions{})
+	client, err := providerhost.Dial(ctx, binary, providerhost.DialOptions{})
 	if err != nil {
 		return nil, err
 	}
