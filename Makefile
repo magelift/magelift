@@ -169,6 +169,9 @@ acceptance-dependencies-check: ## Verify jq/yq v4 and shared acceptance command 
 skills-test: ## Test bundled skill installation and verification
 	GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/skills
 
+installer-harness-test: ## Run the installer trust harness against local fixtures
+	bash scripts/install-verify-harness.sh
+
 extension-test: ## Build the public extension SDK contract with empty caches
 	./scripts/custom-extension-clean-room.sh
 
