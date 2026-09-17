@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+
+	"github.com/magelift/magelift/sdk"
 )
 
 const (
@@ -52,17 +54,9 @@ func NewMagentoOverlays(frontName, cookieDomain, unsecureBaseURL, secureBaseURL,
 
 // MagentoOverlays are portable Magento runtime values from magelift.yaml.
 // Adapters inject them through MAGENTO_DC_* / CONFIG__* and MAGENTO_DC__OVERRIDE.
-type MagentoOverlays struct {
-	FrontName        string
-	CookieDomain     string
-	UnsecureBaseURL  string
-	SecureBaseURL    string
-	CORSOrigins      []string
-	StorefrontOrigin string
-	ConsumersMode    string
-	ConsumerNames    []string
-	Variables        map[string]string
-}
+// MagentoOverlays is the SDK-governed Magento runtime contract. The struct
+// moved to the SDK so deploy inputs are versioned; behavior stays here.
+type MagentoOverlays = sdk.MagentoOverlays
 
 // MagentoOverlayEnv returns scalar Magento runtime contract bindings.
 func MagentoOverlayEnv(overlays MagentoOverlays) []EnvBinding {

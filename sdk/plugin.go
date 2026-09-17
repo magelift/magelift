@@ -39,6 +39,7 @@ var PluginMethods = map[Operation]string{
 	OpEdgeExecute:            "Plugin.EdgeExecute",
 	OpResiliencePlan:         "Plugin.ResiliencePlan",
 	OpResilienceExecute:      "Plugin.ResilienceExecute",
+	OpDeployAppPhase:         "Plugin.DeployAppPhase",
 }
 
 // PluginMethod returns the net/rpc method for an operation, failing closed

@@ -148,6 +148,9 @@ const (
 	OpEdgeExecute       Operation = "edge-execute"
 	OpResiliencePlan    Operation = "resilience-plan"
 	OpResilienceExecute Operation = "resilience-execute"
+	// DeployAppPhase executes one Magento deploy phase inside the
+	// provider (register, migrate, cleanup, stabilize, health).
+	OpDeployAppPhase Operation = "deploy-app-phase"
 )
 
 // OperationVersion advertises one operation name and version.
