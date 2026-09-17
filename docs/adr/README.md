@@ -20,3 +20,5 @@ Each ADR states context, decision, consequences, alternatives, and provenance.
 - [ADR 0010](0010-live-certification.md): No paid multi-cloud CI. Packed live certification with GCP as the thorough path.
 - [ADR 0011](0011-subprocess-dial-proof.md): Subprocess Dial proof for one adapter (GCP Autopilot); rest stay in-process.
 - [ADR 0012](0012-search-proof-shapes.md): Search proof shapes and AWS spend cap; live runs in Phase 2.
+- [ADR 0013](0013-provider-plugin-contract.md): Versioned typed operations protocol; nested provider modules; lockstep alpha.
+- [ADR 0014](0014-distribution-trust.md): One fail-closed trust policy for installer, updater, core load, and provider download.
