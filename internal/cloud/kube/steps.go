@@ -296,7 +296,7 @@ func (s *Steps) Health(ctx context.Context, request deployflow.Request) error {
 	if err != nil {
 		return err
 	}
-	command := platform.MagentoProbeShell(probeRequest.SearchEndpoint, probeRequest.SearchEndpoint != "")
+	command := platform.MagentoProbeShell(probeRequest.SearchEndpoint, probeRequest.SearchEndpoint != "", "")
 	return s.probe.RunProbe(ctx, probeRequest, command)
 }
 

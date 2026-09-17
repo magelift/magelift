@@ -1,6 +1,9 @@
 package platform
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 // Magento workload shell contracts. Cloud adapters pass these into ECS tasks /
 // GKE Jobs/Deployments; they must not invent alternate Magento CLI sequences.
@@ -38,15 +41,41 @@ func MagentoQueueArgs() []string {
 // meaningless against them) and for disabled search. All three legs are
 // non-interactive by nature, so no --no-interaction flag is set (an unknown
 // flag would fail the probe spuriously).
-func MagentoProbeShell(searchEndpoint string, checkReachability bool) []string {
+//
+// Search is proved through Magento's effective configuration, not just a
+// reachable server: the configured search host must equal the expected
+// endpoint's host, and the configured engine must equal expectedEngine
+// when provided (empty keeps the legacy nonempty check). A reachable
+// server with wrong Magento configuration fails the probe.
+func MagentoProbeShell(searchEndpoint string, checkReachability bool, expectedEngine string) []string {
 	script := "bin/magento setup:db:status"
 	if strings.TrimSpace(searchEndpoint) != "" {
 		script += " && test -n \"$(bin/magento config:show catalog/search/engine)\""
+		host := probeSearchHost(searchEndpoint)
+		script += " && test \"$(bin/magento config:show catalog/search/opensearch_server_hostname)\" = '" + shellQuote(host) + "'"
+		if strings.TrimSpace(expectedEngine) != "" {
+			script += " && test \"$(bin/magento config:show catalog/search/engine)\" = '" + shellQuote(strings.TrimSpace(expectedEngine)) + "'"
+		}
 		if checkReachability {
-			script += " && curl -fsS --max-time 10 '" + strings.ReplaceAll(searchEndpoint, "'", "'\\''") + "' -o /dev/null"
+			script += " && curl -fsS --max-time 10 '" + shellQuote(searchEndpoint) + "' -o /dev/null"
 		}
 	}
 	return []string{"/bin/sh", "-ec", script}
+}
+
+// probeSearchHost extracts the hostname Magento must be configured with.
+// Unparseable endpoints compare literally so exotic-but-consistent setups
+// keep working while garbage fails against real configuration.
+func probeSearchHost(endpoint string) string {
+	trimmed := strings.TrimSpace(endpoint)
+	if parsed, err := url.Parse(trimmed); err == nil && parsed.Hostname() != "" {
+		return parsed.Hostname()
+	}
+	return trimmed
+}
+
+func shellQuote(value string) string {
+	return strings.ReplaceAll(value, "'", "'\\''")
 }
 
 // MagentoQueueArgsFor starts the named Magento consumers, or Magento's default async worker.

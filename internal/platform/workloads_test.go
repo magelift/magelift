@@ -33,7 +33,7 @@ func TestMagentoMigrationShellMatchesPHPDeploySequence(t *testing.T) {
 }
 
 func TestMagentoProbeShellAlwaysChecksDatabaseStatus(t *testing.T) {
-	joined := strings.Join(MagentoProbeShell("", false), " ")
+	joined := strings.Join(MagentoProbeShell("", false, ""), " ")
 	if !strings.Contains(joined, "setup:db:status") {
 		t.Fatalf("probe shell = %q, want setup:db:status", joined)
 	}
@@ -43,17 +43,36 @@ func TestMagentoProbeShellAlwaysChecksDatabaseStatus(t *testing.T) {
 }
 
 func TestMagentoProbeShellSearchLegs(t *testing.T) {
-	withReachability := strings.Join(MagentoProbeShell("https://search.internal:9200", true), " ")
+	withReachability := strings.Join(MagentoProbeShell("https://search.internal:9200", true, ""), " ")
 	for _, want := range []string{"config:show catalog/search/engine", "curl -fsS", "https://search.internal:9200"} {
 		if !strings.Contains(withReachability, want) {
 			t.Errorf("reachable probe = %q, want %q", withReachability, want)
 		}
 	}
-	wiringOnly := strings.Join(MagentoProbeShell("https://search.internal:443", false), " ")
+	wiringOnly := strings.Join(MagentoProbeShell("https://search.internal:443", false, ""), " ")
 	if !strings.Contains(wiringOnly, "config:show catalog/search/engine") {
 		t.Errorf("wiring-only probe = %q, want the wiring check", wiringOnly)
 	}
 	if strings.Contains(wiringOnly, "curl -fsS") {
 		t.Errorf("wiring-only probe = %q, want no unsigned reachability leg", wiringOnly)
+	}
+}
+
+func TestMagentoProbeShellAssertsEffectiveSearchConfig(t *testing.T) {
+	joined := strings.Join(MagentoProbeShell("https://search.internal:9200", false, "opensearch"), " ")
+	for _, want := range []string{
+		`test "$(bin/magento config:show catalog/search/opensearch_server_hostname)" = 'search.internal'`,
+		`test "$(bin/magento config:show catalog/search/engine)" = 'opensearch'`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("probe = %q, want %q", joined, want)
+		}
+	}
+	unscoped := strings.Join(MagentoProbeShell("https://search.internal:9200", false, ""), " ")
+	if !strings.Contains(unscoped, "opensearch_server_hostname") {
+		t.Errorf("probe = %q, want host assertion without engine scope", unscoped)
+	}
+	if strings.Count(unscoped, "catalog/search/engine") != 1 {
+		t.Errorf("probe = %q, want engine check without engine assertion", unscoped)
 	}
 }

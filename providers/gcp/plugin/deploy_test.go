@@ -20,10 +20,15 @@ import (
 type recordingJobs struct {
 	created []string
 	deleted []string
+	jobs    map[string]*batchv1.Job
 }
 
 func (f *recordingJobs) CreateJob(_ context.Context, _ string, job *batchv1.Job) (string, error) {
 	f.created = append(f.created, job.Name)
+	if f.jobs == nil {
+		f.jobs = map[string]*batchv1.Job{}
+	}
+	f.jobs[job.Name] = job
 	return job.Name, nil
 }
 
@@ -52,6 +57,7 @@ func deployTestOutputs(t *testing.T) []byte {
 		"clusterName": "shop-cluster", "serviceName": "shop-web",
 		"databaseWriter": "10.0.0.1", "cacheEndpoint": "10.0.0.2:6379",
 		"databaseSecretName": "db-secret", "encryptionKeySecretName": "crypt-secret",
+		"searchEndpoint": "http://search.internal:9200",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +67,9 @@ func deployTestOutputs(t *testing.T) []byte {
 
 func deployTestPlan(t *testing.T) sdk.StoredPlan {
 	t.Helper()
-	plan := storedTestPlan(t, testSpec())
+	spec := testSpec()
+	spec.Catalog.SearchMode = "opensearch"
+	plan := storedTestPlan(t, spec)
 	inputs, err := json.Marshal(deployTestInputs())
 	if err != nil {
 		t.Fatal(err)
@@ -173,6 +181,13 @@ func TestDeployStabilizeAndHealthPassOnReadyRollout(t *testing.T) {
 	}
 	if len(jobs.created) != 1 {
 		t.Fatalf("probe jobs = %v", jobs.created)
+	}
+	probe := jobs.jobs[jobs.created[0]]
+	script := strings.Join(probe.Spec.Template.Spec.Containers[0].Command, " ")
+	for _, want := range []string{"opensearch_server_hostname", "= 'opensearch'"} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("probe command = %q, want %q", script, want)
+		}
 	}
 }
 
