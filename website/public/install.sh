@@ -1,12 +1,22 @@
 #!/bin/sh
-# MageLift installer: downloads the latest release, verifies its SHA-256
-# checksum against the signed checksums.txt, and installs the binary.
+# MageLift installer: downloads the release, verifies the Sigstore bundle on
+# checksums.txt plus the archive SHA-256, and installs the binary. Cosign is
+# bootstrapped from a pinned release below, so no signing tooling is needed.
+#
+# Pin rotation: when the release workflow moves cosign-release, update
+# COSIGN_VERSION together with every COSIGN_PIN below from
+# https://github.com/sigstore/cosign/releases/download/<version>/cosign_checksums.txt
+# (cosign-<os>-<arch> lines). Never bump one without the other.
+#
 # Usage: curl -fsSL https://magelift.dev/install.sh | sh
 # Optional: MAGELIFT_INSTALL_DIR=/custom/bin MAGELIFT_VERSION=v1.2.3 sh
+# Test-only overrides: MAGELIFT_RELEASE_BASE, MAGELIFT_COSIGN_BASE,
+# MAGELIFT_COSIGN_VERSION, MAGELIFT_COSIGN_PIN.
 set -eu
 
 REPO="magelift/magelift"
 BIN="magelift"
+COSIGN_VERSION="${MAGELIFT_COSIGN_VERSION:-v3.1.3}"
 
 fail() {
   printf 'install: %s\n' "$1" >&2
@@ -45,7 +55,21 @@ fi
 
 VERSION="${TAG#v}"
 ARCHIVE="${BIN}_${VERSION}_${OS}_${ARCH}.tar.gz"
-BASE="https://github.com/$REPO/releases/download/$TAG"
+BASE="${MAGELIFT_RELEASE_BASE:-https://github.com/$REPO/releases/download/$TAG}"
+
+# Bootstrap pins: expected SHA-256 of the cosign release binary per
+# platform. Overridable only for the installer harness (fixture cosign).
+if [ "${MAGELIFT_COSIGN_PIN:-}" ]; then
+  COSIGN_PIN="$MAGELIFT_COSIGN_PIN"
+else
+  case "$OS/$ARCH" in
+    linux/amd64) COSIGN_PIN="4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71" ;;
+    linux/arm64) COSIGN_PIN="c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a" ;;
+    darwin/amd64) COSIGN_PIN="2347488e5d5b25336644024dfeca5601b190e91197a71a917bda44744aff106c" ;;
+    darwin/arm64) COSIGN_PIN="5cf948c2f4dfe59687bdd0b8523709067383e03982cc543475c8a7dc70e92a76" ;;
+    *) fail "unsupported platform '$OS/$ARCH' for the cosign bootstrap" ;;
+  esac
+fi
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT INT TERM
@@ -54,30 +78,40 @@ printf 'Downloading %s (%s/%s)\n' "$TAG" "$OS" "$ARCH"
 curl -fsSL -o "$TMP/$ARCHIVE" "$BASE/$ARCHIVE" || fail "download failed: $BASE/$ARCHIVE"
 curl -fsSL -o "$TMP/checksums.txt" "$BASE/checksums.txt" || fail "download failed: checksums.txt"
 
-# SHA-256 verification is not optional: abort when no verifier exists.
+# SHA-256 is not optional: abort when no verifier exists.
 if command -v sha256sum >/dev/null 2>&1; then
-  (cd "$TMP" && grep " $ARCHIVE\$" checksums.txt | sha256sum -c - >/dev/null) \
-    || fail "checksum verification failed for $ARCHIVE"
+  sha256_file() { sha256sum "$1" | cut -d' ' -f1; }
+  sha256_check() { (cd "$TMP" && grep " $ARCHIVE\$" checksums.txt | sha256sum -c - >/dev/null); }
 elif command -v shasum >/dev/null 2>&1; then
-  (cd "$TMP" && grep " $ARCHIVE\$" checksums.txt | shasum -a 256 -c - >/dev/null) \
-    || fail "checksum verification failed for $ARCHIVE"
+  sha256_file() { shasum -a 256 "$1" | cut -d' ' -f1; }
+  sha256_check() { (cd "$TMP" && grep " $ARCHIVE\$" checksums.txt | shasum -a 256 -c - >/dev/null); }
 else
   fail "no sha256sum or shasum available; refusing to install unverified bits"
 fi
 
-# Stronger provenance check when cosign is on the machine: the checksum file
-# itself was signed keylessly by the release workflow.
-if command -v cosign >/dev/null 2>&1; then
-  if curl -fsSL -o "$TMP/checksums.txt.sigstore.json" "$BASE/checksums.txt.sigstore.json"; then
-    cosign verify-blob \
-      --bundle "$TMP/checksums.txt.sigstore.json" \
-      --certificate-identity "https://github.com/$REPO/.github/workflows/release.yml@refs/tags/$TAG" \
-      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-      "$TMP/checksums.txt" >/dev/null \
-      && printf 'Sigstore bundle verified (release.yml @ %s)\n' "$TAG" \
-      || fail "sigstore verification failed for checksums.txt"
-  fi
+# Bootstrap cosign from the pinned release, then require the Sigstore bundle
+# on checksums.txt. Every step fails closed: a missing or mismatched
+# bootstrap, bundle, or signature aborts the install.
+COSIGN_BASE="${MAGELIFT_COSIGN_BASE:-https://github.com/sigstore/cosign/releases/download}"
+COSIGN_FILE="cosign-$OS-$ARCH"
+curl -fsSL -o "$TMP/$COSIGN_FILE" "$COSIGN_BASE/$COSIGN_VERSION/$COSIGN_FILE" \
+  || fail "download failed: cosign $COSIGN_VERSION for $OS/$ARCH"
+if [ "$(sha256_file "$TMP/$COSIGN_FILE")" != "$COSIGN_PIN" ]; then
+  fail "cosign bootstrap checksum mismatch (expected pinned $COSIGN_VERSION)"
 fi
+chmod +x "$TMP/$COSIGN_FILE"
+
+curl -fsSL -o "$TMP/checksums.txt.sigstore.json" "$BASE/checksums.txt.sigstore.json" \
+  || fail "download failed: checksums.txt.sigstore.json (bundle is required)"
+"$TMP/$COSIGN_FILE" verify-blob \
+  --bundle "$TMP/checksums.txt.sigstore.json" \
+  --certificate-identity "https://github.com/$REPO/.github/workflows/release.yml@refs/tags/$TAG" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  "$TMP/checksums.txt" >/dev/null \
+  || fail "sigstore verification failed for checksums.txt"
+printf 'Sigstore bundle verified (release.yml @ %s)\n' "$TAG"
+
+sha256_check || fail "checksum verification failed for $ARCHIVE"
 
 tar -xzf "$TMP/$ARCHIVE" -C "$TMP" "$BIN" || fail "archive did not contain $BIN"
 

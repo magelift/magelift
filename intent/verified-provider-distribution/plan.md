@@ -8,7 +8,7 @@
 - [x] 1.2 Updater recovery (same-dir backup, version self-check,
   restore on failure, stale-backup replace) — verify:
   `go test ./internal/upgrade/ -count=1`
-- [ ] 2.1 Installer fail-closed rewrite plus harness
+- [x] 2.1 Installer fail-closed rewrite plus harness
   (pinned cosign bootstrap, mandatory bundle, fixture-server
   success/tamper/missing tests) — verify: harness green,
   `shellcheck` clean on the touched scripts
