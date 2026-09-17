@@ -18,10 +18,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/magelift/magelift/internal/cosign"
 )
@@ -50,7 +52,18 @@ type Client struct {
 	goos       string
 	goarch     string
 	verifier   blobVerifier
+	// selfCheck runs the installed binary after the swap; nil uses the
+	// default `version` execution. Tests stub it to avoid executing
+	// fixture bytes.
+	selfCheck func(context.Context, string) error
 }
+
+// backupSuffix names the previous binary kept beside the executable until
+// the replacement proves it runs. Same directory, so the swap and any
+// restore stay on one filesystem.
+const backupSuffix = ".prev"
+
+const selfCheckTimeout = 30 * time.Second
 
 type Release struct {
 	TagName string  `json:"tag_name"`
@@ -183,8 +196,67 @@ func (c *Client) Install(ctx context.Context, release Release, executable string
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close upgrade file: %w", err)
 	}
-	if err := os.Rename(temporaryName, executable); err != nil {
-		return fmt.Errorf("replace current executable: %w", err)
+	backup := executable + backupSuffix
+	// A stale backup from a killed run is replaced, never executed.
+	if err := os.Remove(backup); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("clear stale upgrade backup: %w", err)
+	}
+	_, statErr := os.Stat(executable)
+	switch {
+	case statErr == nil:
+		if err := os.Rename(executable, backup); err != nil {
+			return fmt.Errorf("back up current executable: %w", err)
+		}
+		if err := os.Rename(temporaryName, executable); err != nil {
+			if restoreErr := os.Rename(backup, executable); restoreErr != nil {
+				return fmt.Errorf("replace current executable: %v (restore also failed: %v; previous binary kept at %s)", err, restoreErr, backup)
+			}
+			return fmt.Errorf("replace current executable: %w", err)
+		}
+	case os.IsNotExist(statErr):
+		// Fresh install: no previous binary to keep.
+		backup = ""
+		if err := os.Rename(temporaryName, executable); err != nil {
+			return fmt.Errorf("replace current executable: %w", err)
+		}
+	default:
+		return fmt.Errorf("stat current executable: %w", statErr)
+	}
+	if err := c.checkInstalled(ctx, executable); err != nil {
+		if backup == "" {
+			os.Remove(executable)
+			return fmt.Errorf("new binary failed its self-check: %w", err)
+		}
+		if restoreErr := os.Rename(backup, executable); restoreErr != nil {
+			return fmt.Errorf("new binary failed its self-check: %v (restore also failed: %v; previous binary kept at %s)", err, restoreErr, backup)
+		}
+		return fmt.Errorf("new binary failed its self-check, previous version restored: %w", err)
+	}
+	// The upgrade succeeded; a leftover backup is inert litter the next
+	// run replaces. Never fail a good install over its cleanup.
+	if backup != "" {
+		_ = os.Remove(backup)
+	}
+	return nil
+}
+
+func (c *Client) checkInstalled(ctx context.Context, executable string) error {
+	check := defaultSelfCheck
+	if c != nil && c.selfCheck != nil {
+		check = c.selfCheck
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, selfCheckTimeout)
+	defer cancel()
+	return check(ctx, executable)
+}
+
+func defaultSelfCheck(ctx context.Context, executable string) error {
+	command := exec.CommandContext(ctx, executable, "version")
+	if output, err := command.CombinedOutput(); err != nil {
+		return fmt.Errorf("run %s version: %v: %s", executable, err, strings.TrimSpace(string(output)))
 	}
 	return nil
 }
