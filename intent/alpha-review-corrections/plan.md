@@ -18,7 +18,7 @@
 - [x] 1.3 Crash-safe updater (R11: copy backup, injectable
   transitions, fault tests, Windows note) — verify:
   `go test ./internal/upgrade/ -count=1`
-- [x] 2.1 Provider boundary (R05: execution into plugin,
+- [ ] 2.1 Provider boundary (reopened: second review finding 9; reconcile, partial) (R05: execution into plugin,
   SDK contracts, provider-local helpers, alpha registry
   scoping, ADR reconcile, leanness gate) — verify:
   `go list -deps` clean both ways, full suites green
@@ -31,11 +31,11 @@
 - [x] 2.4 Real publication mechanics (R06: coherent fixtures,
   full provider compile `GOWORK=off` against synthetic
   modules) — verify: distribution suite green
-- [x] 2.5 Require-bump plus real verification (R06: bump
+- [ ] 2.5 Require-bump plus real verification (reopened: second review finding 4; rc.3) (R06: bump
   requires to rc.2 after tagging, record proxy sums,
   verify `GOWORK=off` root plus provider builds) — needs
   rc.2 tags; runs with the rc.2 release
-- [x] 3.1 Media reality (R03: GCS mechanism, provider
+- [ ] 3.1 Media reality (reopened: second review findings 2, 3, 5) (R03: GCS mechanism, provider
   media ops, key continuity; live-verified or changed)
   — verify: unit suites green, live proof in order 8
 - [x] 3.2 Serving health (R04: serving-path probe,
@@ -44,10 +44,10 @@
 - [x] 3.3 Lifecycle authority (R08: PHP-emitted sequence,
   golden plus regen target, scope docs) — verify:
   golden test green, phpunit green if php present
-- [x] 4.1 CI coverage (R09: module jobs, filters, cache
+- [ ] 4.1 CI coverage (reopened: second review finding 8 plus gate latest-attempt) (R09: module jobs, filters, cache
   keys, promotion gate on checks) — verify: actionlint,
   gate-script failure demo
-- [x] 4.2 Onboarding truth (R12: shipped-path rewrite,
+- [ ] 4.2 Onboarding truth (reopened: second review finding 10) (R12: shipped-path rewrite,
   ADC, mail recipient; recipe fixture pending loop
   evidence) — verify: docs green, humanizer plus marks
 - [ ] 5.1 Amendments plus gates (dated report notes,

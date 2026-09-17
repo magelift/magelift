@@ -200,3 +200,71 @@ func TestProvidersInstallRegistersFlags(t *testing.T) {
 		t.Errorf("providers install must not accept --provider (YAML-driven)")
 	}
 }
+
+func TestProvidersInstallBootstrapsFromReleaseShapedVersion(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	binDir := t.TempDir()
+	binary := filepath.Join(binDir, "magelift-provider-aws")
+	if err := os.WriteFile(binary, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	previous := Version
+	Version = "0.1.0-alpha.1-rc.2"
+	t.Cleanup(func() { Version = previous })
+
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
+	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/cache/cosign", nil }
+	o.fetchProviderLock = func(_ context.Context, version string) (providerhost.Lockfile, error) {
+		if version != "v0.1.0-alpha.1-rc.2" {
+			t.Fatalf("version = %q", version)
+		}
+		return providerhost.ParseLock(strings.NewReader(providersTestLock))
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"bootstrapped": true`) {
+		t.Fatalf("output lacks bootstrap flag: %s", out.String())
+	}
+}
+
+func TestProvidersInstallRefusesToReplaceInvalidLock(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(dir, "magelift.providers.lock")
+	if err := os.WriteFile(lockPath, []byte("{bogus"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.fetchProviderLock = func(_ context.Context, _ string) (providerhost.Lockfile, error) {
+		t.Fatal("bootstrap must not run over an invalid lock")
+		return providerhost.Lockfile{}, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "providers", "install"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("install succeeded over an invalid lock")
+	}
+	contents, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "{bogus" {
+		t.Fatalf("invalid lock was replaced: %q", contents)
+	}
+}

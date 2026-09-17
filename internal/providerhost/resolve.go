@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+// ErrNoLockfile marks lock auto-discovery that found no lockfile
+// anywhere. Callers bootstrap only on this error: an existing lock
+// that fails to parse or verify must fail closed, never be replaced.
+var ErrNoLockfile = errors.New("no magelift.providers.lock in the project or beside the CLI")
+
 // ResolveOptions selects how a provider artifact is located. All
 // production loaders (registry, backend, hooks) resolve through this one
 // function so installation and execution never disagree.
@@ -18,7 +23,8 @@ type ResolveOptions struct {
 	// LockPath forces one lockfile. Empty auto-discovers:
 	// ./magelift.providers.lock, then beside the CLI.
 	LockPath string
-	// CacheDir overrides the user cache. Empty uses the default.
+	// CacheDir overrides the user cache. Empty honors
+	// MAGELIFT_PROVIDER_CACHE_DIR, else the default.
 	CacheDir string
 }
 
@@ -38,11 +44,11 @@ type Resolved struct {
 	Cached bool
 }
 
-// Resolve locates the lockfile and binary for a provider. Beside-CLI
-// locks load beside-CLI binaries (shipped or dev bundles); project and
-// explicit locks load the locked version from the cache. A missing
-// binary names providers install; verification failures stay loud at
-// Load time.
+// Resolve locates the lockfile and binary for a provider. Binary order
+// is beside-CLI, then versioned cache: `providers install` downloads
+// into the cache, so a beside-CLI lock with no beside-CLI binary still
+// loads the installed artifact. A missing binary names providers
+// install; verification failures stay loud at Load time.
 func Resolve(provider string, opts ResolveOptions) (Resolved, error) {
 	id := strings.TrimSpace(provider)
 	if id == "" {
@@ -56,19 +62,21 @@ func Resolve(provider string, opts ResolveOptions) (Resolved, error) {
 	if err != nil {
 		return Resolved{}, err
 	}
+	cacheDir, err := EffectiveCacheDir(opts.CacheDir)
+	if err != nil {
+		return Resolved{}, err
+	}
 	if besideCLI {
 		paths := DiscoverArtifactPaths(opts.ExecutablePath, id)
-		if !fileExists(paths.Binary) {
-			return Resolved{}, fmt.Errorf("provider %q is not installed beside the CLI: run `magelift providers install` to download the locked version", id)
+		if fileExists(paths.Binary) {
+			return Resolved{LockPath: lockPath, Lock: lock, Artifact: artifact, Binary: paths.Binary}, nil
 		}
-		return Resolved{LockPath: lockPath, Lock: lock, Artifact: artifact, Binary: paths.Binary}, nil
-	}
-	cacheDir := opts.CacheDir
-	if strings.TrimSpace(cacheDir) == "" {
-		cacheDir, err = DefaultCacheDir()
-		if err != nil {
-			return Resolved{}, err
+		if binary, bundle, err := ResolveCached(lockPath, id, cacheDir); err == nil {
+			return Resolved{LockPath: lockPath, Lock: lock, Artifact: artifact, Binary: binary, Bundle: bundle, Cached: true}, nil
+		} else if !errors.Is(err, ErrCacheMiss) {
+			return Resolved{}, fmt.Errorf("cached provider %q is unusable: %w (run `magelift providers install` to repair it)", id, err)
 		}
+		return Resolved{}, fmt.Errorf("provider %q is not installed beside the CLI or in the cache: run `magelift providers install` to download the locked version", id)
 	}
 	binary, bundle, err := ResolveCached(lockPath, id, cacheDir)
 	if err != nil {
@@ -81,7 +89,9 @@ func Resolve(provider string, opts ResolveOptions) (Resolved, error) {
 }
 
 // ResolveLock locates and parses the lockfile without resolving a binary.
-// Callers that install (rather than load) use it directly.
+// Callers that install (rather than load) use it directly. Absence wraps
+// ErrNoLockfile; any existing lock that cannot be read, parsed, or
+// trusted returns its own error so callers fail closed.
 func ResolveLock(opts ResolveOptions) (string, Lockfile, bool, error) {
 	if trimmed := strings.TrimSpace(opts.LockPath); trimmed != "" {
 		lock, err := openLock(trimmed)
@@ -96,15 +106,23 @@ func ResolveLock(opts ResolveOptions) (string, Lockfile, bool, error) {
 			return "", Lockfile{}, false, err
 		}
 		return "magelift.providers.lock", lock, false, nil
+	} else if !os.IsNotExist(err) {
+		return "", Lockfile{}, false, fmt.Errorf("stat magelift.providers.lock: %w", err)
 	}
 	dir := "."
 	if strings.TrimSpace(opts.ExecutablePath) != "" {
 		dir = filepath.Dir(opts.ExecutablePath)
 	}
 	beside := filepath.Join(dir, "magelift.providers.lock")
+	if _, err := os.Stat(beside); err != nil {
+		if !os.IsNotExist(err) {
+			return "", Lockfile{}, false, fmt.Errorf("stat %s: %w", beside, err)
+		}
+		return "", Lockfile{}, false, fmt.Errorf("%w: run `magelift providers install` to bootstrap one", ErrNoLockfile)
+	}
 	lock, err := openLock(beside)
 	if err != nil {
-		return "", Lockfile{}, false, fmt.Errorf("no magelift.providers.lock in the project or beside the CLI: run `magelift providers install` to bootstrap one: %v", err)
+		return "", Lockfile{}, false, err
 	}
 	return beside, lock, true, nil
 }

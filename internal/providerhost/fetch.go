@@ -31,14 +31,36 @@ func ValidReleaseTag(version string) bool {
 	return releaseTagPattern.MatchString(strings.TrimSpace(version))
 }
 
+// bareVersionPattern accepts the GoReleaser {{ .Version }} form: the
+// release version without its leading v (the embedded CLI Version has
+// this shape). Normalization only restores the prefix; nothing else is
+// guessed.
+var bareVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
+
+// NormalizeReleaseTag converts an embedded or user-supplied version into
+// the release tag that names its artifacts. Branch names, mutable names,
+// and anything else stay errors.
+func NormalizeReleaseTag(version string) (string, error) {
+	trimmed := strings.TrimSpace(version)
+	if ValidReleaseTag(trimmed) {
+		return trimmed, nil
+	}
+	if bareVersionPattern.MatchString(trimmed) {
+		return "v" + trimmed, nil
+	}
+	return "", fmt.Errorf("version %q is not a release tag", version)
+}
+
 // FetchLock downloads the platform lockfile for a release version.
 // baseURL defaults to the first-party release base; tests override it.
 // The pinned-publisher rule in ParseLock authenticates the metadata:
 // a lockfile naming any other publisher is refused.
 func FetchLock(ctx context.Context, version, baseURL string, client *http.Client) (Lockfile, error) {
-	if !ValidReleaseTag(version) {
-		return Lockfile{}, fmt.Errorf("provider lockfile version %q is not a release tag", version)
+	tag, err := NormalizeReleaseTag(version)
+	if err != nil {
+		return Lockfile{}, fmt.Errorf("provider lockfile version: %w", err)
 	}
+	version = tag
 	if ctx == nil {
 		ctx = context.Background()
 	}

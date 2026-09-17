@@ -3,6 +3,7 @@ package providerhost
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,5 +142,97 @@ func TestResolveRejectsForeignPublisher(t *testing.T) {
 	}
 	if _, err := Resolve("gcp", ResolveOptions{CacheDir: t.TempDir()}); err == nil {
 		t.Fatal("foreign publisher was accepted")
+	}
+}
+
+func TestResolveLockAbsenceWrapsErrNoLockfile(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	binDir := t.TempDir()
+
+	_, _, _, err := ResolveLock(ResolveOptions{ExecutablePath: filepath.Join(binDir, "magelift")})
+	if err == nil || !errors.Is(err, ErrNoLockfile) {
+		t.Fatalf("ResolveLock error = %v, want ErrNoLockfile", err)
+	}
+}
+
+func TestResolveLockMalformedProjectLockFailsClosed(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.WriteFile(filepath.Join(dir, "magelift.providers.lock"), []byte("{bogus"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, _, err := ResolveLock(ResolveOptions{})
+	if err == nil || errors.Is(err, ErrNoLockfile) {
+		t.Fatalf("ResolveLock error = %v, want a non-absence error", err)
+	}
+}
+
+func TestResolveLockUnreadableProjectLockFailsClosed(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	path := filepath.Join(dir, "magelift.providers.lock")
+	if err := os.WriteFile(path, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+
+	_, _, _, err := ResolveLock(ResolveOptions{})
+	if err == nil || errors.Is(err, ErrNoLockfile) {
+		t.Fatalf("ResolveLock error = %v, want a non-absence error", err)
+	}
+}
+
+func TestResolveLockMalformedBesideCLILockFailsClosed(t *testing.T) {
+	project := t.TempDir()
+	t.Chdir(project)
+	binDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(binDir, "magelift.providers.lock"), []byte("{bogus"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, _, err := ResolveLock(ResolveOptions{ExecutablePath: filepath.Join(binDir, "magelift")})
+	if err == nil || errors.Is(err, ErrNoLockfile) {
+		t.Fatalf("ResolveLock error = %v, want a non-absence error", err)
+	}
+}
+
+func TestResolveBesideCLILockFallsBackToCache(t *testing.T) {
+	project := t.TempDir()
+	t.Chdir(project)
+	binDir := t.TempDir()
+	cache := t.TempDir()
+	resolveTestLock(t, binDir, "v9", func() string {
+		digest, _ := resolveTestCache(t, cache, "v9", []byte("installed-binary"))
+		return digest
+	}())
+
+	resolved, err := Resolve("gcp", ResolveOptions{ExecutablePath: filepath.Join(binDir, "magelift"), CacheDir: cache})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if !resolved.Cached || !strings.HasPrefix(resolved.Binary, cache) {
+		t.Fatalf("resolved = %+v, want the cached install", resolved)
+	}
+}
+
+func TestResolveHonorsProviderCacheEnv(t *testing.T) {
+	project := t.TempDir()
+	t.Chdir(project)
+	cache := t.TempDir()
+	t.Setenv("MAGELIFT_PROVIDER_CACHE_DIR", cache)
+	digest, binary := resolveTestCache(t, cache, "v9", []byte("env-cached-binary"))
+	resolveTestLock(t, project, "v9", digest)
+
+	resolved, err := Resolve("gcp", ResolveOptions{})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if !resolved.Cached || resolved.Binary != binary {
+		t.Fatalf("resolved = %+v, want cached %q", resolved, binary)
 	}
 }
