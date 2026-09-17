@@ -1,13 +1,16 @@
 name: Release Container Images
 
-# Stable semver tags only (no hyphen prerelease). A 12x multi-arch RC
+# Stable semver tags only (no hyphen prerelease). The trigger excludes
+# RC tags before any run exists (last matching pattern wins); the job
+# `if` below repeats the rule as defense-in-depth. A 12x multi-arch RC
 # matrix costs ~750 job-minutes per attempt, so RC images stay manual:
-# to publish an RC image matrix, temporarily drop the job `if` or retag
-# without '-'.
+# to publish an RC image matrix, temporarily drop the exclusion or
+# retag without '-'.
 on:
   push:
-    # `sdk/v*` module tags never match: `v*` anchors at the start of the ref name.
-    tags: ['v*']
+    # `sdk/v*` module tags never match: `v*` anchors at the start of
+    # the ref name. Any tag containing `-` (`-rc`, `-alpha`) is out.
+    tags: ['v*', '!*-*']
 
 concurrency:
   group: release-images-${{ github.ref }}
