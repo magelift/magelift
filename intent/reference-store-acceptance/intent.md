@@ -1,6 +1,12 @@
 ---
-status: draft
+status: accepted
 slug: reference-store-acceptance
+accepted: 2026-09-17
+acceptance: defaults adopted (alpha recipe equals the Order-6
+  preview preset pins; structured pilot intake in the spec;
+  expiry scheduler specified with the provider and proved live);
+  live GCP runs load magelift-certify with destroy on exit;
+  no tag pushed here (go/no-go plus tag command only)
 ---
 # Intent: reference-store acceptance (prove the shipped path, then tag alpha)
 
