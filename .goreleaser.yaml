@@ -18,9 +18,12 @@ builds:
       - -s
       - -w
       - -X github.com/magelift/magelift/internal/cli.Version={{ .Version }}
-  # v1 subprocess proof: one provider binary, same matrix as the CLI, same
-  # version. The artifact version equals the CLI version (single-version v1).
+  # Autonomous provider: built from its nested module (providers/gcp owns
+  # its go.mod), same matrix as the CLI, same lockstep version for alpha.
+  # The binary reports its version via Describe; keep the main.Version
+  # ldflag or releases ship as v0.0.0-dev.
   - id: magelift-provider-gcp
+    dir: providers/gcp
     main: ./cmd/magelift-provider-gcp
     binary: magelift-provider-gcp
     goos: [linux, darwin, windows]
@@ -30,6 +33,7 @@ builds:
     ldflags:
       - -s
       - -w
+      - -X main.Version={{ .Version }}
 
 archives:
   - id: cli

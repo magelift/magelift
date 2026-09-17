@@ -19,6 +19,7 @@ builds:
       - -w
       - -X github.com/magelift/magelift/internal/cli.Version={{ .Version }}
   - id: magelift-provider-gcp
+    dir: providers/gcp
     main: ./cmd/magelift-provider-gcp
     binary: magelift-provider-gcp
     goos: [linux]
@@ -28,6 +29,7 @@ builds:
     ldflags:
       - -s
       - -w
+      - -X main.Version={{ .Version }}
 
 archives:
   - id: cli

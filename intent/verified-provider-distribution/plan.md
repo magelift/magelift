@@ -16,7 +16,7 @@
   verify-blob plus checksum in validate/build/ENV jobs, drop
   install-only setup-go; update `ci_test.go` expectations) —
   verify: `go test ./internal/cli/ -run TestCI -count=1`
-- [ ] 3.1 Release pipeline ships the sequence (GoReleaser nested
+- [x] 3.1 Release pipeline ships the sequence (GoReleaser nested
   provider main, Go lockfile generator plus unit tests,
   release.yml wiring, smoke green) — verify:
   `make release-smoke` green, generator tests green
