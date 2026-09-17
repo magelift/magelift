@@ -12,6 +12,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"gopkg.in/yaml.v3"
 
+	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/config"
 	deployflow "github.com/magelift/magelift/internal/deploy"
@@ -393,11 +394,11 @@ func (p *ShimPlanned) WithLiveQueueReplicas(replicas int) (platform.PlannedStack
 	return p.module.replan(context.Background(), next)
 }
 
-// ShimOps runs Magento deploy steps core-side from published deploy inputs.
+// ShimOps orchestrates Magento deploys core-side while the provider executes
+// every application phase. Stored deploy inputs pass through as opaque
+// bytes; core behavior never depends on provider internals.
 type ShimOps struct {
 	client        *Client
-	NewCandidate  func(context.Context, kube.Backend) (kube.CandidateRunner, error)
-	NewRuntime    func(context.Context, kube.Backend) (kube.RuntimeChecker, error)
 	RecordRelease func(context.Context, deployflow.Request, deployflow.Result) error
 }
 
@@ -442,7 +443,7 @@ func (o ShimOps) AcquireLock(ctx context.Context, planned platform.PlannedStack)
 	}, nil
 }
 
-func (o ShimOps) NewDeploySteps(ctx context.Context, backend any, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
+func (o ShimOps) NewDeploySteps(_ context.Context, backend any, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
 	shim, ok := AsShimPlanned(planned)
 	if !ok {
 		return nil, fmt.Errorf("GCP ops received unexpected planned type %T", planned)
@@ -451,29 +452,169 @@ func (o ShimOps) NewDeploySteps(ctx context.Context, backend any, planned platfo
 	if !ok {
 		return nil, fmt.Errorf("GCP deploy steps require an infrastructure backend with outputs, got %T", backend)
 	}
-	var deploySpec kube.DeploySpec
-	if err := json.Unmarshal(shim.stored.DeployInputsJSON, &deploySpec); err != nil {
-		return nil, fmt.Errorf("decode GCP deploy inputs: %w", err)
+	if o.client == nil {
+		return nil, errors.New("provider client is required")
 	}
-	newCandidate := o.NewCandidate
-	if newCandidate == nil {
-		newCandidate = func(context.Context, kube.Backend) (kube.CandidateRunner, error) {
-			return kube.NewCandidateFromFactory(kube.ClientFromOutputs), nil
+	if diagnostics == nil {
+		diagnostics = io.Discard
+	}
+	return &shimDeploySteps{
+		client:      o.client,
+		backend:     typed,
+		envelope:    shim.inputs.envelope,
+		stored:      shim.stored,
+		diagnostics: diagnostics,
+		record:      o.RecordRelease,
+	}, nil
+}
+
+// shimDeploySteps implements deployflow.Steps for plugin-backed stacks.
+// Infrastructure methods drive the Pulumi backend; application phases RPC
+// to the provider, which decodes its own stored inputs and executes. The
+// opaque candidate handle crosses back and forth; core never interprets it.
+type shimDeploySteps struct {
+	client      *Client
+	backend     kube.Backend
+	envelope    sdk.Envelope
+	stored      sdk.StoredPlan
+	diagnostics io.Writer
+	record      func(context.Context, deployflow.Request, deployflow.Result) error
+	state       []byte
+}
+
+var _ deployflow.Steps = (*shimDeploySteps)(nil)
+
+func (s *shimDeploySteps) Validate(_ context.Context, request deployflow.Request) error {
+	if s == nil || s.backend == nil {
+		return errors.New("GCP deployment steps are required")
+	}
+	if err := sdk.ValidateTargetDescriptor(request.Target); err != nil {
+		return err
+	}
+	if request.ImageDigest != s.stored.ImageDigest {
+		return fmt.Errorf("deployment digest %q does not match the planned artifact", request.ImageDigest)
+	}
+	return nil
+}
+
+func (s *shimDeploySteps) Preview(ctx context.Context, request deployflow.Request) (automation.ChangeSummary, error) {
+	return automation.NewRunner(s.backend, s.diagnostics).Preview(ctx, automation.Request{Target: request.Target, Preview: request.Preview})
+}
+
+func (s *shimDeploySteps) RegisterCandidate(ctx context.Context, request deployflow.Request) error {
+	outputs, err := s.backend.Outputs(ctx)
+	if err != nil {
+		return fmt.Errorf("read deployment outputs: %w", err)
+	}
+	// Greenfield stacks have no cluster yet. Create infrastructure first.
+	if _, err := platform.RequireStringOutput(outputs, platform.OutputClusterName); err != nil {
+		if _, updateErr := s.UpdateServices(ctx, request); updateErr != nil {
+			return fmt.Errorf("create initial infrastructure: %w", updateErr)
+		}
+		outputs, err = s.backend.Outputs(ctx)
+		if err != nil {
+			return fmt.Errorf("read deployment outputs after initial create: %w", err)
 		}
 	}
-	newRuntime := o.NewRuntime
-	if newRuntime == nil {
-		newRuntime = func(_ context.Context, b kube.Backend) (kube.RuntimeChecker, error) {
-			return kube.NewRuntimeFromFactory(b, kube.ClientFromOutputs)
-		}
+	encoded, err := json.Marshal(outputs)
+	if err != nil {
+		return fmt.Errorf("encode deployment outputs: %w", err)
 	}
-	candidate, err := newCandidate(ctx, typed)
+	resp, err := Call[sdk.DeployAppPhaseCall, sdk.DeployAppPhaseResult](ctx, s.client, sdk.OpDeployAppPhase, &sdk.DeployAppPhaseCall{
+		ProtocolVersion: sdk.ProtocolV1, Envelope: s.envelope, Plan: s.stored,
+		Phase: sdk.DeployPhaseRegister, ImageDigest: request.ImageDigest, OutputsJSON: encoded,
+	})
+	if err != nil {
+		return err
+	}
+	if resp.Error != nil {
+		return AsPluginError(sdk.OpDeployAppPhase, resp.Error)
+	}
+	s.state = resp.StateJSON
+	s.report(resp.Message)
+	return nil
+}
+
+func (s *shimDeploySteps) RunMigrations(ctx context.Context, request deployflow.Request) error {
+	if len(s.state) == 0 {
+		return errors.New("deployment candidate has not been registered")
+	}
+	resp, err := s.phase(ctx, sdk.DeployPhaseMigrate, request)
+	if err != nil {
+		return err
+	}
+	s.state = nil
+	s.report(resp.Message)
+	return nil
+}
+
+func (s *shimDeploySteps) CleanupCandidate(ctx context.Context, request deployflow.Request) error {
+	if len(s.state) == 0 {
+		return nil
+	}
+	resp, err := s.phase(ctx, sdk.DeployPhaseCleanup, request)
+	if err != nil {
+		return err
+	}
+	s.state = nil
+	s.report(resp.Message)
+	return nil
+}
+
+func (s *shimDeploySteps) UpdateServices(ctx context.Context, request deployflow.Request) (automation.ChangeSummary, error) {
+	return automation.NewRunner(s.backend, s.diagnostics).Update(ctx, automation.Request{Target: request.Target, Preview: request.Preview})
+}
+
+func (s *shimDeploySteps) Stabilize(ctx context.Context, request deployflow.Request) error {
+	resp, err := s.phase(ctx, sdk.DeployPhaseStabilize, request)
+	if err != nil {
+		return err
+	}
+	s.report(resp.Message)
+	return nil
+}
+
+func (s *shimDeploySteps) Health(ctx context.Context, request deployflow.Request) error {
+	resp, err := s.phase(ctx, sdk.DeployPhaseHealth, request)
+	if err != nil {
+		return err
+	}
+	s.report(resp.Message)
+	return nil
+}
+
+func (s *shimDeploySteps) Record(ctx context.Context, request deployflow.Request, result deployflow.Result) error {
+	if s.record == nil {
+		return nil
+	}
+	return s.record(ctx, request, result)
+}
+
+func (s *shimDeploySteps) phase(ctx context.Context, phase sdk.DeployAppPhase, request deployflow.Request) (*sdk.DeployAppPhaseResult, error) {
+	outputs, err := s.backend.Outputs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read deployment outputs: %w", err)
+	}
+	encoded, err := json.Marshal(outputs)
+	if err != nil {
+		return nil, fmt.Errorf("encode deployment outputs: %w", err)
+	}
+	resp, err := Call[sdk.DeployAppPhaseCall, sdk.DeployAppPhaseResult](ctx, s.client, sdk.OpDeployAppPhase, &sdk.DeployAppPhaseCall{
+		ProtocolVersion: sdk.ProtocolV1, Envelope: s.envelope, Plan: s.stored,
+		Phase: phase, ImageDigest: request.ImageDigest, OutputsJSON: encoded, StateJSON: s.state,
+	})
 	if err != nil {
 		return nil, err
 	}
-	runtime, err := newRuntime(ctx, typed)
-	if err != nil {
-		return nil, err
+	if resp.Error != nil {
+		return nil, AsPluginError(sdk.OpDeployAppPhase, resp.Error)
 	}
-	return kube.New(typed, deploySpec, candidate, runtime, diagnostics, o.RecordRelease)
+	return resp, nil
+}
+
+func (s *shimDeploySteps) report(message string) {
+	if s == nil || s.diagnostics == nil || strings.TrimSpace(message) == "" {
+		return
+	}
+	fmt.Fprintln(s.diagnostics, message)
 }

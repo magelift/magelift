@@ -75,13 +75,18 @@ func DefaultTimeouts() map[sdk.Operation]Timeout {
 		sdk.OpEdgeExecute:            mutation,
 		sdk.OpResiliencePlan:         {Duration: 2 * time.Minute, RetryableOnTimeout: true},
 		sdk.OpResilienceExecute:      mutation,
+		sdk.OpDeployAppPhase:         {Duration: 45 * time.Minute},
 	}
 }
 
-// Server implements the 29 plugin operations. Nil seam fields select
+// Server implements the 30 plugin operations. Nil seam fields select
 // production wiring; tests inject fakes.
 type Server struct {
 	Version string
+
+	// NewDeployStores builds the candidate and runtime stores for deploy
+	// phases. Nil builds production stores from the client factory.
+	NewDeployStores func(factory kube.ClientFactory, outputs map[string]any) (*kube.CandidateStore, *kube.DeploymentRuntime, error)
 
 	Admission stackRegionAdmission
 	Bootstrap gcpops.Bootstrap

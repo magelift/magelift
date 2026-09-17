@@ -46,7 +46,7 @@ func (p *RPCPlugin) Client(*plugin.MuxBroker, *rpc.Client) (any, error) {
 	return nil, nil
 }
 
-// RPCServer exposes the 29 operations over net/rpc. Every method validates
+// RPCServer exposes the 30 operations over net/rpc. Every method validates
 // the protocol version, enforces the per-operation timeout, and reports
 // failures as typed in-band errors: a non-nil rpc return means transport
 // breakage, never an operation failure.
@@ -461,5 +461,15 @@ func (s *RPCServer) ResilienceExecute(req *sdk.ResilienceExecuteCall, resp *sdk.
 	}
 	return dispatch(s, sdk.OpResilienceExecute, version, resp, func(ctx context.Context) (*sdk.ResilienceExecuteResult, *sdk.OperationError) {
 		return s.server().ResilienceExecute(ctx, req)
+	})
+}
+
+func (s *RPCServer) DeployAppPhase(req *sdk.DeployAppPhaseCall, resp *sdk.DeployAppPhaseResult) error {
+	version := ""
+	if req != nil {
+		version = req.ProtocolVersion
+	}
+	return dispatch(s, sdk.OpDeployAppPhase, version, resp, func(ctx context.Context) (*sdk.DeployAppPhaseResult, *sdk.OperationError) {
+		return s.server().DeployAppPhase(ctx, req)
 	})
 }

@@ -12,9 +12,14 @@ import (
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/config"
+	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/sdk"
 )
+
+func deployRequestForTest(digest string) deployflow.Request {
+	return deployflow.Request{Target: sdk.TargetDescriptor{ID: "gcp.gke-autopilot", Provider: "gcp", Runtime: "gke-autopilot"}, ImageDigest: digest}
+}
 
 func shimTestConfig() config.Config {
 	return config.Config{
@@ -302,11 +307,75 @@ func TestShimOpsDeploySteps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := steps.(*kube.Steps); !ok {
+	if _, ok := steps.(*shimDeploySteps); !ok {
 		t.Fatalf("steps = %T", steps)
 	}
 	if _, err := module.Ops().NewDeploySteps(context.Background(), struct{}{}, planned, io.Discard); err == nil || !strings.Contains(err.Error(), "backend with outputs") {
 		t.Fatalf("wrong backend error = %v", err)
+	}
+}
+
+func TestShimDeployStepsDrivePluginPhases(t *testing.T) {
+	t.Parallel()
+	deployInputs, err := json.Marshal(sdk.DeployInputs{ImageDigest: "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64), DatabaseName: "magento", Region: "europe-west1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := cannedStoredPlan()
+	stored.DeployInputsJSON = deployInputs
+	var phases []string
+	caller := &stubCaller{respond: func(method string, reply any) error {
+		switch method {
+		case "Plugin.Plan":
+			*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: stored}
+			return nil
+		case "Plugin.DeployAppPhase":
+			phases = append(phases, "phase")
+			*(reply.(*sdk.DeployAppPhaseResult)) = sdk.DeployAppPhaseResult{StateJSON: []byte(`{"candidate":true}`), Message: "ok"}
+			return nil
+		default:
+			return errors.New("unexpected method " + method)
+		}
+	}}
+	module := shimTestModule(t, caller)
+	planned, err := module.Plan(shimTestConfig(), "staging", platform.PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &stubKubeBackend{outputs: map[string]any{"clusterName": "c"}}
+	steps, err := module.Ops().NewDeploySteps(context.Background(), backend, planned, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := deployRequestForTest(stored.ImageDigest)
+	if err := steps.RegisterCandidate(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if err := steps.RunMigrations(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if err := steps.Stabilize(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if err := steps.Health(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if len(phases) != 4 {
+		t.Fatalf("phase calls = %d, want 4", len(phases))
+	}
+	// Stored inputs pass through undecoded: corrupt bytes still build
+	// steps (the plugin validates at execution).
+	stored.DeployInputsJSON = []byte(`{invalid`)
+	caller.respond = func(method string, reply any) error {
+		*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: stored}
+		return nil
+	}
+	replanned, err := module.Plan(shimTestConfig(), "staging", platform.PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := module.Ops().NewDeploySteps(context.Background(), backend, replanned, io.Discard); err != nil {
+		t.Fatalf("opaque inputs refused: %v", err)
 	}
 }
 
