@@ -121,6 +121,13 @@ cache after checksum and signature verification, and persists
 the pinned verifier so later commands need no signing tooling.
 The first run with no lockfile bootstraps the CLI's release
 version into a reviewable `magelift.providers.lock`.
+Review and commit it: builds refuse uncommitted trees,
+and the lock is part of the reviewable project state.
+
+```sh
+git add magelift.providers.lock magelift.yaml
+git commit -m "Pin the provider release"
+```
 
 ### 5. Bootstrap
 

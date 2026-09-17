@@ -94,7 +94,8 @@ narrowed only where noted with reasoning.
   plugin (new typed ops); core stops decoding provider
   deploy inputs into kube types. Needed operation contracts
   go in the SDK with schemas, not Go-type-name comments.
-- Provider drops root-`internal` imports; minimal helpers
+- DEFERRED to `aws-provider-parity` (hard prerequisite):
+  provider drops root-`internal` imports; minimal helpers
   become provider-local (duplication consciously chosen
   over coupling for one provider; a versioned support
   module stays a noted future option).

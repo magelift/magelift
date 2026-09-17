@@ -76,9 +76,11 @@ for run in runs:
     name = run.get("name", "")
     if name not in wanted:
         continue
-    # Latest attempt wins: a rerun in progress supersedes an older
-    # success. Order by start time, then run id.
-    key = (run.get("started_at") or "", run.get("id") or 0)
+    # Latest attempt wins: reruns get new check-run ids, so the
+    # highest id is the newest attempt. Timestamps cannot serve:
+    # a queued rerun has no start time yet and would sort before
+    # the older success it supersedes.
+    key = run.get("id") or 0
     if name not in latest or key >= latest[name][0]:
         latest[name] = (key, run)
 
