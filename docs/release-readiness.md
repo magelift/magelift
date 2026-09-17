@@ -166,12 +166,32 @@ maintainer owns winget/Scoop if demand appears.
 ### Local packaging smoke
 
 Run `./scripts/release-smoke-local.sh` or `make release-smoke` for a host-only
-check (`goreleaser build --single-target --parallelism=1`, `GOMAXPROCS=1`,
-`GOFLAGS=-p=1`). Do not use a full multi-platform `goreleaser release` as a local
-smoke; that matrix belongs on CI.
+check (snapshot release on the dialproof config, signing and SBOM skipped,
+`GOMAXPROCS=1`, `GOFLAGS=-p=1`). It asserts the CLI archive, the provider
+binary, and the provider checksums entry. Do not use a full multi-platform
+`goreleaser release` as a local smoke; that matrix belongs on CI.
+
+### Tag sequence (module tags before the release tag)
+
+Tags stay ask-first. When the release is approved:
+
+1. Prove the mechanics: `go test ./tests/distribution/ -count=1`,
+   `make release-smoke`, `make installer-harness-test` green.
+2. Push module tags first: `sdk/vX.Y.Z`, then
+   `providers/gcp/vX.Y.Z`. Wait for proxy propagation and confirm
+   `GOWORK=off GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org go list -m github.com/magelift/magelift/sdk@vX.Y.Z`
+   (and the provider path) resolve.
+3. Push `vX.Y.Z` last. It triggers `release.yml`, which builds,
+   signs, and publishes the CLI archives, provider binaries,
+   bundles, and lockfiles.
+4. Tag-then-require: bump root and provider `go.mod` files to the
+   tagged SDK version, run `go mod tidy` (it fails pre-tag by
+   design: unpublished modules have no resolvable versions),
+   and re-run the distribution proof against the real versions.
 
 ### Packaging smoke record
 
+- 2026-09-17: `make release-smoke` exit 0 (snapshot release on the dialproof config; asserts CLI archive, provider binary, provider checksums entry)
 - 2026-09-15: `make release-smoke` exit 0 (serial single-target host build; asserts `magelift` plus `magelift-provider-gcp` in `dist/`)
 - 2026-09-13: `make release-smoke` exit 0 (serial single-target host build; asserts `magelift` plus `magelift-provider-gcp` in `dist/`)
 - 2026-07-28: `make release-smoke` exit 0 (serial single-target host build, ~159s)
