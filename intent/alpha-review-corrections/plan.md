@@ -25,7 +25,7 @@
   default, exec path, production-constructor tests,
   stale-bearer assertions) — verify: plugin plus kube
   suites green
-- [ ] 2.3 Timeout policy (R10: reclassify by effect,
+- [x] 2.3 Timeout policy (R10: reclassify by effect,
   assert all mutations) — verify: plugin suite green
 - [ ] 2.4 Real publication (R06: coherent fixtures, full
   provider compile `GOWORK=off`, require-bump to rc.1)

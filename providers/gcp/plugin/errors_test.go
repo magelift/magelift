@@ -103,10 +103,33 @@ func TestDefaultTimeoutsCoverAllOperations(t *testing.T) {
 			t.Errorf("operation %q has no timeout", operation)
 		}
 	}
-	if timeouts[sdk.OpApply].RetryableOnTimeout || timeouts[sdk.OpDestroy].RetryableOnTimeout {
-		t.Error("mutations must not be retryable on timeout")
+	mutations := []sdk.Operation{
+		sdk.OpApply, sdk.OpDestroy, sdk.OpDestroyLeftoverBackups,
+		sdk.OpBootstrapEnsure,
+		sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpStateBackup, sdk.OpStateRestore,
+		sdk.OpSecretSet, sdk.OpSecretRemove,
+		sdk.OpDelete, sdk.OpEdgeExecute, sdk.OpResilienceExecute,
+		sdk.OpDeployAppPhase,
 	}
-	if !timeouts[sdk.OpOutputs].RetryableOnTimeout || !timeouts[sdk.OpPlan].RetryableOnTimeout {
-		t.Error("reads must be retryable on timeout")
+	for _, operation := range mutations {
+		if timeouts[operation].RetryableOnTimeout {
+			t.Errorf("mutation %q is retryable on timeout", operation)
+		}
+	}
+	reads := []sdk.Operation{
+		sdk.OpDescribe, sdk.OpValidateConfig, sdk.OpPlan, sdk.OpPreview, sdk.OpOutputs,
+		sdk.OpBootstrapVerify, sdk.OpStateStatus,
+		sdk.OpSecretList, sdk.OpSecretRead,
+		sdk.OpTailLogs, sdk.OpCheckRuntime, sdk.OpPrepareExec, sdk.OpPrepareTunnel,
+		sdk.OpCostInputs, sdk.OpInventory,
+		sdk.OpEdgePlan, sdk.OpResiliencePlan,
+	}
+	for _, operation := range reads {
+		if !timeouts[operation].RetryableOnTimeout {
+			t.Errorf("read %q is not retryable on timeout", operation)
+		}
+	}
+	if len(mutations)+len(reads) != len(sdk.PluginMethods) {
+		t.Errorf("classified %d of %d operations; every op needs an effect class", len(mutations)+len(reads), len(sdk.PluginMethods))
 	}
 }
