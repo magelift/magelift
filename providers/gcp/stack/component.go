@@ -143,10 +143,10 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 		SearchMode: spec.Catalog.SearchMode, SearchReplicas: spec.Catalog.SearchReplicas,
 		SearchImage: spec.Catalog.OpenSearchImage,
 		QueueMode:   spec.Catalog.QueueMode, QueueReplicas: spec.Catalog.QueueReplicas,
-		QueueImage:  spec.Catalog.RabbitMQImage,
-		MediaBucket: component.Storage.BucketName, MediaURL: component.Storage.MediaURL,
+		QueueImage:        spec.Catalog.RabbitMQImage,
+		MediaBucket:       component.Storage.BucketName,
 		MediaHmacAccessID: component.Storage.HmacAccessID, MediaHmacSecret: component.Storage.HmacSecret,
-		MediaS3Prefix: storage.MediaPrefix,
+		MediaS3Prefix: "",
 		EncryptionKey: encryptionKey,
 		SmtpHost:      spec.Email.Host, SmtpPort: spec.Email.Port, SmtpUsername: spec.Email.Username,
 		SmtpFrom: spec.Email.From, SmtpPassword: smtpPassword,
@@ -231,6 +231,21 @@ func resolveSmtpPassword(ctx *pulumi.Context, name string, email EmailSelection,
 	return pulumi.ToSecret(password).(pulumi.StringOutput), nil
 }
 
+// mediaAppURL is the storefront media base operators verify delivery
+// through. Image URLs stay app-relative and materialize via get.php;
+// the bucket itself is private and never addressed directly.
+func mediaAppURL(domain string) pulumi.StringOutput {
+	return pulumi.String(mediaAppURLValue(domain)).ToStringOutput()
+}
+
+func mediaAppURLValue(domain string) string {
+	trimmed := strings.TrimSpace(domain)
+	if trimmed == "" {
+		return ""
+	}
+	return "https://" + trimmed + "/media/"
+}
+
 func (c *Component) Outputs() pulumi.Map {
 	applicationURL := c.Runtime.ApplicationURL
 	if c.Edge.NativeEdgeEnabled {
@@ -249,7 +264,7 @@ func (c *Component) Outputs() pulumi.Map {
 		platform.OutputDatabaseSecretName:      c.Runtime.DatabaseSecretName,
 		platform.OutputEncryptionKeySecretName: c.Runtime.EncryptionKeySecretName,
 		platform.OutputQueuePasswordSecretName: c.Runtime.QueuePasswordSecretName,
-		"mediaURL":                             c.Storage.MediaURL,
+		platform.OutputMediaURL:                mediaAppURL(c.Edge.DomainName),
 		"mediaBucket":                          c.Storage.BucketName,
 		"searchEndpoint":                       c.Runtime.SearchEndpoint,
 		"queueMode":                            c.Runtime.QueueMode,

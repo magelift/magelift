@@ -37,3 +37,17 @@ func TestServiceAccountIDIsValid(t *testing.T) {
 		}
 	}
 }
+
+func TestMediaObjectKeyFollowsMagentoURIMapping(t *testing.T) {
+	t.Parallel()
+	// Pinned to magento/magento2 2.4.9: the remote_storage root prefix
+	// stays empty and Magento appends the MEDIA directory URI ("media")
+	// below it, so media-relative paths map under media/ while
+	// VAR_IMPORT_EXPORT lands at the sibling import_export/ subtree.
+	if MediaPrefix != "media/" {
+		t.Fatalf("MediaPrefix = %q, want the Magento MEDIA URI", MediaPrefix)
+	}
+	if got := MediaObjectKey("catalog/product/a.jpg"); got != "media/catalog/product/a.jpg" {
+		t.Fatalf("MediaObjectKey = %q", got)
+	}
+}

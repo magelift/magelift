@@ -16,7 +16,7 @@ final class RuntimeEnvTemplateTest extends TestCase
         $env = require dirname(__DIR__, 3) . '/images/php-nginx/env.php';
 
         self::assertSame('#env(MAGENTO_DC_MEDIA__DRIVER, "file")', $env['remote_storage']['driver']);
-        self::assertSame('#env(MAGENTO_DC_MEDIA__PREFIX, "media/")', $env['remote_storage']['prefix']);
+        self::assertSame('#env(MAGENTO_DC_MEDIA__PREFIX, "")', $env['remote_storage']['prefix']);
         self::assertSame('#env(MAGENTO_DC_MEDIA__BUCKET, "")', $env['remote_storage']['config']['bucket']);
         self::assertSame('#env(MAGENTO_DC_MEDIA__REGION, "")', $env['remote_storage']['config']['region']);
         self::assertSame(

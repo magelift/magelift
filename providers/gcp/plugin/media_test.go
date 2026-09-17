@@ -16,6 +16,9 @@ import (
 type fakeObjectStore struct {
 	objects map[string][]byte
 	uploads map[string][]byte
+	// onUpload runs before the upload is recorded. Tests use it to
+	// mutate the source tree mid-traversal.
+	onUpload func(object string)
 }
 
 func (f *fakeObjectStore) List(_ context.Context, _ string, prefix string) ([]string, error) {
@@ -49,6 +52,9 @@ func (f *fakeObjectStore) Download(_ context.Context, _ string, object, root, na
 func (f *fakeObjectStore) Upload(_ context.Context, _ string, object string, src *os.File) (int64, error) {
 	if src == nil {
 		return 0, fmt.Errorf("no open file")
+	}
+	if f.onUpload != nil {
+		f.onUpload(object)
 	}
 	body, err := io.ReadAll(src)
 	if err != nil {
@@ -298,5 +304,58 @@ func TestMediaImportAcceptsDottedNames(t *testing.T) {
 	}
 	if result.FileCount != 1 || string(store.uploads["media/photo..jpg"]) != "dots" {
 		t.Fatalf("result = %+v uploads = %#v", result, store.uploads)
+	}
+}
+
+func TestMediaImportRejectsParentSwapDuringTraversal(t *testing.T) {
+	t.Parallel()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src := t.TempDir()
+	if err := os.WriteFile(filepath.Join(src, "a-first.txt"), []byte("first"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// WalkDir visits lexically: a-first.txt uploads (triggering the
+	// swap) before z-later is traversed.
+	later := filepath.Join(src, "z-later")
+	if err := os.Mkdir(later, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(later, "inner.txt"), []byte("inner"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store := &fakeObjectStore{}
+	swapped := false
+	store.onUpload = func(object string) {
+		if swapped || object != "media/a-first.txt" {
+			return
+		}
+		swapped = true
+		if err := os.RemoveAll(later); err != nil {
+			t.Errorf("swap setup: %v", err)
+			return
+		}
+		if err := os.Symlink(outside, later); err != nil {
+			t.Errorf("swap setup: %v", err)
+		}
+	}
+	server := &Server{NewMediaStore: func() objectStore { return store }}
+	envelope, plan := planCall(testEnvelope(), storedTestPlan(t, testSpec()))
+	_, operr := server.MediaImport(context.Background(), &sdk.MediaTransferCall{
+		ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan,
+		OutputsJSON: mediaTestOutputs(t), LocalDir: src,
+	})
+	if !swapped {
+		t.Fatal("swap hook never ran")
+	}
+	if operr == nil {
+		t.Fatal("import accepted an outside file after parent-directory swap")
+	}
+	for object, body := range store.uploads {
+		if string(body) == "secret" {
+			t.Fatalf("outside file uploaded as %q", object)
+		}
 	}
 }

@@ -125,9 +125,12 @@ return [
     // a selected driver with empty bucket or credentials still fails
     // closed in the driver factory. Markers use MAGENTO_DC_* names:
     // the application image build rejects anything else here.
+    // The root prefix stays empty: Magento appends each directory URI
+    // below it (media/ for MEDIA, import_export/ for VAR_IMPORT_EXPORT),
+    // so the media subtree the CLI manages is exactly media/.
     'remote_storage' => [
         'driver' => '#env(MAGENTO_DC_MEDIA__DRIVER, "file")',
-        'prefix' => '#env(MAGENTO_DC_MEDIA__PREFIX, "media/")',
+        'prefix' => '#env(MAGENTO_DC_MEDIA__PREFIX, "")',
         'config' => [
             'bucket' => '#env(MAGENTO_DC_MEDIA__BUCKET, "")',
             'region' => '#env(MAGENTO_DC_MEDIA__REGION, "")',

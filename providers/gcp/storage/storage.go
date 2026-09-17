@@ -1,17 +1,18 @@
 // Package storage provisions Magento media object storage on GCS.
 //
 // Asset-delivery design: Magento's AwsS3 remote-storage driver talks to
-// GCS through S3 interop (HMAC keys below); storefronts fetch media URLs
-// directly, so the bucket is world-readable. The bucket is single
-// purpose: every object lives under media/ (driver prefix plus transfer
-// scoping), nothing else is ever written here, and nothing written here
-// is secret. Anonymous readers cannot use IAM conditions, so the public
-// grant is unconditional by necessity; writes stay HMAC-gated to the
-// media service account. Catalog images are public by nature (any
-// visitor's browser fetches them); paid downloadable content is out of
-// alpha scope and needs signed-URL or split delivery when it arrives.
-// The HMAC secret never leaves Pulumi state and the workload Secret; it
-// is not a stack output.
+// GCS through S3 interop (HMAC keys below). The bucket stays fully
+// private (public access prevention enforced): Magento routes both
+// MEDIA and VAR_IMPORT_EXPORT through the remote driver, so import and
+// export files share the bucket and must never be world-readable.
+// Storefronts fetch media through the application instead: image URLs
+// stay app-relative (base_media_url default), nginx falls back to
+// get.php, and get.php materializes from remote storage through the
+// Synchronizer. Only the media service account reads and writes here.
+// The bucket uses fine-grained access because the driver sets private
+// object ACLs on every write, which uniform buckets reject; IAM grants
+// no reads to anyone but the service account. The HMAC secret never
+// leaves Pulumi state and the workload Secret; it is not a stack output.
 package storage
 
 import (
@@ -26,9 +27,23 @@ import (
 
 const TypeToken = "magelift:gcp:MediaStorage"
 
-// MediaPrefix scopes Magento objects. Contract with the PHP lifecycle
-// remote-storage writer: both sides use media/.
+// MediaPrefix is the Magento MEDIA subtree inside remote storage. It is
+// pinned to DirectoryList::MEDIA's URL path ("media"), not to the
+// remote_storage root prefix (which stays empty so each directory URI
+// lands at the bucket root). Magento appends the URI itself: a
+// media-relative catalog/product/a.jpg lives at media/catalog/a.jpg,
+// while VAR_IMPORT_EXPORT lands at the sibling import_export/ subtree
+// the CLI never touches. Refs: DirectoryList::getDefaultConfig,
+// RemoteStorage\Filesystem::getDirectoryWrite,
+// AwsS3Factory::createConfigured (magento/magento2 2.4.9).
 const MediaPrefix = "media/"
+
+// MediaObjectKey maps a pub/media-relative path to its remote object
+// key. Relative paths use slash separators, as the CLI transfer layer
+// enforces.
+func MediaObjectKey(relative string) string {
+	return MediaPrefix + relative
+}
 
 type Args struct {
 	Project    string
@@ -40,7 +55,6 @@ type Args struct {
 type Component struct {
 	pulumi.ResourceState
 	BucketName   pulumi.StringOutput
-	MediaURL     pulumi.StringOutput
 	HmacAccessID pulumi.StringOutput
 	HmacSecret   pulumi.StringOutput
 	MediaAccount pulumi.StringOutput
@@ -70,13 +84,15 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	parent := pulumi.Parent(component)
 
 	bucket, err := storage.NewBucket(ctx, name, &storage.BucketArgs{
-		Project:                  pulumi.String(args.Project),
-		Name:                     pulumi.String(bucketName),
-		Location:                 pulumi.String(args.Location),
-		UniformBucketLevelAccess: pulumi.Bool(true),
-		// Inherited (not enforced) so the world-readable grant below
-		// applies. An org policy forcing prevention fails closed here.
-		PublicAccessPrevention: pulumi.String("inherited"),
+		Project:  pulumi.String(args.Project),
+		Name:     pulumi.String(bucketName),
+		Location: pulumi.String(args.Location),
+		// Fine-grained: the AwsS3 driver sets private object ACLs on
+		// every write and uniform buckets reject ACL operations.
+		UniformBucketLevelAccess: pulumi.Bool(false),
+		// Fully private delivery is through the application; enforce
+		// prevention so no future binding can expose the bucket.
+		PublicAccessPrevention: pulumi.String("enforced"),
 		ForceDestroy:           pulumi.Bool(true),
 		Versioning:             &storage.BucketVersioningArgs{Enabled: pulumi.Bool(true)},
 		Labels:                 pulumi.ToStringMap(args.Labels),
@@ -109,25 +125,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}, parent, pulumi.DependsOn([]pulumi.Resource{bucket, account})); err != nil {
 		return nil, fmt.Errorf("grant media bucket access: %w", err)
 	}
-	// Unconditional by necessity: IAM rejects conditions on allUsers
-	// bindings, and anonymous storefront readers have no other
-	// principal. The bucket stays single-purpose instead.
-	if _, err := storage.NewBucketIAMMember(ctx, name+"-media-public", &storage.BucketIAMMemberArgs{
-		Bucket: bucket.Name,
-		Role:   pulumi.String("roles/storage.objectViewer"),
-		Member: pulumi.String("allUsers"),
-	}, parent, pulumi.DependsOn([]pulumi.Resource{bucket})); err != nil {
-		return nil, fmt.Errorf("grant media public reads: %w", err)
-	}
 	component.BucketName = bucket.Name
-	component.MediaURL = bucket.Name.ApplyT(func(n string) string {
-		return fmt.Sprintf("https://storage.googleapis.com/%s/%s", n, MediaPrefix)
-	}).(pulumi.StringOutput)
 	component.HmacAccessID = hmac.AccessId
 	component.HmacSecret = hmac.Secret
 	component.MediaAccount = account.Email
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{
-		"bucketName": component.BucketName, "mediaURL": component.MediaURL,
+		"bucketName": component.BucketName,
 		"hmacAccessId": component.HmacAccessID, "mediaAccount": component.MediaAccount,
 	}); err != nil {
 		return nil, err

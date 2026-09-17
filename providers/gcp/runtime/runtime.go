@@ -75,7 +75,6 @@ type Args struct {
 	QueueReplicas               int
 	QueueImage                  string
 	MediaBucket                 pulumi.StringInput
-	MediaURL                    pulumi.StringInput
 	MediaHmacAccessID           pulumi.StringInput
 	MediaHmacSecret             pulumi.StringInput
 	MediaS3Prefix               string
@@ -562,21 +561,24 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 // appendMediaDCBindings renders the env.php remote_storage section.
 // Markers use MAGENTO_DC_* names (the application image build rejects
 // MAGELIFT markers in env.php); the secret arrives separately via
-// SecretKeyRef. Empty inputs append nothing.
+// SecretKeyRef. Empty values append nothing: unset markers fall back
+// to the template defaults (notably the empty root prefix).
 func appendMediaDCBindings(bindings []platform.EnvBinding, bucket, keyID, region, prefix string) []platform.EnvBinding {
 	if strings.TrimSpace(bucket) == "" {
 		return bindings
 	}
-	bindings = append(bindings,
-		platform.EnvBinding{Name: platform.EnvMagentoMediaDriver, Value: mediaDriver},
-		platform.EnvBinding{Name: platform.EnvMagentoMediaPrefix, Value: prefix},
-		platform.EnvBinding{Name: platform.EnvMagentoMediaBucket, Value: bucket},
-		platform.EnvBinding{Name: platform.EnvMagentoMediaRegion, Value: region},
-		platform.EnvBinding{Name: platform.EnvMagentoMediaEndpoint, Value: mediaS3Endpoint},
-	)
-	if strings.TrimSpace(keyID) != "" {
-		bindings = append(bindings, platform.EnvBinding{Name: platform.EnvMagentoMediaKey, Value: keyID})
+	add := func(name, value string) {
+		if strings.TrimSpace(value) == "" {
+			return
+		}
+		bindings = append(bindings, platform.EnvBinding{Name: name, Value: value})
 	}
+	add(platform.EnvMagentoMediaDriver, mediaDriver)
+	add(platform.EnvMagentoMediaPrefix, prefix)
+	add(platform.EnvMagentoMediaBucket, bucket)
+	add(platform.EnvMagentoMediaRegion, region)
+	add(platform.EnvMagentoMediaEndpoint, mediaS3Endpoint)
+	add(platform.EnvMagentoMediaKey, keyID)
 	return bindings
 }
 

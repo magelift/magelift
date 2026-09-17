@@ -149,34 +149,6 @@ func parentDir(name string) string {
 	return ""
 }
 
-// openRegularFile opens path only when it is a regular file. The stat,
-// open, and fstat-compare sequence refuses links without relying on
-// platform open flags: anything swapped between the checks fails the
-// identity comparison.
-func openRegularFile(path string) (*os.File, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return nil, err
-	}
-	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("refusing non-regular file %q", path)
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	opened, err := file.Stat()
-	if err != nil {
-		file.Close()
-		return nil, err
-	}
-	if !os.SameFile(info, opened) {
-		file.Close()
-		return nil, fmt.Errorf("refusing unstable file %q", path)
-	}
-	return file, nil
-}
-
 // MediaExport downloads the media prefix to operator disk.
 func (s *Server) MediaExport(ctx context.Context, req *sdk.MediaTransferCall) (*sdk.MediaTransferResult, *sdk.OperationError) {
 	return s.mediaTransfer(ctx, req, true)
@@ -257,24 +229,41 @@ func exportMediaTree(ctx context.Context, store objectStore, bucket, localDir st
 }
 
 func importMediaTree(ctx context.Context, store objectStore, bucket, localDir string) (int64, int64, error) {
+	root, err := os.OpenRoot(localDir)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer root.Close()
 	var files, bytes int64
-	err := filepath.WalkDir(localDir, func(path string, entry fs.DirEntry, err error) error {
+	err = filepath.WalkDir(localDir, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() {
+		relative, err := filepath.Rel(localDir, path)
+		if err != nil {
+			return err
+		}
+		// Re-stat through the root handle: WalkDir's entry reflects
+		// enumeration time, but parents may have changed since. The
+		// rooted open below can only fail closed on escape.
+		info, err := root.Lstat(relative)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() != entry.IsDir() {
+			return fmt.Errorf("refusing %q: changed during traversal", relative)
+		}
+		if info.IsDir() {
 			return nil
 		}
-		file, err := openRegularFile(path)
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("refusing non-regular file %q", relative)
+		}
+		file, err := openRootedRegularFile(root, relative)
 		if err != nil {
 			return err
 		}
-		relative, relErr := filepath.Rel(localDir, path)
-		if relErr != nil {
-			file.Close()
-			return relErr
-		}
-		object := gcpstorage.MediaPrefix + filepath.ToSlash(relative)
+		object := gcpstorage.MediaObjectKey(filepath.ToSlash(relative))
 		written, err := store.Upload(ctx, bucket, object, file)
 		closeErr := file.Close()
 		if err != nil {
@@ -288,4 +277,31 @@ func importMediaTree(ctx context.Context, store objectStore, bucket, localDir st
 		return nil
 	})
 	return files, bytes, err
+}
+
+// openRootedRegularFile opens a root-relative path for reading. The
+// root handle refuses escapes; the identity comparison refuses files
+// swapped between the stat and the open.
+func openRootedRegularFile(root *os.Root, name string) (*os.File, error) {
+	info, err := root.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("refusing non-regular file %q", name)
+	}
+	file, err := root.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	opened, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+	if !os.SameFile(info, opened) {
+		file.Close()
+		return nil, fmt.Errorf("refusing unstable file %q", name)
+	}
+	return file, nil
 }
