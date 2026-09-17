@@ -172,4 +172,10 @@ if ! "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/queuedone.ou
 	exit 1
 fi
 
+# 11. The live fetch requests every attempt, not the latest-only view.
+grep -q "check-runs?per_page=100&filter=all" "$GATE" || {
+	printf 'gate live fetch lost filter=all\n' >&2
+	exit 1
+}
+
 printf 'release checks gate ok\n'

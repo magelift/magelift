@@ -834,6 +834,7 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 	}
 	sawHMAC, sawSA, sawWriterGrant, sawFineGrained := false, false, false, false
 	sawSecret, sawKey, sawEndpoint, sawSecretRef, sawDriver := false, false, false, false, false
+	sawMediaURLPin, sawMediaURLSecurePin := false, false
 	for _, res := range mocks.resources {
 		switch res.TypeToken {
 		case "gcp:storage/hmacKey:HmacKey":
@@ -896,6 +897,16 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 							t.Fatalf("media secret must not appear as plaintext env: %q", value.StringValue())
 						}
 						sawSecretRef = true
+					case "CONFIG__DEFAULT__WEB__UNSECURE__BASE_MEDIA_URL":
+						if value := entry["value"].StringValue(); value != "{{unsecure_base_url}}media/" {
+							t.Fatalf("base_media_url = %q", value)
+						}
+						sawMediaURLPin = true
+					case "CONFIG__DEFAULT__WEB__SECURE__BASE_MEDIA_URL":
+						if value := entry["value"].StringValue(); value != "{{secure_base_url}}media/" {
+							t.Fatalf("secure base_media_url = %q", value)
+						}
+						sawMediaURLSecurePin = true
 					}
 				}
 			}
@@ -906,6 +917,9 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 	}
 	if !sawSecret || !sawKey || !sawEndpoint || !sawSecretRef || !sawDriver {
 		t.Fatalf("media env incomplete: secret=%v key=%v endpoint=%v secretRef=%v driver=%v", sawSecret, sawKey, sawEndpoint, sawSecretRef, sawDriver)
+	}
+	if !sawMediaURLPin || !sawMediaURLSecurePin {
+		t.Fatalf("base_media_url not pinned app-relative: unsecure=%v secure=%v", sawMediaURLPin, sawMediaURLSecurePin)
 	}
 }
 

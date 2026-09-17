@@ -123,7 +123,10 @@ command -v gh >/dev/null 2>&1 || {
 }
 deadline=$((SECONDS + TIMEOUT_SECONDS))
 while true; do
-	payload="$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100")"
+	# filter=all: the default latest filter orders by completed_at and can
+	# omit a queued rerun (no completion time) that supersedes the visible
+	# success. Single page: required checks number well under 100.
+	payload="$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100&filter=all")"
 	set +e
 	evaluate "$payload"
 	code="$?"
