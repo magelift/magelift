@@ -21,7 +21,7 @@
   SDK contracts, provider-local helpers, alpha registry
   scoping, ADR reconcile, leanness gate) — verify:
   `go list -deps` clean both ways, full suites green
-- [ ] 2.2 Credential wiring (R02: provider-owned factory
+- [x] 2.2 Credential wiring (R02: provider-owned factory
   default, exec path, production-constructor tests,
   stale-bearer assertions) — verify: plugin plus kube
   suites green

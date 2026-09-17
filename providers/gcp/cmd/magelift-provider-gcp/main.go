@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
+	gcpauth "github.com/magelift/magelift/providers/gcp/auth"
 	gcpplugin "github.com/magelift/magelift/providers/gcp/plugin"
 )
 
@@ -26,7 +27,14 @@ func main() {
 	}
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: gcpplugin.HandshakeConfig,
-		Plugins:         gcpplugin.PluginMap(&gcpplugin.Server{Version: Version}),
+		Plugins:         gcpplugin.PluginMap(newProductionServer()),
 		Logger:          hclog.New(&hclog.LoggerOptions{Level: hclog.Warn, Output: os.Stderr}),
 	})
+}
+
+// newProductionServer wires the released plugin: version stamp plus fresh
+// ambient credentials for every Kubernetes client the server builds.
+// Exec/tunnel launch tokens resolve through ambient ADC automatically.
+func newProductionServer() *gcpplugin.Server {
+	return &gcpplugin.Server{Version: Version, KubeClients: gcpauth.NewClientFactory()}
 }

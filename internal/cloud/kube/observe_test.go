@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -395,6 +396,49 @@ func TestObservePrepareExecKubectl(t *testing.T) {
 	want := "exec -n default -i deploy/shop-web -- bin/magento cache:flush"
 	if joined != want {
 		t.Fatalf("args after kubeconfig = %q, want %q", joined, want)
+	}
+}
+
+func TestObservePrepareExecMintsFreshToken(t *testing.T) {
+	replicas := int32(1)
+	obs := NewObserve(fake.NewClientset(&appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default"},
+		Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
+		Status:     appsv1.DeploymentStatus{ReadyReplicas: 1},
+	})).WithTokenSource(func(context.Context) (string, error) { return "fresh-token", nil })
+	target, err := obs.PrepareExec(context.Background(), observePlanned{project: "shop", env: "preview"}, map[string]any{
+		platform.OutputClusterName: "shop-cluster",
+		platform.OutputServiceName: "shop-web",
+		platform.OutputKubeconfig:  BuildStaticTokenKubeconfig("c", "https://1.2.3.4", testCAData, "stale-token"),
+	}, platform.ExecQuery{Workload: "web", Command: []string{"bin/magento", "cache:flush"}})
+	if err != nil {
+		t.Fatalf("PrepareExec: %v", err)
+	}
+	body, err := os.ReadFile(target.Args[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "fresh-token") || strings.Contains(string(body), "stale-token") {
+		t.Fatalf("launched kubeconfig = %s", body)
+	}
+	for _, arg := range target.Args {
+		if strings.Contains(arg, "fresh-token") || strings.Contains(arg, "stale-token") {
+			t.Fatalf("token leaked to argv: %#v", target.Args)
+		}
+	}
+}
+
+func TestObservePrepareExecSurfacesTokenFailure(t *testing.T) {
+	obs := NewObserve(fake.NewClientset()).WithTokenSource(func(context.Context) (string, error) {
+		return "", errors.New("refresh exploded")
+	})
+	_, err := obs.PrepareExec(context.Background(), observePlanned{project: "shop", env: "preview"}, map[string]any{
+		platform.OutputClusterName: "shop-cluster",
+		platform.OutputServiceName: "shop-web",
+		platform.OutputKubeconfig:  BuildStaticTokenKubeconfig("c", "https://1.2.3.4", testCAData, "stale-token"),
+	}, platform.ExecQuery{Workload: "web"})
+	if err == nil || !strings.Contains(err.Error(), "refresh exploded") {
+		t.Fatalf("err = %v", err)
 	}
 }
 
