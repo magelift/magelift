@@ -813,6 +813,27 @@ Options:
       --digest string                    signed registry digest reference
       --from string                      source environment
 ```
+## magelift providers
+
+Download and verify provider plugins
+
+```text
+magelift providers
+```
+### magelift providers install
+
+Download and verify the providers named by magelift.yaml
+
+```text
+magelift providers install [flags]
+```
+
+Options:
+
+```text
+      --cache-dir string   provider cache directory (default: user cache)
+      --lockfile string    provider lockfile path (default: ./magelift.providers.lock, then beside the CLI)
+```
 ## magelift queue-status
 
 Run the Magento queue-status operation on the web workload
