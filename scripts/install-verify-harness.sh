@@ -19,7 +19,7 @@ esac
 ARCHIVE="magelift_${VERSION}_${OS}_${ARCH}.tar.gz"
 COSIGN_FILE="cosign-$OS-$ARCH"
 
-WORK="$(mktemp -d /tmp/magelift-install-harness.XXXXXX)"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/magelift-install-harness.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 free_port() {

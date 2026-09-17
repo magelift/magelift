@@ -7,10 +7,11 @@ description: Install the MageLift Magento CLI. Use go install until the first Gi
 
 Install the `magelift` CLI, then continue with [getting started](getting-started.md).
 
-!!! note "No public release tag yet"
-    GitHub Releases is empty until `v1.0.0-rc.1` ships. Until then, use
-    [From source](#from-source) (`go install`). After the first tag, prefer
-    the installer or a release archive below.
+!!! note "No stable release yet"
+    Every published release is currently a prerelease, and prereleases
+    never become the default install channel. Install one with an
+    explicit `MAGELIFT_VERSION` (see below), or use
+    [From source](#from-source) (`go install`) until the first stable tag.
 
 ## Installer
 

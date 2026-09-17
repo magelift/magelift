@@ -136,6 +136,18 @@ jobs:
         if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
         with:
           subject-checksums: dist/checksums.txt
+      # The release stays draft until every verification above passes.
+      # Lockfiles upload outside the signed checksum set by construction
+      # (bundles postdate checksums); their authentication policy is the
+      # pinned-publisher design: the CLI refuses lockfiles whose
+      # identity/issuer differ from the release workflow pin, and content
+      # trust stays digest plus bundle-over-pinned-identity.
+      - name: Publish the verified candidate
+        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --draft=false
   # The cask publishes to the tap during release; this job is the tested
   # macOS install path the readiness doc requires. A failure fails the
   # workflow visibly so the tap file gets fixed forward the same day.

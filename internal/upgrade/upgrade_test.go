@@ -56,6 +56,14 @@ func TestLatestUsesGitHubHeadersAndDecodesRelease(t *testing.T) {
 	}
 }
 
+func TestLatestReportsNoStableReleaseOn404(t *testing.T) {
+	client := &Client{httpClient: &fakeHTTP{responses: map[string]string{}}, apiBase: "https://api.example"}
+	_, err := client.Latest(context.Background())
+	if !errors.Is(err, ErrNoStableRelease) {
+		t.Fatalf("err = %v, want no-stable-release", err)
+	}
+}
+
 func TestInstallVerifiesChecksumAndReplacesExecutable(t *testing.T) {
 	archive := testArchive(t, "magelift", []byte("new binary"))
 	digest := sha256.Sum256(archive)

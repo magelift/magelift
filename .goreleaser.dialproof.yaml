@@ -75,6 +75,10 @@ signs:
 release:
   preflight:
     fail_on_error: true
+  # Debug tags are never installable: draft, prerelease, never latest.
+  draft: true
+  prerelease: true
+  make_latest: false
 
 changelog:
   use: github-native

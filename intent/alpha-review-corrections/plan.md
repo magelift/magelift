@@ -1,12 +1,13 @@
 # Plan: alpha review corrections
 
-- [ ] 1.1 Release channels (R07: prerelease plus draft plus
+- [x] 1.1 Release channels (R07: prerelease plus draft plus
   publish gate, installer channel split with verified API
-  behavior, lockfile auth note) — verify: actionlint,
-  gate script tests, installer harness green
+  behavior, lockfile auth note, upgrade 404 channel,
+  harness TMPDIR) — verify: actionlint, upgrade tests,
+  installer harness green
 - [ ] 1.2 Connected installation (R01: URLs in lockfiles,
   pinned publisher, shared resolver, metadata bootstrap,
-  verifier persistence, CI provider step, TMPDIR harness)
+  verifier persistence, CI provider step)
   — verify: providerhost plus cli plus registry suites,
   clean-machine proof on a GCE VM (destroyed after)
 - [ ] 1.3 Crash-safe updater (R11: copy backup, injectable
