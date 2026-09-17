@@ -74,7 +74,7 @@ No stable release exists yet, so install an explicit prerelease.
 Pick the tag from [Releases](https://github.com/magelift/magelift/releases):
 
 ```sh
-curl -fsSL https://magelift.dev/install.sh | MAGELIFT_VERSION=v0.1.0-alpha.1-rc.3 sh
+curl -fsSL https://magelift.dev/install.sh | MAGELIFT_VERSION=v0.1.0-alpha.1-rc.4 sh
 magelift version
 ```
 
@@ -160,7 +160,7 @@ yours once (the installer ships a binary; sources come
 separately):
 
 ```sh
-TAG=v0.1.0-alpha.1-rc.3
+TAG=v0.1.0-alpha.1-rc.4
 mkdir -p ~/magelift-src
 curl -fsSL "https://github.com/magelift/magelift/archive/refs/tags/$TAG.tar.gz" \
   | tar -xz -C ~/magelift-src --strip-components=1
@@ -254,10 +254,15 @@ magelift --env preview outputs --output json
   runs email-disabled, so delivery proof waits for pilots
   with relays.
 - **Media:** upload a product image in admin, then fetch its
-  storefront URL with plain curl (no cloud credentials) and
-  confirm the object under `media/` in the `mediaBucket`
+  storefront URL with plain curl (no cloud credentials):
+  image URLs stay app-relative and materialize through
+  get.php. Leave `base_media_url` at its default; the
+  build rejects shops pointing it at object storage.
+  Confirm the object under `media/` in the `mediaBucket`
   from outputs
   (`gcloud storage ls gs://<mediaBucket>/media/`).
+  Import/export files share the private bucket under
+  `import_export/` and are never URL-addressable.
 - **Cost:** `magelift --env preview cost` prints account-free
   capacity with unpriced items listed; `--live` is not wired on
   GCP and errors rather than guessing. Budgets alert, never cap.

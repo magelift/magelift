@@ -26,4 +26,5 @@ RUN cp /tmp/magelift-runtime-env.php /app/app/etc/env.php \
     && test ! -e auth.json \
     && test -f app/etc/env.php \
     && ! grep -Eiq 'MAGELIFT' app/etc/env.php \
-    && php -r '$data = require "app/etc/env.php"; array_walk_recursive($data, static function ($value, $key): void { if (preg_match("/password|secret|token/i", (string) $key) === 1 && is_string($value) && $value !== "" && !str_starts_with($value, "#env(")) { exit(1); } });'
+    && php -r '$data = require "app/etc/env.php"; array_walk_recursive($data, static function ($value, $key): void { if (preg_match("/password|secret|token/i", (string) $key) === 1 && is_string($value) && $value !== "" && !str_starts_with($value, "#env(")) { exit(1); } });' \
+    && php -r '$file = "app/etc/config.php"; if (!is_file($file)) { exit(0); } $data = require $file; $check = static function ($node) use (&$check): void { if (!is_array($node)) { return; } foreach ($node as $key => $value) { if (is_string($key) && stripos($key, "base_media_url") !== false && is_string($value) && preg_match("#https?://[^/]*(storage\\.googleapis\\.com|amazonaws\\.com|[.]s3[.]|blob\\.core\\.windows\\.net)#i", $value) === 1) { fwrite(STDERR, "base_media_url must stay app-relative: media delivery runs through the storefront, never direct bucket URLs\n"); exit(1); } $check($value); } }; $check($data);'

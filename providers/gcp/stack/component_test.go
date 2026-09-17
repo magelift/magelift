@@ -832,7 +832,7 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-preview", mocks)); err != nil {
 		t.Fatal(err)
 	}
-	sawHMAC, sawSA, sawWriterGrant, sawPublicGrant := false, false, false, false
+	sawHMAC, sawSA, sawWriterGrant, sawFineGrained := false, false, false, false
 	sawSecret, sawKey, sawEndpoint, sawSecretRef, sawDriver := false, false, false, false, false
 	for _, res := range mocks.resources {
 		switch res.TypeToken {
@@ -842,17 +842,24 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 			if strings.Contains(res.Name, "media") {
 				sawSA = true
 			}
+		case "gcp:storage/bucket:Bucket":
+			if strings.Contains(res.Name, "media") {
+				if uniform, ok := res.Inputs["uniformBucketLevelAccess"]; !ok || uniform.BoolValue() {
+					t.Fatal("media bucket must use fine-grained access for driver ACL compatibility")
+				}
+				if prevention, ok := res.Inputs["publicAccessPrevention"]; !ok || prevention.StringValue() != "enforced" {
+					t.Fatal("media bucket must enforce public access prevention")
+				}
+				sawFineGrained = true
+			}
 		case "gcp:storage/bucketIAMMember:BucketIAMMember":
 			role := res.Inputs["role"].StringValue()
 			member := res.Inputs["member"].StringValue()
 			if role == "roles/storage.objectAdmin" && strings.HasPrefix(member, "serviceAccount:") {
 				sawWriterGrant = true
 			}
-			if role == "roles/storage.objectViewer" && member == "allUsers" {
-				if condition, ok := res.Inputs["condition"]; ok && !condition.IsNull() {
-					t.Fatal("public grant must not carry a condition: IAM rejects conditions on allUsers")
-				}
-				sawPublicGrant = true
+			if member == "allUsers" || member == "allAuthenticatedUsers" {
+				t.Fatalf("media bucket grants reads to %q; delivery is through the application", member)
 			}
 		case "kubernetes:core/v1:Secret":
 			if strings.HasSuffix(res.Name, "-media-hmac") {
@@ -894,10 +901,23 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 			}
 		}
 	}
-	if !sawHMAC || !sawSA || !sawWriterGrant || !sawPublicGrant {
-		t.Fatalf("media IAM incomplete: hmac=%v sa=%v writer=%v public=%v", sawHMAC, sawSA, sawWriterGrant, sawPublicGrant)
+	if !sawHMAC || !sawSA || !sawWriterGrant || !sawFineGrained {
+		t.Fatalf("media IAM incomplete: hmac=%v sa=%v writer=%v finegrained=%v", sawHMAC, sawSA, sawWriterGrant, sawFineGrained)
 	}
 	if !sawSecret || !sawKey || !sawEndpoint || !sawSecretRef || !sawDriver {
 		t.Fatalf("media env incomplete: secret=%v key=%v endpoint=%v secretRef=%v driver=%v", sawSecret, sawKey, sawEndpoint, sawSecretRef, sawDriver)
+	}
+}
+
+func TestMediaAppURLUsesStorefront(t *testing.T) {
+	t.Parallel()
+	if got := mediaAppURLValue("preview.example.com"); got != "https://preview.example.com/media/" {
+		t.Fatalf("mediaURL = %q", got)
+	}
+	if got := mediaAppURLValue(""); got != "" {
+		t.Fatalf("empty domain mediaURL = %q, want empty", got)
+	}
+	if got := mediaAppURLValue("preview.example.com"); strings.Contains(got, "storage.googleapis.com") {
+		t.Fatalf("mediaURL addresses the private bucket: %q", got)
 	}
 }

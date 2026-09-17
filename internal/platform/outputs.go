@@ -49,6 +49,12 @@ const (
 	// Not in RequiredOutputKeys yet; AWS historically exported mediaURL only; adapters
 	// that support media-sync must export this key (GCP already does; AWS added in 05-05).
 	OutputMediaBucket = "mediaBucket"
+	// OutputMediaURL is the base URL operators verify media delivery
+	// through. The mechanism differs per provider: GCP serves through
+	// the storefront (app-relative image URLs via get.php; the bucket
+	// is private), so it exports the store media base. Direct bucket
+	// URLs must never appear here for GCP.
+	OutputMediaURL = "mediaURL"
 	// OutputKubeconfig is the cluster kubeconfig for shared Kubernetes day-2
 	// (Observe/Steps). Optional Magento-facing key; not in RequiredOutputKeys so
 	// ECS and other non-K8s stacks stay free of it. K8s adapters export it as a

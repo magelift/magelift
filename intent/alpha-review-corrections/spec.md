@@ -58,13 +58,29 @@ narrowed only where noted with reasoning.
 - Lead mechanism: Magento S3-compatible remote storage
   against GCS (HMAC keys provisioned by the stack),
   configured through the env template's remote_storage
-  section. Delivery is a single-purpose world-readable
-  bucket: IAM rejects conditions on allUsers bindings, so
-  prefix-scoped public reads are not expressible, and the
-  bucket holds only public-by-design storefront assets
-  under media/ (writes stay HMAC-gated). Paid downloadable
-  content is out of alpha scope. Verified live or the
-  mechanism changes (documented).
+  section with an empty root prefix. Magento appends
+  directory URIs below the root (media/ for MEDIA,
+  import_export/ for VAR_IMPORT_EXPORT); the CLI manages
+  the media/ subtree only and can never address import
+  or export files.
+- The bucket stays fully private (public access
+  prevention enforced, no anonymous bindings): Magento
+  routes both media and import/export through the remote
+  driver, so transfer files share the bucket. Delivery
+  runs through the storefront instead: base_media_url
+  keeps its app-relative default (a build guard rejects
+  shops pointing it at object storage), nginx falls back
+  to get.php under /media/, and get.php materializes
+  from remote storage through the Synchronizer.
+- Fine-grained bucket access: the AwsS3 driver sets
+  private object ACLs on every write, which uniform
+  buckets reject. Reads stay HMAC-gated to the media
+  service account.
+- Proof: real upload, app-relative image URL in
+  storefront HTML, fresh-pod retrieval, replacement,
+  export/import round trip, plus the negative test
+  (unauthenticated import/export paths fail). Verified
+  live or the mechanism changes (documented).
 - CLI media operations route through the provider: new
   typed plugin ops for media export (to operator disk;
   the plugin runs locally) and import. Core drops the
