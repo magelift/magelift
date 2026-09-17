@@ -119,13 +119,20 @@ func TestDescribe(t *testing.T) {
 	if result.ProviderID != "gcp" || result.ProviderVersion != "v1.2.3" || result.ProtocolVersion != sdk.ProtocolV1 {
 		t.Fatalf("identity = %#v", result)
 	}
-	if len(result.Operations) != 30 {
-		t.Fatalf("operations = %d, want 30", len(result.Operations))
+	if len(result.Operations) != 31 {
+		t.Fatalf("operations = %d, want 31", len(result.Operations))
 	}
+	advertised := false
 	for _, operation := range result.Operations {
 		if operation.Version != "1.0" {
 			t.Fatalf("operation %q version = %q", operation.Name, operation.Version)
 		}
+		if operation.Name == string(sdk.OpDeployAppPhase) {
+			advertised = true
+		}
+	}
+	if !advertised {
+		t.Fatal("deploy-app-phase is not advertised")
 	}
 	if len(result.Runtimes) != 2 {
 		t.Fatalf("runtimes = %#v", result.Runtimes)

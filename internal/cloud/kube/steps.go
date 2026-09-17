@@ -309,6 +309,15 @@ func (s *Steps) waitForIntendedRollout(ctx context.Context) (ServiceHealth, erro
 	if err != nil {
 		return ServiceHealth{}, fmt.Errorf("read kubernetes runtime outputs: %w", err)
 	}
+	return WaitForIntendedRollout(ctx, outputs, s.spec.ImageDigest, s.runtime, s.waitInterval, s.waitTimeout)
+}
+
+// WaitForIntendedRollout passes only when the intended revision is serving:
+// the controller has observed the latest generation, every desired replica
+// runs the updated template, the deployment is available, and the served
+// image digest matches the release. Stale healthy replicas fail. Exported
+// for provider plugins executing deploy phases; Steps delegates to it.
+func WaitForIntendedRollout(ctx context.Context, outputs map[string]any, wantDigest string, runtime RuntimeChecker, interval, timeout time.Duration) (ServiceHealth, error) {
 	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
 	if err != nil {
 		return ServiceHealth{}, err
@@ -317,7 +326,9 @@ func (s *Steps) waitForIntendedRollout(ctx context.Context) (ServiceHealth, erro
 	if err != nil {
 		return ServiceHealth{}, err
 	}
-	interval, timeout := s.waitInterval, s.waitTimeout
+	if runtime == nil {
+		return ServiceHealth{}, errors.New("kubernetes runtime checker is required")
+	}
 	if interval <= 0 {
 		interval = 5 * time.Second
 	}
@@ -329,8 +340,8 @@ func (s *Steps) waitForIntendedRollout(ctx context.Context) (ServiceHealth, erro
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		health, checkErr := s.runtime.Check(waitContext, cluster, service)
-		if checkErr == nil && intendedRollout(health, s.spec.ImageDigest) {
+		health, checkErr := runtime.Check(waitContext, cluster, service)
+		if checkErr == nil && intendedRollout(health, wantDigest) {
 			return health, nil
 		}
 		select {
@@ -342,7 +353,7 @@ func (s *Steps) waitForIntendedRollout(ctx context.Context) (ServiceHealth, erro
 				"wait for kubernetes intended rollout: desired=%d ready=%d updated=%d generation=%d observed=%d available=%v digestMatch=%v",
 				health.DesiredReplicas, health.ReadyReplicas, health.UpdatedReplicas,
 				health.Generation, health.ObservedGeneration, health.Available,
-				health.ImageDigest == s.spec.ImageDigest,
+				health.ImageDigest == wantDigest,
 			)
 		case <-ticker.C:
 		}
@@ -370,6 +381,13 @@ func (s *Steps) waitForHealthyService(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("read kubernetes runtime outputs: %w", err)
 	}
+	return WaitForHealthyService(ctx, outputs, s.runtime, s.waitInterval, s.waitTimeout)
+}
+
+// WaitForHealthyService blocks until the web Deployment reports the desired
+// replicas ready and available. Exported for provider plugins executing
+// deploy phases; Steps delegates to it.
+func WaitForHealthyService(ctx context.Context, outputs map[string]any, runtime RuntimeChecker, interval, timeout time.Duration) error {
 	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
 	if err != nil {
 		return err
@@ -378,7 +396,9 @@ func (s *Steps) waitForHealthyService(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	interval, timeout := s.waitInterval, s.waitTimeout
+	if runtime == nil {
+		return errors.New("kubernetes runtime checker is required")
+	}
 	if interval <= 0 {
 		interval = 5 * time.Second
 	}
@@ -390,7 +410,7 @@ func (s *Steps) waitForHealthyService(ctx context.Context) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		health, checkErr := s.runtime.Check(waitContext, cluster, service)
+		health, checkErr := runtime.Check(waitContext, cluster, service)
 		if checkErr == nil && health.DesiredReplicas > 0 && health.ReadyReplicas >= health.DesiredReplicas && health.Available {
 			return nil
 		}
