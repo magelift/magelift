@@ -51,8 +51,10 @@ jobs:
       # release fails after the builds (seen on v0.0.0-dialproof.3).
       - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
       # Module tags need proxy plus sumdb visibility before packaging:
-      # the provider build resolves its magelift requirements from the
-      # network, and a fresh tag 404s for minutes (seen on rc.3).
+      # workspace builds still verify requirement .mod files over the
+      # network on cold caches, and a fresh tag 404s for minutes (seen
+      # on rc.3/rc.4). Two consecutive downloads prove the entries are
+      # serveable and stable, not flapping into view.
       - name: Wait for module visibility
         if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
         env:
@@ -61,19 +63,29 @@ jobs:
         run: |
           deadline=$((SECONDS + 1800))
           for module in "github.com/magelift/magelift" "github.com/magelift/magelift/sdk" "github.com/magelift/magelift/providers/gcp"; do
-            while true; do
+            stable=0
+            while [[ "$stable" -lt 2 ]]; do
               # go mod download, not go list: packaging needs the zip plus
               # both sumdb entries, and the .mod alone can go visible first.
               if go mod download "$module@$RELEASE_TAG" >/dev/null 2>&1; then
-                break
+                stable=$((stable + 1))
+              else
+                stable=0
               fi
               if [[ "$SECONDS" -ge "$deadline" ]]; then
                 echo "module $module@$RELEASE_TAG never became visible" >&2
                 exit 1
               fi
-              sleep 60
+              [[ "$stable" -lt 2 ]] && sleep 60
             done
           done
+      # Forensics: workspace resolution is what keeps tag builds local;
+      # print it so the next visibility failure starts from evidence.
+      - name: Show module resolution
+        run: |
+          go env GOWORK
+          go list -m -f '{{.Path}} {{.Version}} {{.Dir}}' github.com/magelift/magelift
+        working-directory: providers/gcp
       # Ephemeral dialproof tags take the slim linux/amd64 config (no SBOM,
       # taps, or attest): same signs/checksum/archive shape, ~5 min, so the
       # bundle/lockfile debug loop does not pay the 2h full matrix.
@@ -206,7 +218,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
-          bash scripts/release-checks-gate.sh --sha "$SHA"
+          bash scripts/release-checks-gate.sh --sha "$SHA" --exclude-run "$GITHUB_RUN_ID"
           gh release edit "$RELEASE_TAG" --draft=false
       # Explicit save with if: always() — setup-go's post-step never runs
       # when the job fails, and the next candidate wants this build cache.

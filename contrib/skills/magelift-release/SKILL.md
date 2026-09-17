@@ -56,9 +56,13 @@ need the tags first. Order matters; never move a tag:
 5. Download the root sums into the provider, commit, tag and push
    `providers/gcp/<v>`. Module tags may point at different commits;
    each module version is immutable and complete on its own.
-6. Dispatch full CI on the release tag
+6. Poll module visibility until two consecutive
+   `go mod download <module>@<v>` passes 60s apart for all three
+   modules (fresh tags 404 for minutes and flap into view).
+   Only then dispatch full CI on the release tag
    (`gh workflow run ci.yml --ref <v> -f all=true`); the publish
-   gate requires actual success on the tag commit.
+   gate requires actual success on the tag commit, and CI jobs
+   fail the same visibility race when dispatched too early.
 7. Verify the pristine consumer before trusting the candidate:
    `go install` the CLI and provider mains at `<v>` plus an SDK
    scratch build, all `GOWORK=off` from the proxy. The release
