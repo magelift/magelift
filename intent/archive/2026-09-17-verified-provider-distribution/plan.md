@@ -27,7 +27,7 @@
 - [x] 4.1 Trust docs (ADR 0014, install.md rewrite, pointers;
   humanizer plus marks) — verify: `make docs` green, prose
   passes recorded
-- [ ] 4.2 Full proof (root, SDK, provider, synthetic, harness,
+- [x] 4.2 Full proof (root, SDK, provider, synthetic, harness,
   skills, generate, docs, lint, clean-room gates; report plus
   archive) — verify: every gate named green, report verdict
   recorded
