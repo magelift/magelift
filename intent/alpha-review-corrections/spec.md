@@ -57,8 +57,13 @@ narrowed only where noted with reasoning.
 
 - Lead mechanism: Magento S3-compatible remote storage
   against GCS (HMAC keys provisioned by the stack),
-  configured through Magento overlays; public delivery
-  without making the bucket public. Verified live or the
+  configured through the env template's remote_storage
+  section. Delivery is a single-purpose world-readable
+  bucket: IAM rejects conditions on allUsers bindings, so
+  prefix-scoped public reads are not expressible, and the
+  bucket holds only public-by-design storefront assets
+  under media/ (writes stay HMAC-gated). Paid downloadable
+  content is out of alpha scope. Verified live or the
   mechanism changes (documented).
 - CLI media operations route through the provider: new
   typed plugin ops for media export (to operator disk;

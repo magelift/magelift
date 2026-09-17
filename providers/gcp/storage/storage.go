@@ -2,11 +2,16 @@
 //
 // Asset-delivery design: Magento's AwsS3 remote-storage driver talks to
 // GCS through S3 interop (HMAC keys below); storefronts fetch media URLs
-// directly, so the media/ prefix is world-readable while everything else
-// stays private. This is the public-asset pattern, not a shortcut: the
-// driver integration is real (Magento writes and reads through it), and
-// only product assets are exposed. The HMAC secret never leaves Pulumi
-// state and the workload Secret; it is not a stack output.
+// directly, so the bucket is world-readable. The bucket is single
+// purpose: every object lives under media/ (driver prefix plus transfer
+// scoping), nothing else is ever written here, and nothing written here
+// is secret. Anonymous readers cannot use IAM conditions, so the public
+// grant is unconditional by necessity; writes stay HMAC-gated to the
+// media service account. Catalog images are public by nature (any
+// visitor's browser fetches them); paid downloadable content is out of
+// alpha scope and needs signed-URL or split delivery when it arrives.
+// The HMAC secret never leaves Pulumi state and the workload Secret; it
+// is not a stack output.
 package storage
 
 import (
@@ -21,8 +26,8 @@ import (
 
 const TypeToken = "magelift:gcp:MediaStorage"
 
-// MediaPrefix scopes Magento objects and the public-read grant. Contract
-// with the PHP lifecycle remote-storage writer: both sides use media/.
+// MediaPrefix scopes Magento objects. Contract with the PHP lifecycle
+// remote-storage writer: both sides use media/.
 const MediaPrefix = "media/"
 
 type Args struct {
@@ -69,7 +74,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		Name:                     pulumi.String(bucketName),
 		Location:                 pulumi.String(args.Location),
 		UniformBucketLevelAccess: pulumi.Bool(true),
-		// Inherited (not enforced) so the media/ prefix grant below
+		// Inherited (not enforced) so the world-readable grant below
 		// applies. An org policy forcing prevention fails closed here.
 		PublicAccessPrevention: pulumi.String("inherited"),
 		ForceDestroy:           pulumi.Bool(true),
@@ -104,19 +109,15 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}, parent, pulumi.DependsOn([]pulumi.Resource{bucket, account})); err != nil {
 		return nil, fmt.Errorf("grant media bucket access: %w", err)
 	}
+	// Unconditional by necessity: IAM rejects conditions on allUsers
+	// bindings, and anonymous storefront readers have no other
+	// principal. The bucket stays single-purpose instead.
 	if _, err := storage.NewBucketIAMMember(ctx, name+"-media-public", &storage.BucketIAMMemberArgs{
 		Bucket: bucket.Name,
 		Role:   pulumi.String("roles/storage.objectViewer"),
 		Member: pulumi.String("allUsers"),
-		Condition: &storage.BucketIAMMemberConditionArgs{
-			Title:       pulumi.String("magelift-media-prefix"),
-			Description: pulumi.String("Product assets under media/ are world-readable; nothing else is."),
-			Expression: bucket.Name.ApplyT(func(n string) string {
-				return fmt.Sprintf("resource.name.startsWith('projects/_/buckets/%s/objects/%s')", n, MediaPrefix)
-			}).(pulumi.StringOutput),
-		},
 	}, parent, pulumi.DependsOn([]pulumi.Resource{bucket})); err != nil {
-		return nil, fmt.Errorf("grant media prefix reads: %w", err)
+		return nil, fmt.Errorf("grant media public reads: %w", err)
 	}
 	component.BucketName = bucket.Name
 	component.MediaURL = bucket.Name.ApplyT(func(n string) string {
