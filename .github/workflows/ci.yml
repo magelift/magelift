@@ -29,6 +29,7 @@ jobs:
     outputs:
       go: ${{ steps.filter.outputs.go == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
       sdk: ${{ steps.filter.outputs.sdk == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      provider: ${{ steps.filter.outputs.provider == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
       docs: ${{ steps.filter.outputs.docs == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
       php: ${{ steps.filter.outputs.php == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
       images: ${{ steps.filter.outputs.images == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
@@ -62,6 +63,15 @@ jobs:
               - 'docker-compose.floci.yml'
               - 'docker-compose.floci-gcp.yml'
             sdk:
+              - 'sdk/**/*.go'
+              - 'sdk/go.mod'
+              - 'sdk/go.sum'
+              - 'go.work'
+              - 'go.work.sum'
+            provider:
+              - 'providers/**/*.go'
+              - 'providers/gcp/go.mod'
+              - 'providers/gcp/go.sum'
               - 'sdk/**/*.go'
               - 'sdk/go.mod'
               - 'sdk/go.sum'
@@ -107,9 +117,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
             go-prime-${{ runner.os }}-
           lookup-only: true
       - name: Warm module cache
@@ -124,7 +134,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
 
   lint:
     name: lint
@@ -151,10 +161,10 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-
-            go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
@@ -181,9 +191,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
       - run: |
           mapfile -t go_files < <(git ls-files '*.go')
           gofmt -w "${go_files[@]}"
@@ -191,6 +201,7 @@ jobs:
       - run: go build -o /tmp/genconfig ./cmd/genconfig && /tmp/genconfig --check
       - run: go build -o /tmp/gendocs ./cmd/gendocs && /tmp/gendocs --check
       - run: go test -race ./...
+      - run: go test -tags synthetic ./tests/synthetic/ -count=1
       - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
           go-version-file: go.mod
@@ -221,9 +232,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
       - run: GOWORK=off go build ./...
         working-directory: sdk
         env:
@@ -252,6 +263,57 @@ jobs:
           go-version-file: go.mod
           go-package: ./...
           work-dir: sdk
+
+  provider-verify:
+    needs: [changes, cache-prime]
+    # Nested GCP provider module: build, vet, full suite, lint, vuln scan.
+    # Workspace mode until the rc.2 require-bump lands (box 2.5), which
+    # flips these to GOWORK=off and re-enables the tidy check.
+    if: ${{ always() && !cancelled() && needs.changes.outputs.provider == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: providers/gcp/go.mod
+          cache: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - run: go build ./...
+        working-directory: providers/gcp
+        env:
+          GOFLAGS: -p=1
+          GOMAXPROCS: "1"
+      - run: go vet ./...
+        working-directory: providers/gcp
+        env:
+          GOFLAGS: -p=1
+          GOMAXPROCS: "1"
+      - run: go test -race ./... -count=1
+        working-directory: providers/gcp
+        env:
+          GOFLAGS: -p=1
+          GOMAXPROCS: "1"
+      - name: golangci-lint (provider module)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13.2
+          args: ./...
+          working-directory: providers/gcp
+      - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          go-version-file: providers/gcp/go.mod
+          go-package: ./...
+          work-dir: providers/gcp
 
   docs:
     needs: changes
@@ -544,9 +606,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
       - name: Install pinned JSON/YAML tools
         env:
           YQ_VERSION: v4.53.3

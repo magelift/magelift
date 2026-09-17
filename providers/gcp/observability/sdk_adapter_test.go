@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	providerobservability "github.com/magelift/magelift/internal/external/observability"
-	provider "github.com/magelift/magelift/internal/provider"
-	"github.com/magelift/magelift/sdk"
 )
 
 type lifecycleStub struct{}
@@ -25,12 +23,6 @@ func (lifecycleStub) Destroy(context.Context, providerobservability.Plan, []stri
 }
 func (lifecycleStub) VerifyCleanup(context.Context, providerobservability.Plan) (providerobservability.CleanupObservation, error) {
 	return providerobservability.CleanupObservation{Complete: true, UnownedPreserved: true}, nil
-}
-
-type adapterFactory func(context.Context, provider.ClientRequest) (sdk.ObservabilityAdapter, error)
-
-func (factory adapterFactory) NewObservabilityClient(ctx context.Context, request provider.ClientRequest) (sdk.ObservabilityAdapter, error) {
-	return factory(ctx, request)
 }
 
 func TestSDKAdapterBridgeValidatesGCPIdentity(t *testing.T) {

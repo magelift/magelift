@@ -147,7 +147,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release edit "$RELEASE_TAG" --draft=false
+        run: |
+          SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
+          bash scripts/release-checks-gate.sh --sha "$SHA"
+          gh release edit "$RELEASE_TAG" --draft=false
   # The cask publishes to the tap during release; this job is the tested
   # macOS install path the readiness doc requires. A failure fails the
   # workflow visibly so the tap file gets fixed forward the same day.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	provider "github.com/magelift/magelift/internal/provider"
 	"github.com/magelift/magelift/sdk"
 )
 
@@ -16,12 +15,6 @@ func (stub sdkEdgeStub) PlanEdge(context.Context, sdk.EdgePlanRequest) (sdk.Edge
 }
 func (stub sdkEdgeStub) ExecuteEdge(context.Context, sdk.EdgeExecutionRequest) (sdk.EdgeExecutionResult, error) {
 	return sdk.EdgeExecutionResult{}, nil
-}
-
-type sdkEdgeFactory func(context.Context, provider.ClientRequest) (sdk.EdgeAdapter, error)
-
-func (factory sdkEdgeFactory) NewEdgeClient(ctx context.Context, request provider.ClientRequest) (sdk.EdgeAdapter, error) {
-	return factory(ctx, request)
 }
 
 func TestSDKEdgeAdapterBridgeValidatesGCPIdentity(t *testing.T) {

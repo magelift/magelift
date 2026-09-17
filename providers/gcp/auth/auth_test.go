@@ -103,7 +103,8 @@ func TestTokenRejectsWithoutSource(t *testing.T) {
 	if _, err := NewRefresher(nil, nil).Token(context.Background()); err == nil {
 		t.Fatal("nil source was accepted")
 	}
-	if _, err := NewRefresher(&scriptedSource{}, nil).Token(nil); err == nil {
+	var nilCtx context.Context
+	if _, err := NewRefresher(&scriptedSource{}, nil).Token(nilCtx); err == nil {
 		t.Fatal("nil context was accepted")
 	}
 	var nilRefresher *Refresher
@@ -168,7 +169,8 @@ func TestTokenSourceAcceptsCIWorkloadIdentity(t *testing.T) {
 
 func TestDefaultTokenSourceRequiresContext(t *testing.T) {
 	t.Parallel()
-	if _, err := DefaultTokenSource(nil); err == nil {
+	var nilCtx context.Context
+	if _, err := DefaultTokenSource(nilCtx); err == nil {
 		t.Fatal("nil context was accepted")
 	}
 }
