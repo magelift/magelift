@@ -39,6 +39,31 @@ Do not reintroduce `acourtiol/magelift` in workflows or ldflags.
 `.github/workflows/images.yml` skips prerelease tags (semver `-rc` / `-beta`).
 Stable semver tags only unless that `if` is intentionally changed.
 
+## Candidate tag sequence
+
+Requires must name tags that exist with complete manifests, but sums
+need the tags first. Order matters; never move a tag:
+
+1. Full local gates green on HEAD, working tree clean.
+2. Tag and push `sdk/<v>` at HEAD (the SDK has no MageLift
+   requires, so its content is final).
+3. Bump requires to `<v>` (root: SDK; provider: SDK plus root),
+   download the SDK sums, verify the root builds `GOWORK=off`,
+   commit.
+4. Tag and push `<v>` at that commit. The release starts; its
+   visibility-wait step polls the proxy and sumdb before packaging
+   (fresh tags 404 for minutes).
+5. Download the root sums into the provider, commit, tag and push
+   `providers/gcp/<v>`. Module tags may point at different commits;
+   each module version is immutable and complete on its own.
+6. Dispatch full CI on the release tag
+   (`gh workflow run ci.yml --ref <v> -f all=true`); the publish
+   gate requires actual success on the tag commit.
+7. Verify the pristine consumer before trusting the candidate:
+   `go install` the CLI and provider mains at `<v>` plus an SDK
+   scratch build, all `GOWORK=off` from the proxy. The release
+   pipeline repeats this before publish; run it locally too.
+
 ## Gates
 
 Before cutting a public tag, read `docs/release-readiness.md` and
