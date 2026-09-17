@@ -227,6 +227,96 @@ func TestEnvSweepSkipsProtectedExpiredPreview(t *testing.T) {
 	}
 }
 
+func TestEnvSweepReportsResidualRetainedBackups(t *testing.T) {
+	path := writeLifecycleConfig(t, "preview", false)
+	setEnvironmentExpiration(t, path, "staging", "2020-01-01T00:00:00Z")
+	keepAutomatedBackups(t, path)
+	backend := &fakeInfrastructureBackend{}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "--yes", "env", "sweep"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"residual":`) || !strings.Contains(out.String(), `"mechanism": "rds-final-snapshot-and-automated-backups"`) {
+		t.Fatalf("sweep did not report residual backups: %s", out.String())
+	}
+	if strings.Contains(out.String(), `"residualUnknown"`) {
+		t.Fatalf("sweep reported unknown residual on a clean destroy: %s", out.String())
+	}
+}
+
+func TestEnvSweepOmitsResidualWhenNothingSurvives(t *testing.T) {
+	path := writeLifecycleConfig(t, "preview", false)
+	setEnvironmentExpiration(t, path, "staging", "2020-01-01T00:00:00Z")
+	backend := &fakeInfrastructureBackend{}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "--yes", "env", "sweep"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"action": "destroyed"`) {
+		t.Fatalf("sweep did not destroy: %s", out.String())
+	}
+	if strings.Contains(out.String(), `"residual"`) || strings.Contains(out.String(), `"residualUnknown"`) {
+		t.Fatalf("sweep reported residual on a clean destroy: %s", out.String())
+	}
+}
+
+func TestSweepResidualUnknownOnForeignShape(t *testing.T) {
+	if _, unknown := sweepResidual(map[string]any{}); !unknown {
+		t.Fatal("empty result was not reported unknown")
+	}
+	residual, unknown := sweepResidual(map[string]any{"destroyed": infrastructureResult{RetainedBackups: []config.RetainedBackup{{Mechanism: "x"}}}})
+	if unknown || len(residual) != 1 {
+		t.Fatalf("residual = %v unknown = %v", residual, unknown)
+	}
+}
+
+func keepAutomatedBackups(t *testing.T, path string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document map[string]any
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		t.Fatal(err)
+	}
+	target := document["target"].(map[string]any)
+	aws := target["aws"].(map[string]any)
+	catalog, ok := aws["catalog"].(map[string]any)
+	if !ok {
+		catalog = map[string]any{}
+		aws["catalog"] = catalog
+	}
+	catalog["databaseDeleteAutomatedBackups"] = false
+	updated, err := yaml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, updated, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPreviewSweepUsesPersistedIdentityAndKeepsBaseOverlay(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "magelift.yaml")
 	if err := os.WriteFile(path, []byte(previewTestConfig()), 0o600); err != nil {
