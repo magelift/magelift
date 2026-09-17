@@ -66,6 +66,7 @@ func selectionFromSpec(spec Spec) gcpprovider.AdmissionSelection {
 
 func requiredServices(spec Spec) []string {
 	services := []string{
+		"artifactregistry.googleapis.com",
 		"compute.googleapis.com",
 		"container.googleapis.com",
 		"cloudbilling.googleapis.com",
