@@ -41,7 +41,7 @@
 - [x] 2.4 Real publication mechanics (R06: coherent fixtures,
   full provider compile `GOWORK=off` against synthetic
   modules) — verify: distribution suite green
-- [ ] 2.5 Require-bump plus real verification (rc.5: latest tree) (R06: bump
+- [x] 2.5 Require-bump plus real verification (R06: bump
   requires to rc.2 after tagging, record proxy sums,
   verify `GOWORK=off` root plus provider builds) — needs
   rc.2 tags; runs with the rc.2 release
