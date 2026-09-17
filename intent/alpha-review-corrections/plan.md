@@ -14,7 +14,7 @@
   command via production registry; project-pinned and
   generated-CI repeats; VM destroyed after) — needs
   rc.2 artifacts; runs before the order-8 re-run
-- [ ] 1.3 Crash-safe updater (R11: copy backup, injectable
+- [x] 1.3 Crash-safe updater (R11: copy backup, injectable
   transitions, fault tests, Windows note) — verify:
   `go test ./internal/upgrade/ -count=1`
 - [ ] 2.1 Provider boundary (R05: execution into plugin,

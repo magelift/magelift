@@ -167,6 +167,128 @@ func TestInstallSupportsFreshExecutable(t *testing.T) {
 	}
 }
 
+type scriptedFileOps struct {
+	osFileOps
+	copyErr     error
+	removeErr   error
+	renameFails map[int]error
+	renames     int
+}
+
+func (s *scriptedFileOps) Copy(src, dst string) error {
+	if s.copyErr != nil {
+		return s.copyErr
+	}
+	return s.osFileOps.Copy(src, dst)
+}
+
+func (s *scriptedFileOps) Rename(oldpath, newpath string) error {
+	s.renames++
+	if err, ok := s.renameFails[s.renames]; ok {
+		return err
+	}
+	return s.osFileOps.Rename(oldpath, newpath)
+}
+
+func (s *scriptedFileOps) Remove(name string) error {
+	if s.removeErr != nil {
+		return s.removeErr
+	}
+	return s.osFileOps.Remove(name)
+}
+
+func faultTestClient(httpClient *fakeHTTP) *Client {
+	return &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "linux", goarch: "amd64", verifier: fakeBlobVerifier{}, selfCheck: func(context.Context, string) error { return nil }}
+}
+
+func faultTestResponses(t *testing.T) *fakeHTTP {
+	t.Helper()
+	archive := testArchive(t, "magelift", []byte("new binary"))
+	digest := sha256.Sum256(archive)
+	return &fakeHTTP{responses: map[string]string{
+		"https://api.example/checksums.txt":           hex.EncodeToString(digest[:]) + "  magelift_1.2.3_linux_amd64.tar.gz\n",
+		"https://api.example/checksums.sigstore.json": "{}",
+		"https://api.example/magelift.tar.gz":         string(archive),
+	}}
+}
+
+func TestInstallBackupCopyFailureLeavesOriginal(t *testing.T) {
+	client := faultTestClient(faultTestResponses(t))
+	client.files = &scriptedFileOps{copyErr: errors.New("disk full")}
+	executable := filepath.Join(t.TempDir(), "magelift")
+	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := client.Install(context.Background(), Release{TagName: "v1.2.3", Assets: releaseAssets()}, executable)
+	if err == nil || !strings.Contains(err.Error(), "back up current executable") {
+		t.Fatalf("err = %v", err)
+	}
+	if contents, _ := os.ReadFile(executable); string(contents) != "old binary" {
+		t.Fatalf("executable = %q", contents)
+	}
+	if _, err := os.Stat(executable + backupSuffix); !os.IsNotExist(err) {
+		t.Fatalf("partial backup remains: %v", err)
+	}
+}
+
+func TestInstallSwapFailureLeavesOriginalPlusSpare(t *testing.T) {
+	client := faultTestClient(faultTestResponses(t))
+	client.files = &scriptedFileOps{renameFails: map[int]error{1: errors.New("cross-device")}}
+	executable := filepath.Join(t.TempDir(), "magelift")
+	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := client.Install(context.Background(), Release{TagName: "v1.2.3", Assets: releaseAssets()}, executable)
+	if err == nil || !strings.Contains(err.Error(), "previous version untouched") {
+		t.Fatalf("err = %v", err)
+	}
+	if contents, _ := os.ReadFile(executable); string(contents) != "old binary" {
+		t.Fatalf("executable = %q", contents)
+	}
+	if contents, _ := os.ReadFile(executable + backupSuffix); string(contents) != "old binary" {
+		t.Fatalf("spare backup = %q", contents)
+	}
+}
+
+func TestInstallRestoreFailureKeepsSpareAndNamesIt(t *testing.T) {
+	archive := testArchive(t, "magelift", []byte("new binary"))
+	digest := sha256.Sum256(archive)
+	client := &Client{httpClient: &fakeHTTP{responses: map[string]string{
+		"https://api.example/checksums.txt":           hex.EncodeToString(digest[:]) + "  magelift_1.2.3_linux_amd64.tar.gz\n",
+		"https://api.example/checksums.sigstore.json": "{}",
+		"https://api.example/magelift.tar.gz":         string(archive),
+	}}, apiBase: "https://api.example", goos: "linux", goarch: "amd64", verifier: fakeBlobVerifier{},
+		selfCheck: func(context.Context, string) error { return errors.New("exit status 1") },
+		files:     &scriptedFileOps{renameFails: map[int]error{2: errors.New("locked")}}}
+	executable := filepath.Join(t.TempDir(), "magelift")
+	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := client.Install(context.Background(), Release{TagName: "v1.2.3", Assets: releaseAssets()}, executable)
+	if err == nil || !strings.Contains(err.Error(), "previous binary kept at") {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := os.Stat(executable + backupSuffix); err != nil {
+		t.Fatalf("spare backup missing: %v", err)
+	}
+}
+
+func TestInstallStaleClearFailureAborts(t *testing.T) {
+	client := faultTestClient(faultTestResponses(t))
+	client.files = &scriptedFileOps{removeErr: errors.New("denied")}
+	executable := filepath.Join(t.TempDir(), "magelift")
+	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(executable+backupSuffix, []byte("stale"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := client.Install(context.Background(), Release{TagName: "v1.2.3", Assets: releaseAssets()}, executable)
+	if err == nil || !strings.Contains(err.Error(), "clear stale upgrade backup") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestInstallDefaultSelfCheckRunsVersion(t *testing.T) {
 	script := "#!/bin/sh\nif [ \"$1\" = \"version\" ]; then echo magelift-test; exit 0; fi\nexit 1\n"
 	archive := testArchive(t, "magelift", []byte(script))

@@ -58,6 +58,57 @@ type Client struct {
 	// default `version` execution. Tests stub it to avoid executing
 	// fixture bytes.
 	selfCheck func(context.Context, string) error
+	// files performs the swap transitions; nil uses the OS. Tests
+	// script failures at each transition.
+	files fileOps
+}
+
+// fileOps covers the filesystem transitions of the swap so fault tests
+// can fail each one. Production uses osFileOps.
+type fileOps interface {
+	Copy(src, dst string) error
+	Rename(oldpath, newpath string) error
+	Remove(name string) error
+}
+
+type osFileOps struct{}
+
+func (osFileOps) Copy(src, dst string) error { return copyFile(src, dst) }
+func (osFileOps) Rename(oldpath, newpath string) error { return os.Rename(oldpath, newpath) }
+func (osFileOps) Remove(name string) error { return os.Remove(name) }
+
+func (c *Client) fileOps() fileOps {
+	if c != nil && c.files != nil {
+		return c.files
+	}
+	return osFileOps{}
+}
+
+// copyFile duplicates src to dst with its permission bits. A failed copy
+// removes the partial destination; a crash may still leave one, which the
+// swap tolerates (backups are replaced, never executed).
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open copy source: %w", err)
+	}
+	defer in.Close()
+	info, err := in.Stat()
+	if err != nil {
+		return fmt.Errorf("stat copy source: %w", err)
+	}
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode().Perm())
+	if err != nil {
+		return fmt.Errorf("create copy destination: %w", err)
+	}
+	_, copyErr := io.Copy(out, in)
+	syncErr := out.Sync()
+	closeErr := out.Close()
+	if copyErr != nil || syncErr != nil || closeErr != nil {
+		os.Remove(dst)
+		return fmt.Errorf("copy file contents: %v %v %v", copyErr, syncErr, closeErr)
+	}
+	return nil
 }
 
 // backupSuffix names the previous binary kept beside the executable until
@@ -211,27 +262,32 @@ func (c *Client) Install(ctx context.Context, release Release, executable string
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close upgrade file: %w", err)
 	}
+	ops := c.fileOps()
 	backup := executable + backupSuffix
 	// A stale backup from a killed run is replaced, never executed.
-	if err := os.Remove(backup); err != nil && !os.IsNotExist(err) {
+	if err := ops.Remove(backup); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("clear stale upgrade backup: %w", err)
 	}
+	// Crash safety: the backup is a COPY, so the executable never leaves
+	// its path until the single atomic replacement rename. A kill before
+	// the rename leaves the old binary (plus maybe a partial .prev, which
+	// is replaced, never executed); a kill during rename leaves old or
+	// new; the command is never missing. Windows cannot replace a running
+	// executable: the rename fails and the old binary stays (documented
+	// in docs/install.md).
 	_, statErr := os.Stat(executable)
 	switch {
 	case statErr == nil:
-		if err := os.Rename(executable, backup); err != nil {
+		if err := ops.Copy(executable, backup); err != nil {
 			return fmt.Errorf("back up current executable: %w", err)
 		}
-		if err := os.Rename(temporaryName, executable); err != nil {
-			if restoreErr := os.Rename(backup, executable); restoreErr != nil {
-				return fmt.Errorf("replace current executable: %v (restore also failed: %v; previous binary kept at %s)", err, restoreErr, backup)
-			}
-			return fmt.Errorf("replace current executable: %w", err)
+		if err := ops.Rename(temporaryName, executable); err != nil {
+			return fmt.Errorf("replace current executable failed; previous version untouched (spare copy at %s): %w", backup, err)
 		}
 	case os.IsNotExist(statErr):
 		// Fresh install: no previous binary to keep.
 		backup = ""
-		if err := os.Rename(temporaryName, executable); err != nil {
+		if err := ops.Rename(temporaryName, executable); err != nil {
 			return fmt.Errorf("replace current executable: %w", err)
 		}
 	default:
@@ -239,10 +295,10 @@ func (c *Client) Install(ctx context.Context, release Release, executable string
 	}
 	if err := c.checkInstalled(ctx, executable); err != nil {
 		if backup == "" {
-			os.Remove(executable)
+			ops.Remove(executable)
 			return fmt.Errorf("new binary failed its self-check: %w", err)
 		}
-		if restoreErr := os.Rename(backup, executable); restoreErr != nil {
+		if restoreErr := ops.Rename(backup, executable); restoreErr != nil {
 			return fmt.Errorf("new binary failed its self-check: %v (restore also failed: %v; previous binary kept at %s)", err, restoreErr, backup)
 		}
 		return fmt.Errorf("new binary failed its self-check, previous version restored: %w", err)
@@ -250,7 +306,7 @@ func (c *Client) Install(ctx context.Context, release Release, executable string
 	// The upgrade succeeded; a leftover backup is inert litter the next
 	// run replaces. Never fail a good install over its cleanup.
 	if backup != "" {
-		_ = os.Remove(backup)
+		_ = ops.Remove(backup)
 	}
 	return nil
 }

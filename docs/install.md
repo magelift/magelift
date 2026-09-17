@@ -55,9 +55,11 @@ Release archives include checksums and an SBOM from GoReleaser.
 ## Staying current
 
 `magelift upgrade` checks for and installs signed releases with the same
-verification as the installer. It keeps your current binary as a backup,
-swaps atomically, runs the new binary once to prove it works, and restores
-the backup if that self-check fails.
+verification as the installer. It copies your current binary as a backup,
+swaps atomically (the installed command is never missing, even on a
+crash), runs the new binary once to prove it works, and restores the
+backup if that self-check fails. On Windows the swap cannot replace a
+running executable; rerun the upgrade from a second copy in that case.
 
 ## Providers
 
