@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/magelift/magelift/sdk"
 	gcpstack "github.com/magelift/magelift/providers/gcp/stack"
+	"github.com/magelift/magelift/sdk"
 )
 
 // BuildDeployInputs derives the versioned deploy contract from a resolved

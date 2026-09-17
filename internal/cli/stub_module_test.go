@@ -186,6 +186,7 @@ func (p stubPlanned) WithImageDigest(digest string) (platform.PlannedStack, erro
 	p.digest = digest
 	return p, nil
 }
+
 // Envelope and StoredPlan let GCP media tests exercise the plugin-backed
 // transfer path through a stub planned stack.
 func (p stubPlanned) Envelope() sdk.Envelope {

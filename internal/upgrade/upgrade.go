@@ -73,9 +73,9 @@ type fileOps interface {
 
 type osFileOps struct{}
 
-func (osFileOps) Copy(src, dst string) error { return copyFile(src, dst) }
+func (osFileOps) Copy(src, dst string) error           { return copyFile(src, dst) }
 func (osFileOps) Rename(oldpath, newpath string) error { return os.Rename(oldpath, newpath) }
-func (osFileOps) Remove(name string) error { return os.Remove(name) }
+func (osFileOps) Remove(name string) error             { return os.Remove(name) }
 
 func (c *Client) fileOps() fileOps {
 	if c != nil && c.files != nil {
