@@ -11,6 +11,7 @@ import (
 
 	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/platform"
+	gcpauth "github.com/magelift/magelift/providers/gcp/auth"
 	provcleanup "github.com/magelift/magelift/providers/gcp/cleanup"
 	gcpcost "github.com/magelift/magelift/providers/gcp/cost"
 	gcpops "github.com/magelift/magelift/providers/gcp/ops"
@@ -519,10 +520,28 @@ func (s *Server) estimator() gcpcost.Estimator {
 }
 
 func (s *Server) observe() *kube.Observe {
-	if s == nil {
-		return kube.NewObserveWithFactory(nil)
+	factory := gcpauth.NewClientFactory()
+	tokens := s.execTokens()
+	if s != nil && s.KubeClients != nil {
+		factory = s.KubeClients
 	}
-	return kube.NewObserveWithFactory(s.KubeClients)
+	return kube.NewObserveWithFactory(factory).WithTokenSource(tokens)
+}
+
+// execTokens mints fresh cluster bearers for exec/tunnel launch. Tests
+// override Server.ExecTokens; production uses ambient ADC (the live
+// expiry phase covers ADC integration, unit tests cover mechanics).
+func (s *Server) execTokens() kube.TokenSource {
+	if s != nil && s.ExecTokens != nil {
+		return s.ExecTokens
+	}
+	return func(ctx context.Context) (string, error) {
+		source, err := gcpauth.DefaultTokenSource(ctx)
+		if err != nil {
+			return "", err
+		}
+		return gcpauth.NewRefresher(source, nil).Token(ctx)
+	}
 }
 
 func (s *Server) tunnel() gcpops.Tunnel {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/platform"
+	gcpauth "github.com/magelift/magelift/providers/gcp/auth"
 	"github.com/magelift/magelift/sdk"
 )
 
@@ -80,7 +81,7 @@ func (s *Server) deployStores(outputs map[string]any) (*kube.CandidateStore, *ku
 		factory = s.KubeClients
 	}
 	if factory == nil {
-		factory = kube.ClientFromOutputs
+		factory = gcpauth.NewClientFactory()
 	}
 	candidate := kube.NewCandidateFromFactory(factory)
 	client, err := factory(outputs)

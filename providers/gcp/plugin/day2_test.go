@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
 
+	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/internal/platform"
 	gcpcost "github.com/magelift/magelift/providers/gcp/cost"
 	gcpresilience "github.com/magelift/magelift/providers/gcp/resilience"
@@ -245,10 +247,11 @@ func TestCheckRuntime(t *testing.T) {
 
 func TestPrepareExec(t *testing.T) {
 	t.Parallel()
-	server := &Server{}
+	server := &Server{ExecTokens: func(context.Context) (string, error) { return "fresh-token", nil }}
 	envelope, plan := planCall(testEnvelope(), storedTestPlan(t, testSpec()))
+	kubeconfig := kube.BuildStaticTokenKubeconfig("ctx", "https://10.0.0.1", "Q0E=", "stale-token")
 	outputs, err := json.Marshal(map[string]any{
-		"clusterName": "shop-staging-gke", "serviceName": "shop-web", "kubeconfig": "fake-config",
+		"clusterName": "shop-staging-gke", "serviceName": "shop-web", "kubeconfig": kubeconfig,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -268,6 +271,13 @@ func TestPrepareExec(t *testing.T) {
 	joined := strings.Join(target.Args, " ")
 	if !strings.Contains(joined, "exec") || !strings.Contains(joined, "cache:flush") {
 		t.Fatalf("target = %#v", target)
+	}
+	launched, err := os.ReadFile(target.Args[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(launched), "fresh-token") || strings.Contains(string(launched), "stale-token") {
+		t.Fatalf("launched kubeconfig carries the stale bearer: %s", launched)
 	}
 }
 

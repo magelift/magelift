@@ -45,6 +45,40 @@ type Observe struct {
 	namespace   string
 	serviceName string // OutputServiceName cached by BindOutputs for TailLogs
 	httpDoer    httpDoer
+	tokens      TokenSource
+}
+
+// WithTokenSource returns a copy that mints fresh bearer tokens into
+// kubectl kubeconfigs at exec/tunnel launch. Nil clears the source and
+// restores static kubeconfig behavior.
+func (o *Observe) WithTokenSource(source TokenSource) *Observe {
+	if o == nil {
+		return &Observe{namespace: defaultNamespace, tokens: source}
+	}
+	next := *o
+	next.tokens = source
+	return &next
+}
+
+// kubeconfigForLaunch returns the stack kubeconfig with a fresh token when
+// a source is wired, or the stored text otherwise.
+func (o *Observe) kubeconfigForLaunch(ctx context.Context, outputs map[string]any) (string, error) {
+	kubeconfig, err := platform.RequireStringOutput(outputs, platform.OutputKubeconfig)
+	if err != nil {
+		return "", err
+	}
+	if o == nil || o.tokens == nil {
+		return kubeconfig, nil
+	}
+	token, err := o.tokens(ctx)
+	if err != nil {
+		return "", fmt.Errorf("mint fresh cluster token: %w", err)
+	}
+	refreshed, err := RefreshKubeconfigToken([]byte(kubeconfig), token)
+	if err != nil {
+		return "", err
+	}
+	return string(refreshed), nil
 }
 
 // NewObserve returns Observe backed by an injected clientset (tests / pre-built clients).
@@ -433,8 +467,10 @@ func (o *Observe) PrepareExec(ctx context.Context, _ platform.PlannedStack, outp
 		return platform.ExecTarget{}, err
 	}
 	// Fail closed on missing kubeconfig so callers cannot silently fall back to
-	// provider ADC (T-06-08). Value is not logged (T-06-07).
-	kubeconfig, err := platform.RequireStringOutput(outputs, platform.OutputKubeconfig)
+	// provider ADC (T-06-08). Value is not logged (T-06-07). A wired token
+	// source mints a fresh bearer into the launch kubeconfig so short-lived
+	// kubectl targets never inherit an expired stored token.
+	kubeconfig, err := o.kubeconfigForLaunch(ctx, outputs)
 	if err != nil {
 		return platform.ExecTarget{}, err
 	}
@@ -512,7 +548,9 @@ func (o *Observe) PrepareTunnel(ctx context.Context, _ platform.PlannedStack, ou
 	if err != nil {
 		return platform.ExecTarget{}, err
 	}
-	kubeconfig, err := platform.RequireStringOutput(outputs, platform.OutputKubeconfig)
+	// Tunnels are long-lived: a wired token source mints a fresh bearer
+	// at launch (good for the token lifetime; rerun past it).
+	kubeconfig, err := o.kubeconfigForLaunch(ctx, outputs)
 	if err != nil {
 		return platform.ExecTarget{}, err
 	}

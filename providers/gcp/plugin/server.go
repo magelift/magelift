@@ -87,6 +87,9 @@ type Server struct {
 	// NewDeployStores builds the candidate and runtime stores for deploy
 	// phases. Nil builds production stores from the client factory.
 	NewDeployStores func(factory kube.ClientFactory, outputs map[string]any) (*kube.CandidateStore, *kube.DeploymentRuntime, error)
+	// ExecTokens mints fresh bearers for exec/tunnel launch kubeconfigs.
+	// Nil uses ambient ADC. Tests stub it; production leaves it nil.
+	ExecTokens kube.TokenSource
 
 	Admission stackRegionAdmission
 	Bootstrap gcpops.Bootstrap
