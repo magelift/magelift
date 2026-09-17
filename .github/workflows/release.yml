@@ -18,8 +18,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Six cross-compiles of the Pulumi-heavy binary need wall time; keep under
-    # the hosted-runner kill window by serializing (see --parallelism 1).
+    # Twelve Pulumi-heavy cross-compiles; warm caches carry the
+    # repeat-release case. No parallelism or GOMAXPROCS caps: the old
+    # serialism was measured on small private runners, not hosted ones.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,6 +31,19 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      # Warm Go caches (shared with CI's go-prime keys): repeat releases
+      # recompile only MageLift packages instead of the Pulumi world.
+      # Explicit save: the post step never runs when the job fails late.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-
+          lookup-only: true
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: v3.1.3
@@ -68,25 +82,25 @@ jobs:
         with:
           distribution: goreleaser
           version: v2.18.1
-          args: release --clean --parallelism 1 --timeout 30m -f .goreleaser.dialproof.yaml
+          args: release --clean --timeout 30m -f .goreleaser.dialproof.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GOMAXPROCS: "1"
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
         with:
           distribution: goreleaser
           version: v2.18.1
-          # Parallelism 1: keep the Pulumi-heavy cross-compiles serial;
-          # concurrent runs overwhelm small runners and lose communication.
-          # Timeout 150m: twelve serial Pulumi-heavy cross-compiles exceed
-          # GoReleaser's default 1h; the job allows 180 minutes.
-          args: release --clean --parallelism 1 --timeout 150m
+          # Default parallelism and GOMAXPROCS: GoReleaser and the Go
+          # toolchain size themselves to the runner. Timeout 150m stays
+          # a safe upper bound.
+          args: release --clean --timeout 150m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Pushes the brew formula and Scoop manifest to their tap repos.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          GOMAXPROCS: "1"
+          # OOM guardrail only (the historical private-runner failure);
+          # 12GiB never binds a healthy link on the 16GB box.
+          GOMEMLIMIT: 12GiB
       # The CLI verifies a provider binary against the digest plus
       # Cosign bundle named in magelift.providers.lock. One lock per
       # platform (the installed binary has a fixed name); digests come
@@ -94,7 +108,6 @@ jobs:
       - name: Generate provider lockfiles
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-          GOMAXPROCS: "1"
         run: go run ./cmd/genproviders --tag "$RELEASE_TAG" --dist dist
       - name: Upload provider lockfiles
         env:
@@ -170,7 +183,6 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           GOWORK: "off"
-          GOMAXPROCS: "1"
         run: |
           go install "github.com/magelift/magelift/cmd/magelift@${RELEASE_TAG}"
           go install "github.com/magelift/magelift/providers/gcp/cmd/magelift-provider-gcp@${RELEASE_TAG}"
@@ -196,6 +208,15 @@ jobs:
           SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
           bash scripts/release-checks-gate.sh --sha "$SHA"
           gh release edit "$RELEASE_TAG" --draft=false
+      # Explicit save with if: always() — setup-go's post-step never runs
+      # when the job fails, and the next candidate wants this build cache.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always()
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
   # The cask publishes to the tap during release; this job is the tested
   # macOS install path the readiness doc requires. A failure fails the
   # workflow visibly so the tap file gets fixed forward the same day.
