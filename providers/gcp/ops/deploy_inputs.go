@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/sdk"
 	gcpstack "github.com/magelift/magelift/providers/gcp/stack"
 )
 
-// BuildDeployInputs derives the shared kube deploy inputs from a resolved
-// spec. The protocol server embeds the JSON in the stored plan so the core
-// can construct deploy steps without reading the opaque plan.
+// BuildDeployInputs derives the versioned deploy contract from a resolved
+// spec. The protocol server embeds the JSON in the stored plan; the plugin
+// decodes and executes it per phase, and the core passes it through
+// without interpreting provider behavior.
 func BuildDeployInputs(spec gcpstack.Spec) ([]byte, error) {
-	deploySpec := kube.DeploySpec{
+	deploySpec := sdk.DeployInputs{
 		ImageDigest:        spec.Artifact.ImageDigest,
 		DatabaseName:       spec.Dependencies.DatabaseName,
 		ApplicationMode:    spec.Application.Mode,

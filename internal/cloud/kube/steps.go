@@ -57,29 +57,9 @@ type RuntimeChecker interface {
 }
 
 // DeploySpec holds provider-portable Magento deploy knobs for kube.Steps.
-type DeploySpec struct {
-	ImageDigest        string
-	DatabaseName       string
-	ApplicationMode    string
-	ApplicationVersion string
-	WebRuntime         string
-	CPURequest         string
-	MemoryRequest      string
-	CloudProject       string
-	Region             string
-	Magento            platform.MagentoOverlays
-}
-
-func (s DeploySpec) Validate() error {
-	var problems []error
-	if !candidateDigest.MatchString(s.ImageDigest) {
-		problems = append(problems, errors.New("image digest must be repository@sha256:..."))
-	}
-	if strings.TrimSpace(s.DatabaseName) == "" {
-		problems = append(problems, errors.New("database name is required"))
-	}
-	return errors.Join(problems...)
-}
+// The contract moved to the SDK; this alias keeps in-process providers
+// (EKS, OVH) compiling against the same versioned shape.
+type DeploySpec = sdk.DeployInputs
 
 // Steps implements deployflow.Steps for Magento on Kubernetes (D-03, KUBE-04).
 type Steps struct {
@@ -155,7 +135,7 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 			return fmt.Errorf("read kubernetes deployment outputs after initial create: %w", err)
 		}
 	}
-	candidateRequest, err := candidateRequestFromOutputs(outputs, s.spec, request)
+	candidateRequest, err := CandidateRequestFromOutputs(outputs, s.spec, request.ImageDigest)
 	if err != nil {
 		return err
 	}
@@ -167,7 +147,9 @@ func (s *Steps) RegisterCandidate(ctx context.Context, request deployflow.Reques
 	return err
 }
 
-func candidateRequestFromOutputs(outputs map[string]any, spec DeploySpec, request deployflow.Request) (CandidateRequest, error) {
+// CandidateRequestFromOutputs builds the job request from stack outputs plus
+// the deploy contract. Exported for provider plugins executing deploy phases.
+func CandidateRequestFromOutputs(outputs map[string]any, spec DeploySpec, imageDigest string) (CandidateRequest, error) {
 	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
 	if err != nil {
 		return CandidateRequest{}, err
@@ -236,7 +218,7 @@ func candidateRequestFromOutputs(outputs map[string]any, spec DeploySpec, reques
 		Cluster:                 cluster,
 		Namespace:               defaultNamespace,
 		ServiceName:             service,
-		ImageDigest:             request.ImageDigest,
+		ImageDigest:             imageDigest,
 		DatabaseWriter:          databaseWriter,
 		DatabaseName:            spec.DatabaseName,
 		DatabaseSecretName:      databaseSecretName,
@@ -310,7 +292,7 @@ func (s *Steps) Health(ctx context.Context, request deployflow.Request) error {
 	if err != nil {
 		return fmt.Errorf("read kubernetes deployment outputs: %w", err)
 	}
-	probeRequest, err := candidateRequestFromOutputs(outputs, s.spec, request)
+	probeRequest, err := CandidateRequestFromOutputs(outputs, s.spec, request.ImageDigest)
 	if err != nil {
 		return err
 	}
