@@ -833,7 +833,7 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	sawHMAC, sawSA, sawWriterGrant, sawPublicGrant := false, false, false, false
-	sawSecret, sawKey, sawEndpoint, sawSecretRef := false, false, false, false
+	sawSecret, sawKey, sawEndpoint, sawSecretRef, sawDriver := false, false, false, false, false
 	for _, res := range mocks.resources {
 		switch res.TypeToken {
 		case "gcp:storage/hmacKey:HmacKey":
@@ -876,6 +876,11 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 						sawKey = true
 					case "MAGELIFT_MEDIA_S3_ENDPOINT":
 						sawEndpoint = true
+					case "MAGELIFT_MEDIA_DRIVER":
+						if value := entry["value"].StringValue(); value != "aws-s3" {
+							t.Fatalf("media driver = %q", value)
+						}
+						sawDriver = true
 					case "MAGELIFT_MEDIA_S3_SECRET":
 						ref := entry["valueFrom"].ObjectValue()["secretKeyRef"].ObjectValue()
 						if key := ref["key"].StringValue(); key != "secret" {
@@ -893,7 +898,7 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 	if !sawHMAC || !sawSA || !sawWriterGrant || !sawPublicGrant {
 		t.Fatalf("media IAM incomplete: hmac=%v sa=%v writer=%v public=%v", sawHMAC, sawSA, sawWriterGrant, sawPublicGrant)
 	}
-	if !sawSecret || !sawKey || !sawEndpoint || !sawSecretRef {
-		t.Fatalf("media env incomplete: secret=%v key=%v endpoint=%v secretRef=%v", sawSecret, sawKey, sawEndpoint, sawSecretRef)
+	if !sawSecret || !sawKey || !sawEndpoint || !sawSecretRef || !sawDriver {
+		t.Fatalf("media env incomplete: secret=%v key=%v endpoint=%v secretRef=%v driver=%v", sawSecret, sawKey, sawEndpoint, sawSecretRef, sawDriver)
 	}
 }
