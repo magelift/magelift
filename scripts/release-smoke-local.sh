@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Local packaging smoke: goreleaser check + one host binary + legal files.
-# Keep --single-target and low parallelism; full multi-platform matrices belong on CI.
+# Local packaging smoke: goreleaser check + one snapshot release (host only)
+# + legal files + provider matrix presence. Signing, SBOM, and publish are
+# skipped: full multi-platform matrices with signatures belong on CI.
+# Keep --single-target and low parallelism.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,19 +13,22 @@ export GOMAXPROCS=1
 export GOFLAGS=-p=1
 export GOMEMLIMIT=1GiB
 
-printf '+ goreleaser check\n'
-go run github.com/goreleaser/goreleaser/v2@v2.18.1 check
+printf '+ goreleaser check (both configs)\n'
+go run github.com/goreleaser/goreleaser/v2@v2.18.1 check -f .goreleaser.yaml
+go run github.com/goreleaser/goreleaser/v2@v2.18.1 check -f .goreleaser.dialproof.yaml
 
-printf '+ goreleaser build --snapshot --single-target --parallelism=1 GOMAXPROCS=%s GOFLAGS=%s (host only)\n' \
+# The dialproof config is the slim linux/amd64 shape; the full matrix
+# belongs on CI.
+printf '+ goreleaser release --snapshot --parallelism=1 GOMAXPROCS=%s GOFLAGS=%s (dialproof config)\n' \
 	"$GOMAXPROCS" "$GOFLAGS"
 rm -rf dist
-go run github.com/goreleaser/goreleaser/v2@v2.18.1 build --snapshot --clean \
-	--single-target --parallelism=1
+go run github.com/goreleaser/goreleaser/v2@v2.18.1 release --snapshot --clean \
+	-f .goreleaser.dialproof.yaml --parallelism=1 --skip=publish,sign,sbom
 
-bin="$(find dist -type f \( -name 'magelift' -o -name 'magelift.exe' \) | head -1 || true)"
-if [[ -z "$bin" ]]; then
-	printf 'magelift binary missing under dist/\n' >&2
-	find dist -maxdepth 4 -type f 2>/dev/null | head -40 >&2 || true
+cli_archive="$(find dist -maxdepth 1 -type f -name 'magelift_*.tar.gz' -o -maxdepth 1 -type f -name 'magelift_*.zip' | head -1 || true)"
+if [[ -z "$cli_archive" ]]; then
+	printf 'CLI archive missing under dist/\n' >&2
+	find dist -maxdepth 2 2>/dev/null | head -40 >&2 || true
 	exit 1
 fi
 
@@ -34,28 +39,22 @@ if [[ -z "$provider_bin" ]]; then
 	exit 1
 fi
 
-# Archives.files in .goreleaser.yaml; confirm sources exist for real releases.
-test -f LICENSE
-test -f NOTICE
-test -f README.md
+# The release matrix must carry the provider into checksums.txt, or the
+# lockfile generator has nothing to pin on a real tag.
+grep -q 'magelift-provider-gcp_' dist/checksums.txt \
+	|| { printf 'provider missing from dist/checksums.txt\n' >&2; exit 1; }
 
-chmod +x "$bin" 2>/dev/null || true
-if [[ "$bin" == *.exe ]]; then
+# Archives.files in .goreleaser.yaml; confirm the real archive packs them.
+tar -tzf "$cli_archive" | rg -q 'LICENSE'
+tar -tzf "$cli_archive" | rg -q 'NOTICE'
+
+bin_dir="$(mktemp -d "${TMPDIR:-/tmp}/magelift-smoke.XXXXXX")"
+trap 'rm -rf "$bin_dir"' EXIT
+tar -xzf "$cli_archive" -C "$bin_dir"
+if [[ "$cli_archive" == *.zip ]]; then
 	printf 'skipping version exec for windows artifact on this host\n'
 else
-	"$bin" version >/dev/null
+	"$bin_dir/magelift" version >/dev/null
 fi
 
-# Pack a minimal smoke tarball the way archives.files would.
-smoke_dir="$(mktemp -d /tmp/magelift-smoke.XXXXXX)"
-trap 'rm -rf "$smoke_dir"' EXIT
-cp "$bin" LICENSE NOTICE README.md "$smoke_dir/"
-(
-	cd "$smoke_dir"
-	tar -czf magelift-smoke.tar.gz magelift LICENSE NOTICE README.md 2>/dev/null \
-		|| tar -czf magelift-smoke.tar.gz magelift.exe LICENSE NOTICE README.md
-)
-tar -tzf "$smoke_dir/magelift-smoke.tar.gz" | rg -q 'LICENSE'
-tar -tzf "$smoke_dir/magelift-smoke.tar.gz" | rg -q 'NOTICE'
-
-printf 'release smoke ok binary=%s provider=%s (serial single-target)\n' "$bin" "$provider_bin"
+printf 'release smoke ok archive=%s provider=%s (serial single-target)\n' "$cli_archive" "$provider_bin"
