@@ -267,9 +267,12 @@ jobs:
   provider-verify:
     needs: [changes, cache-prime]
     # Nested GCP provider module: build, vet, full suite, lint, vuln scan.
-    # Workspace mode until the rc.2 require-bump lands (box 2.5), which
-    # flips these to GOWORK=off and re-enables the tidy check.
-    if: ${{ always() && !cancelled() && needs.changes.outputs.provider == 'true' }}
+    # Runs whenever any Go changes: the provider still imports root
+    # internals, so root edits re-verify it until import decoupling
+    # (alpha-review-corrections 2.1) lands. Workspace mode is correct
+    # here (tree tested against tree); GOWORK=off standalone proofs
+    # belong to the release pipeline, where requires equal the tag.
+    if: ${{ always() && !cancelled() && (needs.changes.outputs.go == 'true' || needs.changes.outputs.provider == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -303,6 +306,8 @@ jobs:
         env:
           GOFLAGS: -p=1
           GOMAXPROCS: "1"
+      - run: go mod tidy && git diff --exit-code -- go.mod go.sum
+        working-directory: providers/gcp
       - name: golangci-lint (provider module)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
