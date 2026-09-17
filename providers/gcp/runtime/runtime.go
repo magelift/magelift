@@ -27,6 +27,10 @@ const (
 	// mediaS3Endpoint is the GCS S3-interop endpoint Magento's AwsS3
 	// driver talks to with the media HMAC credentials.
 	mediaS3Endpoint = "https://storage.googleapis.com"
+	// mediaDriver selects Magento remote storage. GCP always uses the
+	// AwsS3 driver against GCS interop; runtimes without object storage
+	// omit the binding and keep local media via the template default.
+	mediaDriver = "aws-s3"
 )
 
 type Args struct {
@@ -554,6 +558,7 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 			QueueUsername:      queueUser,
 			MediaBucket:        values[5].(string),
 			MediaURL:           values[6].(string),
+			MediaDriver:        mediaDriver,
 			MediaS3Key:         values[7].(string),
 			MediaS3Endpoint:    mediaS3Endpoint,
 			MediaS3Region:      args.Region,

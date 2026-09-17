@@ -441,6 +441,36 @@ func TestCoreEnvBindingsIncludeMagentoContract(t *testing.T) {
 	}
 }
 
+func TestCoreEnvBindingsEmitMediaRemoteStorage(t *testing.T) {
+	bindings := CoreEnvBindings(CapabilityEndpoints{
+		MediaBucket: "shop-media", MediaURL: "https://storage.googleapis.com/shop-media/media/",
+		MediaDriver: "aws-s3", MediaS3Key: "GOOGKEY", MediaS3Endpoint: "https://storage.googleapis.com",
+		MediaS3Region: "europe-west1", MediaS3Prefix: "media/",
+	})
+	found := map[string]string{}
+	for _, binding := range bindings {
+		found[binding.Name] = binding.Value
+	}
+	for name, want := range map[string]string{
+		EnvMediaBucket: "shop-media", EnvMediaDriver: "aws-s3", EnvMediaS3Key: "GOOGKEY",
+		EnvMediaS3Endpoint: "https://storage.googleapis.com", EnvMediaS3Region: "europe-west1",
+		EnvMediaS3Prefix: "media/",
+	} {
+		if found[name] != want {
+			t.Fatalf("%s = %q, want %q", name, found[name], want)
+		}
+	}
+	if _, ok := found["MAGELIFT_MEDIA_S3_SECRET"]; ok {
+		t.Fatal("media secret must never be a plain binding")
+	}
+	plain := CoreEnvBindings(CapabilityEndpoints{})
+	for _, binding := range plain {
+		if strings.HasPrefix(binding.Name, "MAGELIFT_MEDIA") {
+			t.Fatalf("media binding %q emitted without inputs", binding.Name)
+		}
+	}
+}
+
 func TestCoreEnvBindingsSelectsAMQPForRabbitMQ(t *testing.T) {
 	bindings := CoreEnvBindings(CapabilityEndpoints{
 		ApplicationMode: "integrated", WebRuntime: "nginx-fpm",

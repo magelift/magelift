@@ -51,6 +51,7 @@ const (
 	// EnvMediaS3* feeds the PHP lifecycle remote-storage writer. The
 	// secret travels only via SecretKeyRef (MAGELIFT_MEDIA_S3_SECRET),
 	// never as a plain binding.
+	EnvMediaDriver     = "MAGELIFT_MEDIA_DRIVER"
 	EnvMediaS3Key      = "MAGELIFT_MEDIA_S3_KEY"
 	EnvMediaS3Endpoint = "MAGELIFT_MEDIA_S3_ENDPOINT"
 	EnvMediaS3Region   = "MAGELIFT_MEDIA_S3_REGION"
@@ -116,6 +117,7 @@ type CapabilityEndpoints struct {
 	QueueUsername      string
 	MediaBucket        string
 	MediaURL           string
+	MediaDriver        string
 	MediaS3Key         string
 	MediaS3Endpoint    string
 	MediaS3Region      string
@@ -229,6 +231,9 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 	}
 	if endpoints.MediaURL != "" {
 		bindings = append(bindings, EnvBinding{Name: EnvMediaURL, Value: endpoints.MediaURL})
+	}
+	if endpoints.MediaDriver != "" {
+		bindings = append(bindings, EnvBinding{Name: EnvMediaDriver, Value: endpoints.MediaDriver})
 	}
 	if endpoints.MediaS3Key != "" {
 		bindings = append(bindings, EnvBinding{Name: EnvMediaS3Key, Value: endpoints.MediaS3Key})
