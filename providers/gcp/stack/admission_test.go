@@ -37,7 +37,8 @@ func TestSelectionFromSpecUsesReleaseAwareCloudSQLAndGCPCatalog(t *testing.T) {
 
 func TestAdmitSpecFailsClosed(t *testing.T) {
 	t.Parallel()
-	if _, err := (RegionAdmission{}).AdmitSpec(nil, Spec{}); err == nil {
+	var nilCtx context.Context
+	if _, err := (RegionAdmission{}).AdmitSpec(nilCtx, Spec{}); err == nil {
 		t.Fatal("AdmitSpec(nil ctx) succeeded, want error")
 	}
 	failing := RegionAdmission{NewClient: func(context.Context) (gcpprovider.CapabilityAPI, error) {

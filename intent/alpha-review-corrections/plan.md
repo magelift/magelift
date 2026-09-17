@@ -43,7 +43,7 @@
 - [x] 3.3 Lifecycle authority (R08: PHP-emitted sequence,
   golden plus regen target, scope docs) — verify:
   golden test green, phpunit green if php present
-- [ ] 4.1 CI coverage (R09: module jobs, filters, cache
+- [x] 4.1 CI coverage (R09: module jobs, filters, cache
   keys, promotion gate on checks) — verify: actionlint,
   gate-script failure demo
 - [ ] 4.2 Onboarding truth (R12: shipped-path rewrite,

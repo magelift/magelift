@@ -175,6 +175,7 @@ acceptance-harness-test: acceptance-dependencies-check ## Run offline acceptance
 
 acceptance-dependencies-check: ## Verify jq/yq v4 and shared acceptance command preflight before mutation
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) dependency_preflight_test.sh -- bash tests/acceptance/dependency_preflight_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) release_checks_gate_test.sh -- bash tests/acceptance/release_checks_gate_test.sh
 
 skills-test: ## Test bundled skill installation and verification
 	GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/skills
