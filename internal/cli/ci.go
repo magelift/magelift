@@ -16,7 +16,6 @@ import (
 )
 
 const checkoutAction = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1"
-const setupGoAction = "actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0"
 const setupBuildxAction = "docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0"
 const setupQemuAction = "docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0"
 const dockerLoginAction = "docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0"
@@ -24,6 +23,7 @@ const configureAWSAction = "aws-actions/configure-aws-credentials@cbe3b392738ccf
 const gcpAuthAction = "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0"
 const gcpSetupAction = "google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1"
 const cosignInstallerAction = "sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2"
+const cosignRelease = "v3.1.3"
 
 var releaseVersionPattern = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$`)
 
@@ -192,8 +192,7 @@ func renderWorkflow(configFile, version string, environments []string, generator
 	}
 	workflow.WriteString("    steps:\n")
 	workflow.WriteString("      - uses: " + checkoutAction + "\n")
-	workflow.WriteString("      - uses: " + setupGoAction + "\n        with:\n          go-version: '1.27.1'\n          cache: false\n")
-	workflow.WriteString("      - name: Install MageLift\n        run: go install github.com/magelift/magelift/cmd/magelift@" + version + "\n")
+	writeVerifiedInstall(&workflow, version, true)
 	workflow.WriteString("      - name: Validate configuration\n        run: magelift --config " + shellQuote(configFile) + " --no-interaction config validate\n")
 	workflow.WriteString("      - name: Resolve environment\n        run: magelift --config " + shellQuote(configFile) + " --env \"${{ matrix.environment }}\" --no-interaction --output json config effective > /dev/null\n")
 	workflow.WriteString("\n  build:\n    name: Build and sign immutable image\n    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'\n    needs: validate\n    runs-on: ubuntu-latest\n")
@@ -202,11 +201,10 @@ func renderWorkflow(configFile, version string, environments []string, generator
 	}
 	workflow.WriteString("    permissions:\n      contents: read\n      packages: write\n      id-token: write\n      attestations: write\n    outputs:\n      digest: ${{ steps.build.outputs.digest }}\n    steps:\n")
 	workflow.WriteString("      - uses: " + checkoutAction + "\n        with:\n          persist-credentials: false\n")
-	workflow.WriteString("      - uses: " + setupGoAction + "\n        with:\n          go-version-file: go.mod\n          cache: false\n")
-	workflow.WriteString("      - uses: " + setupQemuAction + "\n      - uses: " + setupBuildxAction + "\n      - uses: " + cosignInstallerAction + "\n        with:\n          cosign-release: v3.1.3\n")
+	workflow.WriteString("      - uses: " + setupQemuAction + "\n      - uses: " + setupBuildxAction + "\n      - uses: " + cosignInstallerAction + "\n        with:\n          cosign-release: " + cosignRelease + "\n")
 	workflow.WriteString("      - uses: " + dockerLoginAction + "\n        with:\n          registry: ghcr.io\n          username: ${{ github.actor }}\n          password: ${{ secrets.GITHUB_TOKEN }}\n")
 	generator.WriteBuildAuth(&workflow)
-	workflow.WriteString("      - name: Install MageLift\n        run: go install -ldflags=\"-X github.com/magelift/magelift/internal/cli.Version=" + version + "\" github.com/magelift/magelift/cmd/magelift@" + version + "\n")
+	writeVerifiedInstall(&workflow, version, false)
 	workflow.WriteString("      - name: Build and sign image\n        id: build\n        env:\n          MAGELIFT_RELEASE_IMAGE: ${{ vars.MAGELIFT_RELEASE_IMAGE }}\n          MAGELIFT_BUILDER_IMAGE: ${{ vars.MAGELIFT_BUILDER_IMAGE }}\n          MAGELIFT_RUNTIME_IMAGE: ${{ vars.MAGELIFT_RUNTIME_IMAGE }}\n        run: |\n          set -eu\n          for required in MAGELIFT_RELEASE_IMAGE MAGELIFT_BUILDER_IMAGE MAGELIFT_RUNTIME_IMAGE; do\n            test -n \"${!required}\"\n          done\n          magelift --config " + shellQuote(configFile) + " --no-interaction --output json build --push \\\n            --image \"$MAGELIFT_RELEASE_IMAGE\" \\\n            --builder-image \"$MAGELIFT_BUILDER_IMAGE\" \\\n            --runtime-image \"$MAGELIFT_RUNTIME_IMAGE\" > build-result.json\n          digest=\"$(jq -er '.image.imageReference + \"@\" + .image.digest' build-result.json)\"\n          printf 'digest=%s\\n' \"$digest\" >> \"$GITHUB_OUTPUT\"\n")
 	if containsEnvironment(environments, "preview") {
 		workflow.WriteString("\n  preview:\n    name: Preview infrastructure\n    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'magelift-preview')\n    needs: validate\n    runs-on: ubuntu-latest\n    environment: preview\n    concurrency:\n      group: magelift-preview-${{ github.repository }}-${{ github.event.pull_request.number }}\n      cancel-in-progress: false\n    permissions:\n      contents: read\n      id-token: write\n    steps:\n")
@@ -293,8 +291,32 @@ func writeGCPAuth(workflow *strings.Builder) {
 
 func writeWorkflowCheckoutAndInstall(workflow *strings.Builder, version string) {
 	workflow.WriteString("      - uses: " + checkoutAction + "\n        with:\n          persist-credentials: false\n")
-	workflow.WriteString("      - uses: " + setupGoAction + "\n        with:\n          go-version-file: go.mod\n          cache: false\n")
-	workflow.WriteString("      - name: Install MageLift\n        run: go install -ldflags=\"-X github.com/magelift/magelift/internal/cli.Version=" + version + "\" github.com/magelift/magelift/cmd/magelift@" + version + "\n")
+	writeVerifiedInstall(workflow, version, true)
+}
+
+// writeVerifiedInstall installs the pinned release binary: Sigstore bundle
+// on checksums.txt, archive checksum, extract to PATH. Every step fails
+// closed; no toolchain compile. cosignInstaller adds the cosign-installer
+// step for jobs that do not already install cosign (generated jobs all run
+// ubuntu-latest, so the linux/amd64 archive is correct).
+func writeVerifiedInstall(workflow *strings.Builder, version string, cosignInstaller bool) {
+	if cosignInstaller {
+		workflow.WriteString("      - uses: " + cosignInstallerAction + "\n        with:\n          cosign-release: " + cosignRelease + "\n")
+	}
+	workflow.WriteString("      - name: Install MageLift\n        env:\n          MAGELIFT_VERSION: " + version + "\n        run: |\n")
+	workflow.WriteString("          set -eu\n")
+	workflow.WriteString("          archive=\"magelift_${MAGELIFT_VERSION#v}_linux_amd64.tar.gz\"\n")
+	workflow.WriteString("          base=\"https://github.com/magelift/magelift/releases/download/$MAGELIFT_VERSION\"\n")
+	workflow.WriteString("          tmp=\"$(mktemp -d)\"\n")
+	workflow.WriteString("          trap 'rm -rf \"$tmp\"' EXIT\n")
+	workflow.WriteString("          curl -fsSL -o \"$tmp/$archive\" \"$base/$archive\"\n")
+	workflow.WriteString("          curl -fsSL -o \"$tmp/checksums.txt\" \"$base/checksums.txt\"\n")
+	workflow.WriteString("          curl -fsSL -o \"$tmp/checksums.txt.sigstore.json\" \"$base/checksums.txt.sigstore.json\"\n")
+	workflow.WriteString("          cosign verify-blob --bundle \"$tmp/checksums.txt.sigstore.json\" --certificate-identity \"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/$MAGELIFT_VERSION\" --certificate-oidc-issuer https://token.actions.githubusercontent.com \"$tmp/checksums.txt\"\n")
+	workflow.WriteString("          (cd \"$tmp\" && grep \" $archive$\" checksums.txt | sha256sum -c -)\n")
+	workflow.WriteString("          tar -xzf \"$tmp/$archive\" -C \"$tmp\" magelift\n")
+	workflow.WriteString("          sudo install -m 0755 \"$tmp/magelift\" /usr/local/bin/magelift\n")
+	workflow.WriteString("          magelift version\n")
 }
 
 func writePreviewApplyStep(workflow *strings.Builder, configFile string) {

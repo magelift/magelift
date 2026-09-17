@@ -12,7 +12,7 @@
   (pinned cosign bootstrap, mandatory bundle, fixture-server
   success/tamper/missing tests) — verify: harness green,
   `shellcheck` clean on the touched scripts
-- [ ] 2.2 CI templates to verified binaries (download plus
+- [x] 2.2 CI templates to verified binaries (download plus
   verify-blob plus checksum in validate/build/ENV jobs, drop
   install-only setup-go; update `ci_test.go` expectations) —
   verify: `go test ./internal/cli/ -run TestCI -count=1`
