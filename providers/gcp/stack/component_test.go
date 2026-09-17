@@ -849,9 +849,8 @@ func TestProgramWiresMediaRemoteStorage(t *testing.T) {
 				sawWriterGrant = true
 			}
 			if role == "roles/storage.objectViewer" && member == "allUsers" {
-				condition := res.Inputs["condition"].ObjectValue()["expression"].StringValue()
-				if !strings.Contains(condition, "/objects/media/") {
-					t.Fatalf("public grant is not prefix-scoped: %q", condition)
+				if condition, ok := res.Inputs["condition"]; ok && !condition.IsNull() {
+					t.Fatal("public grant must not carry a condition: IAM rejects conditions on allUsers")
 				}
 				sawPublicGrant = true
 			}
