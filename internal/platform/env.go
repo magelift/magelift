@@ -56,6 +56,11 @@ const (
 	EnvMagentoMediaKey      = "MAGENTO_DC_MEDIA__KEY"
 	EnvMagentoMediaSecret   = "MAGENTO_DC_MEDIA__SECRET"
 
+	// EnvMagentoBaseMediaURL pins image emission app-relative. The
+	// media bucket is private; only storefront-relative URLs work.
+	EnvMagentoBaseMediaURL       = "CONFIG__DEFAULT__WEB__UNSECURE__BASE_MEDIA_URL"
+	EnvMagentoBaseMediaURLSecure = "CONFIG__DEFAULT__WEB__SECURE__BASE_MEDIA_URL"
+
 	EnvSearchEndpoint = "MAGELIFT_SEARCH_ENDPOINT"
 	EnvMediaBucket    = "MAGELIFT_MEDIA_BUCKET"
 	EnvMediaURL       = "MAGELIFT_MEDIA_URL"

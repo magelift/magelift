@@ -48,7 +48,9 @@ jobs:
           deadline=$((SECONDS + 1800))
           for module in "github.com/magelift/magelift" "github.com/magelift/magelift/sdk" "github.com/magelift/magelift/providers/gcp"; do
             while true; do
-              if go list -m "$module@$RELEASE_TAG" >/dev/null 2>&1; then
+              # go mod download, not go list: packaging needs the zip plus
+              # both sumdb entries, and the .mod alone can go visible first.
+              if go mod download "$module@$RELEASE_TAG" >/dev/null 2>&1; then
                 break
               fi
               if [[ "$SECONDS" -ge "$deadline" ]]; then

@@ -579,6 +579,14 @@ func appendMediaDCBindings(bindings []platform.EnvBinding, bucket, keyID, region
 	add(platform.EnvMagentoMediaRegion, region)
 	add(platform.EnvMagentoMediaEndpoint, mediaS3Endpoint)
 	add(platform.EnvMagentoMediaKey, keyID)
+	// Delivery runs through the storefront: pin the media base URLs
+	// app-relative. Env config overrides core_config_data, so even a
+	// migrated shop database pointing at object storage cannot divert
+	// emission (a remote URL would only 403 against the private bucket).
+	bindings = append(bindings,
+		platform.EnvBinding{Name: platform.EnvMagentoBaseMediaURL, Value: "{{unsecure_base_url}}media/"},
+		platform.EnvBinding{Name: platform.EnvMagentoBaseMediaURLSecure, Value: "{{secure_base_url}}media/"},
+	)
 	return bindings
 }
 
