@@ -201,7 +201,7 @@ func (s *Steps) Health(ctx context.Context, request deployflow.Request) error {
 	// SigV4-only serverless search skips unsigned reachability: curl without
 	// signing would fail a working shop. Wiring is still asserted.
 	reachable := searchEndpoint != "" && string(s.spec.Catalog.SearchMode) != string(awsstack.SearchModeServerless)
-	command := platform.MagentoProbeShell(searchEndpoint, reachable)
+	command := platform.MagentoProbeShell(searchEndpoint, reachable, "")
 	return s.probe.RunProbe(ctx, awsoperations.CandidateRequest{
 		Cluster: cluster, TaskDefinitionARN: definition, ImageDigest: request.ImageDigest,
 		PrivateSubnetIDs: subnets, SecurityGroupID: securityGroup, StartedBy: "magelift",

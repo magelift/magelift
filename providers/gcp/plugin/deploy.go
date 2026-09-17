@@ -41,6 +41,10 @@ func (s *Server) DeployAppPhase(ctx context.Context, req *sdk.DeployAppPhaseCall
 	if req.ImageDigest != inputs.ImageDigest {
 		return nil, InvalidError("deployment digest does not match the planned artifact")
 	}
+	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	if operr != nil {
+		return nil, operr
+	}
 	outputs, operr := decodeOutputs(req.OutputsJSON)
 	if operr != nil {
 		return nil, operr
@@ -62,7 +66,11 @@ func (s *Server) DeployAppPhase(ctx context.Context, req *sdk.DeployAppPhaseCall
 		}
 		return &sdk.DeployAppPhaseResult{Message: "service stabilized"}, nil
 	case sdk.DeployPhaseHealth:
-		return s.deployHealth(ctx, candidate, runtime, outputs, inputs, req.ImageDigest)
+		engine := ""
+		if spec.Catalog.SearchMode == "opensearch" {
+			engine = spec.Catalog.SearchMode
+		}
+		return s.deployHealth(ctx, candidate, runtime, outputs, inputs, req.ImageDigest, engine)
 	default:
 		return nil, InvalidError(fmt.Sprintf("unknown deploy phase %q", string(req.Phase)))
 	}
@@ -144,7 +152,7 @@ func (s *Server) deployCleanup(ctx context.Context, candidate *kube.CandidateSto
 	return &sdk.DeployAppPhaseResult{Message: "candidate cleaned"}, nil
 }
 
-func (s *Server) deployHealth(ctx context.Context, candidate *kube.CandidateStore, runtime *kube.DeploymentRuntime, outputs map[string]any, inputs sdk.DeployInputs, imageDigest string) (*sdk.DeployAppPhaseResult, *sdk.OperationError) {
+func (s *Server) deployHealth(ctx context.Context, candidate *kube.CandidateStore, runtime *kube.DeploymentRuntime, outputs map[string]any, inputs sdk.DeployInputs, imageDigest, engine string) (*sdk.DeployAppPhaseResult, *sdk.OperationError) {
 	health, err := kube.WaitForIntendedRollout(ctx, outputs, imageDigest, runtime, deployWaitInterval, deployWaitTimeout)
 	if err != nil {
 		return nil, mapError(err)
@@ -156,7 +164,7 @@ func (s *Server) deployHealth(ctx context.Context, candidate *kube.CandidateStor
 	if err != nil {
 		return nil, mapError(err)
 	}
-	command := platform.MagentoProbeShell(request.SearchEndpoint, request.SearchEndpoint != "")
+	command := platform.MagentoProbeShell(request.SearchEndpoint, request.SearchEndpoint != "", engine)
 	if err := candidate.RunProbe(ctx, request, command); err != nil {
 		return nil, mapError(err)
 	}
