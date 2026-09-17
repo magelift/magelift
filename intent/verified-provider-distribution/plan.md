@@ -20,7 +20,7 @@
   provider main, Go lockfile generator plus unit tests,
   release.yml wiring, smoke green) — verify:
   `make release-smoke` green, generator tests green
-- [ ] 3.2 Publication proof before any tag (file-proxy
+- [x] 3.2 Publication proof before any tag (file-proxy
   `GOWORK=off` SDK consumer plus provider resolve test under
   `tests/distribution/`, tag-then-require sequence documented) —
   verify: `go test ./tests/distribution/ -count=1`
