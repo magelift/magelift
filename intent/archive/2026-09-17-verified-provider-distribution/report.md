@@ -55,3 +55,17 @@ verdict: pass
 ## Follow-ups
 
 None. Next: Order 8 reference-store-acceptance.
+
+## Correction (2026-09-17, alpha review R01/R06/R07/R11)
+
+The components existed but were not connected. R01: one shared
+resolver (project locks control the cached version), pinned
+first-party publisher, absolute lockfile URLs, release-metadata
+bootstrap writing a reviewable project pin, persisted verifier, and
+CI provider steps; the clean-machine proof runs against rc.2
+artifacts. R06: coherent proxy fixtures plus a real GOWORK=off
+provider compile; first require-bump at rc.2. R07: draft plus
+prerelease plus never-latest channels with a checks-gated publish
+step (dialproof.6 metadata corrected). R11: copy-based upgrade
+backup with per-transition fault tests. Fixed in
+intent/alpha-review-corrections (boxes 1.1, 1.2, 1.3, 2.4, 2.5).

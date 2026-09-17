@@ -177,3 +177,16 @@ fail-closed errors with tested messages.
 Pass. Both WARNINGs fixed and re-verified same turn; two
 SUGGESTIONs remain as noted. Nothing left over needs its own
 intent beyond the roadmap's Orders 6–8.
+
+## Correction (2026-09-17, alpha review R02/R05/R10)
+
+The autonomy claim outran the wiring. R02: Kubernetes clients now
+default to per-request fresh ADC bearers (API, exec, tunnel) with
+stale-bearer assertions and production-constructor coverage. R05:
+deploy-step execution moved into the plugin behind the typed
+deploy-app-phase op with SDK-governed deploy inputs; the alpha core
+registers GCP plus AWS ECS only (EKS/OVH/Scaleway behind
+MAGELIFT_EXPERIMENTAL_PROVIDERS); ADR 0013 reconciles the as-built
+boundary with provider-import decoupling deferred to AWS parity.
+R10: every operation classified by effect; mutations never retryable.
+Fixed in intent/alpha-review-corrections (boxes 2.1, 2.2, 2.3).
