@@ -4,12 +4,18 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	internalcli "github.com/magelift/magelift/internal/cli"
 	"github.com/magelift/magelift/internal/registry"
 	"github.com/magelift/magelift/sdk"
 	"github.com/spf13/cobra"
 )
+
+// ExperimentalProvidersEnv opts the CLI into the deferred providers
+// (EKS, OVH, Scaleway). Empty is the alpha set: GCP plus AWS ECS.
+const ExperimentalProvidersEnv = "MAGELIFT_EXPERIMENTAL_PROVIDERS"
 
 // New returns a command with the first-party MageLift modules registered.
 func New() (*cobra.Command, error) {
@@ -37,7 +43,11 @@ func NewWithExtensions(extensions ...sdk.Module) (*cobra.Command, error) {
 // explicitly linked community modules, with provider hooks supplied by the
 // caller instead of the default first-party set.
 func NewWithExtensionsAndHooks(hooks internalcli.Hooks, extensions ...sdk.Module) (*cobra.Command, error) {
-	modules, err := registry.NewDefault()
+	newDefault := registry.NewDefault
+	if strings.TrimSpace(os.Getenv(ExperimentalProvidersEnv)) != "" {
+		newDefault = registry.NewDefaultWithExperimental
+	}
+	modules, err := newDefault()
 	if err != nil {
 		return nil, fmt.Errorf("register first-party modules: %w", err)
 	}

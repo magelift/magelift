@@ -28,8 +28,12 @@ sdk-test: ## Run the SDK module suite standalone (no workspace)
 provider-gcp-build: ## Build the autonomous GCP provider plugin binary
 	go build -o dist/magelift-provider-gcp ./providers/gcp/cmd/magelift-provider-gcp
 
-core-leanness: ## Prove the CLI carries no GCP provider code or cloud SDKs
+core-leanness: ## Prove the CLI carries no GCP provider code or GCP cloud SDKs
 	test -z "$$(go list -deps ./cmd/magelift | grep -E 'magelift/providers/|magelift/internal/cloud/gcp|cloud\.google\.com/go|google\.golang\.org/api/')"
+# NOTE: OVH/Scaleway SDKs stay linked (cleanup recovery needs them) but
+# unregistered by default; see registry.NewDefault and ADR 0013. AWS ECS
+# stays in-process by design until aws-provider-parity extracts it. Full
+# provider-SDK independence is a post-parity gate, not this one.
 
 lint: ## Run static Go checks
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./...
