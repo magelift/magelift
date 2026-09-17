@@ -143,4 +143,33 @@ if [[ "$code" != "3" ]]; then
 	exit 1
 fi
 
+# 9. A queued rerun without a start time supersedes its older success.
+write_payload
+mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:07:00Z", "id": 10}, {"name": "provider-verify", "status": "queued", "conclusion": null, "started_at": null, "id": 11}]'
+code=0
+"$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/queued.out" 2>&1 || code="$?"
+if [[ "$code" != "2" ]]; then
+	printf 'gate exit = %s, want 2 (queued rerun)\n' "$code" >&2
+	exit 1
+fi
+grep -q "PENDING  provider-verify" "$WORK/queued.out" || {
+	printf 'gate did not flag the queued rerun\n' >&2
+	exit 1
+}
+
+# 10. A waiting rerun likewise reports pending, and its later success passes.
+mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:07:00Z", "id": 10}, {"name": "provider-verify", "status": "waiting", "conclusion": null, "started_at": null, "id": 11}]'
+code=0
+"$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/waiting.out" 2>&1 || code="$?"
+if [[ "$code" != "2" ]]; then
+	printf 'gate exit = %s, want 2 (waiting rerun)\n' "$code" >&2
+	exit 1
+fi
+mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:07:00Z", "id": 10}, {"name": "provider-verify", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T11:00:00Z", "completed_at": "2026-09-17T11:07:00Z", "id": 11}]'
+if ! "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/queuedone.out" 2>&1; then
+	cat "$WORK/queuedone.out" >&2
+	printf 'gate rejected a completed rerun\n' >&2
+	exit 1
+fi
+
 printf 'release checks gate ok\n'

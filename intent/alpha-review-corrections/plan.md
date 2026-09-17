@@ -33,11 +33,11 @@
 - [x] 2.4 Real publication mechanics (R06: coherent fixtures,
   full provider compile `GOWORK=off` against synthetic
   modules) — verify: distribution suite green
-- [ ] 2.5 Require-bump plus real verification (reopened: second review finding 4; rc.3) (R06: bump
+- [ ] 2.5 Require-bump plus real verification (rc.4: review-rc3 evidence; visibility wait) (R06: bump
   requires to rc.2 after tagging, record proxy sums,
   verify `GOWORK=off` root plus provider builds) — needs
   rc.2 tags; runs with the rc.2 release
-- [x] 3.1 Media reality (R03: GCS mechanism, provider
+- [ ] 3.1 Media reality (reopened: review-rc3 findings 1, 2, 3 plus ACL compat) (R03: GCS mechanism, provider
   media ops, key continuity; live-verified or changed)
   — verify: unit suites green, live proof in order 8
 - [x] 3.2 Serving health (R04: serving-path probe,
