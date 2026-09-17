@@ -1,6 +1,11 @@
 ---
-status: draft
+status: accepted
 slug: verified-provider-distribution
+accepted: 2026-09-16
+acceptance: defaults adopted (contract tag scheme proved end to end;
+  installer verifies without user-installed signing tooling;
+  cache plus atomic-replace specified with per-path tests);
+  no live cloud, local registries/proxies prove the sequence
 ---
 # Intent: verified provider distribution (install you can trust)
 
