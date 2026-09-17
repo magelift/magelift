@@ -18,11 +18,14 @@ import (
 )
 
 // objectStore moves bytes between a bucket prefix and operator disk. The
-// production implementation speaks GCS; tests substitute fakes.
+// production implementation speaks GCS; tests substitute fakes. Names
+// are bucket-relative and untrusted: Download validates and contains
+// them at open time. Upload takes a file the caller already opened
+// without following links.
 type objectStore interface {
 	List(ctx context.Context, bucket, prefix string) ([]string, error)
-	Download(ctx context.Context, bucket, object, dest string) (int64, error)
-	Upload(ctx context.Context, bucket, object, src string) (int64, error)
+	Download(ctx context.Context, bucket, object, root, name string) (int64, error)
+	Upload(ctx context.Context, bucket, object string, src *os.File) (int64, error)
 }
 
 type gcsObjectStore struct {
@@ -61,7 +64,23 @@ func (s gcsObjectStore) List(ctx context.Context, bucket, prefix string) ([]stri
 	return names, nil
 }
 
-func (s gcsObjectStore) Download(ctx context.Context, bucket, object, dest string) (int64, error) {
+func (s gcsObjectStore) Download(ctx context.Context, bucket, object, root, name string) (int64, error) {
+	if err := checkContainedName(name); err != nil {
+		return 0, fmt.Errorf("object %q: %w", object, err)
+	}
+	rootDir, err := os.OpenRoot(root)
+	if err != nil {
+		return 0, err
+	}
+	defer rootDir.Close()
+	if parent := parentDir(name); parent != "" {
+		if err := rootDir.MkdirAll(parent, 0o755); err != nil {
+			return 0, err
+		}
+	}
+	if info, err := rootDir.Lstat(name); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return 0, fmt.Errorf("refusing to write through symlink at %q", name)
+	}
 	client, err := s.client(ctx)
 	if err != nil {
 		return 0, err
@@ -72,10 +91,7 @@ func (s gcsObjectStore) Download(ctx context.Context, bucket, object, dest strin
 		return 0, err
 	}
 	defer reader.Close()
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return 0, err
-	}
-	writer, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	writer, err := rootDir.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return 0, err
 	}
@@ -87,24 +103,78 @@ func (s gcsObjectStore) Download(ctx context.Context, bucket, object, dest strin
 	return written, closeErr
 }
 
-func (s gcsObjectStore) Upload(ctx context.Context, bucket, object, src string) (int64, error) {
+func (s gcsObjectStore) Upload(ctx context.Context, bucket, object string, src *os.File) (int64, error) {
+	if src == nil {
+		return 0, fmt.Errorf("upload %s: no open file", object)
+	}
 	client, err := s.client(ctx)
 	if err != nil {
 		return 0, err
 	}
 	defer client.Close()
-	reader, err := os.Open(src)
-	if err != nil {
-		return 0, err
-	}
-	defer reader.Close()
 	writer := client.Bucket(bucket).Object(object).NewWriter(ctx)
-	written, copyErr := io.Copy(writer, reader)
+	written, copyErr := io.Copy(writer, src)
 	closeErr := writer.Close()
 	if copyErr != nil {
 		return written, copyErr
 	}
 	return written, closeErr
+}
+
+// checkContainedName rejects bucket-relative names that could escape the
+// destination root. Matching is per path element: `photo..jpg` is a
+// legitimate name while `..` is not.
+func checkContainedName(name string) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return fmt.Errorf("empty object name")
+	}
+	if strings.HasPrefix(trimmed, "/") || filepath.IsAbs(filepath.FromSlash(trimmed)) {
+		return fmt.Errorf("absolute object name")
+	}
+	for _, element := range strings.Split(trimmed, "/") {
+		if element == "." || element == ".." {
+			return fmt.Errorf("object name escapes its directory")
+		}
+	}
+	return nil
+}
+
+// parentDir returns the slash-separated parent of a validated name, or
+// "" when the name sits at the root.
+func parentDir(name string) string {
+	if index := strings.LastIndex(name, "/"); index >= 0 {
+		return name[:index]
+	}
+	return ""
+}
+
+// openRegularFile opens path only when it is a regular file. The stat,
+// open, and fstat-compare sequence refuses links without relying on
+// platform open flags: anything swapped between the checks fails the
+// identity comparison.
+func openRegularFile(path string) (*os.File, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("refusing non-regular file %q", path)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	opened, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+	if !os.SameFile(info, opened) {
+		file.Close()
+		return nil, fmt.Errorf("refusing unstable file %q", path)
+	}
+	return file, nil
 }
 
 // MediaExport downloads the media prefix to operator disk.
@@ -173,11 +243,10 @@ func exportMediaTree(ctx context.Context, store objectStore, bucket, localDir st
 	var files, bytes int64
 	for _, object := range objects {
 		relative := strings.TrimPrefix(object, gcpstorage.MediaPrefix)
-		if relative == "" || strings.Contains(relative, "..") {
-			continue
+		if err := checkContainedName(relative); err != nil {
+			return files, bytes, fmt.Errorf("object %q: %w", object, err)
 		}
-		dest := filepath.Join(localDir, filepath.FromSlash(relative))
-		written, err := store.Download(ctx, bucket, object, dest)
+		written, err := store.Download(ctx, bucket, object, localDir, relative)
 		if err != nil {
 			return files, bytes, fmt.Errorf("download %s: %w", object, err)
 		}
@@ -196,14 +265,23 @@ func importMediaTree(ctx context.Context, store objectStore, bucket, localDir st
 		if entry.IsDir() {
 			return nil
 		}
-		relative, err := filepath.Rel(localDir, path)
+		file, err := openRegularFile(path)
 		if err != nil {
 			return err
 		}
+		relative, relErr := filepath.Rel(localDir, path)
+		if relErr != nil {
+			file.Close()
+			return relErr
+		}
 		object := gcpstorage.MediaPrefix + filepath.ToSlash(relative)
-		written, err := store.Upload(ctx, bucket, object, path)
+		written, err := store.Upload(ctx, bucket, object, file)
+		closeErr := file.Close()
 		if err != nil {
 			return fmt.Errorf("upload %s: %w", relative, err)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("upload %s: %w", relative, closeErr)
 		}
 		files++
 		bytes += written
