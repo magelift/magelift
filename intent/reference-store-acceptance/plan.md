@@ -4,7 +4,7 @@
   top-level `residual` entry with billing-honest framing plus
   `residualUnknown`; unit tests) — verify:
   `go test ./internal/cli/ -run TestSweep -count=1`
-- [ ] 1.2 Recipe doc plus runbook skeletons (new
+- [x] 1.2 Recipe doc plus runbook skeletons (new
   `docs/alpha-recipe.md` with pins and bounds; operations
   runbook section shells marked unproved until the loop
   fills them; humanizer plus marks) — verify: `make docs`
