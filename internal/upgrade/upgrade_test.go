@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/magelift/magelift/internal/cosign"
@@ -64,7 +65,7 @@ func TestInstallVerifiesChecksumAndReplacesExecutable(t *testing.T) {
 		"https://api.example/checksums.sigstore.json": "{}",
 		"https://api.example/magelift.tar.gz":         string(archive),
 	}}
-	client := &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "linux", goarch: "amd64", verifier: fakeBlobVerifier{}}
+	client := &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "linux", goarch: "amd64", verifier: fakeBlobVerifier{}, selfCheck: func(context.Context, string) error { return nil }}
 	executable := filepath.Join(t.TempDir(), "magelift")
 	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
 		t.Fatal(err)
@@ -79,6 +80,103 @@ func TestInstallVerifiesChecksumAndReplacesExecutable(t *testing.T) {
 	}
 	if string(contents) != "new binary" {
 		t.Fatalf("installed executable = %q", contents)
+	}
+	if _, err := os.Stat(executable + backupSuffix); !os.IsNotExist(err) {
+		t.Fatalf("backup was not cleaned up: %v", err)
+	}
+}
+
+func TestInstallRestoresPreviousBinaryOnSelfCheckFailure(t *testing.T) {
+	archive := testArchive(t, "magelift", []byte("new binary"))
+	digest := sha256.Sum256(archive)
+	checksum := hex.EncodeToString(digest[:]) + "  magelift_1.2.3_linux_amd64.tar.gz\n"
+	httpClient := &fakeHTTP{responses: map[string]string{
+		"https://api.example/checksums.txt":           checksum,
+		"https://api.example/checksums.sigstore.json": "{}",
+		"https://api.example/magelift.tar.gz":         string(archive),
+	}}
+	client := &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "linux", goarch: "amd64", verifier: fakeBlobVerifier{}, selfCheck: func(context.Context, string) error { return errors.New("exit status 1") }}
+	executable := filepath.Join(t.TempDir(), "magelift")
+	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := client.Install(context.Background(), Release{TagName: "v1.2.3", Assets: releaseAssets()}, executable)
+	if err == nil || !strings.Contains(err.Error(), "previous version restored") {
+		t.Fatalf("err = %v, want restore", err)
+	}
+	contents, err := os.ReadFile(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "old binary" {
+		t.Fatalf("restored executable = %q", contents)
+	}
+}
+
+func TestInstallReplacesStaleBackup(t *testing.T) {
+	archive := testArchive(t, "magelift", []byte("new binary"))
+	digest := sha256.Sum256(archive)
+	checksum := hex.EncodeToString(digest[:]) + "  magelift_1.2.3_linux_amd64.tar.gz\n"
+	httpClient := &fakeHTTP{responses: map[string]string{
+		"https://api.example/checksums.txt":           checksum,
+		"https://api.example/checksums.sigstore.json": "{}",
+		"https://api.example/magelift.tar.gz":         string(archive),
+	}}
+	client := &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "linux", goarch: "amd64", verifier: fakeBlobVerifier{}, selfCheck: func(context.Context, string) error { return nil }}
+	dir := t.TempDir()
+	executable := filepath.Join(dir, "magelift")
+	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(executable+backupSuffix, []byte("stale junk"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Install(context.Background(), Release{TagName: "v1.2.3", Assets: releaseAssets()}, executable); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(executable + backupSuffix); !os.IsNotExist(err) {
+		t.Fatalf("stale backup survived: %v", err)
+	}
+}
+
+func TestInstallSupportsFreshExecutable(t *testing.T) {
+	archive := testArchive(t, "magelift", []byte("new binary"))
+	digest := sha256.Sum256(archive)
+	checksum := hex.EncodeToString(digest[:]) + "  magelift_1.2.3_linux_amd64.tar.gz\n"
+	httpClient := &fakeHTTP{responses: map[string]string{
+		"https://api.example/checksums.txt":           checksum,
+		"https://api.example/checksums.sigstore.json": "{}",
+		"https://api.example/magelift.tar.gz":         string(archive),
+	}}
+	client := &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "linux", goarch: "amd64", verifier: fakeBlobVerifier{}, selfCheck: func(context.Context, string) error { return nil }}
+	executable := filepath.Join(t.TempDir(), "magelift")
+	if err := client.Install(context.Background(), Release{TagName: "v1.2.3", Assets: releaseAssets()}, executable); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(executable)
+	if err != nil || string(contents) != "new binary" {
+		t.Fatalf("installed executable = %q, err = %v", contents, err)
+	}
+}
+
+func TestInstallDefaultSelfCheckRunsVersion(t *testing.T) {
+	script := "#!/bin/sh\nif [ \"$1\" = \"version\" ]; then echo magelift-test; exit 0; fi\nexit 1\n"
+	archive := testArchive(t, "magelift", []byte(script))
+	digest := sha256.Sum256(archive)
+	checksum := hex.EncodeToString(digest[:]) + "  magelift_1.2.3_linux_amd64.tar.gz\n"
+	httpClient := &fakeHTTP{responses: map[string]string{
+		"https://api.example/checksums.txt":           checksum,
+		"https://api.example/checksums.sigstore.json": "{}",
+		"https://api.example/magelift.tar.gz":         string(archive),
+	}}
+	client := &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "linux", goarch: "amd64", verifier: fakeBlobVerifier{}}
+	executable := filepath.Join(t.TempDir(), "magelift")
+	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// No selfCheck stub: the default executes the installed script.
+	if err := client.Install(context.Background(), Release{TagName: "v1.2.3", Assets: releaseAssets()}, executable); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -154,7 +252,7 @@ func TestInstallExtractsWindowsZip(t *testing.T) {
 		"https://api.example/checksums.sigstore.json": "{}",
 		"https://api.example/magelift.zip":            string(archive),
 	}}
-	client := &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "windows", goarch: "amd64", verifier: fakeBlobVerifier{}}
+	client := &Client{httpClient: httpClient, apiBase: "https://api.example", goos: "windows", goarch: "amd64", verifier: fakeBlobVerifier{}, selfCheck: func(context.Context, string) error { return nil }}
 	executable := filepath.Join(t.TempDir(), "magelift.exe")
 	if err := os.WriteFile(executable, []byte("old binary"), 0o755); err != nil {
 		t.Fatal(err)

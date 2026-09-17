@@ -5,7 +5,7 @@
   URL semantics, atomic cache install, digest re-check on load;
   httptest tamper/missing/compat tests) — verify:
   `go test ./internal/providerhost/ ./internal/cli/ -count=1`
-- [ ] 1.2 Updater recovery (same-dir backup, version self-check,
+- [x] 1.2 Updater recovery (same-dir backup, version self-check,
   restore on failure, stale-backup replace) — verify:
   `go test ./internal/upgrade/ -count=1`
 - [ ] 2.1 Installer fail-closed rewrite plus harness
