@@ -8,6 +8,7 @@ package distribution
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/mod/module"
 	modzip "golang.org/x/mod/zip"
@@ -24,8 +26,15 @@ const (
 	sdkModule      = "github.com/magelift/magelift/sdk"
 	providerModule = "github.com/magelift/magelift/providers/gcp"
 	rootModule     = "github.com/magelift/magelift"
-	proofVersion   = "v0.7.0-distproof"
 )
+
+// version is unique per test run: staged content follows the
+// working tree, so a fixed string would serve stale module-cache zips
+// across tree states.
+func proofVersion(t *testing.T) string {
+	t.Helper()
+	return fmt.Sprintf("v0.7.0-distproof.0.%d", time.Now().UnixNano())
+}
 
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
@@ -52,6 +61,8 @@ func proxyEnv(t *testing.T, dir string, upstream bool) (proxy string, env []stri
 		proxyURL += ",https://proxy.golang.org"
 	}
 	base := os.Environ()
+	// Proof versions are unique per run, so the shared module cache
+	// stays correct: each staged version is fetched exactly once.
 	overrides := map[string]string{
 		"GOWORK":      "off",
 		"GOPROXY":     proxyURL,
@@ -210,14 +221,15 @@ func TestSDKConsumerBuildsOutsideWorkspace(t *testing.T) {
 	root := repositoryRoot(t)
 	work := t.TempDir()
 	proxy, env := proxyEnv(t, work, false)
-	publishModule(t, proxy, sdkModule, proofVersion, filepath.Join(root, "sdk"))
-	assertProxyCoherent(t, proxy, sdkModule, proofVersion)
+	version := proofVersion(t)
+	publishModule(t, proxy, sdkModule, version, filepath.Join(root, "sdk"))
+	assertProxyCoherent(t, proxy, sdkModule, version)
 
 	consumer := filepath.Join(work, "consumer")
 	if err := os.MkdirAll(consumer, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	goMod := "module distproofconsumer\n\ngo 1.27.0\n\nrequire " + sdkModule + " " + proofVersion + "\n"
+	goMod := "module distproofconsumer\n\ngo 1.27.0\n\nrequire " + sdkModule + " " + version + "\n"
 	if err := os.WriteFile(filepath.Join(consumer, "go.mod"), []byte(goMod), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -236,8 +248,8 @@ func TestSDKConsumerBuildsOutsideWorkspace(t *testing.T) {
 	}
 	runGo(t, consumer, tidyEnv, "mod", "tidy")
 	listed := runGo(t, consumer, env, "list", "-m", sdkModule)
-	if !strings.Contains(listed, proofVersion) {
-		t.Fatalf("go list -m = %q, want %s", listed, proofVersion)
+	if !strings.Contains(listed, version) {
+		t.Fatalf("go list -m = %q, want %s", listed, version)
 	}
 	runGo(t, consumer, env, "build", "-o", filepath.Join(consumer, "consumer"), ".")
 	command := exec.Command(filepath.Join(consumer, "consumer"))
@@ -258,8 +270,9 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	// resolve upstream (documented network use: the claim under test is
 	// magelift-module resolution plus compilation, not offline vendoring).
 	proxy, env := proxyEnv(t, work, true)
-	publishModule(t, proxy, sdkModule, proofVersion, filepath.Join(root, "sdk"))
-	assertProxyCoherent(t, proxy, sdkModule, proofVersion)
+	version := proofVersion(t)
+	publishModule(t, proxy, sdkModule, version, filepath.Join(root, "sdk"))
+	assertProxyCoherent(t, proxy, sdkModule, version)
 
 	// Post-tag shape: staged copies carry versioned magelift requires
 	// (the tree keeps its pre-tag workspace form until the
@@ -270,14 +283,14 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 		"providers": true, "sdk": true, ".git": true, "dist": true,
 		".venv": true, "node_modules": true, "website": true,
 	})
-	appendRequire(t, filepath.Join(rootCopy, "go.mod"), sdkModule, proofVersion)
-	publishModule(t, proxy, rootModule, proofVersion, rootCopy)
-	assertProxyCoherent(t, proxy, rootModule, proofVersion)
+	setRequire(t, filepath.Join(rootCopy, "go.mod"), sdkModule, version)
+	publishModule(t, proxy, rootModule, version, rootCopy)
+	assertProxyCoherent(t, proxy, rootModule, version)
 
 	copied := filepath.Join(work, "provider")
 	copyDir(t, filepath.Join(root, "providers", "gcp"), copied)
-	appendRequire(t, filepath.Join(copied, "go.mod"), sdkModule, proofVersion)
-	appendRequire(t, filepath.Join(copied, "go.mod"), rootModule, proofVersion)
+	setRequire(t, filepath.Join(copied, "go.mod"), sdkModule, version)
+	setRequire(t, filepath.Join(copied, "go.mod"), rootModule, version)
 
 	// Resolve the full graph, then compile the real provider: every
 	// package including the plugin binary. GOWORK=off throughout.
@@ -289,7 +302,7 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	}
 	runGo(t, copied, tidyEnv, "mod", "tidy")
 	listed := runGo(t, copied, env, "list", "-m", "all")
-	for _, want := range []string{sdkModule + " " + proofVersion, rootModule + " " + proofVersion} {
+	for _, want := range []string{sdkModule + " " + version, rootModule + " " + version} {
 		if !strings.Contains(listed, want) {
 			t.Fatalf("module graph lacks %s", want)
 		}
@@ -297,14 +310,46 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	runGo(t, copied, env, "build", "./...")
 }
 
-func appendRequire(t *testing.T, goModPath, modulePath, version string) {
+// setRequire points modulePath at version, replacing any existing
+// require line (single or block form) so the staged graph selects
+// exactly the proof version instead of racing a committed require.
+func setRequire(t *testing.T, goModPath, modulePath, version string) {
 	t.Helper()
-	goMod, err := os.ReadFile(goModPath)
+	contents, err := os.ReadFile(goModPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	goMod = append(goMod, "\nrequire "+modulePath+" "+version+"\n"...)
-	if err := os.WriteFile(goModPath, goMod, 0o644); err != nil {
+	lines := strings.Split(string(contents), "\n")
+	replaced := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		fields := strings.Fields(trimmed)
+		if len(fields) < 2 {
+			continue
+		}
+		if fields[0] == "require" && len(fields) == 3 && fields[1] == modulePath {
+			lines[i] = "require " + modulePath + " " + version
+			replaced = true
+			continue
+		}
+		if fields[0] == modulePath && len(fields) >= 2 && isVersionField(fields[1]) {
+			indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+			rest := ""
+			if len(fields) > 2 {
+				rest = " " + strings.Join(fields[2:], " ")
+			}
+			lines[i] = indent + modulePath + " " + version + rest
+			replaced = true
+		}
+	}
+	if !replaced {
+		lines = append(lines, "require "+modulePath+" "+version)
+	}
+	if err := os.WriteFile(goModPath, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func isVersionField(field string) bool {
+	return strings.HasPrefix(field, "v") || strings.HasPrefix(field, "0.")
 }
