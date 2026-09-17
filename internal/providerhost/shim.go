@@ -338,6 +338,19 @@ func AsShimPlanned(planned platform.PlannedStack) (*ShimPlanned, bool) {
 	return value, ok
 }
 
+// EnvelopePlan exposes plan identity for plan-scoped plugin calls without
+// coupling callers to the concrete shim type.
+type EnvelopePlan interface {
+	Envelope() sdk.Envelope
+	StoredPlan() sdk.StoredPlan
+}
+
+// AsEnvelopePlan extracts plan identity for plugin calls.
+func AsEnvelopePlan(planned platform.PlannedStack) (EnvelopePlan, bool) {
+	value, ok := planned.(EnvelopePlan)
+	return value, ok
+}
+
 func (p *ShimPlanned) StackName() string        { return p.stored.StackName }
 func (p *ShimPlanned) Provider() sdk.ProviderID { return "gcp" }
 func (p *ShimPlanned) Runtime() sdk.RuntimeID   { return sdk.RuntimeID(p.stored.Runtime) }

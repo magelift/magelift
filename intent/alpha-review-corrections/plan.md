@@ -34,7 +34,7 @@
   requires to rc.2 after tagging, record proxy sums,
   verify `GOWORK=off` root plus provider builds) — needs
   rc.2 tags; runs with the rc.2 release
-- [ ] 3.1 Media reality (R03: GCS mechanism, provider
+- [x] 3.1 Media reality (R03: GCS mechanism, provider
   media ops, key continuity; live-verified or changed)
   — verify: unit suites green, live proof in order 8
 - [ ] 3.2 Serving health (R04: serving-path probe,

@@ -186,6 +186,16 @@ func (p stubPlanned) WithImageDigest(digest string) (platform.PlannedStack, erro
 	p.digest = digest
 	return p, nil
 }
+// Envelope and StoredPlan let GCP media tests exercise the plugin-backed
+// transfer path through a stub planned stack.
+func (p stubPlanned) Envelope() sdk.Envelope {
+	return sdk.Envelope{Project: p.project, Environment: p.environment, Region: p.region}
+}
+
+func (p stubPlanned) StoredPlan() sdk.StoredPlan {
+	return sdk.StoredPlan{StackName: p.stackName, Provider: string(p.Provider()), Runtime: string(p.Runtime())}
+}
+
 func (p stubPlanned) TargetDescriptor() sdk.TargetDescriptor {
 	switch {
 	case p.provider == "ovh" && p.runtime == "mks":

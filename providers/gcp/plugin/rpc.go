@@ -46,7 +46,7 @@ func (p *RPCPlugin) Client(*plugin.MuxBroker, *rpc.Client) (any, error) {
 	return nil, nil
 }
 
-// RPCServer exposes the 30 operations over net/rpc. Every method validates
+// RPCServer exposes the 33 operations over net/rpc. Every method validates
 // the protocol version, enforces the per-operation timeout, and reports
 // failures as typed in-band errors: a non-nil rpc return means transport
 // breakage, never an operation failure.
@@ -471,5 +471,25 @@ func (s *RPCServer) DeployAppPhase(req *sdk.DeployAppPhaseCall, resp *sdk.Deploy
 	}
 	return dispatch(s, sdk.OpDeployAppPhase, version, resp, func(ctx context.Context) (*sdk.DeployAppPhaseResult, *sdk.OperationError) {
 		return s.server().DeployAppPhase(ctx, req)
+	})
+}
+
+func (s *RPCServer) MediaExport(req *sdk.MediaTransferCall, resp *sdk.MediaTransferResult) error {
+	version := ""
+	if req != nil {
+		version = req.ProtocolVersion
+	}
+	return dispatch(s, sdk.OpMediaExport, version, resp, func(ctx context.Context) (*sdk.MediaTransferResult, *sdk.OperationError) {
+		return s.server().MediaExport(ctx, req)
+	})
+}
+
+func (s *RPCServer) MediaImport(req *sdk.MediaTransferCall, resp *sdk.MediaTransferResult) error {
+	version := ""
+	if req != nil {
+		version = req.ProtocolVersion
+	}
+	return dispatch(s, sdk.OpMediaImport, version, resp, func(ctx context.Context) (*sdk.MediaTransferResult, *sdk.OperationError) {
+		return s.server().MediaImport(ctx, req)
 	})
 }

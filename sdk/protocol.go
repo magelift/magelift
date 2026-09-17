@@ -151,6 +151,11 @@ const (
 	// DeployAppPhase executes one Magento deploy phase inside the
 	// provider (register, migrate, cleanup, stabilize, health).
 	OpDeployAppPhase Operation = "deploy-app-phase"
+	// MediaExport downloads the media tree to operator disk; MediaImport
+	// uploads a tree. The plugin runs locally, so local paths are the
+	// operator's machine.
+	OpMediaExport Operation = "media-export"
+	OpMediaImport Operation = "media-import"
 )
 
 // OperationVersion advertises one operation name and version.

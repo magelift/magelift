@@ -534,6 +534,19 @@ List configured environments
 ```text
 magelift env list
 ```
+### magelift env media-export
+
+Download the environment media bucket tree to a local directory
+
+```text
+magelift env media-export <environment> [flags]
+```
+
+Options:
+
+```text
+      --dest string   local directory to download into (required)
+```
 ### magelift env media-sync
 
 Upload a local media tree into the environment media bucket (merge)
@@ -833,6 +846,7 @@ Options:
 ```text
       --cache-dir string   provider cache directory (default: user cache)
       --lockfile string    provider lockfile path (default: ./magelift.providers.lock, then beside the CLI)
+      --version string     release tag to bootstrap the lockfile from when none exists (default: the CLI version)
 ```
 ## magelift queue-status
 
