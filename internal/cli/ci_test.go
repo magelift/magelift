@@ -90,9 +90,14 @@ func TestCIGenerateIsDeterministicAndKeepsWorkflowOffStdout(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(workflow)
-	for _, required := range []string{checkoutAction, setupGoAction, setupQemuAction, setupBuildxAction, cosignInstallerAction, "github.com/magelift/magelift/cmd/magelift@v1.2.3", "Build and sign immutable image", "environment: staging", "MAGELIFT_BUILD_ROLE_ARN", `- "staging"`, "--env \"${{ matrix.environment }}\"", "deploy --digest"} {
+	for _, required := range []string{checkoutAction, setupQemuAction, setupBuildxAction, cosignInstallerAction, "MAGELIFT_VERSION: v1.2.3", "cosign verify-blob", "checksums.txt.sigstore.json", "sha256sum -c -", "Build and sign immutable image", "environment: staging", "MAGELIFT_BUILD_ROLE_ARN", `- "staging"`, "--env \"${{ matrix.environment }}\"", "deploy --digest"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("workflow lacks %q:\n%s", required, text)
+		}
+	}
+	for _, banned := range []string{"go install", "setup-go", "go-version-file"} {
+		if strings.Contains(text, banned) {
+			t.Fatalf("workflow still contains %q", banned)
 		}
 	}
 }
@@ -111,7 +116,7 @@ func TestCIValidateDetectsWorkflowAndConfigDrift(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tampered := strings.Replace(string(workflow), "# v7.0.0", "# v4.0.0", 1)
+	tampered := strings.Replace(string(workflow), "# v7.0.1", "# v7.0.0", 1)
 	if err := os.WriteFile(workflowPath, []byte(tampered), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -165,9 +170,16 @@ func TestCIGenerateIncludesProductionApprovalAndPromotion(t *testing.T) {
 			t.Fatalf("production workflow lacks %q:\n%s", required, text)
 		}
 	}
-	for _, forbidden := range []string{`test -n "$PULUMI_BACKEND_URL"`, "--certificate-identity", "MAGELIFT_PULUMI_BACKEND_URL"} {
+	for _, forbidden := range []string{`test -n "$PULUMI_BACKEND_URL"`, "MAGELIFT_PULUMI_BACKEND_URL"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("production workflow still requires cloud-devops %q:\n%s", forbidden, text)
+		}
+	}
+	// Cosign's own --certificate-identity (pinned release identity in the
+	// Install step) is required; magelift deploy steps must not need one.
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, "--certificate-identity") && !strings.Contains(line, "cosign verify-blob") {
+			t.Fatalf("production workflow still requires cloud-devops --certificate-identity:\n%s", line)
 		}
 	}
 }
