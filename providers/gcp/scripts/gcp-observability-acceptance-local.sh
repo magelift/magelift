@@ -30,6 +30,12 @@ if [[ ! "$project" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ || ! "$run_id" =~ ^[A-Za-z0
 	printf 'invalid GCP project, run ID, marker, or verification budget\n' >&2
 	exit 2
 fi
+
+if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
+	printf 'gcp observability acceptance dry-run project=%s marker=%s; no GCP mutation invoked\n' "$project" "$marker"
+	exit 0
+fi
+
 marker_digest="$(printf '%s' "$marker" | shasum -a 256 | awk '{print substr($1,1,16)}')"
 delivery_digest="$(printf '%s' delivery | shasum -a 256 | awk '{print substr($1,1,16)}')"
 dashboard_display="MageLift ${marker_digest} Dashboard ${delivery_digest}"
@@ -151,10 +157,6 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 gcloud projects describe "$project" --format='value(projectId)' >/dev/null
-if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
-	printf 'gcp observability acceptance dry-run project=%s marker=%s\n' "$project" "$marker"
-	exit 0
-fi
 
 dependency_status=0
 acceptance_require_commands gcloud go shasum curl || dependency_status=1

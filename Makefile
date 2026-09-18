@@ -127,6 +127,7 @@ acceptance-harness-test: acceptance-dependencies-check ## Run offline acceptance
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) lib_cosign_test.sh -- bash tests/acceptance/lib_cosign_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) go_memlimit_test.sh -- bash tests/acceptance/go_memlimit_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_dry_run_no_account_test.sh -- bash tests/acceptance/aws_dry_run_no_account_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_dry_run_no_account_test.sh -- bash tests/acceptance/gcp_dry_run_no_account_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) campaign_isolation_test.sh -- bash tests/acceptance/campaign_isolation_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_seed_task_definition_test.sh -- bash tests/acceptance/aws_seed_task_definition_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) shared_evidence_test.sh -- bash tests/acceptance/shared_evidence_test.sh
