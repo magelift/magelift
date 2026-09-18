@@ -13,7 +13,7 @@ func TestStagePublishesThreeCoherentModules(t *testing.T) {
 	root := filepath.Join("..", "..")
 	proxy := t.TempDir()
 	version := "v0.7.0-modproxy-test"
-	if err := run(root, version, proxy); err != nil {
+	if err := run(root, "HEAD", version, proxy); err != nil {
 		t.Fatal(err)
 	}
 	modules := map[string]string{
@@ -95,7 +95,36 @@ func assertNoNestedModules(t *testing.T, archive, version string) {
 }
 
 func TestRunRequiresFlags(t *testing.T) {
-	if err := run("", "v1.0.0", t.TempDir()); err == nil {
+	if err := run("", "HEAD", "v1.0.0", t.TempDir()); err == nil {
 		t.Fatal("run accepted an empty root")
+	}
+}
+
+func TestStageMatchesArchiveContent(t *testing.T) {
+	root := filepath.Join("..", "..")
+	proxy := t.TempDir()
+	version := "v0.7.0-modproxy-test"
+	if err := run(root, "HEAD", version, proxy); err != nil {
+		t.Fatal(err)
+	}
+	// Tracked content stages verbatim: website/ must survive (the proxy
+	// only prunes nested modules, and an earlier prune list wrongly
+	// dropped it).
+	zipPath := filepath.Join(proxy, "github.com/magelift/magelift", "@v", version+".zip")
+	reader, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	prefix := "github.com/magelift/magelift@" + version + "/"
+	sawWebsite := false
+	for _, file := range reader.File {
+		if strings.HasPrefix(file.Name, prefix+"website/") {
+			sawWebsite = true
+			break
+		}
+	}
+	if !sawWebsite {
+		t.Fatal("root zip lacks tracked website/ content")
 	}
 }
