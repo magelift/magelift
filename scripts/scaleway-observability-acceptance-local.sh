@@ -27,6 +27,12 @@ if [[ ! "$project" =~ ^[0-9a-fA-F-]{36}$ || ! "$region" =~ ^(fr-par|nl-ams|pl-wa
 	printf 'invalid Scaleway project, region, run ID, or observability marker\n' >&2
 	exit 2
 fi
+
+if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
+	printf 'scaleway observability acceptance dry-run project=%s region=%s marker=%s; no Scaleway mutation invoked\n' "$project" "$region" "$marker"
+	exit 0
+fi
+
 marker_digest="$(printf '%s' "$marker" | shasum -a 256 | awk '{print substr($1,1,16)}')"
 source_prefix="magelift-${marker_digest}-"
 token_name="${source_prefix}token"
@@ -63,10 +69,6 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 scw --profile "$profile" --output json cockpit data-source list "project-id=$project" "region=$region" >/dev/null
-if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
-	printf 'scaleway observability acceptance dry-run project=%s region=%s marker=%s\n' "$project" "$region" "$marker"
-	exit 0
-fi
 
 dependency_status=0
 acceptance_require_commands scw go shasum || dependency_status=1

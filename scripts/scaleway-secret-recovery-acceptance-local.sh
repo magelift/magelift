@@ -26,7 +26,7 @@ bucket="${MAGELIFT_SCALEWAY_SECRET_RECOVERY_BUCKET:-magelift-secret-recovery-${r
 secret_name="${MAGELIFT_SCALEWAY_SECRET_RECOVERY_SECRET_NAME:-magelift-acceptance-secret-${run_id}}"
 marker="${MAGELIFT_SCALEWAY_SECRET_RECOVERY_MARKER:-magelift/scaleway/secret/${run_id}}"
 fixture="${MAGELIFT_SCALEWAY_SECRET_RECOVERY_FIXTURE:-fixture-known-content-${run_id}}"
-project="${MAGELIFT_SCALEWAY_SECRET_RECOVERY_PROJECT:-$(scw --profile "$profile" config get default-project-id 2>/dev/null || true)}"
+project="${MAGELIFT_SCALEWAY_SECRET_RECOVERY_PROJECT:-}"
 bucket_created=0
 ttl_marker="${TMPDIR:-/tmp}/magelift-scaleway-secret-recovery-${run_id}-ttl-expired-$$"
 
@@ -46,6 +46,9 @@ if (( dependency_status != 0 )); then
 	exit 2
 fi
 
+if [[ -z "$project" ]]; then
+	project="$(scw --profile "$profile" config get default-project-id 2>/dev/null || true)"
+fi
 if [[ -z "$project" ]]; then
 	printf 'could not resolve the selected Scaleway profile default project ID\n' >&2
 	exit 2
