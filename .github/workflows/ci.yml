@@ -649,6 +649,7 @@ jobs:
       - varnish
       - floci-aws
       - floci-gcp
+      - provider-verify
       - release-config
       - workflow-lint
       - shellcheck
