@@ -8,7 +8,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands gcloud go || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -33,6 +32,12 @@ ttl_marker="${TMPDIR:-/tmp}/magelift-gcp-pubsub-${run_id}-ttl-expired-$$"
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == 1 || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
 	printf 'gcp Pub/Sub acceptance dry-run ok; no provider mutation invoked\n'
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands gcloud go || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 acceptance_prepare_lifecycle

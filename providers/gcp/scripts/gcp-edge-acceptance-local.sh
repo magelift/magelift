@@ -24,7 +24,6 @@ source "$ROOT/scripts/acceptance/lib-cleanup-ledger.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands gcloud go cf dig curl || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -387,6 +386,12 @@ if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_R
 	printf 'gcp edge acceptance dry-run project=%s domain=%s marker=%s originGroup=%s waf=%s armorTraffic=%s failover=%s originTitle=%s trafficImpact=not-run; no GCP mutation invoked\n' \
 		"$project" "$domain" "$marker" "$origin_group" "$waf_enabled" "$armor_traffic" "$failover" "${origin_title:-not-requested}"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands gcloud go cf dig curl || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 : "${MAGELIFT_GCP_EDGE_ACCEPTANCE:?set MAGELIFT_GCP_EDGE_ACCEPTANCE=1 for a disposable live GCP edge run}"

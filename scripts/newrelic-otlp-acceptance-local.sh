@@ -11,7 +11,6 @@ source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands newrelic go || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -65,6 +64,12 @@ acceptance_start_ttl_watchdog "${ACCEPTANCE_TTL_SECONDS:-1800}" "$cleanup_marker
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
 	printf 'newrelic Go OTLP acceptance dry-run ok profile=%s account=%s endpoint=%s nerdgraph=%s marker=%s\n' "$profile" "$account_id" "$endpoint" "$nerdgraph_endpoint" "$marker"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands newrelic go || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 query_spec='query { actor { apiAccess { keySearch(query: { types: USER }) { keys { key } } } } }'

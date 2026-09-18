@@ -14,7 +14,6 @@ source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands newrelic || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -56,6 +55,12 @@ trap 'exit 143' TERM
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
 	printf 'newrelic acceptance dry-run ok profile=%s eventType=%s marker=%s\n' "$profile" "$event_type" "$marker"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands newrelic || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 # `profile list` intentionally exposes only masked credentials. Parse the

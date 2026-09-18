@@ -14,7 +14,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_json_yaml_tools || dependency_status=1
-acceptance_require_commands ovhcloud go || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -38,6 +37,12 @@ fi
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
 	printf 'OVHcloud Object Storage recovery acceptance dry-run ok profile=%s project=%s region=%s bucket=%s marker=%s; no OVH mutation invoked\n' "$profile" "$project" "$region" "$bucket" "$marker"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands ovhcloud go || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 if [[ "$project" == dry-run ]]; then
 	printf 'MAGELIFT_OVH_RECOVERY_PROJECT must be set to the exact OVHcloud project ID before live mutation\n' >&2

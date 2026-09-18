@@ -16,7 +16,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands gcloud go shasum curl || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -155,6 +154,12 @@ gcloud projects describe "$project" --format='value(projectId)' >/dev/null
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
 	printf 'gcp observability acceptance dry-run project=%s marker=%s\n' "$project" "$marker"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands gcloud go shasum curl || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 acceptance_prepare_lifecycle

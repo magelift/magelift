@@ -151,7 +151,16 @@ while IFS= read -r script; do
 			"${script#"$ROOT/"}" "$dependency_line" "$dry_run_line" >&2
 		exit 1
 	fi
-done < <(find "$ROOT/scripts" -maxdepth 1 -type f -name '*-acceptance-local.sh' -print | sort)
+
+	# Provider CLIs are a live-path concern. Dry-run must not require aws,
+	# scw, ovhcloud, cf, gcloud, or newrelic just to print the contract.
+	command_line="$(grep -n -m1 'acceptance_require_commands' "$script" | cut -d: -f1 || true)"
+	if [[ -n "$dry_run_line" && -n "$command_line" && "$command_line" -le "$dry_run_line" ]]; then
+		printf '%s must require provider CLIs after its dry-run path (command line %s, dry-run line %s)\n' \
+			"${script#"$ROOT/"}" "$command_line" "$dry_run_line" >&2
+		exit 1
+	fi
+done < <(find "$ROOT/scripts" "$ROOT/providers/gcp/scripts" -maxdepth 1 -type f -name '*-acceptance-local.sh' -print | sort)
 
 if (( acceptance_wrapper_count == 0 )); then
 	printf 'no top-level acceptance wrappers found\n' >&2

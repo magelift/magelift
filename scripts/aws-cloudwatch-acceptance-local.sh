@@ -11,7 +11,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands aws go shasum || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -80,11 +79,18 @@ trap cloudwatch_cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-AWS_PROFILE="$profile" AWS_REGION="$region" aws sts get-caller-identity >/dev/null
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
 	printf 'aws CloudWatch acceptance dry-run profile=%s region=%s marker=%s\n' "$profile" "$region" "$marker"
 	exit 0
 fi
+
+dependency_status=0
+acceptance_require_commands aws go shasum || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
+fi
+
+AWS_PROFILE="$profile" AWS_REGION="$region" aws sts get-caller-identity >/dev/null
 
 acceptance_prepare_lifecycle
 acceptance_start_ttl_watchdog "$ACCEPTANCE_TTL_SECONDS" "$ttl_marker"

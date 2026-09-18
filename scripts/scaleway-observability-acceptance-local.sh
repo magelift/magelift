@@ -11,7 +11,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands scw go shasum || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -67,6 +66,12 @@ scw --profile "$profile" --output json cockpit data-source list "project-id=$pro
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
 	printf 'scaleway observability acceptance dry-run project=%s region=%s marker=%s\n' "$project" "$region" "$marker"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands scw go shasum || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 acceptance_prepare_lifecycle
