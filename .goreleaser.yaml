@@ -3,7 +3,9 @@ version: 2
 
 # Local packaging smoke: use scripts/release-smoke-local.sh or make release-smoke
 # (dialproof config, host only). Full multi-platform matrices belong on CI.
-# Cap Go with GOMEMLIMIT from scripts/go-memlimit.sh; do not pin --parallelism.
+# Cap Go with GOMEMLIMIT from scripts/go-memlimit.sh; do not pin
+# GOMAXPROCS. Hosted release.yml passes --parallelism 1 so the
+# twelve-target matrix runs one compile at a time.
 
 project_name: magelift
 

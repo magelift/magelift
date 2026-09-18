@@ -176,7 +176,8 @@ jobs:
     # After lint when present; Dependabot skips lint so this is the sole Go gate.
     if: ${{ always() && !cancelled() && needs.changes.outputs.go == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 25m cancelled rc.16 after every real step passed (post-action cleanup).
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -21,8 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     # Twelve Pulumi-heavy cross-compiles; warm caches carry the
     # repeat-release case. Cap Go at 75% of the runner's available RAM
-    # (`scripts/go-memlimit.sh`). Do not pin GOMAXPROCS or goreleaser
-    # --parallelism.
+    # (`scripts/go-memlimit.sh`). Do not pin GOMAXPROCS or go -p.
+    # GoReleaser --parallelism 1 is pipe concurrency: one target at a
+    # time so each compile inherits the full GOMEMLIMIT. Concurrent
+    # targets OOM ubuntu-latest 16GB (rc.16 died mid-matrix with no
+    # compiler error). rc.12 and rc.15 finished the matrix serialized.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -112,7 +115,7 @@ jobs:
         with:
           distribution: goreleaser
           version: v2.18.1
-          args: release --clean --timeout 150m
+          args: release --clean --parallelism 1 --timeout 150m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Pushes the brew formula and Scoop manifest to their tap repos.

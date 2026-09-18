@@ -18,8 +18,11 @@ make release-smoke
 ```
 
 Never run a full multi-platform `goreleaser release` on a laptop.
-Do not pass `--parallelism`. `GOMEMLIMIT` is 75% of available RAM
-(`scripts/go-memlimit.sh`).
+Do not pin `GOMAXPROCS` or go `-p`. `GOMEMLIMIT` is 75% of
+available RAM (`scripts/go-memlimit.sh`). The hosted full matrix
+passes GoReleaser `--parallelism 1` (pipe concurrency, not Go
+threads): twelve Pulumi-heavy targets on ubuntu-latest 16GB OOM
+when they share that limit.
 
 ## Identities and registries
 

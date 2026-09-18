@@ -81,7 +81,7 @@ func TestGoWorkflowJobsCapMemory(t *testing.T) {
 			}
 		}
 		if len(pinned) > 0 {
-			b.WriteString("Go jobs must not pin GOMAXPROCS, -p=1, or goreleaser --parallelism:\n")
+			b.WriteString("Go jobs must not pin GOMAXPROCS or go -p=1:\n")
 			for _, id := range pinned {
 				b.WriteString("  - ")
 				b.WriteString(id)
@@ -160,9 +160,18 @@ func jobPinsGoParallelism(raw []byte) bool {
 	s := string(raw)
 	return strings.Contains(s, "GOMAXPROCS:") ||
 		strings.Contains(s, "GOMAXPROCS=") ||
-		strings.Contains(s, "--parallelism 1") ||
-		strings.Contains(s, "--parallelism=1") ||
 		strings.Contains(s, "GOFLAGS: -p=1") ||
 		strings.Contains(s, "GOFLAGS: '-p=1'") ||
 		strings.Contains(s, "GOFLAGS: \"-p=1\"")
+}
+
+func TestReleaseSerializesGoreleaserPipes(t *testing.T) {
+	root := moduleRoot(t)
+	data, err := os.ReadFile(filepath.Join(root, ".github/workflows/release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte("release --clean --parallelism 1 --timeout 150m")) {
+		t.Fatal("full-matrix goreleaser must pass --parallelism 1; concurrent Pulumi targets OOM ubuntu-latest")
+	}
 }
