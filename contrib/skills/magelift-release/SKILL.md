@@ -68,9 +68,18 @@ minutes. Order matters; never move a tag:
    superseded magelift lines remain in every go.sum (tidy
    prunes inconsistently: rc.9 died on lines one tidy kept
    and CI's dropped; delete leftovers by hand when the
-   graph provably dropped them). Verify the root and
-   provider build `GOWORK=off` against the staged proxy,
-   commit the manifests.
+   graph provably dropped them). Commit the manifests.
+6. Stability gate (non-optional): re-stage from the manifest
+   commit, re-download every magelift sum, and require
+   `git diff --exit-code` empty. Any go.sum edit after
+   staging invalidates staged sums (rc.10 died on exactly
+   that: a prune landed after the last stage). Loop back
+   to 5 on any diff.
+7. Verify the root and provider build `GOWORK=off` against
+   the staged proxy, then verify the tag tree locally the
+   way CI will: fresh clone at HEAD plus `go mod tidy`
+   plus `git diff --exit-code` in each module and the
+   linter. Only then tag.
 5. Tag `sdk/<v>`, `<v>`, and `providers/gcp/<v>` at that commit
    and push all three in one `git push`. The release starts; its
    visibility-wait sleeps first, then polls.
