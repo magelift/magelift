@@ -19,13 +19,19 @@ fi
 
 profile="${MAGELIFT_AWS_RECOVERY_PROFILE:-default}"
 region="${MAGELIFT_AWS_RECOVERY_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
-if [[ -z "$region" ]]; then
-	region="$(aws configure get region --profile "$profile" 2>/dev/null || true)"
-fi
 run_id="${MAGELIFT_AWS_RECOVERY_RUN_ID:-$(date -u +%Y%m%d%H%M%S)-$$}"
 bucket="${MAGELIFT_AWS_RECOVERY_BUCKET:-magelift-recovery-${run_id}}"
 marker="${MAGELIFT_AWS_RECOVERY_MARKER:-magelift/aws/recovery/${run_id}}"
 fixture="${MAGELIFT_AWS_RECOVERY_FIXTURE:-fixture-known-content-${run_id}}"
+
+if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
+	printf 'AWS S3 recovery acceptance dry-run ok profile=%s region=%s bucket=%s marker=%s; no AWS mutation invoked\n' "$profile" "${region:-unset}" "$bucket" "$marker"
+	exit 0
+fi
+
+if [[ -z "$region" ]]; then
+	region="$(aws configure get region --profile "$profile" 2>/dev/null || true)"
+fi
 
 if [[ ! "$profile" =~ ^[A-Za-z0-9._-]{1,64}$ || ! "$region" =~ ^[A-Za-z0-9-]{1,32}$ || ! "$run_id" =~ ^[A-Za-z0-9._-]{1,48}$ || ! "$bucket" =~ ^[a-z0-9][a-z0-9.-]{2,62}$ || ! "$marker" =~ ^[A-Za-z0-9._/-]{1,128}$ || ! "$fixture" =~ ^[A-Za-z0-9._/-]{1,128}$ ]]; then
 	printf 'set valid AWS S3 recovery profile, region, run ID, bucket, marker, and fixture values\n' >&2
@@ -35,11 +41,6 @@ fi
 export AWS_PROFILE="$profile"
 export AWS_REGION="$region"
 export AWS_DEFAULT_REGION="$region"
-
-if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
-	printf 'AWS S3 recovery acceptance dry-run ok profile=%s region=%s bucket=%s marker=%s; no AWS mutation invoked\n' "$profile" "$region" "$bucket" "$marker"
-	exit 0
-fi
 
 dependency_status=0
 acceptance_require_commands aws go || dependency_status=1
