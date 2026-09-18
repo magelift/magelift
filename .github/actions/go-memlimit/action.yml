@@ -7,4 +7,14 @@ runs:
   steps:
     - name: Cap Go memory
       shell: bash
-      run: echo "GOMEMLIMIT=$(bash "${GITHUB_WORKSPACE}/scripts/go-memlimit.sh")" >> "$GITHUB_ENV"
+      run: | # zizmor: ignore[github-env] value is digits plus MiB from MemAvailable, not workflow inputs
+        limit="$(bash "${GITHUB_WORKSPACE}/scripts/go-memlimit.sh")"
+        if [[ ! "$limit" =~ ^[0-9]+MiB$ ]]; then
+          printf 'go-memlimit: expected <digits>MiB, got %s\n' "$limit" >&2
+          exit 1
+        fi
+        {
+          echo "GOMEMLIMIT<<EOF"
+          echo "$limit"
+          echo "EOF"
+        } >> "$GITHUB_ENV"
