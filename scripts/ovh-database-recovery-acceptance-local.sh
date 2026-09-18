@@ -15,6 +15,12 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 # shellcheck source=acceptance/lib-cleanup-ledger.sh
 source "$ROOT/scripts/acceptance/lib-cleanup-ledger.sh"
 
+dependency_status=0
+acceptance_require_jq || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
+fi
+
 profile="${MAGELIFT_OVH_DATABASE_RECOVERY_PROFILE:-${MAGELIFT_OVH_PROFILE:-default}}"
 project="${MAGELIFT_OVH_DATABASE_RECOVERY_PROJECT:-8728028545db487baeee2e472e7e96dd}"
 region="${MAGELIFT_OVH_DATABASE_RECOVERY_REGION:-GRA}"
@@ -42,7 +48,6 @@ if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_R
 fi
 
 dependency_status=0
-acceptance_require_jq || dependency_status=1
 acceptance_require_commands ovhcloud curl go || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2

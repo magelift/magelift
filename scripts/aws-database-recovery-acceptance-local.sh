@@ -12,11 +12,14 @@ source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
 source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
+dependency_status=0
+acceptance_require_json_yaml_tools || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
+fi
+
 profile="${MAGELIFT_AWS_RDS_RECOVERY_PROFILE:-default}"
 region="${MAGELIFT_AWS_RDS_RECOVERY_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
-if [[ -z "$region" ]]; then
-	region="$(aws configure get region --profile "$profile" 2>/dev/null || true)"
-fi
 run_id="${MAGELIFT_AWS_RDS_RECOVERY_RUN_ID:-$(date -u +%Y%m%d%H%M%S)-$$}"
 source_kind="${MAGELIFT_AWS_RDS_RECOVERY_SOURCE_KIND:-instance}"
 source_instance="${MAGELIFT_AWS_RDS_RECOVERY_INSTANCE:-magelift-rds-${run_id}}"
@@ -42,6 +45,22 @@ explicit_subnet_ids="${MAGELIFT_AWS_RDS_RECOVERY_SUBNET_IDS:-}"
 # for disposable isolation while staying inside both RDS and Aurora limits.
 master_password="MageLift-${run_id:0:20}-Rds9"
 
+if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
+	printf 'AWS database recovery acceptance dry-run ok profile=%s region=%s sourceKind=%s source=%s subnetGroup=%s sourceClass=%s restoreClass=%s engineVersion=%s multiAZ=%s marker=%s; no AWS mutation invoked\n' \
+		"$profile" "${region:-unset}" "$source_kind" "$source_instance" "$subnet_group" "$source_class" "$restore_class" "$engine_version" "$multi_az" "$marker"
+	exit 0
+fi
+
+if [[ -z "$region" ]]; then
+	region="$(aws configure get region --profile "$profile" 2>/dev/null || true)"
+fi
+
+dependency_status=0
+acceptance_require_commands aws curl go || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
+fi
+
 if [[ ! "$profile" =~ ^[A-Za-z0-9._-]{1,64}$ || ! "$region" =~ ^[A-Za-z0-9-]{1,32}$ || ! "$run_id" =~ ^[A-Za-z0-9._-]{1,48}$ || ! "$source_kind" =~ ^(instance|cluster)$ || ! "$source_instance" =~ ^[a-z][a-z0-9-]{0,62}$ || ! "$source_member" =~ ^[a-z][a-z0-9-]{0,62}$ || ! "$subnet_group" =~ ^[a-z][a-z0-9-]{1,254}$ || ! "$security_group" =~ ^[A-Za-z0-9._-]{1,255}$ || ! "$source_class" =~ ^[A-Za-z0-9._-]{1,64}$ || ! "$restore_class" =~ ^[A-Za-z0-9._-]{1,64}$ || ! "$engine_version" =~ ^[A-Za-z0-9._-]{1,64}$ || ! "$multi_az" =~ ^(0|1|true|false)$ || ! "$marker" =~ ^[A-Za-z0-9._/-]{1,128}$ || ! "$fixture" =~ ^[A-Za-z0-9._/-]{1,128}$ ]]; then
 	printf 'set valid AWS RDS/Aurora recovery profile, source kind, region, run ID, generated names, classes, engine version, marker, and fixture values\n' >&2
 	exit 2
@@ -54,19 +73,6 @@ fi
 export AWS_PROFILE="$profile"
 export AWS_REGION="$region"
 export AWS_DEFAULT_REGION="$region"
-
-if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
-	printf 'AWS database recovery acceptance dry-run ok profile=%s region=%s sourceKind=%s source=%s subnetGroup=%s sourceClass=%s restoreClass=%s engineVersion=%s multiAZ=%s marker=%s; no AWS mutation invoked\n' \
-		"$profile" "$region" "$source_kind" "$source_instance" "$subnet_group" "$source_class" "$restore_class" "$engine_version" "$multi_az" "$marker"
-	exit 0
-fi
-
-dependency_status=0
-acceptance_require_json_yaml_tools || dependency_status=1
-acceptance_require_commands aws curl go || dependency_status=1
-if (( dependency_status != 0 )); then
-	exit 2
-fi
 
 export MAGELIFT_ACCEPTANCE_TTL_SECONDS="${MAGELIFT_ACCEPTANCE_TTL_SECONDS:-7200}"
 acceptance_prepare_lifecycle
