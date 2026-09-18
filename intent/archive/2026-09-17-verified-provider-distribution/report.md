@@ -77,4 +77,9 @@ refused because CI acceptance failed (`rg` on a jq-only image). The
 harness now uses `grep -E`. CloudWatch, S3 recovery, and Secrets
 recovery dry-run without a region or `aws configure`. Go jobs set
 `GOMEMLIMIT` to 75% of available RAM and do not pin `GOMAXPROCS` or
-`-p`.
+`-p`. Hosted force-all CI is green on `d5f781a`
+([35382767735](https://github.com/magelift/magelift/actions/runs/35382767735)).
+Box 1.4 still needs the next published (non-draft) RC; the first
+require-bump was rc.2, and later RCs repeat the same staging
+sequence. The order-8 re-run waits for that published candidate,
+not rc.2.

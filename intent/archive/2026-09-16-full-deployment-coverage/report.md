@@ -64,7 +64,10 @@ lands. Fixed in intent/alpha-review-corrections (boxes 3.1, 4.2).
 
 R12 clean-machine proof still needs published artifacts. rc.15 publish
 failed the checks gate: acceptance called `rg` and the CI image has
-`jq` only. After `grep -E`, the next fail was CloudWatch dry-run
-requiring an AWS region. Dry-run now exits before `aws configure`.
+`jq` only. After `grep -E`, later dry-run wrappers called `aws` /
+`gcloud` / `scw` before exiting. Those wrappers now print the
+contract and exit before provider CLIs. Hosted force-all CI is green
+on `d5f781a`
+([35382767735](https://github.com/magelift/magelift/actions/runs/35382767735)).
 Draft assets do not count. The next published candidate is required;
 cutting that tag stays ask-first.
