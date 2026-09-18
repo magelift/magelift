@@ -18,9 +18,6 @@ if (( dependency_status != 0 )); then
 fi
 
 project="${GOOGLE_CLOUD_PROJECT:-${GCLOUD_PROJECT:-}}"
-if [[ -z "$project" ]]; then
-	project="$(gcloud config get-value project 2>/dev/null)"
-fi
 location="${MAGELIFT_GCP_SECRET_LOCATION:-EUROPE-WEST9}"
 run_id="${MAGELIFT_GCP_SECRET_RECOVERY_RUN_ID:-$(date -u +%Y%m%d-%H%M%S)-$$}"
 bucket="${MAGELIFT_GCP_SECRET_ARCHIVE_BUCKET:-magelift-secret-recovery-${run_id}}"
@@ -35,6 +32,15 @@ isolated|in-place) ;;
 	exit 2
 	;;
 esac
+
+if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
+	printf 'GCP Secret Manager recovery acceptance dry-run project=%s location=%s bucket=%s secret=%s marker=%s destination=%s; no mutation invoked\n' "${project:-unset}" "$location" "$bucket" "$secret_id" "$marker" "$destination"
+	exit 0
+fi
+
+if [[ -z "$project" ]]; then
+	project="$(gcloud config get-value project 2>/dev/null)"
+fi
 ttl_marker="${TMPDIR:-/tmp}/magelift-gcp-secret-recovery-${run_id}-ttl-expired-$$"
 
 if [[ ! "$project" =~ ^[A-Za-z0-9][A-Za-z0-9.-]{4,61}[A-Za-z0-9]$ || ! "$location" =~ ^[A-Za-z0-9-]{2,32}$ || ! "$run_id" =~ ^[A-Za-z0-9._-]{1,48}$ || ! "$bucket" =~ ^[a-z0-9][a-z0-9.-]{2,62}$ || ! "$secret_id" =~ ^[A-Za-z0-9_-]+$ || ! "$marker" =~ ^[A-Za-z0-9._/-]{1,128}$ || ! "$fixture" =~ ^[A-Za-z0-9._/-]{1,128}$ ]] || (( ${#secret_id} > 255 )); then
@@ -92,11 +98,6 @@ fi
 if ! grep -Eqi '(not found|does not exist|HTTPError 404|: 404)' <<<"$probe_output"; then
 	printf 'cannot prove generated GCP Secret Manager archive bucket is absent; refusing to continue: %s\n' "$probe_output" >&2
 	exit 2
-fi
-
-if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
-	printf 'GCP Secret Manager recovery acceptance dry-run project=%s location=%s bucket=%s secret=%s marker=%s destination=%s; no mutation invoked\n' "$project" "$location" "$bucket" "$secret_id" "$marker" "$destination"
-	exit 0
 fi
 
 dependency_status=0

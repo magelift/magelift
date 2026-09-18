@@ -16,9 +16,6 @@ if (( dependency_status != 0 )); then
 fi
 
 project="${GOOGLE_CLOUD_PROJECT:-${GCLOUD_PROJECT:-}}"
-if [[ -z "$project" ]]; then
-	project="$(gcloud config get-value project 2>/dev/null)"
-fi
 location="${MAGELIFT_GCP_OBJECT_LOCATION:-EUROPE-WEST9}"
 run_id="${MAGELIFT_GCP_RECOVERY_RUN_ID:-$(date -u +%Y%m%d-%H%M%S)-$$}"
 bucket="${MAGELIFT_GCP_RECOVERY_BUCKET:-magelift-recovery-${run_id}}"
@@ -40,6 +37,15 @@ media|infrastructure-state|audit-evidence) ;;
 	exit 2
 	;;
 esac
+
+if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
+	printf 'gcp recovery acceptance dry-run project=%s location=%s bucket=%s marker=%s class=%s destination=%s; no GCP mutation invoked\n' "${project:-unset}" "$location" "$bucket" "$marker" "$data_class" "$destination"
+	exit 0
+fi
+
+if [[ -z "$project" ]]; then
+	project="$(gcloud config get-value project 2>/dev/null)"
+fi
 bucket_created=0
 ttl_marker="${TMPDIR:-/tmp}/magelift-gcp-recovery-${run_id}-ttl-expired-$$"
 
@@ -86,11 +92,6 @@ fi
 if ! grep -Eqi '(not found|does not exist|HTTPError 404|: 404)' <<<"$probe_output"; then
 	printf 'cannot prove generated GCP recovery bucket is absent; refusing to continue: %s\n%s\n' "$bucket" "$probe_output" >&2
 	exit 2
-fi
-
-if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
-	printf 'gcp recovery acceptance dry-run project=%s location=%s bucket=%s marker=%s class=%s destination=%s\n' "$project" "$location" "$bucket" "$marker" "$data_class" "$destination"
-	exit 0
 fi
 
 dependency_status=0
