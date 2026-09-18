@@ -12,13 +12,6 @@ source "$ROOT/scripts/acceptance/lib-dependencies.sh"
 # shellcheck source=acceptance/lib-lifecycle.sh
 source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
-dependency_status=0
-acceptance_require_json_yaml_tools || dependency_status=1
-acceptance_require_commands aws curl go || dependency_status=1
-if (( dependency_status != 0 )); then
-	exit 2
-fi
-
 profile="${MAGELIFT_AWS_RDS_RECOVERY_PROFILE:-default}"
 region="${MAGELIFT_AWS_RDS_RECOVERY_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
 if [[ -z "$region" ]]; then
@@ -66,6 +59,13 @@ if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_R
 	printf 'AWS database recovery acceptance dry-run ok profile=%s region=%s sourceKind=%s source=%s subnetGroup=%s sourceClass=%s restoreClass=%s engineVersion=%s multiAZ=%s marker=%s; no AWS mutation invoked\n' \
 		"$profile" "$region" "$source_kind" "$source_instance" "$subnet_group" "$source_class" "$restore_class" "$engine_version" "$multi_az" "$marker"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_json_yaml_tools || dependency_status=1
+acceptance_require_commands aws curl go || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 export MAGELIFT_ACCEPTANCE_TTL_SECONDS="${MAGELIFT_ACCEPTANCE_TTL_SECONDS:-7200}"
