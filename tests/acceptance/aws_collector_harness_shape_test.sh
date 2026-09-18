@@ -24,8 +24,8 @@ grep -Fq 'ecs delete-service' "$SCRIPT"
 grep -Fq 'go run ./cmd/aws-collector-acceptance' "$SCRIPT"
 grep -Fq 'acceptance_start_ttl_watchdog' "$SCRIPT"
 
-trap_line="$(rg -n '^trap cleanup EXIT$' "$SCRIPT" | head -1 | cut -d: -f1)"
-watchdog_line="$(rg -n 'acceptance_start_ttl_watchdog' "$SCRIPT" | tail -1 | cut -d: -f1)"
+trap_line="$(grep -n '^trap cleanup EXIT$' "$SCRIPT" | head -1 | cut -d: -f1)"
+watchdog_line="$(grep -n 'acceptance_start_ttl_watchdog' "$SCRIPT" | tail -1 | cut -d: -f1)"
 if [[ -z "$trap_line" || -z "$watchdog_line" || "$watchdog_line" -le "$trap_line" ]]; then
 	printf 'AWS ECS collector acceptance must install cleanup before the TTL watchdog\n' >&2
 	exit 1

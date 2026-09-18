@@ -28,8 +28,8 @@ for relative in "${wrappers[@]}"; do
 			exit 1
 		}
 	done
-	trap_line="$(rg -n '^trap (cleanup|cloudwatch_cleanup) EXIT' "$file" | head -n 1 | cut -d: -f1)"
-	start_line="$(rg -n 'acceptance_start_ttl_watchdog' "$file" | tail -n 1 | cut -d: -f1)"
+	trap_line="$(grep -nE '^trap (cleanup|cloudwatch_cleanup) EXIT' "$file" | head -n 1 | cut -d: -f1)"
+	start_line="$(grep -n 'acceptance_start_ttl_watchdog' "$file" | tail -n 1 | cut -d: -f1)"
 	if [[ -z "$trap_line" || -z "$start_line" || "$start_line" -le "$trap_line" ]]; then
 		printf '%s must install cleanup before starting the watchdog\n' "$relative" >&2
 		exit 1

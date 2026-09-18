@@ -48,7 +48,8 @@ acceptance_paths() {
 	if [[ -n "${MAGELIFT_ACCEPTANCE_CHECKPOINT:-}" ]]; then
 		export ACCEPTANCE_CHECKPOINT="$MAGELIFT_ACCEPTANCE_CHECKPOINT"
 		if [[ "$DRY_RUN" == 1 || "$DRY_RUN" == true ]]; then
-			export ACCEPTANCE_CHECKPOINT="$(dry_run_checkpoint_path "$ACCEPTANCE_CHECKPOINT")"
+			ACCEPTANCE_CHECKPOINT="$(dry_run_checkpoint_path "$ACCEPTANCE_CHECKPOINT")"
+			export ACCEPTANCE_CHECKPOINT
 		fi
 	elif [[ "${ACCEPTANCE_CHECKPOINT:-}" != /* && "${ACCEPTANCE_CHECKPOINT:-}" != *"${PROVIDER}-matrix"* ]]; then
 		if [[ "$DRY_RUN" == 1 || "$DRY_RUN" == true ]]; then
@@ -487,19 +488,24 @@ run() {
 	"${config[@]}" "$@"
 }
 
-export MAGELIFT_ACCEPTANCE_RELEASE="$(yq -r '.application.version // "unknown"' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_RUNTIME="$(yq -r '.target.runtime // "unknown"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_RELEASE="$(yq -r '.application.version // "unknown"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_RUNTIME="$(yq -r '.target.runtime // "unknown"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_PHP_VERSION="$(yq -r '.build.php // ""' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_PHP_EXTENSIONS="$(yq -r '(.build.extensions // ["intl", "pdo_mysql"]) | join(",")' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_COMPOSER_VERSION="$(yq -r '.build.composer.version // ""' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_DATABASE="$(yq -r '.target.'"$PROVIDER"'.databaseVersion // .target.'"$PROVIDER"'.databaseFlavor // "mysql"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_CACHE="$(yq -r '.target.scaleway.cacheMode // "valkey"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_EDGE="$(yq -r '(.edge.externalProvider // .edge.nativeProvider // "none")' "$LIVE_CONFIG")"
+export MAGELIFT_ACCEPTANCE_RELEASE MAGELIFT_ACCEPTANCE_RUNTIME
 export MAGELIFT_ACCEPTANCE_PRESET="$PROFILE"
 export MAGELIFT_ACCEPTANCE_DIGEST="$DIGEST"
-export MAGELIFT_ACCEPTANCE_PHP_VERSION="$(yq -r '.build.php // ""' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_PHP_EXTENSIONS="$(yq -r '(.build.extensions // ["intl", "pdo_mysql"]) | join(",")' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_COMPOSER_VERSION="$(yq -r '.build.composer.version // ""' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_DATABASE="$(yq -r '.target.'"$PROVIDER"'.databaseVersion // .target.'"$PROVIDER"'.databaseFlavor // "mysql"' "$LIVE_CONFIG")"
+export MAGELIFT_ACCEPTANCE_PHP_VERSION MAGELIFT_ACCEPTANCE_PHP_EXTENSIONS MAGELIFT_ACCEPTANCE_COMPOSER_VERSION
+export MAGELIFT_ACCEPTANCE_DATABASE
 export MAGELIFT_ACCEPTANCE_SEARCH="disabled"
 export MAGELIFT_ACCEPTANCE_QUEUE="database"
-export MAGELIFT_ACCEPTANCE_CACHE="$(yq -r '.target.scaleway.cacheMode // "valkey"' "$LIVE_CONFIG")"
+export MAGELIFT_ACCEPTANCE_CACHE
 export MAGELIFT_ACCEPTANCE_WEB_CACHE="none"
-export MAGELIFT_ACCEPTANCE_EDGE="$(yq -r '(.edge.externalProvider // .edge.nativeProvider // "none")' "$LIVE_CONFIG")"
+export MAGELIFT_ACCEPTANCE_EDGE
 
 run_runtime_health() {
 	local timeout="${MAGELIFT_K8S_ACCEPTANCE_RUNTIME_TIMEOUT_SECS:-600}"
@@ -527,7 +533,7 @@ cleanup() {
 	local ec=$?
 	acceptance_stop_ttl_watchdog || true
 	if acceptance_ttl_expired; then
-		MAGELIFT_ACCEPTANCE_CLEANUP_REASON="acceptance TTL expired; forced cleanup"
+		export MAGELIFT_ACCEPTANCE_CLEANUP_REASON="acceptance TTL expired; forced cleanup"
 		MAGELIFT_K8S_ACCEPTANCE_KEEP=false
 	fi
 	if [[ "${MAGELIFT_K8S_ACCEPTANCE_KEEP:-false}" == true ]]; then
@@ -549,7 +555,7 @@ cleanup() {
 			# Kubernetes ports are still releasing. The exact-prefix scan below is
 			# authoritative; retain the Pulumi error as context without marking a
 			# clean account as dirty.
-			MAGELIFT_ACCEPTANCE_CLEANUP_REASON="Pulumi destroy reported a transient provider error; bounded orphan cleanup later proved the ownership prefix empty"
+			export MAGELIFT_ACCEPTANCE_CLEANUP_REASON="Pulumi destroy reported a transient provider error; bounded orphan cleanup later proved the ownership prefix empty"
 		fi
 	fi
 	if [[ "$acceptance_cell_recorded" == 1 ]]; then
@@ -557,7 +563,7 @@ cleanup() {
 			if ! update_cell_cleanup_state "$acceptance_cell" complete; then
 				cleanup_result=FAIL
 				ec=1
-				MAGELIFT_ACCEPTANCE_CLEANUP_REASON="provider cleanup passed but checkpoint cleanup state could not be finalized"
+				export MAGELIFT_ACCEPTANCE_CLEANUP_REASON="provider cleanup passed but checkpoint cleanup state could not be finalized"
 			fi
 		else
 			update_cell_cleanup_state "$acceptance_cell" pending || true
@@ -604,8 +610,8 @@ if [[ "$K8S_RUNTIME_HEALTH_ENABLED" == 1 ]]; then
 	fi
 
 else
-	MAGELIFT_ACCEPTANCE_SCENARIO="infra-only"
-	MAGELIFT_ACCEPTANCE_REASON="live acceptance proved infrastructure lifecycle only; runtime health was not exercised because the shared --infra-only path requires a Magento-compatible immutable image"
+	export MAGELIFT_ACCEPTANCE_SCENARIO="infra-only"
+	export MAGELIFT_ACCEPTANCE_REASON="live acceptance proved infrastructure lifecycle only; runtime health was not exercised because the shared --infra-only path requires a Magento-compatible immutable image"
 	printf '%s infrastructure acceptance passed; runtime health not exercised (set MAGELIFT_K8S_ACCEPTANCE_RUNTIME_HEALTH=true only with a Magento-compatible immutable image)\n' "$PROVIDER" >&2
 fi
 duration="$(( $(date +%s) - started ))s"

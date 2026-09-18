@@ -22,8 +22,8 @@ grep -Fq 'delete_owned_snapshots' "$SCRIPT"
 grep -Fq 'source_claimed=1' "$SCRIPT"
 grep -Fq 'subnet_group_claimed=1' "$SCRIPT"
 
-modify_line="$(rg -n -- '--no-deletion-protection' "$SCRIPT" | head -n 1 | cut -d: -f1)"
-delete_line="$(rg -n -- 'delete-db-instance' "$SCRIPT" | head -n 1 | cut -d: -f1)"
+modify_line="$(grep -n -- '--no-deletion-protection' "$SCRIPT" | head -n 1 | cut -d: -f1)"
+delete_line="$(grep -n -- 'delete-db-instance' "$SCRIPT" | head -n 1 | cut -d: -f1)"
 if [[ -z "$modify_line" || -z "$delete_line" || "$modify_line" -ge "$delete_line" ]]; then
 	printf 'owned RDS instance cleanup must disable deletion protection before delete\n' >&2
 	exit 1

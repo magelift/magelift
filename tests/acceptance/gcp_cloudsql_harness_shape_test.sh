@@ -73,16 +73,16 @@ grep -Fq 'Cloud SQL operation %s completed with an error' "$SCRIPT" || {
 	exit 1
 }
 
-claim_line="$(rg -n '^instance_claimed=1$' "$SCRIPT" | tail -1 | cut -d: -f1)"
-create_line="$(rg -n 'gcloud sql instances create' "$SCRIPT" | head -1 | cut -d: -f1)"
+claim_line="$(grep -n '^instance_claimed=1$' "$SCRIPT" | tail -1 | cut -d: -f1)"
+create_line="$(grep -n 'gcloud sql instances create' "$SCRIPT" | head -1 | cut -d: -f1)"
 if [[ -z "$claim_line" || -z "$create_line" || "$claim_line" -ge "$create_line" ]]; then
 	printf 'Cloud SQL source name is not claimed before create (claim=%s create=%s)\n' "$claim_line" "$create_line" >&2
 	exit 1
 fi
 
-patch_line="$(rg -n 'patch_response=' "$SCRIPT" | head -1 | cut -d: -f1)"
-wait_line="$(rg -nF 'wait_for_cloud_sql_operation "${patch_operation}"' "$SCRIPT" | head -1 | cut -d: -f1)"
-run_line="$(rg -n '\(cd "\$\{ROOT\}" && .*go run ./providers/gcp/cmd/gcp-cloudsql-acceptance' "$SCRIPT" | head -1 | cut -d: -f1)"
+patch_line="$(grep -n 'patch_response=' "$SCRIPT" | head -1 | cut -d: -f1)"
+wait_line="$(grep -nF 'wait_for_cloud_sql_operation "${patch_operation}"' "$SCRIPT" | head -1 | cut -d: -f1)"
+run_line="$(grep -nE '\(cd "\$\{ROOT\}" && .*go run ./providers/gcp/cmd/gcp-cloudsql-acceptance' "$SCRIPT" | head -1 | cut -d: -f1)"
 if [[ -z "$patch_line" || -z "$wait_line" || -z "$run_line" || "$patch_line" -ge "$wait_line" || "$wait_line" -ge "$run_line" ]]; then
 	printf 'Cloud SQL operation readiness is not ordered before the backup command (patch=%s wait=%s run=%s)\n' "$patch_line" "$wait_line" "$run_line" >&2
 	exit 1

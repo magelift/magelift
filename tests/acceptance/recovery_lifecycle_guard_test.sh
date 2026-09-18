@@ -36,14 +36,14 @@ for relative in "${wrappers[@]}"; do
 		printf '%s does not stop the TTL watchdog during cleanup\n' "$relative" >&2
 		exit 1
 	}
-	trap_line="$(rg -n '^trap cleanup EXIT$' "$file" | head -n 1 | cut -d: -f1)"
-	start_line="$(rg -n 'acceptance_start_ttl_watchdog' "$file" | tail -n 1 | cut -d: -f1)"
+	trap_line="$(grep -n '^trap cleanup EXIT$' "$file" | head -n 1 | cut -d: -f1)"
+	start_line="$(grep -n 'acceptance_start_ttl_watchdog' "$file" | tail -n 1 | cut -d: -f1)"
 	if [[ -z "$trap_line" || -z "$start_line" || "$start_line" -le "$trap_line" ]]; then
 		printf '%s must install the cleanup trap before starting the watchdog\n' "$relative" >&2
 		exit 1
 	fi
-	stop_line="$(rg -n 'acceptance_stop_ttl_watchdog \|\| true' "$file" | head -n 1 | cut -d: -f1)"
-	cleanup_line="$(rg -n '^cleanup\(\)' "$file" | head -n 1 | cut -d: -f1)"
+	stop_line="$(grep -n 'acceptance_stop_ttl_watchdog || true' "$file" | head -n 1 | cut -d: -f1)"
+	cleanup_line="$(grep -n '^cleanup()' "$file" | head -n 1 | cut -d: -f1)"
 	if [[ -z "$stop_line" || -z "$cleanup_line" || "$stop_line" -le "$cleanup_line" ]]; then
 		printf '%s must stop the watchdog inside cleanup\n' "$relative" >&2
 		exit 1
