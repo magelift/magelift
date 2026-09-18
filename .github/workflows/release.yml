@@ -34,8 +34,8 @@ jobs:
           cache: false
       # Warm Go caches (shared with CI's go-prime keys): repeat releases
       # recompile only MageLift packages instead of the Pulumi world.
-      # Explicit save: the post step never runs when the job fails late.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Restore before compile; save after. lookup-only never downloads.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/go-build
@@ -44,7 +44,6 @@ jobs:
           restore-keys: |
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
             go-prime-${{ runner.os }}-
-          lookup-only: true
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: v3.1.3
@@ -231,9 +230,9 @@ jobs:
           SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
           bash scripts/release-checks-gate.sh --sha "$SHA" --exclude-run "$GITHUB_RUN_ID"
           gh release edit "$RELEASE_TAG" --draft=false
-      # Explicit save with if: always() — setup-go's post-step never runs
-      # when the job fails, and the next candidate wants this build cache.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # Save-only: the restore step above is the download. always() so a
+      # late packaging failure still warms the next candidate.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: always()
         with:
           path: |
