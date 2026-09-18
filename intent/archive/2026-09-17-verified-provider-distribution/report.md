@@ -74,5 +74,7 @@ intent/alpha-review-corrections (boxes 1.1, 1.2, 1.3, 2.4, 2.5).
 
 R07 publish gate behaved as designed: draft rc.15 assets exist; publish
 refused because CI acceptance failed (`rg` on a jq-only image). The
-harness now uses `grep -E`. Go jobs set `GOMEMLIMIT` to 75% of
-available RAM and do not pin `GOMAXPROCS` or `-p`.
+harness now uses `grep -E`. CloudWatch, S3 recovery, and Secrets
+recovery dry-run without a region or `aws configure`. Go jobs set
+`GOMEMLIMIT` to 75% of available RAM and do not pin `GOMAXPROCS` or
+`-p`.
