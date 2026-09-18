@@ -9,14 +9,15 @@ concurrency:
   group: release-artifacts-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-  id-token: write
-  attestations: write
-  checks: read
+permissions: {}
 
 jobs:
   release:
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      checks: read
     runs-on: ubuntu-latest
     # Twelve Pulumi-heavy cross-compiles; warm caches carry the
     # repeat-release case. Cap Go at 75% of the runner's available RAM
