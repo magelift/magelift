@@ -21,7 +21,9 @@ const (
 	// in website/public/install.sh (same release, same checksums).
 	VerifierVersion  = "v3.1.3"
 	verifierBaseURL  = "https://github.com/sigstore/cosign/releases/download"
-	maxVerifierBytes = 128 << 20
+	// Cosign v3.1.3 linux/amd64 is 141178250 bytes; windows/amd64 is
+	// 198819314. 128MiB rejected every pinned platform.
+	maxVerifierBytes = 256 << 20
 	verifierTimeout  = 5 * time.Minute
 )
 
