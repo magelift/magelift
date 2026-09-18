@@ -5,13 +5,16 @@
 # full CI on the tag (gh workflow run ci.yml --ref <tag> -f all=true).
 #
 # Usage: release-checks-gate.sh --sha <sha> [--repo owner/name]
-#        [--checks-json FILE] [--exclude-run ID] [check...]
-# Default checks: CI passed, provider-verify, php (8.3), php (8.5).
-# "CI passed" is the workflow aggregate (does not include
-# provider-verify). PHP cells are the full-dispatch matrix; a
-# truncated payload or a single cell is not enough. All required
-# checks must succeed on the same workflow run so partial reruns
-# cannot be stitched together.
+#        [--run-id ID] [--checks-json FILE] [--exclude-run ID] [check...]
+# Default checks: CI passed, lint, go-verify, sdk-verify,
+# provider-verify, floci-gcp, php (8.3), php (8.5).
+# "CI passed" still catches failures in other jobs; skipped
+# path-filtered jobs count as OK there, so this list also
+# requires the release-mandatory jobs to succeed (not skip)
+# on the selected run. PHP cells are the full-dispatch matrix.
+# Evaluate one run only: --run-id pins it; otherwise the newest
+# non-excluded run. Pending stays pending. Missing checks never
+# search an older success.
 # --checks-json evaluates one canned payload (or a JSON array of
 # page payloads). Exit 0 pass, 1 blocked, 2 still pending.
 # --exclude-run ignores check runs from one workflow run (the
@@ -22,7 +25,8 @@ REPO="magelift/magelift"
 SHA=""
 CHECKS_JSON=""
 EXCLUDE_RUN=""
-CHECKS=("CI passed" "provider-verify" "php (8.3)" "php (8.5)")
+RUN_ID=""
+CHECKS=("CI passed" "lint" "go-verify" "sdk-verify" "provider-verify" "floci-gcp" "php (8.3)" "php (8.5)")
 POLL_SECONDS="${GATE_POLL_SECONDS:-60}"
 TIMEOUT_SECONDS="${GATE_TIMEOUT_SECONDS:-1800}"
 
@@ -44,8 +48,12 @@ while [[ $# -gt 0 ]]; do
 		EXCLUDE_RUN="${2:?--exclude-run needs a value}"
 		shift 2
 		;;
+	--run-id)
+		RUN_ID="${2:?--run-id needs a value}"
+		shift 2
+		;;
 	-h | --help)
-		sed -n '2,17p' "$0"
+		sed -n '2,21p' "$0"
 		exit 0
 		;;
 	--* | "")
@@ -70,6 +78,7 @@ evaluate() {
 	export GATE_CHECKS
 	GATE_CHECKS="$(printf '%s\n' "${CHECKS[@]}")"
 	export GATE_EXCLUDE_RUN="$EXCLUDE_RUN"
+	export GATE_RUN_ID="$RUN_ID"
 	python3 - <<'PY'
 import json
 import os
@@ -165,67 +174,54 @@ def required_on_run(jobs):
     return pending, blocked, missing
 
 
+wanted_run = os.environ.get("GATE_RUN_ID", "").strip()
+dispatch = "tag a CI-green commit, or dispatch full CI: gh workflow run ci.yml --ref <tag> -f all=true"
+
+
+def run_active(rid):
+    return any((job.get("status") or "") != "completed" for job in by_run.get(rid, {}).values())
+
+
 active = any(
     (run.get("status") or "") != "completed" and not own_run(run) for run in runs
 )
 
-# Prefer the newest run that has the aggregate "CI passed" when that
-# check is required; otherwise the newest run that has any required job.
-candidates = []
-require_aggregate = any(item == "CI passed" for item in wanted)
-for rid, jobs in by_run.items():
-    if require_aggregate and "CI passed" not in jobs:
-        continue
-    candidates.append(rid)
-candidates.sort(key=lambda rid: int(rid) if rid.isdigit() else -1, reverse=True)
-
-if not candidates:
-    if active:
-        print("PENDING  CI passed: no complete validation run yet, CI still active")
+if wanted_run:
+    if wanted_run not in by_run:
+        print(f"PENDING  required checks: run {wanted_run} has no check runs yet")
         sys.exit(2)
-    print("BLOCKED  CI passed: no check run on this commit (tag a CI-green commit, or dispatch full CI: gh workflow run ci.yml --ref <tag> -f all=true)")
-    sys.exit(1)
+    rid = wanted_run
+    active = run_active(rid)
+else:
+    candidates = [rid for rid in by_run if rid]
+    candidates.sort(key=lambda item: int(item) if item.isdigit() else -1, reverse=True)
+    if not candidates:
+        if active:
+            print("PENDING  CI passed: no complete validation run yet, CI still active")
+            sys.exit(2)
+        print(f"BLOCKED  CI passed: no check run on this commit ({dispatch})")
+        sys.exit(1)
+    rid = candidates[0]
 
-code = 0
-chosen = None
-chosen_pending = False
-for rid in candidates:
-    pending, blocked, missing = required_on_run(by_run[rid])
-    if blocked:
-        for name, actual, detail in blocked:
-            print(f"BLOCKED  {name}: conclusion={detail} (run {rid or 'unknown'}, check {actual})")
-        code = 1
-        chosen = rid
-        break
-    if pending or missing:
-        if pending:
-            name, actual, detail, attempt = pending[0]
-            print(f"PENDING  {name}: status={detail} (attempt {attempt}, run {rid or 'unknown'})")
-            chosen_pending = True
-        elif missing and active:
-            print(f"PENDING  {missing[0]}: no check run yet on run {rid or 'unknown'}, CI still active")
-            chosen_pending = True
-        else:
-            for name in missing:
-                print(f"BLOCKED  {name}: no check run on run {rid or 'unknown'} (tag a CI-green commit, or dispatch full CI: gh workflow run ci.yml --ref <tag> -f all=true)")
-            code = 1
-            chosen = rid
-            break
-        continue
-    chosen = rid
-    for name in wanted:
-        print(f"PASS     {name}: success (run {rid or 'unknown'})")
-    sys.exit(0)
-
-if chosen_pending and code == 0:
-    sys.exit(2)
-if code == 1:
+pending, blocked, missing = required_on_run(by_run[rid])
+if blocked:
+    for name, actual, detail in blocked:
+        print(f"BLOCKED  {name}: conclusion={detail} (run {rid or 'unknown'}, check {actual})")
     sys.exit(1)
-if active:
-    print("PENDING  required checks: CI still active")
+if pending:
+    name, actual, detail, attempt = pending[0]
+    print(f"PENDING  {name}: status={detail} (attempt {attempt}, run {rid or 'unknown'})")
     sys.exit(2)
-print("BLOCKED  required checks: no complete validation run on this commit")
-sys.exit(1)
+if missing:
+    if active:
+        print(f"PENDING  {missing[0]}: no check run yet on run {rid or 'unknown'}, CI still active")
+        sys.exit(2)
+    for name in missing:
+        print(f"BLOCKED  {name}: no check run on run {rid or 'unknown'} ({dispatch})")
+    sys.exit(1)
+for name in wanted:
+    print(f"PASS     {name}: success (run {rid or 'unknown'})")
+sys.exit(0)
 PY
 }
 

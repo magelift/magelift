@@ -321,8 +321,10 @@ if "$GATE" --sha abc123 --checks-json "$WORK/stitch.json" >"$WORK/stitch.out" 2>
 	printf 'gate stitched php 8.5 from another run\n' >&2
 	exit 1
 fi
-grep -q "BLOCKED  php (8.5): no check run" "$WORK/stitch.out" || {
+# Newest run is 200 (php 8.5 only). Do not walk back to run 100.
+grep -q "BLOCKED  CI passed: no check run on run 200" "$WORK/stitch.out" || {
 	printf 'gate hid the stitched-run gap\n' >&2
+	cat "$WORK/stitch.out" >&2
 	exit 1
 }
 
@@ -337,9 +339,12 @@ page1 = {"check_runs": [
 ]}
 page2 = {"check_runs": [
     {"name": "CI passed", "status": "completed", "conclusion": "success", "id": 201, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/201"},
-    {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 202, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/202"},
-    {"name": "php (8.3)", "status": "completed", "conclusion": "success", "id": 203, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/203"},
-    {"name": "php (8.5)", "status": "completed", "conclusion": "success", "id": 204, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/204"},
+    {"name": "go-verify", "status": "completed", "conclusion": "success", "id": 202, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/202"},
+    {"name": "sdk-verify", "status": "completed", "conclusion": "success", "id": 203, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/203"},
+    {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 204, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/204"},
+    {"name": "floci-gcp", "status": "completed", "conclusion": "success", "id": 205, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/205"},
+    {"name": "php (8.3)", "status": "completed", "conclusion": "success", "id": 206, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/206"},
+    {"name": "php (8.5)", "status": "completed", "conclusion": "success", "id": 207, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/207"},
 ]}
 with open(sys.argv[1], "w") as handle:
     json.dump([page1, page2], handle)
@@ -362,6 +367,127 @@ if [[ -f /tmp/rc11-checks.json ]]; then
 		cat "$WORK/rc11.out" >&2
 		exit 1
 	}
+fi
+
+# 22. A pending newer run must not fall back to an older success.
+python3 - "$WORK/newer-pending.json" <<'PY'
+import json
+import sys
+
+def job(run, name, status, conclusion, ident):
+    return {
+        "name": name,
+        "status": status,
+        "conclusion": conclusion,
+        "id": ident,
+        "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/{ident}",
+    }
+
+names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-verify", "floci-gcp", "php (8.3)", "php (8.5)"]
+runs = [job("100", name, "completed", "success", 10 + i) for i, name in enumerate(names)]
+runs.extend([
+    job("200", "CI passed", "queued", None, 20),
+    job("200", "provider-verify", "queued", None, 21),
+])
+with open(sys.argv[1], "w") as handle:
+    json.dump({"check_runs": runs}, handle)
+PY
+code=0
+"$GATE" --sha abc123 --checks-json "$WORK/newer-pending.json" >"$WORK/newer-pending.out" 2>&1 || code="$?"
+if [[ "$code" != "2" ]]; then
+	printf 'gate exit = %s, want 2 (pending newer run)\n' "$code" >&2
+	cat "$WORK/newer-pending.out" >&2
+	exit 1
+fi
+grep -q "PENDING  CI passed: status=queued" "$WORK/newer-pending.out" || {
+	printf 'gate hid the pending newer aggregate\n' >&2
+	cat "$WORK/newer-pending.out" >&2
+	exit 1
+}
+if grep -q "PASS" "$WORK/newer-pending.out"; then
+	printf 'gate fell back to the older green run\n' >&2
+	cat "$WORK/newer-pending.out" >&2
+	exit 1
+fi
+
+# 23. A newer run that does not yet have the aggregate stays pending.
+python3 - "$WORK/newer-noagg.json" <<'PY'
+import json
+import sys
+
+def job(run, name, status, conclusion, ident):
+    return {
+        "name": name,
+        "status": status,
+        "conclusion": conclusion,
+        "id": ident,
+        "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/{ident}",
+    }
+
+names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-verify", "floci-gcp", "php (8.3)", "php (8.5)"]
+runs = [job("100", name, "completed", "success", 10 + i) for i, name in enumerate(names)]
+runs.append(job("200", "lint", "in_progress", None, 30))
+with open(sys.argv[1], "w") as handle:
+    json.dump({"check_runs": runs}, handle)
+PY
+code=0
+"$GATE" --sha abc123 --checks-json "$WORK/newer-noagg.json" >"$WORK/newer-noagg.out" 2>&1 || code="$?"
+if [[ "$code" != "2" ]]; then
+	printf 'gate exit = %s, want 2 (newer run before aggregate)\n' "$code" >&2
+	cat "$WORK/newer-noagg.out" >&2
+	exit 1
+fi
+if grep -q "PASS" "$WORK/newer-noagg.out"; then
+	printf 'gate promoted on an older run while a newer run lacked the aggregate\n' >&2
+	cat "$WORK/newer-noagg.out" >&2
+	exit 1
+fi
+
+# 24. Aggregate success with skipped release-mandatory jobs blocks.
+write_payload
+for name in lint go-verify sdk-verify floci-gcp; do
+	mutate "$name" "[{\"name\": \"$name\", \"status\": \"completed\", \"conclusion\": \"skipped\", \"id\": 80, \"html_url\": \"https://github.com/magelift/magelift/actions/runs/100/job/80\"}]"
+done
+if "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/skipped-mand.out" 2>&1; then
+	printf 'gate promoted with skipped release-mandatory jobs\n' >&2
+	cat "$WORK/skipped-mand.out" >&2
+	exit 1
+fi
+grep -q "BLOCKED  lint: conclusion=skipped" "$WORK/skipped-mand.out" || {
+	printf 'gate hid a skipped mandatory job\n' >&2
+	cat "$WORK/skipped-mand.out" >&2
+	exit 1
+}
+
+# 25. --run-id evaluates only that run.
+write_payload
+python3 - "$WORK/pin.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1].replace("pin.json", "checks.json")) as handle:
+    data = json.load(handle)
+data["check_runs"].append({
+    "name": "CI passed",
+    "status": "queued",
+    "conclusion": None,
+    "id": 90,
+    "html_url": "https://github.com/magelift/magelift/actions/runs/200/job/90",
+})
+with open(sys.argv[1], "w") as handle:
+    json.dump(data, handle)
+PY
+code=0
+"$GATE" --sha abc123 --checks-json "$WORK/pin.json" --run-id 200 >"$WORK/pin.out" 2>&1 || code="$?"
+if [[ "$code" != "2" ]]; then
+	printf 'gate exit = %s, want 2 (pinned pending run)\n' "$code" >&2
+	cat "$WORK/pin.out" >&2
+	exit 1
+fi
+if grep -q "PASS" "$WORK/pin.out"; then
+	printf 'gate ignored --run-id and passed the older run\n' >&2
+	cat "$WORK/pin.out" >&2
+	exit 1
 fi
 
 printf 'release checks gate ok\n'
