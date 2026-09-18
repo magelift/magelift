@@ -18,8 +18,8 @@ require (
 	cloud.google.com/go/storage v1.67.1
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.8.0
-	github.com/magelift/magelift v0.1.0-alpha.1-rc.8
-	github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.8
+	github.com/magelift/magelift v0.1.0-alpha.1-rc.9
+	github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.9
 	github.com/pulumi/pulumi-gcp/sdk/v9 v9.36.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.34.1
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.1
