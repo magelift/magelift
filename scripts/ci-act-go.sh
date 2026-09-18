@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 # Run MageLift Go CI jobs locally via nektos/act (no GitHub Actions minutes).
 #
-# Serial builds keep local Act/Go smoke light (see contrib/skills/magelift-serial-builds).
 # Does not run image/php/docs jobs; those stay for real Actions when minutes return.
 #
 # Prerequisites: brew install act; Colima (or Docker) running.
 #
 # Usage:
-#   ./scripts/ci-act-go.sh              # changes → cache-prime → lint×6 → go-verify
-#   ./scripts/ci-act-go.sh lint         # lint matrix only (all partitions, serial)
-#   ./scripts/ci-act-go.sh lint aws     # one lint partition
+#   ./scripts/ci-act-go.sh              # changes → cache-prime → lint → go-verify
+#   ./scripts/ci-act-go.sh lint
 #   ./scripts/ci-act-go.sh go-verify
 #   ./scripts/ci-act-go.sh cache-prime
 set -euo pipefail
@@ -66,6 +64,8 @@ ACT_BASE=(
   -W .github/workflows/ci.yml
   -e "$EVENT_FILE"
   --input all=true
+  # One act container at a time. This is not a GOMAXPROCS pin; Go
+  # inside the job still parallelizes under GOMEMLIMIT.
   --concurrent-jobs 1
   --container-daemon-socket -
   "${ARCH_ARGS[@]}"
@@ -82,40 +82,26 @@ run_job() {
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo " act ► job ${job} $*"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  "${ACT_BASE[@]}" -j "$job" "$@" \
-    --env GOMAXPROCS=1 \
-    --env GOFLAGS=-p=1
+  "${ACT_BASE[@]}" -j "$job" "$@"
 }
 
 TARGET="${1:-all}"
-PART="${2:-}"
 
 case "$TARGET" in
   all)
     run_job changes
     run_job cache-prime
-    for name in aws gcp ovh scaleway core aggregate; do
-      run_job lint --matrix "name:${name}"
-    done
+    run_job lint
     run_job go-verify
     echo ""
     echo "act Go pipeline finished (local substitute for hosted CI Go jobs)."
     ;;
-  lint)
-    if [[ -n "$PART" ]]; then
-      run_job lint --matrix "name:${PART}"
-    else
-      for name in aws gcp ovh scaleway core aggregate; do
-        run_job lint --matrix "name:${name}"
-      done
-    fi
-    ;;
-  changes|cache-prime|go-verify|workflow-lint)
+  lint|changes|cache-prime|go-verify|workflow-lint)
     run_job "$TARGET"
     ;;
   *)
     echo "Unknown target: $TARGET" >&2
-    echo "Usage: $0 [all|changes|cache-prime|lint [partition]|go-verify|workflow-lint]" >&2
+    echo "Usage: $0 [all|changes|cache-prime|lint|go-verify|workflow-lint]" >&2
     exit 2
     ;;
 esac

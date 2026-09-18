@@ -190,3 +190,10 @@ MAGELIFT_EXPERIMENTAL_PROVIDERS); ADR 0013 reconciles the as-built
 boundary with provider-import decoupling deferred to AWS parity.
 R10: every operation classified by effect; mutations never retryable.
 Fixed in intent/alpha-review-corrections (boxes 2.1, 2.2, 2.3).
+
+## Correction (2026-09-18, alpha review 5.1)
+
+The root CLI still links AWS, OVH, and Scaleway Pulumi. Import
+decoupling and those extracts stay deferred to `aws-provider-parity`.
+Until then, compile and test set `GOMEMLIMIT` to 75% of available RAM
+instead of serializing the graph. R05 is unchanged.

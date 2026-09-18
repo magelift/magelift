@@ -23,9 +23,9 @@ Always-on layer only. Load one skill from the tables below. Do not paste skill b
 - Share Pulumi components behind `if provider ==`. Topology stays in
   `internal/cloud/<provider>/` (ADR 0003, 0004).
 - Put secret values in YAML, logs, or evidence. References only.
-- Run local GoReleaser multi-target matrices, unbounded `go test -race ./...`,
-  or parallel heavy `go build` from an IDE session. Makefile already exports
-  `GOMAXPROCS=1 GOFLAGS=-p=1 GOMEMLIMIT=1GiB`. Load `magelift-serial-builds`.
+- Run local GoReleaser multi-target matrices or unbounded `go test -race ./...`.
+  Do not pin `GOMAXPROCS` or `-p`. `GOMEMLIMIT` is 75% of available RAM
+  (`scripts/go-memlimit.sh`).
 
 ## Ask first: protected/production destroy, release tags, history rewrite.
 
@@ -37,7 +37,7 @@ Always-on layer only. Load one skill from the tables below. Do not paste skill b
   `platform.ModuleRegistry`. `infra.RegisterTarget` alone does not ship
   `magelift deploy`.
 - After clone, once: `composer install --working-dir=build`. Gate: `make verify`.
-  Iterate: `GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/<pkg>/ -count=1`.
+  Iterate: `go test ./internal/<pkg>/ -count=1`.
 - Do not hand-edit generated schema, CLI reference, certification coverage, or
   `agents/manifest.json`. Use `make generate`.
 - Recall: read `.agents/knowledge/index.md`, grep, open only matching notes.
@@ -56,7 +56,6 @@ and is only for dogfooding user flows or the skills acceptance run.
 | When | Skill |
 | --- | --- |
 | Code, docs, PR, honesty | `contrib/skills/magelift-contribute` |
-| Local compile / release smoke | `contrib/skills/magelift-serial-builds` |
 | New `internal/cloud/<provider>/` | `contrib/skills/magelift-provider` |
 | Public extension boundary | `contrib/skills/magelift-extend` |
 | Live matrix cell + evidence | `contrib/skills/magelift-certify` |

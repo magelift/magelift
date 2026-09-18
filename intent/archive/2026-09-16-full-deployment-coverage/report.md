@@ -59,3 +59,10 @@ shipped path (installer, provider install, image build), ADC-first
 credentials with doctor detection, test-customer mail procedure, and
 scheduled expiry; the pin sheet stays proposed until loop evidence
 lands. Fixed in intent/alpha-review-corrections (boxes 3.1, 4.2).
+
+## Correction (2026-09-18, alpha review 5.1)
+
+R12 clean-machine proof still needs published artifacts. rc.15 publish
+failed the checks gate: acceptance called `rg` and the CI image has
+`jq` only. Draft assets do not count. The next published candidate is
+required; cutting that tag stays ask-first.

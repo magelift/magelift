@@ -19,9 +19,9 @@ jobs:
   release:
     runs-on: ubuntu-latest
     # Twelve Pulumi-heavy cross-compiles; warm caches carry the
-    # repeat-release case. Serial: uncapped parallelism OOM-kills even
-    # hosted 16GB runners with no error output (rc.8, 2026-09-18).
-    # Revisit via the dialproof canary, never on a release candidate.
+    # repeat-release case. Cap Go at 75% of the runner's available RAM
+    # (`scripts/go-memlimit.sh`). Do not pin GOMAXPROCS or goreleaser
+    # --parallelism.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -32,6 +32,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - uses: ./.github/actions/go-memlimit
       # Warm Go caches (shared with CI's go-prime keys): repeat releases
       # recompile only MageLift packages instead of the Pulumi world.
       # Restore before compile; save after. lookup-only never downloads.
@@ -101,7 +102,7 @@ jobs:
         with:
           distribution: goreleaser
           version: v2.18.1
-          args: release --clean --parallelism 1 --timeout 30m -f .goreleaser.dialproof.yaml
+          args: release --clean --timeout 30m -f .goreleaser.dialproof.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: "0"
@@ -110,19 +111,12 @@ jobs:
         with:
           distribution: goreleaser
           version: v2.18.1
-          # Parallelism 1: concurrent Pulumi-graph cross-compiles
-          # OOM-kill the runner with no error output (rc.8 proved it
-          # on hosted hardware, not just small private runners).
-          # Timeout 150m stays a safe upper bound.
-          args: release --clean --parallelism 1 --timeout 150m
+          args: release --clean --timeout 150m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Pushes the brew formula and Scoop manifest to their tap repos.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          # Serial builds (proven) at full thread count: one Pulumi link
-          # peaks far below 16GB, while concurrent links OOM-kill.
           CGO_ENABLED: "0"
-          GOMEMLIMIT: 12GiB
       # The CLI verifies a provider binary against the digest plus
       # Cosign bundle named in magelift.providers.lock. One lock per
       # platform (the installed binary has a fixed name); digests come

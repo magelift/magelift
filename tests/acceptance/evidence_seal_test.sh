@@ -42,10 +42,10 @@ append_shared_cleanup "PASS" "ml-evidence-seal" "magelift-run=run-evidence-seal"
 SEALED="$TMP/sealed.jsonl"
 CERTIFICATION_BIN="$TMP/magelift-certification"
 printf '+ evidence_seal_test: building certification CLI (cold cache can take several minutes)\n'
-# Parallel build: the Makefile serializes Go for IDE safety, but this one
-# bounded compile needs all cores; serial cold builds exceed 25 minutes.
-SEAL_PROCS="$( (nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4) | head -n 1)"
-(cd "$ROOT" && GOMAXPROCS="$SEAL_PROCS" GOFLAGS="${GOFLAGS:-} -p=$SEAL_PROCS" GOMEMLIMIT=4GiB go build -o "$CERTIFICATION_BIN" ./cmd/magelift)
+# shellcheck source=../../scripts/go-memlimit.sh
+source "$ROOT/scripts/go-memlimit.sh"
+magelift_apply_go_memlimit
+(cd "$ROOT" && go build -o "$CERTIFICATION_BIN" ./cmd/magelift)
 printf '+ evidence_seal_test: sealing evidence\n'
 "$CERTIFICATION_BIN" --output json certification seal --file "$ACCEPTANCE_SHARED_EVIDENCE" --output-file "$SEALED" >/dev/null
 

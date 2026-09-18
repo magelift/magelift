@@ -1,5 +1,10 @@
 # Log
 
+## 2026-09-18
+
+- Deleted the serial-builds skill and the MacBook-only serial-cap lesson. Live rule is `GOMEMLIMIT` at 75% of available RAM (`scripts/go-memlimit.sh`); no `GOMAXPROCS` / `-p` pin. CI/release jobs take `.github/actions/go-memlimit`; a lintcoverage test fails if a Go job omits it.
+- Hosted acceptance has `jq` only. Do not call `rg` from harness scripts; use `grep -E`.
+
 ## 2026-09-15
 
 - Anonymized employer-linked repo slugs to "prior shop" in two notes, with history-preserving rename.

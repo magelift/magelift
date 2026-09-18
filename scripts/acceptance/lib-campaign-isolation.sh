@@ -1,25 +1,16 @@
 #!/usr/bin/env bash
-# Packed-campaign isolation: one git worktree, one resource prefix, serial Go,
-# and Pulumi state that is not inherited from a sibling provider tree.
+# Packed-campaign isolation: one git worktree, one resource prefix,
+# GOMEMLIMIT at 75% of available RAM, and Pulumi state that is not
+# inherited from a sibling provider tree.
 # shellcheck shell=bash
 
-acceptance_campaign_serial_go() {
-	export GOMAXPROCS=1
-	local flags="${GOFLAGS:-}"
-	case " ${flags} " in
-	*" -p=1 "* | *" -p 1 "*) ;;
-	*)
-		if [[ -n "$flags" ]]; then
-			flags="${flags} -p=1"
-		else
-			flags="-p=1"
-		fi
-		;;
-	esac
-	export GOFLAGS="$flags"
-	export GOMEMLIMIT="${GOMEMLIMIT:-1GiB}"
-	printf '+ campaign isolation serial Go GOMAXPROCS=%s GOFLAGS=%s GOMEMLIMIT=%s\n' \
-		"$GOMAXPROCS" "$GOFLAGS" "$GOMEMLIMIT"
+_campaign_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=../go-memlimit.sh
+source "$_campaign_root/scripts/go-memlimit.sh"
+
+acceptance_campaign_go_memlimit() {
+	magelift_apply_go_memlimit
+	printf '+ campaign isolation GOMEMLIMIT=%s\n' "$GOMEMLIMIT"
 }
 
 acceptance_campaign_prefix_is_reserved() {

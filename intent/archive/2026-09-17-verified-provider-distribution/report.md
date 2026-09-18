@@ -69,3 +69,10 @@ prerelease plus never-latest channels with a checks-gated publish
 step (dialproof.6 metadata corrected). R11: copy-based upgrade
 backup with per-transition fault tests. Fixed in
 intent/alpha-review-corrections (boxes 1.1, 1.2, 1.3, 2.4, 2.5).
+
+## Correction (2026-09-18, alpha review 5.1)
+
+R07 publish gate behaved as designed: draft rc.15 assets exist; publish
+refused because CI acceptance failed (`rg` on a jq-only image). The
+harness now uses `grep -E`. Go jobs set `GOMEMLIMIT` to 75% of
+available RAM and do not pin `GOMAXPROCS` or `-p`.

@@ -291,7 +291,7 @@ func runGo(t *testing.T, dir string, args ...string) string {
 	if dir != "" {
 		cmd.Dir = dir
 	}
-	cmd.Env = append(os.Environ(), "GOMAXPROCS=1", "GOFLAGS=-p=1")
+	cmd.Env = os.Environ()
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

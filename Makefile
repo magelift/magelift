@@ -1,12 +1,12 @@
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
 
-# MageLift's Pulumi dependency graph is large. Keep local Go compilation and
-# test scheduling bounded so one command cannot exhaust a contributor's Mac.
-# This also keeps an accidental `make -j` from starting multiple builds.
-export GOMAXPROCS := 1
-export GOFLAGS := -p=1
-export GOMEMLIMIT := 1GiB
+# Soft-cap Go at 75% of available RAM so a Pulumi-sized compile cannot
+# take the host. Do not pin GOMAXPROCS or -p; the toolchain schedules
+# those. .NOTPARALLEL only blocks accidental `make -j` of two heavy
+# Makefile targets.
+unexport GOMAXPROCS
+export GOMEMLIMIT := $(shell "$(CURDIR)/scripts/go-memlimit.sh")
 
 .PHONY: help generate generate-check cli-docs cli-docs-check certification-docs certification-docs-check fmt fmt-check test sdk-test lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test pulumi-mock-test floci-test-aws floci-gcp-test provider-gcp-build core-leanness local-gates acceptance-dependencies-check acceptance-harness-test aws-acceptance-local aws-recovery-acceptance-local aws-database-recovery-acceptance-local aws-secret-recovery-acceptance-local aws-sqs-acceptance-local aws-cloudwatch-acceptance-local aws-cloudfront-acceptance-local gcp-acceptance-local gcp-collector-acceptance-local gcp-cloudsql-acceptance-local gcp-cloudsql-destroy-retention-acceptance-local gcp-cloudsql-cleanup-ledger-acceptance-local gcp-recovery-acceptance-local gcp-secret-recovery-acceptance-local gcp-pubsub-acceptance-local gcp-observability-acceptance-local gcp-edge-acceptance-local ovh-acceptance-local ovh-recovery-acceptance-local ovh-database-recovery-acceptance-local scaleway-acceptance-local scaleway-recovery-acceptance-local scaleway-secret-recovery-acceptance-local scaleway-observability-acceptance-local fastly-acceptance-local newrelic-acceptance-local newrelic-otlp-acceptance-local skills-test extension-test docs docs-serve workflow-check verify release-smoke ci-act-go
 
@@ -125,6 +125,7 @@ acceptance-harness-test: acceptance-dependencies-check ## Run offline acceptance
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) lifecycle_guard_test.sh -- bash tests/acceptance/lifecycle_guard_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) cloudflare_dns_helper_test.sh -- bash tests/acceptance/cloudflare_dns_helper_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) lib_cosign_test.sh -- bash tests/acceptance/lib_cosign_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) go_memlimit_test.sh -- bash tests/acceptance/go_memlimit_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) campaign_isolation_test.sh -- bash tests/acceptance/campaign_isolation_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_seed_task_definition_test.sh -- bash tests/acceptance/aws_seed_task_definition_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) shared_evidence_test.sh -- bash tests/acceptance/shared_evidence_test.sh
@@ -184,7 +185,7 @@ acceptance-dependencies-check: ## Verify jq/yq v4 and shared acceptance command 
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) nginx_media_deny_shape_test.sh -- bash tests/acceptance/nginx_media_deny_shape_test.sh
 
 skills-test: ## Test bundled skill installation and verification
-	GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/skills
+	go test ./internal/skills
 
 installer-harness-test: ## Run the installer trust harness against local fixtures
 	bash scripts/install-verify-harness.sh

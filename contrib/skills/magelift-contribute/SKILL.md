@@ -37,12 +37,13 @@ make verify
 Narrow loops while iterating:
 
 ```sh
-GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/<pkg>/ -count=1
+go test ./internal/<pkg>/ -count=1
 make docs
 ```
 
-For heavy local compiles, load `magelift-serial-builds` and keep packaging smoke
-single-target.
+Do not pin `GOMAXPROCS` or `-p`. Makefile sets `GOMEMLIMIT` to 75% of
+available RAM. Local packaging smoke uses the dialproof (host-only)
+GoReleaser config; the full matrix stays on CI.
 
 ## PR shape
 

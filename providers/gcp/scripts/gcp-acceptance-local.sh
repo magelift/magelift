@@ -23,7 +23,7 @@ source "$ROOT/scripts/acceptance/lib-cosign.sh"
 source "$ROOT/scripts/acceptance/lib-campaign-isolation.sh"
 
 json_dependency_status=0
-acceptance_campaign_serial_go
+acceptance_campaign_go_memlimit
 acceptance_require_jq || json_dependency_status=1
 
 DRY_RUN="${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}"
@@ -695,8 +695,8 @@ ensure_acceptance_state_bucket() {
 }
 
 if [[ ! -x "$BIN" || "${MAGELIFT_GCP_ACCEPTANCE_REBUILD:-false}" == true ]]; then
-	printf '+ building GCP acceptance CLI -> %s (serial GOMAXPROCS=1)\n' "$BIN"
-	(cd "$ROOT" && GOMAXPROCS=1 GOFLAGS=-p=1 GOMEMLIMIT=1GiB go build -trimpath -ldflags='-s -w' -o "$BIN" ./cmd/magelift)
+	printf '+ building GCP acceptance CLI -> %s GOMEMLIMIT=%s\n' "$BIN" "${GOMEMLIMIT:-}"
+	(cd "$ROOT" && go build -trimpath -ldflags='-s -w' -o "$BIN" ./cmd/magelift)
 else
 	printf '+ using existing GCP acceptance CLI -> %s\n' "$BIN"
 fi

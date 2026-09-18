@@ -85,15 +85,17 @@ Map jobs → verify targets: `generate-check` / `cli-docs-check` / `fmt-check` /
 ## `go test -race` measurement
 
 Criterion 1 requires `go test -race ./...` inside `go-verify`. `-race` roughly
-doubles per-package memory over a graph that peaks near 8.5 GB when provider SDKs
-link into one binary, so fit on the **2 vCPU / 7 GB** runner class must be
-measured, not assumed.
+doubles per-package memory over a graph that peaks near 8.5 GB when AWS, OVH,
+and Scaleway Pulumi still link into the root CLI. Public `ubuntu-latest` is
+4 vCPU / 16 GB. Jobs set `GOMEMLIMIT` to 75% of available RAM
+(`.github/actions/go-memlimit`) and do not pin `GOMAXPROCS` or `-p`. Remaining
+provider extracts shrink that graph later. Fit is measured, not assumed.
 
 | Environment | Command | Wall time | Peak RSS | Outcome |
 | --- | --- | --- | --- | --- |
-| Local (serial sample) | `GOMAXPROCS=1 GOFLAGS=-p=1 go test -race ./internal/lintcoverage/ ./internal/usererr/ -count=1` | ~4.7s | ~102 MiB | pass (narrow sample only) |
-| Local (full race) | `GOMAXPROCS=1 GOFLAGS=-p=1 go test -race ./... -count=1` | deferred-local | deferred-local | Prefer CI; see `contrib/skills/magelift-serial-builds` for local smoke guidance |
-| CI `go-verify` (2 vCPU / 7 GB) | `go test -race ./...` | ~12m | n/a | pass on run 30836267745 |
+| Local (sample) | `go test -race ./internal/lintcoverage/ ./internal/usererr/ -count=1` | ~4.7s | ~102 MiB | pass (narrow sample only) |
+| Local (full race) | `go test -race ./... -count=1` | deferred-local | deferred-local | Prefer CI. `GOMEMLIMIT` is 75% of available RAM. |
+| CI `go-verify` (public `ubuntu-latest`) | `go test -race ./...` | ~12m | n/a | pass on run 30836267745 (older 2 vCPU / 7 GB class) |
 
 If CI fails on memory or the runner is reaped with no test output, partition the
 test step by the same six package groups as the lint matrix; do not raise

@@ -86,9 +86,9 @@ magelift version
 This is also the development path: building from source never enters
 release verification. There is no bypass flag.
 
-On memory-constrained machines, contributors may set `GOMAXPROCS=1 GOFLAGS=-p=1`
-(see the repo [CONTRIBUTING](https://github.com/magelift/magelift/blob/main/CONTRIBUTING.md)).
-Ordinary installs do not need it.
+Building from the repo Makefile sets `GOMEMLIMIT` to 75% of available
+RAM. Do not pin `GOMAXPROCS` or `-p`. Ordinary `go install` does not
+need either.
 
 ## Next
 

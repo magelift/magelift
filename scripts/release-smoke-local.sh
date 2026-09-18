@@ -2,16 +2,14 @@
 # Local packaging smoke: goreleaser check + one snapshot release (host only)
 # + legal files + provider matrix presence. Signing, SBOM, and publish are
 # skipped: full multi-platform matrices with signatures belong on CI.
-# Keep --single-target and low parallelism.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-export GOMAXPROCS=1
-# Cap package-level compile parallelism inside the single go build as well.
-export GOFLAGS=-p=1
-export GOMEMLIMIT=1GiB
+# shellcheck source=go-memlimit.sh
+source "$ROOT/scripts/go-memlimit.sh"
+magelift_apply_go_memlimit
 
 printf '+ goreleaser check (both configs)\n'
 go run github.com/goreleaser/goreleaser/v2@v2.18.1 check -f .goreleaser.yaml
@@ -19,11 +17,11 @@ go run github.com/goreleaser/goreleaser/v2@v2.18.1 check -f .goreleaser.dialproo
 
 # The dialproof config is the slim linux/amd64 shape; the full matrix
 # belongs on CI.
-printf '+ goreleaser release --snapshot --parallelism=1 GOMAXPROCS=%s GOFLAGS=%s (dialproof config)\n' \
-	"$GOMAXPROCS" "$GOFLAGS"
+printf '+ goreleaser release --snapshot GOMEMLIMIT=%s (dialproof config)\n' \
+	"$GOMEMLIMIT"
 rm -rf dist
 go run github.com/goreleaser/goreleaser/v2@v2.18.1 release --snapshot --clean \
-	-f .goreleaser.dialproof.yaml --parallelism=1 --skip=publish,sign,sbom
+	-f .goreleaser.dialproof.yaml --skip=publish,sign,sbom
 
 cli_archive="$(find dist -maxdepth 1 -type f -name 'magelift_*.tar.gz' -o -maxdepth 1 -type f -name 'magelift_*.zip' | head -1 || true)"
 if [[ -z "$cli_archive" ]]; then
@@ -57,4 +55,4 @@ else
 	"$bin_dir/magelift" version >/dev/null
 fi
 
-printf 'release smoke ok archive=%s provider=%s (serial single-target)\n' "$cli_archive" "$provider_bin"
+printf 'release smoke ok archive=%s provider=%s\n' "$cli_archive" "$provider_bin"

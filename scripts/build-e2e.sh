@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export GOMAXPROCS=1
-export GOFLAGS=-p=1
-export GOMEMLIMIT=1GiB
-
 repository_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=go-memlimit.sh
+source "$repository_root/scripts/go-memlimit.sh"
+magelift_apply_go_memlimit
 work=$(mktemp -d "${TMPDIR:-/tmp}/magelift-build.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 

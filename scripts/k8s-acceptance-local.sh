@@ -28,7 +28,7 @@ source "$ROOT/scripts/acceptance/lib-cosign.sh"
 source "$ROOT/scripts/acceptance/lib-campaign-isolation.sh"
 
 json_dependency_status=0
-acceptance_campaign_serial_go
+acceptance_campaign_go_memlimit
 acceptance_require_json_yaml_tools || json_dependency_status=1
 
 PROFILE="${MAGELIFT_ACCEPTANCE_PROFILE:-preview}"
