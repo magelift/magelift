@@ -80,18 +80,18 @@ minutes. Order matters; never move a tag:
    way CI will: fresh clone at HEAD plus `go mod tidy`
    plus `git diff --exit-code` in each module and the
    linter. Only then tag.
-5. Tag `sdk/<v>`, `<v>`, and `providers/gcp/<v>` at that commit
+8. Tag `sdk/<v>`, `<v>`, and `providers/gcp/<v>` at that commit
    and push all three in one `git push`. The release starts; its
    visibility-wait sleeps first, then polls.
-6. Wait five minutes in silence (no proxy, sumdb, or CI requests:
+9. Wait five minutes in silence (no proxy, sumdb, or CI requests:
    an early 404 seeds a 30-minute negative). Then one primer per
    module (`go mod download <module>@<v>` with default proxy and
    sumdb); all three must pass.
-7. Only then dispatch full CI on the release tag
+10. Only then dispatch full CI on the release tag
    (`gh workflow run ci.yml --ref <v> -f all=true`); the publish
    gate requires actual success on the tag commit, and CI jobs
    fail the same visibility race when dispatched too early.
-8. Verify the pristine consumer before trusting the candidate:
+11. Verify the pristine consumer before trusting the candidate:
    `go install` the CLI and provider mains at `<v>` plus an SDK
    scratch build, all `GOWORK=off` from the proxy. The release
    pipeline repeats this before publish; run it locally too.
