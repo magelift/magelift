@@ -227,11 +227,11 @@ func serviceContract(component, family string, ports []int) ([]LocalCredentialBi
 	switch component {
 	case "database":
 		return []LocalCredentialBinding{
-				{Name: "application-user", Environment: "MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME"},
-				{Name: "application-password", Environment: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD"},
-			}, LocalConnectionShape{
-				Host: "database", Port: 3306, Database: "magento", User: "magento", PasswordEnv: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD",
-			}
+			{Name: "application-user", Environment: "MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME"},
+			{Name: "application-password", Environment: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD"},
+		}, LocalConnectionShape{
+			Host: "database", Port: 3306, Database: "magento", User: "magento", PasswordEnv: "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD",
+		}
 	case "cache":
 		return nil, LocalConnectionShape{Host: "cache", Port: 6379}
 	case "search":
@@ -239,22 +239,22 @@ func serviceContract(component, family string, ports []int) ([]LocalCredentialBi
 	case "queue":
 		if family == "artemis" {
 			return []LocalCredentialBinding{
-					{Name: "application-user", Environment: "MAGENTO_DC_QUEUE__STOMP__USER"},
-					{Name: "application-password", Environment: "MAGENTO_DC_QUEUE__STOMP__PASSWORD"},
-				}, LocalConnectionShape{
-					Host: "queue", Port: 61613, ManagementPort: 8161, User: "magento", PasswordEnv: "MAGENTO_DC_QUEUE__STOMP__PASSWORD", Scheme: "stomp",
-				}
+				{Name: "application-user", Environment: "MAGENTO_DC_QUEUE__STOMP__USER"},
+				{Name: "application-password", Environment: "MAGENTO_DC_QUEUE__STOMP__PASSWORD"},
+			}, LocalConnectionShape{
+				Host: "queue", Port: 61613, ManagementPort: 8161, User: "magento", PasswordEnv: "MAGENTO_DC_QUEUE__STOMP__PASSWORD", Scheme: "stomp",
+			}
 		}
 		managementPort := 15672
 		if len(ports) > 1 {
 			managementPort = ports[1]
 		}
 		return []LocalCredentialBinding{
-				{Name: "application-user", Environment: "MAGENTO_DC_QUEUE__AMQP__USERNAME"},
-				{Name: "application-password", Environment: "MAGENTO_DC_QUEUE__AMQP__PASSWORD"},
-			}, LocalConnectionShape{
-				Host: "queue", Port: 5672, ManagementPort: managementPort, User: "magento", PasswordEnv: "MAGENTO_DC_QUEUE__AMQP__PASSWORD", VHost: "/",
-			}
+			{Name: "application-user", Environment: "MAGENTO_DC_QUEUE__AMQP__USERNAME"},
+			{Name: "application-password", Environment: "MAGENTO_DC_QUEUE__AMQP__PASSWORD"},
+		}, LocalConnectionShape{
+			Host: "queue", Port: 5672, ManagementPort: managementPort, User: "magento", PasswordEnv: "MAGENTO_DC_QUEUE__AMQP__PASSWORD", VHost: "/",
+		}
 	default:
 		connection := LocalConnectionShape{Host: component}
 		if len(ports) > 0 {

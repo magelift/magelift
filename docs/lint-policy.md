@@ -16,9 +16,12 @@ tractable. Expand deliberately; do not dump every available linter into CI.
 | `revive` | Style subset (narrow rules in `.golangci.yml`) |
 | `gocritic` | Selected diagnostics (`#diagnostic` only; opinionated off) |
 
-`gofmt` is `make fmt-check` (the Go 1.27.1 toolchain). golangci-lint 2.13.2's
-gofmt formatter disagrees with that toolchain on some composite literals, so it
-is not enabled.
+`gofmt` is `make fmt-check`, which calls `$(go env GOROOT)/bin/gofmt` (the
+Go 1.27.1 toolchain). A PATH `gofmt` can be an older distro binary and will
+rewrite composite-literal indent on files such as
+`internal/localdev/catalog.go`. `go-verify` uses the same GOROOT binary.
+golangci-lint 2.13.2's gofmt formatter disagrees with that toolchain on some
+composite literals, so it is not enabled.
 
 `govulncheck` runs as a separate CI step inside `go-verify` (not inside golangci-lint).
 

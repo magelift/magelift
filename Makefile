@@ -13,11 +13,16 @@ export GOMEMLIMIT := $(shell "$(CURDIR)/scripts/go-memlimit.sh")
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-36s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
+# PATH gofmt can be an older distro binary (for example /usr/bin/gofmt -> go-1.26).
+# CI and make fmt-check must use the go.mod toolchain so composite literals
+# do not flip between indent styles.
+GOFMT := $(shell go env GOROOT)/bin/gofmt
+
 fmt: ## Format Go sources
-	gofmt -w $$(find . -type f -name '*.go' -not -path './vendor/*')
+	$(GOFMT) -w $$(find . -type f -name '*.go' -not -path './vendor/*')
 
 fmt-check: ## Check Go formatting without changing files
-	test -z "$$(gofmt -l $$(find . -type f -name '*.go' -not -path './vendor/*'))"
+	test -z "$$($(GOFMT) -l $$(find . -type f -name '*.go' -not -path './vendor/*'))"
 
 test: ## Run Go tests with the race detector
 	go test -race ./...

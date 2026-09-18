@@ -195,8 +195,9 @@ jobs:
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - run: |
+          gofmt="$(go env GOROOT)/bin/gofmt"
           mapfile -t go_files < <(git ls-files '*.go')
-          gofmt -w "${go_files[@]}"
+          "$gofmt" -w "${go_files[@]}"
           git diff --exit-code
       - run: go build -o /tmp/genconfig ./cmd/genconfig && /tmp/genconfig --check
       - run: go build -o /tmp/gendocs ./cmd/gendocs && /tmp/gendocs --check
