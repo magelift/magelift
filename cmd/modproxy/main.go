@@ -63,6 +63,12 @@ func run(root, ref, version, out string) error {
 	staged := []struct{ module, dir string }{
 		{"github.com/magelift/magelift", work},
 	}
+	var subs []string
+	defer func() {
+		for _, sub := range subs {
+			_ = os.RemoveAll(sub)
+		}
+	}()
 	for _, module := range []struct {
 		path, dir string
 	}{
@@ -73,7 +79,7 @@ func run(root, ref, version, out string) error {
 		if err != nil {
 			return err
 		}
-		defer os.RemoveAll(sub)
+		subs = append(subs, sub)
 		if err := extractArchive(root, ref, module.dir, sub); err != nil {
 			return err
 		}
