@@ -12,7 +12,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands aws go || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -34,6 +33,12 @@ export AWS_DEFAULT_REGION="$region"
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
 	printf 'AWS SQS acceptance dry-run ok profile=%s region=%s; no AWS mutation invoked\n' "$profile" "$region"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands aws go || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 run_id="$(date -u +%Y%m%d%H%M%S)-$$"

@@ -11,7 +11,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_json_yaml_tools || dependency_status=1
-acceptance_require_commands gcloud go || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -92,6 +91,12 @@ fi
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
 	printf 'gcp recovery acceptance dry-run project=%s location=%s bucket=%s marker=%s class=%s destination=%s\n' "$project" "$location" "$bucket" "$marker" "$data_class" "$destination"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands gcloud go || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 acceptance_prepare_lifecycle

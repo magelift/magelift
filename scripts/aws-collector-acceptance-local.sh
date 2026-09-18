@@ -11,7 +11,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands aws newrelic go mktemp || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -165,6 +164,12 @@ acceptance_start_ttl_watchdog "$ACCEPTANCE_TTL_SECONDS" "$ttl_marker"
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
 	printf 'aws ECS collector acceptance dry-run ok region=%s cluster=%s service=%s marker=%s\n' "$region" "$cluster" "$service" "$marker"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands aws newrelic go mktemp || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 aws sts get-caller-identity >/dev/null

@@ -14,7 +14,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands gcloud kubectl mktemp shasum curl || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -102,6 +101,12 @@ if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_R
 		"$([[ "$runtime" == "gke-standard" ]] && printf 'create' || printf 'create-auto')" \
 		"$msp_required" "$alert_required"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands gcloud kubectl mktemp shasum curl || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 : "${MAGELIFT_GCP_NATIVE_OBS_ACCEPTANCE:?set MAGELIFT_GCP_NATIVE_OBS_ACCEPTANCE=1 for a disposable live GKE observability run}"

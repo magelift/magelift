@@ -15,7 +15,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_json_yaml_tools || dependency_status=1
-acceptance_require_commands scw go || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -39,6 +38,12 @@ fi
 if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
 	printf 'Scaleway Secret Manager recovery acceptance dry-run ok profile=%s region=%s bucket=%s secret=%s marker=%s; no Scaleway mutation invoked\n' "$profile" "$region" "$bucket" "$secret_name" "$marker"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands scw go || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 if [[ -z "$project" ]]; then

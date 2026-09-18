@@ -10,7 +10,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 
 dependency_status=0
 acceptance_require_jq || dependency_status=1
-acceptance_require_commands gcloud newrelic go mktemp shasum || dependency_status=1
 if (( dependency_status != 0 )); then
 	exit 2
 fi
@@ -264,6 +263,12 @@ if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
  printf 'gcp collector acceptance dry-run ok project=%s cluster=%s runtime=%s create_cluster=%s location=%s marker=%s\n' \
   "$project" "$cluster" "$runtime" "$create_cluster" "$cluster_location" "$marker"
  exit 0
+fi
+
+dependency_status=0
+acceptance_require_commands gcloud newrelic go mktemp shasum || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 create_disposable_cluster
