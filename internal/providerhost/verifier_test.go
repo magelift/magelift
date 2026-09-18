@@ -95,3 +95,17 @@ func TestCachedVerifierPathMissesEmptyCache(t *testing.T) {
 		t.Fatal("empty cache reported a verifier")
 	}
 }
+
+func TestMaxVerifierBytesFitsPinnedCosignRelease(t *testing.T) {
+	// GitHub asset sizes for Cosign VerifierVersion, fetched 2026-09-18.
+	const (
+		cosignLinuxAmd64   = 141178250
+		cosignWindowsAmd64 = 198819314
+	)
+	if maxVerifierBytes <= cosignLinuxAmd64 {
+		t.Fatalf("maxVerifierBytes = %d; Cosign %s linux/amd64 is %d", maxVerifierBytes, VerifierVersion, cosignLinuxAmd64)
+	}
+	if maxVerifierBytes <= cosignWindowsAmd64 {
+		t.Fatalf("maxVerifierBytes = %d; Cosign %s windows/amd64 is %d", maxVerifierBytes, VerifierVersion, cosignWindowsAmd64)
+	}
+}
