@@ -83,7 +83,15 @@ func run(root, ref, version, out string) error {
 		if err := extractArchive(root, ref, module.dir, sub); err != nil {
 			return err
 		}
-		staged = append(staged, struct{ module, dir string }{module.path, filepath.Join(sub, module.dir)})
+		moduleDir := filepath.Join(sub, module.dir)
+		// Go's repository-to-module conversion copies a root license
+		// into a nested module that has none of its own
+		// (go.dev/ref/mod#vcs-dir). Staging must do the same or the
+		// provider zip hash diverges from proxy.golang.org.
+		if err := inheritRootLicense(moduleDir, work); err != nil {
+			return err
+		}
+		staged = append(staged, struct{ module, dir string }{module.path, moduleDir})
 	}
 	for _, module := range staged {
 		if err := publish(out, module.module, version, module.dir); err != nil {
@@ -109,6 +117,49 @@ func extractArchive(root, ref, path, dest string) error {
 		return fmt.Errorf("git archive %s: %w", ref, err)
 	}
 	return extract.Wait()
+}
+
+func isLicenseFile(name string) bool {
+	upper := strings.ToUpper(name)
+	base := upper
+	if index := strings.IndexByte(upper, '.'); index > 0 {
+		base = upper[:index]
+	}
+	switch base {
+	case "LICENSE", "LICENCE", "COPYING", "UNLICENSE":
+		return true
+	default:
+		return false
+	}
+}
+
+func inheritRootLicense(moduleDir, repoRoot string) error {
+	entries, err := os.ReadDir(moduleDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() && isLicenseFile(entry.Name()) {
+			return nil
+		}
+	}
+	rootEntries, err := os.ReadDir(repoRoot)
+	if err != nil {
+		return err
+	}
+	for _, entry := range rootEntries {
+		if entry.IsDir() || !isLicenseFile(entry.Name()) {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(repoRoot, entry.Name()))
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(moduleDir, entry.Name()), data, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func publish(proxy, modulePath, version, srcDir string) error {
