@@ -64,9 +64,11 @@ minutes. Order matters; never move a tag:
    `GOPROXY=file:///tmp/proxy`, `GOSUMDB=off`). Never stage
    into the shared cache: staged bytes under a real future
    version poison every later honest check on the machine.
-   Then `go mod tidy` the same way: downloads only add
-   sums, so superseded versions linger until tidy prunes
-   them (rc.6 died on exactly that). Verify the root and
+   Then `go mod tidy` the same way, then ASSERT zero
+   superseded magelift lines remain in every go.sum (tidy
+   prunes inconsistently: rc.9 died on lines one tidy kept
+   and CI's dropped; delete leftovers by hand when the
+   graph provably dropped them). Verify the root and
    provider build `GOWORK=off` against the staged proxy,
    commit the manifests.
 5. Tag `sdk/<v>`, `<v>`, and `providers/gcp/<v>` at that commit
