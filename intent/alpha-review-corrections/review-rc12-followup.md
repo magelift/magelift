@@ -75,3 +75,11 @@ Results: five Go tests passed; the nginx HTTP harness passed; both shell fixture
 At the final workflow inspection, [rc12 release run 35335610055](https://github.com/magelift/magelift/actions/runs/35335610055) was still in progress at “Wait for module visibility”, on `53452ae`. I did not observe a completed rc12 release or completed clean-machine acceptance evidence. This review did not access or mutate the acceptance cloud resources, stop another agent's work, dispatch CI, or publish anything.
 
 The next change should stay confined to selecting and enforcing complete release validation. Rerun its failure fixtures, then preserve the actual candidate's deployment and generated-CI evidence before closing boxes 1.4 and 5.1.
+
+## Follow-up verification: `31f6721`
+
+Both P1 findings above are resolved in `98a7a67`, reviewed through `31f6721`. The release workflow selects a CI workflow run for the target commit and passes its ID to the gate. The gate evaluates that run without falling back, and explicitly requires the mandatory checks to succeed.
+
+The full release-gate fixture suite passed. Independently rerunning the two original reproduction payloads returned the expected results: the newer pending run exits 2; skipped lint, root Go, SDK, and GCP contract checks exit 1. `git diff --check` passed. The runbook now also requires a conflicting beside-CLI executable and actual provider execution evidence.
+
+This closes the two source-review findings, not the acceptance proof. At verification time the rc12 tag and running release workflow still pointed to `53452ae`, which predates these fixes. The running workflow therefore does not contain the corrected promotion gate. Apply the reviewed gate as a separate explicit verification of the candidate's CI before any publication decision; future release tags should include the workflow fix. Do not move the existing tag to imply it contains later changes.
