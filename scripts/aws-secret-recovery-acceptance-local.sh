@@ -18,14 +18,20 @@ fi
 
 profile="${MAGELIFT_AWS_SECRET_RECOVERY_PROFILE:-default}"
 region="${MAGELIFT_AWS_SECRET_RECOVERY_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
-if [[ -z "$region" ]]; then
-	region="$(aws configure get region --profile "$profile" 2>/dev/null || true)"
-fi
 run_id="${MAGELIFT_AWS_SECRET_RECOVERY_RUN_ID:-$(date -u +%Y%m%d%H%M%S)-$$}"
 bucket="${MAGELIFT_AWS_SECRET_ARCHIVE_BUCKET:-magelift-secret-recovery-${run_id}}"
 secret_name="${MAGELIFT_AWS_SECRET_RECOVERY_NAME:-magelift-acceptance-secret-${run_id}}"
 marker="${MAGELIFT_AWS_SECRET_RECOVERY_MARKER:-magelift/aws/secret-recovery/${run_id}}"
 fixture="${MAGELIFT_AWS_SECRET_RECOVERY_FIXTURE:-fixture-known-secret-${run_id}}"
+
+if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
+	printf 'AWS Secrets Manager recovery acceptance dry-run ok profile=%s region=%s bucket=%s secret=%s marker=%s; no AWS mutation invoked\n' "$profile" "${region:-unset}" "$bucket" "$secret_name" "$marker"
+	exit 0
+fi
+
+if [[ -z "$region" ]]; then
+	region="$(aws configure get region --profile "$profile" 2>/dev/null || true)"
+fi
 
 if [[ ! "$profile" =~ ^[A-Za-z0-9._-]{1,64}$ || ! "$region" =~ ^[A-Za-z0-9-]{1,32}$ || ! "$run_id" =~ ^[A-Za-z0-9._-]{1,48}$ || ! "$bucket" =~ ^[a-z0-9][a-z0-9.-]{2,62}$ || ! "$secret_name" =~ ^[A-Za-z0-9/_+=.@-]+$ || ! "$marker" =~ ^[A-Za-z0-9._/-]{1,128}$ || ! "$fixture" =~ ^[A-Za-z0-9._/-]{1,128}$ ]] || (( ${#secret_name} > 512 )); then
 	printf 'set valid AWS Secrets Manager recovery profile, region, run ID, bucket, secret name, marker, and fixture values\n' >&2
@@ -36,11 +42,6 @@ export AWS_PROFILE="$profile"
 export AWS_REGION="$region"
 export AWS_DEFAULT_REGION="$region"
 export MAGELIFT_AWS_SECRET_ARCHIVE_BUCKET="$bucket"
-
-if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
-	printf 'AWS Secrets Manager recovery acceptance dry-run ok profile=%s region=%s bucket=%s secret=%s marker=%s; no AWS mutation invoked\n' "$profile" "$region" "$bucket" "$secret_name" "$marker"
-	exit 0
-fi
 
 dependency_status=0
 acceptance_require_commands aws go || dependency_status=1

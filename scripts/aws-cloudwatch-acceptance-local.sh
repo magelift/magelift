@@ -16,9 +16,18 @@ if (( dependency_status != 0 )); then
 fi
 
 profile="${MAGELIFT_AWS_PROFILE:-default}"
-region="${MAGELIFT_AWS_REGION:-$(aws configure get region --profile "$profile" 2>/dev/null || true)}"
+region="${MAGELIFT_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-}}}"
 run_id="${MAGELIFT_AWS_CLOUDWATCH_RUN_ID:-$(date -u +%Y%m%d-%H%M%S)-$$}"
 marker="${MAGELIFT_AWS_CLOUDWATCH_MARKER:-magelift/aws/observability/${run_id}}"
+
+if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
+	printf 'aws CloudWatch acceptance dry-run profile=%s region=%s marker=%s; no AWS mutation invoked\n' "$profile" "${region:-unset}" "$marker"
+	exit 0
+fi
+
+if [[ -z "$region" ]]; then
+	region="$(aws configure get region --profile "$profile" 2>/dev/null || true)"
+fi
 
 if [[ ! "$profile" =~ ^[A-Za-z0-9._-]{1,64}$ || ! "$region" =~ ^[a-z]{2}(-gov)?-[a-z]+-[0-9]+$ || ! "$run_id" =~ ^[A-Za-z0-9._-]{1,96}$ || ! "$marker" =~ ^[A-Za-z0-9._/-]{1,128}$ ]]; then
 	printf 'invalid AWS profile, region, run ID, or CloudWatch marker\n' >&2
@@ -78,11 +87,6 @@ cloudwatch_cleanup() {
 trap cloudwatch_cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-
-if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
-	printf 'aws CloudWatch acceptance dry-run profile=%s region=%s marker=%s\n' "$profile" "$region" "$marker"
-	exit 0
-fi
 
 dependency_status=0
 acceptance_require_commands aws go shasum || dependency_status=1
