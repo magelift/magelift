@@ -32,15 +32,15 @@ grep -Fq 'gcloud monitoring policies create' "$SCRIPT"
 grep -Fq 'resource.type=\"k8s_container\"' "$SCRIPT"
 grep -Fq 'MAGELIFT_GCP_NATIVE_OBS_ALERT' "$SCRIPT"
 
-trap_line="$(rg -n '^trap cleanup EXIT$' "$SCRIPT" | head -1 | cut -d: -f1)"
-watchdog_line="$(rg -n 'acceptance_start_ttl_watchdog' "$SCRIPT" | tail -1 | cut -d: -f1)"
+trap_line="$(grep -n '^trap cleanup EXIT$' "$SCRIPT" | head -1 | cut -d: -f1)"
+watchdog_line="$(grep -n 'acceptance_start_ttl_watchdog' "$SCRIPT" | tail -1 | cut -d: -f1)"
 if [[ -z "$trap_line" || -z "$watchdog_line" || "$watchdog_line" -le "$trap_line" ]]; then
 	printf 'native observability acceptance must install cleanup before the TTL watchdog\n' >&2
 	exit 1
 fi
-dry_run_line="$(rg -n 'MAGELIFT_ACCEPTANCE_DRY_RUN' "$SCRIPT" | head -1 | cut -d: -f1)"
-create_auto_line="$(rg -n 'gcloud container clusters create-auto' "$SCRIPT" | head -1 | cut -d: -f1)"
-create_std_line="$(rg -n 'gcloud container clusters create "\$cluster"' "$SCRIPT" | head -1 | cut -d: -f1)"
+dry_run_line="$(grep -n 'MAGELIFT_ACCEPTANCE_DRY_RUN' "$SCRIPT" | head -1 | cut -d: -f1)"
+create_auto_line="$(grep -n 'gcloud container clusters create-auto' "$SCRIPT" | head -1 | cut -d: -f1)"
+create_std_line="$(grep -n 'gcloud container clusters create "\$cluster"' "$SCRIPT" | head -1 | cut -d: -f1)"
 if [[ -z "$dry_run_line" || -z "$create_auto_line" || -z "$create_std_line" || "$create_auto_line" -le "$dry_run_line" || "$create_std_line" -le "$dry_run_line" ]]; then
 	printf 'GKE creation must be after the dry-run exit gate\n' >&2
 	exit 1

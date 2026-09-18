@@ -88,7 +88,7 @@ cloudfront_acceptance_dns_create_validation_cname() {
 }
 
 cloudfront_acceptance_wait_acm_issued() {
-	local cert_arn="${1:?certificate ARN required}" deadline attempt status
+	local cert_arn="${1:?certificate ARN required}" deadline status
 	deadline=$(( $(date +%s) + 1200 ))
 	while :; do
 		status="$(aws acm describe-certificate --region us-east-1 --certificate-arn "$cert_arn" --query 'Certificate.Status' --output text 2>/dev/null || true)"
@@ -248,7 +248,6 @@ acceptance_prepare_lifecycle
 ttl_marker="${TMPDIR:-/tmp}/magelift-aws-cloudfront-${run_id}-ttl-expired-$$"
 
 cert_arn=""
-cert_claimed=0
 waf_name=""
 waf_id=""
 waf_arn=""
@@ -319,11 +318,10 @@ acceptance_start_ttl_watchdog "$ACCEPTANCE_TTL_SECONDS" "$ttl_marker"
 printf '+ cloudfront: requesting ACM certificate domain=%s region=us-east-1\n' "$domain" >&2
 acceptance_cleanup_ledger_claim "$ledger_path" acm-certificate source "$domain" 20
 cert_arn="$(aws acm request-certificate --region us-east-1 --domain-name "$domain" --validation-method DNS --query CertificateArn --output text)"
-cert_claimed=1
 acceptance_cleanup_ledger_record "$ledger_path" acm-certificate "$domain" "$cert_arn"
 
 validation_json=""
-for attempt in {1..30}; do
+for _ in {1..30}; do
 	validation_json="$(aws acm describe-certificate --region us-east-1 --certificate-arn "$cert_arn" --query 'Certificate.DomainValidationOptions[0].ResourceRecord' --output json 2>/dev/null || true)"
 	if [[ -n "$validation_json" && "$validation_json" != "null" ]]; then
 		break

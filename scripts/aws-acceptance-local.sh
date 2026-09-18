@@ -49,7 +49,8 @@ acceptance_paths() {
 	if [[ -n "${MAGELIFT_ACCEPTANCE_CHECKPOINT:-}" ]]; then
 		export ACCEPTANCE_CHECKPOINT="$MAGELIFT_ACCEPTANCE_CHECKPOINT"
 		if [[ "$DRY_RUN" == 1 || "$DRY_RUN" == true ]]; then
-			export ACCEPTANCE_CHECKPOINT="$(dry_run_checkpoint_path "$ACCEPTANCE_CHECKPOINT")"
+			ACCEPTANCE_CHECKPOINT="$(dry_run_checkpoint_path "$ACCEPTANCE_CHECKPOINT")"
+			export ACCEPTANCE_CHECKPOINT
 		fi
 	elif [[ "${ACCEPTANCE_CHECKPOINT:-}" != /* && "${ACCEPTANCE_CHECKPOINT:-}" != *aws-matrix* ]]; then
 		if [[ "$DRY_RUN" == 1 || "$DRY_RUN" == true ]]; then
@@ -914,11 +915,11 @@ run_aws_eks_zone_loss_cell() {
 	local ready_zones_before ready_zones_after before_node_names target_zone target_records target_count
 	local target_record target_node_name target_provider_id target_label_zone target_provider_zone
 	local target_instance target_instance_json target_instance_state target_instance_zone target_asg provider_extra
-	local asg_name asg_json asg_min asg_desired asg_max old_ids_json replacement_ids_json
+	local asg_name asg_json asg_min asg_desired asg_max old_ids_json
 	local replacement_instance replacement_node replacement_instance_json replacement_state
 	local target_before_json='[]' injected_targets='[]' target_after_json='[]'
 	local target_zone_ready_after all_replaced zone_degraded_observed_json=false
-	local target_before_id used_replacement_ids_json
+	local used_replacement_ids_json
 	if [[ "$target_runtime" != "eks" || "$(configured_compute_mode)" != "self-managed" ]]; then
 		printf 'resilience:zone-loss requires EKS computeMode:self-managed\n' >&2
 		return 2
@@ -1071,7 +1072,6 @@ run_aws_eks_zone_loss_cell() {
 		used_replacement_ids_json='[]'
 		while IFS= read -r target_record; do
 			target_instance="$(printf '%s' "$target_record" | jq -r '.instanceIDBefore')"
-			target_before_id="$target_instance"
 			target_node_name="$(printf '%s' "$target_record" | jq -r '.nodeName')"
 			target_provider_id="$(printf '%s' "$target_record" | jq -r '.providerID')"
 			target_provider_zone="$(printf '%s' "$target_record" | jq -r '.providerZone')"
@@ -1328,7 +1328,7 @@ cleanup() {
 	local cleanup_result=PASS
 	local cleanup_recorded=0
 	if acceptance_ttl_expired; then
-		MAGELIFT_ACCEPTANCE_CLEANUP_REASON="acceptance TTL expired; forced cleanup"
+		export MAGELIFT_ACCEPTANCE_CLEANUP_REASON="acceptance TTL expired; forced cleanup"
 		MAGELIFT_AWS_ACCEPTANCE_KEEP=false
 	fi
 	if [[ "${MAGELIFT_AWS_ACCEPTANCE_KEEP:-false}" == true ]]; then
@@ -1840,29 +1840,34 @@ ACCEPTANCE_CHECKPOINT_FINGERPRINT="$({
 	cat "$CELL_CATALOG"
 } | shasum -a 256 | awk '{print $1}')"
 export ACCEPTANCE_CHECKPOINT_FINGERPRINT
-export MAGELIFT_ACCEPTANCE_RELEASE="$(yq -r '.application.version // "unknown"' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_EDITION="$(yq -r '.application.edition // "open-source"' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_RUNTIME="$(yq -r '.target.runtime // "ecs-fargate"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_RELEASE="$(yq -r '.application.version // "unknown"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_EDITION="$(yq -r '.application.edition // "open-source"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_RUNTIME="$(yq -r '.target.runtime // "ecs-fargate"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_PHP_VERSION="$(yq -r '.build.php // ""' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_PHP_EXTENSIONS="$(yq -r '(.build.extensions // ["intl", "pdo_mysql"]) | join(",")' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_COMPOSER_VERSION="$(yq -r '.build.composer.version // ""' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_DATABASE="$(yq -r '.target.aws.catalog.databaseEngine // .target.aws.catalog.engine // "rds-mysql"' "$LIVE_CONFIG")"
+if [[ "$target_runtime" == "eks" ]]; then
+	MAGELIFT_ACCEPTANCE_COMPUTE_MODE="$(configured_compute_mode)"
+	MAGELIFT_ACCEPTANCE_SEARCH="$(yq -r '.target.aws.catalog.eks.searchMode // "disabled"' "$LIVE_CONFIG")"
+	MAGELIFT_ACCEPTANCE_QUEUE="$(yq -r '.target.aws.catalog.eks.queueMode // "database"' "$LIVE_CONFIG")"
+else
+	MAGELIFT_ACCEPTANCE_COMPUTE_MODE="$(configured_compute_mode)"
+	MAGELIFT_ACCEPTANCE_SEARCH="$(yq -r '.target.aws.catalog.searchMode // "disabled"' "$LIVE_CONFIG")"
+	MAGELIFT_ACCEPTANCE_QUEUE="$(yq -r '.target.aws.catalog.queueMode // "db"' "$LIVE_CONFIG")"
+fi
+MAGELIFT_ACCEPTANCE_CACHE="$(yq -r '.target.aws.catalog.cacheMode // "valkey"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_WEB_CACHE="$(yq -r '.target.aws.catalog.varnishMode // "varnish"' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_EDGE="$(yq -r '(.edge.externalProvider // .edge.nativeProvider // "none")' "$LIVE_CONFIG")"
+MAGELIFT_ACCEPTANCE_KUBERNETES_MODE="$(acceptance_shared_kubernetes_mode "$MAGELIFT_ACCEPTANCE_RUNTIME")"
+export MAGELIFT_ACCEPTANCE_RELEASE MAGELIFT_ACCEPTANCE_EDITION MAGELIFT_ACCEPTANCE_RUNTIME
 export MAGELIFT_ACCEPTANCE_PRESET="$profile"
 export MAGELIFT_ACCEPTANCE_DIGEST="$MAGELIFT_AWS_ACCEPTANCE_DIGEST"
-export MAGELIFT_ACCEPTANCE_PHP_VERSION="$(yq -r '.build.php // ""' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_PHP_EXTENSIONS="$(yq -r '(.build.extensions // ["intl", "pdo_mysql"]) | join(",")' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_COMPOSER_VERSION="$(yq -r '.build.composer.version // ""' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_DATABASE="$(yq -r '.target.aws.catalog.databaseEngine // .target.aws.catalog.engine // "rds-mysql"' "$LIVE_CONFIG")"
-if [[ "$target_runtime" == "eks" ]]; then
-	export MAGELIFT_ACCEPTANCE_COMPUTE_MODE="$(configured_compute_mode)"
-	export MAGELIFT_ACCEPTANCE_SEARCH="$(yq -r '.target.aws.catalog.eks.searchMode // "disabled"' "$LIVE_CONFIG")"
-	export MAGELIFT_ACCEPTANCE_QUEUE="$(yq -r '.target.aws.catalog.eks.queueMode // "database"' "$LIVE_CONFIG")"
-else
-	export MAGELIFT_ACCEPTANCE_COMPUTE_MODE="$(configured_compute_mode)"
-	export MAGELIFT_ACCEPTANCE_SEARCH="$(yq -r '.target.aws.catalog.searchMode // "disabled"' "$LIVE_CONFIG")"
-	export MAGELIFT_ACCEPTANCE_QUEUE="$(yq -r '.target.aws.catalog.queueMode // "db"' "$LIVE_CONFIG")"
-fi
-export MAGELIFT_ACCEPTANCE_CACHE="$(yq -r '.target.aws.catalog.cacheMode // "valkey"' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_WEB_CACHE="$(yq -r '.target.aws.catalog.varnishMode // "varnish"' "$LIVE_CONFIG")"
-export MAGELIFT_ACCEPTANCE_EDGE="$(yq -r '(.edge.externalProvider // .edge.nativeProvider // "none")' "$LIVE_CONFIG")"
+export MAGELIFT_ACCEPTANCE_PHP_VERSION MAGELIFT_ACCEPTANCE_PHP_EXTENSIONS MAGELIFT_ACCEPTANCE_COMPOSER_VERSION
+export MAGELIFT_ACCEPTANCE_DATABASE MAGELIFT_ACCEPTANCE_COMPUTE_MODE MAGELIFT_ACCEPTANCE_SEARCH MAGELIFT_ACCEPTANCE_QUEUE
+export MAGELIFT_ACCEPTANCE_CACHE MAGELIFT_ACCEPTANCE_WEB_CACHE MAGELIFT_ACCEPTANCE_EDGE
 export MAGELIFT_ACCEPTANCE_STACK_ID="${project_tag}-${profile}-aws-${target_runtime}"
-export MAGELIFT_ACCEPTANCE_KUBERNETES_MODE="$(acceptance_shared_kubernetes_mode "$MAGELIFT_ACCEPTANCE_RUNTIME")"
+export MAGELIFT_ACCEPTANCE_KUBERNETES_MODE
 aws_seed_path="$(yq -r ".environments.\"$profile\".seedDump // \"\"" "$LIVE_CONFIG")"
 if [[ -n "$aws_seed_path" && "$aws_seed_path" != /* ]]; then
 	aws_seed_path="$(cd "$(dirname "$MAGELIFT_CONFIG")" && pwd)/$aws_seed_path"

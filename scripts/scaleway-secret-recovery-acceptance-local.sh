@@ -59,8 +59,7 @@ cleanup_source_secret() {
 }
 
 cleanup_bucket() {
-	local attempt
-	for attempt in {1..45}; do
+	for _ in {1..45}; do
 		if scw --profile "$profile" object bucket delete "$bucket" "region=$region" >/dev/null 2>&1; then
 			local remaining
 			remaining="$(scw --profile "$profile" --output json object bucket list "region=$region" 2>/dev/null | jq --arg name "$bucket" '[.[]? | select((.Name // .name // .bucket_name // "") == $name)] | length' 2>/dev/null || printf 'unknown')"

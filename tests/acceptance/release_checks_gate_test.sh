@@ -215,4 +215,61 @@ grep -q "BLOCKED  provider-verify: no check run" "$WORK/selfonly.out" || {
 	exit 1
 }
 
+# 14. GitHub Actions matrix names satisfy the family check. A
+# sibling name such as phpunit must not.
+write_payload
+mutate php '[
+  {"name": "php (8.3)", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:09:00Z", "id": 61},
+  {"name": "php (8.5)", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:09:00Z", "id": 62},
+  {"name": "phpunit", "status": "completed", "conclusion": "failure", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:09:00Z", "id": 63}
+]'
+if ! "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/matrix.out" 2>&1; then
+	cat "$WORK/matrix.out" >&2
+	printf 'gate rejected a green php matrix\n' >&2
+	exit 1
+fi
+grep -q "PASS     php: success" "$WORK/matrix.out" || {
+	printf 'gate hid the php matrix verdict\n' >&2
+	exit 1
+}
+
+# 15. One failed matrix cell blocks the family.
+mutate php '[
+  {"name": "php (8.3)", "status": "completed", "conclusion": "success", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:09:00Z", "id": 61},
+  {"name": "php (8.5)", "status": "completed", "conclusion": "failure", "started_at": "2026-09-17T10:00:00Z", "completed_at": "2026-09-17T10:09:00Z", "id": 62}
+]'
+if "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/matrixfail.out" 2>&1; then
+	printf 'gate promoted despite a failed php matrix cell\n' >&2
+	exit 1
+fi
+grep -q "BLOCKED  php: conclusion=failure" "$WORK/matrixfail.out" || {
+	printf 'gate did not name the failed php matrix cell\n' >&2
+	exit 1
+}
+
+# 16. A phpunit-only payload does not satisfy php.
+python3 - "$WORK/phpunit.json" <<'PY'
+import json
+import sys
+
+runs = [
+    {"name": "lint", "status": "completed", "conclusion": "success", "id": 1},
+    {"name": "go-verify", "status": "completed", "conclusion": "success", "id": 2},
+    {"name": "sdk-verify", "status": "completed", "conclusion": "success", "id": 3},
+    {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 4},
+    {"name": "floci-gcp", "status": "completed", "conclusion": "success", "id": 5},
+    {"name": "phpunit", "status": "completed", "conclusion": "success", "id": 6},
+]
+with open(sys.argv[1], "w") as handle:
+    json.dump({"check_runs": runs}, handle)
+PY
+if "$GATE" --sha abc123 --checks-json "$WORK/phpunit.json" >"$WORK/phpunit.out" 2>&1; then
+	printf 'gate treated phpunit as php\n' >&2
+	exit 1
+fi
+grep -q "BLOCKED  php: no check run" "$WORK/phpunit.out" || {
+	printf 'gate hid the phpunit mismatch\n' >&2
+	exit 1
+}
+
 printf 'release checks gate ok\n'

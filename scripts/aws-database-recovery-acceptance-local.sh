@@ -95,7 +95,7 @@ not_found_error() {
 }
 
 owned_instance_count() {
-	local instances_json line id arn tags_json count=0 preserve_instance="$source_instance"
+	local instances_json id arn tags_json count=0 preserve_instance="$source_instance"
 	if [[ "$source_kind" == "cluster" ]]; then
 		preserve_instance="$source_member"
 	fi
@@ -121,7 +121,7 @@ owned_instance_count() {
 }
 
 owned_snapshot_count() {
-	local snapshots_json line id arn tags_json count=0
+	local snapshots_json id arn tags_json count=0
 	if ! snapshots_json="$(aws rds describe-db-snapshots --region "$region" --snapshot-type manual --output json 2>&1)"; then
 		printf 'RDS DB snapshot inventory failed: %s\n' "$snapshots_json" >&2
 		return 1
@@ -162,7 +162,7 @@ owned_snapshot_count() {
 }
 
 delete_owned_instances() {
-	local instances_json line id arn tags_json output preserve_instance="$source_instance"
+	local instances_json id arn tags_json output preserve_instance="$source_instance"
 	if [[ "$source_kind" == "cluster" ]]; then
 		preserve_instance="$source_member"
 	fi
@@ -244,7 +244,7 @@ delete_owned_clusters() {
 }
 
 delete_owned_snapshots() {
-	local snapshots_json line id arn tags_json output
+	local snapshots_json id arn tags_json output
 	if ! snapshots_json="$(aws rds describe-db-snapshots --region "$region" --snapshot-type manual --output json 2>&1)"; then
 		printf 'RDS DB snapshot cleanup inventory failed: %s\n' "$snapshots_json" >&2
 		return 1

@@ -8,6 +8,7 @@
 # Usage: release-checks-gate.sh --sha <sha> [--repo owner/name]
 #        [--checks-json FILE] [--exclude-run ID] [check...]
 # Default checks: lint go-verify sdk-verify provider-verify floci-gcp php.
+# A wanted name also matches GitHub Actions matrix titles ("php (8.3)").
 # --checks-json evaluates one canned check-runs payload (tests):
 # exit 0 pass, 1 blocked, 2 still pending. Without it, the gate polls
 # the API until every required check completes or the timeout expires.
@@ -80,15 +81,25 @@ except (KeyError, ValueError) as exc:
 
 wanted = os.environ.get("GATE_CHECKS", "").split()
 runs = data.get("check_runs", []) if isinstance(data, dict) else []
+
+
+def matches(wanted_name, actual):
+    # GitHub Actions matrix jobs are named "php (8.3)", not "php".
+    # Require an exact name or the matrix suffix so "php" does not
+    # accept "phpunit" or "frankenphp".
+    return actual == wanted_name or actual.startswith(wanted_name + " (")
+
+
 latest = {}
 for run in runs:
     name = run.get("name", "")
-    if name not in wanted:
+    if not any(matches(item, name) for item in wanted):
         continue
     # Latest attempt wins: reruns get new check-run ids, so the
     # highest id is the newest attempt. Timestamps cannot serve:
     # a queued rerun has no start time yet and would sort before
-    # the older success it supersedes.
+    # the older success it supersedes. Key by the actual check
+    # name so each matrix cell is judged on its own latest run.
     key = run.get("id") or 0
     if name not in latest or key >= latest[name][0]:
         latest[name] = (key, run)
@@ -109,8 +120,8 @@ active = any(
 )
 code = 0
 for name in wanted:
-    entry = latest.get(name)
-    if entry is None:
+    matched = [(actual, latest[actual]) for actual in latest if matches(name, actual)]
+    if not matched:
         if active:
             print(f"PENDING  {name}: no check run yet, CI still active")
             code = 2
@@ -118,17 +129,26 @@ for name in wanted:
             print(f"BLOCKED  {name}: no check run on this commit (tag a CI-green commit, or dispatch full CI: gh workflow run ci.yml --ref <tag> -f all=true)")
             code = 1
         continue
-    run = entry[1]
-    status = run.get("status", "")
-    conclusion = run.get("conclusion", "")
-    if status != "completed":
-        print(f"PENDING  {name}: status={status or 'unknown'} (attempt {run.get('id', '?')})")
-        code = 2
-    elif conclusion == "success":
-        print(f"PASS     {name}: success")
-    else:
-        print(f"BLOCKED  {name}: conclusion={conclusion or 'unknown'}")
+    pending = False
+    pending_run = None
+    blocked = None
+    for _actual, entry in matched:
+        run = entry[1]
+        status = run.get("status", "")
+        conclusion = run.get("conclusion", "")
+        if status != "completed":
+            pending = True
+            pending_run = run
+        elif conclusion != "success":
+            blocked = conclusion or "unknown"
+    if blocked is not None:
+        print(f"BLOCKED  {name}: conclusion={blocked}")
         code = 1
+    elif pending:
+        print(f"PENDING  {name}: status={pending_run.get('status') or 'unknown'} (attempt {pending_run.get('id', '?')})")
+        code = 2
+    else:
+        print(f"PASS     {name}: success")
 
 sys.exit(code)
 PY

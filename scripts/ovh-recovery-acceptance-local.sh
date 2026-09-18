@@ -68,9 +68,8 @@ ovh_bucket_present() {
 }
 
 wait_for_ovh_bucket_absent() {
-	local attempt
 	local probe_status
-	for attempt in {1..30}; do
+	for _ in {1..30}; do
 		if ovh_bucket_present; then
 			sleep 2
 		else
@@ -111,8 +110,7 @@ cleanup() {
 	if [[ -n "$temporary_user_id" ]]; then
 		local user_status=""
 		local user_count=""
-		local attempt
-		for attempt in {1..30}; do
+		for _ in {1..30}; do
 			user_status="$(ovhcloud cloud user get "$temporary_user_id" --cloud-project "$project" --profile "$profile" --output json 2>/dev/null | jq -r '.status // empty' 2>/dev/null || true)"
 			if [[ "$user_status" == "ok" ]]; then
 				break
@@ -123,7 +121,7 @@ cleanup() {
 			printf 'OVHcloud temporary Object Storage user cleanup failed user=%s status=%s\n' "$temporary_user_id" "$user_status" >&2
 			cleanup_status=1
 		else
-			for attempt in {1..30}; do
+			for _ in {1..30}; do
 				user_count="$(ovhcloud cloud user list --cloud-project "$project" --profile "$profile" --output json 2>/dev/null | jq --arg description "$description" '[(. // [])[] | select(.description == $description)] | length' 2>/dev/null || true)"
 				if [[ "$user_count" == "0" ]]; then
 					break
@@ -165,7 +163,7 @@ if [[ -z "$access_key" || -z "$secret_key" ]]; then
 	fi
 	temporary_user_id="$(printf '%s\n' "$user_ids" | sed '/^$/d')"
 	user_status=""
-	for attempt in {1..30}; do
+	for _ in {1..30}; do
 		user_status="$(ovhcloud cloud user get "$temporary_user_id" --cloud-project "$project" --profile "$profile" --output json | jq -r '.status // empty' 2>/dev/null || true)"
 		if [[ "$user_status" == "ok" ]]; then
 			break
