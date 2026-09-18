@@ -64,5 +64,7 @@ lands. Fixed in intent/alpha-review-corrections (boxes 3.1, 4.2).
 
 R12 clean-machine proof still needs published artifacts. rc.15 publish
 failed the checks gate: acceptance called `rg` and the CI image has
-`jq` only. Draft assets do not count. The next published candidate is
-required; cutting that tag stays ask-first.
+`jq` only. After `grep -E`, the next fail was CloudWatch dry-run
+requiring an AWS region. Dry-run now exits before `aws configure`.
+Draft assets do not count. The next published candidate is required;
+cutting that tag stays ask-first.

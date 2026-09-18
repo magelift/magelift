@@ -65,6 +65,6 @@
 - [ ] 5.1 Amendments plus gates (dated report notes,
   ROADMAP refresh, full local gates, report, archive)
   — 2026-09-18 amendments on orders 4–7 and ROADMAP
-  note landed; full gates and archive wait for hosted
-  CI plus box 1.4. Verify: every gate green, verdict
-  recorded
+  note landed; `make local-gates` green on this host
+  (PHP 8.5.4). Archive waits for hosted CI plus box
+  1.4. Verify: every gate green, verdict recorded
