@@ -57,8 +57,11 @@ minutes. Order matters; never move a tag:
    and download the sums from it with
    `GOPROXY=file:///tmp/proxy GOSUMDB=off` (staged zips are
    content-identical to the tags, so the sums match exactly).
-   Verify the root and provider build `GOWORK=off` against
-   the staged proxy, commit.
+   Then `go mod tidy` each module the same way: downloads
+   only add sums, so superseded versions linger until tidy
+   prunes them (rc.6 died on exactly that). Verify the root
+   and provider build `GOWORK=off` against the staged
+   proxy, commit.
 5. Tag `sdk/<v>`, `<v>`, and `providers/gcp/<v>` at that commit
    and push all three in one `git push`. The release starts; its
    visibility-wait sleeps first, then polls.
