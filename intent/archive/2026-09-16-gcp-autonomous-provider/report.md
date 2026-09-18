@@ -196,4 +196,6 @@ Fixed in intent/alpha-review-corrections (boxes 2.1, 2.2, 2.3).
 The root CLI still links AWS, OVH, and Scaleway Pulumi. Import
 decoupling and those extracts stay deferred to `aws-provider-parity`.
 Until then, compile and test set `GOMEMLIMIT` to 75% of available RAM
-instead of serializing the graph. R05 is unchanged.
+instead of serializing the graph. R05 is unchanged. Hosted force-all
+CI is green on `d5f781a`
+([35382767735](https://github.com/magelift/magelift/actions/runs/35382767735)).

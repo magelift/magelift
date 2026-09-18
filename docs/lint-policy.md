@@ -83,6 +83,7 @@ Map jobs → verify targets: `generate-check` / `cli-docs-check` / `fmt-check` /
 
 | Run | Date | Outcome |
 | --- | --- | --- |
+| [35382767735](https://github.com/magelift/magelift/actions/runs/35382767735) | 2026-09-18 | force-all green on `wip/all-local-work` `@d5f781a` (lint, go-verify, provider-verify, acceptance, images, varnish, floci, php, docs, CI passed) |
 | [30836267745](https://github.com/magelift/magelift/actions/runs/30836267745) | 2026-08-03 | force-all green (lint, go-verify, images, varnish, floci, php, docs) |
 
 ## `go test -race` measurement

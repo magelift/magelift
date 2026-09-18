@@ -43,10 +43,11 @@
 - [x] 2.4 Real publication mechanics (R06: coherent fixtures,
   full provider compile `GOWORK=off` against synthetic
   modules) — verify: distribution suite green
-- [x] 2.5 Require-bump plus real verification (R06: bump
-  requires to rc.2 after tagging, record proxy sums,
-  verify `GOWORK=off` root plus provider builds) — needs
-  rc.2 tags; runs with the rc.2 release
+- [x] 2.5 Require-bump plus real verification (R06: first
+  require-bump landed with rc.2; later RCs repeat the same
+  stage-sums-then-tag sequence in `contrib/skills/magelift-release`)
+  — verify: distribution suite green; rc.2 and later RC
+  tags used that procedure
 - [x] 3.1 Media reality (R03: GCS mechanism, provider
   media ops, key continuity; live-verified or changed)
   — verify: unit suites green, live proof in order 8
@@ -66,5 +67,7 @@
   ROADMAP refresh, full local gates, report, archive)
   — 2026-09-18 amendments on orders 4–7 and ROADMAP
   note landed; `make local-gates` green on this host
-  (PHP 8.5.4). Archive waits for hosted CI plus box
-  1.4. Verify: every gate green, verdict recorded
+  (PHP 8.5.4). Hosted force-all CI green on `d5f781a`:
+  https://github.com/magelift/magelift/actions/runs/35382767735
+  Archive still waits on box 1.4 (next published RC).
+  Verify: every gate green, verdict recorded

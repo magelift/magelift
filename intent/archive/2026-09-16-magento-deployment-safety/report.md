@@ -150,4 +150,5 @@ with explicitly unverified parts. Fixed in intent/alpha-review-corrections
 
 No new product finding. Compile and test hosts now set `GOMEMLIMIT` to
 75% of available RAM and no longer pin `GOMAXPROCS` or `-p`. R04/R08
-stand as of 2026-09-17.
+stand as of 2026-09-17. Hosted force-all CI is green on `d5f781a`
+([35382767735](https://github.com/magelift/magelift/actions/runs/35382767735)).
