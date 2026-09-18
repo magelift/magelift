@@ -29,6 +29,11 @@ if [[ ! "$profile" =~ ^[A-Za-z0-9._-]{1,64}$ || ! "$region" =~ ^(fr-par|nl-ams|p
 	exit 2
 fi
 
+if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == true ]]; then
+	printf 'scaleway recovery acceptance dry-run profile=%s region=%s bucket=%s marker=%s; no Scaleway mutation invoked\n' "$profile" "$region" "$bucket" "$marker"
+	exit 0
+fi
+
 cleanup() {
 	local status=$?
 	set +e
@@ -62,11 +67,6 @@ existing="$(scw --profile "$profile" --output json object bucket list "region=$r
 if jq -e --arg name "$bucket" 'any(.[]; (.Name // .name // .bucket_name // "") == $name)' <<<"$existing" >/dev/null; then
 	printf 'generated Scaleway recovery bucket already exists; refusing to adopt it: %s\n' "$bucket" >&2
 	exit 2
-fi
-
-if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" ]]; then
-	printf 'scaleway recovery acceptance dry-run profile=%s region=%s bucket=%s marker=%s\n' "$profile" "$region" "$bucket" "$marker"
-	exit 0
 fi
 
 dependency_status=0
