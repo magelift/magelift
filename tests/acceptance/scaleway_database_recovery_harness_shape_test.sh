@@ -54,4 +54,8 @@ unenv_output="$(
 grep -Fq 'no Scaleway mutation invoked' <<<"$unenv_output"
 grep -Fq 'sourceName=magelift-rdb-shape-unenv' <<<"$unenv_output"
 
+# Dry-run is an offline contract: it must not require the Scaleway CLI.
+PATH=/usr/bin:/bin MAGELIFT_SCALEWAY_DATABASE_RECOVERY_RUN_ID=shape-noscw \
+	MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash "$SCRIPT" | grep -Fq 'no Scaleway mutation invoked'
+
 printf 'scaleway_database_recovery_harness_shape_test OK\n'

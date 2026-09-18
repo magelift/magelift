@@ -14,13 +14,6 @@ source "$ROOT/scripts/acceptance/lib-lifecycle.sh"
 # shellcheck source=acceptance/lib-cleanup-ledger.sh
 source "$ROOT/scripts/acceptance/lib-cleanup-ledger.sh"
 
-dependency_status=0
-acceptance_require_jq || dependency_status=1
-acceptance_require_commands scw go || dependency_status=1
-if (( dependency_status != 0 )); then
-	exit 2
-fi
-
 profile="${SCW_PROFILE:-default}"
 project="${MAGELIFT_SCALEWAY_DATABASE_RECOVERY_PROJECT:-${SCW_PROJECT_ID:-}}"
 region="${MAGELIFT_SCALEWAY_DATABASE_RECOVERY_REGION:-fr-par}"
@@ -41,6 +34,13 @@ if [[ "${MAGELIFT_ACCEPTANCE_DRY_RUN:-0}" == "1" || "${MAGELIFT_ACCEPTANCE_DRY_R
 	printf 'Scaleway Managed Database recovery acceptance dry-run ok profile=%s project=%s region=%s sourceName=%s nodeType=%s marker=%s; no Scaleway mutation invoked\n' \
 		"$profile" "${project:-unset}" "$region" "$source_name" "$node_type" "$marker"
 	exit 0
+fi
+
+dependency_status=0
+acceptance_require_jq || dependency_status=1
+acceptance_require_commands scw go || dependency_status=1
+if (( dependency_status != 0 )); then
+	exit 2
 fi
 
 if [[ ! "$project" =~ ^[0-9a-fA-F-]{36}$ ]]; then

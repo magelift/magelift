@@ -44,4 +44,7 @@ grep -Fq 'flavor=db1-4' <<<"$output"
 grep -Fq 'plan=essential' <<<"$output"
 grep -Fq 'region=GRA' <<<"$output"
 
+PATH=/usr/bin:/bin MAGELIFT_OVH_DATABASE_RECOVERY_RUN_ID=shape-noovh \
+	MAGELIFT_ACCEPTANCE_DRY_RUN=1 bash "$SCRIPT" | grep -Fq 'no OVH mutation invoked'
+
 printf 'ovh_database_recovery_harness_shape_test OK\n'
