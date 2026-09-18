@@ -1,0 +1,10 @@
+name: Cap Go memory
+description: >-
+  Set GOMEMLIMIT to 75% of this runner's available RAM.
+  Do not pin GOMAXPROCS or compile -p.
+runs:
+  using: composite
+  steps:
+    - name: Cap Go memory
+      shell: bash
+      run: echo "GOMEMLIMIT=$(bash "${GITHUB_WORKSPACE}/scripts/go-memlimit.sh")" >> "$GITHUB_ENV"

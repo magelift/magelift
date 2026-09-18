@@ -314,8 +314,8 @@ func TestRouterTableMatchesSkillTree(t *testing.T) {
 			dirs = append(dirs, track+"/skills/"+entry.Name())
 		}
 	}
-	if len(dirs) != 12 {
-		t.Errorf("skill dirs = %d, want 12 (5 user + 7 contributor)", len(dirs))
+	if len(dirs) != 11 {
+		t.Errorf("skill dirs = %d, want 11 (5 user + 6 contributor)", len(dirs))
 	}
 	for _, dir := range dirs {
 		if mentions[dir] != 1 {

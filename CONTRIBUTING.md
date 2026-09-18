@@ -23,7 +23,7 @@ Then:
 
 ```sh
 # After: composer install --working-dir=build  (once)
-make verify   # or at least: make docs && GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/<pkg>/ -count=1
+make verify   # or at least: make docs && go test ./internal/<pkg>/ -count=1
 ```
 
 Open a PR with: what changed, how you verified, risk (usually “docs/test only”).
@@ -106,10 +106,14 @@ before cutting `v1.0.0-rc.1`. Lint partition timing and policy live in
 [docs/lint-policy.md](docs/lint-policy.md). See also
 [docs/release-readiness.md](docs/release-readiness.md).
 
-Optional: `make ci-act-go` runs Go CI jobs locally via nektos/act (serial). It is
-**not** a substitute for full `make verify` (missing php-test, docs, and other
-local targets).
-More detail: [tests/README.md](tests/README.md).
+Optional: `make ci-act-go` runs Go CI jobs locally via nektos/act, one
+container at a time, so two hosted Go jobs do not share one laptop. Go
+inside each job still parallelizes under `GOMEMLIMIT`. This is not a
+substitute for full `make verify` (missing php-test, docs, and other
+local targets). More detail: [tests/README.md](tests/README.md).
+
+`make` sets `GOMEMLIMIT` to 75% of available RAM (`scripts/go-memlimit.sh`)
+and leaves `GOMAXPROCS` and compile `-p` to the toolchain.
 
 ## Adding a provider
 

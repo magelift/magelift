@@ -197,8 +197,8 @@ YAML. That catalog also warm-patches ECS `searchMode` (`disabled` then
 ## Run
 
 ```sh
-GOMAXPROCS=1 GOFLAGS=-p=1 GOMEMLIMIT=1GiB \
-  go build -trimpath -ldflags='-s -w' -o /tmp/magelift ./cmd/magelift
+# Makefile / scripts/go-memlimit.sh set GOMEMLIMIT to 75% of RAM.
+go build -trimpath -ldflags='-s -w' -o /tmp/magelift ./cmd/magelift
 
 export MAGELIFT_BIN=/tmp/magelift
 export MAGELIFT_CONFIG=/path/to/acceptance.magelift.yaml

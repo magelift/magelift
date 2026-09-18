@@ -16,18 +16,18 @@ trap cleanup EXIT
 
 export GOMODCACHE="$scratch/modcache"
 export GOCACHE="$scratch/gocache"
-export GOMAXPROCS=1
-export GOFLAGS=-p=1
-export GOMEMLIMIT=1GiB
+# shellcheck source=go-memlimit.sh
+source "$repo_root/scripts/go-memlimit.sh"
+magelift_apply_go_memlimit
 export GOGC=50
 
 cd "$repo_root"
 printf '+ building the public extension SDK contract with empty caches\n'
 go build -trimpath -o "$scratch/magelift-extension-contract" ./examples/custom-extension-contract
-"$scratch/magelift-extension-contract" | rg '^example\.community-contract$'
+"$scratch/magelift-extension-contract" | grep -E '^example\.community-contract$'
 
 printf '+ asserting the example imports no internal/ packages\n'
-if go list -deps ./examples/custom-extension-contract | rg 'magelift/internal/'; then
+if go list -deps ./examples/custom-extension-contract | grep -E 'magelift/internal/'; then
 	printf 'custom-extension-contract must not import internal/ packages\n' >&2
 	exit 1
 fi

@@ -92,7 +92,7 @@ Reference-without-own is asserted in
   adopted external ID on mutate.
 
 ```sh
-GOMAXPROCS=1 GOFLAGS=-p=1 go test ./internal/cloud/aws/stack/ -count=1 \
+go test ./internal/cloud/aws/stack/ -count=1 \
   -run 'Adopt|Refuse|Adopted|Detach'
 ```
 

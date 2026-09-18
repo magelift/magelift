@@ -162,8 +162,8 @@ application/cache intersection remains open. None of these profiles closes the
   it only after measuring the local build footprint with
   `MAGELIFT_GCP_ACCEPTANCE_MIN_FREE_MB`.
 - Never interrupt mid-create/destroy.
-- Serial builds for the provider-specific harness binary (`GOMAXPROCS=1`); see
-  `contrib/skills/magelift-serial-builds`
+- The harness builds its CLI under `GOMEMLIMIT` at 75% of available RAM
+  (`scripts/go-memlimit.sh`). Do not pin `GOMAXPROCS` or `-p`.
 - When another agent works on AWS in the main checkout, run this from a separate
   checkout and keep a unique acceptance prefix so resource names and
   `/tmp` workdirs do not collide.

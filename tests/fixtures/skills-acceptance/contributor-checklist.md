@@ -1,7 +1,7 @@
 # Contributor-track checklist (executed 2026-09-16; all boxes checked with observed evidence)
 
 > Status: executed 2026-09-16. Docs links verified by tree reads; commands
-> verified by execution; dry-run-only procedures carry dates. Box 3.1: 7/7.
+> verified by execution; dry-run-only procedures carry dates. Box 3.1: 6/6.
 
 Conventions: `[FILE]` = verified by reading the tree. `[RUN date]` = verified
 by execution on that date. Live-cloud and release-tag procedures are
@@ -60,15 +60,7 @@ dry-run-only with last-executed dates recorded per spec.
 - [x] Dry-run-only: public tag cuts + hosted workflow runs — none cut;
       v1.0.0-rc.1 is the user's pending call. Recorded N/A 2026-09-16.
 
-## 6. magelift-serial-builds — Constrained-runner discipline
-
-- [x] Commands exist [RUN 2026-09-16]: `go` ✓, `docker` ✓, `npm` ✓, `npx` ✓
-      present; `goreleaser` missing (same host gap as skill 5 — recorded).
-- [x] Script + target resolve [FILE]: `scripts/release-smoke-local.sh` ✓,
-      `Makefile` `release-smoke:` ✓.
-- [x] Docs links: none cited (no broken-link surface).
-
-## 7. magelift-site — Website + MkDocs
+## 6. magelift-site — Website + MkDocs
 
 - [x] Commands exist [RUN 2026-09-16]: `npm` ✓, `npx` ✓, `docker` ✓ present.
 - [x] Paths resolve [FILE]: `website/scripts/build-site.sh` ✓,
@@ -78,6 +70,6 @@ dry-run-only with last-executed dates recorded per spec.
 
 ## Tally
 
-7/7 when every unchecked box above is checked with observed evidence. Any
+6/6 when every unchecked box above is checked with observed evidence. Any
 procedure needing a live cloud or a release tag stays dry-run-only with its
 last-executed date (or explicit N/A + date) recorded.

@@ -122,10 +122,8 @@ jobs:
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
             go-prime-${{ runner.os }}-
           lookup-only: true
+      - uses: ./.github/actions/go-memlimit
       - name: Warm module cache
-        env:
-          GOFLAGS: -p=1
-          GOMAXPROCS: "1"
         run: go mod download
       # Explicit save with if: always() — setup-go's post-step never runs when the runner is reaped.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -165,6 +163,7 @@ jobs:
           restore-keys: |
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
             go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
@@ -194,6 +193,7 @@ jobs:
           key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
       - run: |
           mapfile -t go_files < <(git ls-files '*.go')
           gofmt -w "${go_files[@]}"
@@ -235,21 +235,13 @@ jobs:
           key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
       - run: GOWORK=off go build ./...
         working-directory: sdk
-        env:
-          GOFLAGS: -p=1
-          GOMAXPROCS: "1"
       - run: GOWORK=off go vet ./...
         working-directory: sdk
-        env:
-          GOFLAGS: -p=1
-          GOMAXPROCS: "1"
       - run: GOWORK=off go test -race ./... -count=1
         working-directory: sdk
-        env:
-          GOFLAGS: -p=1
-          GOMAXPROCS: "1"
       - run: GOWORK=off go mod tidy && git diff --exit-code -- go.mod go.sum
         working-directory: sdk
       - name: golangci-lint (SDK module)
@@ -291,21 +283,13 @@ jobs:
           key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
       - run: go build ./...
         working-directory: providers/gcp
-        env:
-          GOFLAGS: -p=1
-          GOMAXPROCS: "1"
       - run: go vet ./...
         working-directory: providers/gcp
-        env:
-          GOFLAGS: -p=1
-          GOMAXPROCS: "1"
       - run: go test -race ./... -count=1
         working-directory: providers/gcp
-        env:
-          GOFLAGS: -p=1
-          GOMAXPROCS: "1"
       - run: go mod tidy && git diff --exit-code -- go.mod go.sum
         working-directory: providers/gcp
       - name: golangci-lint (provider module)
@@ -512,6 +496,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - uses: ./.github/actions/go-memlimit
       - name: Run Floci AWS contract tests
         env:
           MAGELIFT_FLOCI: '1'
@@ -540,6 +525,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - uses: ./.github/actions/go-memlimit
       - name: Run floci-gcp contract tests
         env:
           MAGELIFT_FLOCI_GCP: '1'
@@ -558,6 +544,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: ./.github/actions/go-memlimit
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser
@@ -575,6 +562,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - uses: ./.github/actions/go-memlimit
       - name: Check workflow syntax and expressions
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
 
@@ -615,6 +603,7 @@ jobs:
           key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
             go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
       - name: Install pinned JSON/YAML tools
         env:
           YQ_VERSION: v4.53.3

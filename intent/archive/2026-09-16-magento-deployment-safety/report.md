@@ -145,3 +145,9 @@ JSON that Go renders (single authority with CI drift check); the
 incompatible-schema runbook is scoped to operator-attested manual steps
 with explicitly unverified parts. Fixed in intent/alpha-review-corrections
 (boxes 3.2, 3.3).
+
+## Correction (2026-09-18, alpha review 5.1)
+
+No new product finding. Compile and test hosts now set `GOMEMLIMIT` to
+75% of available RAM and no longer pin `GOMAXPROCS` or `-p`. R04/R08
+stand as of 2026-09-17.

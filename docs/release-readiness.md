@@ -166,10 +166,12 @@ maintainer owns winget/Scoop if demand appears.
 ### Local packaging smoke
 
 Run `./scripts/release-smoke-local.sh` or `make release-smoke` for a host-only
-check (snapshot release on the dialproof config, signing and SBOM skipped,
-`GOMAXPROCS=1`, `GOFLAGS=-p=1`). It asserts the CLI archive, the provider
-binary, and the provider checksums entry. Do not use a full multi-platform
-`goreleaser release` as a local smoke; that matrix belongs on CI.
+check (snapshot release on the dialproof config, signing and SBOM skipped).
+The script sets `GOMEMLIMIT` to 75% of available RAM and does not pin
+`GOMAXPROCS` or goreleaser `--parallelism`. It asserts the CLI archive, the
+provider binary, and the provider checksums entry. Do not use a full
+multi-platform `goreleaser release` as a local smoke; that matrix belongs
+on CI.
 
 ### Tag sequence (module tags before the release tag)
 

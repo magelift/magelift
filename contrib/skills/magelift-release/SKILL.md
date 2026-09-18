@@ -9,7 +9,7 @@ version: 1.0.0
 
 # MageLift release
 
-## Local smoke (serial)
+## Local smoke
 
 ```sh
 make release-smoke
@@ -17,8 +17,9 @@ make release-smoke
 ./scripts/release-smoke-local.sh
 ```
 
-Never run a full multi-platform `goreleaser release` on a laptop. See
-`magelift-serial-builds`.
+Never run a full multi-platform `goreleaser release` on a laptop.
+Do not pass `--parallelism`. `GOMEMLIMIT` is 75% of available RAM
+(`scripts/go-memlimit.sh`).
 
 ## Identities and registries
 

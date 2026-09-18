@@ -13,7 +13,8 @@ Magento-wired proof.
 Overlap GCP and AWS waits with **separate git worktrees**, not two Magento
 shops in one bill. Each tree needs its own prefix
 (`MAGELIFT_GCP_ACCEPTANCE_NAME`, `MAGELIFT_AWS_ACCEPTANCE_PROJECT_TAG`,
-OVH/Scaleway `MAGELIFT_*_ACCEPTANCE_PREFIX`), `GOMAXPROCS=1 GOFLAGS=-p=1`,
+OVH/Scaleway `MAGELIFT_*_ACCEPTANCE_PREFIX`), `GOMEMLIMIT` at 75% of
+available RAM (the harness applies `scripts/go-memlimit.sh`),
 and Pulumi state that is not inherited from the sibling tree. Shared
 prefixes such as `mlacc` are refused. The harness library is
 `scripts/acceptance/lib-campaign-isolation.sh`.

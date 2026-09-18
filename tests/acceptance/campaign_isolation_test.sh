@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Packed-campaign isolation: unique prefixes, serial Go, no inherited Pulumi backend.
+# Packed-campaign isolation: unique prefixes, GOMEMLIMIT 75%, no inherited Pulumi backend.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -7,16 +7,22 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$ROOT/scripts/acceptance/lib-campaign-isolation.sh"
 
 unset GOMAXPROCS GOFLAGS GOMEMLIMIT PULUMI_BACKEND_URL
-acceptance_campaign_serial_go
-if [[ "$GOMAXPROCS" != 1 || "$GOFLAGS" != "-p=1" || "$GOMEMLIMIT" != "1GiB" ]]; then
-	printf 'serial Go defaults = GOMAXPROCS=%s GOFLAGS=%s GOMEMLIMIT=%s\n' "$GOMAXPROCS" "$GOFLAGS" "$GOMEMLIMIT" >&2
+export MAGELIFT_GOMEMLIMIT_AVAILABLE_KIB=1048576
+export MAGELIFT_GOMEMLIMIT_PERCENT=75
+acceptance_campaign_go_memlimit
+if [[ -n "${GOMAXPROCS+x}" ]]; then
+	printf 'campaign isolation must unset GOMAXPROCS, got %s\n' "${GOMAXPROCS-}" >&2
+	exit 1
+fi
+if [[ "$GOMEMLIMIT" != "768MiB" ]]; then
+	printf 'campaign isolation GOMEMLIMIT=%s want 768MiB\n' "$GOMEMLIMIT" >&2
 	exit 1
 fi
 
-export GOFLAGS="-race"
-acceptance_campaign_serial_go >/dev/null
-if [[ "$GOFLAGS" != "-race -p=1" ]]; then
-	printf 'serial Go must append -p=1 to existing GOFLAGS, got %s\n' "$GOFLAGS" >&2
+export GOFLAGS="-race -p=1"
+acceptance_campaign_go_memlimit >/dev/null
+if [[ "${GOFLAGS:-}" != "-race" ]]; then
+	printf 'campaign isolation must drop -p=1 and keep other GOFLAGS, got %s\n' "${GOFLAGS-}" >&2
 	exit 1
 fi
 
@@ -53,7 +59,7 @@ acceptance_campaign_require_isolated_backend ''
 
 for script in scripts/aws-acceptance-local.sh providers/gcp/scripts/gcp-acceptance-local.sh scripts/k8s-acceptance-local.sh; do
 	path="$ROOT/$script"
-	for required in 'lib-campaign-isolation.sh' 'acceptance_campaign_serial_go'; do
+	for required in 'lib-campaign-isolation.sh' 'acceptance_campaign_go_memlimit'; do
 		if ! grep -q "$required" "$path"; then
 			printf '%s missing %s\n' "$script" "$required" >&2
 			exit 1

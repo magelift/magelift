@@ -21,8 +21,10 @@
   export/import round trip, and the negative test
   (unauthenticated import/export paths fail; stock
   denies hold for customer/downloadable/import/
-  custom_options); VM destroyed after) — needs rc.15
-  artifacts; runs before the order-8 re-run
+  custom_options); VM destroyed after) — needs the next
+  published candidate after rc.15. rc.15 publish failed the
+  checks gate (acceptance assumed `rg`; CI has jq). Draft
+  assets do not satisfy this box. Tag is ask-first.
 - [x] 1.3 Crash-safe updater (R11: copy backup, injectable
   transitions, fault tests, Windows note) — verify:
   `go test ./internal/upgrade/ -count=1`
@@ -62,4 +64,7 @@
   evidence) — verify: docs green, humanizer plus marks
 - [ ] 5.1 Amendments plus gates (dated report notes,
   ROADMAP refresh, full local gates, report, archive)
-  — verify: every gate green, verdict recorded
+  — 2026-09-18 amendments on orders 4–7 and ROADMAP
+  note landed; full gates and archive wait for hosted
+  CI plus box 1.4. Verify: every gate green, verdict
+  recorded

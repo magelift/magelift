@@ -218,7 +218,7 @@ SDK contract proof as the only Go command in progress:
 ```sh
 export GOMODCACHE="$(mktemp -d /tmp/magelift-modcache.XXXXXX)"
 export GOCACHE="$(mktemp -d /tmp/magelift-gocache.XXXXXX)"
-GOMAXPROCS=1 GOFLAGS=-p=1 go build -o /tmp/magelift-extension-contract ./examples/custom-extension-contract
+go build -o /tmp/magelift-extension-contract ./examples/custom-extension-contract
 /tmp/magelift-extension-contract
 ```
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-export GOMAXPROCS=1
-export GOFLAGS=-p=1
-export GOMEMLIMIT=1GiB
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
+# shellcheck source=../../../scripts/go-memlimit.sh
+source "$root/scripts/go-memlimit.sh"
+magelift_apply_go_memlimit
 
 compose=(docker compose -f docker-compose.floci-gcp.yml)
 cleanup() {
