@@ -118,6 +118,28 @@ func TestMakefileLeavesGoSchedulingToToolchain(t *testing.T) {
 	}
 }
 
+func TestFmtUsesToolchainGofmt(t *testing.T) {
+	root := moduleRoot(t)
+	makefile, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(makefile, []byte("go env GOROOT)/bin/gofmt")) {
+		t.Fatal("Makefile fmt/fmt-check must invoke $(go env GOROOT)/bin/gofmt, not PATH gofmt")
+	}
+	if bytes.Contains(makefile, []byte("\tgofmt -")) || bytes.Contains(makefile, []byte("$$(gofmt -")) {
+		t.Fatal("Makefile must not call PATH gofmt")
+	}
+
+	ci, err := os.ReadFile(filepath.Join(root, ".github/workflows/ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(ci, []byte(`gofmt="$(go env GOROOT)/bin/gofmt"`)) {
+		t.Fatal("go-verify must format with $(go env GOROOT)/bin/gofmt")
+	}
+}
+
 func jobRunsGo(raw []byte) bool {
 	s := string(raw)
 	for _, marker := range goJobMarkers {
