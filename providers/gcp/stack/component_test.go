@@ -57,6 +57,41 @@ func TestProgramBuildsMockGraph(t *testing.T) {
 	}
 }
 
+func TestProgramGeneratesEncryptionKeyWhenUnset(t *testing.T) {
+	spec := Spec{
+		Identity: Identity{
+			Project: "shop", GCPProject: "example-gcp-project", Environment: "preview",
+			Region: "europe-west1", EnvironmentClass: "preview", Preset: "preview",
+			Labels: map[string]string{"magelift-managed-by": "magelift"},
+		},
+		Application: Application{Edition: "open-source", Version: "2.4.8", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		Artifact:    Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"},
+		Policy:      NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c"}},
+		Catalog: CatalogSelection{
+			CloudSQLTier: "db-perf-optimized-N-2", CloudSQLAvailability: "ZONAL", ValkeyRequirement: "8.1",
+			MemorystoreNodeType: "SHARED_CORE_NANO", AutopilotCPURequest: "500m", AutopilotMemoryRequest: "1Gi",
+			DesiredWebReplicas: 1, SearchMode: "opensearch", SearchReplicas: 1, QueueMode: "database",
+		},
+		Dependencies: Dependencies{DatabaseName: "magento", MasterUsername: "magento"},
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-preview", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	var generated, stored bool
+	for _, res := range mocks.resources {
+		if res.TypeToken == "random:index/randomPassword:RandomPassword" && strings.Contains(res.Name, "encryption-key") {
+			generated = true
+		}
+		if res.TypeToken == "gcp:secretmanager/secretVersion:SecretVersion" && strings.Contains(res.Name, "encryption-key") {
+			stored = true
+		}
+	}
+	if !generated || !stored {
+		t.Fatalf("generated=%v stored=%v", generated, stored)
+	}
+}
+
 func TestSpecRefusesInPlaceRabbitMQQuorum(t *testing.T) {
 	spec := Spec{
 		Identity: Identity{

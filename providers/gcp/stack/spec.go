@@ -334,9 +334,6 @@ func (s Spec) validate(options validateOptions) error {
 	if s.Dependencies.DatabaseName == "" || s.Dependencies.MasterUsername == "" {
 		problems = append(problems, errors.New("database name and master username are required"))
 	}
-	if !options.accountOnly && strings.TrimSpace(s.Dependencies.EncryptionKeySecret) == "" {
-		problems = append(problems, errors.New("Magento encryption key Secret Manager secret ID is required"))
-	}
 	if err := sdk.ValidateObservabilityIntent(s.Observability); err != nil {
 		problems = append(problems, fmt.Errorf("observability intent: %w", err))
 	}

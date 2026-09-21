@@ -17,6 +17,7 @@ import (
 	"github.com/magelift/magelift/providers/gcp/storage"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp"
 	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/secretmanager"
+	"github.com/pulumi/pulumi-random/sdk/v4/go/random"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -62,7 +63,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 	if provider != nil {
 		childOpts = append(childOpts, pulumi.Provider(provider))
 	}
-	encryptionKey, err := resolveEncryptionKey(ctx, name, spec.Identity.GCPProject, spec.Dependencies.EncryptionKeySecret, provider)
+	encryptionKey, err := magentoEncryptionKey(ctx, name, spec.Identity.GCPProject, spec.Dependencies.EncryptionKeySecret, provider, component)
 	if err != nil {
 		return nil, fmt.Errorf("resolve Magento encryption key: %w", err)
 	}
@@ -178,6 +179,47 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 		return nil, err
 	}
 	return component, nil
+}
+
+// magentoEncryptionKey returns the Magento crypt key. An empty secret ID
+// generates one random value, stores it in Secret Manager, and keeps that
+// value for the life of the stack. A set ID reads an existing secret so a
+// restore can keep the key that already encrypted shop data.
+func magentoEncryptionKey(ctx *pulumi.Context, name, project, secretID string, provider *gcp.Provider, parent pulumi.Resource) (pulumi.StringInput, error) {
+	if strings.TrimSpace(secretID) != "" {
+		return resolveEncryptionKey(ctx, name, project, secretID, provider)
+	}
+	if strings.TrimSpace(project) == "" {
+		return nil, errors.New("GCP project is required to store the generated Magento encryption key")
+	}
+	opts := []pulumi.ResourceOption{pulumi.Parent(parent)}
+	if provider != nil {
+		opts = append(opts, pulumi.Provider(provider))
+	}
+	generated, err := random.NewRandomPassword(ctx, name+"-encryption-key", &random.RandomPasswordArgs{
+		Length:  pulumi.Int(32),
+		Special: pulumi.Bool(false),
+	}, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("generate Magento encryption key: %w", err)
+	}
+	secret, err := secretmanager.NewSecret(ctx, name+"-encryption-key-secret", &secretmanager.SecretArgs{
+		Project:  pulumi.String(project),
+		SecretId: pulumi.String(name + "-crypt"),
+		Replication: &secretmanager.SecretReplicationArgs{
+			Auto: &secretmanager.SecretReplicationAutoArgs{},
+		},
+	}, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("create Magento encryption key secret: %w", err)
+	}
+	if _, err := secretmanager.NewSecretVersion(ctx, name+"-encryption-key-version", &secretmanager.SecretVersionArgs{
+		Secret:     secret.ID(),
+		SecretData: generated.Result,
+	}, append(opts, pulumi.DependsOn([]pulumi.Resource{secret, generated}))...); err != nil {
+		return nil, fmt.Errorf("store Magento encryption key: %w", err)
+	}
+	return generated.Result, nil
 }
 
 func resolveEncryptionKey(ctx *pulumi.Context, name, project, secretID string, provider *gcp.Provider) (pulumi.StringInput, error) {
