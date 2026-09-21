@@ -13,7 +13,7 @@
     "name": "magelift-dependencies",
     "description": "Check the local tools MageLift needs for Docker, cloud access, builds, and imported database dumps. Use when doctor reports a missing or unreachable tool.",
     "version": "1.0.0",
-    "digest": "b37cb7416425054df172860d569ca9841fc602deff9ff249cf88e796a4b7eca8",
+    "digest": "bcba966c564d4970a299234c0fe02eaeae0cbd2a1be402ba4d4510b6b1763f70",
     "sources": [
       "embedded",
       "skills-cli"
