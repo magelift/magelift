@@ -219,10 +219,11 @@ The command prints the pushed digest. Pin it as
 `target.gcp.imageDigest` (or pass `--digest` to deploy and
 promote). Tags move; only digests deploy.
 
-The stack generates the Magento encryption key on first deploy,
-stores it in Secret Manager, and reuses that value on later
-updates. Leave `encryptionKeySecret` unset. Set it only when a
-restore must keep a key that already encrypted shop data.
+The stack generates a 32-character Magento encryption key on
+first deploy and stores it in Secret Manager. Later deploys
+leave that value in place. Leave `encryptionKeySecret` unset.
+Set it only when a restore must keep a key that already
+encrypted shop data.
 
 ### 7. Deploy
 
