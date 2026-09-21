@@ -138,6 +138,7 @@ func (s *Server) Plan(ctx context.Context, req *sdk.PlanRequest) (*sdk.PlanResul
 		ValkeyRequirement:   req.ValkeyRequirement,
 		AllowUnsupported:    req.AllowUnsupported,
 		AllowExpiredPreview: req.AllowExpiredPreview,
+		AccountOnly:         req.AccountOnly,
 	})
 	if err != nil {
 		return nil, InvalidError(err.Error())

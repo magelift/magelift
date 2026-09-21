@@ -505,6 +505,10 @@ func outputsCommand(o *options) *cobra.Command {
 }
 
 func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedStack, error) {
+	return o.planStackWith(platform.PlanOptions{AllowExpiredPreview: allowExpiredPreview})
+}
+
+func (o *options) planStackWith(opts platform.PlanOptions) (string, platform.PlannedStack, error) {
 	o.resolvedPreviewIdentity = nil
 	if o.modules == nil {
 		return "", nil, errors.New("stack module registry is required")
@@ -514,7 +518,10 @@ func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedS
 		return "", nil, err
 	}
 	o.resolvedPreviewIdentity = effective.Config.PreviewIdentity
-	_, planned, err := o.modules.Plan(effective.Config, environment, platform.PlanOptions{AllowExpiredPreview: allowExpiredPreview, Context: o.planContext})
+	if opts.Context == nil {
+		opts.Context = o.planContext
+	}
+	_, planned, err := o.modules.Plan(effective.Config, environment, opts)
 	if err != nil {
 		return "", nil, err
 	}

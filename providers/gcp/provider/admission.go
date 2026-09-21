@@ -27,6 +27,48 @@ type AdmissionSelection struct {
 	Runtime            string
 }
 
+// ValidateAccountPrep checks the project identity, billing, and the
+// storage API bootstrap needs for the state bucket. It does not query
+// Cloud SQL, Memorystore, or GKE catalogs; those belong to deploy.
+func ValidateAccountPrep(ctx context.Context, client CapabilityAPI, selection AdmissionSelection) error {
+	if ctx == nil {
+		return errors.New("GCP plan admission context is required")
+	}
+	if client == nil {
+		return errors.New("GCP capability client is required")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	projectID := strings.TrimSpace(selection.ProjectID)
+	if projectID == "" {
+		return errors.New("GCP plan admission project is required")
+	}
+	identity, err := client.Project(ctx, projectID)
+	if err != nil {
+		return fmt.Errorf("read GCP project identity: %w", err)
+	}
+	if strings.TrimSpace(identity.ID) != projectID {
+		return fmt.Errorf("GCP credentials resolved to project %q, but the plan targets %q", identity.ID, projectID)
+	}
+	billingEnabled, err := client.BillingEnabled(ctx, projectID)
+	if err != nil {
+		return fmt.Errorf("check GCP billing account: %w", err)
+	}
+	if !billingEnabled {
+		return fmt.Errorf("GCP project %q has no open billing account", projectID)
+	}
+	const storageAPI = "storage.googleapis.com"
+	services, err := client.EnabledServices(ctx, identity, []string{storageAPI})
+	if err != nil {
+		return fmt.Errorf("check GCP service states: %w", err)
+	}
+	if !services[storageAPI] {
+		return fmt.Errorf("GCP service %q is not enabled for project %q", storageAPI, projectID)
+	}
+	return nil
+}
+
 func ValidateSelection(ctx context.Context, client CapabilityAPI, selection AdmissionSelection) error {
 	if ctx == nil {
 		return errors.New("GCP plan admission context is required")

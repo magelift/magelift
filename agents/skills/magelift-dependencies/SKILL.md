@@ -16,8 +16,9 @@ magelift doctor
 
 The report separates required tools from optional capabilities. A cloud target
 does not require Docker unless the selected command actually builds or runs a
-local container. Read the capability and install hint beside each failed check
-before changing the machine.
+local container. Deploy and bootstrap do not need a Pulumi CLI; that engine
+runs inside the MageLift process. Read the capability and install hint beside
+each failed check before changing the machine.
 
 Use the explicit installer only after reviewing the proposed package-manager
 commands:

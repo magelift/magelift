@@ -22,7 +22,11 @@ const (
 // lifecycle operation.
 type PlanOptions struct {
 	AllowExpiredPreview bool
-	Context             context.Context
+	// AccountOnly plans the project identity bootstrap uses. It does not
+	// require a built image or an encryption-key secret, and it does not
+	// query catalogs that exist only for deploy.
+	AccountOnly bool
+	Context     context.Context
 }
 
 // PlannedStack is an opaque, validated stack plan produced by a StackModule.

@@ -96,6 +96,22 @@ func validAdmissionSelection() AdmissionSelection {
 	}
 }
 
+func TestValidateAccountPrepDoesNotQueryDeployCatalogs(t *testing.T) {
+	client := validFakeCapabilityAPI()
+	client.services["storage.googleapis.com"] = true
+	selection := validAdmissionSelection()
+	if err := ValidateAccountPrep(context.Background(), client, selection); err != nil {
+		t.Fatal(err)
+	}
+	for name := range client.calls {
+		switch name {
+		case "Project", "BillingEnabled", "EnabledServices":
+		default:
+			t.Fatalf("account prep called %s", name)
+		}
+	}
+}
+
 func TestValidateSelectionUsesReadOnlyGCPCapabilityPort(t *testing.T) {
 	client := validFakeCapabilityAPI()
 	if err := ValidateSelection(context.Background(), client, validAdmissionSelection()); err != nil {

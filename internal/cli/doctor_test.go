@@ -186,7 +186,7 @@ func TestDoctorNextPointsAtValidateOnBuildFailure(t *testing.T) {
 	}
 }
 
-func TestDoctorNextPointsAtInstallerOnMissingDependency(t *testing.T) {
+func TestDoctorDoesNotRequirePulumiCLI(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "magelift.yaml")
 	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
@@ -198,10 +198,10 @@ func TestDoctorNextPointsAtInstallerOnMissingDependency(t *testing.T) {
 	o.dependencyRunner = &fakeDependencyRunner{missing: map[string]bool{"pulumi": true}}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
-	if err := cmd.Execute(); err == nil {
-		t.Fatal("expected doctor to fail on missing pulumi")
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("doctor required a host pulumi CLI: %v\n%s", err, out.String())
 	}
-	if !strings.Contains(out.String(), `"next": "magelift doctor --install-dependencies"`) {
-		t.Fatalf("doctor next = %s, want installer flag", out.String())
+	if strings.Contains(out.String(), "dependency.pulumi") {
+		t.Fatalf("doctor still reports pulumi: %s", out.String())
 	}
 }

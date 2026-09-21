@@ -286,10 +286,10 @@ func InstallDependencies(ctx context.Context, runner DependencyRunner, actions [
 // and day-2 launchers. The Go SDKs remain the provider API boundary; provider
 // CLIs are listed only when a returned ExecTarget launches them.
 func SpecsForTarget(provider, runtimeID string) []DependencySpec {
-	specs := []DependencySpec{
-		{ID: "pulumi", Command: "pulumi", Capability: "cloud infrastructure Automation API", Requirement: DependencyRequired, VersionArgs: []string{"version"}, InstallPackage: "pulumi", Installable: true},
-	}
-	specs = append(specs, dockerDependencySpecs(DependencyOptional)...)
+	// Pulumi runs in-process through the Automation API
+	// (UpsertStackInlineSource). A host `pulumi` binary is not consulted,
+	// and `apt-get install pulumi` is not a Debian package.
+	specs := dockerDependencySpecs(DependencyOptional)
 
 	switch runtimeID {
 	case "eks", "gke-autopilot", "gke-standard", "kapsule", "mks":

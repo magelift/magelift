@@ -35,6 +35,8 @@ type Spec struct {
 	// expired preview for teardown. The Pulumi program reads it to skip
 	// only the expiry check; deploy planning never sets it.
 	AllowExpiredPreview bool
+	// AccountOnly is the bootstrap plan. Deploy planning never sets it.
+	AccountOnly bool
 }
 
 type Identity struct {
@@ -238,17 +240,29 @@ func memorystoreAPIEngineVersionForMagento(version, configured, requirement stri
 }
 
 func (s Spec) Validate() error {
-	return s.validate(false)
+	return s.validate(validateOptions{})
 }
 
 // ValidateAllowExpiredPreview is restricted to teardown planning. It keeps
 // every structural and security check while allowing an already expired
 // preview to be converted into a destroy request.
 func (s Spec) ValidateAllowExpiredPreview() error {
-	return s.validate(true)
+	return s.validate(validateOptions{allowExpiredPreview: true})
 }
 
-func (s Spec) validate(allowExpiredPreview bool) error {
+// ValidateAccount is restricted to account bootstrap. It keeps identity and
+// topology checks and skips the image digest and encryption-key secret,
+// which exist only after the shop image is built.
+func (s Spec) ValidateAccount() error {
+	return s.validate(validateOptions{accountOnly: true})
+}
+
+type validateOptions struct {
+	allowExpiredPreview bool
+	accountOnly         bool
+}
+
+func (s Spec) validate(options validateOptions) error {
 	var problems []error
 	problems = append(problems, s.Email.validate()...)
 	databaseVersion, err := s.CloudSQLDatabaseVersion()
@@ -308,7 +322,7 @@ func (s Spec) validate(allowExpiredPreview bool) error {
 	if s.Identity.Preset != sdk.PresetPreview && s.Identity.Preset != sdk.PresetStandard && s.Identity.Preset != sdk.PresetHighAvailability {
 		problems = append(problems, fmt.Errorf("invalid preset %q", s.Identity.Preset))
 	}
-	if !digest.MatchString(s.Artifact.ImageDigest) {
+	if !options.accountOnly && !digest.MatchString(s.Artifact.ImageDigest) {
 		problems = append(problems, errors.New("artifact image digest must be repository@sha256:..."))
 	}
 	if _, err := netip.ParsePrefix(s.Policy.NetworkCIDR); err != nil {
@@ -320,7 +334,7 @@ func (s Spec) validate(allowExpiredPreview bool) error {
 	if s.Dependencies.DatabaseName == "" || s.Dependencies.MasterUsername == "" {
 		problems = append(problems, errors.New("database name and master username are required"))
 	}
-	if strings.TrimSpace(s.Dependencies.EncryptionKeySecret) == "" {
+	if !options.accountOnly && strings.TrimSpace(s.Dependencies.EncryptionKeySecret) == "" {
 		problems = append(problems, errors.New("Magento encryption key Secret Manager secret ID is required"))
 	}
 	if err := sdk.ValidateObservabilityIntent(s.Observability); err != nil {
@@ -348,7 +362,7 @@ func (s Spec) validate(allowExpiredPreview bool) error {
 			problems = append(problems, err)
 		}
 	}
-	if !allowExpiredPreview && !s.Lifecycle.ExpiresAt.IsZero() && time.Now().After(s.Lifecycle.ExpiresAt) {
+	if !options.allowExpiredPreview && !s.Lifecycle.ExpiresAt.IsZero() && time.Now().After(s.Lifecycle.ExpiresAt) {
 		problems = append(problems, errors.New("preview environment has expired"))
 	}
 	return errors.Join(problems...)

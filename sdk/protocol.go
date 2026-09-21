@@ -238,6 +238,10 @@ type PlanRequest struct {
 	ValkeyRequirement   string              `json:"valkeyRequirement,omitempty"`
 	AllowUnsupported    bool                `json:"allowUnsupported,omitempty"`
 	AllowExpiredPreview bool                `json:"allowExpiredPreview,omitempty"`
+	// AccountOnly asks for the account-prep plan bootstrap uses. Deploy
+	// planning leaves it false and still requires the image digest and
+	// encryption-key secret.
+	AccountOnly bool `json:"accountOnly,omitempty"`
 }
 
 // PlanResult carries the stored plan or a typed validation failure.
