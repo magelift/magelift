@@ -185,6 +185,25 @@ func testPlanRequest() *sdk.PlanRequest {
 	}
 }
 
+func TestPlanAccountOnlySkipsImageAndEncryptionKey(t *testing.T) {
+	t.Parallel()
+	server := &Server{Admission: stubAdmission{}}
+	request := testPlanRequest()
+	request.AccountOnly = true
+	request.TargetBlock = []byte("project: example-gcp-project\nregion: europe-west1\n")
+	result, operr := server.Plan(context.Background(), request)
+	if operr != nil {
+		t.Fatal(operr)
+	}
+	var spec gcpstack.Spec
+	if err := json.Unmarshal(result.Plan.Opaque, &spec); err != nil {
+		t.Fatal(err)
+	}
+	if !spec.AccountOnly || spec.Artifact.ImageDigest != "" || spec.Dependencies.EncryptionKeySecret != "" {
+		t.Fatalf("account plan = %#v", spec)
+	}
+}
+
 func TestPlan(t *testing.T) {
 	t.Parallel()
 	server := &Server{Admission: stubAdmission{}}

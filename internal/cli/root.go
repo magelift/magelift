@@ -804,6 +804,9 @@ target:
     region: europe-west1
     # Search defaults to the recipe OpenSearch; pin openSearchMode: disabled
     # only to skip search on a first smoke run.
+    # After magelift build, set imageDigest to the pushed shop digest.
+    # Before deploy, create a Secret Manager secret and set its ID here.
+    # encryptionKeySecret: magento-crypt-key
 # Outbound email: uncomment and point at your SMTP relay once the relay
 # account exists (see docs/onboarding.md prerequisites). Preview
 # environments stay disabled unless you set a mode explicitly.

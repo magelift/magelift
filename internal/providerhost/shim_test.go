@@ -167,7 +167,7 @@ func TestShimPlan(t *testing.T) {
 	if !strings.Contains(string(captured.TargetBlock), "example-gcp-project") {
 		t.Fatalf("target block = %s", captured.TargetBlock)
 	}
-	if captured.Runtime != "gke-autopilot" || captured.ValkeyRequirement != "9" || !captured.AllowExpiredPreview {
+	if captured.Runtime != "gke-autopilot" || captured.ValkeyRequirement != "9" || !captured.AllowExpiredPreview || captured.AccountOnly {
 		t.Fatalf("request = %#v", captured)
 	}
 }

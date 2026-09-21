@@ -33,6 +33,7 @@ type PlanInputs struct {
 	ValkeyRequirement   string
 	AllowUnsupported    bool
 	AllowExpiredPreview bool
+	AccountOnly         bool
 }
 
 func PlanFromInputs(in PlanInputs) (Spec, error) {
@@ -308,8 +309,12 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 		Observability: observability,
 	}
 	spec.AllowExpiredPreview = in.AllowExpiredPreview
+	spec.AccountOnly = in.AccountOnly
 	validate := spec.Validate
-	if in.AllowExpiredPreview {
+	switch {
+	case in.AccountOnly:
+		validate = spec.ValidateAccount
+	case in.AllowExpiredPreview:
 		validate = spec.ValidateAllowExpiredPreview
 	}
 	if err := validate(); err != nil {

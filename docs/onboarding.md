@@ -27,20 +27,26 @@ needs you (or your registrar, Google billing, Adobe account team).
   `magelift doctor` mints a token to prove ADC works and tells
   you which half is missing; on CI runners it skips the check
   explicitly.
-- **CI service account API grants (CI only).** `magelift bootstrap`
-  mints the workload identity pool, provider, and service account
-  plus the repository impersonation binding. Granting the service
-  account API roles on your project stays an operator IAM step;
-  cover at least the services admission checks (artifactregistry,
-  compute, container, sqladmin, secretmanager, storage,
-  serviceusage, plus billing read and logging/monitoring for
-  observability).
-- **Your Magento 2.4.9 tree in git.** Builds inspect the git
-  checkout holding `magelift.yaml` and refuse detached or
+- **API grants for the identity that deploys.** This is the CI
+  service account after `magelift bootstrap`, and also a VM or
+  workstation service account if that identity runs deploy.
+  Bootstrap mints the workload identity pool, provider, and
+  service account plus the repository impersonation binding.
+  Granting API roles on the project stays an operator IAM step.
+  Cover artifactregistry, compute, container, sqladmin,
+  secretmanager, storage, serviceusage, memorystore (deploy
+  creates the Valkey instance; `roles/memorystore.admin` is the
+  predefined role that includes it), plus billing read and
+  logging/monitoring for observability.
+- **Git, with a name and email configured.** Builds inspect the
+  git checkout holding `magelift.yaml` and refuse detached or
   uncommitted trees; the shop needs a remote for provenance
-  and a committed `composer.lock`.
+  and a committed `composer.lock`. A stock image often has no
+  `git` package and no `user.name`.
 - **Docker with buildx on the build host.** `docker buildx version`
-  must answer; base images build for `linux/amd64`.
+  must answer; base images build for `linux/amd64`. Debian's
+  own Docker package is too old for this path. Use Docker's
+  current Debian packages, which include the buildx plugin.
 - **A registry you can push to.** The step below creates an
   Artifact Registry repository; adapt the commands if you use
   another registry.
@@ -74,12 +80,16 @@ No stable release exists yet, so install an explicit prerelease.
 Pick the tag from [Releases](https://github.com/magelift/magelift/releases):
 
 ```sh
-curl -fsSL https://magelift.dev/install.sh | MAGELIFT_VERSION=v0.1.0-alpha.1-rc.15 sh
+curl -fsSL https://magelift.dev/install.sh | MAGELIFT_VERSION=v0.1.0-alpha.1-rc.18 sh
+export PATH="$HOME/.local/bin:$PATH"
 magelift version
 ```
 
 The installer verifies the Sigstore bundle plus archive checksum
 before installing; see [Install](install.md) for the full story.
+If it prints that `~/.local/bin` is not on `PATH`, the `export`
+above is the fix for this shell. The infrastructure engine is
+inside the CLI.
 
 ### 2. Template
 
@@ -160,7 +170,7 @@ yours once (the installer ships a binary; sources come
 separately):
 
 ```sh
-TAG=v0.1.0-alpha.1-rc.15
+TAG=v0.1.0-alpha.1-rc.18
 mkdir -p ~/magelift-src
 curl -fsSL "https://github.com/magelift/magelift/archive/refs/tags/$TAG.tar.gz" \
   | tar -xz -C ~/magelift-src --strip-components=1
@@ -208,6 +218,30 @@ magelift build --push \
 The command prints the pushed digest. Pin it as
 `target.gcp.imageDigest` (or pass `--digest` to deploy and
 promote). Tags move; only digests deploy.
+
+Create the Magento encryption key in Secret Manager before
+deploy. The value stays in the secret. YAML holds the secret
+ID only:
+
+```sh
+umask 077
+openssl rand -hex 16 > "$HOME/magento-crypt.key"
+gcloud secrets create magento-crypt-key \
+  --data-file="$HOME/magento-crypt.key" --project=PROJECT_ID
+rm -f "$HOME/magento-crypt.key"
+```
+
+Set both fields, then commit:
+
+```yaml
+target:
+  gcp:
+    imageDigest: europe-west1-docker.pkg.dev/PROJECT_ID/shop/shop@sha256:SHOP_DIGEST
+    encryptionKeySecret: magento-crypt-key
+```
+
+`magelift bootstrap` does not need either field. `magelift deploy`
+refuses to plan without them.
 
 ### 7. Deploy
 

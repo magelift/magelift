@@ -334,6 +334,27 @@ func gcpDeploymentInputs() PlanInputs {
 	}
 }
 
+func TestPlanFromInputsAccountOnlySkipsImageAndEncryptionKey(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.AccountOnly = true
+	in.Target.ImageDigest = ""
+	in.Target.EncryptionKeySecret = ""
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !spec.AccountOnly {
+		t.Fatal("account-only plan was not recorded")
+	}
+	if err := spec.Validate(); err == nil {
+		t.Fatal("deploy validation accepted an account-only spec that has no image")
+	}
+	in.AccountOnly = false
+	if _, err := PlanFromInputs(in); err == nil || !strings.Contains(err.Error(), "artifact image digest") {
+		t.Fatalf("deploy plan error = %v", err)
+	}
+}
+
 func TestPlanFromInputsMapsEmailRelay(t *testing.T) {
 	t.Parallel()
 	in := gcpDeploymentInputs()

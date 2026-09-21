@@ -191,7 +191,7 @@ func TestRunExecTargetPreflightsLauncherBeforeStartingSession(t *testing.T) {
 	}
 }
 
-func TestInfrastructurePreflightsPulumiBeforeBackendCreation(t *testing.T) {
+func TestInfrastructureDoesNotRequirePulumiCLI(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
 	runner := &fakeDependencyRunner{missing: map[string]bool{"pulumi": true}}
 	backendCalled := false
@@ -202,13 +202,13 @@ func TestInfrastructurePreflightsPulumiBeforeBackendCreation(t *testing.T) {
 		return &fakeInfrastructureBackend{}, nil
 	}
 	command := newCommandWithOptions(o)
-	command.SetArgs([]string{"--config", path, "--env", "staging", "deploy"})
+	command.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "deploy"})
 	err := command.Execute()
-	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "pulumi") {
-		t.Fatalf("error=%v code=%d", err, ExitCode(err))
+	if !backendCalled {
+		t.Fatalf("deploy stopped before the infrastructure backend because pulumi was absent: %v", err)
 	}
-	if backendCalled {
-		t.Fatal("backend was created after Pulumi preflight failure")
+	if err != nil && strings.Contains(err.Error(), "pulumi") {
+		t.Fatalf("deploy still requires the pulumi CLI: %v", err)
 	}
 }
 

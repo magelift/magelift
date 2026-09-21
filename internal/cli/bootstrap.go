@@ -18,7 +18,7 @@ func bootstrapCommand(o *options) *cobra.Command {
 		Short: "Prepare this cloud account for Magento",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, planned, err := o.planStack(false)
+			_, planned, err := o.planStackWith(platform.PlanOptions{AccountOnly: true, Context: cmd.Context()})
 			if err != nil {
 				return invalid(err)
 			}

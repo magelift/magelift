@@ -30,7 +30,14 @@ func (a RegionAdmission) AdmitSpec(ctx context.Context, spec Spec) (Spec, error)
 	if err != nil {
 		return Spec{}, fmt.Errorf("create GCP read-only capability client: %w", err)
 	}
-	if err := gcpprovider.ValidateSelection(ctx, client, selectionFromSpec(spec)); err != nil {
+	selection := selectionFromSpec(spec)
+	if spec.AccountOnly {
+		if err := gcpprovider.ValidateAccountPrep(ctx, client, selection); err != nil {
+			return Spec{}, err
+		}
+		return spec, nil
+	}
+	if err := gcpprovider.ValidateSelection(ctx, client, selection); err != nil {
 		return Spec{}, err
 	}
 	return spec, nil

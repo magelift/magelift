@@ -107,6 +107,7 @@ type retainedInputs struct {
 	valkeyRequirement   string
 	allowUnsupported    bool
 	allowExpiredPreview bool
+	accountOnly         bool
 }
 
 func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
@@ -157,6 +158,7 @@ func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.P
 		valkeyRequirement:   requirement.Versions[0],
 		allowUnsupported:    cfg.Compatibility.AllowUnsupported,
 		allowExpiredPreview: opts.AllowExpiredPreview,
+		accountOnly:         opts.AccountOnly,
 	}
 	return m.replan(planContext(opts), inputs)
 }
@@ -181,6 +183,7 @@ func (m *ShimModule) replan(ctx context.Context, inputs retainedInputs) (*ShimPl
 		ValkeyRequirement:   inputs.valkeyRequirement,
 		AllowUnsupported:    inputs.allowUnsupported,
 		AllowExpiredPreview: inputs.allowExpiredPreview,
+		AccountOnly:         inputs.accountOnly,
 	})
 	if err != nil {
 		return nil, err
