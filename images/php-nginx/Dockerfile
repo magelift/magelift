@@ -102,14 +102,25 @@ EXPOSE 8080 9000
 
 CMD ["php-fpm", "--nodaemonize"]
 
-FROM runtime AS builder
+# Compile and static content run with no database. This stage must not inherit
+# runtime: that image auto-prepends deployment-config.php, which resolves
+# env.php (install date, 127.0.0.1) into MAGENTO_DC__OVERRIDE and makes
+# Magento open a database connection during the image build. env.php is
+# applied only when the runtime container starts.
+FROM extensions AS builder
 
-USER root
+ARG APP_UID=10001
+ARG APP_GID=10001
+
+COPY images/php-nginx/builder.ini /usr/local/etc/php/conf.d/zz-magelift-builder.ini
+
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update \
     && apt-get install -y --no-install-recommends git unzip \
-    && install -d -o magelift -g magelift /opt/magelift/build /workspace /output
+    && groupadd --gid "${APP_GID}" magelift \
+    && useradd --uid "${APP_UID}" --gid magelift --no-create-home --shell /usr/sbin/nologin magelift \
+    && install -d -o magelift -g magelift /opt/magelift/build /workspace /output /tmp/magelift
 
 COPY --from=composer /usr/bin/composer /usr/local/bin/composer
 COPY --chown=magelift:magelift build/composer.json build/composer.lock /opt/magelift/build/

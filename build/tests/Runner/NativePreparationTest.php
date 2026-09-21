@@ -202,6 +202,10 @@ final class NativePreparationTest extends TestCase
             ->prepare(PrepareRequest::fromJson($request));
 
         self::assertContains(
+            ['php', \MageLift\Build\Magento\DefaultStoreScaffold::COMMAND],
+            array_map(static fn (ProcessRequest $process): array => $process->argv, $runner->requests),
+        );
+        self::assertContains(
             ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'en_US', '--theme', 'Magento/blank', '--no-interaction'],
             array_map(static fn (ProcessRequest $process): array => $process->argv, $runner->requests),
         );

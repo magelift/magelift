@@ -135,11 +135,14 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
     {
         if ($this->staticContent === []) {
             // The build runner has no Magento database. SCD is opt-in because
-            // locales and websites must be dumped into config.php first.
+            // locales and themes must be named. A skeleton with no dumped
+            // stores gets the single-store scaffold before the first deploy.
             return [];
         }
 
-        $commands = [];
+        $commands = [
+            new Command(Executable::Php, [DefaultStoreScaffold::COMMAND]),
+        ];
         foreach ($this->staticContent as $content) {
             if ($content['locale'] === '' || $content['theme'] === '') {
                 throw new InvalidArgumentException('Static content locale and theme must be non-empty.');

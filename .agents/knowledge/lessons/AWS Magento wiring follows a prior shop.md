@@ -22,4 +22,4 @@ What that example happens to show (not a certified MageLift pin):
 - Search: provisioned OpenSearch Service domain in the VPC, not AOSS. FGAC off. Access policy Allow `es:ESHttp*` for `AWS *` because ElasticSuite does not SigV4. ECS sets `OPENSEARCH_HOST=https://<domain_endpoint>` and `OPENSEARCH_PORT=443`. No signing sidecar.
 - AOSS serverless is not that shop. Magento OSS still cannot sign SigV4, so MageLift `searchMode:serverless` needs a local SigV4 proxy. Do not put that sidecar on the provisioned domain path.
 
-Look at `infrastructure/opensearch.tf`, `infrastructure/aurora.tf`, `infrastructure/locals.tf` (`DB_HOST` / `OPENSEARCH_*`), and `infrastructure/docker/scripts/generate-env.php` if you need the example. MageLift adapter tests remain the product contract.
+The same shop's build and deploy split is in [Magento image builds must not see a runtime env.php](Magento%20image%20builds%20must%20not%20see%20a%20runtime%20env.php.md) and [Magento deploy writes env.php before traffic moves](Magento%20deploy%20writes%20env.php%20before%20traffic%20moves.md). MageLift adapter tests remain the product contract.

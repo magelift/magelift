@@ -1,5 +1,10 @@
 # Log
 
+## 2026-09-21
+
+- Added [Magento image builds must not see a runtime env.php](lessons/Magento%20image%20builds%20must%20not%20see%20a%20runtime%20env.php.md) and [Magento deploy writes env.php before traffic moves](lessons/Magento%20deploy%20writes%20env.php%20before%20traffic%20moves.md) from a production shop's pipeline. No shop or company name. Updated the prior-shop wiring note to point at them, and noted that Debian has no `cosign` apt package.
+- Updated the image-build lesson: the builder starts from the extension image so runtime auto-prepend cannot inject a database, and a composer skeleton gets the single-store scaffold in `config.php` before static content.
+
 ## 2026-09-18
 
 - Deleted the serial-builds skill and the MacBook-only serial-cap lesson. Live rule is `GOMEMLIMIT` at 75% of available RAM (`scripts/go-memlimit.sh`); no `GOMAXPROCS` / `-p` pin. CI/release jobs take `.github/actions/go-memlimit`; a lintcoverage test fails if a Go job omits it.
