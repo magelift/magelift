@@ -196,6 +196,8 @@ func magentoEncryptionKey(ctx *pulumi.Context, name, project, secretID string, p
 	if provider != nil {
 		opts = append(opts, pulumi.Provider(provider))
 	}
+	// 32 characters, no symbols. A later update must not write a new secret
+	// version: Magento data encrypted with this key cannot be read with another.
 	generated, err := random.NewRandomPassword(ctx, name+"-encryption-key", &random.RandomPasswordArgs{
 		Length:  pulumi.Int(32),
 		Special: pulumi.Bool(false),
@@ -213,13 +215,20 @@ func magentoEncryptionKey(ctx *pulumi.Context, name, project, secretID string, p
 	if err != nil {
 		return nil, fmt.Errorf("create Magento encryption key secret: %w", err)
 	}
-	if _, err := secretmanager.NewSecretVersion(ctx, name+"-encryption-key-version", &secretmanager.SecretVersionArgs{
+	version, err := secretmanager.NewSecretVersion(ctx, name+"-encryption-key-version", &secretmanager.SecretVersionArgs{
 		Secret:     secret.ID(),
 		SecretData: generated.Result,
-	}, append(opts, pulumi.DependsOn([]pulumi.Resource{secret, generated}))...); err != nil {
+	}, append(opts, pulumi.DependsOn([]pulumi.Resource{secret, generated}), pulumi.IgnoreChanges([]string{"secretData"}))...)
+	if err != nil {
 		return nil, fmt.Errorf("store Magento encryption key: %w", err)
 	}
-	return generated.Result, nil
+	key := version.SecretData.ApplyT(func(value *string) (string, error) {
+		if value == nil || strings.TrimSpace(*value) == "" {
+			return "", errors.New("generated Magento encryption key is empty")
+		}
+		return *value, nil
+	}).(pulumi.StringOutput)
+	return pulumi.ToSecret(key).(pulumi.StringOutput), nil
 }
 
 func resolveEncryptionKey(ctx *pulumi.Context, name, project, secretID string, provider *gcp.Provider) (pulumi.StringInput, error) {
