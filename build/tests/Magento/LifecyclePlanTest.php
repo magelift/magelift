@@ -68,6 +68,7 @@ final class LifecyclePlanTest extends TestCase
         self::assertSame([
             ['composer', 'install', '--no-dev', '--prefer-dist', '--no-interaction', '--no-progress', '--optimize-autoloader'],
             ['bin/magento', 'setup:di:compile'],
+            ['php', \MageLift\Build\Magento\DefaultStoreScaffold::COMMAND],
             ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'en_US', '--theme', 'Magento/blank', '--no-interaction'],
             ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'fr_FR', '--theme', 'Vendor/theme', '--no-interaction'],
         ], array_map(
@@ -100,6 +101,7 @@ final class LifecyclePlanTest extends TestCase
         self::assertSame([
             ['composer', 'install', '--no-dev', '--prefer-dist', '--no-interaction', '--no-progress', '--optimize-autoloader'],
             ['bin/magento', 'setup:di:compile'],
+            ['php', \MageLift\Build\Magento\DefaultStoreScaffold::COMMAND],
             ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'en_US', '--theme', 'Magento/blank', '-s', 'compact', '-j', '3', '--no-interaction'],
             ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'fr_FR', '--theme', 'Vendor/theme', '-s', 'compact', '-j', '3', '--no-interaction'],
         ], array_map(

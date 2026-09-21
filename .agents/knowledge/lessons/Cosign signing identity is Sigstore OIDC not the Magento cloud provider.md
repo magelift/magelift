@@ -38,6 +38,12 @@ the path; see
 Strip CR/LF before Cosign. Acceptance harnesses may still pass explicit
 identity flags through `scripts/acceptance/lib-cosign.sh`.
 
+Debian does not ship a `cosign` apt package. `apt-get install cosign` fails,
+which is what `magelift build --push` prints on a clean Debian host. Install
+the upstream `.deb` (or put the Cosign binary that `providers install` already
+cached onto `PATH`). `build --push` looks up `cosign` on `PATH`; it does not
+use that cache by itself.
+
 # Related
 
 * Relates to: [Cosign identity-token files must be a single-line JWT](Cosign%20identity-token%20files%20must%20be%20a%20single-line%20JWT.md)
