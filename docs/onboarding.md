@@ -219,29 +219,10 @@ The command prints the pushed digest. Pin it as
 `target.gcp.imageDigest` (or pass `--digest` to deploy and
 promote). Tags move; only digests deploy.
 
-Create the Magento encryption key in Secret Manager before
-deploy. The value stays in the secret. YAML holds the secret
-ID only:
-
-```sh
-umask 077
-openssl rand -hex 16 > "$HOME/magento-crypt.key"
-gcloud secrets create magento-crypt-key \
-  --data-file="$HOME/magento-crypt.key" --project=PROJECT_ID
-rm -f "$HOME/magento-crypt.key"
-```
-
-Set both fields, then commit:
-
-```yaml
-target:
-  gcp:
-    imageDigest: europe-west1-docker.pkg.dev/PROJECT_ID/shop/shop@sha256:SHOP_DIGEST
-    encryptionKeySecret: magento-crypt-key
-```
-
-`magelift bootstrap` does not need either field. `magelift deploy`
-refuses to plan without them.
+The stack generates the Magento encryption key on first deploy,
+stores it in Secret Manager, and reuses that value on later
+updates. Leave `encryptionKeySecret` unset. Set it only when a
+restore must keep a key that already encrypted shop data.
 
 ### 7. Deploy
 

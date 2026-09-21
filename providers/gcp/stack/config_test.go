@@ -353,6 +353,14 @@ func TestPlanFromInputsAccountOnlySkipsImageAndEncryptionKey(t *testing.T) {
 	if _, err := PlanFromInputs(in); err == nil || !strings.Contains(err.Error(), "artifact image digest") {
 		t.Fatalf("deploy plan error = %v", err)
 	}
+	in.Target.ImageDigest = "ghcr.io/magelift/magento@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	spec, err = PlanFromInputs(in)
+	if err != nil {
+		t.Fatalf("deploy plan without an operator encryption key: %v", err)
+	}
+	if spec.Dependencies.EncryptionKeySecret != "" {
+		t.Fatalf("generated-key plan stored an operator secret ID %q", spec.Dependencies.EncryptionKeySecret)
+	}
 }
 
 func TestPlanFromInputsMapsEmailRelay(t *testing.T) {
