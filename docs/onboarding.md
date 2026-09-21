@@ -33,7 +33,9 @@ needs you (or your registrar, Google billing, Adobe account team).
   Bootstrap mints the workload identity pool, provider, and
   service account plus the repository impersonation binding.
   Granting API roles on the project stays an operator IAM step.
-  Cover artifactregistry, compute, container, sqladmin,
+  Cover artifactregistry admin (the registry create command
+  needs repositories.create; writer is not enough), compute,
+  container, sqladmin,
   secretmanager, storage, serviceusage, memorystore (deploy
   creates the Valkey instance; `roles/memorystore.admin` is the
   predefined role that includes it), plus billing read and
