@@ -38,6 +38,11 @@ func TestBuilderImageDoesNotLoadRuntimeDeploymentConfig(t *testing.T) {
 	if !strings.Contains(builder, "io.magelift.php.base=\"${PHP_BASE}\"") || !strings.Contains(builder, "io.magelift.php.branch=\"${PHP_BRANCH}\"") {
 		t.Fatal("builder stage must carry the same PHP base label as the runtime image")
 	}
+	upgradeAt := strings.Index(builder, "apt-get upgrade -y --no-install-recommends")
+	installAt := strings.Index(builder, "apt-get install -y --no-install-recommends git unzip")
+	if upgradeAt < 0 || installAt < 0 || upgradeAt > installAt {
+		t.Fatal("builder stage must upgrade OS packages before installing git and unzip")
+	}
 
 	ini, err := os.ReadFile(filepath.Join("..", "..", "..", "images", "php-nginx", "builder.ini"))
 	if err != nil {

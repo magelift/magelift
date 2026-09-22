@@ -1,5 +1,9 @@
 # Log
 
+## 2026-09-22
+
+- Updated [Magento image builds must not see a runtime env.php](lessons/Magento%20image%20builds%20must%20not%20see%20a%20runtime%20env.php.md): the builder stage must `apt-get upgrade` before installing git and unzip. The image is scanned on its own, and installing git does not upgrade Debian packages the PHP base already has fixes for.
+
 ## 2026-09-21
 
 - Added [Magento image builds must not see a runtime env.php](lessons/Magento%20image%20builds%20must%20not%20see%20a%20runtime%20env.php.md) and [Magento deploy writes env.php before traffic moves](lessons/Magento%20deploy%20writes%20env.php%20before%20traffic%20moves.md) from a production shop's pipeline. No shop or company name. Updated the prior-shop wiring note to point at them, and noted that Debian has no `cosign` apt package.
