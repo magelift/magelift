@@ -32,7 +32,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.8.0
-	github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.21
+	github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.22
 	github.com/ovh/go-ovh v1.9.0
 	github.com/ovh/okms-sdk-go v0.5.4
 	github.com/ovh/pulumi-ovh/sdk/v2 v2.19.1
