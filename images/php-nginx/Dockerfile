@@ -111,6 +111,12 @@ FROM extensions AS builder
 
 ARG APP_UID=10001
 ARG APP_GID=10001
+ARG PHP_BRANCH=8.5
+ARG PHP_BASE
+
+LABEL io.magelift.php.branch="${PHP_BRANCH}" \
+      io.magelift.php.base="${PHP_BASE}" \
+      io.magelift.base.family="debian-trixie"
 
 COPY images/php-nginx/builder.ini /usr/local/etc/php/conf.d/zz-magelift-builder.ini
 

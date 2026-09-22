@@ -35,6 +35,9 @@ func TestBuilderImageDoesNotLoadRuntimeDeploymentConfig(t *testing.T) {
 	if !strings.Contains(builder, "images/php-nginx/builder.ini") {
 		t.Fatal("builder stage does not install builder.ini")
 	}
+	if !strings.Contains(builder, "io.magelift.php.base=\"${PHP_BASE}\"") || !strings.Contains(builder, "io.magelift.php.branch=\"${PHP_BRANCH}\"") {
+		t.Fatal("builder stage must carry the same PHP base label as the runtime image")
+	}
 
 	ini, err := os.ReadFile(filepath.Join("..", "..", "..", "images", "php-nginx", "builder.ini"))
 	if err != nil {
