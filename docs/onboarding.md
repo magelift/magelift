@@ -35,11 +35,18 @@ needs you (or your registrar, Google billing, Adobe account team).
   Granting API roles on the project stays an operator IAM step.
   Cover artifactregistry admin (the registry create command
   needs repositories.create; writer is not enough), compute,
-  container, sqladmin,
-  secretmanager, storage, serviceusage, memorystore (deploy
+  container, sqladmin, servicenetworking (Cloud SQL private
+  IP peering; `roles/servicenetworking.networksAdmin`),
+  networkconnectivity (Memorystore service connection
+  policies; `roles/networkconnectivity.consumerNetworkAdmin`),
+  iam (the media identity; `roles/iam.serviceAccountCreator`),
+  secretmanager, storage (object admin does not create
+  HMAC keys; `roles/storage.hmacKeyAdmin` does), serviceusage, memorystore (deploy
   creates the Valkey instance; `roles/memorystore.admin` is the
   predefined role that includes it), plus billing read and
-  logging/monitoring for observability.
+  logging/monitoring for observability. Autopilot also needs
+  `roles/iam.serviceAccountUser` on the Compute Engine default
+  service account, not only on the project.
 - **Git, with a name and email configured.** Builds inspect the
   git checkout holding `magelift.yaml` and refuse detached or
   uncommitted trees; the shop needs a remote for provenance
