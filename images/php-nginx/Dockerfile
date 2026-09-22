@@ -120,9 +120,14 @@ LABEL io.magelift.php.branch="${PHP_BRANCH}" \
 
 COPY images/php-nginx/builder.ini /usr/local/etc/php/conf.d/zz-magelift-builder.ini
 
+# Upgrade the same way the runtime stage does. This image is scanned on
+# its own. The PHP base keeps Debian packages (perl, gzip, pcre2) that
+# already have archive fixes; installing git does not upgrade them, and
+# ignore-unfixed does not hide a fix that exists.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends git unzip \
     && groupadd --gid "${APP_GID}" magelift \
     && useradd --uid "${APP_UID}" --gid magelift --no-create-home --shell /usr/sbin/nologin magelift \
