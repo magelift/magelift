@@ -62,7 +62,7 @@ jobs:
       # propagation instead of seeding a miss; two consecutive
       # downloads then prove the entries are serveable and stable.
       - name: Wait for module visibility
-        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           GOWORK: "off"
@@ -94,15 +94,17 @@ jobs:
       # Forensics: workspace resolution is what keeps tag builds local;
       # print it so the next visibility failure starts from evidence.
       - name: Show module resolution
+        env:
+          GOWORK: ${{ github.workspace }}/go.work
         run: |
           go env GOWORK
           go list -m -f '{{.Path}} {{.Version}} {{.Dir}}' github.com/magelift/magelift
         working-directory: providers/gcp
-      # Ephemeral dialproof tags take the slim linux/amd64 config (no SBOM,
-      # taps, or attest): same signs/checksum/archive shape, ~5 min, so the
-      # bundle/lockfile debug loop does not pay the 2h full matrix.
+      # Dialproof and commit canary tags take the slim linux/amd64 config
+      # (no SBOM, taps, or attest): same signs/checksum/archive shape, so the
+      # debug loop does not pay the full matrix. Canary refs stay draft.
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
-        if: startsWith(github.ref_name, 'v0.0.0-dialproof')
+        if: "(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         with:
           distribution: goreleaser
           version: v2.18.1
@@ -110,8 +112,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: "0"
+          # Provider builds run in providers/gcp. Pin the workspace so they
+          # compile this checkout, not the published module in go.mod.
+          GOWORK: ${{ github.workspace }}/go.work
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
-        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         with:
           distribution: goreleaser
           version: v2.18.1
@@ -121,6 +126,7 @@ jobs:
           # Pushes the brew formula and Scoop manifest to their tap repos.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
           CGO_ENABLED: "0"
+          GOWORK: ${{ github.workspace }}/go.work
       # The CLI verifies a provider binary against the digest plus
       # Cosign bundle named in magelift.providers.lock. One lock per
       # platform (the installed binary has a fixed name); digests come
@@ -134,7 +140,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release upload "$RELEASE_TAG" dist/magelift.providers.lock.* --clobber
+          bash scripts/release-upload-assets.sh "$RELEASE_TAG" dist/magelift.providers.lock.*
       - name: Verify provider bundles
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -191,7 +197,7 @@ jobs:
           --certificate-oidc-issuer https://token.actions.githubusercontent.com
           dist/checksums.txt
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         with:
           subject-checksums: dist/checksums.txt
       # Pristine consumer proof: the published modules resolve and
@@ -199,7 +205,7 @@ jobs:
       # installs ignore the checkout and build from the proxy with
       # sumdb verification; the release fails before publish otherwise.
       - name: Verify published modules
-        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         env:
           RELEASE_TAG: ${{ github.ref_name }}
           GOWORK: "off"
@@ -220,7 +226,7 @@ jobs:
       # identity/issuer differ from the release workflow pin, and content
       # trust stays digest plus bundle-over-pinned-identity.
       - name: Publish the verified candidate
-        if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.ref_name }}
@@ -247,7 +253,7 @@ jobs:
   # workflow visibly so the tap file gets fixed forward the same day.
   # Dialproof tags publish no tap, so there is nothing to verify.
   cask-verify:
-    if: "!startsWith(github.ref_name, 'v0.0.0-dialproof')"
+    if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
     needs: [release]
     runs-on: macos-latest
     timeout-minutes: 30

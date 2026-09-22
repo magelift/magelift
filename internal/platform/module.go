@@ -62,6 +62,7 @@ type ModuleRegistry struct {
 	byPlatform     map[targetKey]StackModule
 	byID           map[sdk.TargetID]StackModule
 	extensionsByID map[string]sdk.ExtensionDescriptor
+	closers        []func()
 }
 
 type targetKey struct {
@@ -75,6 +76,31 @@ func NewModuleRegistry() *ModuleRegistry {
 		byPlatform:     make(map[targetKey]StackModule),
 		byID:           make(map[sdk.TargetID]StackModule),
 		extensionsByID: make(map[string]sdk.ExtensionDescriptor),
+	}
+}
+
+// RegisterCloser records a function run by Close. Nil functions are ignored.
+// Registration order is the call order.
+func (r *ModuleRegistry) RegisterCloser(close func()) {
+	if r == nil || close == nil {
+		return
+	}
+	r.closers = append(r.closers, close)
+}
+
+// Close runs registered closers once, in registration order. A second call
+// does nothing. Closers are how a CLI invocation reaps provider processes
+// that the module registry dialed outside the per-command session list.
+func (r *ModuleRegistry) Close() {
+	if r == nil {
+		return
+	}
+	closers := r.closers
+	r.closers = nil
+	for _, close := range closers {
+		if close != nil {
+			close()
+		}
 	}
 }
 

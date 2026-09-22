@@ -70,6 +70,9 @@ func TestRegisterCandidateUsesPlatformMigrationContract(t *testing.T) {
 	if strings.Contains(cmd, "setup:static-content:deploy") {
 		t.Fatalf("migration must not regenerate static content at deploy time: %v", container.Command)
 	}
+	if upgrade, importAt := strings.Index(cmd, "setup:upgrade"), strings.Index(cmd, "app:config:import"); upgrade < 0 || importAt < 0 || upgrade > importAt {
+		t.Fatalf("command = %q, want setup:upgrade before app:config:import", cmd)
+	}
 	foundDBHost := false
 	for _, env := range container.Env {
 		if env.Name == platform.EnvMagentoDBHost && env.Value == "10.0.0.1" {

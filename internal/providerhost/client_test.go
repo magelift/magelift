@@ -159,6 +159,25 @@ func v2ProviderBinary(t *testing.T) string {
 	return v2BinaryPath
 }
 
+func TestCachedDialerCloseReapsPlugin(t *testing.T) {
+	binary := v2ProviderBinary(t)
+	dialer := &CachedDialer{Dial: func(ctx context.Context) (*Client, error) {
+		return Dial(ctx, binary, DialOptions{})
+	}}
+	client, err := dialer.Do(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.process == nil || client.process.Exited() {
+		t.Fatal("provider process was not running after dial")
+	}
+	dialer.Close()
+	if !client.process.Exited() {
+		t.Fatal("provider process still running after CachedDialer.Close")
+	}
+	dialer.Close()
+}
+
 func TestDialNegotiatesLivePlugin(t *testing.T) {
 	binary := v2ProviderBinary(t)
 	var logs bytes.Buffer

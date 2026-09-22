@@ -25,6 +25,7 @@
 .magelift/
 .pulumi/
 .codebase-memory/
+auth.json
 
 # Editor and operating-system files
 .idea/

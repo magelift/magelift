@@ -51,6 +51,7 @@ func NewDefaultWithExperimental() (*platform.ModuleRegistry, error) {
 
 func registerGCPShims(modules *platform.ModuleRegistry) (*platform.ModuleRegistry, error) {
 	dialer := &providerhost.CachedDialer{Dial: dialGCP}
+	modules.RegisterCloser(dialer.Close)
 	for _, runtime := range []sdk.RuntimeID{"gke-autopilot", "gke-standard"} {
 		shim, err := providerhost.NewLazyShimModule(runtime, dialer.Do)
 		if err != nil {

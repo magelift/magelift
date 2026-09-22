@@ -140,8 +140,12 @@ func TestRuntimeResourceGraphAndSecurityContract(t *testing.T) {
 		t.Fatal("container definition contains plaintext secret material")
 	}
 	deployTask := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-deploy-task")
-	if _, found := deployTask.inputs["taskRoleArn"]; !found || !strings.Contains(deployTask.inputs["containerDefinitions"].StringValue(), "app:config:import") || !strings.Contains(deployTask.inputs["containerDefinitions"].StringValue(), "setup:upgrade") || !strings.Contains(deployTask.inputs["containerDefinitions"].StringValue(), "cache:flush") {
+	deployCmd := deployTask.inputs["containerDefinitions"].StringValue()
+	if _, found := deployTask.inputs["taskRoleArn"]; !found || !strings.Contains(deployCmd, "app:config:import") || !strings.Contains(deployCmd, "setup:upgrade") || !strings.Contains(deployCmd, "cache:flush") {
 		t.Fatalf("deploy task role or command is unsafe: inputs=%#v", deployTask.inputs)
+	}
+	if upgrade, importAt := strings.Index(deployCmd, "setup:upgrade"), strings.Index(deployCmd, "app:config:import"); upgrade < 0 || importAt < 0 || upgrade > importAt {
+		t.Fatalf("deploy command = %q, want setup:upgrade before app:config:import", deployCmd)
 	}
 	if !strings.Contains(deployTask.inputs["containerDefinitions"].StringValue(), "MAGELIFT_DATABASE_CREDENTIALS") {
 		t.Fatal("deploy task does not receive the managed database secret reference")

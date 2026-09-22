@@ -94,8 +94,11 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
             ],
             Phase::Package => [],
             Phase::Deploy => [
-                new Command(Executable::Magento, ['app:config:import', '--no-interaction']),
+                // setup:upgrade creates core tables, including flag. app:config:import
+                // reads flag on a fresh database and fails with SQLSTATE 42S02 if it
+                // runs first, which leaves the shop returning HTTP 500.
                 new Command(Executable::Magento, ['setup:upgrade', '--keep-generated', '--no-interaction']),
+                new Command(Executable::Magento, ['app:config:import', '--no-interaction']),
                 new Command(Executable::Magento, ['cache:clean']),
             ],
             Phase::PostDeploy => [

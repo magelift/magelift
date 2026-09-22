@@ -44,6 +44,9 @@ type Hooks struct {
 	NewGCPCleanupProvider      func(context.Context, sdk.CleanupLedger) (CleanupProvider, error)
 	NewCleanupProvider         func(context.Context, sdk.CleanupLedger) (CleanupProvider, error)
 	MediaEndpoint              func() (string, error)
+	// Close reaps provider processes owned by these hooks. Execute runs it
+	// on every return path via the module registry.
+	Close func()
 }
 
 type exitError struct {
@@ -292,6 +295,9 @@ func newCommandWithHooks(stdout, stderr io.Writer, modules *platform.ModuleRegis
 		}
 		return ops.NewDeploySteps(ctx, backend, planned, diagnostics)
 	}
+	if hooks.Close != nil {
+		modules.RegisterCloser(hooks.Close)
+	}
 	return newCommandWithOptions(o)
 }
 
@@ -333,6 +339,7 @@ func newCommandWithOptions(o *options) *cobra.Command {
 	root.AddCommand(infrastructureCommands(o)...)
 	root.AddCommand(commandGroups(o)...)
 	root.AddCommand(completionCommand(root))
+	trackProviderCloser(root, o.modules.Close)
 	return root
 }
 
