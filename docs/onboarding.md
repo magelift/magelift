@@ -82,7 +82,7 @@ No stable release exists yet, so install an explicit prerelease.
 Pick the tag from [Releases](https://github.com/magelift/magelift/releases):
 
 ```sh
-curl -fsSL https://magelift.dev/install.sh | MAGELIFT_VERSION=v0.1.0-alpha.1-rc.21 sh
+curl -fsSL https://magelift.dev/install.sh | MAGELIFT_VERSION=v0.1.0-alpha.1-rc.22 sh
 export PATH="$HOME/.local/bin:$PATH"
 magelift version
 ```
@@ -172,7 +172,7 @@ yours once (the installer ships a binary; sources come
 separately):
 
 ```sh
-TAG=v0.1.0-alpha.1-rc.21
+TAG=v0.1.0-alpha.1-rc.22
 mkdir -p ~/magelift-src
 curl -fsSL "https://github.com/magelift/magelift/archive/refs/tags/$TAG.tar.gz" \
   | tar -xz -C ~/magelift-src --strip-components=1
