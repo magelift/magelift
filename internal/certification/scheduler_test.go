@@ -337,7 +337,9 @@ func TestExecuteScheduleRunsIndependentUnitsAndPersistsUnitCheckpoints(t *testin
 		close(release)
 	}()
 	result, err := ExecuteSchedule(context.Background(), schedule, func(ctx context.Context, unit ExecutionUnit) (ScheduleExecutionResult, error) {
-		started <- struct{}{}
+		// Count before signaling. The releaser closes once both units
+		// have signaled, so a count taken after that signal can miss
+		// the overlap and report a maximum of 1.
 		value := current.Add(1)
 		for {
 			previous := maximum.Load()
@@ -345,6 +347,7 @@ func TestExecuteScheduleRunsIndependentUnitsAndPersistsUnitCheckpoints(t *testin
 				break
 			}
 		}
+		started <- struct{}{}
 		defer current.Add(-1)
 		select {
 		case <-release:
