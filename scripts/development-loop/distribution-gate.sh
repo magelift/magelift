@@ -198,7 +198,8 @@ stage_release_assets() {
 }
 
 run_staged_gate() {
-	WORK="$(mktemp -d "${TMPDIR:-/tmp}/magelift-devloop-distribution.XXXXXX")"
+	mkdir -p "$ROOT/.magelift/tmp"
+	WORK="$(mktemp -d "$ROOT/.magelift/tmp/magelift-devloop-distribution.XXXXXX")"
 	trap 'devloop_stop_fixture_server; rm -rf "$WORK"' EXIT INT TERM
 	STAGED="$WORK/staged"
 	if ! stage_release_assets "$STAGED"; then
@@ -207,11 +208,13 @@ run_staged_gate() {
 	fi
 	mkdir -p "$WORK/release-root/release"
 	cp "$STAGED/$ARCHIVE" "$STAGED/checksums.txt" "$STAGED/checksums.txt.sigstore.json" "$WORK/release-root/release/"
-	cp "$STAGED/$PROVIDER_LOCK" "$STAGED/$PROVIDER_BINARY" "$STAGED/$PROVIDER_BUNDLE" "$WORK/release-root/"
+	# The provider binary is hundreds of megabytes and is verified from the
+	# download directory. The installer only fetches the CLI archive.
 	devloop_start_fixture_server "$WORK/release-root"
 	local dest="$WORK/dest"
 	mkdir -p "$dest"
-	if ! MAGELIFT_VERSION="$TAG" \
+	if ! TMPDIR="$WORK" \
+		MAGELIFT_VERSION="$TAG" \
 		MAGELIFT_INSTALL_DIR="$dest" \
 		MAGELIFT_RELEASE_BASE="http://127.0.0.1:${DEVLOOP_SERVER_PORT}/release" \
 		sh "$INSTALL"; then
