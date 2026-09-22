@@ -28,6 +28,7 @@ import (
 func RegisterHooks() internalcli.Hooks {
 	dialer := &providerhost.CachedDialer{Dial: dialGCP}
 	return internalcli.Hooks{
+		Close: dialer.Close,
 		NewComposerSecrets: func(ctx context.Context, region string) (internalcli.ComposerSecretProvider, error) {
 			return awssecrets.New(ctx, region)
 		},

@@ -1,0 +1,116 @@
+# Development-loop gates for commit-addressed canaries.
+# Operator actions: pushing and deleting v0.0.0-canary.<sha> are maintainer
+# steps. This workflow never creates, pushes, undrafts, or deletes the canary ref.
+name: Alpha Development Loop
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Full 40-character lowercase Git commit SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  distribution-gate:
+    name: distribution gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit_sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      - name: Run distribution gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAGELIFT_DEVLOOP_GATE_FILE: ${{ runner.temp }}/gates.jsonl
+        run: |
+          set -euo pipefail
+          tag="v0.0.0-canary.${{ inputs.commit_sha }}"
+          if ! gh release view "$tag" --json isDraft >/dev/null 2>&1; then
+            mkdir -p "$(dirname "$MAGELIFT_DEVLOOP_GATE_FILE")"
+            jq -nc --arg gate distribution --arg status SKIP \
+              --arg detail "missing prerequisite: draft release assets for ${tag}" \
+              '{gate:$gate,status:$status,detail:$detail}' >>"$MAGELIFT_DEVLOOP_GATE_FILE"
+            printf 'distribution gate SKIP: draft assets for %s are unavailable\n' "$tag"
+            exit 0
+          fi
+          bash scripts/development-loop/distribution-gate.sh \
+            --sha "${{ inputs.commit_sha }}" \
+            --gate-file "$MAGELIFT_DEVLOOP_GATE_FILE"
+      - name: Upload gate record
+        if: always()
+        uses: actions/upload-artifact@ea1653718b0f6aedb526bcd8c3f1265b08158779 # v4.6.2
+        with:
+          name: distribution-gate
+          path: ${{ runner.temp }}/gates.jsonl
+          if-no-files-found: ignore
+
+  artifact-gate:
+    name: artifact gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit_sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: "8.5"
+          coverage: none
+      - name: Install Composer dependencies
+        run: composer install --working-dir=build --no-interaction --prefer-dist --no-progress
+      - name: Run artifact gate
+        env:
+          MAGELIFT_DEVLOOP_GATE_FILE: ${{ runner.temp }}/gates.jsonl
+          MAGELIFT_DEVLOOP_ARTIFACT_DIGEST: ${{ vars.MAGELIFT_DEVLOOP_ARTIFACT_DIGEST }}
+        run: |
+          bash scripts/development-loop/artifact-gate.sh \
+            --sha "${{ inputs.commit_sha }}" \
+            --gate-file "$MAGELIFT_DEVLOOP_GATE_FILE"
+      - name: Upload gate record
+        if: always()
+        uses: actions/upload-artifact@ea1653718b0f6aedb526bcd8c3f1265b08158779 # v4.6.2
+        with:
+          name: artifact-gate
+          path: ${{ runner.temp }}/gates.jsonl
+          if-no-files-found: ignore
+
+  gcp-product-gate:
+    name: gcp product gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit_sha }}
+          persist-credentials: false
+      - name: Run GCP product gate (dry-run)
+        env:
+          MAGELIFT_ACCEPTANCE_DRY_RUN: "1"
+          MAGELIFT_DEVLOOP_GATE_FILE: ${{ runner.temp }}/gates.jsonl
+          MAGELIFT_GCP_ACCEPTANCE_DIGEST: ${{ vars.MAGELIFT_DEVLOOP_ARTIFACT_DIGEST }}
+        run: |
+          bash scripts/development-loop/gcp-product-gate.sh \
+            --sha "${{ inputs.commit_sha }}" \
+            --gate-file "$MAGELIFT_DEVLOOP_GATE_FILE"
+      - name: Upload gate record
+        if: always()
+        uses: actions/upload-artifact@ea1653718b0f6aedb526bcd8c3f1265b08158779 # v4.6.2
+        with:
+          name: gcp-product-gate
+          path: ${{ runner.temp }}/gates.jsonl
+          if-no-files-found: ignore

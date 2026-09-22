@@ -54,6 +54,10 @@ func TestMigrationJobBindsRabbitMQCredentials(t *testing.T) {
 	if !sawPassword {
 		t.Fatalf("migration Job is missing %s", platform.EnvMagentoQueuePassword)
 	}
+	cmd := strings.Join(job.Spec.Template.Spec.Containers[0].Command, " ")
+	if upgrade, importAt := strings.Index(cmd, "setup:upgrade"), strings.Index(cmd, "app:config:import"); upgrade < 0 || importAt < 0 || upgrade > importAt {
+		t.Fatalf("migration command = %q, want setup:upgrade before app:config:import", cmd)
+	}
 	for _, env := range job.Spec.Template.Spec.Containers[0].Env {
 		if env.Name == platform.EnvMagentoSearchHost && env.Value == "search.internal" {
 			return

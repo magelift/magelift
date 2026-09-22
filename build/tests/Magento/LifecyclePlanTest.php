@@ -34,13 +34,39 @@ final class LifecyclePlanTest extends TestCase
         ]];
         yield 'package' => [Phase::Package, []];
         yield 'deploy' => [Phase::Deploy, [
-            ['bin/magento', 'app:config:import', '--no-interaction'],
             ['bin/magento', 'setup:upgrade', '--keep-generated', '--no-interaction'],
+            ['bin/magento', 'app:config:import', '--no-interaction'],
             ['bin/magento', 'cache:clean'],
         ]];
         yield 'post-deploy' => [Phase::PostDeploy, [
             ['bin/magento', 'cache:flush'],
         ]];
+    }
+
+    public function testDeployCreatesSchemaBeforeConfigImport(): void
+    {
+        $commands = array_map(
+            static fn ($command): array => $command->argv(),
+            (new LifecyclePlan())->commandsFor(Phase::Deploy),
+        );
+        $upgrade = null;
+        $import = null;
+        foreach ($commands as $index => $command) {
+            if (($command[1] ?? '') === 'setup:upgrade') {
+                $upgrade = $index;
+            }
+            if (($command[1] ?? '') === 'app:config:import') {
+                $import = $index;
+            }
+        }
+
+        self::assertNotNull($upgrade);
+        self::assertNotNull($import);
+        self::assertLessThan(
+            $import,
+            $upgrade,
+            'setup:upgrade must create magento.flag before app:config:import reads it',
+        );
     }
 
     public function testPlanContainsNoEnvironmentSpecificValues(): void

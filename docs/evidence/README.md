@@ -52,6 +52,7 @@ emptied the prefix; it still does not replace
 | Cloud Armor GA import drops Magento `requestBodiesToExclude` | [20260813af](gcp-edge-armor-attempt-20260813af.md) |
 | AWS X-Ray Magento traces | typed unsupported: no `ObservabilityAdapter` registers X-Ray; YAML `nativeProvider: xray` is typed unavailable. An EKS IAM snippet is not a Magento cell. |
 | Schema-mismatch rollback refuses when Magento epochs differ | [gcap28 leftover](gcp-gke-autopilot-schema-mismatch-gcap28-20260820.md) |
+| rc19-proof HTTP 500 was import-before-upgrade; owned resources deleted | [2026-09-22](gcp-rc19-proof-http500-20260922.md) |
 
 ## Provenance notes
 

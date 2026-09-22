@@ -126,6 +126,8 @@ HARNESS_STEP := bash scripts/acceptance/run-harness-step.sh
 
 acceptance-harness-test: acceptance-dependencies-check ## Run offline acceptance harness shell tests (serial; no AWS)
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) harness_step_timeout_test.sh -- bash tests/acceptance/harness_step_timeout_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) development_loop_gate_test.sh -- bash tests/acceptance/development_loop_gate_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) release_canary_predicate_test.sh -- bash tests/acceptance/release_canary_predicate_test.sh
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) evidence_append_test.sh -- bash tests/acceptance/evidence_append_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) lifecycle_guard_test.sh -- bash tests/acceptance/lifecycle_guard_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) cloudflare_dns_helper_test.sh -- bash tests/acceptance/cloudflare_dns_helper_test.sh

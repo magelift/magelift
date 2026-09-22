@@ -43,6 +43,11 @@ func TestMagentoMigrationShellRendersGoldenSequence(t *testing.T) {
 	if strings.Contains(shell[2], "setup:static-content:deploy") {
 		t.Fatalf("migration shell = %q, want no deploy-time static-content deploy", shell[2])
 	}
+	upgrade := strings.Index(shell[2], "setup:upgrade")
+	importCmd := strings.Index(shell[2], "app:config:import")
+	if upgrade < 0 || importCmd < 0 || upgrade > importCmd {
+		t.Fatalf("migration shell = %q, want setup:upgrade before app:config:import", shell[2])
+	}
 }
 
 func TestMagentoProbeShellAlwaysChecksDatabaseStatus(t *testing.T) {

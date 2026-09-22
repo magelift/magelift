@@ -2,13 +2,13 @@
     "deploy": [
         [
             "bin/magento",
-            "app:config:import",
+            "setup:upgrade",
+            "--keep-generated",
             "--no-interaction"
         ],
         [
             "bin/magento",
-            "setup:upgrade",
-            "--keep-generated",
+            "app:config:import",
             "--no-interaction"
         ],
         [

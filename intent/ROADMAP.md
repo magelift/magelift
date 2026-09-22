@@ -1,120 +1,241 @@
-# Roadmap to first release: narrow alpha, then earn stability
+# Roadmap: GCP alpha, AWS second, provider platform third
 
-Goal: one tagged, installable alpha (`v0.1.0-alpha.1`, exact naming subject to
-the release decision) that lets a pilot agency team install from verified
-binaries and run one documented GCP Autopilot recipe — deploy, release,
-failed-release recovery, post-expiry operation, backup/restore, preview
-expiry — without DevOps-owned infrastructure work. No tag is authorized by
-this file; `reference-store-acceptance` ends with a go/no-go plus the exact
-tag command, and the maintainer makes the release call.
+Updated: 2026-09-22.
 
-Authority: `intent/audit.md` (2026-09-16). It assigns every finding F01–F15 to
-an intent below. This file only orders the queue and states the gates. Archived
-intents are history, not the queue; historical evidence is linked where it
-still counts and never mistaken for current release proof.
+## Goal
 
-Old roadmap (24 orders to `v1.0.0-rc.1`) is superseded in full. Recoverable
-from git history. The stable cut is deferred past alpha, pilots, and AWS
-parity — see `v1-stable-cut` (deferred).
+Ship a useful public alpha quickly without creating work that must be thrown
+away when AWS follows:
 
-## The queue (8 to alpha, 3 deferred)
+1. Make one pinned Magento Open Source recipe repeatably deploy on GCP GKE
+   Autopilot from the supported user path.
+2. Publish that path as the first alpha.
+3. Move AWS ECS behind the same autonomous provider contract.
+4. Harden the contract only after GCP and AWS have proved what actually needs
+   to be portable.
 
-Work one intent at a time: accept, spec, plan, implement, verify, archive.
-No code before the plan is approved. Local contract, mock, schema, and docs
-tracks may proceed in parallel while they provision nothing paid.
+The product remains a Go CLI that consumes magelift.yaml and deploys into the
+user's cloud account. MageLift is not a host.
 
-| Order | Intent | Cloud | Exit | Status |
+The decision basis is [report.md](report.md). Current code, accepted ADRs,
+capability evidence, and the repository instructions remain authoritative when
+they conflict with an older planning record.
+
+## Reset decision
+
+The previous queue made one clean-machine run prove installation, provider
+distribution, image construction, GCP infrastructure, Magento behavior, media
+security, resolver precedence, generated CI, extended operations, and cleanup.
+That coupled unrelated defects to public release candidates.
+
+This roadmap replaces that queue. It does not reverse the useful architecture:
+
+- keep Go, YAML, Pulumi Automation API, and the monorepo;
+- keep the existing artifact manifest and immutable artifact identity;
+- keep GCP as an autonomous signed provider process;
+- keep provider-owned cloud topology;
+- keep GKE Autopilot as the first GCP runtime;
+- keep explicit account bootstrap;
+- keep existing AWS code and evidence warm;
+- keep experimental providers frozen; and
+- keep capability claims bounded by the capability matrix and evidence pack.
+
+The change is the order of proof and the supported surface.
+
+## Working sequence
+
+Work one intent at a time:
+
+1. accept intent;
+2. write and approve spec;
+3. write and approve plan;
+4. implement;
+5. verify in isolation;
+6. archive only with a passing verification report.
+
+No implementation starts from a draft intent. Later draft intents may be
+corrected using evidence from earlier work.
+
+| Order | Intent | Purpose | Exit | Status |
 | --- | --- | --- | --- | --- |
-| 1 | `release-trust-baseline` | none | Evidence gate green (sealed-run mismatch reconciled with provenance, derived files regenerated); matrix plus evidence name exactly what each cell proves; website/docs cost and security language matches code (`Enforced: false` honored, no hard-cap promise); writable-path claims aligned. | [archived](archive/2026-09-16-release-trust-baseline/) |
-| 2 | `provider-plugin-contract` | none | Approved spec plus ADR plus human-docs update define core vs provider, the versioned operations protocol, and independent-release mechanics. No implementation; followers prove it. | [archived](archive/2026-09-16-provider-plugin-contract/) (ADR 0013 reconciled by corrections) |
-| 3 | `mocked-shop-scenarios` | none | Original synthetic fixtures with example-only identities; three honest layers (offline protocol/config, local app where useful, live owned elsewhere); gaps fail loudly and file back. Proves routing, contracts, failures, validation — never store proof. | [archived](archive/2026-09-16-mocked-shop-scenarios/) |
-| 4 | `magento-deployment-safety` | local; live only if the spec needs it | Deploy success means intended rollout plus bounded Magento readiness (generation, replicas, digest); one lifecycle authority (PHP owns, Go orchestrates); assets proved delivered; conservative incompatible-migration policy; the five failure classes tested. | [archived](archive/2026-09-16-magento-deployment-safety/) + [corrections](alpha-review-corrections/) R04/R08 |
-| 5 | `gcp-autonomous-provider` | GCP live (packed, destroy on exit) | One autonomous GCP Autopilot provider in a separate module and process: provisions plus all seven day-2 ops over the versioned protocol, explicit negotiation, fail-closed integrity/compat, fresh-credential operations with expiry/refresh/restart/CI-identity tested. Execution crosses the plugin boundary; import decoupling (provider still uses root-internal helpers, core still links AWS/OVH/Scaleway SDKs) is deferred to AWS parity as a hard prerequisite. | [archived](archive/2026-09-16-gcp-autonomous-provider/) + [corrections](alpha-review-corrections/) R02/R05/R10 |
-| 6 | `full-deployment-coverage` | none beyond what order 5 proved | One documented path from clean workstation to working shop on the alpha recipe; human-action prerequisites named pre-deploy; one validated SMTP path; classified deploy failures; skills match the built CLI. | [archived](archive/2026-09-16-full-deployment-coverage/) + [corrections](alpha-review-corrections/) R03/R12 |
-| 7 | `verified-provider-distribution` | none (local registries/proxies prove the sequence) | Clean-module SDK consumer plus provider resolve with `GOWORK=off`; YAML-driven provider download with checksum/signature/digest/compat enforcement; one fail-closed trust policy for installer/updater/core/plugins; install plus CI use verified release binaries. | [archived](archive/2026-09-17-verified-provider-distribution/) + [corrections](alpha-review-corrections/) R01/R06/R07/R11 |
-| 7.5 | `alpha-review-corrections` | GCE clean-machine proof only (destroyed after) | Every R01–R12 finding resolved or explicitly dispositioned; orders 4–7 reports amended; full gates green; then the order-8 re-run. | in progress; hosted force-all green on `d5f781a` ([35382767735](https://github.com/magelift/magelift/actions/runs/35382767735)); 1.4 blocked on next published RC (rc.15 publish failed; drafts do not count) |
-| 8 | `reference-store-acceptance` | GCP live (release candidate + artifacts) | Shipped-path loop green on pinned recipe: initial deploy, release, failed release with CLI-diagnosed recovery, post-expiry ops, backup/restore (encryption key + media), autonomous preview expiry with residual-cost report. Ends with go/no-go plus tag command. Then pilot intake begins. | paused for corrections; re-runs after 7.5 archives, from the published candidate box 1.4 proves |
+| 1 | [alpha-development-loop](alpha-development-loop/intent.md) | Stop debugging through public release candidates. Close the rc.22 experiment and establish commit-addressed GCP canaries with independent gate results. | The HTTP 500 has an evidence-backed cause and regression test; provider children terminate; retained resources are gone; a commit can run distribution, artifact, and GCP product gates without a semantic-version release. | in progress |
+| 2 | [transparent-provider-delivery](transparent-provider-delivery/intent.md) | Preserve the signed provider boundary while removing manual provider installation from the normal online path. | A clean install automatically acquires and verifies the exact release-pinned GCP provider; project pins win; tampering fails closed; offline/prewarm installation remains explicit. | draft; after 1 |
+| 3 | [published-build-images](published-build-images/intent.md) | Stop asking users to clone MageLift and build framework base images. | A release catalog publishes tested builder/runtime digests with compatibility and provenance; the reference shop builds from those assets and emits the existing artifact manifest. | draft; after 2 |
+| 4 | [gcp-alpha-release](gcp-alpha-release/intent.md) | Prove and publish the smallest useful GCP product slice. | Two clean commit canaries pass the pinned GCP recipe; a candidate from the same identities passes public distribution qualification; onboarding is executed literally; the report ends in a go/no-go and ask-first tag command. | draft; after 3 |
+| 5 | [aws-autonomous-provider](aws-autonomous-provider/intent.md) | Add AWS immediately after GCP without a second application lifecycle. | AWS ECS runs as a separate signed provider using the same artifact, operations, lifecycle, distribution, and error contracts; AWS topology and evidence remain provider-owned. | draft; after 4 |
+| 6 | [provider-ecosystem-readiness](provider-ecosystem-readiness/intent.md) | Turn the two-provider experience into a durable extension contract before adding more clouds. | Core has no provider SDKs, provider modules have no root-internal imports, provider-owned configuration schemas and conformance tests exist, and compatibility rules support independent provider releases. | draft; after 5 |
 
-Deferred (start only after the alpha tag; never gate it):
+## First-alpha gates
 
-| Intent | Status | Resume trigger |
-| --- | --- | --- |
-| `aws-provider-parity` (draft) | post-alpha | Alpha tagged + pilot feedback started. Second autonomous provider on the same protocol; AWS gaps closed or honestly documented; search earns app-level proof or stays infra-only. |
-| `v1-stable-cut` (deferred) | post-alpha + AWS parity + pilots | Stability review with user evidence (diagnose from CLI output, recover without maintainer commands, understand cost/responsibilities). Then define the freeze surface from proved contracts. |
-| `eu-providers-experimental` (deferred) | post-alpha | Maintainer call, default after AWS parity unless a pilot pays for EU first. Scaleway GREEN kept, OVH retry when pools converge. |
+The old monolithic box 1.4 is replaced by independent gates. A failure keeps
+only its own gate red.
 
-## Finding-to-intent map
+| Gate | Owner | Proves | Blocks first alpha |
+| --- | --- | --- | --- |
+| A. Distribution | orders 1–2 | CLI installation, provider acquisition, signature/digest verification, negotiation, process cleanup | yes |
+| B. Artifact | order 3 | published build inputs, database-free build, existing manifest, provenance, signature, secret absence | yes |
+| C. GCP product | orders 1 and 4 | bootstrap, deploy task, serving rollout, Magento HTTPS/assets/search/cron/queue/media, second deploy, destroy | yes |
+| D. Project provider pin | order 2 | project lock precedence, exact executed identity, incompatibility and tamper rejection | yes for the documented pin feature; does not require a second Magento deployment |
+| E. Generated CI | later pilot work | generated workflow and workload federation from released artifacts | no; experimental until proved |
+| F. Extended operations | capability-specific follow-ups | backup/restore, failed release recovery, credential expiry, preview expiry, HA, external integrations | no, unless the alpha claims that exact capability |
 
-| Finding | Owner |
+Security negatives for an endpoint exposed by the alpha stay in the relevant
+blocking gate. Splitting gates is not permission to omit trust-boundary tests.
+
+## First-alpha product boundary
+
+The public alpha has one paved recipe:
+
+| Concern | Alpha choice |
 | --- | --- |
-| F01 provider independence not achieved | `provider-plugin-contract`, then `gcp-autonomous-provider` |
-| F02 subprocess proof, not product | `gcp-autonomous-provider`, `verified-provider-distribution` |
-| F03 SDK boundary too porous | `provider-plugin-contract` |
-| F04 GCP ops on expiring saved token | `gcp-autonomous-provider`, verified in `reference-store-acceptance` |
-| F05 health can mean scheduler health | `magento-deployment-safety` |
-| F06 two Magento lifecycle authorities | `magento-deployment-safety` |
-| F07 workspace masks distribution | `verified-provider-distribution` |
-| F08 claims exceed cell evidence | `release-trust-baseline`, `reference-store-acceptance` |
-| F09 evidence integrity gate red | `release-trust-baseline` |
-| F10 budgets are not enforced caps | `release-trust-baseline`, `full-deployment-coverage`, acceptance |
-| F11 first-install verification skippable | `verified-provider-distribution` |
-| F12 security docs vs runtime disagree | claims: `release-trust-baseline`; runtime: `magento-deployment-safety`, `full-deployment-coverage` |
-| F13 onboarding confuses automation/ownership | `full-deployment-coverage`, `release-trust-baseline`, `aws-provider-parity` |
-| F14 synthetic scenarios must not fake stores | `mocked-shop-scenarios`, acceptance |
-| F15 clearer ownership, not more repos | boundaries: `provider-plugin-contract`; queue: this file |
+| Application | Magento Open Source 2.4.9, repository-evidenced patch and PHP tuple |
+| Provider/runtime | GCP / GKE Autopilot |
+| Database | Cloud SQL MySQL version in the evidenced compatibility intersection |
+| Cache/session | Evidenced Memorystore Valkey version |
+| Search | One-replica OpenSearch workload on Autopilot |
+| Queue | Magento database queue |
+| Media | Private GCS through the implemented Magento remote-storage contract |
+| Secrets | Secret Manager references; no plaintext YAML |
+| Deployment | One candidate GKE Job before web, cron, and consumer rollout |
+| Edge | Existing GCP HTTPS load-balancing path |
+| Observability | Native logs required for diagnosis; external telemetry is not an alpha gate |
 
-## Disposition of the previous open work
+The exact immutable digests are selected by the release intent, not frozen in
+this roadmap.
 
-| Previous intent | Disposition | Why |
-| --- | --- | --- |
-| `full-deployment-coverage` | Rewritten as draft reference onboarding | Three email vendors before one working shop delayed the primary workflow; old spec/plan superseded, `audit.md` kept as inventory with F13 corrections. |
-| `mocked-shop-scenarios` | Rewritten as draft synthetic foundation | Useful test ideas kept; mocks separated from store proof; private-shop dependence removed; old spec/plan superseded. |
-| `v1-stable-cut` | Deferred past alpha | Report PENDING, ref stale, architecture not freezable; old spec/plan/report kept historical. |
-| `eu-providers-experimental` | Deferred with evidence kept | Valuable experimental work, unnecessary for the first supported release; Scaleway GREEN and OVH PARKED retained. |
+The alpha does not promise:
 
-None of the four was archived as complete; none had a passing verification
-record for its old scope. Prior files carry explicit HISTORICAL banners.
+- arbitrary Magento, PHP, database, cache, search, or queue combinations;
+- GKE Standard or high availability;
+- zero-downtime incompatible schema changes;
+- cross-region or cross-cloud disaster recovery;
+- generated CI;
+- every existing day-two operation;
+- a hard cloud-spend cap;
+- external edge or observability integrations; or
+- a stable provider API.
 
-## Alpha boundary (what the tag promises)
+Existing broader capabilities keep the status recorded in
+[the capability matrix](../docs/capability-matrix.md). This roadmap does not
+downgrade or upgrade certification by itself.
 
-- One GCP Autopilot recipe with pinned compatible versions (Magento, PHP,
-  MySQL, Valkey, search, RabbitMQ, image digests), serving HTTPS, assets,
-  search, cron/consumers where required, outbound SMTP, persistent media.
-- Bounded promises only: no arbitrary versions, no zero-downtime incompatible
-  schema changes, no cross-cloud DR, no hard spending cap.
-- Existing integrations stay only with honest experimental labels and must
-  not drag embedded provider SDKs back into the lean core.
-- If pilot interviews prove the first pilot must be AWS, flip orders 5–8 to
-  AWS at intent acceptance with identical gates. Never two simultaneous
-  reference implementations to avoid deciding.
+## Development and release policy
 
-## Budget discipline
+### Product debugging
 
-| Target | Rule |
+Product debugging uses commit-addressed canaries in the dedicated acceptance
+account. Canaries use the production provider boundary and immutable artifacts,
+but do not require a public semantic-version tag.
+
+Every live run:
+
+- loads the certification skill;
+- records the exact commit, CLI, provider, build inputs, image, manifest, and
+  state identities;
+- declares owned resources before mutation;
+- destroys on exit unless a retained debug cell is explicitly authorized;
+- inventories residual resources and spend; and
+- records each gate independently.
+
+### Public release qualification
+
+A release candidate may be cut only from a commit that already passed the
+blocking product gates. Candidate qualification proves that public module
+publication, archives, signatures, locks, downloads, and runtime identities
+match the known-green canary.
+
+Release tags remain ask-first. No intent may hide a release tag inside an
+implementation or verification step.
+
+## Provider expansion rule
+
+The reusable product boundary is:
+
+- common YAML envelope and Magento application model;
+- existing artifact manifest and immutable artifact contract;
+- deploy phase semantics;
+- typed provider operations, progress, and errors;
+- provider discovery and trust;
+- health and evidence semantics; and
+- acceptance scenario definitions.
+
+Providers do not share network, database, cache, search, queue, runtime, edge,
+or observability Pulumi graphs. AWS follows GCP through the same contract but
+keeps AWS topology. Additional providers wait until order 6 demonstrates that
+the contract is not shaped around only GCP and AWS implementation accidents.
+
+## Preserved but unscheduled work
+
+The following work remains valuable but has no active intent until the stated
+trigger:
+
+| Work | Trigger |
 | --- | --- |
-| GCP | Carries reference proof (orders 5, 8). Packed sessions, destroy on exit, per-session spend recorded. Existing functional search/operator evidence minimizes new spend. |
-| AWS | Zero live spend before `aws-provider-parity`. At resume, re-verify credits and write a per-session cap with retry margin; minimum sizes, short-lived stacks. Never inherit the old ~$180 number. |
-| OVH / Scaleway | Zero live spend before the deferred EU resume. Then: serialized, minimum SKUs, destroy always, no KEEP, short TTL, own-money cap. |
-| Vendors (Cloudflare, Fastly, New Relic) | Attach to the GCP alpha origin or record unproven. No second origin for a vendor. |
+| Generated GitHub CI | The published laptop path is green and a pilot needs team automation |
+| Backup/restore and failed-release recovery | First alpha is installed by pilots; prioritize from operational risk and feedback |
+| Production/HA GCP profile | A pilot needs production scale and accepts the cost/evidence program |
+| Cloud Run runtime | After GCP alpha; bounded standalone prototype must beat Autopilot on measured user or operating cost |
+| Independent provider cadence | GCP and AWS supported; one provider needs a release without a core change |
+| Stable contract/version | GCP and AWS pilots plus order 6 demonstrate the freeze surface |
+| OVH and Scaleway | After AWS unless a funded pilot makes one the next provider |
+| EKS and GKE Standard | A concrete workload cannot fit the certified runtimes |
+| External edge/observability | Stable origin first; add by user demand |
 
-## Non-goals to alpha
+Do not pre-create implementation intents for these. Open an intent when its
+trigger is real and evidence can define the outcome.
 
-Stable v1 freeze, RC semantics, community catalog hosting, per-provider
-independent release cadence beyond the contract's alpha mechanics. EKS, GKE
-Standard, MKS, Kapsule Magento certification. AOSS serverless certification,
-three-node HA search, X-Ray, regional DR. Provider cost adapters beyond honest
-estimates. Cloud SQL attach and non-AWS brownfield. Windows package managers
-beyond archive download. MkDocs migration, YAML v4 final, JSON v2,
-test-runner major bumps. Three-vendor managed email.
+## Disposition of the previous live queue
+
+The 2026-09-16/17 live planning queue was superseded by
+[the architecture report](report.md). Its unfinished folders were not moved
+into the completed archive because they lacked an isolated passing report.
+Their tracked contents remain recoverable from Git history.
+
+| Previous record | Disposition |
+| --- | --- |
+| alpha-review-corrections | Superseded by orders 1–4; findings remain evidence, not one release gate |
+| reference-store-acceptance | Replaced by the narrower GCP alpha intent and independent Gates A–F |
+| aws-provider-parity | Rewritten as aws-autonomous-provider and moved immediately after GCP alpha |
+| eu-providers-experimental | Removed from the active queue; capability docs and evidence remain; resume only on trigger |
+| v1-stable-cut | Removed; stability is a decision after two providers and pilots |
+| loose alpha review and audit | Superseded by report.md and this roadmap |
+
+Existing directories under intent/archive remain immutable decision history.
+
+## Budget and resource discipline
+
+| Scope | Rule |
+| --- | --- |
+| GCP canaries and alpha | Dedicated acceptance project only; smallest evidenced recipe; destroy on exit; no KEEP by default; exact residual inventory |
+| AWS parity | Reconfirm credits and set a per-session budget before live work; minimum shape; destroy and assert clean |
+| Other providers | No live spend until their trigger creates an accepted intent |
+| Third-party vendors | No new paid integration gate before the origin path is stable |
+
+Budgets alert and inform; they are not an enforcement claim unless code and
+evidence prove enforcement.
+
+## Success measures
+
+The roadmap is working when:
+
+- Magento defects can be reproduced and fixed without cutting a public RC;
+- clean install to GCP preview has one documented MageLift-only path;
+- no user builds MageLift framework images or manually installs a first-party
+  provider;
+- the same application artifact and lifecycle reach AWS;
+- a provider-specific change does not require live execution on another cloud;
+- release qualification is shorter than product acceptance;
+- each capability claim points to exact evidence; and
+- new providers require an adapter and evidence, not edits throughout core.
 
 ## Working agreement
 
-- One intent at a time through accept, spec, plan, implement, verify, archive.
-- Tests ship with their implementation; acceptance never excuses deferred testing.
-- Reuse valid evidence within its scope; rerun when code, packaging, or the
-  public execution path changes. Final proof references the release candidate
-  and artifacts, never an old commit.
-- Pilot success is user evidence: diagnose from CLI output, recover without
-  maintainer-only commands, understand ongoing cost and responsibilities.
-- Ask-first: release tags, protected/production destroy, history rewrite,
-  public module publication.
+- One active intent at a time.
+- Smallest correct change; no unrelated feature breadth.
+- No code before an approved plan.
+- Reuse existing contracts before adding abstractions.
+- Current code and ADRs outrank old intent prose.
+- Mocks prove contracts, not live Magento.
+- Human docs and public claims change with their ADR/capability source.
+- Ask first for release tags, protected or production destroy, and history
+  rewrite.
