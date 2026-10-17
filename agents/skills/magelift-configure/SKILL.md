@@ -26,6 +26,20 @@ Use this skill before preview or deploy when the service shape is changing.
   sidecar. Private sibling shops may illustrate one of those shapes. They are
   not the only target and they do not certify a cell.
 
+## Build the shop
+
+Run `magelift build` from the shop repository after committing YAML, the Composer
+lock and existing module configuration. The default community recipe is PHP 8.5
+with nginx-fpm on Linux amd64. Verified release image pins are required; a
+missing published catalog produces an availability error, with no local-source
+fallback. Once published, missing pinned images are pulled automatically.
+
+Existing disabled modules and declared locales/themes are preserved. Build-time
+credentials use secret references and private mounts. Advanced base overrides
+must be supplied together; pushed builds require registry digests. Explicit ARM
+overrides remain outside alpha qualification. The package/build component also
+works without invoking cloud provisioning.
+
 ## Check the result
 
 ```sh

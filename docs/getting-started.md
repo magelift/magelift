@@ -1,6 +1,6 @@
 ---
 title: Getting started with MageLift
-description: Install MageLift, validate sample Magento YAML, run local Compose or a disposable AWS/GCP preview on certified ECS Fargate or GKE Autopilot.
+description: Install a versioned MageLift CLI, configure a shop, build its image and prepare a GCP community alpha preview.
 ---
 
 # Getting started
@@ -9,21 +9,22 @@ Install the CLI, fill in `magelift.yaml`, then let Magelift prepare the cloud
 account and deploy Magento. You should not need Pulumi, Kubernetes, or image
 signing commands on this path.
 
-**Target:** under 30 minutes from clone to a validated `magelift.yaml` (local path),
-or about an hour to a cloud preview URL (AWS or GCP).
+The community alpha starts with the GCP GKE Autopilot recipe. Its current
+release gates and untested paths are listed in [release readiness](release-readiness.md).
+Historical certification evidence is linked from the capability matrix.
 
 ## How to get Magento running with MageLift
 
 1. **Install the CLI.** Follow [Install](install.md), then run `magelift version`.
 2. **Choose local or cloud.** See [local vs cloud](local-vs-cloud.md). Local Compose needs no cloud credentials.
-3. **Start a config.** Run `magelift init --provider aws` (or `gcp`), fill the placeholders, then `magelift doctor`.
-4. **Preview on a certified target.** AWS ECS Fargate or GCP GKE Autopilot; destroy when done.
+3. **Start a config.** Run `magelift init --provider gcp`, fill the placeholders, then `magelift doctor`.
+4. **Build, then preview.** Follow [application builds](builds.md), then preview the GCP recipe; destroy disposable resources when done.
 5. **Optional migrate.** Leave ACC/Upsun via [weekend-migrate](weekend-migrate.md).
 
 ## 1. Install
 
-Follow [Install](install.md) (release archive preferred after the first tag, or
-`go install`). Then:
+Choose an explicit published prerelease through [Install](install.md). Work
+from your shop repository; no MageLift source checkout is required. Then:
 
 ```sh
 magelift version
@@ -41,13 +42,12 @@ magelift local up
 
 ## 3. Starter config
 
-Generate a starter for a certified provider. Each starter carries
-preview, staging, and production env blocks and validates with no
-other edits:
+Generate a GCP starter, then fill the project, domains and secret references.
+Each starter includes preview, staging and production environment blocks:
 
 ```sh
-magelift init --provider aws    # AWS ECS Fargate; the default
-magelift init --provider gcp    # GCP GKE Autopilot
+magelift init --provider gcp    # GCP GKE Autopilot; community alpha path
+# magelift init --provider aws  # AWS ECS Fargate; secondary path
 ```
 
 What you get: preview runs database-backed queues (`db` on AWS,

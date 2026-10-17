@@ -14,6 +14,12 @@ The finalized artifact manifest is external to the application image. MageLift w
 1. `prepare` records deterministic pre-digest metadata (source revision, Magento edition, PHP, modules, checksums, static content matrix, required capabilities).
 2. `finalize` accepts only that prepared output plus BuildKit's `containerimage.digest`. It does not re-inspect the tree.
 
+The CLI supplies its semantic version to the isolated PHP runner through a
+public environment value; standalone package invocations retain their own
+version default. Builder/runtime identities are OCI labels within the final
+image digest. These additions keep the external manifest schema and runner
+JSON protocol unchanged.
+
 Neither step records secret values. Promotion, sign, and rollback use the digest in the external manifest.
 
 `magelift build --push`, `sign`, and `promote` use the operator's current cloud or CI login. Cosign keyless identity is Sigstore OIDC (Actions, Google SA), not Artifact Registry or ECR native signatures. The YAML-only path does not require Cosign flags.

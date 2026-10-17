@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.27
+# syntax=docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
 
 ARG RUNTIME_BASE=scratch
 FROM ${RUNTIME_BASE}
@@ -6,10 +6,14 @@ FROM ${RUNTIME_BASE}
 ARG SOURCE_REVISION
 ARG SOURCE_URI
 ARG MAGELIFT_VERSION
+ARG BUILDER_IMAGE
+ARG RUNTIME_IMAGE_DIGEST
 
 LABEL org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.source="${SOURCE_URI}" \
-      org.opencontainers.image.version="${MAGELIFT_VERSION}"
+      org.opencontainers.image.version="${MAGELIFT_VERSION}" \
+      io.magelift.builder.image="${BUILDER_IMAGE}" \
+      io.magelift.runtime.image="${RUNTIME_IMAGE_DIGEST}"
 
 # Magento's build commands may create app/etc/env.php with only build-time
 # cache metadata. Keep the deployment scaffold from the pinned runtime base;

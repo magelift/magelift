@@ -41,11 +41,12 @@ Each cloud lives under `internal/cloud/<provider>/` behind
 
 ## Install
 
-Until `v1.0.0-rc.1`, install from source (Releases is empty). Prefer a release
-archive after the first tag; see [Install](https://magelift.dev/docs/install/).
+Use a versioned CLI release archive from [Install](https://magelift.dev/docs/install/).
+Prereleases require an explicit `MAGELIFT_VERSION`; they never become the
+default stable channel. Installed releases need Docker for local builds and
+no Go toolchain. Source builds are covered in [Contributing](CONTRIBUTING.md).
 
 ```sh
-go install github.com/magelift/magelift/cmd/magelift@latest
 magelift version
 ```
 
@@ -56,7 +57,7 @@ First hour: [getting started](docs/getting-started.md) →
 
 ```sh
 make help
-make verify
+make verify-community
 make local-gates
 ```
 

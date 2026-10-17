@@ -15,12 +15,16 @@ use MageLift\Build\Runner\RunnerService;
 require dirname(__DIR__).'/vendor/autoload.php';
 
 $workspace = '/output';
+$mageLiftVersion = getenv('MAGELIFT_VERSION');
+if (!is_string($mageLiftVersion) || $mageLiftVersion === '') {
+    $mageLiftVersion = '0.1.0';
+}
 $service = new RunnerService(
     new NativeRunnerFilesystem(),
     new GitRevisionVerifier(),
     new NativePreparation(new NativeProcessRunner(), $workspace, new MagentoCapabilityProvider(), new ConfigModuleReader()),
     $workspace,
-    '0.1.0',
+    $mageLiftVersion,
     '0.1.0',
 );
 exit((new ConsoleApplication($service))->run(STDIN, STDOUT, STDERR));

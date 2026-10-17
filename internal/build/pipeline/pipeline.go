@@ -175,8 +175,10 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 		return Result{}, fmt.Errorf("materialize application Dockerfile: %w", err)
 	}
 	buildArguments := map[string]string{
-		"RUNTIME_BASE":    request.RuntimeImage,
-		"SOURCE_REVISION": request.Repository.Revision,
+		"RUNTIME_BASE":         request.RuntimeImage,
+		"SOURCE_REVISION":      request.Repository.Revision,
+		"BUILDER_IMAGE":        request.BuilderImage,
+		"RUNTIME_IMAGE_DIGEST": runtimeImageTraceIdentity(request),
 	}
 	if request.ProvenanceSource != "" {
 		buildArguments["SOURCE_URI"] = request.ProvenanceSource
@@ -370,6 +372,13 @@ func numericVersionAtLeast(got, want string) bool {
 
 func buildkitBuilder() string {
 	return strings.TrimSpace(os.Getenv("BUILDX_BUILDER"))
+}
+
+func runtimeImageTraceIdentity(request Request) string {
+	if request.RuntimeImageID != "" {
+		return request.RuntimeImageID
+	}
+	return request.RuntimeImage
 }
 
 func validateRequest(request Request, containers Container, builder Builder) (string, buildkit.OutputMode, []string, error) {

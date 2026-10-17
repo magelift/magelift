@@ -161,6 +161,42 @@ func TestRunInOutputRejectsWritableSourceAlias(t *testing.T) {
 	}
 }
 
+func TestRunPropagatesMageLiftVersion(t *testing.T) {
+	runner := Runner{Binary: os.Args[0], Image: "helper/inspect@" + testDigest, TempRoot: t.TempDir(), MageLiftVersion: "0.0.0-dev"}
+	result, err := runner.Run(context.Background(), t.TempDir(), []byte(`{"protocolVersion":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer result.Cleanup()
+	var invocation helperInvocation
+	if err := json.Unmarshal(result.Response, &invocation); err != nil {
+		t.Fatal(err)
+	}
+	assertContainsArgument(t, invocation.Args, "MAGELIFT_VERSION=0.0.0-dev")
+}
+
+func TestRunRejectsInvalidMageLiftVersion(t *testing.T) {
+	runner := Runner{Binary: os.Args[0], Image: "helper/inspect@" + testDigest, TempRoot: t.TempDir(), MageLiftVersion: "not-semver"}
+	_, err := runner.Run(context.Background(), t.TempDir(), []byte(`{"protocolVersion":1}`))
+	if err == nil || !strings.Contains(err.Error(), "semantic version") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunPropagatesLinuxAMD64Platform(t *testing.T) {
+	runner := Runner{Binary: os.Args[0], Image: "helper/inspect@" + testDigest, TempRoot: t.TempDir(), Platform: "linux/amd64"}
+	result, err := runner.Run(context.Background(), t.TempDir(), []byte(`{"protocolVersion":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer result.Cleanup()
+	var invocation helperInvocation
+	if err := json.Unmarshal(result.Response, &invocation); err != nil {
+		t.Fatal(err)
+	}
+	assertContainsArgument(t, invocation.Args, "--platform=linux/amd64")
+}
+
 func TestRunAllowsExplicitBridgeNetworkForPreparation(t *testing.T) {
 	runner := Runner{Binary: os.Args[0], Image: "helper/inspect@" + testDigest, TempRoot: t.TempDir(), Network: "bridge"}
 	result, err := runner.Run(context.Background(), t.TempDir(), []byte(`{"protocolVersion":1}`))

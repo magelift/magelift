@@ -158,7 +158,7 @@ func TestPipelineRetainsLocalRuntimeTagIdentity(t *testing.T) {
 	request := pipelineRequest(t)
 	request.RuntimeImage = "magelift/php-nginx:local"
 	request.RuntimeImageID = "sha256:" + strings.Repeat("e", 64)
-	builder := &fakeBuilder{t: t, expectedRuntime: request.RuntimeImage}
+	builder := &fakeBuilder{t: t, expectedRuntime: request.RuntimeImage, expectedRuntimeTrace: request.RuntimeImageID}
 
 	if _, err := New(&fakeContainers{t: t}, builder).Run(context.Background(), request); err != nil {
 		t.Fatal(err)
@@ -197,8 +197,17 @@ func TestPipelineCoordinatesReleaseBuild(t *testing.T) {
 	if got.BuildArgs["SOURCE_URI"] != request.ProvenanceSource || got.BuildArgs["MAGELIFT_VERSION"] != "1.2.3" {
 		t.Fatalf("release labels = %#v", got.BuildArgs)
 	}
+	if got.BuildArgs["BUILDER_IMAGE"] != request.BuilderImage || got.BuildArgs["RUNTIME_IMAGE_DIGEST"] != request.RuntimeImage {
+		t.Fatalf("image trace build args = %#v", got.BuildArgs)
+	}
 	if !strings.Contains(string(applicationDockerfile), "org.opencontainers.image.source") || !strings.Contains(string(applicationDockerfile), "org.opencontainers.image.version") {
 		t.Fatal("embedded Dockerfile does not declare release labels")
+	}
+	if !strings.Contains(string(applicationDockerfile), "io.magelift.builder.image") || !strings.Contains(string(applicationDockerfile), "io.magelift.runtime.image") {
+		t.Fatal("embedded Dockerfile does not declare MageLift image trace labels")
+	}
+	if !strings.Contains(string(applicationDockerfile), "docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b") {
+		t.Fatal("embedded Dockerfile does not pin the Dockerfile frontend")
 	}
 	if !strings.Contains(string(applicationDockerfile), "cp /app/app/etc/env.php /tmp/magelift-runtime-env.php") || !strings.Contains(string(applicationDockerfile), "cp /tmp/magelift-runtime-env.php /app/app/etc/env.php") {
 		t.Fatal("embedded Dockerfile does not preserve the runtime deployment scaffold")
@@ -478,11 +487,12 @@ func (fake *fakeContainers) record(event string) {
 }
 
 type fakeBuilder struct {
-	t               *testing.T
-	events          *[]string
-	expectedRuntime string
-	expectedOutput  buildkit.OutputMode
-	request         buildkit.Request
+	t                    *testing.T
+	events               *[]string
+	expectedRuntime      string
+	expectedRuntimeTrace string
+	expectedOutput       buildkit.OutputMode
+	request              buildkit.Request
 }
 
 func (fake *fakeBuilder) Build(_ context.Context, request buildkit.Request) (buildkit.Result, error) {
@@ -503,6 +513,16 @@ func (fake *fakeBuilder) Build(_ context.Context, request buildkit.Request) (bui
 	}
 	if request.BuildArgs["RUNTIME_BASE"] != expectedRuntime {
 		fake.t.Fatalf("runtime pin = %q", request.BuildArgs["RUNTIME_BASE"])
+	}
+	expectedRuntimeTrace := fake.expectedRuntimeTrace
+	if expectedRuntimeTrace == "" {
+		expectedRuntimeTrace = expectedRuntime
+	}
+	if request.BuildArgs["RUNTIME_IMAGE_DIGEST"] != expectedRuntimeTrace {
+		fake.t.Fatalf("runtime trace identity = %q", request.BuildArgs["RUNTIME_IMAGE_DIGEST"])
+	}
+	if request.BuildArgs["BUILDER_IMAGE"] == "" {
+		fake.t.Fatal("builder trace identity is required")
 	}
 	contents, err := os.ReadFile(request.Dockerfile)
 	if err != nil {

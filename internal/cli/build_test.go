@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	buildkit "github.com/magelift/magelift/internal/build/kit"
+	buildpipeline "github.com/magelift/magelift/internal/build/pipeline"
 	"github.com/magelift/magelift/internal/secretref"
 	"github.com/magelift/magelift/internal/source"
+	"github.com/magelift/magelift/internal/toolchain"
 )
 
 type fakeComposerSecretProvider struct {
@@ -34,7 +36,7 @@ func TestBuildPipelineRequestCreatesReleaseRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if request.Output != buildkit.OutputPush || len(request.Platforms) != 2 {
+	if request.Output != buildkit.OutputPush || len(request.Platforms) != 1 || request.Platforms[0] != "linux/amd64" {
 		t.Fatalf("unexpected release request: %#v", request)
 	}
 	if request.ProvenanceSource != "https://github.com/acourtiol/shop.git?checksum="+revision {
@@ -63,9 +65,8 @@ func TestBuildPipelineRequestRejectsIncompleteOrUnsafeReleaseOptions(t *testing.
 		t.Fatalf("unexpected query credential error: %v", err)
 	}
 	base.SourceURL = "https://github.com/acourtiol/shop.git"
-	base.RuntimeImage = ""
-	if _, err := buildPipelineRequest(base); err == nil || !strings.Contains(err.Error(), "--runtime-image") {
-		t.Fatalf("unexpected required flag error: %v", err)
+	if _, err := buildPipelineRequest(base); err != nil {
+		t.Fatalf("push request without base images should be accepted: %v", err)
 	}
 }
 
@@ -76,6 +77,87 @@ func TestBuildPipelineRequestRejectsReleaseFlagsWithoutPush(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "require --push") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildPipelineRequestDefaultsLocalPlatformToLinuxAMD64(t *testing.T) {
+	request, err := buildPipelineRequest(buildRequestOptions{
+		Repository:  source.Repository{Revision: strings.Repeat("a", 40)},
+		ProjectName: "boutique",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Platform != "linux/amd64" {
+		t.Fatalf("platform=%q", request.Platform)
+	}
+	if request.ImageReference != "magelift/boutique:"+strings.Repeat("a", 12) {
+		t.Fatalf("image reference=%q", request.ImageReference)
+	}
+}
+
+func TestBuildPipelineRequestAllowsAdvancedBaseImagesWithoutPush(t *testing.T) {
+	builder := "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("b", 64)
+	runtime := "ghcr.io/magelift/magelift-nginx@sha256:" + strings.Repeat("c", 64)
+	request, err := buildPipelineRequest(buildRequestOptions{
+		BuilderImage: builder,
+		RuntimeImage: runtime,
+		Platforms:    []string{"linux/amd64"},
+		Repository:   source.Repository{Revision: strings.Repeat("a", 40)},
+		ProjectName:  "boutique",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.BuilderImage != builder || request.RuntimeImage != runtime {
+		t.Fatalf("unexpected images: %#v", request)
+	}
+}
+
+func TestBuildPipelineRequestPushDoesNotRequireExplicitBaseImages(t *testing.T) {
+	revision := strings.Repeat("a", 40)
+	request, err := buildPipelineRequest(buildRequestOptions{
+		Push:           true,
+		ImageReference: "ghcr.io/magelift/shop:revision",
+		Repository: source.Repository{
+			Revision:  revision,
+			OriginURL: "https://github.com/acourtiol/shop.git",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.BuilderImage != "" || request.RuntimeImage != "" {
+		t.Fatalf("base images should be resolved later: %#v", request)
+	}
+}
+
+func TestApplyResolvedImagesUsesPublishedReferences(t *testing.T) {
+	builderRef := "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("a", 64)
+	runtimeRef := "ghcr.io/magelift/magelift-nginx@sha256:" + strings.Repeat("b", 64)
+	request := buildpipeline.Request{}
+	applyResolvedImages(&request, toolchain.Images{
+		BuilderReference: builderRef,
+		BuilderID:        "sha256:" + strings.Repeat("a", 64),
+		RuntimeReference: runtimeRef,
+		RuntimeID:        "sha256:" + strings.Repeat("b", 64),
+	})
+	if request.BuilderImage != builderRef || request.RuntimeImage != runtimeRef || request.RuntimeImageID != "" {
+		t.Fatalf("unexpected request images: %#v", request)
+	}
+}
+
+func TestApplyResolvedImagesUsesBuilderIDForLocalTags(t *testing.T) {
+	request := buildpipeline.Request{}
+	builderID := "sha256:" + strings.Repeat("a", 64)
+	runtimeRef := "magelift/php-nginx@sha256:" + strings.Repeat("b", 64)
+	applyResolvedImages(&request, toolchain.Images{
+		BuilderID:        builderID,
+		RuntimeReference: runtimeRef,
+		RuntimeID:        "sha256:" + strings.Repeat("b", 64),
+	})
+	if request.BuilderImage != builderID || request.RuntimeImage != runtimeRef {
+		t.Fatalf("unexpected resolved images: %#v", request)
 	}
 }
 
@@ -230,5 +312,70 @@ func TestSecretRegionUsesARNAndValidatesService(t *testing.T) {
 	region, err = secretRegion(secretref.Reference{Kind: secretref.ParameterStore, ID: "/shop/composer"}, "eu-west-3")
 	if err != nil || region != "eu-west-3" {
 		t.Fatalf("default region=%q error=%v", region, err)
+	}
+}
+
+func TestNormalizePublicVersion(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "", want: "0.0.0-dev"},
+		{input: "dev", want: "0.0.0-dev"},
+		{input: "DEV", want: "0.0.0-dev"},
+		{input: "v1.2.3", want: "1.2.3"},
+		{input: "0.1.0-alpha.1", want: "0.1.0-alpha.1"},
+	}
+	for _, test := range tests {
+		got, err := normalizePublicVersion(test.input)
+		if err != nil || got != test.want {
+			t.Fatalf("normalizePublicVersion(%q) = (%q, %v), want %q", test.input, got, err, test.want)
+		}
+	}
+	if _, err := normalizePublicVersion("main"); err == nil || !strings.Contains(err.Error(), "semantic version") {
+		t.Fatalf("unexpected invalid version error: %v", err)
+	}
+}
+
+func TestApplyResolvedLocalOverridesKeepRuntimeDriftGuard(t *testing.T) {
+	request := buildpipeline.Request{BuilderImage: "magelift/php-builder:qualification", RuntimeImage: "magelift/php-nginx:qualification"}
+	images := toolchain.Images{BuilderID: "sha256:" + strings.Repeat("a", 64), RuntimeID: "sha256:" + strings.Repeat("b", 64)}
+	applyResolvedImages(&request, images)
+	if request.BuilderImage != images.BuilderID || request.RuntimeImage != "magelift/php-nginx:qualification" || request.RuntimeImageID != images.RuntimeID {
+		t.Fatalf("request = %+v", request)
+	}
+	changed := images
+	changed.RuntimeID = "sha256:" + strings.Repeat("c", 64)
+	if sameResolvedRuntime(images, changed) {
+		t.Fatal("runtime drift was accepted")
+	}
+}
+
+func TestDefaultImageRecipeRejectsWrongPHPOrRuntimeBeforePull(t *testing.T) {
+	for _, tc := range []struct {
+		php, runtime, builder, image string
+		allowed                      bool
+	}{
+		{"8.5", "nginx-fpm", "", "", true},
+		{"8.4", "nginx-fpm", "", "", false},
+		{"8.5", "frankenphp-classic", "", "", false},
+		{"8.4", "nginx-fpm", "builder-override", "runtime-override", true},
+	} {
+		if err := validateDefaultImageRecipe(tc.php, tc.runtime, tc.builder, tc.image); (err == nil) != tc.allowed {
+			t.Fatalf("%+v: %v", tc, err)
+		}
+	}
+}
+
+func TestExplicitARMOverrideRemainsOutsideDefaultQualification(t *testing.T) {
+	options := buildRequestOptions{Repository: source.Repository{Revision: strings.Repeat("a", 40)}, ProjectName: "shop", Platforms: []string{"linux/arm64"}}
+	if _, err := buildPipelineRequest(options); err == nil || !strings.Contains(err.Error(), "explicit") {
+		t.Fatalf("unqualified defaults accepted: %v", err)
+	}
+	options.BuilderImage = "ghcr.io/example/builder@sha256:" + strings.Repeat("b", 64)
+	options.RuntimeImage = "ghcr.io/example/runtime@sha256:" + strings.Repeat("c", 64)
+	request, err := buildPipelineRequest(options)
+	if err != nil || request.Platform != "linux/arm64" {
+		t.Fatalf("explicit advanced override lost: %+v, %v", request, err)
 	}
 }

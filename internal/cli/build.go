@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
+	"regexp"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
@@ -20,6 +20,12 @@ import (
 	"github.com/magelift/magelift/internal/toolchain"
 	"github.com/spf13/cobra"
 )
+
+const defaultBuildPlatform = "linux/amd64"
+
+const devPublicVersion = "0.0.0-dev"
+
+var publicVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
 
 // ComposerSecretProvider resolves Composer credentials from supported secret
 // reference backends.
@@ -46,6 +52,9 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
+		if err := validateDefaultImageRecipe(spec.Build.PHP, string(spec.Application.WebRuntime), builderImage, runtimeImage); err != nil {
+			return invalid(err)
+		}
 		defaults, err := file.ProjectDefaults()
 		if err != nil {
 			return invalid(err)
@@ -57,12 +66,9 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
-		var images toolchain.Images
-		if !push {
-			images, err = toolchain.New().Resolve(cmd.Context())
-			if err != nil {
-				return &exitError{code: 3, err: err}
-			}
+		resolver, err := imageResolver(builderImage, runtimeImage)
+		if err != nil {
+			return invalid(err)
 		}
 		composerAuth, err := o.loadComposerCredentials(cmd.Context(), spec.Build.Composer.Credentials, defaults.Region)
 		if err != nil {
@@ -92,19 +98,33 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
+		mageLiftVersion, err := normalizePublicVersion(Version)
+		if err != nil {
+			return invalid(err)
+		}
+		images, err := resolver.Resolve(cmd.Context())
+		if err != nil {
+			return &exitError{code: 3, err: err}
+		}
+		applyResolvedImages(&request, images)
+		containerPlatform := request.Platform
+		if containerPlatform == "" && len(request.Platforms) > 0 {
+			containerPlatform = request.Platforms[0]
+		}
 		builder := buildkit.NewRunner(o.stderr)
 		builder.TempRoot = tempRoot
 		pipeline := buildpipeline.New(
-			buildpipeline.ContainerAdapter{TempRoot: tempRoot, Stderr: o.stderr, Network: "bridge"},
+			buildpipeline.ContainerAdapter{
+				TempRoot:        tempRoot,
+				Stderr:          o.stderr,
+				Network:         "bridge",
+				Platform:        containerPlatform,
+				MageLiftVersion: mageLiftVersion,
+			},
 			builder,
 		)
 		request.Config = file
-		request.MageLiftVersion = Version
-		if !push {
-			request.BuilderImage = images.BuilderID
-			request.RuntimeImage = toolchain.DefaultRuntimeTag
-			request.RuntimeImageID = images.RuntimeID
-		}
+		request.MageLiftVersion = mageLiftVersion
 		result, err := pipeline.Run(cmd.Context(), request)
 		if err != nil {
 			return &exitError{code: 3, err: err}
@@ -121,8 +141,8 @@ func buildCommand(o *options) *cobra.Command {
 			}
 			return o.write(result)
 		}
-		verifiedImages, err := toolchain.New().Resolve(cmd.Context())
-		if err != nil || verifiedImages.RuntimeID != images.RuntimeID {
+		verifiedImages, err := resolver.Resolve(cmd.Context())
+		if err != nil || !sameResolvedRuntime(images, verifiedImages) {
 			_ = os.Remove(result.Manifest)
 			if err != nil {
 				return &exitError{code: 3, err: fmt.Errorf("verify local runtime image after build: %w", err)}
@@ -133,11 +153,73 @@ func buildCommand(o *options) *cobra.Command {
 	}}
 	command.Flags().BoolVar(&push, "push", false, "push the image and publish build attestations")
 	command.Flags().StringVar(&imageReference, "image", "", "target image reference for a pushed build")
-	command.Flags().StringVar(&builderImage, "builder-image", "", "builder image pinned by registry digest")
-	command.Flags().StringVar(&runtimeImage, "runtime-image", "", "runtime image pinned by registry digest")
+	command.Flags().StringVar(&builderImage, "builder-image", "", "advanced builder image override (pair with --runtime-image; registry digest required with --push)")
+	command.Flags().StringVar(&runtimeImage, "runtime-image", "", "advanced runtime image override (pair with --builder-image; registry digest required with --push)")
 	command.Flags().StringVar(&sourceURL, "source-url", "", "HTTPS Git source URL used for provenance")
 	command.Flags().StringSliceVar(&platforms, "platform", nil, "target platform, repeatable or comma-separated")
 	return command
+}
+
+func normalizePublicVersion(version string) (string, error) {
+	trimmed := strings.TrimSpace(version)
+	if trimmed == "" || strings.EqualFold(trimmed, "dev") {
+		return devPublicVersion, nil
+	}
+	if strings.HasPrefix(trimmed, "v") || strings.HasPrefix(trimmed, "V") {
+		trimmed = trimmed[1:]
+	}
+	if !publicVersionPattern.MatchString(trimmed) {
+		return "", fmt.Errorf("CLI version %q is not a semantic version", version)
+	}
+	return trimmed, nil
+}
+
+func imageResolver(builderImage, runtimeImage string) (*toolchain.Resolver, error) {
+	if builderImage == "" && runtimeImage == "" {
+		return toolchain.New(), nil
+	}
+	if builderImage == "" || runtimeImage == "" {
+		return nil, errors.New("--builder-image and --runtime-image must be set together")
+	}
+	return toolchain.NewResolver(toolchain.SystemCommandRunner(), builderImage, runtimeImage), nil
+}
+
+func validateDefaultImageRecipe(php, webRuntime, builderImage, runtimeImage string) error {
+	if builderImage == "" && runtimeImage == "" && (php != toolchain.DefaultPHPBranch || webRuntime != toolchain.DefaultWebRuntime) {
+		return fmt.Errorf("default community images require PHP %s and %s; other recipes need explicit --builder-image and --runtime-image overrides", toolchain.DefaultPHPBranch, toolchain.DefaultWebRuntime)
+	}
+	return nil
+}
+
+func applyResolvedImages(request *buildpipeline.Request, images toolchain.Images) {
+	if !toolchain.IsImmutableReference(request.BuilderImage) {
+		if images.BuilderReference != "" {
+			request.BuilderImage = images.BuilderReference
+		} else {
+			request.BuilderImage = images.BuilderID
+		}
+	}
+	if request.RuntimeImage == "" {
+		if toolchain.IsImmutableReference(images.RuntimeReference) {
+			request.RuntimeImage = images.RuntimeReference
+			request.RuntimeImageID = ""
+		} else {
+			request.RuntimeImage = toolchain.DefaultRuntimeTag
+			request.RuntimeImageID = images.RuntimeID
+		}
+	}
+	if !toolchain.IsImmutableReference(request.RuntimeImage) {
+		// Advanced local tags are checked against the captured image ID again
+		// after the build; pushed builds still require repository digests.
+		request.RuntimeImageID = images.RuntimeID
+	}
+}
+
+func sameResolvedRuntime(before, after toolchain.Images) bool {
+	if before.RuntimeReference != "" {
+		return before.RuntimeReference == after.RuntimeReference && before.RuntimeID == after.RuntimeID
+	}
+	return before.RuntimeID == after.RuntimeID
 }
 
 func digestReference(imageReference, digest string) (string, error) {
@@ -176,19 +258,24 @@ func buildPipelineRequest(options buildRequestOptions) (buildpipeline.Request, e
 		ComposerAuth:      options.ComposerAuth,
 	}
 	if !options.Push {
-		if options.ImageReference != "" || options.BuilderImage != "" || options.RuntimeImage != "" || options.SourceURL != "" || len(options.Platforms) != 0 {
-			return buildpipeline.Request{}, errors.New("release image, source, and platform flags require --push")
+		if options.ImageReference != "" || options.SourceURL != "" {
+			return buildpipeline.Request{}, errors.New("release image and source flags require --push")
 		}
-		platform, err := localLinuxPlatform()
+		platform, err := resolveLocalPlatform(options.Platforms)
 		if err != nil {
 			return buildpipeline.Request{}, err
 		}
+		if platform != defaultBuildPlatform && (options.BuilderImage == "" || options.RuntimeImage == "") {
+			return buildpipeline.Request{}, errors.New("non-amd64 builds require explicit builder/runtime images and are outside the community alpha qualification")
+		}
 		request.ImageReference = "magelift/" + options.ProjectName + ":" + options.Repository.Revision[:12]
 		request.Platform = platform
+		request.BuilderImage = options.BuilderImage
+		request.RuntimeImage = options.RuntimeImage
 		return request, nil
 	}
-	if options.ImageReference == "" || options.BuilderImage == "" || options.RuntimeImage == "" {
-		return buildpipeline.Request{}, errors.New("--push requires --image, --builder-image, and --runtime-image")
+	if options.ImageReference == "" {
+		return buildpipeline.Request{}, errors.New("--push requires --image")
 	}
 	baseSource := options.SourceURL
 	if baseSource == "" {
@@ -203,11 +290,65 @@ func buildPipelineRequest(options buildRequestOptions) (buildpipeline.Request, e
 	request.BuilderImage = options.BuilderImage
 	request.RuntimeImage = options.RuntimeImage
 	request.ProvenanceSource = provenanceSource
-	request.Platforms = append([]string(nil), options.Platforms...)
-	if len(request.Platforms) == 0 {
-		request.Platforms = []string{"linux/amd64", "linux/arm64"}
+	request.Platforms, err = resolveReleasePlatforms(options.Platforms)
+	if err != nil {
+		return buildpipeline.Request{}, err
+	}
+	for _, platform := range request.Platforms {
+		if platform != defaultBuildPlatform && (options.BuilderImage == "" || options.RuntimeImage == "") {
+			return buildpipeline.Request{}, errors.New("non-amd64 builds require explicit builder/runtime images and are outside the community alpha qualification")
+		}
 	}
 	return request, nil
+}
+
+func resolveLocalPlatform(platforms []string) (string, error) {
+	flattened := flattenPlatforms(platforms)
+	if len(flattened) == 0 {
+		return defaultBuildPlatform, nil
+	}
+	if len(flattened) != 1 {
+		return "", errors.New("local builds require exactly one --platform")
+	}
+	return compatibleBuildPlatform(flattened[0])
+}
+
+func resolveReleasePlatforms(platforms []string) ([]string, error) {
+	flattened := flattenPlatforms(platforms)
+	if len(flattened) == 0 {
+		return []string{defaultBuildPlatform}, nil
+	}
+	resolved := make([]string, 0, len(flattened))
+	for _, platform := range flattened {
+		normalized, err := compatibleBuildPlatform(platform)
+		if err != nil {
+			return nil, err
+		}
+		resolved = append(resolved, normalized)
+	}
+	return resolved, nil
+}
+
+func flattenPlatforms(platforms []string) []string {
+	flattened := make([]string, 0, len(platforms))
+	for _, entry := range platforms {
+		for _, part := range strings.Split(entry, ",") {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				flattened = append(flattened, part)
+			}
+		}
+	}
+	return flattened
+}
+
+func compatibleBuildPlatform(platform string) (string, error) {
+	switch platform {
+	case defaultBuildPlatform, "linux/arm64":
+		return platform, nil
+	default:
+		return "", fmt.Errorf("unsupported build platform %q for the community alpha recipe (default: %s; explicit ARM images are advanced overrides)", platform, defaultBuildPlatform)
+	}
 }
 
 func immutableSourceURL(raw, revision string) (string, error) {
@@ -338,13 +479,4 @@ func buildTempRoot(artifactDirectory string) (string, error) {
 	}
 
 	return root, nil
-}
-
-func localLinuxPlatform() (string, error) {
-	switch runtime.GOARCH {
-	case "amd64", "arm64":
-		return "linux/" + runtime.GOARCH, nil
-	default:
-		return "", fmt.Errorf("local builds do not support architecture %q", runtime.GOARCH)
-	}
 }

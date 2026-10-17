@@ -81,11 +81,11 @@ magelift build [flags]
 Options:
 
 ```text
-      --builder-image string   builder image pinned by registry digest
+      --builder-image string   advanced builder image override (pair with --runtime-image; registry digest required with --push)
       --image string           target image reference for a pushed build
       --platform strings       target platform, repeatable or comma-separated
       --push                   push the image and publish build attestations
-      --runtime-image string   runtime image pinned by registry digest
+      --runtime-image string   advanced runtime image override (pair with --builder-image; registry digest required with --push)
       --source-url string      HTTPS Git source URL used for provenance
 ```
 ## magelift cache-flush

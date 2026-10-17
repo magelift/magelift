@@ -18,16 +18,19 @@ const DefaultMaxStdout int64 = 1 << 20
 
 var pinnedImage = regexp.MustCompile(`^(?:sha256:[a-f0-9]{64}|[^\s@]+@sha256:[a-f0-9]{64})$`)
 var secretID = regexp.MustCompile(`^[a-z][a-z0-9_.-]*$`)
+var publicVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
 
 var ErrStdoutLimit = errors.New("container runner stdout limit exceeded")
 
 type Runner struct {
-	Binary    string
-	Image     string
-	TempRoot  string
-	Stderr    io.Writer
-	MaxStdout int64
-	Network   string
+	Binary          string
+	Image           string
+	Platform        string
+	MageLiftVersion string
+	TempRoot        string
+	Stderr          io.Writer
+	MaxStdout       int64
+	Network         string
 }
 
 type Secret struct {
@@ -103,12 +106,20 @@ func (runner Runner) run(ctx context.Context, sourceDir, outputDir string, proto
 		"--security-opt=no-new-privileges",
 		"--tmpfs", "/tmp:rw,noexec,nosuid,nodev,mode=1777",
 		"--env", "HOME=/tmp",
+	}
+	if runner.MageLiftVersion != "" {
+		arguments = append(arguments, "--env", "MAGELIFT_VERSION="+runner.MageLiftVersion)
+	}
+	arguments = append(arguments,
 		"--mount", mountArgument(sourceDir, "/workspace", true),
 		"--mount", mountArgument(outputDir, "/output", false),
 		"--workdir", "/workspace",
-	}
+	)
 	for _, mount := range secretMounts {
 		arguments = append(arguments, "--mount", mount)
+	}
+	if runner.Platform != "" {
+		arguments = append(arguments, "--platform="+runner.Platform)
 	}
 	arguments = append(arguments, runner.Image)
 	command := exec.CommandContext(ctx, runner.binary(), arguments...)
@@ -156,6 +167,12 @@ func (runner Runner) validate(protocolJSON []byte, secrets []Secret) error {
 	}
 	if runner.Network != "" && runner.Network != "none" && runner.Network != "bridge" {
 		return errors.New("container runner network must be none or bridge")
+	}
+	if runner.Platform != "" && !regexp.MustCompile(`^linux/(amd64|arm64)$`).MatchString(runner.Platform) {
+		return errors.New("container runner platform must be linux/amd64 or linux/arm64")
+	}
+	if runner.MageLiftVersion != "" && !publicVersion.MatchString(runner.MageLiftVersion) {
+		return errors.New("container runner MageLift version must be a semantic version")
 	}
 	seen := map[string]bool{}
 	for _, secret := range secrets {
