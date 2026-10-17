@@ -48,6 +48,9 @@ with nginx-fpm on Linux amd64. Recipes and pinned upstream inputs ship with
 the CLI. The user's Docker engine/CI builds the builder, runtime and application
 images. Local builds do not publish. `magelift build --push --image <registry>/<repository>:<tag>`
 publishes the application into that user-owned repository and signs it.
+GitHub Actions signing uses the job's OIDC identity and requires `id-token:
+write`; it does not impersonate the deployment account for signing. Explicit
+token overrides remain available for advanced automation.
 Builder/runtime intermediates stay on the runner; the final build consumes the
 bundled pinned runtime recipe. Optional `build.cache` configures separate registry
 cache references; keep private layers and release caches out of fork jobs.

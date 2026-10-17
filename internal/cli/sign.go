@@ -12,6 +12,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	envGitHubActions             = "GITHUB_ACTIONS"
+	envGitHubIDTokenRequestURL   = "ACTIONS_ID_TOKEN_REQUEST_URL"
+	envGitHubIDTokenRequestToken = "ACTIONS_ID_TOKEN_REQUEST_TOKEN"
+)
+
 func signCommand(o *options) *cobra.Command {
 	var digest, tokenFile string
 	command := &cobra.Command{Use: "sign", Short: "Sign a pushed image digest using the current cloud login", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
@@ -68,12 +74,46 @@ func (o *options) identitySource(tokenFile string) (oidcidentity.Source, bool, e
 	if tokenFile != "" {
 		return oidcidentity.FileSource{Path: tokenFile}, true, nil
 	}
-	source, err := oidcidentity.SourceFromEnv(getenvOrEmpty(o))
+	getenv := getenvOrEmpty(o)
+	source, err := oidcidentity.SourceFromEnv(getenv)
 	if err != nil || source != nil {
 		return source, source != nil, err
 	}
-	cloud := oidcidentity.CloudCLISource(getenvOrEmpty(o), o.lookPathOrMissing(), o.gcpSigningServiceAccount())
+	ambient, err := githubActionsAmbientSigning(getenv)
+	if err != nil {
+		return nil, false, err
+	}
+	if ambient {
+		return nil, false, nil
+	}
+	cloud := oidcidentity.CloudCLISource(getenv, o.lookPathOrMissing(), o.gcpSigningServiceAccount())
 	return cloud, false, nil
+}
+
+// githubActionsAmbientSigning reports whether Cosign should use its built-in
+// GitHub Actions OIDC provider (ACTIONS_ID_TOKEN_REQUEST_URL and
+// ACTIONS_ID_TOKEN_REQUEST_TOKEN). MageLift does not mint or pass that JWT.
+func githubActionsAmbientSigning(getenv func(string) string) (bool, error) {
+	url := strings.TrimSpace(getenv(envGitHubIDTokenRequestURL))
+	token := strings.TrimSpace(getenv(envGitHubIDTokenRequestToken))
+	if url != "" && token != "" {
+		return true, nil
+	}
+	if url != "" || token != "" {
+		return false, usererr.New(
+			"GitHub Actions OIDC signing is not configured completely",
+			"add permissions.id-token: write to the job and ensure the workflow requests an OIDC token for Sigstore signing",
+			"docs/getting-started.md",
+		)
+	}
+	if getenv(envGitHubActions) != "true" {
+		return false, nil
+	}
+	return false, usererr.New(
+		"GitHub Actions cannot request an OIDC identity token for signing",
+		"add permissions.id-token: write to the job (for example on build jobs that run magelift sign or build --push)",
+		"docs/getting-started.md",
+	)
 }
 
 func (o *options) identitySignOptions(ctx context.Context, tokenFile string) (cosign.SignOptions, func(), error) {
