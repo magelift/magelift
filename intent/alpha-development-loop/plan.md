@@ -6,6 +6,42 @@ spec: spec.md
 
 # Plan: alpha development loop
 
+## Community alpha disposition (2026-10-17)
+
+ML-00 records this against branch `reboot/community-alpha` at
+`3ac1b844a7117752f3a5045054587508c16dcf6c`. The file list below is the
+original plan. Where it says "Not started" and a later box is checked, the
+checked box is the execution record.
+
+Checked boxes stay checked. ML-01 re-runs the existing regression tests if
+those paths are touched. It does not rebuild `CachedDialer.Close`, the
+`Execute` closer, the canary upload rules, gate independence, or the
+`setup:upgrade` before `app:config:import` order unless a regression
+reproduces.
+
+Still open for ML-01, and still required for milestone A:
+
+- [ ] 11.2 Three independent gate records against the drafted canary and the
+  acceptance-project image digest.
+- [ ] 12.1 Live GCP product gate in the dedicated acceptance project, destroy
+  on exit. The maintainer authorized the acceptance projects on 2026-10-17;
+  configuration, IAM, immutable inputs and cleanup scope must still be
+  checked. A dry run does not fill this box.
+
+Paused for milestone A. Not done, and not blockers for the community alpha:
+
+- [ ] 12.2 Certification seal (`magelift certification seal` /
+  `docs/evidence/runs/`). Historical evidence stays as written. Do not
+  reopen `docs/capability-matrix.md` from this plan.
+- [ ] 13.1 A new development-loop proof page linked from
+  `docs/evidence/README.md`. The rc.22 diagnosis already recorded in
+  `docs/evidence/gcp-rc19-proof-http500-20260922.md` stays.
+- [ ] 13.2 Closing the loop with `make verify`. That target runs
+  `test-race-full`. The community gate is `make verify-community`, the fast
+  loop is `make test-fast`, and targeted race is `make test-race`. This box
+  stays open until `make verify-community` has actually been run for the
+  lot. The partial results already written under 13.2 remain partial.
+
 ## Files that change
 
 - `internal/providerhost/discover.go` — edit: `CachedDialer.Close` reaps the cached plugin and drops it so a later dial starts fresh.
@@ -61,21 +97,22 @@ spec: spec.md
 - [ ] 12.1 Live GCP product gate in the dedicated acceptance project, destroy on exit, no KEEP unless the spec's authorization record exists — verify: the acceptance harness exits clean.
 - [ ] 12.2 Seal the candidate — verify: `magelift certification seal` writes `docs/evidence/runs/`, `magelift certification verify` accepts it, and `make check-clean-room` passes.
 - [ ] 13.1 Write the development-loop proof and link it from `docs/evidence/README.md` without editing `docs/capability-matrix.md` — verify: `make docs`.
-- [ ] 13.2 Full local suite — verify: `make verify`. Partial, not this box: `make generate-check`, `make cli-docs-check`, `make lint` (0 issues), `make license-check`, `make docs`, and `make check-clean-room` passed. Build PHPUnit (133 tests), PHPStan, and Psalm passed in `php:8.5-fpm-trixie` with the repo mounted. Host `make php-test` still cannot run. `make test` is `go test -race ./...`, which the repo instructions forbid as an unbounded race.
+- [ ] 13.2 Full local suite — paused as an alpha blocker (see the disposition above). Partial results, not this box: `make generate-check`, `make cli-docs-check`, `make lint` (0 issues), `make license-check`, `make docs`, and `make check-clean-room` passed. Build PHPUnit (133 tests), PHPStan, and Psalm passed in `php:8.5-fpm-trixie` with the repo mounted. Host `make php-test` could not run in that session. On 2026-10-17 the local community gate is `make verify-community`; `make test` aliases `make test-fast`; `make test-race-full` remains `go test -race ./...` and is not this box. Those commands were not run for this disposition.
 
 ## Risks
 
 - Pushing `v0.0.0-canary.<sha>` is ask-first. The workflow will not create that ref.
 - Draft assets are not on the public download URL. The distribution gate has to stage them and still verify the tag-bound signature.
-- rc.22 may stay unresolved. The spec forbids a guessed cause, a guessed regression, and a passing product gate in that case.
-- Live cleanup failure is a product-gate failure. Destroy only the retained rc.22 cell, and only after the diagnosis record exists.
+- rc.22 classification is already recorded as migration (`magento.flag` missing) in boxes 7.3 and 8.2. Do not invent a second cause. Boxes 11.2 and 12.1 are still open. A product gate that has not been run stays `NOT_RUN` or `FAIL`, not a pass.
+- Live cleanup failure is a product-gate failure. The retained rc.22 cell was destroyed in box 9.1. A later live run destroys only resources that the run owns, and records the result and inventories residuals independently.
 - Raw logs under `.magelift/` stay uncommitted.
 
 ## Proof
 
 - Provider processes started by either GCP `CachedDialer` are closed when `Execute` returns, including errors and cancellation: `TestCachedDialerCloseReapsPlugin` and `TestExecuteClosesProviders`.
 - A canary ref packages on the existing slim release lane and cannot replace a lockfile with a different digest: `make workflow-check` and `bash tests/acceptance/release_canary_predicate_test.sh`.
-- The rest of the proof is the unticked boxes: three independent gate records, an evidence-backed rc.22 classification or an explicit unresolved result, empty owned inventory, and a sealed evidence file that does not change the capability matrix.
+- rc.22 classification is recorded: migration, `magento.flag` missing, and the regression that orders `setup:upgrade` before `app:config:import`. Owned rc.19 proof resources were destroyed; unlabeled and `mldp7-*` resources were left on purpose (boxes 7.3, 8.2, 9.1, 9.2).
+- Still required before this loop is closed for milestone A: boxes 11.2 and 12.1. Boxes 12.2, 13.1, and 13.2 are paused, not done, and not alpha blockers.
 
 ## Deviations
 

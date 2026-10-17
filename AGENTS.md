@@ -3,6 +3,11 @@
 CLI that deploys Magento Open Source / Adobe Commerce in the user's AWS or GCP
 account. Not a host. The supported user path is YAML-only.
 
+Current priority is milestone A, the GCP community alpha, in
+`intent/ROADMAP.md`. AWS stays second and inside that roadmap's envelope.
+Experimental providers stay at the level `docs/capability-matrix.md` and
+`docs/evidence/README.md` already record. They do not block milestone A.
+
 Always-on layer only. Load one skill from the tables below. Do not paste skill bodies,
 `.agents/knowledge/`, or CONTRIBUTING. Longer rules belong in a skill.
 
@@ -12,39 +17,67 @@ Always-on layer only. Load one skill from the tables below. Do not paste skill b
   employer source/docs/IDs/secrets, and never name the employer. Gate: `make check-clean-room`. Ledger:
   `docs/provenance.md`.
 - Call a cell certified unless `docs/capability-matrix.md` plus
-  `docs/evidence/README.md` say so. Today: AWS ECS Fargate and GCP GKE Autopilot.
-  EKS, OVH, Scaleway, and GKE Standard stay experimental.
+  `docs/evidence/README.md` say so for that exact cell. Historical evidence
+  stays as written. Milestone A does not certify every catalog intersection
+  or frozen provider. EKS, OVH, Scaleway, and GKE Standard stay experimental.
+- Treat `NOT_RUN`, a mock, or an untested path as a live pass. A startup
+  path that is known to fail stays failed until a real run says otherwise.
 - Freelance `magelift deploy`/`destroy` against a non-acceptance account.
-  Prefer `make local-gates`. Live GCP is thorough E2E; AWS, OVH, Scaleway,
-  Cloudflare, New Relic, and Fastly are light smoke. Load
-  `magelift-certify`; destroy on exit; no KEEP unless a retained debug cell.
+  Live GCP uses the dedicated acceptance project. AWS stays targeted and
+  inside the envelope in `intent/ROADMAP.md`. OVH, Scaleway, Cloudflare,
+  New Relic, and Fastly stay light smoke and do not block the alpha. Load
+  `magelift-certify` before a live mutation; destroy on exit; no KEEP unless
+  a retained debug cell records an owner, expiry, inventory, and destroy
+  procedure. CLI exit is not the only cleanup for an interrupted run.
 - Commit `.cursor/`, `.claude/`, `.agents/` caches, credentials, Pulumi state,
   or third-party skill packs. Do commit `.agents/knowledge/`.
 - Share Pulumi components behind `if provider ==`. Topology stays in
   `internal/cloud/<provider>/` (ADR 0003, 0004).
 - Put secret values in YAML, logs, or evidence. References only.
-- Run local GoReleaser multi-target matrices or unbounded `go test -race ./...`.
-  Do not pin `GOMAXPROCS` or `-p`. `GOMEMLIMIT` is 75% of available RAM
+- Run local GoReleaser multi-target matrices, `make test-race-full`, or
+  unbounded `go test -race ./...` as the default local loop. Do not pin
+  `GOMAXPROCS` or `-p`. `GOMEMLIMIT` is 75% of available RAM
   (`scripts/go-memlimit.sh`).
 
-## Ask first: protected/production destroy, release tags, history rewrite.
+## Ask first
+
+Protected or production destroy, release tags, public publish, history
+rewrite, and cloud spend outside the envelope in `intent/ROADMAP.md`.
 
 ## Do
 
-- Work comes from `intent/ROADMAP.md`, one intent at a time: accept, spec,
-  plan, implement, verify, archive. No code before the plan is approved.
-- Smallest correct change. Wire CLI modules through `cmd/magelift` /
+- Active work follows `intent/ROADMAP.md`: lots ML-00 through ML-09, one lot
+  at a time, in dependency order. The maintainer plan reconciled there is
+  execution authority for those lots. Do not open another spec or plan
+  approval for each subtask. A checked box in an older plan is re-verified,
+  not rebuilt. Pause unfinished work outside the active lot. Do not mark it
+  done.
+- Smallest correct change. Fix a capability that already exists before adding
+  a second version of it. Wire CLI modules through `cmd/magelift` /
   `platform.ModuleRegistry`. `infra.RegisterTarget` alone does not ship
   `magelift deploy`.
-- After clone, once: `composer install --working-dir=build`. Gate: `make verify`.
-  Iterate: `go test ./internal/<pkg>/ -count=1`.
+- After clone, once: `composer install --working-dir=build`.
+  Community alpha gate: `make verify-community`.
+  Fast loop: `make test-fast`.
+  Targeted race: `make test-race`.
+  `make verify-community` also runs that targeted race.
+  Package iteration: `go test ./internal/<pkg>/ -count=1`.
+  `make test-fast` runs the root module, `sdk/` with `GOWORK=off`, and
+  `providers/gcp/` on the workspace. Root `go test ./...` does not cover the
+  nested modules. `make verify` still runs `test-race-full` and is not the
+  alpha gate. `make local-gates` and live acceptance targets stay available
+  for the jobs they name.
+- `make php-test` uses host PHP when `dom`, `filter`, `json`, `libxml`,
+  `mbstring`, `tokenizer`, and `xmlwriter` are present, otherwise the pinned
+  Composer image. `lifecycle-golden-check` uses the same PHP runner.
 - Do not hand-edit generated schema, CLI reference, certification coverage, or
   `agents/manifest.json`. Use `make generate`.
 - Recall: read `.agents/knowledge/index.md`, grep, open only matching notes.
   Default UPDATE or SKIP. Do not file session resumes, KEEP run IDs, or facts
   the code, CBM, or Serena already answer.
 - When a public contract, certification tier, or topology rule changes, update
-  the ADR and the human page together. Human docs and website copy go through
+  the ADR and the human page together. Do not rewrite historical evidence
+  conclusions. Human docs and website copy go through
   humanizer, then remove-ai-marks. Humans start at `README.md`.
 
 ## Skills

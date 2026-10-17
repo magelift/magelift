@@ -12,9 +12,10 @@ version: 1.0.0
 ## Defaults
 
 1. Smallest correct change. Touch only what the task needs.
-2. Do not invent certified claims. Certified targets today: AWS ECS Fargate and
-   GCP GKE Autopilot. EKS / OVH / Scaleway / GKE Standard stay experimental until
-   `docs/capability-matrix.md` plus `docs/evidence/README.md` say otherwise.
+2. Bound claims to the exact recipe and evidence in `docs/capability-matrix.md`
+   and `docs/evidence/README.md`. Historical certification does not prove a new
+   alpha build. EKS / OVH / Scaleway / GKE Standard stay experimental. Milestone
+   A requires the GCP recipe, not exhaustive provider certification.
 3. Prefer existing docs and examples over new prose. Update the matrix and the
    current evidence file when status changes.
 4. When a public contract, certification tier, or topology rule changes, update
@@ -31,8 +32,13 @@ version: 1.0.0
 # After clone, once:
 composer install --working-dir=build
 
-make verify
+make verify-community
 ```
+
+The community gate covers the root, SDK and GCP modules independently; nested
+modules are not covered by root `go test ./...`. `make test-fast` runs the three
+Go suites without race. `make test-race` runs bounded race checks. The broader
+`make verify` suite remains available; it is not the alpha publication threshold.
 
 Narrow loops while iterating:
 

@@ -1,5 +1,21 @@
 # Public release readiness
 
+## Community alpha milestone A (2026-10-17)
+
+The current release scope is the GCP community alpha in
+`intent/ROADMAP.md`. Require `make verify-community`, verified
+installation and build inputs, one successful reference-recipe run with a
+second deployment preserving data, and a scoped destruction inventory. A
+mock, dry run, or historical certification is not that product run.
+
+The full architecture matrix, AWS extraction, HA, advanced restore, console,
+and third-party integrations do not block this alpha. Record their actual
+status and known defects. Keep the artifact trust, secret protection, license,
+and resource ownership checks. Tags and public publication require explicit
+maintainer approval. The dated gate boards below retain their historical
+results; their pending matrix rows are not additional milestone A gates.
+
+
 No public tag may be created until maintainers have documented:
 
 - trademark and package-name clearance for MageLift;

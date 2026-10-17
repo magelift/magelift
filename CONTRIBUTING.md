@@ -23,7 +23,7 @@ Then:
 
 ```sh
 # After: composer install --working-dir=build  (once)
-make verify   # or at least: make docs && go test ./internal/<pkg>/ -count=1
+make verify-community   # GCP community alpha; no cloud credentials required
 ```
 
 Open a PR with: what changed, how you verified, risk (usually “docs/test only”).
@@ -32,12 +32,12 @@ already-pinned ecosystem group; major bumps need a human review note.
 
 ## Prerequisites
 
-For a full green `make verify` (the default local gate):
+For `make verify-community` (the community alpha local gate):
 
 - **Go** toolchain matching [`go.mod`](go.mod) (CI uses `go-version-file`)
-- **PHP 8.2+** and **Composer**, required because `make verify` runs `php-test`
+- **PHP 8.2+** and **Composer**, required because the verification gate runs `php-test`
   on the `build/` Magento package. After clone, once: `composer install --working-dir=build`
-- **MkDocs**, required because `make verify` runs `docs` (strict link/nav build)
+- **MkDocs**, required for `make docs` in the broader verification suite (strict link/nav build)
 
 Pulled automatically via pinned `go run` from Makefile targets (no separate
 global install needed for these):
@@ -49,7 +49,7 @@ global install needed for these):
 Optional / situational:
 
 - **Docker**, only for Floci, image builds, and local Compose (`make floci-test-aws`,
-  `make floci-gcp-test`, `make local-gates`, `magelift local`, image targets). Not required for default `make verify`.
+  `make floci-gcp-test`, `make local-gates`, `magelift local`, image targets). Required for the container PHP fallback when host extensions are missing.
 - **AWS or GCP credentials**, only for real-cloud acceptance targets
   (`make aws-acceptance-local`, `make gcp-acceptance-local`).
 
@@ -74,11 +74,16 @@ Layout:
 - Record design inputs in `docs/provenance.md`; keep third-party notices.
 - Never commit credentials, customer data, build artifacts, or Pulumi state.
 
+The maintainer-approved community implementation plan authorizes ML-00 through
+ML-09 in dependency order. ML-06 through ML-09 do not block milestone A.
+Additional work still follows the intent process. Live tests require an explicitly
+authorized acceptance target; a local green gate is not live cloud evidence.
+
 ## Changes
 
 1. Branch from `main`.
 2. Add tests and docs with behavior changes.
-3. Run `make verify` plus any targeted checks under Testing.
+3. Run `make verify-community` plus checks appropriate to your change.
 4. Conventional Commit subject, e.g. `feat(config): explain provenance`.
 5. Open a PR with the template (risk, compatibility, how you verified).
 
@@ -90,19 +95,21 @@ otherwise.
 
 | Goal | Command |
 | --- | --- |
-| Default local gate | `make verify` |
+| Community alpha local gate | `make verify-community` |
+| Fast Go suites: root, SDK, GCP workspace | `make test-fast` |
+| Broader verification suite | `make verify` |
 | Account-free stack (mocks + harness + Floci) | `make local-gates` |
 | Pulumi mock graphs | `make pulumi-mock-test` |
 | Account-free AWS paths | `make floci-test-aws` |
 | Account-free GCP paths | `make floci-gcp-test` |
 | Real AWS (destroy on exit; light smoke) | `make aws-acceptance-local`; read `docs/aws-acceptance.md` |
-| Real GCP (thorough certified path; destroy on exit) | `make gcp-acceptance-local`; read `docs/gcp-acceptance.md` |
+| Real GCP (reference recipe; destroy on exit) | `make gcp-acceptance-local`; read `docs/gcp-acceptance.md` |
 
 ### Local verification vs hosted CI
 
-The contributor gate is local **`make verify`**. Hosted GitHub Actions runs on
+The community alpha contributor gate is local **`make verify-community`**. Hosted GitHub Actions runs on
 the public `magelift/magelift` repo. Path-filtered CI on `main` must stay green
-before cutting `v1.0.0-rc.1`. Lint partition timing and policy live in
+before release qualification. Lint partition timing and policy live in
 [docs/lint-policy.md](docs/lint-policy.md). See also
 [docs/release-readiness.md](docs/release-readiness.md).
 

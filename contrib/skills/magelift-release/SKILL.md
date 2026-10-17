@@ -50,7 +50,9 @@ staggered tag-then-request poisons fresh versions. Stage sums
 first, push every tag at once, then request nothing for five
 minutes. Order matters; never move a tag:
 
-1. Full local gates green on HEAD, working tree clean.
+1. `make verify-community` green on HEAD, working tree clean. Read
+   `docs/release-readiness.md` before a public semver tag. Do not substitute
+   `make test-race-full`.
 2. Build the staging tool first
    (`go build -o /tmp/modproxy ./cmd/modproxy`): after the
    bump, requires name nonexistent versions and nothing in
@@ -100,11 +102,34 @@ minutes. Order matters; never move a tag:
    scratch build, all `GOWORK=off` from the proxy. The release
    pipeline repeats this before publish; run it locally too.
 
+## Community alpha
+
+Milestone A is the GCP community alpha in `intent/ROADMAP.md`. A public
+alpha does not wait until every provider, catalog intersection, and open
+issue is certified. Historical capability evidence stays as written.
+
+Checks on the distributed artifact stay: publisher, signature, digest,
+protocol, and the Cosign identities below. Non-blocking bugs are
+documented. Untested capabilities are named, including `NOT_RUN`.
+
+Local commands for this alpha:
+
+```sh
+make test-fast            # root, sdk (GOWORK=off), providers/gcp; no race
+make test-race            # targeted race
+make verify-community     # alpha gate; also runs the targeted race
+```
+
+`make test-race-full` (`go test -race ./...` in the root module) and a
+full multi-platform GoReleaser matrix are not that gate. Release tags and
+public publish stay ask-first.
+
 ## Gates
 
 Before cutting a public tag, read `docs/release-readiness.md` and
 `docs/publishing.md`. Do not claim hosted CI green while Actions minutes are
-deferred without saying so.
+deferred without saying so. The local community gate is
+`make verify-community`, not `make test-race-full`.
 
 Workflow `run` blocks execute under `bash -e`: never end a loop body
 with a bare `&&` list — when the test is false it becomes the step's
