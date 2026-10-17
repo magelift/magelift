@@ -229,3 +229,84 @@ Preparation for ML-03: registry inspection of both
 `ghcr.io/magelift/magelift-nginx:8.5` returned `not found`. No new image was
 published and no old application digest was adopted as the new acceptance
 artifact.
+
+ML-02 acquisition and offline proof:
+
+- Both production GCP lazy dialing and the CLI backend loader use the existing
+  resolver/downloader through `Acquire`. Project pins win over beside-CLI locks
+  and the exact CLI release lock. Malformed locks, missing GCP entries and corrupt
+  caches fail without selecting another version. Non-GCP names are refused by
+  automatic acquisition. Release lock cache writes serialize across processes.
+- Required signed-release and session-launcher tools use the existing package
+  manager allowlist with interactive confirmation or `--yes`. Non-interactive
+  missing-tool errors, Docker prerequisites and cloud authentication remain
+  explicit. No Go toolchain is required by an installed release.
+- A real proxy-blocked Cosign 3.1.3 check initially FAILED: the default verifier
+  attempted a live TUF refresh despite its cache. Passing the authenticated
+  Sigstore trust root succeeded. The CLI now carries that public snapshot,
+  authenticated with `cosign initialize` on 2026-10-17, and validates its digest
+  before writing or using it. Corruption is refused; explicit repair restores
+  the embedded bytes. Publisher, certificate, transparency and digest checks
+  remain enabled. Root rotation requires a reviewed CLI update.
+- `MAGELIFT_SIGNED_PROVIDER_ACCEPTANCE=1 go test ./internal/providerhost -run
+  '^TestAcquireSignedReleaseThenOffline$' -count=1 -v`: PASS (9.442s) using
+  actual signed historical canary artifacts, authenticated staging via `gh`,
+  real pinned Cosign verification, then HTTP-denied acquisition and proxy-blocked
+  Cosign verification. The initial direct download trial was FAIL/HTTP 404
+  because the historical canary is still a draft. This is not proof of public
+  distribution of the current source or of current-provider cloud behavior.
+- Complete `internal/providerhost` and `internal/cosign` suites after the root
+  correction: PASS. The final combined community gate is running after these
+  security changes; its result is not inferred from the earlier green run.
+
+Local packaging smoke:
+
+- GoReleaser 2.18.3 single Linux amd64 snapshot: PASS after correction.
+  First attempt: FAIL because `dist` does not expand Go templates; its output
+  was moved to private `/tmp/magelift-community-alpha/failed-smoke-dist`.
+- The corrected script uses a concrete private temporary output path, includes
+  LICENSE/NOTICE, checks provider presence and executes the extracted CLI.
+  Pre-existing CLI/provider files in `dist/` retained their original SHA-256.
+- Measured snapshot: archive 62,878,001 bytes; extracted stripped CLI
+  307,945,632 bytes; provider 207,552,672 bytes. These exclude the on-demand
+  verifier, Docker images and caches. This unsigned local snapshot is not a
+  published release.
+- Repeated real historical distribution gate with Cosign 3.1.3: PASS. No tag,
+  release publication, tap/bucket write or cloud resource mutation occurred.
+
+ML-02 final local result: PASS.
+
+`MAGELIFT_PHP_TEST_CONTAINER=1 make verify-community docs workflow-check`
+completed with exit 0 after the offline trust-root correction. It ran the root,
+SDK and GCP suites independently, targeted race checks, PHP checks, golden
+contract, clean-room and core boundary checks, gate regressions, strict docs
+and workflow validation. Before this pass, module distribution tests failed
+because the first smoke's 552 MiB artifacts were retained under `.magelift`;
+they were moved outside the source tree, preserving the artifacts and the
+module ZIP test. No exclusion or test bypass was added.
+
+Implementation commit: `35a8e48` (`feat(cli): acquire verified GCP providers at
+activation with offline cache support`). Packaging smoke correction:
+`4d76bf4`. Native Brew/Scoop/Windows remain NOT_RUN and are not advertised as
+qualified. Current-source public distribution and current-provider cloud
+execution remain release-scenario checks, not inferred passes.
+
+The initial Grok 4.7 medium/high implementation tasks produced no edits in
+approximately ten minutes and were interrupted (exit 130). Composer 2.5 then
+implemented those bounded slices; the parent integrated, corrected and verified
+them. Grok 4.7 low completed the packaging inspection and executed its fixture
+checks. All Cursor invocations used non-fast model IDs.
+
+The shared Docker inventory eventually returned: images 100.6 GB, container
+writable layers 1.694 GB, local volumes 80.42 GB and build cache 48.65 GB.
+These are workstation-wide values, not this task's installation footprint or
+removable task resources. Nothing was pruned. Latest workspace availability
+was 540 GiB; /tmp had 11 GiB available. No cloud resource was created and no
+AWS budget was reserved or spent. Actual remaining account credits were not
+queried or inferred from these local measurements.
+
+Next: ML-03. Magento 2.4.9 remains the latest stable line among the upstream
+releases inspected; 2.4.10-alpha1 is an upstream alpha despite its GitHub
+prerelease metadata. The current official PHP 8.5 FPM Trixie image resolves to
+`sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc`
+and an actual Linux amd64 run reports PHP 8.5.11. No image was published.
