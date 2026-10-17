@@ -109,3 +109,63 @@ func TestMaxVerifierBytesFitsPinnedCosignRelease(t *testing.T) {
 		t.Fatalf("maxVerifierBytes = %d; Cosign %s windows/amd64 is %d", maxVerifierBytes, VerifierVersion, cosignWindowsAmd64)
 	}
 }
+
+func TestEnsureVerifierRejectsCorruptCacheWithoutNetwork(t *testing.T) {
+	fixture := []byte("verified fixture")
+	verifierTestPin(t, fixture)
+	cache := t.TempDir()
+	path, err := VerifierPath(cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("corrupt"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var hits atomic.Int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { hits.Add(1); w.Write(fixture) }))
+	defer server.Close()
+	installer := &VerifierInstaller{HTTP: server.Client(), BaseURL: server.URL, CacheDir: cache}
+	if _, err := installer.Ensure(context.Background()); err == nil || !strings.Contains(err.Error(), "cached verifier is corrupt") {
+		t.Fatalf("error = %v", err)
+	}
+	if hits.Load() != 0 {
+		t.Fatal("corrupt cache triggered download")
+	}
+	installer.Repair = true
+	if _, err := installer.Ensure(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if hits.Load() != 1 {
+		t.Fatal("explicit repair did not download")
+	}
+}
+
+func TestVerifierLegacyCacheRemainsUsableOffline(t *testing.T) {
+	fixture := []byte("legacy verified fixture")
+	verifierTestPin(t, fixture)
+	cache := t.TempDir()
+	path, err := VerifierPath(cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(path, runtime.GOOS+"_"+runtime.GOARCH) {
+		t.Fatalf("platform absent from %s", path)
+	}
+	legacy := filepath.Join(filepath.Dir(filepath.Dir(path)), filepath.Base(path))
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, fixture, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := (&VerifierInstaller{CacheDir: cache, BaseURL: "https://invalid.invalid"}).Ensure(context.Background())
+	if err != nil || got != legacy {
+		t.Fatalf("legacy = %q, %v", got, err)
+	}
+	if got, err := CachedVerifierPath(cache); err != nil || got != legacy {
+		t.Fatalf("cached = %q, %v", got, err)
+	}
+}

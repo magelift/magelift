@@ -3,15 +3,21 @@ package providerhost
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/magelift/magelift/internal/cosign"
 )
@@ -80,8 +86,9 @@ func TestDownloadInstallVerifiesAndCaches(t *testing.T) {
 	if installed.Cached {
 		t.Fatalf("first install should not report Cached")
 	}
-	if !strings.HasSuffix(installed.Binary, filepath.Join("gcp", artifact.Version, ExtractName("gcp"))) {
-		t.Fatalf("unexpected binary path %q", installed.Binary)
+	wantSuffix := filepath.Join("gcp", artifact.Version, CachePlatform(), ExtractName("gcp"))
+	if !strings.HasSuffix(installed.Binary, wantSuffix) {
+		t.Fatalf("unexpected binary path %q, want suffix %q", installed.Binary, wantSuffix)
 	}
 	got, err := os.ReadFile(installed.Binary)
 	if err != nil || string(got) != string(binary) {
@@ -102,8 +109,411 @@ func TestDownloadInstallVerifiesAndCaches(t *testing.T) {
 	if got := hits.Load(); got != 2 {
 		t.Fatalf("cache hit used the network: %d requests", got)
 	}
-	if got := verifyCalls.Load(); got != 0 {
-		t.Fatalf("cache hit re-verified: %d calls", got)
+	if got := verifyCalls.Load(); got != 1 {
+		t.Fatalf("cache hit did not re-verify signature: %d calls", got)
+	}
+}
+
+func TestDownloadInstallNoNetworkOnValidCache(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	bundle := []byte("fake-bundle")
+	var hits atomic.Int32
+	server := downloadTestServer(t, binary, bundle, &hits)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	first := &Downloader{HTTP: server.Client(), Verifier: stubVerifier{}, CacheDir: cache}
+	if _, err := first.Install(context.Background(), "gcp", artifact); err != nil {
+		t.Fatalf("first Install: %v", err)
+	}
+	broken := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("network disabled")
+	})}
+	cached, err := (&Downloader{HTTP: broken, Verifier: stubVerifier{}, CacheDir: cache}).Install(context.Background(), "gcp", artifact)
+	if err != nil {
+		t.Fatalf("cached Install: %v", err)
+	}
+	if !cached.Cached {
+		t.Fatal("expected cache hit without network")
+	}
+	if hits.Load() != 2 {
+		t.Fatalf("cache hit used the network: %d requests", hits.Load())
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestDownloadInstallConcurrentSingleFetch(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	bundle := []byte("fake-bundle")
+	var hits atomic.Int32
+	server := downloadTestServer(t, binary, bundle, &hits)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	const workers = 8
+	var wg sync.WaitGroup
+	errs := make(chan error, workers)
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := (&Downloader{HTTP: server.Client(), Verifier: stubVerifier{}, CacheDir: cache}).Install(context.Background(), "gcp", artifact)
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("Install: %v", err)
+		}
+	}
+	if got := hits.Load(); got != 2 {
+		t.Fatalf("expected one binary and one bundle fetch, got %d HTTP hits", got)
+	}
+}
+
+func TestDownloadInstallRefusesInterruptedPartialCache(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	server := downloadTestServer(t, binary, []byte("fake-bundle"), nil)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	paths, err := CachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(paths.Binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	partial := filepath.Join(filepath.Dir(paths.Binary), ".download-partial-"+filepath.Base(paths.Binary))
+	if err := os.WriteFile(partial, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	downloader := &Downloader{HTTP: server.Client(), Verifier: stubVerifier{}, CacheDir: cache}
+	_, err = downloader.Install(context.Background(), "gcp", artifact)
+	if !errors.Is(err, ErrCacheCorrupt) {
+		t.Fatalf("err = %v, want corrupt cache", err)
+	}
+}
+
+func TestDownloadInstallRepairClearsPartialCache(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	bundle := []byte("fake-bundle")
+	server := downloadTestServer(t, binary, bundle, nil)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	paths, err := CachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(paths.Binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	partial := filepath.Join(filepath.Dir(paths.Binary), ".download-partial-"+filepath.Base(paths.Binary))
+	if err := os.WriteFile(partial, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	downloader := &Downloader{HTTP: server.Client(), Verifier: stubVerifier{}, CacheDir: cache, Repair: true}
+	installed, err := downloader.Install(context.Background(), "gcp", artifact)
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if installed.Cached {
+		t.Fatal("repair install should fetch fresh artifacts")
+	}
+	if hasPartialDownloadTemps(filepath.Dir(paths.Binary)) {
+		t.Fatal("partial download file remained after repair")
+	}
+}
+
+func TestDownloadInstallRefusesInvalidBundleCache(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	server := downloadTestServer(t, binary, []byte("fake-bundle"), nil)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	paths, err := CachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(paths.Binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.Binary, binary, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(CachedBundlePath(paths.Binary), []byte("bad-bundle"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	downloader := &Downloader{
+		HTTP:     server.Client(),
+		Verifier: stubVerifier{err: errors.New("bad bundle")},
+		CacheDir: cache,
+	}
+	_, err = downloader.Install(context.Background(), "gcp", artifact)
+	if !errors.Is(err, ErrCacheCorrupt) {
+		t.Fatalf("err = %v, want corrupt cache", err)
+	}
+}
+
+func TestDownloadInstallRefusesHalfPairPlatformCache(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	server := downloadTestServer(t, binary, []byte("fake-bundle"), nil)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	paths, err := CachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(paths.Binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.Binary, binary, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err = (&Downloader{HTTP: server.Client(), Verifier: stubVerifier{}, CacheDir: cache}).Install(context.Background(), "gcp", artifact)
+	if !errors.Is(err, ErrCacheCorrupt) {
+		t.Fatalf("err = %v, want corrupt cache", err)
+	}
+}
+
+func TestDownloadInstallRefusesLegacyWhenPrimaryCorrupt(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	bundle := []byte("fake-bundle")
+	server := downloadTestServer(t, binary, bundle, nil)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	primary, err := CachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := legacyCachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(primary.Binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(primary.Binary, binary, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy.Binary, binary, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(CachedBundlePath(legacy.Binary), bundle, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = (&Downloader{HTTP: server.Client(), Verifier: stubVerifier{}, CacheDir: cache}).Install(context.Background(), "gcp", artifact)
+	if !errors.Is(err, ErrCacheCorrupt) {
+		t.Fatalf("err = %v, want corrupt primary without legacy fallback", err)
+	}
+}
+
+func TestDownloadInstallRefusesLegacyDigestMismatch(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	bundle := []byte("fake-bundle")
+	server := downloadTestServer(t, binary, bundle, nil)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	legacy, err := legacyCachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(legacy.Binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy.Binary, []byte("other-binary-bytes"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(CachedBundlePath(legacy.Binary), bundle, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = (&Downloader{HTTP: server.Client(), Verifier: stubVerifier{}, CacheDir: cache}).Install(context.Background(), "gcp", artifact)
+	if !errors.Is(err, ErrChecksumMismatch) {
+		t.Fatalf("err = %v, want checksum mismatch", err)
+	}
+}
+
+func TestDownloadInstallCancelsActiveDownload(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	bundle := []byte("fake-bundle")
+	release := make(chan struct{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/magelift-provider-gcp", func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-release:
+		case <-time.After(5 * time.Second):
+		}
+		w.Write(binary)
+	})
+	mux.HandleFunc("/magelift-provider-gcp.sigstore.json", func(w http.ResponseWriter, _ *http.Request) {
+		w.Write(bundle)
+	})
+	server := httptest.NewTLSServer(mux)
+	t.Cleanup(server.Close)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		time.Sleep(75 * time.Millisecond)
+		cancel()
+	}()
+	_, err := (&Downloader{HTTP: server.Client(), Verifier: stubVerifier{}, CacheDir: cache}).Install(ctx, "gcp", artifact)
+	if err == nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want canceled download", err)
+	}
+	paths, err := CachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cachePairComplete(paths.Binary) {
+		t.Fatal("canceled download left a complete cache pair")
+	}
+	if fileExists(paths.Binary) != fileExists(CachedBundlePath(paths.Binary)) {
+		t.Fatal("canceled download left a half-installed platform pair")
+	}
+	close(release)
+}
+
+func TestDownloadInstallConcurrentSubprocessSingleFetch(t *testing.T) {
+	if os.Getenv("MAGELIFT_PROVIDER_CACHE_CHILD") == "1" {
+		cache := os.Getenv("MAGELIFT_PROVIDER_CACHE_DIR")
+		serverURL := os.Getenv("MAGELIFT_PROVIDER_CACHE_SERVER")
+		binary := []byte("fake-provider-binary")
+		artifact := downloadTestArtifact(serverURL, binary)
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+		_, err := (&Downloader{HTTP: client, Verifier: stubVerifier{}, CacheDir: cache}).Install(context.Background(), "gcp", artifact)
+		if err != nil {
+			t.Fatalf("child Install: %v", err)
+		}
+		return
+	}
+	binary := []byte("fake-provider-binary")
+	bundle := []byte("fake-bundle")
+	var hits atomic.Int32
+	server := downloadTestServer(t, binary, bundle, &hits)
+	cache := t.TempDir()
+	const workers = 4
+	var wg sync.WaitGroup
+	errs := make(chan error, workers)
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cmd := exec.Command(os.Args[0], "-test.run=^TestDownloadInstallConcurrentSubprocessSingleFetch$", "-test.count=1")
+			cmd.Env = append(os.Environ(),
+				"MAGELIFT_PROVIDER_CACHE_CHILD=1",
+				"MAGELIFT_PROVIDER_CACHE_DIR="+cache,
+				"MAGELIFT_PROVIDER_CACHE_SERVER="+server.URL,
+			)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				errs <- fmt.Errorf("%w: %s", err, out)
+				return
+			}
+			errs <- nil
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := hits.Load(); got != 2 {
+		t.Fatalf("expected one binary and one bundle fetch across subprocesses, got %d HTTP hits", got)
+	}
+}
+
+func TestDownloadInstallRepairPreservesInstallLock(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	bundle := []byte("fake-bundle")
+	server := downloadTestServer(t, binary, bundle, nil)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	versionDir, err := cacheVersionDir(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(versionDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(versionDir, cacheInstallLockName)
+	if err := os.WriteFile(lockPath, []byte("held"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths, err := CachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(paths.Binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	partial := filepath.Join(filepath.Dir(paths.Binary), ".download-partial-"+filepath.Base(paths.Binary))
+	if err := os.WriteFile(partial, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	installed, err := (&Downloader{HTTP: server.Client(), Verifier: stubVerifier{}, CacheDir: cache, Repair: true}).Install(context.Background(), "gcp", artifact)
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if installed.Cached {
+		t.Fatal("repair install should fetch fresh artifacts")
+	}
+	after, err := os.Stat(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Size() != after.Size() || !os.SameFile(before, after) {
+		t.Fatal("repair removed or replaced the version install lock")
+	}
+	if sysBefore, ok := before.Sys().(*syscall.Stat_t); ok {
+		sysAfter, ok := after.Sys().(*syscall.Stat_t)
+		if !ok || sysBefore.Ino != sysAfter.Ino {
+			t.Fatal("repair changed install lock inode")
+		}
+	}
+}
+
+func TestDownloadInstallAcceptsLegacyCacheLayout(t *testing.T) {
+	binary := []byte("fake-provider-binary")
+	bundle := []byte("fake-bundle")
+	var hits atomic.Int32
+	server := downloadTestServer(t, binary, bundle, &hits)
+	artifact := downloadTestArtifact(server.URL, binary)
+	cache := t.TempDir()
+	legacy, err := legacyCachedArtifactPaths(cache, "gcp", artifact.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(legacy.Binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy.Binary, binary, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(CachedBundlePath(legacy.Binary), bundle, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	broken := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("network disabled")
+	})}
+	installed, err := (&Downloader{HTTP: broken, Verifier: stubVerifier{}, CacheDir: cache}).Install(context.Background(), "gcp", artifact)
+	if err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if !installed.Cached || installed.Binary != legacy.Binary {
+		t.Fatalf("installed = %+v, want legacy cache hit", installed)
 	}
 }
 

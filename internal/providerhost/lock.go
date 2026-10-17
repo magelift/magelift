@@ -36,6 +36,7 @@ var (
 	ErrUnsupportedProtocol = errors.New("unsupported provider protocol")
 	ErrNotDownloadable     = errors.New("provider artifact has no download URL")
 	ErrCacheMiss           = errors.New("provider artifact is not in the cache")
+	ErrCacheCorrupt        = errors.New("provider cache entry is corrupt or incomplete")
 )
 
 // Lockfile is magelift.providers.lock. Digests are sha256 of the subprocess

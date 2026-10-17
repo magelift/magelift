@@ -43,6 +43,8 @@ type VerifierInstaller struct {
 	HTTP     *http.Client
 	BaseURL  string
 	CacheDir string
+	// Repair permits replacement of a corrupt verifier only during explicit installation.
+	Repair bool
 }
 
 // VerifierPath returns the cache location of the pinned verifier.
@@ -62,7 +64,7 @@ func VerifierPath(cacheDir string) (string, error) {
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	return filepath.Join(cacheDir, "_verifier", name), nil
+	return filepath.Join(cacheDir, "_verifier", runtime.GOOS+"_"+runtime.GOARCH, name), nil
 }
 
 // Ensure downloads and checksum-verifies the pinned verifier unless a
@@ -83,9 +85,26 @@ func (v *VerifierInstaller) Ensure(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", fmt.Errorf("create verifier directory: %w", err)
+	}
+	release, err := withCacheInstallLock(ctx, path+".lock")
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	want := verifierPins[runtime.GOOS+"/"+runtime.GOARCH]
 	if digestMatches(path, "sha256:"+want) {
 		return path, nil
+	}
+	if _, err := os.Lstat(path); err == nil && !v.Repair {
+		return "", fmt.Errorf("%w: cached verifier is corrupt; run `magelift providers install` to repair it", ErrChecksumMismatch)
+	} else if err != nil && !os.IsNotExist(err) {
+		return "", fmt.Errorf("inspect cached verifier: %w", err)
+	}
+	legacy := filepath.Join(filepath.Dir(filepath.Dir(path)), filepath.Base(path))
+	if digestMatches(legacy, "sha256:"+want) {
+		return legacy, nil
 	}
 	base := strings.TrimSpace(v.BaseURL)
 	if base == "" {
@@ -163,8 +182,17 @@ func CachedVerifierPath(cacheDir string) (string, error) {
 		return "", err
 	}
 	want, ok := verifierPins[runtime.GOOS+"/"+runtime.GOARCH]
-	if !ok || !digestMatches(path, "sha256:"+want) {
+	if ok && digestMatches(path, "sha256:"+want) {
+		return path, nil
+	}
+	// Legacy entries are usable only when their digest matches this platform.
+	// Never fall back from a present, damaged platform-specific verifier.
+	if _, err := os.Lstat(path); !os.IsNotExist(err) {
 		return "", errVerifierUnavailable
 	}
-	return path, nil
+	legacy := filepath.Join(filepath.Dir(filepath.Dir(path)), filepath.Base(path))
+	if ok && digestMatches(legacy, "sha256:"+want) {
+		return legacy, nil
+	}
+	return "", errVerifierUnavailable
 }
