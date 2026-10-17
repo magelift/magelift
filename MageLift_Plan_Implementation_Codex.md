@@ -52,7 +52,7 @@ Une personne disposant de Docker et d’un accès cloud correctement préparé p
 
 1. Installer un binaire publié, sans compiler MageLift ni cloner son dépôt.
 2. Configurer un projet Magento par YAML ; obtenir des erreurs exploitables.
-3. Construire une image avec les patches déclarés, à partir des images de base publiées.
+3. Construire les images de base et l’application avec les patches déclarés dans sa CI/CD, puis les publier dans son propre registre.
 4. Déployer la recette GCP documentée et accéder à un Magento fonctionnel en HTTPS.
 5. Lire l’état et les logs, exécuter une commande applicative et redéployer.
 6. Détruire son environnement jetable sans supprimer des ressources étrangères.
@@ -102,7 +102,7 @@ La cible AWS conserve son architecture ECS existante. Reprendre la même image a
 | ML-00 | Reprise, règles et boucle de tests cohérente | — | Oui |
 | ML-01 | Fermer la boucle de développement GCP existante | ML-00 | Oui |
 | ML-02 | Installation et acquisition transparente des outils/providers | ML-01 | Oui |
-| ML-03 | Images publiées et build Magento déterministe | ML-02 | Oui |
+| ML-03 | Images construites par l’utilisateur et build Magento déterministe | ML-02 | Oui |
 | ML-04 | Patches et qualité des erreurs de build | ML-03 | Oui pour QPT/hotfixes ; cloud patches bornés, sans matrice exhaustive |
 | ML-05 | Parcours GCP de référence et publication communautaire | ML-01 à ML-04 | Oui |
 | ML-06 | Opérations quotidiennes, sauvegarde et previews | ML-05 | Non |
@@ -197,7 +197,7 @@ Machine propre sans source du framework ; pin projet prioritaire ; signature inv
 
 **Fin :** le guide ne demande plus de placer un provider à côté du binaire à la main. Ne pas extraire AWS dans ce lot.
 
-## ML-03 — Publier les images de base et fermer le build Magento
+## ML-03 — Construire les images dans la CI/CD utilisateur et fermer le build Magento
 
 **But :** l’utilisateur construit son application, pas le framework MageLift.
 
@@ -205,10 +205,10 @@ Machine propre sans source du framework ; pin projet prioritaire ; signature inv
 
 ### Travail
 
-1. Sélectionner une entrée de catalogue pour la recette GCP. Réutiliser le namespace GHCR et les workflows existants ; pas de nouveau registre.
-2. Publier des images builder/runtime accessibles aux utilisateurs, épinglées par digest, avec la provenance/signature déjà prévues. Publication de nouveaux packages publics soumise aux permissions du mainteneur.
+1. Sélectionner une entrée de catalogue pour la recette GCP. Livrer les recettes existantes avec le CLI, sans imposer de clone du framework ni de registre MageLift.
+2. Construire les images builder/runtime et applicatives dans la CI/CD de l’utilisateur. Publier dans son dépôt d’images choisi (GHCR, ECR, Artifact Registry ou autre registre OCI), avec les attestations existantes ; consommer les bases par digest. Aucune publication d’images au nom de MageLift.
 3. Tester Linux/amd64 dans le cloud ; sur un poste ARM, vérifier le build pour la plateforme cible sans annoncer une compatibilité ARM runtime non testée.
-4. Résoudre automatiquement ces images à partir de la configuration/release. Une override avancée reste explicite et sort du parcours testé ; pas de reconstruction cachée depuis `latest`.
+4. Construire automatiquement les bases à partir des recettes et entrées amont épinglées livrées avec la release. Le cache BuildKit reste utilisable. Une override avancée par digest reste explicite ; pas de `latest` implicite ni de dépendance à des images publiées par MageLift.
 5. Préserver un build sans base de données de production ni `env.php` runtime. `composer.lock`, versions d’images, modules, locales et thèmes sont des entrées explicites.
 6. Utiliser le montage de secrets Composer existant. Tester l’absence de secrets dans les couches, logs et manifeste. Ne pas committer de credentials Adobe ni redistribuer des dépendances commerciales sans droits.
 7. Réutiliser les phases : validation → Composer install → patches → DI → contenu statique → image → manifeste externe finalisé.
@@ -222,7 +222,7 @@ Deux builds à entrées verrouillées produisent une application fonctionnelleme
 
 Tester source fraîche, projet existant, credentials absents, extension PHP absente, thème invalide et absence de DB runtime. Le guide part du dépôt de la boutique, pas de MageLift.
 
-**Fin :** un build applicatif fonctionne à partir des images publiées et produit le manifeste existant. Pas de nouvelle matrice Magento/PHP.
+**Fin :** la CI/CD utilisateur construit et publie les images dans son registre, puis produit le manifeste existant. Pas de nouvelle matrice Magento/PHP.
 
 ## ML-04 — Rendre les patches fiables et compréhensibles
 
@@ -260,7 +260,7 @@ Employer des fixtures synthétiques pour les tests unitaires et un exemple upstr
 
 ### Travail
 
-1. Faire le parcours depuis une archive/canary et les images publiées, dans un environnement propre. Utiliser un projet Magento synthétique et un tuple exact.
+1. Faire le parcours depuis une archive/canary dans un environnement propre, avec les images construites et publiées dans le registre de l’utilisateur. Utiliser un projet Magento synthétique et un tuple exact.
 2. Mettre les commandes d’onboarding en accord avec l’aide réelle. Conserver la sémantique actuelle de `magelift preview` comme plan d’infrastructure : ne pas la recycler en commande de création d’environnement éphémère.
 3. Assurer l’ordre : config/identité → prérequis → bootstrap explicite → build → plan → migrations contrôlées → activation → état applicatif.
 4. Vérifier le verrou de déploiement, le traitement d’une erreur et l’absence de lancement simultané des migrations par chaque réplique.
@@ -543,3 +543,7 @@ Les références de dépôt ci-dessous sont relatives à `magelift/magelift` au 
 - **[S12]** Google Cloud, Create, edit, or delete budgets and budget alerts : `https://docs.cloud.google.com/billing/docs/how-to/budgets` — distinction alertes seules et autres dispositifs de plafond selon service.
 
 **Règle finale : publier une capacité limitée qui fonctionne, documenter les défauts réels, puis itérer. Ne pas transformer ce plan en un nouveau projet de plateforme universelle.**
+
+### Correction produit du mainteneur — images
+
+La clarification du mainteneur remplace l’ancienne exigence de publication des bases dans GHCR MageLift : toutes les images sont construites dans la CI/CD utilisateur et publiées dans son propre dépôt OCI. Les recettes sont livrées avec le CLI. Le mode local ne publie rien.

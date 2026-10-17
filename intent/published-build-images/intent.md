@@ -1,5 +1,5 @@
 ---
-status: draft
+status: accepted
 slug: published-build-images
 ---
 
@@ -7,14 +7,10 @@ slug: published-build-images
 
 ## Problem
 
-The current GCP onboarding asks users to clone MageLift, build MageLift's
-builder and runtime base images, inspect their digests, and then build the shop
-image. This makes framework image production part of every user's first deploy,
-expands the number of mutable inputs, and makes a clean-machine proof validate
-maintainer image construction and shop deployment at the same time.
-
-Creating another bundle or manifest would duplicate artifact contracts that
-already exist.
+The maintainer requires every image to be built in the user's CI/CD and
+published to their chosen OCI repository. The original proposal for a public
+MageLift base-image catalog is superseded. Requiring a framework checkout or
+manual base-image assembly would still make onboarding unnecessarily complex.
 
 ## Evidence
 
@@ -35,15 +31,11 @@ establish the required lifecycle split.
 
 ## Proposed outcome
 
-MageLift releases publish tested, immutable builder and runtime images for the
-small supported compatibility catalog. Each entry has digests, architecture,
-Magento/PHP/Composer compatibility, build-package version, SBOM, provenance,
-signature, and support status.
-
-A shop uses those released inputs to build its own immutable application image
-and the existing external artifact manifest. Users no longer clone MageLift or
-build framework base images on the supported path. Builds remain free of the
-runtime database, env.php, and plaintext secrets.
+The CLI ships the existing recipes and PHP build package. A shop's CI builds
+the builder, runtime and application images and publishes them to the same
+user-selected OCI repository. Bases are consumed by their resulting digests.
+Local builds load images without publishing. The existing external manifest
+and traceability remain. Builds need no runtime database or plaintext secrets.
 
 ## Affected users and systems
 
@@ -55,7 +47,7 @@ onboarding.
 
 - Reuse ArtifactManifest, ImmutableArtifactContract, and BuildArtifact.
 - Do not introduce a second application manifest.
-- Publish a small tested catalog, not arbitrary PHP/Magento combinations.
+- Ship one tested recipe; do not expand the compatibility matrix.
 - Base-image and application-image digests are immutable.
 - Shop source and Composer credentials remain user-owned.
 - Composer credentials use the existing secret mount and never enter image
@@ -71,8 +63,8 @@ onboarding.
 - New Magento/PHP compatibility rows.
 - Provider-specific application images.
 
-## Open questions
+## Maintainer decision
 
-- Which registry namespace and retention policy should host the first-party
-  builder/runtime catalog? The spec must select one immutable public path and
-  define how security fixes deprecate, rather than mutate, older digests.
+No MageLift-owned image publication or required registry. Use the user's
+Docker authentication and OCI repository. Registry retention is user-owned;
+MageLift does not automatically delete images after an interrupted build.

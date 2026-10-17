@@ -20,7 +20,7 @@ plugin API, every broker, high availability, or every restore path.
 
 1. Milestone A: one person with Docker and a prepared cloud account can
    install a published binary, configure Magento in YAML, build from
-   published base images and declared patches, deploy the documented GCP
+   the shipped recipes and declared patches in their CI, publishing to their own registry, deploy the documented GCP
    recipe over HTTPS, read status and logs, run an app command, redeploy,
    and destroy that disposable environment without deleting foreign
    resources. They can open a reproducible issue or PR from the contributor
@@ -60,7 +60,7 @@ Their intent files stay draft or absent. Paused does not mean done.
 | ML-00 | yes | this roadmap, `AGENTS.md`, the alpha-loop plan, release skill; Makefile and CI are the same lot but edited separately | One priority list and one local test loop |
 | ML-01 | yes | [alpha-development-loop](alpha-development-loop/intent.md), accepted; plan still open | Finish the existing GCP loop: distribution, artifact, and product gates stay independent. Do not reopen the certification matrix |
 | ML-02 | yes | [transparent-provider-delivery](transparent-provider-delivery/intent.md), draft | Install and provider fetch without a second plugin manager |
-| ML-03 | yes | [published-build-images](published-build-images/intent.md), draft | Published base images and one deterministic Magento build |
+| ML-03 | yes | [published-build-images](published-build-images/intent.md), draft | User-built images in their own registry and one deterministic Magento build |
 | ML-04 | yes for QPT and hotfixes | no new intent directory; `build/` patch lifecycle | Explicit patch policy. Cloud patches stay bounded. Do not apply the same patch twice |
 | ML-05 | yes | [gcp-alpha-release](gcp-alpha-release/intent.md), draft | Documented GCP recipe and the community publish of that slice |
 | ML-06 | no | no intent directory | Day-2 operations, bounded backup/restore, managed previews. Paused |
@@ -214,3 +214,5 @@ Still paused until the trigger is real, same as before:
 - Human docs and public claims change with their ADR or capability source.
 - Ask first for release tags, public publish, protected or production
   destroy, history rewrite, and spend outside the envelope above.
+
+The maintainer’s image clarification supersedes the original ML-03 GHCR requirement: MageLift ships build recipes; the user’s CI builds every image and publishes to their chosen OCI repository. MageLift does not publish builder/runtime images.
