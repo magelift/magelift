@@ -48,7 +48,9 @@ Pushed builds also default to `linux/amd64`. Advanced `--builder-image` and
 registry digests. Explicit ARM or multiple-platform builds require those
 advanced images and remain outside the community alpha qualification.
 
-The Git `origin` must be an HTTPS URL. Repositories with an SSH origin can pass the public source URL explicitly:
+Pushed builds require an immutable HTTPS provenance URL. Private repositories
+and detached checkouts are accepted; no local branch or Git author identity is
+required. Repositories with an SSH origin can pass their HTTPS source URL:
 
 ```sh
 magelift build --push \
@@ -76,9 +78,10 @@ hashes, PHP and Composer versions, modules, static-content matrix and final
 image digest. Its MageLift version comes from the CLI; development builds use
 `0.0.0-dev`. The build-package version remains independent.
 
-The image carries `io.magelift.builder.image` and `io.magelift.runtime.image`
-labels with the resolved base identities. The final digest links those labels
-to the external manifest. Repeat builds may have different OCI digests while
+The image carries `io.magelift.builder.image` and the recipe fingerprint in
+`io.magelift.recipe.sha256`. The manifest records that fingerprint, platform and
+pinned upstream bases. Advanced base overrides retain their runtime identity
+label. The final digest links these inputs to the external manifest. Repeat builds may have different OCI digests while
 retaining equivalent declared inputs and application content.
 
 ## Preparation hooks
@@ -149,3 +152,12 @@ An absent or invalid value fails without printing its contents. This reference
 is available only for build-time Composer credentials; runtime secrets retain
 the provider reference contract. The existing cloud secret references remain
 available. Never put the credential JSON in YAML or pass it as a build argument.
+
+## Hotfix failures
+
+The existing lifecycle applies declared Quality Patch IDs through the tool
+installed by the shop's production Composer lock, then sorted `m2-hotfixes`.
+Host hotfix application first checks whether a patch is needed or fully applied.
+A conflict or partially applied patch stops preparation; review its applicability
+against the locked Magento version before adjusting it and retrying. These
+checks do not merge conflicting patches or make a whole patch series atomic.
