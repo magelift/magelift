@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MageLift\Build\Tests\Magento;
 
 use MageLift\Build\Magento\PatchApplier;
+use MageLift\Build\Magento\PatchCommand;
 use MageLift\Build\Process\NativeProcessRunner;
 use MageLift\Build\Process\ProcessRequest;
 use MageLift\Build\Process\ProcessResult;
@@ -138,6 +139,13 @@ PATCH);
             self::assertStringNotContainsString('NOTFOUND', $error->getMessage());
         }
 
+        // The lifecycle runs PatchCommand directly rather than PatchApplier::apply.
+        $command = new PatchCommand('m2-hotfixes/conflict.patch');
+        $result = $command->run(new NativeProcessRunner(), new ProcessRequest($command->argv(), $root, [], 300));
+        self::assertFalse($result->succeeded());
+        self::assertStringContainsString('m2-hotfixes/conflict.patch', $result->stderr);
+        self::assertStringContainsString('locked Magento version before retrying', $result->stderr);
+        self::assertStringNotContainsString('NOTFOUND', $result->stderr);
         self::assertSame($original, (string) file_get_contents($target));
         self::assertNoPatchRejectArtifacts($root);
     }

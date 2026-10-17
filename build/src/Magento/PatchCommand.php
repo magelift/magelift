@@ -81,7 +81,7 @@ final readonly class PatchCommand implements CommandInterface
         return new ProcessResult(
             $forwardDryRun->exitCode,
             $forwardDryRun->stdout,
-            self::joinDiagnostics($forwardDryRun->stderr, $reverseDryRun->stderr),
+            $this->failureMessage($forwardDryRun->exitCode),
             $reverseDryRun->timedOut,
             $reverseDryRun->cancelled,
         );
@@ -116,10 +116,13 @@ final readonly class PatchCommand implements CommandInterface
         );
     }
 
-    private static function joinDiagnostics(string $first, string $second): string
+    public function failureMessage(int $exitCode): string
     {
-        $diagnostics = array_values(array_filter([$first, $second], static fn (string $value): bool => $value !== ''));
-
-        return implode("\n", $diagnostics);
+        return sprintf(
+            'Failed to apply %s hotfix "%s" (exit %d). Review applicability against your locked Magento version before retrying; adjust or remove the hotfix if it no longer matches the codebase.',
+            PatchApplier::HOTFIX_DIRECTORY,
+            $this->patchPath,
+            $exitCode,
+        );
     }
 }
