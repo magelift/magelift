@@ -101,3 +101,26 @@ func runGit(t *testing.T, directory string, args ...string) {
 		t.Fatalf("git %v: %v: %s", args, err, output)
 	}
 }
+
+func TestGitInspectorAcceptsPrivateDetachedCheckoutWithoutAuthorIdentity(t *testing.T) {
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	root := cleanRepository(t)
+	runGit(t, root, "config", "--unset", "user.name")
+	runGit(t, root, "config", "--unset", "user.email")
+	const origin = "git@private.example.invalid:agency/shop.git"
+	runGit(t, root, "remote", "add", "origin", origin)
+	runGit(t, root, "checkout", "--detach", "--quiet", "HEAD")
+	expected := exec.Command("git", "-C", root, "rev-parse", "HEAD")
+	revision, err := expected.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository, err := (GitInspector{}).Inspect(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repository.OriginURL != origin || repository.Revision != strings.TrimSpace(string(revision)) {
+		t.Fatalf("unexpected repository: %#v", repository)
+	}
+}
