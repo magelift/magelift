@@ -127,4 +127,4 @@ for outcome in pass runtime-fail auxiliary-fail; do
     if [[ "$outcome" == runtime-fail ]] && grep -q 'key-cleanup' "$trace"; then exit 1; fi
   fi
 done
-printf 'gcp_acceptance_ownership_test OK (doubles only)\n' 
+printf 'gcp_acceptance_ownership_test OK (doubles only)\n'
