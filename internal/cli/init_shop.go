@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -197,6 +198,15 @@ func projectNameFromComposer(path string) (string, error) {
 	name = strings.Trim(name, "-")
 	if name == "" {
 		return "example-shop", nil
+	}
+	if name[0] < 'a' || name[0] > 'z' {
+		name = "shop-" + name
+	}
+	// GCP resource planning requires a letter-led name of at most 31 bytes.
+	// Keep a digest when shortening so sibling shops with a shared prefix differ.
+	if len(name) > 31 {
+		digest := sha256.Sum256([]byte(name))
+		name = strings.TrimRight(name[:22], "-") + fmt.Sprintf("-%x", digest[:4])
 	}
 	return name, nil
 }

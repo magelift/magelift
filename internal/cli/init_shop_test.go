@@ -4,10 +4,39 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
 )
+
+func TestInitProjectNameFitsGCPResourceContract(t *testing.T) {
+	valid := regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "composer.json")
+	seen := map[string]bool{}
+	for _, input := range []string{"vendor/001-shop", "vendor/" + strings.Repeat("a", 50) + "-one", "vendor/" + strings.Repeat("a", 50) + "-two", "vendor/normal-shop"} {
+		data, err := json.Marshal(composerProject{Name: input})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		name, err := projectNameFromComposer(path)
+		if err != nil || !valid.MatchString(name) || seen[name] {
+			t.Fatalf("input=%q name=%q duplicate=%v error=%v", input, name, seen[name], err)
+		}
+		again, err := projectNameFromComposer(path)
+		if err != nil || again != name {
+			t.Fatalf("unstable name: %q then %q, error=%v", name, again, err)
+		}
+		if input == "vendor/normal-shop" && name != "normal-shop" {
+			t.Fatalf("ordinary name changed: %q", name)
+		}
+		seen[name] = true
+	}
+}
 
 func TestInspectShopSourceFromLock(t *testing.T) {
 	dir := t.TempDir()
