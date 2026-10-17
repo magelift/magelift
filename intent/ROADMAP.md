@@ -1,220 +1,86 @@
-# Roadmap: GCP community alpha, then the later lots
+# Roadmap: agency test alpha on GCP
 
-Updated: 2026-10-17.
+Updated: 2026-10-18.
 
-This page is the in-repo record of the maintainer implementation plan dated
-2026-10-17 (`MageLift_Plan_Implementation_Codex.md`, plan 1.1, inspected base
-`3ac1b844a7117752f3a5045054587508c16dcf6c`). For lots ML-00 through ML-09, that
-plan is execution authority: do not open a new spec or plan approval per
-subtask. Ask first still applies to public publish, release tags, protected
-or production destroy, history rewrite, and spend outside the envelope below.
+The maintainer's [implementation plan](../MageLift_Plan_Implementation_Codex.md)
+version 1.2 replaces versions 1.0/1.1 and their ML-xx priorities. It is execution
+authority; no repeated spec/plan approval is needed for each subtask. Existing
+verified work is retained. Historical reports remain historical evidence.
+Tags/publication, history rewrite, protected destruction and spending outside
+the envelope still require approval. Never destroy foreign resources.
 
-The product remains a Go CLI that consumes magelift.yaml and deploys into the
-user's cloud account. MageLift is not a host.
+Work stays on `reboot/community-alpha`, created from `wip/all-local-work`.
+The base recorded by the maintainer was `3ac1b844a7117752f3a5045054587508c16dcf6c`.
+The latest committed implementation before this revision was `7aa79fe`; its
+uncommitted source-build, cache and CI changes were preserved during the update.
 
-## Goal
+## Outcome
 
-Ship a community alpha on one GCP recipe, with documented defects allowed,
-then improve from use. Milestone A does not wait on a console, a stable
-plugin API, every broker, high availability, or every restore path.
+A Magento developer can install one product version, inspect an existing shop,
+initialize a test environment, prepare the authorized GCP project and CI, then
+build, publish and deploy through GitHub Actions. The guide does not require
+them to design IAM, PKI, Pulumi state, networking or a cluster topology.
 
-1. Milestone A: one person with Docker and a prepared cloud account can
-   install a published binary, configure Magento in YAML, build from
-   the shipped recipes and declared patches in their CI, publishing deployable images to their own registry, deploy the documented GCP
-   recipe over HTTPS, read status and logs, run an app command, redeploy,
-   and destroy that disposable environment without deleting foreign
-   resources. They can open a reproducible issue or PR from the contributor
-   docs.
-2. Milestone B, after A: bounded backup and restore, managed previews, a
-   CLI surface agents can rely on, a read-only local console, and AWS on
-   the common contract. None of these are retroactive gates for A.
+The CLI ships versioned recipes and PHP build code. The user's runner builds
+the intermediates and publishes the deployable application to their registry;
+there are no central MageLift Docker images. Artifact Registry is the GCP
+reference default. Cache is optional, private where necessary, and separate
+from deployable artifacts. A promotion reuses an existing digest and manifest.
 
-Maintenance (first-party or community), maturity (alpha or experimental, per
-capability or recipe), and the last real test (commit, date, configuration,
-operations, result) stay separate facts. `NOT_RUN` is a real result. Record
-them in `docs/capability-matrix.md` and `docs/evidence/`. Do not add a badge
-engine. Do not rewrite historical evidence conclusions. This roadmap does
-not upgrade or downgrade a certified cell by itself.
+This is an alpha for test environments. Production migration recommendations
+require the pilot's restoration/migration proof. No HA, all-provider matrix,
+console or mandatory AWS extraction blocks the test alpha.
 
-## What stays
+## Active sequence
 
-- Go, Cobra, YAML, Pulumi Automation API, the PHP build, and OCI images.
-- The monorepo, the existing artifact manifest, the operations contract,
-  and the signed GCP plugin. No second manifest and no second deploy loop.
-- GCP as an autonomous signed provider. AWS ECS code and evidence stay.
-  Experimental providers stay frozen at their recorded level.
-- Provider-owned topology (ADR 0003, 0004). No shared Pulumi graph behind
-  `if provider ==`.
-- Secret references only. Clean-room gate `make check-clean-room`.
-- A checked item in an older plan is re-verified. It is not a prompt to
-  rebuild that mechanism.
+| Lot | Current state | Remaining outcome |
+| --- | --- | --- |
+| S0 — usable correction loop | Existing community gates cover root/SDK/GCP; bounded race and current PHP container checks exist. Reconcile current rules and retain the synthetic fixture | Preserve fast local work without a cloud account or release tag dependency |
+| S1 — build with distributed software | Active carryover: embedded source recipe, local/default builds, optional cache, image/manifest trace, verified provider acquisition and local OCI registry proofs | Finish declared QPT/hotfix regressions and a changed patch/cache case; fresh distributed-binary acceptance; keep advanced overrides and private/detached Git usable |
+| S2 — guided agency and CI preparation | Existing init/bootstrap/generator to extend; CI handoff and promotion improvements remain in progress | Minimal test starter, explicit/idempotent owned bootstrap, generated identity/registry details, customized workflow protected, real authorized GCP CI run |
+| S3 — supportable alpha | Existing deploy/ops/doctor/JSON/skills and release workflows retained | Functional GCP scenario, second release and persistence, useful incident, voluntary local diagnostic export, install/release evidence and independent cleanup |
+| S4 — agency pilot | Deferred until a real pilot; existing dump/import/media and local runtime stay available | Isolated shop trial and restoration proof before real commercial data recommendations; requested previews and second-runner recovery |
+| S5 — useful AWS | Experimental path retained; targeted tests within budget | One grouped ECR/ECS scenario and cleanup; extraction only if a measured problem justifies it |
 
-## Lots
+S0–S3 lead to the alpha. S4/S5 follow according to pilots and do not become
+retroactive publication gates. Former ML-06 through ML-09 obligations are not
+an active backlog merely because they appeared in the older plan. Console,
+MCP, universal plugin stability and extra providers have the triggers in plan
+section 7, not unconditional implementation commitments.
 
-One implementation lot is active by default. A lot may land as several
-small PRs. ML-06 through ML-09 stay paused until milestone A is published.
-Their intent files stay draft or absent. Paused does not mean done.
+The old [published-build-images intent](published-build-images/intent.md) is
+superseded. Keep useful Docker sources/tests; do not execute central publishing.
+The former alpha-loop/provider/build reports under
+[community-alpha](community-alpha/verification.md) record what actually ran;
+they do not prove the new guided agency path or a cloud run by themselves.
 
-| Lot | Blocks A | Intent today | Outcome |
-| --- | --- | --- | --- |
-| ML-00 | yes | this roadmap, `AGENTS.md`, the alpha-loop plan, release skill; Makefile and CI are the same lot but edited separately | One priority list and one local test loop |
-| ML-01 | yes | [alpha-development-loop](alpha-development-loop/intent.md), accepted; plan still open | Finish the existing GCP loop: distribution, artifact, and product gates stay independent. Do not reopen the certification matrix |
-| ML-02 | yes | [transparent-provider-delivery](transparent-provider-delivery/intent.md), draft | Install and provider fetch without a second plugin manager |
-| ML-03 | yes | [published-build-images](published-build-images/intent.md), superseded by ML-03 revision 1.1 | Shipped recipes, final-image-only publication, optional user cache and a real minimal CI workflow |
-| ML-04 | yes for QPT and hotfixes | no new intent directory; `build/` patch lifecycle | Explicit patch policy. Cloud patches stay bounded. Do not apply the same patch twice |
-| ML-05 | yes | [gcp-alpha-release](gcp-alpha-release/intent.md), draft | Documented GCP recipe and the community publish of that slice |
-| ML-06 | no | no intent directory | Day-2 operations, bounded backup/restore, managed previews. Paused |
-| ML-07 | no | [aws-autonomous-provider](aws-autonomous-provider/intent.md), draft | Targeted AWS, then extraction. Paused. A GCP pass does not prove AWS |
-| ML-08 | no | no intent directory | Machine-readable CLI, user skills, read-only local console. Paused |
-| ML-09 | no | [provider-ecosystem-readiness](provider-ecosystem-readiness/intent.md), draft | A contributor can add a provider; minimal external integrations. Paused |
+## Resource envelope
 
-## Reference recipe
+GCP acceptance is authorized in `digital-lab-341608` (the maintainer also
+previously allowed `n8n-dlab` if rights required it). Prefer the selected
+`us-central1` reference region, whose compared compute/SQL components tied
+for the lowest inspected prices. Recheck the exact service/cost assumptions
+before mutations; credits do not prove zero gross cost. Every run gets its
+own fresh `magelift-` prefix, owner record, bounded lifetime and cleanup.
+No unapproved retained debug environment.
 
-Magento Open Source 2.4.9 is the repository starting point. Check applicable
-security patches before any public exposure. Use the latest stable toolchains and dependencies compatible with this recipe,
-as requested by the maintainer. Verify compatibility and pin exact versions;
-do not resolve a mutable "latest" during a build.
-Confirm the tuple against Adobe's documentation before publishing a
-compatibility claim. If that check disagrees with the tree, fix the recipe
-and its tests only.
+The configured default AWS account is authorized for targeted acceptance.
+The announced credits are approximately USD150: at most USD100 planned test
+spend after checking coverage/current consumption, keeping USD50 reserve.
+One active disposable stack by default; session estimate/time limit,
+inventory and cleanup precede new creation. No authorization to pay by card
+when credits are exhausted. Current recorded AWS test spend/reservation: zero;
+remaining account credits have not been verified.
 
-| Concern | Alpha choice |
-| --- | --- |
-| Application | Magento Open Source 2.4.9 and the evidenced patch and PHP tuple |
-| Runtime | GCP GKE Autopilot, nginx/PHP-FPM |
-| Database | Cloud SQL MySQL at a version checked for this Magento |
-| Cache/session | Memorystore Valkey at the verified tuple version |
-| Search | Existing OpenSearch path, one replica, with indexing and search actually exercised |
-| Queue | Existing database queue for the alpha path. It does not cover every extension |
-| Media | Private GCS through the adapter contract already in tree. Test it |
-| Secrets | Secret Manager references, materialized at runtime |
-| Deployment | Candidate job and migrations before the new release is activated |
-| Edge | Existing HTTPS path. No new CDN or WAF to close the alpha |
-| Diagnosis | Native logs, deploy state, and errors a user can act on |
+## Verification and honesty
 
-A container that starts does not prove version compatibility. AWS keeps its
-existing ECS architecture. Reuse the same application image only when CPU
-architecture and the runtime contract allow it, and inject AWS bindings at
-runtime.
+Use `make verify-community` for the community gate, narrow package tests for
+iteration, and explicit heavier CI checks when relevant. Keep clean-room,
+trust, locks, secrets and ownership protections. No unbounded root race run,
+no local GoReleaser multi-target matrix, and no removed assertion to hide a bug.
+A local Docker or unit success does not prove GitHub CI, runtime pull or GCP.
+A human guide trial remains NOT_RUN until an outside person actually performs it.
 
-The alpha does not promise arbitrary Magento, PHP, database, cache, search,
-or queue combinations; GKE Standard or high availability; zero-downtime
-incompatible schema changes; cross-region or cross-cloud disaster recovery;
-generated CI; every day-two operation; a hard cloud-spend cap; external edge
-or observability; or a stable provider API.
-
-Security checks on an endpoint the alpha exposes stay in force. Fewer
-certification obligations do not drop trust-boundary tests, secret handling,
-or destroy scope.
-
-## Local commands
-
-Canonical commands, matching the Makefile on this branch:
-
-| Use | Command |
-| --- | --- |
-| Fast Go loop | `make test-fast` |
-| Community alpha local gate | `make verify-community` |
-| Targeted race | `make test-race` |
-
-`make test-fast` runs `scripts/go-test-modules.sh`: root `./...`, `sdk/` with
-`GOWORK=off`, and `providers/gcp/` on the workspace, without `-race`. Root
-`go test ./...` is not a substitute for the nested modules. GCP does not
-require `GOWORK=off` for this gate.
-
-`make test-race` runs `scripts/go-test-race-targeted.sh`. That is root slices
-`internal/lintcoverage`, `internal/usererr`, `internal/providerhost/...`,
-`internal/cli`, and `internal/platform`, plus `sdk/` and GCP `operations`
-with `-race`. It does not race every root package.
-
-`make verify-community` uses the module runner with `--community`,
-which excludes root AWS, OVH, Scaleway and external-vendor suites plus their
-acceptance commands. The SDK and GCP suites still run in full. It depends on
-`test-community`, `test-race`, `php-test`, `lifecycle-golden-check`, `check-clean-room`,
-`core-leanness`, `community-test-helpers`, and the focused `development-loop-test`.
-
-`make verify-community` does not run `generate-check`, `cli-docs-check`,
-`fmt-check`, `lint`, `license-check`, `docs`, `workflow-check`,
-`test-race-full`, the acceptance harness, `local-gates`, Floci, image tests,
-or live cloud targets. Those targets remain. A red test stays red. Do not
-delete it, weaken the assertion, or relabel it `SKIP` to close a lot.
-
-`make test-race-full` is `go test -race ./...` in the root module. It misses
-`sdk/` and `providers/gcp/`. `make verify` runs `test-fast`, `test-race-full`,
-and `sdk-test`, plus lint, docs, and the other checks in its recipe. It is
-the broader suite. It is not the milestone A gate, and it is not the default
-local loop, because of `test-race-full`.
-
-`make php-test` (`scripts/php-test.sh`) uses host PHP when the extensions it
-checks are present, otherwise the pinned Composer image.
-`lifecycle-golden-check` uses the same PHP runner. Missing Composer dependencies
-are installed from the lock through that runner; no host PHP is required with
-Docker. Use `MAGELIFT_PHP_TEST_CONTAINER=1` to force the pinned environment.
-
-Hosted CI runs the full root suite without race and targeted provider/CLI
-race checks; SDK and GCP have separate jobs. Do not pin `GOMAXPROCS` or `-p`.
-`GOMEMLIMIT` is 75% of available RAM.
-
-## Live cloud
-
-GCP is the real-cloud development path: a small recipe in an explicitly
-named acceptance project. Verify identity, permissions, enabled APIs, and
-the ownership prefix before mutation. Credits do not prove that every
-service is covered or that the current identity is allowed to create it.
-Destroy on exit by default. A retained debug cell needs an explicit option,
-an owner, an expiry, an inventory, and a destroy procedure. No standing
-infrastructure by implication.
-
-A mock or dry run is not a GCP pass. If credentials or an authorized target
-are missing, record `NOT_RUN` and continue local work. An HTTP 500 on a
-product gate stays `FAIL` until the product is fixed.
-
-AWS keeps the existing ECS shape. Reconfirm remaining credit before a live
-run. One active AWS test stack by default. No AWS matrix on every PR.
-Planning ceilings, not price quotes and not a card authorization: 50 USD for
-a grouped ECS recipe test, 30 USD for parity after provider extraction,
-20 USD for targeted regressions, 50 USD unplanned reserve. Planned trials
-stop at 100 USD of the roughly 150 USD mentioned, after remaining credit
-and in-flight spend are checked. If the next run does not fit, do not create
-it. Budget alerts notify. They do not prove a hard stop at 100 or 150 USD.
-Cleanup of resources already created can still cost money.
-
-Other providers: no live spend until a later lot is actually active.
-Third-party paid integrations are not an alpha gate.
-
-## Paused, not done
-
-The 2026-09-22 queue (orders 1 through 6 as separate spec/plan cycles, a
-certification seal as the close of the development loop, and `make verify`
-as the alpha's full local suite) is paused where it sits outside milestone A.
-Unfinished folders were not archived. Their open requirements are not
-checked off.
-
-Still paused until the trigger is real, same as before:
-
-| Work | Trigger |
-| --- | --- |
-| Generated GitHub CI | The published laptop path is green and a pilot needs team automation |
-| Backup/restore and failed-release recovery | Milestone A is in use; then order by operational risk |
-| Production/HA GCP profile | A pilot needs that scale and accepts the cost and evidence |
-| Cloud Run runtime | After the Autopilot alpha, and only if a bounded prototype is cheaper to run or to operate |
-| Stable provider contract | After GCP and AWS pilots show the freeze surface (ML-09) |
-| OVH and Scaleway | After AWS, unless a funded pilot is the next provider |
-| EKS and GKE Standard | A concrete workload cannot fit the recorded runtimes |
-| External edge and observability | Stable origin first, then user demand |
-
-`intent/archive/` stays immutable decision history.
-
-## Working agreement
-
-- One active lot. Smallest correct change. Reuse the existing contracts.
-- Current code and ADRs outrank stale intent prose. This roadmap outranks
-  the 2026-09-22 sequence where they differ.
-- Mocks prove contracts. They do not prove live Magento.
-- Human docs and public claims change with their ADR or capability source.
-- Ask first for release tags, public publish, protected or production
-  destroy, history rewrite, and spend outside the envelope above.
-
-The maintainer’s image clarification supersedes the original ML-03 GHCR requirement: MageLift ships build recipes; the user’s CI builds every image and publishes to their chosen OCI repository. MageLift does not publish builder/runtime images.
-
-Revision 1.1 requires the minimal user CI workflow in milestone A. Builder/runtime intermediates stay on the runner; separate base-image publication is not required. Optional registry cache is user-owned and separate from the final artifact.
+Report delivered changes, executed tests, NOT_RUN, limits, remaining resources
+and the next useful work. No new certification engine, state database or
+parallel manifest is needed.

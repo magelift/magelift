@@ -46,9 +46,10 @@ rewrite, and cloud spend outside the envelope in `intent/ROADMAP.md`.
 
 ## Do
 
-- Active work follows `intent/ROADMAP.md`: lots ML-00 through ML-09, one lot
-  at a time, in dependency order. The maintainer plan reconciled there is
-  execution authority for those lots. Do not open another spec or plan
+- Active work follows `intent/ROADMAP.md` and maintainer plan v1.2: S0–S3
+  lead to the test alpha; S4/S5 follow pilots. These replace ML-xx priorities,
+  rather than adding requirements. One lot is active at a time. The plan is
+  execution authority for these lots. Do not open another spec or plan
   approval for each subtask. A checked box in an older plan is re-verified,
   not rebuilt. Pause unfinished work outside the active lot. Do not mark it
   done.

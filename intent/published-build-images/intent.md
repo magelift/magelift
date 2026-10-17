@@ -5,8 +5,8 @@ slug: published-build-images
 
 # Superseded: published Magento build foundation
 
-The original central-image objective is replaced by ML-03 in maintainer plan
-revision 1.1. Preserve the existing recipes and useful checks. Intermediate
+The original central-image objective is replaced by S1/S2 in maintainer plan
+revision 1.2 (S1/S2). Preserve the existing recipes and useful checks. Intermediate
 builder/runtime images stay on the runner; publish deployable images and an
 optional user-owned cache. A real minimal user CI workflow belongs to milestone A.
 

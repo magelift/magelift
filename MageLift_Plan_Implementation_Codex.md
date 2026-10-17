@@ -1,634 +1,314 @@
-# MageLift — Plan d’implémentation pour Codex
+# MageLift — Plan Codex pour un mainteneur solo et des agences Magento
 
-**Version du plan : 1.1 — 17 octobre 2026 — Builds et registres sous contrôle utilisateur**  
+**Version : 1.2 — 18 octobre 2026**  
+**Remplace intégralement les versions 1.0 et 1.1 ; ce n’est pas une liste d’exigences supplémentaire.**  
 **Dépôt :** `magelift/magelift`  
-**Base inspectée :** `wip/all-local-work`, commit `3ac1b844a7117752f3a5045054587508c16dcf6c`  
-**Branche de travail proposée :** `reboot/community-alpha`
+**Base :** `wip/all-local-work`. Dernier SHA identifié dans l’analyse précédente : `3ac1b844a7117752f3a5045054587508c16dcf6c`. Relever le HEAD réel avant de travailler.  
+**Branche :** réutiliser `reboot/community-alpha` si elle existe déjà ; sinon la créer depuis la branche de travail, sans écraser les modifications locales.
 
-## Révision 1.1 — Décision sur les images et la CI/CD
+## 1. Décision produit
 
-Cette version **remplace intégralement la version 1.0**. Le changement concerne la fabrication et la distribution des images, pas l’architecture cloud ni l’ordre GCP → AWS.
+MageLift doit permettre à un développeur Magento d’une petite agence de construire, déployer et exploiter une boutique dans le compte cloud de son client, sans concevoir lui-même une infrastructure ni maintenir des Dockerfiles de framework.
 
-**Décision du mainteneur : aucune image Docker MageLift à publier ou maintenir dans un registre central, sur GHCR ou ailleurs.** MageLift distribue des recettes de construction et du code versionnés. Les images sont construites par la CI/CD du projet utilisateur et poussées dans un registre contrôlé par celui-ci : GHCR, Amazon ECR, Google Artifact Registry ou autre registre compatible et accessible.
+Le mainteneur fournit le logiciel et ses recettes. Il ne fournit ni hébergement, ni astreinte, ni fabrique centrale d’images. Les défauts sont acceptables dans une alpha ; les fausses réussites, les suppressions hors périmètre et les promesses opérationnelles trompeuses ne le sont pas.
 
-Les images amont (PHP, Composer et services, par exemple) restent utilisables avec une version/digest résolus. Les stages builder/runtime spécifiques à MageLift sont construits sur le runner utilisateur ; leur publication séparée n’est pas nécessaire. Un cache externe utilisateur est une optimisation, jamais une dépendance nécessaire au build.
+**Le critère de simplicité n’est pas le nombre de commandes : c’est le nombre de décisions techniques et de manipulations manuelles imposées à l’utilisateur, puis au mainteneur pour l’aider.**
 
-**Conséquence de priorité : un workflow CI utilisateur minimal, exécuté réellement, fait partie du jalon A.** Seules la multiplication des plateformes CI et les fonctionnalités CI avancées sont reportées. Un build local reste possible pour développer et diagnostiquer, avec la même recette.
+### Contraintes conservées
 
-Les observations de code sont issues d’une lecture, sans exécution nouvelle des tests ni déploiement pour cette révision. Les commandes, champs et fichiers ajoutés ci-dessous sont des objectifs d’implémentation, pas une affirmation qu’ils existent déjà.
+- Continuer Go/Cobra, Pulumi, YAML, PHP et les contrats existants. Aucune réécriture générale, aucun nouveau moteur d’infrastructure ou de plugins.
+- Aucune image Docker spécifique à MageLift publiée centralement, sur GHCR ou ailleurs. Les recettes et scripts sont versionnés avec le logiciel ; les images sont construites dans la CI utilisateur et poussées dans son registre.
+- Les images amont non modifiées restent utilisables. Les helpers spécifiques à MageLift doivent eux aussi être construits chez l’utilisateur lorsqu’ils sont nécessaires.
+- GCP est le terrain principal : crédits annoncés illimités. AWS conserve un parcours expérimental et reçoit des essais ciblés : environ 150 USD de crédits annoncés.
+- La première intégration CI documentée et exécutée est GitHub Actions. La CLI reste indépendante de GitHub pour son exécution.
+- Le registre est configurable. Artifact Registry est le défaut proposé sur GCP ; ECR sur le futur parcours AWS. GHCR utilisateur et les autres registres ne sont pas interdits, mais leurs chemins d’authentification ne sont pas tous une condition de première publication.
+- Les providers et capacités expérimentales existants restent récupérables et honnêtement présentés. Ne pas supprimer un chemin nécessaire pour exploiter ou nettoyer une ancienne stack.
 
-## 0. Mandat et décisions
+### Corrections de priorité par rapport à v1.1
 
-Livrer un outil open source utilisable par la communauté, puis améliorer ses capacités à partir des retours. Il ne s’agit ni d’un hébergeur managé ni d’un programme de certification de toutes les architectures possibles.
-
-Le mainteneur dispose, selon ses indications, de crédits GCP illimités et d’environ 150 USD de crédits AWS. GCP est donc le terrain principal de développement et de tests réels. AWS reçoit des tests ciblés. Ces indications ne prouvent ni la couverture de chaque service par les crédits ni les permissions disponibles : les vérifier avant les mutations, sans exposer de secrets.
-
-### Décisions arrêtées
-
-- Continuer le code existant ; aucune réécriture complète, aucune branche orpheline.
-- Garder Go/Cobra, YAML, Pulumi Automation API, le build PHP et les images OCI.
-- Distribuer les recettes de build, pas des images MageLift préconstruites. Aucun `FROM ghcr.io/magelift/...` ni téléchargement obligatoire d’image appartenant au projet MageLift sur le parcours normal.
-- Construire dans la CI/CD utilisateur ; publier images, caches et preuves dans ses espaces. Le choix du registre est indépendant du cloud de déploiement, sous réserve de capacité/authentification explicites.
-- Garder le build local comme outil de diagnostic ; pas de service de build hébergé imposé et pas de Docker installé dans les nœuds de production pour fabriquer l’application.
-- Garder le monorepo, le manifeste d’artefact existant, le contrat des opérations et le plugin GCP signé.
-- Une première recette GCP GKE Autopilot ; conserver AWS ECS et les providers expérimentaux, sans développer leur matrice entière.
-- Publier une alpha communautaire sans attendre la console, une API de plugins stable, tous les brokers, la HA ou toutes les restaurations.
-- Conserver les mécanismes de sécurité utiles. Simplifier les obligations de certification et de planification, pas la protection des données et des ressources.
-- Ne pas exiger un nouveau spec/plan/approval pour chaque sous-tâche de ce document lorsqu’il est transmis par le mainteneur comme instruction d’exécution. Réconcilier cette règle avec `AGENTS.md` dans ML-00. Les validations explicites pour publication, dépense hors enveloppe et actions destructrices protégées restent applicables.
-
-**Principe de travail : corriger une capacité déjà présente avant d’en créer une deuxième version.** Une case cochée dans l’ancien plan est un élément à vérifier, pas une invitation à réimplémenter.
-
-### Ce plan ne commande aucune opération immédiate dans les comptes
-
-Le présent document organise une future implémentation. Il ne contient aucun identifiant de compte autorisé, aucun secret et aucune autorisation de supprimer des ressources existantes. L’exécution doit utiliser une cible d’acceptance explicitement renseignée et reconnue. À défaut, avancer sur le code et les tests locaux ; marquer les essais cloud `NOT_RUN`.
-
-## 1. État de départ utile
-
-Ces observations proviennent de la lecture du dépôt ; les tests n’ont pas été réexécutés lors de la préparation du plan.
-
-| Élément existant | Conséquence pour l’implémentation |
+| Sujet | Décision v1.2 |
 |---|---|
-| `intent/ROADMAP.md` prévoit déjà « GCP alpha, AWS second, provider platform third ». [S1] | Mettre à jour cette roadmap ; ne pas créer une stratégie concurrente. |
-| `intent/alpha-development-loop/plan.md` a déjà coché les corrections de fermeture des providers et l’ordre des migrations. Des vérifications finales restent ouvertes. [S2] | Reprendre les tâches réellement restantes, avec les tests de non-régression existants. |
-| `internal/providerhost/` possède résolution, cache, téléchargement et contrôle de confiance. [S3] | Compléter l’acquisition transparente ; pas de nouveau gestionnaire de plugins. |
-| `providers/gcp/` est un module/plugin séparé ; AWS reste embarqué. [S4] | Ne pas bloquer la première alpha sur l’extraction AWS. |
-| Le build possède `ArtifactManifest`, `ImmutableArtifactContract`, les phases et les patches. [S5, S6] | Pas de second manifeste ni de second cycle de déploiement. |
-| `internal/cli/build.go` exige actuellement `--image`, `--builder-image` et `--runtime-image` pour `--push`. [S19] | Retirer l’obligation de fournir des images de base préconstruites ; compléter le chemin source-build existant. |
-| L’intent historique `published-build-images` proposait des images centrales. [S5] | Le marquer remplacé dans la roadmap ; réutiliser ses tests utiles, sans exécuter son objectif de publication. |
-| `PatchLifecycle.php` appelle QPT et les hotfixes ; son chemin lu n’applique pas les cloud patches. [S6] | Ajouter une politique explicite, sans rejouer deux fois les patches. |
-| Les skills utilisateurs et les sorties JSON existent. [S7, S8] | Les fiabiliser ; pas de chatbot obligatoire. |
-| `make test` lance `go test -race ./...`, alors qu’`AGENTS.md` interdit un race global non borné. [S9] | Réconcilier les cibles de tests avant de demander systématiquement `make verify`. |
+| « Compte et CI correctement préparés » | La préparation guidée fait partie du produit. Facturation, droits accordés par un administrateur et propriété du domaine restent des prérequis externes explicites. |
+| Diagnostic, JSON et skills tardifs | Le minimum utile appartient à la première alpha, pour réduire les demandes de support et permettre l’automatisation. |
+| Extraction AWS planifiée comme passage obligé | Parcours AWS utile d’abord. Extraction seulement si elle résout un problème mesuré ou débloque une contribution réelle. |
+| Plusieurs voies de distribution à qualifier ensemble | Une même release produit les archives et métadonnées Brew/Scoop. Distinguer installation réussie et capacité runtime réellement testée. |
+| Générateur CI autoritaire | Le workflow appartient à l’agence. Pas de remplacement automatique de ses personnalisations. |
+| Publication puis exploitation ambiguë | Alpha sur environnement de test d’abord. Le passage d’une boutique réelle exige une procédure minimale de restauration et de migration validée sur cette boutique. |
+| Longue roadmap technique obligatoire | Quatre lots vers l’alpha ; deux lots suivants selon les pilotes ; autres idées dans un backlog non actif. |
 
-La présence d’un fichier ne prouve pas qu’une fonctionnalité marche. Inversement, une limite dans un ancien rapport ne prouve pas que le code courant contient toujours le défaut.
+La relecture couvre le plan v1.1 complet et des chemins ciblés de code/documentation. Aucun build, test automatisé, essai utilisateur ou déploiement cloud n’a été exécuté pour cette révision. Les comportements décrits ci-dessous sont des objectifs ; les noms de flags nouveaux doivent être confirmés contre l’aide réelle.
 
-## 2. Résultats à livrer
+## 2. Le parcours que l’utilisateur doit obtenir
 
-### Jalon A — Alpha communautaire GCP
+### 2.1 Un développeur Magento, pas un administrateur cloud
 
-Une personne disposant d’un dépôt applicatif, d’une CI avec Docker/BuildKit, d’un registre et d’un accès cloud correctement préparés peut :
+Le premier écran d’initialisation doit demander des informations que l’utilisateur connaît : son projet Magento, son compte/projet cloud, sa région, le dépôt Git, le domaine de test et éventuellement son registre existant. Proposer un défaut pour le registre, la recette et les tailles. Ne pas faire choisir d’emblée un type de cluster, un mécanisme de réseau privé, une topologie HA, un issuer de signature ou un backend Pulumi.
 
-1. Installer un binaire publié, sans compiler MageLift ni cloner son dépôt.
-2. Configurer un projet Magento par YAML ; obtenir des erreurs exploitables.
-3. Déclencher sa CI pour construire l’image applicative et ses stages intermédiaires depuis les recettes versionnées, appliquer les patches déclarés et publier dans son propre registre.
-4. Déployer depuis cette CI le digest produit sur la recette GCP documentée et accéder à un Magento fonctionnel en HTTPS.
-5. Lire l’état et les logs, exécuter une commande applicative, redéployer et promouvoir un artefact existant sans relancer sa construction.
-6. Détruire son environnement jetable sans supprimer des ressources étrangères.
-7. Ouvrir une issue reproductible ou une PR à partir d’instructions utilisables.
+L’initialisation inspecte les fichiers déjà présents, notamment `composer.json`, `composer.lock` et `app/etc/config.php`. Elle propose les versions, locales et paramètres qu’elle peut déterminer sans ambiguïté, puis demande confirmation pour le reste. Elle ne migre ni Magento ni les données, n’active pas tous les modules et ne remplace pas les réglages applicatifs existants.
 
-L’alpha peut contenir des défauts documentés et des capacités expérimentales. Elle ne doit pas présenter comme fonctionnel un parcours de démarrage connu pour échouer systématiquement.
+Une version ou extension non couverte doit produire une limite précise avant de créer des ressources. Un simple scan ne peut pas prouver la compatibilité de toutes les extensions : le rapport doit le dire.
 
-Le développeur peut aussi exécuter la même recette sur son poste avec Docker pour reproduire un problème. Le build local n’est pas une étape manuelle obligatoire avant chaque release CI.
+### 2.2 Séparer préparation initiale et utilisation quotidienne
 
-### Jalon B — Exploitation et deuxième provider
+| Moment | Résultat attendu | Ce que l’utilisateur ne doit pas assembler lui-même |
+|---|---|---|
+| Installation | Binaire disponible, version affichée, aide accessible | Compilation Go, installation manuelle d’un provider à côté du binaire |
+| Initialisation | YAML court, défauts visibles, fichiers à committer identifiés | Schémas Pulumi, versions internes, noms de ressources cloud |
+| Préparation initiale | Identité, APIs, registre, état et permissions de CI préparés ou manque explicitement identifié | Longue liste de rôles IAM et de commandes de fédération |
+| Premier push | CI construit, publie, déploie et fournit URL, digest et résultat | Recopie de scripts Docker et manipulation du manifeste |
+| Exploitation | État, logs, commande Magento et informations de connexion contrôlées | Recherche d’un pod ou d’un ARN à chaque incident |
+| Incident | Étape fautive, cause connue, résultat conservé, prochaine action sûre | Reconstitution manuelle de toutes les sorties de CI |
+| Mise à jour | Version proposée, diff, test hors production, promotion | Découverte après coup que la mise à jour CLI a changé la base de données |
 
-Livrer des préversions incrémentales : sauvegarde/restauration bornée, previews gérées, API CLI exploitable par les agents, console locale en lecture seule et AWS utilisant le contrat commun. Ces éléments ne sont pas une condition rétroactive de publication du jalon A.
+Réutiliser `init`, `bootstrap`, `doctor`, `ci generate`, `build`, `preview`, `deploy` et les commandes d’exploitation existantes. `preview` conserve son sens de plan d’infrastructure. Ne pas introduire une famille de commandes concurrente pour rendre les exemples plus élégants.
 
-### Trois notions distinctes dans les docs
+### 2.3 Le bootstrap est une vraie fonctionnalité
 
-- **Maintenance :** first-party ou community.
-- **Maturité :** alpha ou experimental, par capacité/recette.
-- **Dernier test réel :** commit, date, configuration, opérations effectuées et résultat ; `NOT_RUN` reste un résultat honnête.
+Compléter le bootstrap existant, pas créer un service d’identité MageLift. Une identité autorisée par le propriétaire du compte exécute une préparation ponctuelle, annoncée et réexécutable. Elle peut utiliser le login cloud officiel ; MageLift ne doit pas réimplémenter OAuth.
 
-Ne pas développer un nouveau moteur de badges ou un nouveau registre pour cela. Adapter les sources existantes de `docs/capability-matrix.md` et `docs/evidence/`. Préserver les rapports historiques sans réécrire leurs conclusions.
+La recette prépare les APIs, identités, permissions bornées, fédération GitHub et accès au registre dont elle a besoin, sous réserve des droits et politiques de l’organisation. Le plan doit expliquer les changements avant leur application. Si les permissions manquent, produire une demande concise et ciblée pour l’administrateur, plutôt qu’exiger un rôle Owner permanent ou un secret de compte de service durable.
 
-## 3. Recette de référence
+La création du registre, de la fédération et du stockage d’état précède le build qui les utilise. Réutiliser le backend, la gestion de clés et les verrous existants. Ne pas introduire une autre base d’état. Les ressources partagées de bootstrap ont une durée de vie distincte de celle d’un environnement.
 
-Reprendre celle de la roadmap existante, plutôt que réinventer l’infrastructure. [S1]
+Les instructions DNS doivent nommer exactement les enregistrements attendus et leur état. Une attente de DNS/TLS n’est pas une raison de recréer l’infrastructure. Ne pas commencer par implémenter les APIs de tous les registrars.
 
-| Composant | Décision initiale |
+### 2.4 Un projet, une configuration compréhensible
+
+Le YAML contient l’intention ; les fichiers générés contiennent les détails. Réutiliser les locks et le manifeste déjà présents. Ne pas ajouter plusieurs fichiers de versions à maintenir à la main ni fusionner tous les formats existants dans un nouveau format universel.
+
+Le starter ne déploie qu’un environnement de test. Une production, la HA et des previews à chaque PR sont des choix explicites ultérieurs. Ne pas faire hériter à une production les dates d’expiration, petits quotas, secrets ou politiques de destruction d’une preview.
+
+Les défauts doivent être inspectables dans la configuration effective. Les options avancées restent possibles là où elles existent, mais ne surchargent ni l’assistant initial ni le guide de démarrage.
+
+## 3. Limites de complexité pour le mainteneur
+
+| Surface | Règle de départ |
 |---|---|
-| Magento | Magento Open Source 2.4.9 comme point de départ du dépôt ; vérifier les correctifs de sécurité applicables avant exposition publique. |
-| PHP / Composer | Tuple déjà verrouillé et compatible avec cette recette ; aucune mise à jour globale « latest ». |
-| Runtime | GCP GKE Autopilot, nginx/PHP-FPM. |
-| Base | Cloud SQL MySQL, version explicitement vérifiée avec Magento. |
-| Cache / sessions | Memorystore Valkey, version du tuple vérifié. |
-| Recherche | Chemin OpenSearch existant, une réplique, avec indexation et recherche effectivement exercées. |
-| Queue | Queue base de données existante pour le parcours alpha ; ne pas prétendre qu’elle couvre tous les besoins/extensions. |
-| Médias | GCS privé via le contrat d’adaptation déjà implémenté ; ce contrat doit être testé, pas supposé natif. |
-| Secrets | Références Secret Manager et matérialisation au runtime. |
-| Déploiement | Job candidat/migrations avant activation de la nouvelle release. |
-| Accès | Chemin HTTPS existant, sans introduire un nouveau CDN ni une nouvelle WAF pour fermer l’alpha. |
-| Diagnostic | Logs natifs, état de déploiement et erreurs exploitables. |
-| Construction | Runner CI du projet ; recette MageLift versionnée et stages construits sur ce runner. |
-| Registre de référence GCP | Artifact Registry du compte utilisateur, ou registre existant explicitement choisi ; ce choix ne verrouille pas les autres cibles. |
-| Cache | Backend BuildKit du projet, externe si disponible, privé s’il contient du code ou des dépendances propriétaires. |
+| Dépôt et architecture | Monorepo existant, provider GCP séparé conservé, AWS embarqué tant que cela ne bloque pas un objectif concret. |
+| Release | Une version produit choisie par l’utilisateur. Les modules internes peuvent avoir leurs tags techniques existants ; leur coordination est automatisée, pas exposée au client. |
+| Build | Une recette de référence, une architecture CPU de référence, une distribution Linux conservée. Pas de migration Alpine/Debian opportuniste. |
+| Configuration | Modèle commun existant et paramètres propres à chaque provider ; pas de langage de description supplémentaire. |
+| CI | Une intégration GitHub Actions mince. La logique Magento reste dans le package PHP ; la logique cloud dans le provider. |
+| Documentation | Un démarrage canonique, une référence générée quand elle existe, un guide de dépannage. Ne pas entretenir plusieurs parcours contradictoires. |
+| Tests | Tests locaux du code concerné ; une recette GCP réelle ; AWS à la demande. Pas de nouvelle infrastructure de certification. |
+| Support | Issues/PRs et canal privé sécurité existants. Pas de SaaS de support, ni collecte automatique de dumps ou de logs. |
 
-Ne pas déclarer une compatibilité versionnelle à partir du seul démarrage d’un conteneur. Vérifier le tuple dans la documentation Adobe avant de le publier. En cas de contradiction, limiter la correction à la recette et à ses tests ; ne pas mettre à jour tous les providers.
+Un fichier long, un binaire plus gros que souhaité ou une interface interne imparfaite ne déclenchent pas, seuls, une réécriture. Mesurer le problème : lenteur de compilation, impossibilité de contribuer, taille de téléchargement, défaut de distribution ou couplage qui empêche une correction.
 
-La cible AWS conserve son architecture ECS existante. Reprendre la même image applicative uniquement si l’architecture CPU et le contrat runtime le permettent ; injecter les bindings AWS au runtime. Aucune hypothèse implicite « la preuve GCP valide AWS ».
+Inversement, ne pas laisser durablement une frontière en cours de migration multiplier les modes d’exécution. Toute extraction retenue doit retirer l’ancien chemin à une échéance de code définie, tout en préservant l’accès aux anciens états. Ne pas ajouter une troisième architecture transitoire.
 
-## 4. Ordre des lots
+## 4. Lots exécutables
 
-| Lot | Objet | Dépendances | Bloque le jalon A ? |
-|---|---|---|---|
-| ML-00 | Reprise, règles et boucle de tests cohérente | — | Oui |
-| ML-01 | Fermer la boucle de développement GCP existante | ML-00 | Oui |
-| ML-02 | Installation et acquisition transparente des outils/providers | ML-01 | Oui |
-| ML-03 | Recettes source-build, registre utilisateur et CI minimale | ML-02 | Oui |
-| ML-04 | Patches et qualité des erreurs de build | ML-03 | Oui pour QPT/hotfixes ; cloud patches bornés, sans matrice exhaustive |
-| ML-05 | Parcours GCP de référence et publication communautaire | ML-01 à ML-04 | Oui |
-| ML-06 | Opérations quotidiennes, sauvegarde et previews | ML-05 | Non |
-| ML-07 | AWS ciblé puis extraction du provider | ML-05 ; primitives ML-06 seulement si nécessaires | Non |
-| ML-08 | Interface machine/skills et console locale | ML-06 ; UI GCP sans attendre ML-07 | Non |
-| ML-09 | Contribution d’un provider et intégrations externes minimales | ML-07 | Non |
+Les nouveaux IDs S0–S5 remplacent les anciens ML-xx dans la roadmap active. Les tâches déjà implémentées restent acquises après vérification ; ne pas les refaire. S0–S3 conduisent à l’alpha. S4 et S5 sont ensuite priorisés selon les pilotes et peuvent avancer indépendamment.
 
-Un lot peut produire plusieurs petites PRs, mais il n’y a qu’un seul lot d’implémentation actif par défaut. Ne pas lancer dix agents qui modifient simultanément le SDK, le registre et les workflows.
+### S0 — Une boucle de correction utilisable
 
----
+**Zones :** `AGENTS.md`, `intent/ROADMAP.md`, `Makefile`, CI et tests des modules concernés, scripts de développement existants.
 
-## ML-00 — Reprendre le projet sans nouvelle boucle d’audit
+1. Relever branche, HEAD et changements locaux. Réconcilier la roadmap et les règles avec ce plan, sans archiver une tâche inachevée comme terminée. Réutiliser la branche de reprise si elle existe.
+2. Corriger la contradiction entre les instructions et la cible `make test`, qui lance un race global. Fournir une commande locale raisonnable et une vérification avant merge couvrant explicitement racine, SDK et provider GCP. Les tests de modules imbriqués ne doivent pas être oubliés. Garder le race ciblé et une voie CI adaptée aux vérifications plus lourdes.
+3. Pouvoir exécuter les tests PHP sans exiger le bon PHP sur le poste : construire le conteneur de test localement depuis une base amont, avec les recettes existantes. Rien à publier centralement.
+4. Rejouer les régressions déjà présentes sur fermeture des providers et ordre des migrations. Ne pas rouvrir un ancien défaut corrigé parce qu’un document le mentionne encore.
+5. Réutiliser les artefacts de développement adressés par commit. Une correction locale ne dépend pas d’un tag public ni d’un scellé documentaire. Les vérifications de confiance des artefacts distribués restent actives.
+6. Préparer une fixture Magento synthétique avec un module et un thème de test simples, pour ne pas valider seulement une installation vierge. Aucun code ou dump d’un employeur n’est copié.
 
-**But :** disposer d’une base exécutable et d’une seule définition des priorités.
+**Sortie :** un contributeur peut modifier le code concerné et tester sa correction sans compte cloud. Une session reprend le travail restant au lieu de recommencer un audit global.
 
-**Zones :** `AGENTS.md`, `intent/ROADMAP.md`, `intent/alpha-development-loop/plan.md`, `Makefile`, configuration CI, docs de contribution.
+### S1 — Construire avec le logiciel distribué, pas avec ton workspace
 
-### Travail
+**Zones :** `images/`, `build/`, `internal/build/`, `internal/toolchain/`, `internal/cli/build.go`, manifeste existant, distribution CLI/providers.
 
-1. Vérifier `git status`, la branche et le SHA. Ne pas écraser le travail local. Créer `reboot/community-alpha` à partir de la branche de travail courante. Si elle a avancé, lire le diff depuis le SHA inspecté et enregistrer la nouvelle base.
-2. Lire l’ancien plan actif et les zones de code concernées. Produire une liste courte : déjà fait / défaut reproduit / restant. Pas de nouvel audit général de tous les clouds.
-3. Mettre `intent/ROADMAP.md` en accord avec les lots de ce plan. Mettre en pause les anciennes exigences hors périmètre, sans les marquer terminées. Marquer `published-build-images` remplacé par ML-03 ; retirer la publication d’images centrales et remonter la CI minimale dans le jalon A. Ne pas supprimer les sources Docker ni réécrire les preuves historiques.
-4. Adapter `AGENTS.md` et les règles de release : validation pragmatique, statut expérimental explicite, absence d’obligation de certifier les intersections.
-5. Corriger la contradiction entre `make test`, `make verify` et les instructions mémoire/race. Préserver les tests, mais séparer test rapide, vérification de la recette et race ciblé. Ne pas retirer un test uniquement parce qu’il est rouge.
-6. Ajouter des cibles **proposées** `make test-fast` et `make verify-community`, ou réutiliser leurs équivalents exacts s’ils existent. Documenter une seule commande canonique par usage.
-7. Couvrir séparément le module racine, `sdk/` et `providers/gcp/`. Un `go test ./...` à la racine n’est pas un substitut aux tests des modules imbriqués. Utiliser le workspace là où le couplage existant le nécessite ; ne pas exiger immédiatement `GOWORK=off` pour GCP.
-8. Faire fonctionner les tests PHP dans un environnement reproductible lorsque le poste hôte manque d’extensions. Réutiliser les images/outils existants.
+1. Livrer les sources de recette et le PHP nécessaire avec la version de MageLift, de préférence via l’embarquement déjà disponible ou `go:embed`. Pas de checkout du framework par l’utilisateur, de résolution de branche `main` au build ni d’images Docker MageLift centrales, y compris pour les helpers requis.
+2. Retirer l’obligation de fournir des images builder/runtime préconstruites à `build --push`. Construire sur le runner avec les Dockerfiles ou intermédiaires du pipeline existant. Garder les overrides avancées fonctionnelles ; ne pas créer deux moteurs.
+3. Préserver un seul lifecycle PHP : Composer, patches, DI, contenu statique. Tester QPT et hotfixes sur la fixture. Les cloud patches restent une option bornée : délégation à l’outil upstream verrouillé, périmètre affiché, absence de double application. Pas de catalogue parallèle, sélection IA ni application générale par défaut hors Adobe Cloud.
+4. Pinning des bases/outils, secrets BuildKit, exclusion des dumps et `env.php` runtime, cache utilisateur privé lorsque nécessaire. Le build froid doit fonctionner ; le cache registry est une optimisation. Ne pas promettre de reproductibilité bit à bit à partir des seuls digests de base.
+5. Construire depuis le checkout privé du projet ; un HEAD détaché normal en CI doit être accepté avec un commit identifié. Ne pas exiger une branche locale, une identité Git d’auteur ou une URL de dépôt publique pour construire. Le mode release exige des entrées enregistrées ; le développement local peut signaler un arbre modifié au lieu de le présenter comme une release reproductible.
+6. Une seule plateforme Linux/amd64 pour le chemin GCP initial. Publier les images déployables dans le registre configuré, finaliser le manifeste existant avec leur digest, puis utiliser ce manifeste pour déployer. La promotion ne reconstruit pas.
+7. Réutiliser l’acquisition vérifiée des providers et outils. Pas de Go, PHP ou Node à installer chez l’utilisateur final. Docker/Buildx n’est requis que sur la machine qui construit ou exécute le développement local, pas pour toutes les commandes de lecture. Le moteur Pulumi sous-jacent reste géré et visible dans le diagnostic technique.
 
-### Vérification
+**Tests déterminants :** build froid depuis un artefact distribué et une boutique synthétique ; cache chaud puis patch modifié ; secrets fictifs absents des résultats ; signature invalide refusée ; promotion sans appel au builder ; refus clair d’un composant indispensable absent.
 
-- Tests ciblés sans credentials et sans dépenses cloud.
-- Cas nominal et cas d’échec d’une cible Make : un échec réel produit un code non nul.
-- Les commandes documentées couvrent effectivement les trois modules, ou indiquent précisément lesquels elles excluent.
-- Les anciennes suites larges restent accessibles ; elles ne bloquent pas l’alpha pour des providers gelés sans rapport avec une PR.
+**Sortie :** la recette est utilisable sans accès à ton workspace, sans construire une image centrale et sans manipuler les détails de packaging. Un défaut périphérique de registre ne bloque pas le chemin de référence.
 
-**Fin :** base enregistrée, workflow local cohérent, liste du reste à faire limitée aux lots. Aucun déploiement, nouveau framework de tests ou changement de langage.
+### S2 — Préparer la petite agence et sa CI
 
-## ML-01 — Terminer la boucle de développement GCP existante
+**Zones :** initialisation existante, `internal/cli/bootstrap.go`, bootstrap GCP, `internal/cli/ci.go`, configuration, onboarding.
 
-**But :** corriger et tester le produit sans publier une nouvelle préversion publique à chaque essai.
+1. L’initialisation inspecte la boutique et génère un YAML minimal pour un environnement de test. Détecter avant création les incompatibilités connues et les fichiers requis manquants ; ne pas proposer toutes les topologies.
+2. Compléter le bootstrap guidé décrit en section 2.3. Une relance ne recrée pas les mêmes objets et ne prend pas possession de ressources étrangères. Générer/récupérer les identifiants nécessaires à la CI ; ne pas les faire reconstituer dans la console cloud.
+3. Préparer un workflow utilisateur GitHub Actions : checkout, installation épinglée, authentification, Buildx, build/push, conservation du manifeste, déploiement autorisé. Paramètres ordinaires du projet dans le YAML ; références d’identité non secrètes dans la sortie bootstrap/configuration appropriée ; secrets dans le stockage prévu. Pas de copie de logique Magento dans le YAML CI.
+4. **Respecter le workflow utilisateur.** `ci generate` crée un fichier absent ; s’il diffère, proposer une sortie temporaire/diff et un remplacement explicite. Ne pas écrire un moteur de fusion YAML. L’égalité octet à octet au template devient un contrôle de fraîcheur optionnel, pas une validation de toute CI personnalisée. Ne pas ajouter une validation sémantique universelle des workflows.
+5. Utiliser la fédération d’identité disponible, limitée au dépôt et aux références/environnements autorisés. Séparer les droits de bootstrap, build, déploiement et pull runtime selon la recette. Les contributions non approuvées ne reçoivent ni secrets, ni cache privé, ni privilèges cloud. Une inspection du build ne permet pas de sandboxer un script Composer malveillant : le code exécuté avec des secrets doit être de confiance.
+6. Chemin initial : même cloud et registre utilisateur natif. Le code accepte les destinations externes, mais le guide ne promet que les combinaisons effectivement câblées. Une CI pouvant pousser ne prouve pas que le runtime peut télécharger après expiration de ses credentials. Ne pas implémenter une réplication inter-registres générique pour fermer l’alpha.
+7. Ne pas masquer coût, durée attendue des opérations cloud ou exigences machine. Publier une configuration de runner réellement testée et la consommation brute observée des services. Si le runner CI standard ne suffit pas, documenter une alternative utilisateur précise ; aucune hypothèse de gratuité fondée sur tes crédits.
 
-**Zones :** `scripts/development-loop/`, `.github/workflows/alpha-development-loop.yml`, `providers/gcp/scripts/gcp-acceptance-local.sh`, `internal/providerhost/`, `internal/cli/execute.go`, tests associés. [S2]
+**Tests déterminants :** bootstrap répété ; permission/API manquante avec action lisible ; workflow personnalisé non écrasé ; HEAD détaché ; build et déploiement depuis un autre dépôt autorisé ; pull runtime indépendant du login CI ; PR non autorisée sans privilèges.
 
-### Travail
+**Sortie :** on ne renvoie plus une agence sans DevOps à une longue liste de manipulations IAM. Ce qui nécessite réellement son administrateur ou registrar est identifié séparément et une seule fois.
 
-1. Réexécuter les tests existants concernant `CachedDialer.Close`, fermeture des providers sur retour/erreur/annulation et ordre `setup:upgrade` avant `app:config:import`.
-2. Ne réécrire ces mécanismes que si une régression est reproduite. L’ancien plan les décrit déjà corrigés.
-3. Reprendre les vérifications ouvertes de `alpha-development-loop` : distribution, artefact et produit GCP comme résultats distincts.
-4. Réutiliser les canaries adressés par commit et les artefacts immuables. Aucun nouveau format de release, de manifeste ou de preuve cryptographique.
-5. Un nouveau tag canary, si le workflow existant en a besoin, est préparé pour le mainteneur ; il n’est pas poussé implicitement. Le développement local ne dépend pas de ce tag.
-6. Paramétrer le projet GCP d’acceptance sans valeurs codées en dur. Vérifier l’identité courante, les permissions, les APIs utiles et le préfixe d’appartenance avant mutation.
-7. Ajouter ou corriger uniquement le contrôle nécessaire pour qu’un échec d’une étape n’efface pas les résultats des autres.
-8. Garder les logs bruts ignorés par Git et produire un résumé expurgé : commit, artefact, opérations, résultat, restes connus.
+### S3 — Livrer une alpha exploitable et supportable
 
-### Politique GCP
+**Zones :** opérations et déploiement existants, `doctor`, logs/health/exec, `internal/usererr/`, skills, docs, release.
 
-Déployer une recette de petite taille dans un projet d’acceptance. Les crédits permettent de tester le vrai service plutôt que développer un émulateur supplémentaire.
+1. Exécuter le parcours S1–S2 sur la recette GCP existante : GKE Autopilot, nginx/PHP-FPM, Cloud SQL, Valkey, OpenSearch et médias GCS privés. Vérifier la combinaison Magento/services contre les exigences applicables au moment de l’essai. La queue DB reste le choix alpha, avec ses limites ; ne pas lancer une migration de broker générale.
+2. Vérifier HTTP applicatif, asset, création/lecture de donnée synthétique, recherche réellement indexée, cron, queue et médias autorisés/interdits. Déployer une deuxième release avec un changement observable et vérifier la persistance des données. Les migrations sont contrôlées une fois ; elles ne tournent pas à chaque démarrage de réplique.
+3. Traiter un incident utile : configuration erronée, credential expiré ou migration échouée. Indiquer projet, environnement, étape fautive, résultat connu et prochaine action. Une relance ne doit pas lancer simultanément deux migrations. Pas de retry aveugle d’une opération non démontrée idempotente ; ne pas supprimer l’état pour débloquer l’outil.
+4. Livrer dès l’alpha les sorties JSON et non interactives des commandes importantes, plus des skills exactes. Ne pas imposer MCP ni compte LLM. `doctor` doit être utilisable avant que l’installation ou le déploiement ne réussisse ; un contrôle local ne nécessite pas de credentials cloud.
+5. Ajouter au diagnostic un export volontaire et local des métadonnées utiles, par liste de champs autorisés. Aucun upload automatique. Les logs bruts sont optionnels et à relire ; l’expurgation ne garantit pas de détecter toutes les données d’une extension. Ne pas joindre de dump, token, URL présignée ou configuration secrète.
+6. Une seule commande de release approuvée s’appuie sur les workflows existants pour générer archives signées, checksums, notes et métadonnées Brew/Scoop. Pas de recompilation indépendante pour chaque canal. Tester macOS et Linux annoncés ; sous Windows distinguer binaire/commandes testés et parcours WSL. Ne pas attendre toutes les combinaisons OS/runtime pour publier un canal fonctionnel.
+7. Tester la destruction sur ressources jetables avec inventaire final. Garder l’état jusqu’à résolution des ressources restantes. Un uninstall local ne détruit rien dans le cloud. Une destruction d’environnement conserve les ressources partagées, releases encore utilisées et sauvegardes à retenir.
+8. Une personne externe au projet suit le guide sans instruction orale cachée, sur un environnement de test. Si ce test humain n’a pas encore été possible, le noter : la simplicité d’usage n’est pas validée par les seuls tests automatisés.
 
-Par défaut, nettoyer après le run. Un environnement de debug peut être conservé **uniquement via une option explicite**, avec propriétaire, date d’expiration, inventaire et procédure de destruction. Ne pas créer une infrastructure permanente implicite. La fermeture de la CLI ne doit jamais être l’unique mécanisme de nettoyage d’un run interrompu.
+**Sortie alpha :** installation, initialisation, bootstrap, CI, déploiement fonctionnel, deuxième release, diagnostic d’échec et nettoyage sont démontrés sur une recette. Publier avec ses limites, sans attendre S4/S5, une console ou la certification des autres providers. Les bugs non bloquants restent publics ; ne pas recommander une migration de production sur cette seule preuve.
 
-### Vérification
+### S4 — Accompagner une boutique existante avant d’élargir l’exploitation
 
-- Succès, erreur et annulation ne laissent pas de processus provider orphelin.
-- Résultats `PASS`, `FAIL`, `SKIP`/`NOT_RUN` corrects et indépendants.
-- Un test exécuté avec un double n’est jamais présenté comme un essai GCP réel.
-- Si credentials disponibles : un run réel avec diagnostic et inventaire de sortie. Un HTTP 500 connu est corrigé ou reste `FAIL`, pas reclassé comme succès du produit.
-
-**Fin :** les défauts peuvent être diagnostiqués et corrigés depuis un commit sans multiplier les releases publiques. Ne pas rouvrir la matrice de certification.
+Ce lot se déclenche avec un premier pilote agence. Son objectif n’est pas la HA universelle.
 
-## ML-02 — Rendre l’installation et les providers transparents
+- Réutiliser dump/import et media sync pour copier un jeu contrôlé dans un environnement isolé ; ne jamais commencer par adopter ou supprimer la production du client. Un import peut exécuter des données ou configurations sensibles : accès et intégrations doivent rester bornés.
+- Valider une sauvegarde et restauration minimale sur la recette du pilote : données, médias, références de secrets et clé de chiffrement utile. Cette preuve conditionne la recommandation d’utiliser MageLift pour des données commerciales réelles, pas la publication de l’alpha de test.
+- Expliquer le rollback applicatif et sa limite face à une migration de schéma. Si la récupération n’est pas disponible, le dire et empêcher une fausse action de rollback. Pas de restauration automatique destructive.
+- Permettre de reprendre les opérations depuis un deuxième poste/runner autorisé, sans dépendre d’un état ou d’un journal détenu uniquement par le premier laptop.
+- Activer ensuite les previews demandées : données synthétiques par défaut, intégrations externes neutralisées, création plafonnée, expiration avec nettoyage par CI/scheduler existant même lorsque le poste est éteint. Pas de nouvelle plateforme multi-tenant pour économiser avant mesure.
+- Réutiliser un environnement local existant dans l’agence. Améliorer `magelift local` lorsqu’il est choisi ; ne pas imposer le remplacement de son outil de développement pour déployer avec MageLift.
 
-**But :** supprimer le travail manuel d’assemblage de la toolchain pour l’utilisateur.
+**Sortie :** un pilote peut essayer sa boutique sans risquer la production source, vérifier sa restauration et identifier qui prend en charge les incidents. Une réussite sur une boutique ne prouve pas toutes les extensions Magento.
 
-**Zones :** `internal/providerhost/{resolve,fetch,download,lock}.go`, `internal/toolchain/`, `internal/registry/`, `internal/cli/dependencies.go`, installateur, `.goreleaser.yaml`, workflows de release. [S3]
-
-### Travail
+### S5 — Rendre AWS utile sans en faire un second projet
 
-1. Réutiliser le resolver unique. Ajouter l’acquisition du provider dans le chemin commun d’activation de la cible, après validation de l’enveloppe et sélection explicite de l’environnement.
-2. Priorité : lock projet valide, puis version first-party épinglée par la release. Ni `latest` implicite ni substitution de provider après erreur.
-3. Installation atomique dans un cache versionné par OS/architecture. Gérer un téléchargement interrompu et deux processus concurrents.
-4. Préserver la vérification du publisher, signature, digest, protocole et opérations requises. Une cache corrompue n’est pas silencieusement acceptée ou remplacée.
-5. Garder l’installation explicite pour préchauffage/offline/réparation. Les providers communautaires ne sont pas téléchargés/exécutés automatiquement sur la seule foi d’un nom YAML.
-6. `doctor`, `version`, `help` et la validation de l’enveloppe ne déclenchent pas de déploiement ou d’installation surprise. Lorsqu’une validation provider exige un plugin absent, l’indiquer explicitement.
-7. Automatiser, via les composants existants, l’acquisition des outils requis par le chemin supporté. Docker et l’authentification du compte restent des prérequis clairement annoncés ; Go ne doit pas être requis chez l’utilisateur.
-8. Ne pas inventer un moteur de package management. Employer les archives/outils déjà gérés et l’intégration existante aux gestionnaires de paquets.
-9. Qualifier les archives Linux, Brew et Scoop. Pour Scoop, ajouter un manifeste/bucket seulement dans un espace possédé par le projet. Tester réellement Windows ; si un chemin cloud n’est pas exécutable nativement, limiter explicitement ce qui y est annoncé et documenter WSL.
-10. Mesurer séparément archive CLI, binaire installé, provider, toolchain à la demande et images/cache Docker. Ne pas annoncer un poids total à partir de la seule archive compressée.
-
-### Vérification
-
-Machine propre sans source du framework ; pin projet prioritaire ; signature invalide refusée ; offline avec cache valide ; offline sans cache = instruction claire ; interruption sans cache partielle utilisable ; concurrence sans corruption.
-
-**Fin :** le guide ne demande plus de placer un provider à côté du binaire à la main. Ne pas extraire AWS dans ce lot.
-
-## ML-03 — Recettes de build, registre utilisateur et CI minimale
-
-**But :** construire l’application et ses fondations conteneurisées dans la CI/CD du projet, sans image centrale MageLift, puis publier dans le registre choisi. MageLift reste responsable de la recette et de l’orchestration ; l’utilisateur ne doit pas maintenir manuellement une copie complexe du framework.
-
-**Zones :** `images/`, `docker-bake.hcl`, `build/`, `internal/build/{kit,pipeline,plan,runner}/`, `internal/toolchain/`, `internal/cli/{build,ci}.go`, configuration/schema, `sdk/artifact.go`, workflows et onboarding. Réutiliser les contrats existants. [S5, S19]
+Réutiliser les tests et l’architecture AWS ECS existants. Sur une seule recette, dans l’enveloppe autorisée, vérifier build/push ECR utilisateur, pull runtime, déploiement, quelques opérations, deuxième release et nettoyage. GCP ne sert pas de substitut à ces essais. Conserver des statuts expérimentaux pour ce qui n’a pas été essayé.
 
-### ML-03a — Livrer la recette avec le logiciel
+**Ne pas subordonner ce parcours à l’extraction du provider AWS.** Une fois les difficultés mesurées, une PR séparée peut appliquer le contrat GCP existant si elle réduit réellement la taille distribuée, le temps de compilation ou le couplage. Aucun autre transport RPC. Préserver identités de stacks, backend, URNs, noms et capacité de récupération ; vérifier qu’un refactoring n’implique pas de remplacement destructeur.
 
-1. Faire évoluer les Dockerfiles et scripts existants. Conserver la distribution Linux, les chemins, UID/GID, ports, extensions et modes runtime déjà utilisés par la recette GCP. Ne pas faire une migration Debian → Alpine ou introduire Supervisor seulement pour imiter une autre application.
-2. Distribuer les templates Docker/Bake, le code PHP MageLift nécessaire et les fichiers runtime dans la release source/binaire versionnée : privilégier des fichiers embarqués via `go:embed`, sans image Docker embarquée. Le binaire installé doit contenir ce qui permet de rendre la recette sans cloner le dépôt MageLift. Réutiliser le mécanisme existant s’il répond déjà à cette exigence.
-3. Matérialiser les fichiers générés dans un répertoire de travail propre, ignoré, identifié par la version/hash de recette. Permettre d’inspecter/exporter le plan de build pour le diagnostic ; pas de nouvel outil de templating ni de DSL.
-4. Le parcours normal reste YAML-only. Les templates sont maintenus dans MageLift ; ne pas demander à l’utilisateur de copier puis synchroniser une arborescence de Dockerfiles à chaque mise à jour. Une override de Dockerfile/recette reste avancée et explicitement identifiée dans la traçabilité.
-5. Utiliser des images amont de confiance résolues par digest. Verrouiller les outils téléchargés explicitement. Pas de `latest` résolu silencieusement au milieu d’un build de release. Une mise à jour des bases/outils produit un changement révisable ; l’ancien digest n’est pas modifié. [S15]
-6. Ne pas confondre pinning des images et build totalement hermétique : les dépôts de paquets, extensions, scripts et horodatages peuvent varier. Enregistrer les entrées et versions installées ; ne pas exiger une infrastructure de snapshots de paquets pour fermer l’alpha.
+Un pilote européen engagé peut faire passer OVH ou Scaleway avant cette extraction. Ne pas exiger une architecture de plugins parfaite pour accepter une correction ou un test communautaire utile.
 
-### ML-03b — Construire sur le runner utilisateur
+**Sortie :** un parcours AWS honnêtement documenté et une dépense contrôlée ; les investissements d’architecture restent proportionnés à un besoin réel.
 
-1. Adapter `buildPipelineRequest` et le chemin `--push` : **seule la destination finale doit être nécessaire au parcours source-build**, en plus de la configuration et des credentials utiles. `--builder-image` et `--runtime-image` deviennent des overrides avancées, pas des prérequis.
-2. Construire les stages PHP/extensions, builder et runtime sur le runner, à partir des images amont et des recettes livrées. Ils peuvent être des stages d’un Dockerfile multi-stage ou des intermédiaires locaux dans le pipeline existant : choisir la plus petite modification correcte, pas un deuxième build engine.
-3. Ne pas exiger un push des images builder/runtime intermédiaires pour les réutiliser dans le même build. Par défaut, publier seulement les images déployables nécessaires et, s’il est configuré, le cache.
-4. Même exigence pour tout helper/sidecar spécifique à MageLift requis par la recette : le construire chez l’utilisateur ou supprimer la dépendance si le chemin ne l’utilise pas. Les images de services amont non modifiées peuvent être consommées directement, ou miroitées par l’utilisateur. Aucun helper oublié ne doit recréer une dépendance à GHCR MageLift.
-5. Réutiliser le lifecycle PHP : validation → Composer install → patches → DI → contenu statique → packaging. Préserver l’inventaire des modules et leur activation déclarée. Ne pas écrire une deuxième implémentation shell de ces phases dans le Dockerfile.
-6. Résoudre les difficultés de démarrage de Composer sur source fraîche : une vérification exigeant `vendor/` ne doit pas précéder son existence ; une vérification sur lock peut précéder l’installation si l’outil le permet. Ajouter la régression au bon niveau.
-7. Exclure `auth.json`, `app/etc/env.php` runtime, `.env` sensibles, états cloud, logs et dumps du contexte. Utiliser les secrets BuildKit pour Composer/private Git et le mécanisme de références existant ; aucun secret via `ARG`, `ENV` persistant ou `COPY`. Vérifier aussi les sorties des scripts et les couches intermédiaires, pas seulement le filesystem final. [S14]
-8. Accepter des credentials provenant de la CI utilisateur, pas seulement d’un secret store cloud. Une CI authentifiée à son registre ne doit pas être obligée d’accéder à Pulumi ou à la base pour construire. Le build peut fonctionner sans adopter le provisioning MageLift.
-9. Choisir une plateforme explicite, Linux/amd64 pour la recette GCP initiale. Retirer le multiarchitecture implicite coûteux du parcours par défaut. Linux/arm64 ou un index multiarchitecture restent opt-in ; enregistrer index et manifeste de plateforme sans comparer leurs digests comme s’ils étaient identiques.
-10. Conserver le manifeste externe existant, finalisé après obtention du digest. Ajouter seulement les métadonnées manquantes : recette, bases amont, plateforme, patches et versions. Ne pas rebâtir l’image pour lui injecter son propre digest final.
-11. Faire fonctionner le build local avec la même recette. Un cache vide ou un runner neuf ne doit jamais nécessiter une ancienne image produite par MageLift.
+## 5. Maintenance, mises à jour et pérennité
 
-### ML-03c — Cache sous contrôle utilisateur
+### Une version produit, pas une combinaison à assembler
 
-1. Conserver les stages coûteux stables avant les sources applicatives : OS, PHP/extensions, Composer/dépendances lorsque leur contrat le permet, puis code/patches/DI/static. Toute dépendance réelle d’une phase doit participer à son invalidation. [S20]
-2. Réutiliser BuildKit et son cache externe `type=registry` ; configuration facultative de `cache-from`/`cache-to`, références distinctes de l’artefact final. Le mode `max` peut conserver les stages intermédiaires sans les publier comme images de base. [S13]
-3. Distinguer cache de couches exporté et contenu des `RUN --mount=type=cache`. Ne pas promettre que ce dernier est automatiquement restauré sur un runner éphémère par le seul export registry. Mesurer le bénéfice réel avant toute optimisation supplémentaire.
-4. Isoler les caches par projet, architecture/recette et frontière de confiance. Une PR de fork n’obtient ni credentials de lecture de caches privés ni droits d’écriture sur le cache de release. Ne pas exécuter du code non revu sur un runner persistant privilégié.
-5. Considérer les couches intermédiaires comme sensibles lorsqu’elles contiennent du code privé ou des dépendances propriétaires. Ne pas exposer le cache publiquement par défaut, même si l’image finale retire certains fichiers.
-6. Un cache manquant déclenche un build froid, pas un blocage. Un échec d’authentification du registre de publication ou un échec réel du build reste fatal. Les politiques d’erreur d’export cache sont explicites.
-7. Mesurer build froid et build chaud sans inventer de gain chiffré. Ne pas introduire une fabrique centrale d’images pour optimiser ce lot.
+Le projet et sa CI utilisent une version MageLift précise. Réutiliser les métadonnées et locks existants pour fixer recettes, bases et providers. Une version incompatible doit être expliquée avant mutation ; ne pas installer silencieusement une autre version pour la contourner.
 
-### ML-03d — Registre indépendant de la cible cloud
+La mise à jour de la CLI seule ne lance pas de mise à niveau de Magento, de base de données, de broker ou de cluster. Les changements de recette sont visibles et testés sur un environnement de test. Un digest déjà construit reste une référence de déploiement, pas une recette à reconstruire lors de la promotion.
 
-1. Accepter une référence OCI de destination configurable et une configuration de cache séparée. Ne pas réécrire un chemin GHCR utilisateur vers Artifact Registry/ECR parce que `target.provider` a changé.
-2. Réutiliser l’authentification Docker/Buildx existante, ses credential helpers et les actions d’authentification CI. Limiter les adaptateurs spécifiques à ce qui est nécessaire ; aucun nouveau framework de registry providers.
-3. Séparer **push CI**, **pull runtime**, **provisionnement du dépôt** et **conservation des artefacts**. Une CI pouvant pousser ne prouve pas que GKE/ECS peut tirer l’image après expiration du job.
-4. Registre existant : référence sans adoption ni suppression implicite. Registre créé sur demande : bootstrap explicite, propriété enregistrée et politique de rétention. La création du registre/IAM ne doit pas dépendre d’une application déjà construite dans ce même registre.
-5. Référence initiale GCP : Artifact Registry du projet utilisateur ; configurer l’identité de pull GKE et ses permissions. Ne pas supposer que l’identité applicative du Pod suffit au pull effectué par le nœud/runtime. [S18]
-6. Chemin registry privé générique : configuration Docker existante côté build ; `imagePullSecrets`/authentification runtime équivalente côté Kubernetes. En ML-07, ECS distingue ECR natif et `repositoryCredentials` pour les registres externes. [S16, S17]
-7. Gérer références de secrets, portée et renouvellement. Un jeton de CI temporaire n’est pas stocké tel quel comme credential durable de production. Une combinaison cross-cloud dont le renouvellement n’est pas implémenté est marquée indisponible/expérimentale avec explication, pas masquée en rendant l’image publique.
-8. Vérifier négociation OCI, architecture, compression et transport des attestations pour le chemin annoncé. Le support générique du push ne signifie pas que toutes les fonctions de tous les registres sont testées.
-9. Conserver la provenance, les SBOM et les signatures par les mécanismes existants, mais au nom du **producteur CI utilisateur**. La confiance de la signature d’un binaire provider MageLift et celle d’une image applicative utilisateur sont deux politiques distinctes. Pas de bypass silencieux si le registre ou l’issuer ne correspond pas au contrat configuré.
-10. Conserver les digests encore déployés, les candidats validés et la fenêtre de rollback annoncée. Supprimer une preview ne doit pas supprimer une image partagée utilisée ailleurs. La collecte de cache n’est pas la collecte des releases.
+Maintenir d’abord la ligne alpha courante, sans promettre plusieurs branches LTS. Garder les anciennes releases consultables ; annoncer les changements incompatibles et leur migration. Avant de publier une évolution de configuration/état, tester le chemin depuis la version précédente sur une fixture représentative. Ne pas supprimer les archives, recettes ou preuves dont des releases existantes ont encore besoin.
 
-### ML-03e — Une CI utilisateur minimale dès l’alpha
+### Les recettes doivent recevoir les correctifs, même sans images centrales
 
-1. Réutiliser les commandes/générateurs CI existants. Livrer d’abord un workflow GitHub Actions lisible : checkout → installation versionnée de MageLift → Buildx → authentification → build/push → conservation du manifeste/digest → déploiement du digest sur l’environnement autorisé.
-2. Le workflow appartient au dépôt utilisateur et utilise ses runners, identités, secrets et registre. La CLI reste invocable depuis GitLab CI, Jenkins ou autre runner compatible sans backend GitHub obligatoire ; ne pas prétendre leurs templates testés sans les avoir exécutés.
-3. Préparer explicitement, une fois, la fédération d’identité et les permissions dans la cible autorisée. Rôles de build, déploiement et pull runtime distincts et limités. Un job de PR non approuvé ne reçoit pas les secrets ni les droits de déploiement.
-4. Exécuter les commandes en mode non interactif avec sélection de l’environnement. Une information manquante échoue clairement ; aucun choix implicite de production.
-5. Faire que le job de déploiement consomme le digest/manifest du job de build ; un job de promotion consomme une release déjà construite sans invoquer BuildKit. `staging` et `production` sont des configurations runtime, pas deux recettes de build.
-6. Une séparation de registres/comptes peut nécessiter une copie d’artefact. Ne pas reconstruire ; préserver et vérifier les manifests/blobs, transporter les preuves utiles et refuser toute transformation silencieuse. Si l’identité change, ne pas annoncer « même digest ».
-7. Pour l’alpha, tester un workflow complet GCP et un registre OCI de test pour le chemin générique. ECR réel est vérifié dans le budget ML-07 ; les combinaisons non exécutées restent `NOT_RUN`. Pas de matrice toutes CI × tous registres × tous clouds.
-8. Les workflows du projet MageLift continuent à **construire et tester** ses recettes. Désactiver leur publication centrale d’images Docker ; ne pas supprimer les tests et ne pas republier ces images sous un autre namespace. La distribution signée de la CLI et de ses providers continue.
+Regrouper les mises à jour ordinaires des dépendances dans le mécanisme existant. Une mise à jour urgente de sécurité peut passer séparément. La CI MageLift construit et teste les recettes ; la CI utilisateur reconstruit ensuite ses propres images sur une mise à jour choisie. Aucun rebuild magique des boutiques par le mainteneur.
 
-### Vérification
+Conserver les signatures, la provenance et les SBOM déjà intégrés sur le chemin annoncé. Le workflow généré prépare l’identité de signature utilisateur ; l’agence ne doit pas concevoir son propre système de PKI. Une difficulté d’outillage ne se résout pas en désactivant silencieusement la vérification.
 
-- Runner neuf, sans checkout du framework et sans accès aux images Docker MageLift : build/push complet depuis une release de la CLI et le dépôt synthétique de la boutique.
-- Build local froid et build CI avec la même recette ; versions et entrées traçables. Deux builds peuvent différer bit à bit ; une promotion, elle, réutilise l’artefact produit sans rebuild.
-- Build chaud : cache utilisé ; changement PHP/extension/lock/patch invalide les étapes nécessaires ; aucun cache ne fait disparaître un patch modifié.
-- Secrets fictifs absents des couches, caches exportés, logs, provenance et manifeste ; contexte nettoyé ; tentatives de PR non autorisées refusées.
-- CI GCP réelle : publication dans Artifact Registry utilisateur, pull par la cible avec ses propres credentials et HTTP utile ; pas de dépendance à GHCR MageLift.
-- Registre OCI local/générique : push, digest, cache, échec d’authentification explicite ; les fonctionnalités non implémentées ne renvoient pas de faux succès.
-- Promotion sans appel au builder ; aucun effacement d’image référencée par une autre release/environnement.
-- Les fonctionnalités de signature/attestation exposées doivent être vérifiées sur le chemin annoncé ; ne pas désactiver la vérification pour fermer le lot.
+### Support soutenable
 
-**Fin :** le développeur modifie le YAML et son code, la CI construit toutes les parties spécifiques à MageLift, publie les images nécessaires dans son registre et transmet leurs digests au déploiement. Aucun catalogue central d’images Docker MageLift à publier. Pas de nouvelle matrice Magento/PHP/CI/registre.
+Une issue doit demander version, recette, résultat attendu et reproduction ; le diagnostic remplit les informations connues. Pas de délai public chiffré de réponse ou de résolution ajouté sans engagement explicite du mainteneur. Afficher une prise en compte rapide selon disponibilité, priorité aux problèmes de sécurité, données et déploiement, sans astreinte ni SLA cloud implicites.
 
-## ML-04 — Rendre les patches fiables et compréhensibles
+Une PR de bug n’a pas à financer des tests multi-cloud ni à fournir un mainteneur permanent. Une nouvelle intégration importante doit avoir un périmètre, des tests et une perspective réaliste de maintenance ; le mainteneur peut la laisser expérimentale ou refuser d’en assumer le support. Ne pas inventer un propriétaire communautaire.
 
-**But :** appliquer automatiquement les patches déclarés, pas tous les patches disponibles.
+## 6. Tests et ressources : assez pour progresser, pas un programme de certification
 
-**Zones :** `build/src/Magento/{PatchLifecycle,PatchApplier,PatchCommand,LifecyclePlan}.php`, classes/tests de configuration, configuration Go, générateur de schéma et manifeste. [S6]
+| Situation | Vérification |
+|---|---|
+| PR ordinaire | Packages modifiés et régression ; build/contrats/génération quand concernés. Aucun secret pour un fork. |
+| Changement commun ou recette GCP | Parcours de référence GCP adapté au changement, sur commit de confiance. |
+| Changement AWS | Tests locaux puis essai groupé autorisé lorsque nécessaire et finançable. |
+| Release | Artefacts distribués, installation annoncée, régression de référence et notes honnêtes. Pas toutes les versions × clouds × registries × OS. |
+| Validation ergonomique | Guide exécuté par une personne qui ne connaît pas le code, avec les interventions manuelles consignées. |
 
-### Travail
+Un compte rendu court suffit : commit, entrée de test, commandes, résultat, opérations non exécutées et restes. Préserver les preuves historiques, mais aucun nouveau moteur de certification ni scellé supplémentaire pour fermer un lot.
 
-1. Conserver l’appel au Quality Patches Tool fourni par les dépendances du projet. Ne pas recopier son catalogue ou son moteur. [S10]
-2. Vérifier que la source Composer verrouillée et le runtime de build apportent l’outil requis. Erreur explicite si une liste est configurée sans outil disponible.
-3. Définir un ordre déterministe : éventuelle politique cloud explicite → QPT sélectionné → hotfixes locaux triés.
-4. Ajouter l’intégration cloud patches comme **opt-in expérimental**, jamais « appliquer tous les cloud-required hors Adobe Cloud » par défaut. Le comportement des commandes du package upstream verrouillé doit être lu et testé avant de coder l’adaptateur.
-5. Ne pas supposer que `ece-patches apply` accepte une liste d’identifiants ou applique seulement une catégorie. Si l’outil orchestre déjà QPT et hotfixes, éviter leur deuxième application. En l’absence d’une sélection publique correctement exploitable, limiter l’opt-in au comportement upstream réellement documenté et afficher sa portée ; sinon refuser clairement cette option et la documenter comme non disponible. Aucun faux support.
-6. Ne pas bloquer toute l’alpha sur une matrice exhaustive de cloud patches. QPT et hotfixes doivent fonctionner. La sous-capacité cloud reste expérimentale ou explicitement indisponible tant que son adaptateur borné ne passe pas son test.
-7. Réutiliser les informations upstream de dépendances, remplacement et applicabilité, sans parser du texte humain avec des heuristiques fragiles si une API/donnée structurée est disponible. Ne pas créer une base parallèle.
-8. Conserver QPT/package versions et hashes des hotfixes dans la traçabilité existante. Étendre le manifeste additivement seulement si nécessaire ; ne pas ajouter un second patch lock dupliquant `composer.lock` et le manifeste.
-9. Gérer correctement « déjà appliqué » : l’accepter seulement si l’état est identifié sans ambiguïté. Un patch partiellement appliqué ou conflictuel fait échouer le build. Ne pas continuer sur simple warning.
-10. Améliorer les messages : patch concerné, catégorie, version Magento, étape et action proposée, sans secret.
-11. Ne pas ajouter des mises à jour automatiques silencieuses du catalogue pendant un build. Une mise à jour est une modification de dépendances à réviser.
+**GCP :** un projet d’acceptance autorisé ; un environnement de debug peut être retenu explicitement avec expiration. Les crédits du mainteneur ne sont ni ceux des clients ni une preuve de coût nul. Mesurer les coûts bruts et le besoin de ressources du runner ; ne pas améliorer l’UX en cachant le prix du profil proposé.
 
-### Vérification
+**AWS :** environ 150 USD annoncés, dont 50 USD conservés en réserve. Au plus 100 USD de dépenses de test planifiées après vérification du solde, de sa couverture et des autres consommations. Il ne s’agit ni d’un tarif ni d’un plafond technique garanti. Une seule stack de test active par défaut ; budget de session, durée, inventaire et nettoyage avant nouvelle création. Pas d’autorisation de paiement sur carte pour finir un test. Nettoyer même lorsqu’un essai est interrompu ; ne pas attendre une alerte budgétaire pour agir.
 
-QPT applicable ; identifiant inconnu ; package manquant ; hotfix compatible ; conflit ; déjà appliqué ; ordre stable ; doublon ; configuration erronée ; chemins malveillants ; cloud option désactivée ; cloud option activée avec comportement prouvé ou refus précis.
+Sans cible autorisée, permissions ou enveloppe disponibles : avancer sur le code et noter les essais cloud `NOT_RUN`. Ne pas simuler une réussite et ne pas bloquer des tâches locales indépendantes.
 
-Employer des fixtures synthétiques pour les tests unitaires et un exemple upstream autorisé pour l’intégration. Les droits amont restent applicables ; vérifier `NOTICE`, `LICENSE` et `make check-clean-room`.
+## 7. Backlog non actif
 
-**Fin :** le build ne peut pas annoncer une application réussie après avoir ignoré un conflit. Pas de moteur d’auto-sélection par IA.
+Ces éléments ne sont pas perdus ; ils ne sont pas des prérequis des lots précédents.
 
-## ML-05 — Fermer le parcours GCP et publier l’alpha
+| Élément | Déclencheur |
+|---|---|
+| Console locale | Les pilotes perdent du temps à lire l’état de leurs environnements. Réutiliser les lectures existantes ; Go et assets statiques, lecture seule, loopback protégé, aucune autre base d’état. |
+| Provider européen supplémentaire | Une agence apporte une cible, un cas d’usage et des essais ; pas de développement simultané de trois clouds. |
+| Autres registries/CI | Demande réelle sur leur authentification et leur intégration ; conserver les références OCI et contrats génériques dès maintenant. |
+| Broker alternatif, Aurora, autre runtime | Une boutique identifiée ne peut pas fonctionner correctement sur le parcours actuel. |
+| Observabilité/edge/email multiples | Intégrer d’abord destinations et services existants ; provisionner un fournisseur supplémentaire seulement quand le besoin est testé. |
+| SDK indépendant et releases providers autonomes | Un contributeur ou cycle de release est réellement bloqué par la coordination actuelle. |
+| MCP | Un usage agent ne peut pas être raisonnablement servi par la CLI structurée et les skills. |
+| HA/DR, multi-tenancy de previews | Besoin opérationnel explicite et financement ; pas une case à fermer pour paraître crédible. |
 
-**But :** une version utilisable par quelqu’un d’autre, pas une certification générale.
+Pas de nouveaux services hébergés, télémétrie obligatoire, marketplace, moteur de workflow, compte MageLift obligatoire ou mécanisme universel de tarification.
 
-**Zones :** `providers/gcp/`, `internal/deploy/`, `internal/platform/`, `internal/cli/`, `scripts/development-loop/`, `docs/onboarding.md`, README, docs de support, release.
+## 8. Critères de simplicité observables
 
-### Travail
+Avant d’annoncer la simplicité, vérifier les situations suivantes. Il s’agit de scénarios d’acceptation, pas d’un nouveau tableau de KPI à développer.
 
-1. Faire le parcours depuis une archive/canary dans une CI utilisateur propre, avec les recettes livrées et le registre du projet. Aucun pull d’image Docker MageLift centrale. Utiliser un projet Magento synthétique et un tuple exact.
-2. Mettre les commandes d’onboarding en accord avec l’aide réelle. Conserver la sémantique actuelle de `magelift preview` comme plan d’infrastructure : ne pas la recycler en commande de création d’environnement éphémère.
-3. Assurer l’ordre : config/identité → prérequis → bootstrap explicite (registre/IAM si demandé, puis état/infrastructure nécessaires) → build/push dans la CI utilisateur → plan → migrations contrôlées → activation du digest → état applicatif. Aucun besoin de credentials DB/production pour le job de build.
-4. Vérifier le verrou de déploiement, le traitement d’une erreur et l’absence de lancement simultané des migrations par chaque réplique.
-5. Les logs doivent permettre de distinguer échec Pulumi, Job de migration, rollout et erreur Magento. Conserver stdout propre en sortie JSON.
-6. Tester HTTPS, une réponse applicative utile, un asset statique, création/lecture de données synthétiques, indexation/recherche, cron, queue DB et upload/lecture d’un média. Un `/health` statique ou « pod running » ne suffit pas pour ce scénario.
-7. Vérifier les interdictions d’accès aux secrets/fichiers sensibles et aux médias privés concernés ; ne pas rendre le bucket public pour obtenir un test vert.
-8. Faire un deuxième déploiement sur la même base. Changer un élément observable de l’application et vérifier la persistance des données précédentes. Vérifier séparément qu’une promotion de release consomme le digest existant sans build ; le test peut utiliser deux environnements jetables, sans promettre un profil HA de production.
-9. Détruire uniquement les ressources explicitement possédées par le run. Conserver l’état tant qu’il reste des ressources à gérer. Les sauvegardes retenues, clés à suppression différée ou ressources partagées doivent être distinguées des fuites.
-10. Faire un inventaire de sortie indépendant du seul code retour de Pulumi. Signaler les restes avec une procédure ciblée ; jamais de suppression « tout ce qui commence par magelift » dans le compte.
-11. Corriger docs, captures de commandes, limitations et statuts. Ne pas promouvoir une réussite GCP comme preuve AWS.
-12. Préparer les artefacts et notes de release. Le mainteneur approuve le tag et la publication ; pas de push de tag caché dans un test.
+1. Un utilisateur installe l’outil et lit l’état sans cloner MageLift, compiler Go ou installer Docker sur un poste qui ne construit rien.
+2. Un développeur Magento initialise un dépôt existant sans choisir les détails de réseau, de cluster ou de chiffrement. Un défaut reste inspectable et modifiable.
+3. La préparation du compte ne nécessite pas une séance d’accompagnement oral du mainteneur ; les rares actions administrateur/DNS sont identifiées et vérifiées.
+4. L’utilisateur ajoute ses propres tests à la CI sans que MageLift les écrase ou prétende que son workflow est invalide uniquement parce qu’il diffère du template.
+5. Une panne de credentials ou de migration conduit à une prochaine action précise, sans conseiller automatiquement un destroy/recreate.
+6. Une deuxième personne reprend le projet depuis Git et les comptes autorisés, sans récupérer les fichiers secrets du laptop du premier développeur.
+7. Le mainteneur corrige un bug GCP sans retester tous les clouds, puis publie une version sans assembler manuellement plusieurs catalogues.
+8. Une mise à jour de la CLI ne modifie pas implicitement l’infrastructure ni les données des utilisateurs.
 
-### Seuil de publication
+Si un scénario échoue, corriger cette friction avant d’ajouter une nouvelle option d’infrastructure. Une simple réduction du nombre de lignes YAML ne prouve pas la simplicité.
 
-Exiger un passage propre depuis la CI utilisateur et un deuxième déploiement fonctionnel sur la recette annoncée, plus installation/distribution/build/push/pull cohérents et promotion sans reconstruction. Si une correction change le scénario concerné, le rejouer. Il n’est pas nécessaire de répéter deux créations complètes uniquement pour remplir une obligation documentaire ancienne.
+## 9. Instructions de travail pour Codex
 
-**Bloquants :** fuite de secrets, téléchargement non vérifié introduit par le lot, suppression hors périmètre, corruption reproduite du parcours nominal, migrations concurrentes, incapacité systématique à installer/build/déployer la recette annoncée.
+Travailler sur un lot actif, en petites modifications couvrant un résultat observable. Avant de créer, rechercher l’équivalent dans le code. Pas de nouvelle phase d’audit général, d’ADR pour chaque fonction ou d’approbation répétée du même plan produit. Actualiser seulement les documents que la modification rend faux.
 
-**Non-bloquants s’ils sont documentés et non vendus comme acquis :** absence de HA, provider tiers non testé, broker alternatif, restore avancé, console, variations de performance, absence de test de toutes les versions et API de plugin encore alpha.
+Garder les protections de secrets, de permissions, d’intégrité et de suppression. Les opérations cloud exigent une cible d’acceptance reconnue et autorisée ; ce plan n’autorise aucune destruction de ressource existante non identifiée. Tags, publication, réécriture d’historique, dépassement d’enveloppe et destruction protégée restent soumis à approbation.
 
-Ne pas publier « prêt pour toutes les productions ». Publier « alpha communautaire — recette testée et limites documentées ». La responsabilité d’exploitation reste au déployeur ; les sauvegardes et restaurations ne sont garanties que pour les opérations explicitement testées.
+Rapport de fin : **livré ; tests exécutés ; NOT_RUN ; limites ; ressources restantes ; prochain travail utile**. Ne pas transformer un test rouge en mock vert, supprimer une assertion gênante ou déclarer une tâche terminée parce que la checklist a été éditée.
 
-### Communauté
-
-- Adapter `SUPPORT.md`, `CONTRIBUTING.md`, `SECURITY.md` et les templates existants, sans les dupliquer.
-- Issue : version, OS, recette/provider, reproduction, résultat attendu/obtenu, diagnostic expurgé.
-- PR : description ciblée, test de non-régression, coût cloud éventuel, évolution de contrat éventuelle.
-- Canal privé pour les vulnérabilités ; pas de dumps ni de credentials dans une issue publique.
-- Engagement proposé : prise en compte rapide et transparente, avec priorité à perte de données, sécurité et blocage de déploiement. Un objectif de première réponse sous deux jours ouvrés peut être adopté par le mainteneur ; ce n’est ni un délai garanti de correction ni un SLA d’hébergement.
-- Pas de fermeture automatique prématurée des bugs reproductibles par un bot « stale ».
-
-**Fin :** préversion installable, guide exécutable littéralement, recette bornée et contribution accessible. Publier avant d’entreprendre ML-06 à ML-09 ; ces lots ne doivent pas devenir une nouvelle condition de sortie.
-
-## ML-06 — Opérations quotidiennes, sauvegarde et previews
-
-**But :** rendre utiles et sûres les capacités existantes au quotidien.
-
-**Zones :** `internal/cli/env.go`, `health.go`, `exec.go`, commandes de logs/données existantes, `internal/dumpimport/`, `internal/mediasync/`, `internal/releasejournal/`, `internal/automation/`, adaptateurs GCP.
-
-### Travail
-
-1. Inventorier les commandes déjà enregistrées et améliorer leurs chemins existants. Ne pas créer des synonymes concurrents `db dump`/`env dump` ou `status`/`health` sans nécessité.
-2. Priorité : état et release active, logs bornés, exec, accès à la DB, dump/import, synchronisation contrôlée des médias.
-3. Distinguer dans la documentation dump logique, sauvegarde gérée et restauration. Premier objectif : restaurer un jeu synthétique dans un environnement **nouveau et isolé**, puis y démarrer Magento.
-4. Préserver les secrets nécessaires au déchiffrement applicatif par un mécanisme sécurisé ; ne jamais les joindre au dump public/diagnostic. Vérifier au moins un objet synthétique chiffré si ce mécanisme est revendiqué.
-5. Refuser une restauration destructive sur un environnement protégé sans confirmation explicite de la cible et sauvegarde préalable appropriée. Documenter les conséquences des migrations de schéma ; ne pas appeler « rollback » la seule sélection d’une image ancienne.
-6. Stabiliser création/liste/suppression des previews par l’identité déjà implémentée. Une preview initiale peut avoir des services dédiés ; ne pas inventer du multi-tenant partagé pour optimiser avant d’avoir mesuré.
-7. Données synthétiques par défaut. Les copies de données réelles exigent une procédure d’anonymisation réellement adaptée au schéma et aux extensions ; ne pas promettre une anonymisation générique complète.
-8. Neutraliser emails, paiements et intégrations sortantes dans les fixtures/previews de test. Les flags applicatifs ne prouvent pas l’isolation de toute extension : compléter par un contrôle réseau/credentials approprié lorsqu’il est nécessaire.
-9. Brancher la purge des environnements expirés sur un scheduler/CI existant ou un workflow minimal, avec lock, dry-run, vérification de propriété et exclusions des environnements protégés. Le laptop fermé ne doit pas empêcher la purge.
-10. Ne pas ajouter de calculatrice universelle de coût. Afficher la taille et les ressources connues ; un prix estimé reste daté et distinct d’une facture.
-
-### Vérification
-
-Dump puis restore synthétique avec assertions sur lignes/données/médias, mauvais environnement refusé, droits insuffisants, exec annulé, deux previews isolées, une preview expirée supprimée et un environnement protégé conservé.
-
-**Fin :** publier les opérations au fur et à mesure, en indiquant lesquelles sont testées. La HA, le PITR universel, la reprise inter-région et l’anonymisation universelle restent hors lot.
-
-## ML-07 — AWS : test ciblé, puis provider autonome
-
-**But :** préserver AWS et le faire progresser sans consommer les crédits dans une matrice complète.
-
-**Zones :** `internal/cloud/aws/`, `internal/registry/`, `internal/providerhost/`, `providers/gcp/` comme référence de protocole, `sdk/`, scripts AWS existants, release. Future destination proposée : `providers/aws/`.
-
-### ML-07a : stabiliser le chemin existant
-
-1. Exécuter tests unitaires, graphes Pulumi et tests d’émulateur existants, sans dépenses.
-2. Préparer une seule recette AWS ECS à partir de l’existant. Lire les versions et contraintes réelles ; ne pas transposer littéralement les ressources GCP.
-3. Avant toute création, établir coût indicatif, durée maximale, ressources et plan de nettoyage. Appliquer les règles budgétaires de la section 5.
-4. Sur un run réel groupé : bootstrap explicite du registre/IAM si demandé → build/push de la recette dans ECR utilisateur (ou copie du même artefact compatible sans reconstruction) → déployer le digest → HTTP applicatif/recherche/queue selon la recette → logs/exec → deuxième déploiement → destruction/inventaire. Tester le pull runtime indépendamment du login de la CI et préserver les releases référencées.
-5. Si le budget ne permet pas une partie du scénario, enregistrer précisément `NOT_RUN`. Ne pas remplacer la recherche par `disabled` puis annoncer une recette Magento entièrement testée.
-6. Corriger seulement les défauts reproduits de ce chemin. Les variantes Aurora, EKS, Managed Instances, brokers alternatifs et HA restent dans leur état documenté.
-
-### ML-07b : extraire sans réinventer
-
-1. Réutiliser le protocole, la négociation, le cache et le packaging GCP. Pas de deuxième transport RPC ni de deuxième orchestrateur applicatif.
-2. Déplacer progressivement l’exécution Pulumi AWS et les opérations nécessaires vers `providers/aws/`. Préserver les identités de stacks, le backend, les URNs et les noms ; employer import/alias/migration explicite si un changement les affecte.
-3. Les schémas Magento et les étapes de migration restent communs. Les topologies réseau/base/cache/search restent AWS.
-4. Extraire dans un module de support étroit uniquement les helpers réellement requis pour couper un couplage ; ne pas déplacer toute l’arborescence par principe.
-5. Préserver la lecture et le nettoyage des anciens états. Le passage en plugin ne doit pas faire créer une deuxième infrastructure ou rendre d’anciennes ressources inaccessibles.
-6. Ajouter une vérification de dépendances et mesurer la différence de taille. Les SDK OVH/Scaleway encore nécessaires à un ancien chemin ne justifient pas de bloquer l’alpha : documenter le reliquat, éviter d’ajouter des imports, traiter l’isolation dans une PR ciblée ultérieure.
-7. Tests de parité hors cloud, puis essai réel minimal seulement dans le solde prévu. Ne pas relancer tout GCP pour un changement AWS sans modification du contrat commun.
-
-**Fin :** AWS a un niveau de test explicite et suit le contrat partagé. L’absence de crédits pour une combinaison n’empêche pas sa publication comme expérimentale ; elle empêche uniquement de la prétendre testée.
-
-## ML-08 — Interface machine, skills et console locale
-
-**But :** une même couche d’opérations utilisable par les humains, les agents et une petite UI.
-
-**Zones :** `internal/cli/`, `internal/usererr/`, ports existants, `agents/skills/`, manifeste généré des skills. Nouveaux emplacements proposés uniquement si nécessaires : `internal/console/` et ses assets embarqués.
-
-### ML-08a : contrat machine
-
-1. Conserver `--output json` et `--no-interaction`, sans multiplier les variantes de flags.
-2. Documenter le résultat de chaque commande importante et ses codes de sortie. Ajouter le versionnement structuré de manière additive où il manque ; ne pas casser silencieusement les utilisateurs existants.
-3. stdout = résultat machine ou flux explicitement documenté ; stderr = progression/diagnostic. Répercuter correctement le code retour d’un exec.
-4. Erreurs identifiables, retryabilité lorsque connue, environnement/compte sélectionnés et explication de la prochaine action. Pas de copie automatique de secrets dans les détails.
-5. `--no-interaction` échoue clairement lorsqu’une information/approbation manque. `--yes` ne donne pas de nouveaux droits IAM et ne sélectionne pas arbitrairement la production.
-6. Ajouter à `doctor` ou à un diagnostic existant un bundle expurgé si nécessaire. L’export est local et volontaire ; aucun envoi automatique aux mainteneurs ou à un LLM.
-7. Mettre les skills en accord avec les commandes réellement distribuées. Vérifier leurs exemples par des tests de l’aide/parser ; pas de commande imaginée dans une skill.
-8. Garder l’IA facultative : aucun compte LLM, backend hébergé ou agent intégré requis. MCP peut être ajouté plus tard comme adaptateur, sans bloquer ce lot.
-
-### ML-08b : console locale en lecture seule
-
-1. Une commande proposée `magelift console` lance le serveur local ; vérifier qu’elle n’existe pas déjà avant création. Ne pas détourner `env ui`, qui peut avoir une autre fonction.
-2. Choix minimal : Go HTTP/templates et JavaScript natif, assets via `go:embed`. Pas de nouvelle app Next.js ni de service distant. Pas de Node.js requis chez l’utilisateur.
-3. Lire le même modèle d’état que la CLI : environnements du projet, statut, release active, date du dernier relevé, résultat du dernier déploiement et logs récents bornés.
-4. Extraire seulement les fonctions de lecture nécessaires des handlers CLI. Ne pas appeler le binaire via shell à chaque rafraîchissement et ne pas introduire un deuxième état durable.
-5. Ne pas charger GCP pour afficher AWS, ni faire échouer toute la page si un provider est absent. Afficher `unknown`, `unavailable` ou « non pris en charge » plutôt qu’une couleur verte inventée.
-6. Limiter l’écoute à la boucle locale, protéger l’accès avec un secret de session aléatoire et valider Host/Origin. Pas de CORS permissif. Ne pas stocker le token dans les logs ou l’historique d’une URL durable.
-7. Délais d’expiration/cache/pagination des logs ; fermeture des processus providers à l’arrêt ; aucun appel cloud incontrôlé à chaque frame.
-8. Aucune mutation dans cette version : ni déploiement, ni delete, ni terminal DB web intégré.
-
-### Vérification
-
-JSON strict en réussite et échec, aucune sortie colorée parasite, secrets fictifs expurgés, non-interactif déterministe, navigation multi-env, provider manquant, données périmées visibles, refus des requêtes cross-origin non autorisées, fermeture propre.
-
-**Fin :** la console apporte de la visibilité sans créer un second control plane. Une UI minimale peut être publiée avant la parité AWS complète.
-
-## ML-09 — Permettre la contribution sans devenir un framework universel
-
-**But :** rendre les extensions réalistes pour un contributeur.
-
-**Zones :** `sdk/`, `docs/adding-a-provider.md`, `CONTRIBUTING.md`, exemples et adaptateurs existants.
-
-### Travail
-
-1. Documenter les quelques opérations obligatoires et les capacités optionnelles réellement issues de GCP/AWS. Une capacité non implémentée renvoie une erreur explicite ; pas de no-op vert.
-2. Réutiliser ou compléter un exemple minimal de provider qui se compile et passe une suite de conformité sans compte cloud. Pas de marketplace ni d’auto-installation de code inconnu.
-3. Exiger d’une contribution un propriétaire/mainteneur, un exemple YAML, des tests hors cloud et le relevé honnête des essais réels. Ne pas exiger de crédits dans tous les clouds pour proposer une PR.
-4. Préserver les providers OVH/Scaleway et leurs preuves. Ils peuvent être proposés explicitement comme expérimentaux. Ne pas étendre leur promesse sans vérification ni inventer un mainteneur communautaire.
-5. Intégrations : accepter d’abord des destinations et ressources externes via les contrats existants — endpoint compatible, référence de secret, OTLP, SMTP ou edge préconfiguré selon les capacités réellement présentes.
-6. Distinguer référence à une ressource externe, adoption et suppression. Aucun endpoint fourni par l’utilisateur ne doit transférer implicitement la propriété de la ressource à MageLift.
-7. Pas de provisionnement complet de New Relic, Datadog, Fastly, Cloudflare et tous les fournisseurs email dans ce lot. Ajouter un adaptateur demandé au moment où un contributeur ou pilote le teste.
-8. Reporter le gel du SDK et les releases indépendantes jusqu’à un besoin concret. Les versions coordonnées sont acceptables pendant l’alpha.
-
-**Fin :** un contributeur sait ajouter un provider sans modifier tout le noyau ni acheter un banc de test multi-cloud.
-
----
-
-## 5. Budget et discipline cloud
-
-### GCP
-
-Utiliser GCP pour les tests réels de build, migrations, données, recherche, queue, médias et exploitation. Un runner GCP de build/test peut être utilisé si le poste de développement manque de mémoire, à condition d’être explicitement créé dans le projet autorisé et inventorié.
-
-Conserver une petite recette standard ; limiter les runs concurrents, les durées et les objets retenus. Les crédits ne sont pas une autorisation de créer des ressources sans propriétaire. Distinguer consommation brute et montant net après crédits pour ne pas afficher un coût réel de zéro.
-
-### AWS — enveloppe proposée
-
-Les chiffres suivants sont des plafonds de planification, pas des estimations de prix AWS ni une garantie de facture.
-
-| Usage | Enveloppe de travail |
-|---|---:|
-| Test groupé de la recette ECS existante | 50 USD |
-| Parité après extraction du provider | 30 USD |
-| Régressions ciblées | 20 USD |
-| Réserve non planifiée sur les ~150 USD annoncés | 50 USD |
-
-**Total des essais planifiés : 100 USD maximum, sous réserve de vérification du crédit restant et des dépenses en cours.** Ne pas autoriser la dépense sur carte bancaire pour compléter un test.
-
-Avant un run AWS :
-
-1. Vérifier compte, région, rôle et périmètre autorisés. Pas d’inférence depuis un préfixe de nom historique.
-2. Lire le crédit restant lorsque l’accès le permet ; sinon demander ce seul renseignement avant la création. Vérifier expiration/couverture des crédits et prendre en compte les autres consommations du compte.
-3. Consulter les tarifs actuels des seuls services utilisés et estimer durée de création, test, destruction, stockage résiduel et marge. Un prix inconnu n’est pas zéro.
-4. Enregistrer une réservation indicative avant le run dans un relevé mainteneur simple, ignoré par Git s’il contient des informations de compte. Éviter un nouveau système FinOps.
-5. Une seule stack AWS de test active par défaut. Aucun run automatique sur toutes les PRs ; lancement manuel sur commit de confiance.
-6. Si le nouveau run ne tient pas dans l’enveloppe disponible, ne pas créer. Continuer les tests locaux et noter le blocage.
-7. Timeout et nettoyage de sortie, plus un balayage de récupération indépendant pour les runs interrompus. Les erreurs de nettoyage sont visibles, jamais masquées par un résultat applicatif vert.
-8. Arrêter les nouveaux essais lorsque la consommation engagée et estimée atteint l’enveloppe de 100 USD ; préserver la réserve pour les délais de facturation et résidus. Ne pas « attendre l’alerte » pour arrêter.
-
-AWS Budgets peut notifier après le dépassement. Les budgets GCP de type « alerts-only » ne plafonnent pas non plus automatiquement les dépenses. [S11, S12] Ces garde-fous réduisent le risque sans promettre une coupure exacte à 100 ou 150 USD. Nettoyer les ressources déjà engagées peut encore générer des frais pendant leur suppression.
-
-## 6. Politique de test et de release
-
-### À chaque PR
-
-Tests des packages affectés, régression du bug corrigé, génération/schema/docs quand concernés. Aucun secret cloud pour le code de forks. Pas de workflow `pull_request_target` qui exécute du code de contribution non revu avec des credentials.
-
-### Avant merge d’un lot
-
-`make verify-community` — **cible à créer/réconcilier dans ML-00** — couvre les modules concernés et le parcours de référence hors cloud. Les tests plus larges restent disponibles et leurs exclusions sont explicites.
-
-Les tests doivent échouer sur un défaut réel. Ne pas remplacer un test applicatif rouge par un mock vert, retirer une assertion ou transformer une erreur en `SKIP` pour clôturer le lot.
-
-### Essais cloud
-
-GCP sur changement significatif du parcours GCP ou des contrats communs. AWS sur changements AWS suffisamment regroupés, dans l’enveloppe. Pas de produit cartésien versions × clouds × runtimes × services.
-
-Un rapport court suffit : SHA, versions/digests, configuration, étapes effectuées, résultat et restes. Réutiliser l’outillage de preuve existant lorsqu’il fonctionne ; ne pas développer un nouveau système de scellés pour publier une alpha.
-
-### Publication
-
-Les vérifications de sécurité de l’artefact distribué restent utiles. En revanche, ni la conformité de tous les providers ni la résolution de toutes les issues n’est exigée.
-
-Les bugs non bloquants sont documentés. Les capacités non testées sont identifiées. Les tags, la publication publique et les actions destructrices sur environnements protégés restent soumis à l’approbation du mainteneur.
-
-## 7. Règles d’exécution pour Codex
-
-1. Commencer par ML-00. À chaque session suivante, reprendre le premier lot non terminé et débloqué, pas un nouvel audit général.
-2. Lire `AGENTS.md`, la roadmap et uniquement les skills/fichiers nécessaires au lot. Les documents historiques ne doivent pas remettre en file active des travaux gelés.
-3. Avant création, chercher l’équivalent dans le dépôt : types, erreur, méthode, commande, manifeste, scheduler, fichier de preuve.
-4. Annoncer une liste courte de fichiers et tests ; implémenter. Pas de longue phase de rédaction au lieu du code.
-5. Réutiliser les contrats. Ne pas ajouter un registre, une couche d’indirection ou un DSL pour une seule implémentation.
-6. Ne pas profiter d’une tâche pour mettre toutes les dépendances à jour, renommer tous les packages ou reformater le dépôt.
-7. Ne pas modifier la sémantique publique d’une commande sans justification, migration et test. Les nouveaux chemins/commandes de ce plan sont des propositions d’implémentation, pas l’affirmation qu’ils existent déjà.
-8. Maintenir les tests de régression et les garde-fous destructifs. Une feature flag n’autorise pas une suppression dangereuse.
-9. Une impossibilité d’exécuter un test est notée `NOT_RUN` avec sa cause. Le reste du lot peut avancer ; ne pas inventer la validation.
-10. Ne pas faire dépendre une tâche locale d’une approbation cloud inutile. Mais ne pas déployer dans un compte non autorisé pour éviter une question nécessaire.
-11. Pas de tag, publication ou réécriture d’historique implicite. Pas d’accès aux données d’une vraie boutique pour fabriquer une fixture.
-12. Un commit/une PR doit résoudre un résultat utilisateur et inclure le test pertinent. Pas de commit « tout terminé » fondé sur une mise à jour de checklist.
-
-### Compte rendu obligatoire en fin de lot
+### Prompt de démarrage
 
 ```text
-Lot : ML-XX
-Base / commit : ...
-Livré : ...
-Fichiers principaux : ...
-Tests exécutés : commandes exactes + résultat
-Essais cloud : compte/projet expurgé + opérations + résultat, ou NOT_RUN
-Budget AWS : estimation réservée / consommation connue / incertitude restante
-Ressources restantes : aucune vérifiée, retenues explicitement, ou inventaire précis
-Limites et bugs connus : ...
-Documentation modifiée : ...
-Prochain lot débloqué : ...
+Applique CODEX_IMPLEMENTATION_PLAN.md version 1.2. Il remplace les anciens
+plans ; n’additionne pas leurs exigences.
+
+Reprends la branche existante depuis wip/all-local-work, sans réécriture
+ni écrasement du travail local. Commence par S0, puis S1–S3 pour l’alpha.
+Vérifie ce qui est déjà implémenté ; ne le refais pas.
+
+Priorités : recettes construites dans la CI utilisateur, registre choisi
+par l’utilisateur, onboarding cloud guidé, workflow non écrasé, erreurs
+exploitables, JSON/skills, une release simple. Pas d’images Docker
+MageLift centrales, pas de nouvelle plateforme de plugins ni de certification.
+
+Garde GCP comme recette principale et AWS disponible dans son périmètre
+expérimental. L’extraction AWS, la console et les autres providers ne
+conditionnent pas la première publication.
+
+Conserve les contrats, signatures et protections. Avance sur les tâches
+locales autorisées ; pour les essais cloud, exige la cible d’acceptance
+et l’enveloppe autorisées. Toute vérification non faite est NOT_RUN.
+Pas de tag/publication ni destruction protégée sans approbation.
+
+Pour chaque lot : code ciblé, tests de régression exécutés, documentation
+utile, rapport bref. Le résultat doit réduire une manipulation utilisateur
+ou une difficulté concrète de maintenance, pas seulement ajouter une abstraction.
 ```
 
-Pas de valeurs de secrets, URL présignée, dump, tokens ni identifiants privés inutiles dans ce rapport.
+## 10. Points de référence de la relecture
 
-## 8. Prompt de démarrage à transmettre avec ce document
+Le plan v1.1 a été relu intégralement. Les observations de dépôt suivantes ont été revérifiées sur `wip/all-local-work` pendant la révision :
 
-```text
-Implémente MageLift à partir du plan CODEX_IMPLEMENTATION_PLAN.md.
+- `docs/onboarding.md` : préparation actuelle du compte, rôles/API à accorder, credentials ADC, domaine/DNS, images de base à construire et contraintes Git décrites dans la documentation. Une affirmation documentaire n’est pas une exécution du code.
+- `internal/cli/bootstrap.go` : réutiliser la préparation existante, les paramètres GitHub et les sorties de bootstrap ; compléter leur UX et leur cohérence avec la CI.
+- `internal/cli/ci.go` : validation actuelle par comparaison exacte au workflow rendu ; remplacement du fichier différent dans `writeWorkflow`. Rendre les personnalisations utilisateur explicites et protégées.
 
-Le plan est la directive produit du mainteneur : continuité du dépôt,
-GCP comme terrain principal, AWS limité aux crédits disponibles, alpha
-communautaire sans certification exhaustive. Conserve Go, Pulumi, YAML,
-le build PHP, le manifeste et le contrat provider existants.
+Les références précédemment examinées restent utiles pour localiser les modifications, sans dispenser de vérifier leur état : `internal/cli/build.go`, `internal/providerhost/`, `providers/gcp/`, `internal/registry/`, `build/src/Magento/`, `sdk/artifact.go`, `intent/ROADMAP.md` et les scripts de développement.
 
-Applique la révision 1.1 : aucune image Docker MageLift centrale à publier.
-Distribue les recettes versionnées ; construis builder/runtime/application
-sur la CI du projet utilisateur et pousse vers son registre choisi.
-Conserve BuildKit, les caches utilisateur, le manifeste existant et la
-promotion par digest sans reconstruction. Le workflow CI minimal est une
-condition du jalon A, pas un chantier post-alpha.
+Documentation primaire consultée le 18 octobre 2026 ; relire les versions applicables lors de l’implémentation :
 
-Commence par ML-00, puis enchaîne les lots débloqués dans l’ordre.
-Ne relance pas un audit général et ne recrée pas les éléments déjà livrés.
-Réconcilie AGENTS.md et intent/ROADMAP.md dans ML-00 pour ne pas rester
-bloqué sur les anciennes obligations de certification ou de replanification.
+- Google Cloud, fédération d’identité pour la CI : `https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines` — permissions, conditions de confiance et identités courtes.
+- Google Cloud, GKE et Artifact Registry : `https://docs.cloud.google.com/artifact-registry/docs/integrate-gke` — permissions de pull distinctes des credentials du build.
+- Pulumi Automation API : `https://www.pulumi.com/docs/iac/concepts/automation-api/` — orchestration et outillage sous-jacent.
+- Docker, cache registry : `https://docs.docker.com/build/cache/backends/registry/` ; secrets : `https://docs.docker.com/build/building/secrets/`.
+- GoReleaser, Homebrew Casks : `https://goreleaser.com/customization/publish/homebrew_casks/` ; Scoop : `https://goreleaser.com/customization/publish/scoop/` — publication des métadonnées depuis la chaîne de release.
 
-Travaille sur reboot/community-alpha depuis wip/all-local-work sans écraser
-le travail local. Pour chaque lot, fais des modifications ciblées, ajoute
-les tests, exécute-les et fournis le compte rendu demandé dans le plan.
-
-Pas de nouvelles abstractions sans nécessité démontrée. Pas de nouveau
-manifeste, framework de plugins, moteur de certification, chatbot ou
-migration de langage. Les providers expérimentaux restent disponibles
-avec leur niveau réel de test ; ils ne bloquent pas la première alpha.
-
-Aucun déploiement hors cible d’acceptance explicitement autorisée. Aucun
-secret committé. Aucun tag/publication ni destruction protégée sans
-approbation. Si un test cloud est impossible, note NOT_RUN et avance sur
-les tâches locales indépendantes, sans simuler une réussite.
-
-Arrête-toi avant une action nécessitant une autorisation manquante,
-pas devant une tâche de code déjà couverte par ce plan.
-```
-
-## 9. Sources et points de contrôle
-
-Les références de dépôt ci-dessous sont relatives à `magelift/magelift` au SHA inspecté en tête de document. Elles servent à localiser le travail existant, pas à imposer un comportement historique contre le code courant.
-
-- **[S1]** `intent/ROADMAP.md` — GCP alpha, AWS ensuite, recette et périmètre existants.
-- **[S2]** `intent/alpha-development-loop/plan.md` — tâches déjà réalisées, tests et vérifications restantes.
-- **[S3]** `intent/transparent-provider-delivery/intent.md` ; `internal/providerhost/` — acquisition/résolution/cache.
-- **[S4]** `internal/registry/registry.go` ; `docs/adr/0013-provider-plugin-contract.md` — frontière provider et transition en cours.
-- **[S5]** `intent/published-build-images/intent.md` (objectif de publication centrale remplacé par la révision 1.1) ; `build/src/Artifact/ArtifactManifest.php` ; `sdk/artifact.go` — contrats existants à préserver.
-- **[S6]** `build/src/Magento/PatchLifecycle.php`, `PatchApplier.php`, `LifecyclePlan.php` — build et patches.
-- **[S7]** `agents/README.md` ; `agents/skills/` — skills distribuées.
-- **[S8]** `internal/cli/root.go`, `internal/cli/env_ui_test.go` — CLI et sortie machine.
-- **[S9]** `AGENTS.md` ; `Makefile` — obligations de travail et contradiction de la cible race.
-- **[S10]** Adobe, Quality Patches Tool, Installation and usage : `https://experienceleague.adobe.com/en/docs/commerce-operations/tools/quality-patches-tool/usage` ; dépôts `magento/quality-patches` et `magento/magento-cloud-patches`. Lire les versions effectivement verrouillées avant implémentation.
-- **[S11]** AWS, Managing your costs with AWS Budgets : `https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html` — délai de facturation et de notification.
-- **[S12]** Google Cloud, Create, edit, or delete budgets and budget alerts : `https://docs.cloud.google.com/billing/docs/how-to/budgets` — distinction alertes seules et autres dispositifs de plafond selon service.
-
-### Références ajoutées pour la révision 1.1
-
-- **[S13]** Docker, Registry cache : `https://docs.docker.com/build/cache/backends/registry/` — cache indépendant de l’image finale et stages intermédiaires.
-- **[S14]** Docker, Build secrets : `https://docs.docker.com/build/building/secrets/` — montages de secrets, éviter ARG/ENV persistants.
-- **[S15]** Docker, Building best practices : `https://docs.docker.com/build/building/best-practices/` — bases, multi-stage, pinning et mises à jour.
-- **[S16]** Kubernetes, Pull an Image from a Private Registry : `https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/` — authentification de pull runtime.
-- **[S17]** AWS, Using non-AWS container images in Amazon ECS : `https://docs.aws.amazon.com/AmazonECS/latest/developerguide/private-auth.html` — `repositoryCredentials`, Secrets Manager et rôle d’exécution.
-- **[S18]** Google Cloud, Deploying to Google Kubernetes Engine : `https://docs.cloud.google.com/artifact-registry/docs/integrate-gke` — permissions du pull depuis Artifact Registry.
-- **[S19]** `internal/cli/build.go`, branche `wip/all-local-work`, blob `44b13597e6eab82f4ae14b462e822d5475eca125` — prérequis `--push`, étapes et signatures déjà présents lors de la relecture.
-- **[S20]** Docker, Optimize cache usage : `https://docs.docker.com/build/cache/optimize/` — invalidation, contexte et cache mounts.
-
-**Règle finale : publier une capacité limitée qui fonctionne, documenter les défauts réels, puis itérer. Ne pas transformer ce plan en un nouveau projet de plateforme universelle.**
+**Décision finale : moins de choix initiaux et de chantiers transverses ; davantage d’automatisation sur le parcours concret de l’agence. Ne pas transférer la complexité du mainteneur aux utilisateurs pour pouvoir appeler le produit simple.**
