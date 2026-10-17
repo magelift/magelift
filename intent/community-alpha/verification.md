@@ -310,3 +310,77 @@ releases inspected; 2.4.10-alpha1 is an upstream alpha despite its GitHub
 prerelease metadata. The current official PHP 8.5 FPM Trixie image resolves to
 `sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc`
 and an actual Linux amd64 run reports PHP 8.5.11. No image was published.
+
+## ML-03 — local build verification; publication pending
+
+Implementation commits: `b2ac1d2` (current image inputs and context exclusions),
+`5e59e33` (registered themes), `5064ea3` (image resolution and trace),
+`b08f962` (scoped publication workflow). No image, tag or branch was published.
+Default published image pins remain empty deliberately: the default resolver
+reports unavailability until real GHCR digests are published and anonymously
+verified. Explicit contributor image overrides were used for the checks below.
+ML-03 is therefore not complete.
+
+Current recipe: Magento Open Source 2.4.9, PHP 8.5.11, Composer 2.10.3,
+nginx 1.30.4, Linux amd64. Docker 29.9.1 / Buildx 0.38.0 / BuildKit 0.34.0
+were used through the default builder; the user's older named builder was
+not changed. Dockerfile frontend 1.28.0 and official base images are digest
+pinned. No new dependency framework or manifest was introduced.
+
+Actual local builds from a clean synthetic Magento Git source passed twice.
+Images were `sha256:2704c810f175b744497e9dcea07640e762e2a0ed2ed35c64916cb3461ab93150`
+and `sha256:0bd7deb48f8275b044ef2f70429bcd01cb931915b45f6817ea5cca25e2231a06`.
+Source revision, build inputs, versions, 222 enabled modules, static matrix,
+compatibility, capabilities and checksums matched. Image digests differ;
+bitwise reproducibility is not claimed. These runs exposed a hardcoded CLI
+version in the PHP manifest; the environment now carries the normalized CLI
+version and OCI labels carry the builder/runtime references. The existing
+external manifest and provider contract are unchanged.
+
+Final existing-shop integration passed in 170.005 seconds using the corrected
+builder. Image:
+`sha256:d73c03a572df2bea0b957d6ba49b6d5ab7d0dfe9ab6cdd2b80244221e9b39f8a`.
+Existing manifest SHA256:
+`0999e94aa325d22f49562ff56bc2e7312cc9ae9b62900de7d7916918f44729f7`.
+The source configuration and clean Git tree remained unchanged; the custom
+MageLift_AlphaDisabled module remained disabled in the runtime image. A fake
+Composer credential canary was absent from captured logs, the manifest, and
+all 39 exported archive entries (1,125,084,796 uncompressed bytes inspected).
+OCI version and base image labels matched. The test is opt-in and skips when
+its explicit local fixture/image inputs are absent. Proof and raw manifests
+are private under `/tmp/magelift-community-alpha/`, not committed artifacts.
+
+Negative real builds: missing PHP extension imap exited 3 as expected.
+An unregistered theme initially incorrectly succeeded (exit 0), demonstrating
+a real defect. After registrar validation was added without database bootstrap,
+the same Missing/does-not-exist theme exited 3 with the expected error. The
+positive existing-shop integration above used this final corrected builder.
+Runtime inspection confirmed application YAML and auth.json were absent.
+Local bare image IDs and named digest FROM experiments failed because BuildKit
+attempted remote resolution; advanced local tags retain captured-ID drift
+checks instead. No registry workaround or extra registry was introduced.
+
+Final `MAGELIFT_PHP_TEST_CONTAINER=1 make verify-community docs workflow-check
+cli-docs-check`: PASS, exit 0. This includes root/SDK/GCP community suites,
+targeted race checks, clean-room and architecture gates, PHP static analysis,
+audit, lifecycle golden contract, strict docs and actionlint. Final PHP suite:
+135 tests, 317 assertions, PASS. Generated CLI docs and shipped skill manifest
+were regenerated with project targets. Workflow tests execute the actual
+version/source-tag guard and check the two-cell PHP85 amd64 publication scope.
+Historical evidence-link informational MkDocs messages remain; docs built.
+
+Public GHCR default-path cold pulls/builds, image signing/attestation and
+current-source release installation: NOT_RUN, awaiting explicit publication
+approval. Native Windows/macOS/package-manager runs remain NOT_RUN.
+The remove-ai-marks service was unavailable (connection refused): NOT_RUN;
+prose was reviewed with humanizer. No certification claim follows these tests.
+
+Resources remaining: 526 GiB workspace and 7.6 GiB /tmp available at this
+checkpoint. Task images/build cache and synthetic source fixtures are retained
+locally for review; shared Docker resources were not pruned. Engine-reported
+sizes for an earlier trace builder/runtime/application were respectively
+956,296,496 / 837,517,312 / 1,662,426,781 bytes; layers are shared, these are
+not compressed download sizes or an additive installation footprint. No cloud
+resource was created, no AWS budget was reserved or spent, and account credits
+were not measured. Authorized GCP target remains digital-lab-341608,
+us-central1, with a fresh magelift-prefixed acceptance run.
