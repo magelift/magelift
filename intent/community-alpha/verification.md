@@ -446,3 +446,9 @@ cache, proofs and synthetic sources are retained; no shared Docker resource was
 pruned. No cloud resources created, no AWS budget reserved/spent, remaining
 account credits unmeasured. Registry retention is user-owned: failed pushes
 can leave base images, which MageLift does not delete automatically.
+
+Cursor Composer 2.5 (non-fast) implemented the bounded embedded-context and
+image-builder slice; the parent corrected repository/tag isolation, integrated
+the CLI and reviewed the final source/diff. An optional Grok 4.7 medium
+(non-fast) read-only review produced no report in five minutes and was
+interrupted (exit 130); independent agent review is NOT_RUN, not a pass.
