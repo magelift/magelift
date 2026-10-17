@@ -538,3 +538,37 @@ after checking its ID and acceptance owner label. The exact owned HTTPS Git
 server was stopped (session exit 143 after SIGTERM). Both services are gone;
 their private data and proof files remain. No shared Docker resources pruned.
 Remaining local storage after these tests: 512 GiB workspace, 5.5 GiB /tmp.
+
+
+### S0 synthetic overlay and S1 hotfix follow-up
+
+Added an original reusable module/theme overlay under
+tests/fixtures/magento-shop-overlay. Actual CLI default build from the isolated
+shop passed, exit 0, revision f6c158a72a922dbd60d83feade3d831e9f70a1fb.
+Image sha256:6f43c559035b43ef4b7f2bf0523674521be7813980ebca7c0ec6ea16faed126d;
+manifest SHA256 c5e9554b49241c6601466e6e303d8d663578dc6b3dce6fb1a8864fb0c9a72580.
+Running PHP inside the resulting image confirmed the custom theme CSS contains
+.magelift-alpha-fixture and MageLift_AlphaDisabled remains 0. Manifest matrix
+contains MageLift/alpha/en_US; source Git status is clean and config.php hash
+unchanged. This proves build content, not HTTP/store/cloud behavior.
+
+Hotfix errors now identify category/path/exit and a next action without echoing
+patch stderr/source text. Native patch tests cover a conflicting hunk, full
+reapplication and a genuinely partial two-hunk patch. The partial fixture first
+applies successfully to pristine input, proving it is valid; after resetting to
+partial content, failure leaves the target unchanged with no .rej/.orig files.
+The parent corrected the worker's overlapping-hunk fixture before acceptance.
+MAGELIFT_PHP_TEST_CONTAINER=1 make php-test PASS after that correction:
+152 tests / 359 assertions, PHP 8.5.11, static analysis/audit PASS.
+make docs check-clean-room PASS. Cursor Composer 2.5 non-fast supplied the
+bounded implementation/tests; parent reviewed the source and reran the checks.
+No claim of patch-series atomicity or protection against a write failure after
+successful dry-run is made.
+
+Real QPT execution is still pending: ordinary installation in a separate shop
+failed because the package is not on the configured public registry (exit 2).
+The explicit upstream VCS attempt without credentials then failed GitHub auth
+(exit 1). A retry uses the existing GitHub login via a private read-only Composer
+auth file mounted into the disposable installer; that file is removed on exit.
+No upstream package source/catalog is added to MageLift, and no Adobe credentials
+are invented or requested. These install failures are not passing patch tests.

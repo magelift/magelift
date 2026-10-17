@@ -36,3 +36,8 @@ locks.
 ## Fixtures
 
 E2E fixtures live under `tests/fixtures/`. No credentials or customer data.
+
+The original [Magento shop overlay](fixtures/magento-shop-overlay/README.md)
+adds a disabled custom module and a Luma child theme to an owned synthetic shop
+for real build acceptance. It is separate from the offline YAML scenario data;
+using the overlay does not prove a running storefront or a provider cell.
