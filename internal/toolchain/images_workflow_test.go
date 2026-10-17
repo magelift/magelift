@@ -54,3 +54,33 @@ func TestMageLiftImageWorkflowCannotPublish(t *testing.T) {
 		t.Fatalf("expected one matrix build, got %d", builds)
 	}
 }
+
+func TestRecipeValidationPreservesExistingMatrixWithoutPublishing(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "images.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Strategy struct {
+				Matrix struct {
+					Include []struct {
+						Image string
+						PHP   string `yaml:"php"`
+					}
+				}
+			}
+		}
+	}
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	cells := workflow.Jobs["validate"].Strategy.Matrix.Include
+	kinds := map[string]int{}
+	for _, cell := range cells {
+		kinds[cell.Image]++
+	}
+	if len(cells) != 12 || kinds["nginx"] != 4 || kinds["builder"] != 4 || kinds["frankenphp-classic"] != 4 {
+		t.Fatalf("existing recipe checks lost: %+v", cells)
+	}
+}

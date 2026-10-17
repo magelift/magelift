@@ -13,13 +13,73 @@ concurrency:
 
 jobs:
   validate:
-    name: PHP 8.5 ${{ matrix.target }} (Linux amd64)
+    name: ${{ matrix.image }} PHP ${{ matrix.php }} (Linux amd64)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        target: [builder, runtime]
+        include:
+          - image: nginx
+            file: images/php-nginx/Dockerfile
+            target: runtime
+            php: '8.2'
+            base: docker.io/library/php:8.2-fpm-trixie@sha256:596175799ca76a93d5d0c3cda7d5f70fccfc86dfdaf97580c1c27e665aba991f
+          - image: nginx
+            file: images/php-nginx/Dockerfile
+            target: runtime
+            php: '8.3'
+            base: docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328
+          - image: nginx
+            file: images/php-nginx/Dockerfile
+            target: runtime
+            php: '8.4'
+            base: docker.io/library/php:8.4-fpm-trixie@sha256:59fa733c9af643a122f8a9976119460e35ce76dd0a3f2b9c8f75af8e361a54e2
+          - image: nginx
+            file: images/php-nginx/Dockerfile
+            target: runtime
+            php: '8.5'
+            base: docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc
+          - image: builder
+            file: images/php-nginx/Dockerfile
+            target: builder
+            php: '8.2'
+            base: docker.io/library/php:8.2-fpm-trixie@sha256:596175799ca76a93d5d0c3cda7d5f70fccfc86dfdaf97580c1c27e665aba991f
+          - image: builder
+            file: images/php-nginx/Dockerfile
+            target: builder
+            php: '8.3'
+            base: docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328
+          - image: builder
+            file: images/php-nginx/Dockerfile
+            target: builder
+            php: '8.4'
+            base: docker.io/library/php:8.4-fpm-trixie@sha256:59fa733c9af643a122f8a9976119460e35ce76dd0a3f2b9c8f75af8e361a54e2
+          - image: builder
+            file: images/php-nginx/Dockerfile
+            target: builder
+            php: '8.5'
+            base: docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc
+          - image: frankenphp-classic
+            file: images/frankenphp-classic/Dockerfile
+            target: ''
+            php: '8.2'
+            base: docker.io/dunglas/frankenphp:1.12.7-php8.2-trixie@sha256:3c1ad970186bc0d3b47d0ff3212f9f47dfa0e6c7e5dbb68bec19ed9c6464c466
+          - image: frankenphp-classic
+            file: images/frankenphp-classic/Dockerfile
+            target: ''
+            php: '8.3'
+            base: docker.io/dunglas/frankenphp:1.12.7-php8.3-trixie@sha256:b0029775078a8434f74f7c694e0634e4a8e1a81b758132b22baaf42110a176b4
+          - image: frankenphp-classic
+            file: images/frankenphp-classic/Dockerfile
+            target: ''
+            php: '8.4'
+            base: docker.io/dunglas/frankenphp:1.12.7-php8.4-trixie@sha256:77bc2d40a58ace3a9425e4cbb0c40d044188dfd850e44a943ed043d743625df3
+          - image: frankenphp-classic
+            file: images/frankenphp-classic/Dockerfile
+            target: ''
+            php: '8.5'
+            base: docker.io/dunglas/frankenphp:1.12.7-php8.5-trixie@sha256:f92d81eb3fe4fd18b35d3d58192b7cc3acc8943817bbf39f2fcf0be02a3916dc
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -30,16 +90,21 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: images/php-nginx/Dockerfile
+          file: ${{ matrix.file }}
           target: ${{ matrix.target }}
           platforms: linux/amd64
-          tags: magelift-validation:${{ matrix.target }}
+          build-args: |
+            PHP_BASE=${{ matrix.base }}
+            FRANKENPHP_BASE=${{ matrix.base }}
+            PHP_BRANCH=${{ matrix.php }}
+          tags: magelift-validation:${{ matrix.image }}-${{ matrix.php }}
           push: false
           load: true
           provenance: false
           sbom: false
       - name: Check PHP recipe
         env:
-          TARGET: ${{ matrix.target }}
+          IMAGE: ${{ matrix.image }}
+          PHP_BRANCH: ${{ matrix.php }}
         run: |
-          docker run --rm --entrypoint php "magelift-validation:${TARGET}" -r 'if (PHP_MAJOR_VERSION !== 8 || PHP_MINOR_VERSION !== 5) { exit(1); }'
+          docker run --rm --entrypoint php --env EXPECTED_PHP_BRANCH="$PHP_BRANCH" "magelift-validation:${IMAGE}-${PHP_BRANCH}" -r 'if (PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION !== getenv("EXPECTED_PHP_BRANCH")) { exit(1); }'
