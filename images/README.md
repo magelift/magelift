@@ -77,19 +77,20 @@ passed as build arguments. Release automation will sign and verify the resulting
 digest after registry publication. Pull-request jobs neither push nor request an OIDC
 token.
 
-Tagged releases publish the supported matrix to GHCR as
-`ghcr.io/magelift/magelift-nginx`, `ghcr.io/magelift/magelift-builder`, and
-`ghcr.io/magelift/magelift-frankenphp-classic`. Each PHP branch receives a stable
-branch tag and a release tag. Deployments should pin the digest printed by the
-release workflow; tags are convenience aliases, not release identity.
+MageLift CI builds and tests these recipes without publishing central images.
+The CLI ships the versioned files. The user's CI constructs the stages and
+publishes the application to its selected OCI repository. A separate private
+BuildKit registry cache can retain intermediate layers without publishing bases.
 
 ## Default image policy
 
-Local builds and tests resolve the `:local` bake tags (for example
-`magelift/php-nginx:local`). CLI defaults move to GHCR-versioned digests only
-after the first stable tag, in a separate change; this change implements no
-GHCR pull. The nginx GHCR repo is `ghcr.io/magelift/magelift-nginx`. The
-Varnish sidecar stays pinned to `docker.io/library/varnish:8.0.2@sha256:4b595728592a5b9709c9aac15368ca492e9742fb269ed12466b434a62b2c1b63`.
+The community recipe uses PHP 8.5 / nginx-fpm on Linux amd64. Official upstream
+bases and the Dockerfile frontend are digest pinned. Other bake targets remain
+available for contributor diagnostics and explicit advanced recipes; they are
+not an expanded alpha qualification matrix.
 
-The base contains no Magento source or credentials. A later application-image stage
-will copy the validated build output and artifact manifest into this runtime.
+`magelift build` loads local intermediates. `magelift build --push --image <ref>`
+builds the runtime stage within the application build and publishes only the
+application with its attestations. No published MageLift base is required. The
+existing external artifact manifest is finalized after the image digest exists;
+it is not copied into the image.
