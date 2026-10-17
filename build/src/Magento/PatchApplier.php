@@ -136,18 +136,19 @@ final class PatchApplier
                 $timeoutSeconds,
             ));
             if (!$result->succeeded()) {
-                $patchPath = 'unknown';
-                foreach ($command->arguments() as $argument) {
-                    $patchPath = $argument;
-                }
-                throw new RuntimeException(sprintf(
-                    'Failed to apply hotfix patch "%s" (exit %d).%s',
-                    $patchPath,
-                    $result->exitCode,
-                    $result->stderr !== '' ? ' '.$result->stderr : '',
-                ));
+                throw new RuntimeException(self::formatHotfixApplyFailure($patchPath, $result->exitCode));
             }
         }
+    }
+
+    private static function formatHotfixApplyFailure(string $relativePatchPath, int $exitCode): string
+    {
+        return sprintf(
+            'Failed to apply %s hotfix "%s" (exit %d). Review applicability against your locked Magento version before retrying; adjust or remove the hotfix if it no longer matches the codebase.',
+            self::HOTFIX_DIRECTORY,
+            $relativePatchPath,
+            $exitCode,
+        );
     }
 
     public function assertPatchToolAvailable(): void
