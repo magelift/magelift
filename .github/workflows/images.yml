@@ -1,16 +1,22 @@
 name: Release Container Images
 
-# Stable semver tags only (no hyphen prerelease). The trigger excludes
-# RC tags before any run exists (last matching pattern wins); the job
-# `if` below repeats the rule as defense-in-depth. A 12x multi-arch RC
-# matrix costs ~750 job-minutes per attempt, so RC images stay manual:
-# to publish an RC image matrix, temporarily drop the exclusion or
-# retag without '-'.
+# Stable tags keep the existing catalog publication. Community alpha uses a
+# manual, Linux amd64 PHP 8.5 builder/runtime run; publishing is opt-in.
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Explicit image version (vX.Y.Z or prerelease), approved before publishing
+        required: true
+        type: string
+      publish:
+        description: Publish the two reviewed community alpha images to GHCR
+        type: boolean
+        default: false
   push:
     # `sdk/v*` module tags never match: `v*` anchors at the start of
     # the ref name. Any tag containing `-` (`-rc`, `-alpha`) is out.
-    tags: ['v*', '!*-*']
+    tags: ['v*', '!*-*', 'images/community-alpha.*']
 
 concurrency:
   group: release-images-${{ github.ref }}
@@ -26,7 +32,7 @@ jobs:
   publish:
     name: ${{ matrix.image }} PHP ${{ matrix.php }}
     # Skip prerelease tags (semver uses '-' for -rc / -alpha / -beta).
-    if: ${{ !contains(github.ref_name, '-') }}
+    if: ${{ github.event_name == 'push' && !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -96,57 +102,135 @@ jobs:
     env:
       IMAGE: ghcr.io/magelift/magelift-${{ matrix.image }}
       VERSION: ${{ github.ref_name }}
+      COMMUNITY_ALPHA: 'false'
+      SIGNING_IDENTITY: https://github.com/${{ github.workflow_ref }}
 
-    steps:
+    steps: &image-steps
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - name: Validate image version
+        run: |
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            printf 'An explicit semantic image version is required\n' >&2
+            exit 2
+          fi
+          if [[ "$GITHUB_REF" == refs/tags/images/community-alpha.* ]]; then
+            approved_sha="${GITHUB_REF#refs/tags/images/community-alpha.}"
+            if [[ ! "$approved_sha" =~ ^[a-f0-9]{40}$ || "$approved_sha" != "$GITHUB_SHA" ]]; then
+              printf 'Community image tag must identify its exact source commit\n' >&2
+              exit 2
+            fi
+          fi
+      - if: ${{ env.COMMUNITY_ALPHA != 'true' }}
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          version: v0.38.0
+          driver-opts: image=moby/buildkit:v0.34.0
+      - if: ${{ github.event_name == 'push' || inputs.publish }}
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and publish image
         id: push
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ${{ matrix.file }}
           target: ${{ matrix.target }}
-          platforms: linux/amd64,linux/arm64
-          push: true
+          platforms: ${{ env.COMMUNITY_ALPHA == 'true' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          load: ${{ github.event_name == 'workflow_dispatch' && !inputs.publish }}
+          push: ${{ github.event_name == 'push' || inputs.publish }}
           build-args: |
             PHP_BASE=${{ matrix.base }}
             NGINX_BASE=docker.io/library/nginx:1.30.4-trixie@sha256:d5792f71a9496b833bc08ea834a758c46e2b6a6306c10f4be926f38a656cdc1c
             FRANKENPHP_BASE=${{ matrix.base }}
             PHP_BRANCH=${{ matrix.php }}
           tags: |
-            ${{ env.IMAGE }}:${{ matrix.php }}
+            ${{ env.COMMUNITY_ALPHA != 'true' && format('{0}:{1}', env.IMAGE, matrix.php) || '' }}
             ${{ env.IMAGE }}:${{ matrix.php }}-${{ env.VERSION }}
           labels: |
             org.opencontainers.image.source=https://github.com/magelift/magelift
             org.opencontainers.image.version=${{ env.VERSION }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=MageLift ${{ matrix.image }} PHP ${{ matrix.php }}
-          sbom: true
-          provenance: mode=max
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+          sbom: ${{ github.event_name == 'push' || inputs.publish }}
+          provenance: ${{ (github.event_name == 'push' || inputs.publish) && 'mode=max' || 'false' }}
+      - name: Check PHP and builder tools
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+          PHP_BRANCH: ${{ matrix.php }}
+          IMAGE_KIND: ${{ matrix.image }}
+          PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+        run: |
+          image_ref="${IMAGE}:${PHP_BRANCH}-${VERSION}"
+          if [[ "$PUBLISH" == true ]]; then image_ref="${IMAGE}@${IMAGE_DIGEST}"; fi
+          docker run --rm --platform linux/amd64 --entrypoint php \
+            -e MAGELIFT_EXPECTED_PHP="$PHP_BRANCH" "$image_ref" -r '
+            if (!str_starts_with(PHP_VERSION, getenv("MAGELIFT_EXPECTED_PHP") . ".")) { exit(1); }
+            foreach (["bcmath", "dom", "gd", "intl", "pdo_mysql", "soap", "sodium", "xsl", "zip", "redis", "apcu"] as $extension) {
+              if (!extension_loaded($extension)) { fwrite(STDERR, "Missing extension: " . $extension . PHP_EOL); exit(1); }
+            }
+            echo PHP_VERSION, PHP_EOL;'
+          if [[ "$IMAGE_KIND" == builder ]]; then
+            docker run --rm --platform linux/amd64 --entrypoint composer "$image_ref" --version
+          fi
+      - if: ${{ github.event_name == 'push' || inputs.publish }}
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
           cosign-release: v3.1.3
       - name: Sign published digest
+        if: ${{ github.event_name == 'push' || inputs.publish }}
         run: cosign sign --yes "${IMAGE}@${{ steps.push.outputs.digest }}"
       - name: Verify published digest
+        if: ${{ github.event_name == 'push' || inputs.publish }}
         run: >-
           cosign verify
-          --certificate-identity "https://github.com/magelift/magelift/.github/workflows/images.yml@refs/tags/${VERSION}"
+          --certificate-identity "$SIGNING_IDENTITY"
           --certificate-oidc-issuer https://token.actions.githubusercontent.com
           "${IMAGE}@${{ steps.push.outputs.digest }}"
       - name: Publish registry provenance attestation
+        if: ${{ github.event_name == 'push' || inputs.publish }}
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
           create-storage-record: false
+      - name: Verify anonymous access to published digest
+        if: ${{ github.event_name == 'push' || inputs.publish }}
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          anonymous_config="$(mktemp -d)"
+          trap 'rm -rf "$anonymous_config"' EXIT
+          docker --config "$anonymous_config" pull --platform linux/amd64 "${IMAGE}@${IMAGE_DIGEST}"
+
+  community-alpha:
+    name: Community alpha ${{ matrix.image }} PHP 8.5 (Linux amd64)
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/images/community-alpha.') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: nginx
+            file: images/php-nginx/Dockerfile
+            target: runtime
+            php: '8.5'
+            base: docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc
+          - image: builder
+            file: images/php-nginx/Dockerfile
+            target: builder
+            php: '8.5'
+            base: docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc
+    env:
+      IMAGE: ghcr.io/magelift/magelift-${{ matrix.image }}
+      VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || format('v0.0.0-community.{0}', github.sha) }}
+      COMMUNITY_ALPHA: 'true'
+      SIGNING_IDENTITY: https://github.com/${{ github.workflow_ref }}
+    steps: *image-steps
