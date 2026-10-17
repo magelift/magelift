@@ -572,3 +572,110 @@ The explicit upstream VCS attempt without credentials then failed GitHub auth
 auth file mounted into the disposable installer; that file is removed on exit.
 No upstream package source/catalog is added to MageLift, and no Adobe credentials
 are invented or requested. These install failures are not passing patch tests.
+
+
+## S1 decisive local acceptance / S2 initial integration — 2026-10-18
+
+S1 real hotfix build passed with local BuildKit cache: the compiled custom-theme
+CSS changed to #228844 through m2-hotfixes while source stayed #1255a3 and Git
+status stayed clean. Image sha256:e604fc12dd3a5ee7d335cc5ceb6e214007fdfa7cf7cdf21a12ea89a6b15627cb;
+manifest SHA256 f6c66195078e69b3bd105c85e46b9f28ceeb94b0964792d8d83bd77322595b33.
+This changed-patch run used the local cache, not a registry cache.
+
+QPT installation initially failed on missing repository, anonymous GitHub auth,
+then a locked Symfony dependency conflict. The isolated fixture now explicitly
+locks current upstream QPT1.1.84 and Cloud Patches1.1.14. Composer resolved the
+latest compatible dependencies after unlocking http-kernel; config, DI and YAML
+moved from8.1 to7.4, http-kernel from8.1.9 to8.0.15. No dependency constraint or
+security advisory block was disabled; audit reported no advisories. These are
+synthetic shop lock changes, not MageLift dependency changes. Private Composer
+auth mounts were removed on exit. No upstream code/catalog was added to MageLift.
+
+Actual upstream status recognized Magento2.4.9 and an unknown ID was rejected
+(exit1). A real MageLift build with declared QPT AC-17975 passed; running the
+installed upstream status command inside the image confirmed Applied. Source
+was unchanged. Image sha256:7370b1b24d2dd4b3723406b56d4b959c8f1be7dcbaad773c4717dddf74c67f2f;
+manifest SHA256773e62a2ef5e0dedcea3b0e8701e4529090714ba2b626b36a11ca790d3f5ed43.
+The first test invocation had a duplicated Composer YAML mapping created by the
+harness; it failed decoding (exit2). The fixture was corrected before the real
+successful run, without changing the application validator.
+
+Optional build.cloudPatches now defaults false and delegates one locked upstream
+ECE apply when explicitly enabled. Its single pass owns required cloud patches,
+YAML-declared QPT and project hotfixes. The parent caught a missing apply command
+in the worker's first wrapper; stronger executable tests failed twice, then
+passed after fixing argv and retaining constructor compatibility. Full local
+community/docs/actionlint/generated checks passed, exit0, with160 PHP tests /
+384 assertions. The user-facing scope notice stays on stderr; no separate
+patch database or lifecycle engine was introduced.
+
+Real Cloud Patches opt-in build passed. The built image reports AC-17975 Applied,
+contains the upstream-applied #55aa66 theme CSS and preserves the disabled module.
+The invalid ID deliberately left in .magento.env.yaml (present in the image)
+did not control selection. Source config/theme/Git remained unchanged and stdout
+was valid JSON. Image sha256:b80fd4c4caed2741f98da274d072669d40c8965efa5910c80e79e531dd5b6e38;
+manifest SHA2568e7fb55d905ae3787857fdd237325f0f63ea73509498940ef3cb07123f77f295.
+
+Fresh host-only GoReleaser2.18.3 snapshot packaging of commit58b5286 passed
+(sign/publish/SBOM explicitly skipped for this local archive). The extracted
+archive built a detached synthetic shop with a new empty docker-container
+BuildKit0.34.0 store, no cache import and a host PATH containing only Git/Docker.
+BuildKit was capped at6GiB and4CPU equivalents; Magento preparation runs in a
+separate container, so this is not a measurement of total peak RAM. Build passed
+in320.688s; the temporary builder, its container and state volume are gone.
+Theme/hotfix/module content, snapshot version and recipe hash were checked in
+the result. No MageLift source checkout, Go, PHP or Node was used by that CLI.
+Image sha256:9eb6c9269e340470a2df560ce6afa734c3f12f3c0e3854ae9076bfbb04f416b2;
+manifest SHA2567aed2fceee520cc9819fe0c9e484ce3cc79d82b761984aed44c651b2d120d13f.
+Archive62,991,601 bytes; installed CLI308,441,248; provider207,556,768. These
+sizes exclude tools, Docker images/cache and the rest of the checkout.
+
+A streamed scan of all three QPT/Cloud/cold images passed:68 archive entries,
+52 compressed blobs,2,377,025,893 decoded bytes; the actual build credential and
+its base64 value were absent. This checks those encodings, not every possible
+encoding of arbitrary extension data. The earlier fake canary/cache scans remain
+separate evidence. These local app images were not pushed/signed; current remote
+signature chain, GitHub CI and GCP runtime-pull acceptance remain NOT_RUN.
+
+S2 initial integration delivered: source-inspecting init, default GCP single
+test environment, explicit AWS starter, real source-checkout fallback, Commerce
+edition precedence, regular-file/JSON/compatibility validation before writing,
+nonsecret JSON result and preserved import flows. A real isolated init produced
+one valid test environment without changing the shop. The minimal workflow has
+validate/build/test jobs, retained-manifest handoff, serialized test deployment,
+no production inputs or preview schedule. GCP build/test identities have separate
+GitHub environment references; bootstrap provisioning is still being completed.
+
+Google auth writes federation files in the checkout. Generated GCP jobs now move
+them outside the shop, export only path references, and retain the auth action's
+post cleanup. Executed Bash tests cover paths with spaces, clean Git, unchanged
+credential content,0600 even from0644 input, invalid/symlink/outside paths,
+RUNNER_TEMP inside checkout and failed env publication cleanup. Native PHP also
+rejects known root gha-creds files before preparation. PHP checks pass with161
+tests /388 assertions. CLI/skills suites and strict docs/actionlint/CLI docs pass.
+The first complete S2 gate failed on filename code spans interpreted as YAML
+schema keys by the skills check; formatting was fixed without weakening the
+assertion, and the skills suite passed. Final combined S2 gates will be rerun
+after the remaining bootstrap integration; no full S2 completion is claimed.
+
+Signing now preserves explicit overrides, otherwise uses ambient GitHub OIDC
+before gcloud; missing job OIDC permission fails with guidance. The command
+callback tests prove no deploy-SA impersonation/token materialization in this
+path. The real GitHub signing call is NOT_RUN. Cursor Composer2.5 non-fast
+implemented the bounded init, credential and signer slices; parent corrected
+real source handling, strict input checks, credential-mode/failure cleanup and
+ambient detection against upstream provider semantics. Grok4.7-high again
+produced no report in its bounded signing attempt and was interrupted (exit130),
+so that review is NOT_RUN.
+
+Storage:8.8GiB of owned private proofs/synthetic checkouts were moved from tmpfs
+to /home/alex/.cache/magelift-community-alpha-20261018; the original /tmp path is
+a private alias. Files were preserved. Remaining:490GiB workspace,11GiB /tmp.
+Local images/caches remain; no shared Docker prune. No cloud resources created,
+no external push/tag/publication, AWS reservation/spend still0, credits unmeasured.
+Humanizer applied to prose; remove-ai-marks service remains unavailable/NOT_RUN.
+
+Next useful work is guided account bootstrap: API/registry/state preparation,
+owned scoped build/deploy/pull identities, derived CI settings and real acceptance
+on the authorized GCP target. S3 functional/release/cleanup acceptance and the
+outside-person trial remain pending. S4/S5 are still conditional pilot work.
