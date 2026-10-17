@@ -24,7 +24,8 @@ import (
 )
 
 // Opt-in integration against an owned synthetic shop and prebuilt local images.
-// It never pushes an image or provisions cloud resources.
+// It pushes only when MAGELIFT_REAL_IMAGE explicitly selects an owned registry.
+// It never provisions cloud resources.
 func TestRealBuildKeepsSecretsOutOfImageAndPreservesDisabledModule(t *testing.T) {
 	root := os.Getenv("MAGELIFT_REAL_SHOP_ROOT")
 	if root == "" {

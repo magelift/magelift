@@ -452,3 +452,89 @@ image-builder slice; the parent corrected repository/tag isolation, integrated
 the CLI and reviewed the final source/diff. An optional Grok 4.7 medium
 (non-fast) read-only review produced no report in five minutes and was
 interrupted (exit 130); independent agent review is NOT_RUN, not a pass.
+
+
+## Plan 1.2 / S1–S2 checkpoint — 2026-10-18
+
+The maintainer's v1.2 replaces earlier requirements. The earlier report above
+about publishing builder/runtime tags is historical: commit 499a08e keeps those
+intermediates local and publishes only the application. S0–S3 lead to the test
+alpha; pilot-triggered S4/S5 are not publication gates. No tag or publication
+has been performed.
+
+Delivered: embedded recipe export without Docker/cloud access; default
+source-built local intermediates and composed runtime stage; optional private
+registry cache; build-only Composer env reference; existing manifest enriched
+with recipe hash, platform and three pinned inputs. Existing provider and PHP
+protocol contracts remain. The Docker recipe matrix is retained as build checks
+without central image publication. A detached private Git checkout without any
+configured author identity passes the new source regression.
+
+Real checks on the synthetic Magento 2.4.9 shop, Linux amd64:
+
+- Default CLI build without image overrides: PASS, exit 0, PHP 8.5.11 and
+  Composer 2.10.3. Image b2f62e76572b34c190ae82d1a91b01aeb285c8d85109ba29d1ebfd6a8628b906;
+  external manifest SHA256 1273889129fa8a0975ab94e32d0974120940ccaebab40d28799e21ab12f6981f.
+  OCI recipe label matches manifest buildRecipe.sha256
+  121d78a260d4544d40e9b69d14690355d548844415b7bf133cde1f743cfa78e8.
+- Export with PATH containing no tools: PASS. Existing destination collision
+  tests reject occupied recipe paths.
+- Owned authenticated loopback registry 3.1.2: first push/pull test PASS,
+  174.339 seconds; initial registry cache empty, workstation BuildKit warm.
+  Second push/pull with populated cache PASS, 180.650 seconds. Build log records
+  registry cache import and cached steps. These runs do not demonstrate a cold
+  runner or a cache speedup; the second run included the new manifest metadata.
+- Second image digest sha256:1f8d1548bef1a7798b193463f42f1dae2eed5e9b54bccf8f74838398004435c6;
+  manifest SHA256 9a4f8259142bc3bcf8800adcaa030d67bb16cc863f4ad35b7f6693ff1f76b55b.
+  Full image scan: 40 archive entries / 1,131,415,267 uncompressed bytes;
+  fake Composer credential absent, source unchanged, disabled module preserved.
+- First registry transport checked actual index/child/blob digests plus SPDX
+  and SLSA attestation predicate types. Anonymous API returned 401; actual
+  unauthenticated Docker push failed, exit 1. No denied tag was published.
+  Initial cache/blob scan: 86 files / 32 gzip blobs / 1,247,410,585 decoded bytes,
+  no Composer or fake registry credential. These pipeline tests do not invoke
+  CLI Cosign signing and do not prove the full signature chain.
+
+S2 CI changes: generation preserves customized workflows and reports an exact
+candidate path; explicit --replace adopts the template, --check-template checks
+optional freshness. Default validation reports its configuration/presence/YAML
+syntax scope. User CI builds source recipes; GCP Artifact Registry, user GHCR
+and explicit generic-registry auth remain separate. Build/deploy identity
+references are separate. The existing manifest/checksum/result survive between
+jobs; production promotion requires an existing successful same-workflow,
+same-repository non-PR run and does not invoke the builder. Actual generated
+Bash handoff scripts accept valid input and reject corruption/digest mismatch;
+run-metadata tests reject fork/PR, failed and different-workflow sources.
+These changes do not complete guided bootstrap: identity/policy variables still
+need automatic generation, and the minimal single-test starter remains pending.
+
+Executed: targeted CLI suite PASS; source suite PASS; complete
+MAGELIFT_PHP_TEST_CONTAINER=1 make verify-community docs workflow-check
+cli-docs-check PASS, exit 0. Includes root/SDK/GCP suites, bounded race,
+150 PHP tests / 346 assertions, PHP static analysis/audit, lifecycle golden,
+clean-room, harness, strict docs and actionlint. make generate cli-docs PASS.
+Cursor Composer 2.5 non-fast implemented CI write protection; parent reviewed,
+integrated and fixed the concrete candidate error guidance. Grok 4.7 low
+non-fast completed the bounded upstream patch CLI lookup. A Grok 4.7 high
+non-fast review stalled and was interrupted (exit 130): review NOT_RUN.
+
+NOT_RUN: changed-patch/cache scenario, truly cold distributed runner, current
+GitHub/GCP CI, runtime pull after credential expiry, full signature chain for
+these images, current cloud application acceptance, outside-person guide trial,
+new native macOS/Windows/Brew/Scoop tests and the 12-cell recipe matrix.
+Humanizer applied to human prose; remove-ai-marks service is unavailable
+(connection refused), so its pass is NOT_RUN. No cloud resources were created;
+AWS spend/reservation remains zero and remaining credits unverified.
+Private proofs are under /tmp/magelift-community-alpha; local sources/images and
+cache remain. Local registry/server cleanup is recorded separately below.
+
+
+Registry follow-up: second transport proof PASS (actual index/child/blob hashes,
+SPDX/SLSA predicates); only application tags cold/warm and the separate cache
+reference existed, with no builder/runtime repositories. Final registry/cache
+scan PASS: 113 files, 36 gzip blobs, 1,779,028,191 decoded bytes, no fake Composer
+or registry credentials. The exact owned registry container was stopped/removed
+after checking its ID and acceptance owner label. The exact owned HTTPS Git
+server was stopped (session exit 143 after SIGTERM). Both services are gone;
+their private data and proof files remain. No shared Docker resources pruned.
+Remaining local storage after these tests: 512 GiB workspace, 5.5 GiB /tmp.
