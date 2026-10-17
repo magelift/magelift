@@ -72,6 +72,16 @@ type Build struct {
 	StaticContent  StaticContentSettings `yaml:"staticContent,omitempty" json:"staticContent,omitempty" config:"Static content deployment settings"`
 	QualityPatches []string              `yaml:"qualityPatches,omitempty" json:"qualityPatches,omitempty" config:"Quality Patch IDs applied at build"`
 	Hooks          map[string]BuildHook  `yaml:"hooks,omitempty" json:"hooks,omitempty" config:"Build lifecycle hooks"`
+	Cache          *BuildCache           `yaml:"cache,omitempty" json:"cache,omitempty" config:"Optional user-owned BuildKit registry cache" schema:"nullable"`
+}
+
+// BuildCache configures optional registry import/export for BuildKit layer cache.
+// References name the user's registry only; credentials stay in the CI environment.
+type BuildCache struct {
+	From               []string `yaml:"from,omitempty" json:"from,omitempty" config:"Registry references imported before the build"`
+	To                 string   `yaml:"to,omitempty" json:"to,omitempty" config:"Registry reference receiving exported cache layers" schema:"nullable"`
+	Mode               string   `yaml:"mode,omitempty" json:"mode,omitempty" config:"BuildKit cache export mode" schema:"enum=min|max,nullable"`
+	IgnoreExportErrors bool     `yaml:"ignoreExportErrors,omitempty" json:"ignoreExportErrors,omitempty" config:"Continue when cache export fails"`
 }
 
 // LocalRuntime contains workstation-only choices. Provider-managed services

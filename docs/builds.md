@@ -26,23 +26,21 @@ Buildx builder is used by default; set `BUILDX_BUILDER` when a named builder suc
 ## Push a release candidate
 
 Run this command in your CI/CD after authenticating Docker to your registry.
-MageLift builds and publishes the builder, runtime and application images in
-the repository you select. Builder/runtime tags include the shipped recipe
-fingerprint; the application consumes their resulting registry digests.
-No image is published to a MageLift-owned namespace.
+MageLift constructs the builder and runtime stages on the runner and publishes
+the deployable application to your selected repository. Intermediate images do
+not need to be published. The runtime is built from the bundled recipe in the
+same BuildKit build as the final application; no MageLift image registry is used.
 
 ```sh
 magelift build --push --image ghcr.io/example/shop:candidate
 ```
 
-The same repository holds all three images, using separate tags; for ECR,
-create that repository and grant CI push/pull permissions. GHCR, ECR,
-Artifact Registry and other OCI registries use the same `--image` option.
-For example, `123456789012.dkr.ecr.us-east-1.amazonaws.com/shop:candidate`
-selects an ECR repository. MageLift uses Docker's configured registry login.
-Registry retention policies must preserve the referenced base digests and
-attestations. Interrupted builds may leave published base images; MageLift
-does not delete registry artifacts automatically.
+For ECR, create the application repository and grant CI push/pull permissions.
+GHCR, ECR, Artifact Registry and other OCI registries use the same `--image`
+option and Docker's configured credentials. For example,
+`123456789012.dkr.ecr.us-east-1.amazonaws.com/shop:candidate` selects ECR.
+Successful publication does not prove that the deployment runtime can pull the
+image; configure and test its own durable pull identity separately.
 
 A local `magelift build` loads images into Docker without publishing them.
 Pushed builds also default to `linux/amd64`. Advanced `--builder-image` and
@@ -104,3 +102,50 @@ Hooks are ordered by their target and dependency edges. Retries require
 `idempotent: true`, and each hook has a bounded timeout. YAML hooks are limited to
 the validate, build, and package phases; deployment-time hooks are provider
 extension concerns until the deployment protocol exposes the same typed contract.
+
+## Inspect the recipe
+
+```sh
+magelift build --export-recipe .magelift/recipe-inspection
+```
+
+The destination must not exist. This exports the versioned files and reports
+the recipe SHA256 without invoking Docker, Composer credentials or deployment.
+Generated files are diagnostic output; keep configuration in YAML. Source-built
+images carry `io.magelift.recipe.sha256`; their runtime label uses
+`recipe:sha256:<hash>` rather than claiming a separately published runtime digest.
+Explicit base-image overrides retain their digest labels.
+
+## Optional private registry cache
+
+```yaml
+build:
+  cache:
+    from: [us-central1-docker.pkg.dev/example/build-cache/shop:amd64-recipe-release]
+    to: us-central1-docker.pkg.dev/example/build-cache/shop:amd64-recipe-release
+    mode: max
+    ignoreExportErrors: false
+```
+
+Cache references are separate from the final image. Scope them by project,
+architecture/recipe and trust boundary; use different references and permissions
+for untrusted work. Cached layers may contain private source and proprietary
+packages. Keep that repository private and apply its own retention policy.
+`ignoreExportErrors` is an explicit opt-in; publication/build errors remain fatal.
+A missing cache falls back to a cold build. Registry export retains layers,
+including intermediate stages in max mode; it does not promise to restore the
+contents of `RUN --mount=type=cache` directories on an ephemeral runner.
+
+## Composer credentials supplied by CI
+
+```yaml
+build:
+  composer:
+    credentials: env://COMPOSER_AUTH
+```
+
+The CI supplies `COMPOSER_AUTH` as a secret containing a non-empty JSON object.
+An absent or invalid value fails without printing its contents. This reference
+is available only for build-time Composer credentials; runtime secrets retain
+the provider reference contract. The existing cloud secret references remain
+available. Never put the credential JSON in YAML or pass it as a build argument.

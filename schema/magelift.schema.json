@@ -2050,6 +2050,17 @@
     "build": {
       "additionalProperties": false,
       "properties": {
+        "cache": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/buildCache",
+              "description": "Optional user-owned BuildKit registry cache"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "composer": {
           "$ref": "#/$defs/composer",
           "description": "Composer settings"
@@ -2087,6 +2098,92 @@
       "required": [
         "php"
       ],
+      "type": "object"
+    },
+    "buildCache": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "description": "Registry references imported before the build",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ignoreExportErrors": {
+          "description": "Continue when cache export fails",
+          "type": "boolean"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "description": "BuildKit cache export mode",
+              "enum": [
+                "min",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to": {
+          "anyOf": [
+            {
+              "description": "Registry reference receiving exported cache layers",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "buildCacheOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "description": "Registry references imported before the build",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ignoreExportErrors": {
+          "description": "Continue when cache export fails",
+          "type": "boolean"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "description": "BuildKit cache export mode",
+              "enum": [
+                "min",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to": {
+          "anyOf": [
+            {
+              "description": "Registry reference receiving exported cache layers",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
       "type": "object"
     },
     "buildHook": {
@@ -2304,6 +2401,17 @@
     "buildOverlay": {
       "additionalProperties": false,
       "properties": {
+        "cache": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/buildCacheOverlay",
+              "description": "Optional user-owned BuildKit registry cache"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "composer": {
           "$ref": "#/$defs/composerOverlay",
           "description": "Composer settings"

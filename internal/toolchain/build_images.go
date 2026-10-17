@@ -15,6 +15,7 @@ import (
 	"time"
 
 	buildcontext "github.com/magelift/magelift"
+	"github.com/magelift/magelift/internal/config"
 )
 
 const alphaPlatform = "linux/amd64"
@@ -55,12 +56,17 @@ var imageInspectCommand Command = SystemCommandRunner()
 // tags; a non-empty prefix must be a registry-qualified repository without tag
 // or digest and is used to derive <prefix>:<fingerprint>-builder and
 // <prefix>:<fingerprint>-runtime pushed references.
-func BuildImages(ctx context.Context, diagnostics io.Writer, tempRoot, platform, imagePrefix string) (Images, error) {
+func BuildImages(ctx context.Context, diagnostics io.Writer, tempRoot, platform, imagePrefix string, cacheFrom ...string) (Images, error) {
 	if diagnostics == nil {
 		return Images{}, errors.New("image build diagnostics writer is required")
 	}
 	if platform != alphaPlatform {
 		return Images{}, fmt.Errorf("unsupported platform %q: community alpha builds %s only", platform, alphaPlatform)
+	}
+	for _, reference := range cacheFrom {
+		if err := config.ValidateRegistryCacheReference("build.cache.from", reference); err != nil {
+			return Images{}, err
+		}
 	}
 	push := imagePrefix != ""
 	if push {
@@ -96,11 +102,11 @@ func BuildImages(ctx context.Context, diagnostics io.Writer, tempRoot, platform,
 	defer os.RemoveAll(metadataDir)
 
 	builderMetadata := filepath.Join(metadataDir, "builder.json")
-	if err := runImageBuild(ctx, diagnostics, contextDir, "builder", builderTag, builderMetadata, push); err != nil {
+	if err := runImageBuild(ctx, diagnostics, contextDir, "builder", builderTag, builderMetadata, push, cacheFrom); err != nil {
 		return Images{}, fmt.Errorf("build builder image: %w", err)
 	}
 	runtimeMetadata := filepath.Join(metadataDir, "runtime.json")
-	if err := runImageBuild(ctx, diagnostics, contextDir, "runtime", runtimeTag, runtimeMetadata, push); err != nil {
+	if err := runImageBuild(ctx, diagnostics, contextDir, "runtime", runtimeTag, runtimeMetadata, push, cacheFrom); err != nil {
 		return Images{}, fmt.Errorf("build runtime image: %w", err)
 	}
 
@@ -189,7 +195,7 @@ func registryHostValid(host string) bool {
 	return strings.ContainsAny(host, ".:") && !strings.Contains(host, "/")
 }
 
-func runImageBuild(ctx context.Context, diagnostics io.Writer, contextDir, target, tag, metadataPath string, push bool) error {
+func runImageBuild(ctx context.Context, diagnostics io.Writer, contextDir, target, tag, metadataPath string, push bool, cacheFrom []string) error {
 	args := []string{
 		"buildx", "build",
 		"--file", filepath.Join(contextDir, "images", "php-nginx", "Dockerfile"),
@@ -203,6 +209,9 @@ func runImageBuild(ctx context.Context, diagnostics io.Writer, contextDir, targe
 		args = append(args, "--sbom=true", "--provenance=mode=max,version=v1", "--push")
 	} else {
 		args = append(args, "--provenance=false", "--sbom=false", "--load")
+	}
+	for _, reference := range cacheFrom {
+		args = append(args, "--cache-from", "type=registry,ref="+reference)
 	}
 	args = append(args, contextDir)
 	return dockerBuild.Run(ctx, diagnostics, args)

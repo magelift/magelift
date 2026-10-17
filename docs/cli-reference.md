@@ -82,6 +82,7 @@ Options:
 
 ```text
       --builder-image string   advanced builder image override (pair with --runtime-image; registry digest required with --push)
+      --export-recipe string   export the bundled build recipe without building or publishing
       --image string           target image reference for a pushed build
       --platform strings       target platform, repeatable or comma-separated
       --push                   push the image and publish build attestations

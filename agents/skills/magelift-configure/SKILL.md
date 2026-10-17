@@ -33,8 +33,13 @@ lock and existing module configuration. The default community recipe is PHP 8.5
 with nginx-fpm on Linux amd64. Recipes and pinned upstream inputs ship with
 the CLI. The user's Docker engine/CI builds the builder, runtime and application
 images. Local builds do not publish. `magelift build --push --image <registry>/<repository>:<tag>`
-publishes all three into that user-owned repository, consumes the base digests,
-and signs the application. Authenticate Docker first; MageLift has no required
+publishes the application into that user-owned repository and signs it.
+Builder/runtime intermediates stay on the runner; the final build consumes the
+bundled pinned runtime recipe. Optional `build.cache` configures separate registry
+cache references; keep private layers and release caches out of fork jobs.
+`build.composer.credentials: env://COMPOSER_AUTH` accepts CI credentials through
+the existing private secret mount. `build --export-recipe <new-directory>` exports
+the recipe for diagnostics without Docker or cloud credentials. Authenticate Docker first; MageLift has no required
 image registry. No framework source checkout is needed.
 
 Existing disabled modules and declared locales/themes are preserved. Build-time

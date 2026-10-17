@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -414,5 +416,45 @@ func TestApplyResolvedImagesPreservesGeneratedLocalRuntimeTag(t *testing.T) {
 	after.RuntimeID = "sha256:" + strings.Repeat("c", 64)
 	if sameResolvedRuntime(images, after) {
 		t.Fatal("changed local runtime accepted")
+	}
+}
+
+func TestComposerEnvironmentReferenceDoesNotRequireCloud(t *testing.T) {
+	t.Setenv("ML_TEST_COMPOSER_AUTH", `{"bearer":{"packages.example.invalid":"fake-ci-canary"}}`)
+	value, err := (*options)(nil).loadComposerCredentials(context.Background(), "env://ML_TEST_COMPOSER_AUTH", "")
+	if err != nil || !strings.Contains(string(value), "fake-ci-canary") {
+		t.Fatalf("CI auth resolution: %v", err)
+	}
+	clear(value)
+	for _, reference := range []string{"env://MISSING_ML_COMPOSER_AUTH", "env://ML_TEST_COMPOSER_AUTH?field=x", "env://ML_TEST_COMPOSER_AUTH/extra", "env://ML_TEST_COMPOSER_AUTH\n"} {
+		_, err := (*options)(nil).loadComposerCredentials(context.Background(), reference, "")
+		if err == nil || strings.Contains(err.Error(), "fake-ci-canary") {
+			t.Fatalf("expected safe refusal for %q", reference)
+		}
+	}
+	t.Setenv("ML_TEST_COMPOSER_AUTH", `{"secret-canary":`)
+	if _, err := (*options)(nil).loadComposerCredentials(context.Background(), "env://ML_TEST_COMPOSER_AUTH", ""); err == nil || strings.Contains(err.Error(), "secret-canary") {
+		t.Fatal("invalid JSON leaked or accepted")
+	}
+}
+
+func TestExportBuildRecipeRefusesOccupiedDirectory(t *testing.T) {
+	destination := filepath.Join(t.TempDir(), "recipe")
+	result, err := exportBuildRecipe(destination, "linux/amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result["recipeSha256"]) != 64 {
+		t.Fatal("missing recipe fingerprint")
+	}
+	sentinel := filepath.Join(destination, "keep.txt")
+	if err := os.WriteFile(sentinel, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := exportBuildRecipe(destination, "linux/amd64"); err == nil {
+		t.Fatal("occupied recipe overwritten")
+	}
+	if data, err := os.ReadFile(sentinel); err != nil || string(data) != "keep" {
+		t.Fatal("existing work changed")
 	}
 }

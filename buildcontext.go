@@ -25,9 +25,31 @@ const alphaPlatform = "linux/amd64"
 
 var forbiddenEmbedPath = []string{"/vendor/", "/tests/", "/auth/", "/.git/"}
 
+// WriteContext copies the bundled recipe alongside a private prepared rootfs.
+// Existing recipe paths are refused so the fingerprint always names our bytes.
+func WriteContext(destination string) error {
+	paths, err := listEmbeddedFiles()
+	if err != nil {
+		return err
+	}
+	tops := map[string]bool{}
+	for _, path := range paths {
+		top, _, _ := strings.Cut(path, "/")
+		tops[top] = true
+	}
+	for top := range tops {
+		if _, err := os.Lstat(filepath.Join(destination, top)); !errors.Is(err, os.ErrNotExist) {
+			if err == nil {
+				return fmt.Errorf("recipe path already exists: %s", top)
+			}
+			return err
+		}
+	}
+	return os.CopyFS(destination, embedded)
+}
+
 // MaterializePrivateContext writes the embedded Magento image build context to a
-// private directory under tempRoot and returns a content fingerprint for the
-// embedded inputs combined with platform.
+// private directory under tempRoot and returns a content fingerprint.
 func MaterializePrivateContext(tempRoot, platform string) (contextDir string, fingerprint string, cleanup func(), err error) {
 	if err := validatePlatform(platform); err != nil {
 		return "", "", nil, err

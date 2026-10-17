@@ -247,3 +247,35 @@ func TestBuildImagesHelperProcess(t *testing.T) {
 	}
 	os.Exit(0)
 }
+
+func TestBuildImagesImportsUserCacheForBothLocalStages(t *testing.T) {
+	cache := "registry.example.invalid/shop:amd64-recipe-cache"
+	ids := map[string]string{}
+	calls := 0
+	defer stubDockerBuildFunc(t, func(_ context.Context, _ io.Writer, args []string) error {
+		calls++
+		position := slices.Index(args, "--cache-from")
+		if position < 0 || args[position+1] != "type=registry,ref="+cache {
+			t.Fatalf("cache not imported: %v", args)
+		}
+		if slices.Contains(args, "--push") {
+			t.Fatal("cache import caused image publication")
+		}
+		tag := args[slices.Index(args, "--tag")+1]
+		ids[tag] = "sha256:" + strings.Repeat("a", 64)
+		return nil
+	})()
+	defer stubImageInspect(t, ids)()
+	if _, err := BuildImages(context.Background(), io.Discard, t.TempDir(), alphaPlatform, "", cache); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("expected both stage builds, got %d", calls)
+	}
+	if _, err := BuildImages(context.Background(), io.Discard, t.TempDir(), alphaPlatform, "", "registry.example.invalid/shop:cache,mode=max"); err == nil {
+		t.Fatal("raw cache options accepted")
+	}
+	if calls != 2 {
+		t.Fatal("invalid cache reached Docker")
+	}
+}

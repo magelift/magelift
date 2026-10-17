@@ -207,6 +207,11 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `build.hooks.*.retries.delaySeconds` | integer | no |  | Retry delay in seconds |
 | `build.hooks.*.retries.idempotent` | boolean | no |  | Whether retrying is safe |
 | `build.hooks.*.failure` | string | no | abort, continue | Failure action |
+| `build.cache` | object or null | no |  | Optional user-owned BuildKit registry cache |
+| `build.cache.from` | array | no |  | Registry references imported before the build |
+| `build.cache.to` | string or null | no |  | Registry reference receiving exported cache layers |
+| `build.cache.mode` | string or null | no | min, max | BuildKit cache export mode |
+| `build.cache.ignoreExportErrors` | boolean | no |  | Continue when cache export fails |
 | `local` | object | no |  | Local runtime service and email choices |
 | `local.database` | object | no |  | Local database family and version |
 | `local.database.family` | string or null | no |  | Service family |
@@ -603,6 +608,11 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.build.hooks.*.retries.delaySeconds` | integer | no |  | Retry delay in seconds |
 | `environments.*.build.hooks.*.retries.idempotent` | boolean | no |  | Whether retrying is safe |
 | `environments.*.build.hooks.*.failure` | string | no | abort, continue | Failure action |
+| `environments.*.build.cache` | object or null | no |  | Optional user-owned BuildKit registry cache |
+| `environments.*.build.cache.from` | array | no |  | Registry references imported before the build |
+| `environments.*.build.cache.to` | string or null | no |  | Registry reference receiving exported cache layers |
+| `environments.*.build.cache.mode` | string or null | no | min, max | BuildKit cache export mode |
+| `environments.*.build.cache.ignoreExportErrors` | boolean | no |  | Continue when cache export fails |
 | `environments.*.target` | object or null | no |  |  |
 | `environments.*.target.provider` | string | no | aws, gcp, ovh, scaleway | Infrastructure provider |
 | `environments.*.target.runtime` | string | no | ecs-fargate, eks, gke-autopilot, gke-standard, mks, kapsule | Application runtime |

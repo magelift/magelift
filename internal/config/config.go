@@ -715,7 +715,7 @@ func validate(c Config) (CompatibilityAssessment, error) {
 	if c.Preset != "" && c.Preset != "preview" && c.Preset != "standard" && c.Preset != "high-availability" {
 		problems = append(problems, "environment preset must be preview, standard, or high-availability")
 	}
-	problems = append(problems, validateProviderSecretReference("build.composer.credentials", c.Build.Composer.Credentials, c.Target.Provider)...)
+	problems = append(problems, validateComposerCredentialsReference(c.Build.Composer.Credentials, c.Target.Provider)...)
 	if c.Application.Edition == "commerce" && strings.TrimSpace(c.Build.Composer.Credentials) == "" {
 		problems = append(problems, "build.composer.credentials is required for Adobe Commerce and must be a secret reference")
 	}
@@ -1115,6 +1115,9 @@ func validateBuildRequirements(build Build) []string {
 	}
 	if build.Composer.Version != "" && !composerVersion.MatchString(build.Composer.Version) {
 		problems = append(problems, fmt.Sprintf("build.composer.version %q must be a Composer 2 major.minor, major.minor.patch, or minimum version with +", build.Composer.Version))
+	}
+	if build.Cache != nil {
+		problems = append(problems, validateBuildCache(build.Cache)...)
 	}
 	seenPatches := map[string]struct{}{}
 	for _, id := range build.QualityPatches {

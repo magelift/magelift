@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	buildcontext "github.com/magelift/magelift"
 	buildkit "github.com/magelift/magelift/internal/build/kit"
 	buildpipeline "github.com/magelift/magelift/internal/build/pipeline"
 	"github.com/magelift/magelift/internal/cosign"
@@ -42,6 +43,7 @@ func buildCommand(o *options) *cobra.Command {
 	var builderImage string
 	var runtimeImage string
 	var sourceURL string
+	var exportRecipe string
 	var platforms []string
 	command := &cobra.Command{Use: "build", Short: "Build an immutable Magento application image", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		file, err := o.load()
@@ -54,6 +56,20 @@ func buildCommand(o *options) *cobra.Command {
 		}
 		if err := validateDefaultImageRecipe(spec.Build.PHP, string(spec.Application.WebRuntime), builderImage, runtimeImage); err != nil {
 			return invalid(err)
+		}
+		if exportRecipe != "" {
+			if push || imageReference != "" || builderImage != "" || runtimeImage != "" || sourceURL != "" {
+				return invalid(errors.New("--export-recipe cannot be combined with image or push overrides"))
+			}
+			platform, err := resolveLocalPlatform(platforms)
+			if err != nil {
+				return invalid(err)
+			}
+			result, err := exportBuildRecipe(exportRecipe, platform)
+			if err != nil {
+				return invalid(err)
+			}
+			return o.write(result)
 		}
 		defaults, err := file.ProjectDefaults()
 		if err != nil {
@@ -98,27 +114,29 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
+		request.BuildCache = spec.Build.Cache
+		if cache := request.BuildCache; cache != nil {
+			for _, ref := range append(append([]string(nil), cache.From...), cache.To) {
+				if ref != "" && ref == request.ImageReference {
+					return invalid(errors.New("build cache must use a different reference from the application image"))
+				}
+			}
+		}
 		mageLiftVersion, err := normalizePublicVersion(Version)
 		if err != nil {
 			return invalid(err)
 		}
 		var images toolchain.Images
 		if builderImage == "" && runtimeImage == "" {
-			prefix := ""
-			if push {
-				prefix, err = applicationImageRepository(imageReference)
-				if err != nil {
-					return invalid(err)
-				}
+			// Intermediates stay on the runner. Only the final app is published.
+			var cacheFrom []string
+			if spec.Build.Cache != nil {
+				cacheFrom = spec.Build.Cache.From
 			}
-			images, err = toolchain.BuildImages(cmd.Context(), o.stderr, tempRoot, defaultBuildPlatform, prefix)
+			images, err = toolchain.BuildImages(cmd.Context(), o.stderr, tempRoot, defaultBuildPlatform, "", cacheFrom...)
+			request.UseEmbeddedRecipe = true
 			if err == nil {
-				if push {
-					resolver = toolchain.NewResolver(toolchain.SystemCommandRunner(), images.BuilderReference, images.RuntimeReference)
-					images, err = resolver.Resolve(cmd.Context())
-				} else {
-					resolver = toolchain.NewResolver(toolchain.SystemCommandRunner(), images.BuilderID, images.RuntimeReference)
-				}
+				resolver = toolchain.NewResolver(toolchain.SystemCommandRunner(), images.BuilderID, images.RuntimeReference)
 			}
 		} else {
 			images, err = resolver.Resolve(cmd.Context())
@@ -171,6 +189,7 @@ func buildCommand(o *options) *cobra.Command {
 		}
 		return o.write(result)
 	}}
+	command.Flags().StringVar(&exportRecipe, "export-recipe", "", "export the bundled build recipe without building or publishing")
 	command.Flags().BoolVar(&push, "push", false, "push the image and publish build attestations")
 	command.Flags().StringVar(&imageReference, "image", "", "target image reference for a pushed build")
 	command.Flags().StringVar(&builderImage, "builder-image", "", "advanced builder image override (pair with --runtime-image; registry digest required with --push)")
@@ -424,6 +443,24 @@ func (o *options) loadComposerCredentials(ctx context.Context, rawReference, reg
 	if rawReference == "" {
 		return nil, nil
 	}
+	if strings.HasPrefix(rawReference, "env://") {
+		name := strings.TrimPrefix(rawReference, "env://")
+		if !regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`).MatchString(name) {
+			return nil, errors.New("Composer environment reference must name one variable")
+		}
+		value, present := os.LookupEnv(name)
+		if !present || value == "" {
+			return nil, errors.New("Composer credentials environment variable is unset or empty")
+		}
+		if len(value) > secretref.MaxValueSize {
+			return nil, secretref.ErrValueTooLarge
+		}
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(value), &object); err != nil || len(object) == 0 {
+			return nil, errors.New("Composer credentials environment value must be a non-empty JSON object")
+		}
+		return []byte(value), nil
+	}
 	reference, err := secretref.Parse(rawReference)
 	if err != nil {
 		return nil, fmt.Errorf("parse Composer credentials reference: %w", err)
@@ -526,4 +563,27 @@ func buildTempRoot(artifactDirectory string) (string, error) {
 	}
 
 	return root, nil
+}
+
+// exportBuildRecipe writes only versioned inputs and refuses an occupied target.
+func exportBuildRecipe(destination, platform string) (map[string]string, error) {
+	fingerprint, err := buildcontext.ContentFingerprint(platform)
+	if err != nil {
+		return nil, err
+	}
+	absolute, err := filepath.Abs(destination)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Dir(absolute), 0o755); err != nil {
+		return nil, err
+	}
+	if err := os.Mkdir(absolute, 0o700); err != nil {
+		return nil, fmt.Errorf("recipe destination must not exist: %w", err)
+	}
+	if err := buildcontext.WriteContext(absolute); err != nil {
+		os.RemoveAll(absolute)
+		return nil, err
+	}
+	return map[string]string{"directory": absolute, "recipeSha256": fingerprint, "platform": platform}, nil
 }

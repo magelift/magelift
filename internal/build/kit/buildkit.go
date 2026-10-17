@@ -16,9 +16,15 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/magelift/magelift/internal/config"
 )
 
 const maxMetadataBytes = 4 << 20
+
+// Pin the current Docker-maintained scanner rather than resolving a mutable tag
+// during a release build.
+const sbomGeneratorImage = "docker.io/docker/buildkit-syft-scanner:stable-1@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9"
 
 var digestPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 var revisionPattern = regexp.MustCompile(`^(?:[a-f0-9]{40}|[a-f0-9]{64})$`)
@@ -46,15 +52,19 @@ type Secret struct {
 }
 
 type Request struct {
-	Source           Source
-	ProvenanceSource string
-	Dockerfile       string
-	ImageReference   string
-	Platforms        []string
-	Output           OutputMode
-	BuildArgs        map[string]string
-	Builder          string
-	Secrets          []Secret
+	Source                  Source
+	ProvenanceSource        string
+	Dockerfile              string
+	ImageReference          string
+	Platforms               []string
+	Output                  OutputMode
+	BuildArgs               map[string]string
+	Builder                 string
+	Secrets                 []Secret
+	CacheFrom               []string
+	CacheTo                 string
+	CacheMode               string
+	IgnoreCacheExportErrors bool
 }
 
 type Result struct {
@@ -171,7 +181,7 @@ func validate(request Request, diagnostics io.Writer) error {
 		}
 		seenSecrets[secret.ID] = true
 	}
-	return nil
+	return validateCacheRequest(request)
 }
 
 func validateReleaseSource(request Request) error {
@@ -213,6 +223,37 @@ func registryQualified(reference string) bool {
 	return found && (first == "localhost" || strings.ContainsAny(first, ".:"))
 }
 
+func validateCacheRequest(request Request) error {
+	mode := strings.TrimSpace(request.CacheMode)
+	if mode != "" && strings.TrimSpace(request.CacheTo) == "" {
+		return errors.New("BuildKit cache mode requires a cache export reference")
+	}
+	if request.IgnoreCacheExportErrors && strings.TrimSpace(request.CacheTo) == "" {
+		return errors.New("BuildKit cache ignore-export-errors requires a cache export reference")
+	}
+	if mode != "" && mode != "min" && mode != "max" {
+		return errors.New("BuildKit cache mode must be min or max")
+	}
+	for index, reference := range request.CacheFrom {
+		field := fmt.Sprintf("cache-from[%d]", index)
+		if err := config.ValidateRegistryCacheReference(field, reference); err != nil {
+			return fmt.Errorf("BuildKit %s", err.Error())
+		}
+		if reference == request.ImageReference {
+			return errors.New("BuildKit cache import reference must differ from the image reference")
+		}
+	}
+	if export := strings.TrimSpace(request.CacheTo); export != "" {
+		if err := config.ValidateRegistryCacheReference("cache-to", export); err != nil {
+			return fmt.Errorf("BuildKit %s", err.Error())
+		}
+		if export == request.ImageReference {
+			return errors.New("BuildKit cache export reference must differ from the image reference")
+		}
+	}
+	return nil
+}
+
 func writeSecrets(directory string, secrets []Secret) ([]string, error) {
 	options := make([]string, 0, len(secrets))
 	for index, secret := range secrets {
@@ -240,7 +281,7 @@ func buildArgs(request Request, metadataPath string, secretOptions []string) []s
 	if request.Output == OutputLoad {
 		args = append(args, "--load")
 	} else {
-		args = append(args, "--sbom=true", "--provenance=mode=max,version=v1", "--push")
+		args = append(args, "--sbom=generator="+sbomGeneratorImage, "--provenance=mode=max,version=v1", "--push")
 	}
 	for _, name := range sortedKeys(request.BuildArgs) {
 		args = append(args, "--build-arg", name+"="+request.BuildArgs[name])
@@ -248,11 +289,32 @@ func buildArgs(request Request, metadataPath string, secretOptions []string) []s
 	for _, option := range secretOptions {
 		args = append(args, "--secret", option)
 	}
+	args = append(args, cacheBuildArguments(request)...)
 	source := request.Source.GitURL
 	if source == "" {
 		source = filepath.Clean(request.Source.LocalDirectory)
 	}
 	return append(args, source)
+}
+
+func cacheBuildArguments(request Request) []string {
+	args := make([]string, 0, 2+len(request.CacheFrom))
+	for _, reference := range request.CacheFrom {
+		args = append(args, "--cache-from", "type=registry,ref="+reference)
+	}
+	export := strings.TrimSpace(request.CacheTo)
+	if export == "" {
+		return args
+	}
+	mode := strings.TrimSpace(request.CacheMode)
+	if mode == "" {
+		mode = "max"
+	}
+	option := "type=registry,ref=" + export + ",mode=" + mode
+	if request.IgnoreCacheExportErrors {
+		option += ",ignore-error=true"
+	}
+	return append(args, "--cache-to", option)
 }
 
 func sortedKeys(values map[string]string) []string {

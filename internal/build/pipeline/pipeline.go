@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	buildcontext "github.com/magelift/magelift"
 	buildkit "github.com/magelift/magelift/internal/build/kit"
 	buildplan "github.com/magelift/magelift/internal/build/plan"
 	buildrunner "github.com/magelift/magelift/internal/build/runner"
@@ -60,6 +61,8 @@ type Request struct {
 	MageLiftVersion   string
 	ArtifactDirectory string
 	ComposerAuth      []byte
+	UseEmbeddedRecipe bool
+	BuildCache        *config.BuildCache
 }
 
 type Result struct {
@@ -170,15 +173,42 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 		return Result{}, fmt.Errorf("validate prepared runtime contract: %w", err)
 	}
 
-	dockerfilePath := filepath.Join(prepared.OutputDir, "Dockerfile")
-	if err := writeNewRegularFile(dockerfilePath, applicationDockerfile, 0o600); err != nil {
-		return Result{}, fmt.Errorf("materialize application Dockerfile: %w", err)
+	platform := platforms[0]
+	var recipeFingerprint string
+	var recipeTrace *buildrunner.BuildRecipe
+	var dockerfilePath string
+	if request.UseEmbeddedRecipe {
+		recipeFingerprint, err = buildcontext.ContentFingerprint(platform)
+		if err != nil {
+			return Result{}, fmt.Errorf("embedded recipe fingerprint: %w", err)
+		}
+		if err := buildcontext.WriteContext(prepared.OutputDir); err != nil {
+			return Result{}, fmt.Errorf("materialize embedded recipe context: %w", err)
+		}
+		bases, traceErr := recipeBaseImages(prepared.OutputDir)
+		if traceErr != nil {
+			return Result{}, traceErr
+		}
+		recipeTrace = &buildrunner.BuildRecipe{SHA256: recipeFingerprint, Platform: platform, BaseImages: bases}
+		dockerfilePath, err = materializeEmbeddedRecipeDockerfile(prepared.OutputDir, recipeFingerprint)
+		if err != nil {
+			return Result{}, err
+		}
+	} else {
+		dockerfilePath = filepath.Join(prepared.OutputDir, "Dockerfile")
+		if err := writeNewRegularFile(dockerfilePath, applicationDockerfile, 0o600); err != nil {
+			return Result{}, fmt.Errorf("materialize application Dockerfile: %w", err)
+		}
 	}
 	buildArguments := map[string]string{
-		"RUNTIME_BASE":         request.RuntimeImage,
 		"SOURCE_REVISION":      request.Repository.Revision,
 		"BUILDER_IMAGE":        request.BuilderImage,
-		"RUNTIME_IMAGE_DIGEST": runtimeImageTraceIdentity(request),
+		"RUNTIME_IMAGE_DIGEST": runtimeImageTraceIdentity(request, recipeFingerprint),
+	}
+	if request.UseEmbeddedRecipe {
+		buildArguments["RECIPE_SHA256"] = recipeFingerprint
+	} else {
+		buildArguments["RUNTIME_BASE"] = request.RuntimeImage
 	}
 	if request.ProvenanceSource != "" {
 		buildArguments["SOURCE_URI"] = request.ProvenanceSource
@@ -186,7 +216,7 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 	if request.MageLiftVersion != "" {
 		buildArguments["MAGELIFT_VERSION"] = request.MageLiftVersion
 	}
-	image, err := pipeline.builder.Build(ctx, buildkit.Request{
+	imageRequest := buildkit.Request{
 		Source:           buildkit.Source{LocalDirectory: prepared.OutputDir},
 		Dockerfile:       dockerfilePath,
 		ImageReference:   request.ImageReference,
@@ -195,7 +225,14 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 		ProvenanceSource: request.ProvenanceSource,
 		Builder:          buildkitBuilder(),
 		BuildArgs:        buildArguments,
-	})
+	}
+	if cache := request.BuildCache; cache != nil {
+		imageRequest.CacheFrom = append([]string(nil), cache.From...)
+		imageRequest.CacheTo = cache.To
+		imageRequest.CacheMode = cache.Mode
+		imageRequest.IgnoreCacheExportErrors = cache.IgnoreExportErrors
+	}
+	image, err := pipeline.builder.Build(ctx, imageRequest)
 	if err != nil {
 		return Result{}, fmt.Errorf("build application image: %w", err)
 	}
@@ -210,6 +247,7 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 			PreparedArtifact: prepareResponse.Prepare.PreparedArtifact,
 			SourceRevision:   request.Repository.Revision,
 			ImageDigest:      image.Digest,
+			BuildRecipe:      recipeTrace,
 		},
 	}
 	finalizeJSON, err := buildrunner.EncodeRequest(finalizeRequest)
@@ -374,7 +412,10 @@ func buildkitBuilder() string {
 	return strings.TrimSpace(os.Getenv("BUILDX_BUILDER"))
 }
 
-func runtimeImageTraceIdentity(request Request) string {
+func runtimeImageTraceIdentity(request Request, recipeFingerprint string) string {
+	if request.UseEmbeddedRecipe {
+		return recipeRuntimeTraceIdentity(recipeFingerprint)
+	}
 	if request.RuntimeImageID != "" {
 		return request.RuntimeImageID
 	}
@@ -414,8 +455,15 @@ func validateRequest(request Request, containers Container, builder Builder) (st
 	if request.ImageReference == "" {
 		return "", "", nil, errors.New("image reference is required")
 	}
+	if request.UseEmbeddedRecipe {
+		for _, platform := range platforms {
+			if _, err := buildcontext.ContentFingerprint(platform); err != nil {
+				return "", "", nil, fmt.Errorf("embedded recipe: %w", err)
+			}
+		}
+	}
 	if output == buildkit.OutputPush {
-		if !repositoryDigest.MatchString(request.BuilderImage) || !repositoryDigest.MatchString(request.RuntimeImage) || request.RuntimeImageID != "" {
+		if !request.UseEmbeddedRecipe && (!repositoryDigest.MatchString(request.BuilderImage) || !repositoryDigest.MatchString(request.RuntimeImage) || request.RuntimeImageID != "") {
 			return "", "", nil, errors.New("release builder and runtime images must use repository digest references")
 		}
 		if !registryQualifiedReference(request.ImageReference) {

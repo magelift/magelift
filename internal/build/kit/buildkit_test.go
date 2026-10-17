@@ -46,6 +46,93 @@ func TestRunnerBuildsWithArgvAndParsesDigest(t *testing.T) {
 	}
 }
 
+func TestRunnerAddsRegistryCacheArguments(t *testing.T) {
+	var diagnostics bytes.Buffer
+	runner := NewRunner(&diagnostics)
+	runner.command = helperCommand(t, "success")
+	_, err := runner.Build(context.Background(), Request{
+		Source:                  Source{LocalDirectory: "."},
+		Dockerfile:              "Dockerfile",
+		ImageReference:          "registry.example.invalid/acme/shop:release",
+		Platforms:               []string{"linux/amd64"},
+		Output:                  OutputLoad,
+		CacheFrom:               []string{"registry.example.invalid/acme/cache:import"},
+		CacheTo:                 "registry.example.invalid/acme/cache:export",
+		CacheMode:               "min",
+		IgnoreCacheExportErrors: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments := diagnostics.String()
+	if !strings.Contains(arguments, "--cache-from\ntype=registry,ref=registry.example.invalid/acme/cache:import") {
+		t.Fatalf("cache import missing: %s", arguments)
+	}
+	if !strings.Contains(arguments, "--cache-to\ntype=registry,ref=registry.example.invalid/acme/cache:export,mode=min,ignore-error=true") {
+		t.Fatalf("cache export missing: %s", arguments)
+	}
+}
+
+func TestRunnerDefaultsCacheExportModeToMax(t *testing.T) {
+	var diagnostics bytes.Buffer
+	runner := NewRunner(&diagnostics)
+	runner.command = helperCommand(t, "success")
+	_, err := runner.Build(context.Background(), Request{
+		Source:           Source{LocalDirectory: "."},
+		Dockerfile:       "Dockerfile",
+		ImageReference:   "registry.example.invalid/acme/shop:release",
+		Platforms:        []string{"linux/amd64"},
+		Output:           OutputPush,
+		ProvenanceSource: "https://example.invalid/shop.git?checksum=" + strings.Repeat("c", 40),
+		CacheTo:          "registry.example.invalid/acme/cache:export",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(diagnostics.String(), "mode=max") || strings.Contains(diagnostics.String(), "mode=min") {
+		t.Fatalf("unexpected cache export mode: %s", diagnostics.String())
+	}
+}
+
+func TestRunnerRejectsInvalidCacheBeforeExecution(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Request)
+		message string
+	}{
+		{name: "export matches image", mutate: func(r *Request) {
+			r.CacheTo = r.ImageReference
+		}, message: "must differ from the image reference"},
+		{name: "import matches image", mutate: func(r *Request) {
+			r.CacheFrom = []string{r.ImageReference}
+		}, message: "must differ from the image reference"},
+		{name: "mode without export", mutate: func(r *Request) { r.CacheMode = "max" }, message: "cache export reference"},
+		{name: "ignore without export", mutate: func(r *Request) { r.IgnoreCacheExportErrors = true }, message: "ignore-export-errors requires"},
+		{name: "invalid import reference", mutate: func(r *Request) {
+			r.CacheFrom = []string{"type=registry,ref=registry.example.invalid/acme/cache:import"}
+		}, message: "BuildKit cache options"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := Request{
+				Source:         Source{LocalDirectory: "."},
+				Dockerfile:     "Dockerfile",
+				ImageReference: "registry.example.invalid/acme/shop:release",
+				Platforms:      []string{"linux/amd64"},
+				Output:         OutputLoad,
+			}
+			test.mutate(&request)
+			runner := NewRunner(io.Discard)
+			called := false
+			runner.command = func(context.Context, string, ...string) *exec.Cmd { called = true; return nil }
+			_, err := runner.Build(context.Background(), request)
+			if err == nil || !strings.Contains(err.Error(), test.message) || called {
+				t.Fatalf("error=%v called=%v", err, called)
+			}
+		})
+	}
+}
+
 func TestRunnerAddsReleaseAttestationsForPush(t *testing.T) {
 	var diagnostics bytes.Buffer
 	runner := NewRunner(&diagnostics)
@@ -60,7 +147,7 @@ func TestRunnerAddsReleaseAttestationsForPush(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.Pushed || !strings.Contains(diagnostics.String(), "--sbom=true") || !strings.Contains(diagnostics.String(), "--provenance=mode=max,version=v1") {
+	if !result.Pushed || !strings.Contains(diagnostics.String(), "--sbom=generator="+sbomGeneratorImage) || !strings.Contains(diagnostics.String(), "--provenance=mode=max,version=v1") {
 		t.Fatalf("release attestations missing: %s", diagnostics.String())
 	}
 }

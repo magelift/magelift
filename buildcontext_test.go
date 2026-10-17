@@ -70,6 +70,28 @@ func TestEmbeddedPathsExcludeVendorAuthAndGit(t *testing.T) {
 	}
 }
 
+func TestWriteContextRejectsRecipePathCollision(t *testing.T) {
+	destination := t.TempDir()
+	marker := filepath.Join(destination, "images", "php-nginx")
+	if err := os.MkdirAll(marker, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	custom := filepath.Join(marker, "Dockerfile")
+	if err := os.WriteFile(custom, []byte("KEEP\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteContext(destination); err == nil {
+		t.Fatal("occupied recipe path accepted")
+	}
+	contents, err := os.ReadFile(custom)
+	if err != nil || string(contents) != "KEEP\n" {
+		t.Fatalf("existing file was overwritten: %q", contents)
+	}
+	if _, err := os.Stat(filepath.Join(destination, "build")); !os.IsNotExist(err) {
+		t.Fatal("collision caused a partial recipe copy")
+	}
+}
+
 func TestMaterializePrivateContextRejectsUnsupportedPlatform(t *testing.T) {
 	_, _, cleanup, err := MaterializePrivateContext(t.TempDir(), "linux/arm64")
 	if cleanup != nil {

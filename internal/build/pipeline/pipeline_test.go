@@ -298,6 +298,72 @@ func TestPipelineDefaultsToLocalLoadAndLegacyPlatform(t *testing.T) {
 	}
 }
 
+func TestPipelineEmbeddedRecipeComposesPinnedMultiStageDockerfile(t *testing.T) {
+	request := pipelineRequest(t)
+	request.UseEmbeddedRecipe = true
+	request.RuntimeImage = "magelift/php-nginx:local"
+	request.RuntimeImageID = "sha256:" + strings.Repeat("e", 64)
+	builder := &fakeBuilder{t: t, expectedRuntimeTrace: "recipe:sha256:"}
+	containers := &fakeContainers{t: t, events: &[]string{}}
+
+	result, err := New(containers, builder).Run(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Image.Digest != pipelineDigest {
+		t.Fatalf("result = %#v", result)
+	}
+	if _, exists := builder.request.BuildArgs["RUNTIME_BASE"]; exists {
+		t.Fatal("embedded recipe must not resolve a separate runtime base image")
+	}
+	recipeSHA := builder.request.BuildArgs["RECIPE_SHA256"]
+	if recipeSHA == "" || len(recipeSHA) != 64 {
+		t.Fatalf("recipe fingerprint = %q", recipeSHA)
+	}
+	if builder.request.BuildArgs["RUNTIME_IMAGE_DIGEST"] != "recipe:sha256:"+recipeSHA {
+		t.Fatalf("runtime trace = %q", builder.request.BuildArgs["RUNTIME_IMAGE_DIGEST"])
+	}
+	if !builder.embeddedRecipeVerified {
+		t.Fatal("embedded recipe Dockerfile was not verified during BuildKit invocation")
+	}
+}
+
+func TestPipelineEmbeddedRecipeRejectsUnsupportedPlatformBeforePrepare(t *testing.T) {
+	request := pipelineRequest(t)
+	request.UseEmbeddedRecipe = true
+	request.Platform = "linux/arm64"
+	request.Platforms = nil
+	containers := &fakeContainers{t: t, events: &[]string{}}
+	_, err := New(containers, &fakeBuilder{t: t}).Run(context.Background(), request)
+	if err == nil || !strings.Contains(err.Error(), "linux/amd64") {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(*containers.events) != 0 {
+		t.Fatalf("container ran before platform validation: %v", *containers.events)
+	}
+}
+
+func TestPipelineReleaseAcceptsEmbeddedRecipeWithLocalRuntimePins(t *testing.T) {
+	request := releaseRequest(t)
+	request.UseEmbeddedRecipe = true
+	request.Platforms = []string{"linux/amd64"}
+	request.BuilderImage = "sha256:" + strings.Repeat("d", 64)
+	request.RuntimeImage = "magelift/php-nginx:local"
+	request.RuntimeImageID = "sha256:" + strings.Repeat("e", 64)
+	builder := &fakeBuilder{t: t, expectedOutput: buildkit.OutputPush}
+
+	result, err := New(&fakeContainers{t: t}, builder).Run(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Image.Pushed {
+		t.Fatal("expected pushed release image")
+	}
+	if builder.request.BuildArgs["RECIPE_SHA256"] == "" {
+		t.Fatal("missing recipe fingerprint on release build")
+	}
+}
+
 func TestPipelineUsesConfiguredBuildxBuilder(t *testing.T) {
 	t.Setenv("BUILDX_BUILDER", "colima")
 	builder := &fakeBuilder{t: t}
@@ -487,12 +553,13 @@ func (fake *fakeContainers) record(event string) {
 }
 
 type fakeBuilder struct {
-	t                    *testing.T
-	events               *[]string
-	expectedRuntime      string
-	expectedRuntimeTrace string
-	expectedOutput       buildkit.OutputMode
-	request              buildkit.Request
+	t                      *testing.T
+	events                 *[]string
+	expectedRuntime        string
+	expectedRuntimeTrace   string
+	expectedOutput         buildkit.OutputMode
+	request                buildkit.Request
+	embeddedRecipeVerified bool
 }
 
 func (fake *fakeBuilder) Build(_ context.Context, request buildkit.Request) (buildkit.Result, error) {
@@ -511,12 +578,23 @@ func (fake *fakeBuilder) Build(_ context.Context, request buildkit.Request) (bui
 	if expectedRuntime == "" {
 		expectedRuntime = pinnedRuntime
 	}
-	if request.BuildArgs["RUNTIME_BASE"] != expectedRuntime {
+	embedded := request.BuildArgs["RECIPE_SHA256"] != ""
+	if embedded {
+		if _, exists := request.BuildArgs["RUNTIME_BASE"]; exists {
+			fake.t.Fatal("embedded recipe must not pass RUNTIME_BASE")
+		}
+	} else if request.BuildArgs["RUNTIME_BASE"] != expectedRuntime {
 		fake.t.Fatalf("runtime pin = %q", request.BuildArgs["RUNTIME_BASE"])
 	}
 	expectedRuntimeTrace := fake.expectedRuntimeTrace
 	if expectedRuntimeTrace == "" {
-		expectedRuntimeTrace = expectedRuntime
+		if embedded {
+			expectedRuntimeTrace = "recipe:sha256:" + request.BuildArgs["RECIPE_SHA256"]
+		} else {
+			expectedRuntimeTrace = expectedRuntime
+		}
+	} else if embedded && strings.HasPrefix(expectedRuntimeTrace, "recipe:sha256:") && expectedRuntimeTrace == "recipe:sha256:" {
+		expectedRuntimeTrace = "recipe:sha256:" + request.BuildArgs["RECIPE_SHA256"]
 	}
 	if request.BuildArgs["RUNTIME_IMAGE_DIGEST"] != expectedRuntimeTrace {
 		fake.t.Fatalf("runtime trace identity = %q", request.BuildArgs["RUNTIME_IMAGE_DIGEST"])
@@ -528,7 +606,27 @@ func (fake *fakeBuilder) Build(_ context.Context, request buildkit.Request) (bui
 	if err != nil {
 		fake.t.Fatal(err)
 	}
-	if string(contents) != string(applicationDockerfile) || filepath.Dir(request.Dockerfile) != request.Source.LocalDirectory {
+	if filepath.Dir(request.Dockerfile) != request.Source.LocalDirectory {
+		fake.t.Fatal("BuildKit context directory mismatch")
+	}
+	if embedded {
+		if !strings.Contains(string(contents), "FROM runtime") || strings.Contains(string(contents), "RUNTIME_BASE") {
+			fake.t.Fatal("BuildKit did not receive the composed embedded recipe Dockerfile")
+		}
+		if !strings.Contains(string(contents), "docker.io/library/php:8.5-fpm-trixie@sha256:") {
+			fake.t.Fatal("composed Dockerfile must keep pinned upstream PHP base")
+		}
+		if strings.Count(string(contents), "# syntax=docker/dockerfile:") != 1 {
+			fake.t.Fatal("composed Dockerfile must declare the Dockerfile frontend once")
+		}
+		if _, err := os.Stat(filepath.Join(request.Source.LocalDirectory, "images", "php-nginx", "Dockerfile")); err != nil {
+			fake.t.Fatal("embedded recipe tree was not materialized")
+		}
+		if _, err := os.Stat(filepath.Join(request.Source.LocalDirectory, "rootfs")); err != nil {
+			fake.t.Fatal("prepared rootfs must remain alongside embedded recipe files")
+		}
+		fake.embeddedRecipeVerified = true
+	} else if string(contents) != string(applicationDockerfile) {
 		fake.t.Fatal("BuildKit did not receive the embedded Dockerfile in the private context")
 	}
 	return buildkit.Result{ImageReference: request.ImageReference, Digest: pipelineDigest, Pushed: request.Output == buildkit.OutputPush}, nil
@@ -573,5 +671,40 @@ environments:
 		Platform:          "linux/amd64",
 		ArtifactDirectory: t.TempDir(),
 		ComposerAuth:      []byte(`{"github-oauth":{"github.com":"token"}}`),
+	}
+}
+
+func TestEmbeddedReleaseStillRequiresProvenanceAndRegistryBeforePrepare(t *testing.T) {
+	for _, broken := range []string{"provenance", "registry"} {
+		t.Run(broken, func(t *testing.T) {
+			request := releaseRequest(t)
+			request.UseEmbeddedRecipe = true
+			request.Platforms = []string{"linux/amd64"}
+			request.BuilderImage = "sha256:" + strings.Repeat("d", 64)
+			request.RuntimeImage = "magelift/php-nginx:local"
+			request.RuntimeImageID = "sha256:" + strings.Repeat("e", 64)
+			if broken == "provenance" {
+				request.ProvenanceSource = ""
+			} else {
+				request.ImageReference = "shop:release"
+			}
+			events := []string{}
+			_, err := New(&fakeContainers{t: t, events: &events}, &fakeBuilder{t: t}).Run(context.Background(), request)
+			if err == nil || len(events) != 0 {
+				t.Fatalf("invalid release reached prepare: err=%v events=%v", err, events)
+			}
+		})
+	}
+}
+
+func TestPipelineTransfersExplicitRegistryCachePolicy(t *testing.T) {
+	request := pipelineRequest(t)
+	request.BuildCache = &config.BuildCache{From: []string{"registry.example.invalid/shop:amd64-recipe-cache"}, To: "registry.example.invalid/shop:amd64-recipe-cache", Mode: "max", IgnoreExportErrors: true}
+	builder := &fakeBuilder{t: t}
+	if _, err := New(&fakeContainers{t: t}, builder).Run(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if len(builder.request.CacheFrom) != 1 || builder.request.CacheFrom[0] != request.BuildCache.From[0] || builder.request.CacheTo != request.BuildCache.To || builder.request.CacheMode != "max" || !builder.request.IgnoreCacheExportErrors {
+		t.Fatalf("cache policy lost: %+v", builder.request)
 	}
 }
