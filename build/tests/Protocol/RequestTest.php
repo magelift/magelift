@@ -88,6 +88,18 @@ final class RequestTest extends TestCase
         self::assertStringContainsString('"refreshModules":true', $request->toCanonicalJson());
     }
 
+    public function testParsesAndCanonicalizesCloudPatchesOptIn(): void
+    {
+        $request = PrepareRequest::fromJson(str_replace(
+            '"phpVersion":"8.5.1"',
+            '"phpVersion":"8.5.1","cloudPatches":true',
+            self::prepareJson(),
+        ));
+
+        self::assertTrue($request->cloudPatches);
+        self::assertStringContainsString('"cloudPatches":true', $request->toCanonicalJson());
+    }
+
     #[DataProvider('invalidPrepareRequests')]
     public function testRejectsInvalidPrepareRequests(string $json, string $message): void
     {

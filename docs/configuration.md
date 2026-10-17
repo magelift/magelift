@@ -193,6 +193,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `build.staticContent.strategy` | string or null | no | quick, standard, compact | Static content deploy strategy (-s) |
 | `build.staticContent.threads` | integer or null | no |  | Static content deploy thread count (-j) |
 | `build.qualityPatches` | array | no |  | Quality Patch IDs applied at build |
+| `build.cloudPatches` | boolean | no |  | Opt in to upstream Cloud Patches apply during build |
 | `build.hooks` | object | no |  | Build lifecycle hooks |
 | `build.hooks.*.phase` | string | yes | validate, build, package | Preparation lifecycle phase |
 | `build.hooks.*.relationship` | string | yes | before, after, replace, disable | Relationship to the target step |
@@ -594,6 +595,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.build.staticContent.strategy` | string or null | no | quick, standard, compact | Static content deploy strategy (-s) |
 | `environments.*.build.staticContent.threads` | integer or null | no |  | Static content deploy thread count (-j) |
 | `environments.*.build.qualityPatches` | array | no |  | Quality Patch IDs applied at build |
+| `environments.*.build.cloudPatches` | boolean | no |  | Opt in to upstream Cloud Patches apply during build |
 | `environments.*.build.hooks` | object | no |  | Build lifecycle hooks |
 | `environments.*.build.hooks.*.phase` | string | no | validate, build, package | Preparation lifecycle phase |
 | `environments.*.build.hooks.*.relationship` | string | no | before, after, replace, disable | Relationship to the target step |

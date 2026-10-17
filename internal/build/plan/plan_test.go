@@ -203,6 +203,57 @@ func TestPrepareRequestRejectsInvalidStaticContentStrategy(t *testing.T) {
 	}
 }
 
+func TestPrepareRequestCarriesCloudPatchesOptIn(t *testing.T) {
+	input := strings.Replace(buildConfig, "  qualityPatches: [ACSD-123, MAGETWO-67097]", "  qualityPatches: [ACSD-123, MAGETWO-67097]\n  cloudPatches: true", 1)
+	file, err := config.Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "composer.lock"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	request, err := PrepareRequest(file, source.Repository{Root: root, Revision: strings.Repeat("a", 40)}, "/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !request.Prepare.CloudPatches {
+		t.Fatal("expected cloudPatches opt-in")
+	}
+	encoded, err := buildrunner.EncodeRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"cloudPatches":true`) {
+		t.Fatalf("encoded request missing cloudPatches: %s", encoded)
+	}
+}
+
+func TestPrepareRequestOmitsCloudPatchesWhenDisabled(t *testing.T) {
+	file, err := config.Load([]byte(buildConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "composer.lock"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	request, err := PrepareRequest(file, source.Repository{Root: root, Revision: strings.Repeat("a", 40)}, "/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Prepare.CloudPatches {
+		t.Fatal("cloudPatches must default false")
+	}
+	encoded, err := buildrunner.EncodeRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "cloudPatches") {
+		t.Fatalf("canonical request must omit false cloudPatches: %s", encoded)
+	}
+}
+
 func TestPrepareRequestRejectsNonPositiveStaticContentThreads(t *testing.T) {
 	input := strings.Replace(buildConfig, "    themes: [Magento/luma, Magento/blank]\n", "    themes: [Magento/luma, Magento/blank]\n    threads: -1\n", 1)
 	file, err := config.Load([]byte(input))

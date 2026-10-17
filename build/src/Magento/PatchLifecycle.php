@@ -28,11 +28,33 @@ final class PatchLifecycle
      * @param list<string> $qualityPatchIds
      * @return list<CommandInterface>
      */
-    public static function commands(string $projectRoot, array $hotfixPatches, array $qualityPatchIds = []): array
-    {
+    public static function commands(
+        string $projectRoot,
+        array $hotfixPatches,
+        array $qualityPatchIds = [],
+        bool $cloudPatches = false,
+    ): array {
         $qualityPatchIds = QualityPatchConfig::normalize($qualityPatchIds);
         $packages = ComposerPackageInventory::read($projectRoot);
         $hasQualityPatches = in_array('magento/quality-patches', $packages, true);
+        $hasCloudPatches = in_array('magento/magento-cloud-patches', $packages, true);
+
+        if ($cloudPatches) {
+            if (!$hasCloudPatches) {
+                throw new RuntimeException(
+                    'build.cloudPatches is enabled, but the production Composer lock does not provide '
+                    .'magento/magento-cloud-patches. Add the supported package and lock it before building.',
+                );
+            }
+            if ($qualityPatchIds !== [] && !$hasQualityPatches) {
+                throw new RuntimeException(
+                    'qualityPatches is configured, but the production Composer lock does not provide '
+                    .'magento/quality-patches. Add the supported package and lock it before building.',
+                );
+            }
+
+            return [new CloudPatchCommand($qualityPatchIds)];
+        }
 
         if ($qualityPatchIds !== [] && !$hasQualityPatches) {
             throw new RuntimeException(

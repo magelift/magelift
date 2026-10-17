@@ -96,6 +96,66 @@ final class PatchLifecycleTest extends TestCase
         ], array_map(static fn ($command): array => $command->argv(), $commands));
     }
 
+    public function testCloudPatchesOptInDelegatesSingleUpstreamApplyWithoutHostFallback(): void
+    {
+        $root = $this->tempProject();
+        $this->writeLock($root, ['magento/magento-cloud-patches', 'magento/quality-patches']);
+
+        $commands = PatchLifecycle::commands($root, [
+            'm2-hotfixes/b-second.patch',
+            'm2-hotfixes/a-first.patch',
+        ], ['ACSD-123', 'MAGETWO-67097'], true);
+
+        self::assertCount(1, $commands);
+        self::assertFalse(PatchLifecycle::hasHostPatchFallback($commands));
+        $argv = $commands[0]->argv();
+        self::assertSame('php', $argv[0]);
+        self::assertSame('-r', $argv[1]);
+        self::assertSame('["ACSD-123","MAGETWO-67097"]', $argv[3]);
+    }
+
+    public function testCloudPatchesOptInAllowsEmptyQualityIdsWithOnlyCloudPackage(): void
+    {
+        $root = $this->tempProject();
+        $this->writeLock($root, ['magento/magento-cloud-patches']);
+
+        $commands = PatchLifecycle::commands($root, ['m2-hotfixes/a-first.patch'], [], true);
+
+        self::assertCount(1, $commands);
+        self::assertSame('[]', $commands[0]->argv()[3]);
+    }
+
+    public function testCloudPatchesOptInRequiresLockedCloudPatchesPackage(): void
+    {
+        $root = $this->tempProject();
+        $this->writeLock($root, ['magento/quality-patches']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('magento/magento-cloud-patches');
+        PatchLifecycle::commands($root, [], ['ACSD-123'], true);
+    }
+
+    public function testCloudPatchesOptInRequiresQualityPatchesPackageWhenIdsDeclared(): void
+    {
+        $root = $this->tempProject();
+        $this->writeLock($root, ['magento/magento-cloud-patches']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('magento/quality-patches');
+        PatchLifecycle::commands($root, [], ['ACSD-123'], true);
+    }
+
+    public function testCloudPatchesDefaultPreservesLegacyPatchStages(): void
+    {
+        $root = $this->tempProject();
+        $this->writeLock($root, ['magento/magento-cloud-patches', 'magento/quality-patches']);
+
+        $commands = PatchLifecycle::commands($root, ['m2-hotfixes/a-first.patch'], ['ACSD-123'], false);
+
+        self::assertCount(2, $commands);
+        self::assertTrue(PatchLifecycle::hasHostPatchFallback($commands));
+    }
+
     private function writeLock(string $root, array $packages, array $devPackages = []): void
     {
         file_put_contents($root.'/composer.lock', json_encode([

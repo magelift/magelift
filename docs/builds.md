@@ -153,11 +153,28 @@ is available only for build-time Composer credentials; runtime secrets retain
 the provider reference contract. The existing cloud secret references remain
 available. Never put the credential JSON in YAML or pass it as a build argument.
 
+## Patch application
+
+By default, declared `build.qualityPatches` IDs run through the standalone
+Quality Patches executable from the production Composer lock, then sorted
+`m2-hotfixes` through the host `patch` tool with idempotent dry-run checks.
+
+Optional `build.cloudPatches: true` opts into one upstream `ece-patches apply`
+after `composer install`. The shop must lock `magento/magento-cloud-patches`;
+declared Quality Patch IDs also require `magento/quality-patches` in the
+production lock. Only YAML-declared Quality Patch IDs control selection;
+leftover `.magento.env.yaml` or ambient environment values are ignored. Cloud-required patches, those IDs,
+and existing `m2-hotfixes` are applied in the single upstream pass; MageLift
+does not run a second Quality Patch or host hotfix stage afterward. Upstream
+owns applicability and patch databases; this path is not a certified matrix cell.
+
+`magelift build` prints a scope notice on stderr when cloud patches are enabled.
+
 ## Hotfix failures
 
-The existing lifecycle applies declared Quality Patch IDs through the tool
-installed by the shop's production Composer lock, then sorted `m2-hotfixes`.
 Host hotfix application first checks whether a patch is needed or fully applied.
 A conflict or partially applied patch stops preparation; review its applicability
 against the locked Magento version before adjusting it and retrying. These
 checks do not merge conflicting patches or make a whole patch series atomic.
+When `build.cloudPatches` is enabled, hotfix failures surface through the
+upstream apply instead of the host `patch` fallback.

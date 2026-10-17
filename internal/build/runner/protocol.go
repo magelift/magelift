@@ -83,6 +83,7 @@ type PrepareRequest struct {
 	StaticContent         []StaticContent `json:"staticContent"`
 	LifecycleHooks        []LifecycleHook `json:"lifecycleHooks,omitempty"`
 	QualityPatches        []string        `json:"qualityPatches,omitempty"`
+	CloudPatches          bool            `json:"cloudPatches,omitempty"`
 }
 
 type BuildRecipe struct {

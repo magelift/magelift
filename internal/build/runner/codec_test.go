@@ -139,6 +139,25 @@ func TestDecodeResponseIsStrictAndBounded(t *testing.T) {
 	}
 }
 
+func TestEncodeRequestOmitsFalseCloudPatchesAndIncludesOptIn(t *testing.T) {
+	request := validPrepareRequest()
+	encoded, err := EncodeRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "cloudPatches") {
+		t.Fatalf("false cloudPatches must be omitted: %s", encoded)
+	}
+	request.Prepare.CloudPatches = true
+	encoded, err = EncodeRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(encoded, []byte(`"cloudPatches":true`)) {
+		t.Fatalf("encoded request missing cloudPatches: %s", encoded)
+	}
+}
+
 func TestEncodeRequestPreservesEmptyStaticContentList(t *testing.T) {
 	request := validPrepareRequest()
 	request.Prepare.StaticContent = []StaticContent{}

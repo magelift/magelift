@@ -48,6 +48,14 @@ must be supplied together; pushed builds require registry digests. Explicit ARM
 overrides remain outside alpha qualification. The package/build component also
 works without invoking cloud provisioning.
 
+Optional `build.cloudPatches: true` delegates patch application to the shop's
+locked `magento/magento-cloud-patches` executable (one `ece-patches apply` after
+`composer install`). List Quality Patch IDs under `build.qualityPatches`; when
+cloud patches are enabled they ride the same upstream pass as Cloud-required
+patches and `m2-hotfixes`, not a separate MageLift stage. Lock
+`magento/quality-patches` when IDs are declared. MageLift does not certify this
+path; stderr announces the scope when `magelift build` runs.
+
 ## Check the result
 
 ```sh

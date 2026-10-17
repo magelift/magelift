@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -37,6 +38,13 @@ type ComposerSecretProvider interface {
 
 type composerSecretProvider = ComposerSecretProvider
 
+func writeCloudPatchesBuildNotice(stderr io.Writer, enabled bool) {
+	if !enabled || stderr == nil {
+		return
+	}
+	fmt.Fprintln(stderr, "magelift: build.cloudPatches delegates one locked ece-patches apply: required cloud patches, declared Quality Patch IDs and project hotfixes.")
+}
+
 func buildCommand(o *options) *cobra.Command {
 	var push bool
 	var imageReference string
@@ -54,6 +62,7 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
+		writeCloudPatchesBuildNotice(o.stderr, spec.Build.CloudPatches)
 		if err := validateDefaultImageRecipe(spec.Build.PHP, string(spec.Application.WebRuntime), builderImage, runtimeImage); err != nil {
 			return invalid(err)
 		}

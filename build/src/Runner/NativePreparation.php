@@ -45,7 +45,7 @@ final readonly class NativePreparation implements Preparation
         $composerVersion = $this->assertComposerVersion($request->composerVersion, $buildRoot);
 
         $hotfixPatches = PatchApplier::discover($buildRoot);
-        $patchCommands = PatchLifecycle::commands($buildRoot, $hotfixPatches, $request->qualityPatches);
+        $patchCommands = PatchLifecycle::commands($buildRoot, $hotfixPatches, $request->qualityPatches, $request->cloudPatches);
         if (PatchLifecycle::hasHostPatchFallback($patchCommands)) {
             (new PatchApplier($this->runner))->assertPatchToolAvailable();
         }

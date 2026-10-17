@@ -58,6 +58,7 @@ func PrepareRequest(file *config.File, repository source.Repository, runnerRoot 
 			StaticContent:         staticContent,
 			LifecycleHooks:        lifecycleHooks,
 			QualityPatches:        append([]string(nil), spec.Build.QualityPatches...),
+			CloudPatches:          spec.Build.CloudPatches,
 		},
 	}
 	if err := request.Validate(); err != nil {

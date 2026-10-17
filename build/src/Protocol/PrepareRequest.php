@@ -27,6 +27,7 @@ final readonly class PrepareRequest
         public array $staticContent,
         public array $lifecycleHooks,
         public array $qualityPatches,
+        public bool $cloudPatches = false,
     ) {
     }
 
@@ -38,7 +39,7 @@ final readonly class PrepareRequest
         $payload = ProtocolJson::object($envelope['prepare'], 'prepare');
         ProtocolJson::assertKeys(
             $payload,
-            ['repositoryRoot', 'sourceRevision', 'application', 'phpVersion', 'phpExtensions', 'composerVersion', 'compatibilityStatus', 'refreshModules', 'inputFiles', 'staticContent', 'lifecycleHooks', 'qualityPatches'],
+            ['repositoryRoot', 'sourceRevision', 'application', 'phpVersion', 'phpExtensions', 'composerVersion', 'compatibilityStatus', 'refreshModules', 'inputFiles', 'staticContent', 'lifecycleHooks', 'qualityPatches', 'cloudPatches'],
             ['repositoryRoot', 'sourceRevision', 'application', 'phpVersion', 'compatibilityStatus', 'inputFiles', 'staticContent'],
             'prepare',
         );
@@ -91,7 +92,15 @@ final readonly class PrepareRequest
         $staticContent = self::parseStaticContent($payload['staticContent']);
         $lifecycleHooks = self::parseLifecycleHooks($payload['lifecycleHooks'] ?? []);
         $qualityPatches = self::parseQualityPatches($payload['qualityPatches'] ?? []);
-        return new self($repositoryRoot, $sourceRevision, $application, $phpVersion, $phpExtensions, $composerVersion, $compatibilityStatus, $refreshModules, $inputFiles, $staticContent, $lifecycleHooks, $qualityPatches);
+        $cloudPatches = false;
+        if (array_key_exists('cloudPatches', $payload)) {
+            if (!is_bool($payload['cloudPatches'])) {
+                throw new InvalidProtocolRequest('prepare.cloudPatches must be a boolean.');
+            }
+            $cloudPatches = $payload['cloudPatches'];
+        }
+
+        return new self($repositoryRoot, $sourceRevision, $application, $phpVersion, $phpExtensions, $composerVersion, $compatibilityStatus, $refreshModules, $inputFiles, $staticContent, $lifecycleHooks, $qualityPatches, $cloudPatches);
     }
 
     public function toCanonicalJson(): string
@@ -161,6 +170,9 @@ final readonly class PrepareRequest
         }
         if ($this->qualityPatches !== []) {
             $prepare['qualityPatches'] = $this->qualityPatches;
+        }
+        if ($this->cloudPatches) {
+            $prepare['cloudPatches'] = true;
         }
 
         return ProtocolJson::encode([

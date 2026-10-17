@@ -71,6 +71,7 @@ type Build struct {
 	Composer       Composer              `yaml:"composer,omitempty" json:"composer,omitempty" config:"Composer settings"`
 	StaticContent  StaticContentSettings `yaml:"staticContent,omitempty" json:"staticContent,omitempty" config:"Static content deployment settings"`
 	QualityPatches []string              `yaml:"qualityPatches,omitempty" json:"qualityPatches,omitempty" config:"Quality Patch IDs applied at build"`
+	CloudPatches   bool                  `yaml:"cloudPatches,omitempty" json:"cloudPatches,omitempty" config:"Opt in to upstream Cloud Patches apply during build"`
 	Hooks          map[string]BuildHook  `yaml:"hooks,omitempty" json:"hooks,omitempty" config:"Build lifecycle hooks"`
 	Cache          *BuildCache           `yaml:"cache,omitempty" json:"cache,omitempty" config:"Optional user-owned BuildKit registry cache" schema:"nullable"`
 }

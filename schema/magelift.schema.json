@@ -2061,6 +2061,10 @@
             }
           ]
         },
+        "cloudPatches": {
+          "description": "Opt in to upstream Cloud Patches apply during build",
+          "type": "boolean"
+        },
         "composer": {
           "$ref": "#/$defs/composer",
           "description": "Composer settings"
@@ -2411,6 +2415,10 @@
               "type": "null"
             }
           ]
+        },
+        "cloudPatches": {
+          "description": "Opt in to upstream Cloud Patches apply during build",
+          "type": "boolean"
         },
         "composer": {
           "$ref": "#/$defs/composerOverlay",
