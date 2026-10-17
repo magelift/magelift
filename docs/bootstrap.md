@@ -7,6 +7,13 @@ Laptop users omit GitHub flags. GitHub Actions needs `--github-owner` and
 You do not set a state-backend URL. Magelift derives it from `magelift.yaml`
 after bootstrap.
 
+For an existing GCP state bucket, bootstrap checks its four MageLift ownership
+labels and region before changing versioning or retention. A mismatch stops
+without adopting the bucket. Select a fresh project/environment name or have
+the bucket owner review its recorded ownership; do not relabel another bucket
+to bypass the check. This guard checks labels and region, not the cloud project
+number.
+
 ## Laptop (certified AWS or GCP)
 
 Log in with `aws` or `gcloud`, then:

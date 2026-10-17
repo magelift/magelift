@@ -104,11 +104,61 @@ func stateBucketEnvironment(environment string) string {
 	return environment
 }
 
+// BucketMetadata records the GCS fields bootstrap uses to check state-bucket ownership.
+type BucketMetadata struct {
+	Location string
+	Labels   map[string]string
+}
+
 type BucketAPI interface {
-	BucketExists(ctx context.Context, name string) (bool, error)
+	BucketExists(ctx context.Context, name string) (bool, BucketMetadata, error)
 	CreateBucket(ctx context.Context, name, project, location string, labels map[string]string) error
 	EnsureVersioning(ctx context.Context, name string) error
 	EnsureSoftDelete(ctx context.Context, name string, retention time.Duration) error
+}
+
+var stateBucketOwnershipLabelKeys = []string{
+	"magelift-managed-by",
+	"magelift-project",
+	"magelift-environment",
+	"magelift-purpose",
+}
+
+const stateBucketOwnershipRefusalHint = "select a fresh MageLift project/environment name, or have the bucket owner review its recorded ownership and region"
+
+func validateExistingStateBucket(plan Plan, meta BucketMetadata) error {
+	for _, key := range stateBucketOwnershipLabelKeys {
+		want := plan.Labels[key]
+		got := strings.TrimSpace(meta.Labels[key])
+		if got == "" {
+			return fmt.Errorf(
+				"refusing to mutate GCS state bucket %q: missing ownership label %q; %s",
+				plan.StateBucket, key, stateBucketOwnershipRefusalHint,
+			)
+		}
+		if got != want {
+			return fmt.Errorf(
+				"refusing to mutate GCS state bucket %q: label %q is %q, want %q; %s",
+				plan.StateBucket, key, got, want, stateBucketOwnershipRefusalHint,
+			)
+		}
+	}
+	if !stateBucketLocationsMatch(plan.Region, meta.Location) {
+		return fmt.Errorf(
+			"refusing to mutate GCS state bucket %q: location is %q, want %q; %s",
+			plan.StateBucket, strings.TrimSpace(meta.Location), plan.Region, stateBucketOwnershipRefusalHint,
+		)
+	}
+	return nil
+}
+
+func stateBucketLocationsMatch(wantRegion, bucketLocation string) bool {
+	want := strings.TrimSpace(wantRegion)
+	got := strings.TrimSpace(bucketLocation)
+	if want == "" || got == "" {
+		return false
+	}
+	return strings.EqualFold(want, got)
 }
 
 type Bootstrapper struct {
@@ -151,7 +201,7 @@ func (b *Bootstrapper) Ensure(ctx context.Context, plan Plan) (Result, error) {
 	if b == nil || b.buckets == nil {
 		return Result{}, errors.New("GCP bootstrapper is required")
 	}
-	exists, err := b.buckets.BucketExists(ctx, plan.StateBucket)
+	exists, meta, err := b.buckets.BucketExists(ctx, plan.StateBucket)
 	if err != nil {
 		return Result{}, err
 	}
@@ -159,6 +209,8 @@ func (b *Bootstrapper) Ensure(ctx context.Context, plan Plan) (Result, error) {
 		if err := b.buckets.CreateBucket(ctx, plan.StateBucket, plan.GCPProject, plan.Region, plan.Labels); err != nil {
 			return Result{}, err
 		}
+	} else if err := validateExistingStateBucket(plan, meta); err != nil {
+		return Result{}, err
 	}
 	if err := b.buckets.EnsureVersioning(ctx, plan.StateBucket); err != nil {
 		return Result{}, err
@@ -173,15 +225,29 @@ type gcsBuckets struct {
 	client *storage.Client
 }
 
-func (g gcsBuckets) BucketExists(ctx context.Context, name string) (bool, error) {
-	_, err := g.client.Bucket(name).Attrs(ctx)
+func (g gcsBuckets) BucketExists(ctx context.Context, name string) (bool, BucketMetadata, error) {
+	attrs, err := g.client.Bucket(name).Attrs(ctx)
 	if err == nil {
-		return true, nil
+		return true, bucketMetadataFromAttrs(attrs), nil
 	}
 	if errors.Is(err, storage.ErrBucketNotExist) {
-		return false, nil
+		return false, BucketMetadata{}, nil
 	}
-	return false, fmt.Errorf("head GCS bucket: %w", err)
+	return false, BucketMetadata{}, fmt.Errorf("head GCS bucket: %w", err)
+}
+
+func bucketMetadataFromAttrs(attrs *storage.BucketAttrs) BucketMetadata {
+	if attrs == nil {
+		return BucketMetadata{}
+	}
+	labels := make(map[string]string, len(attrs.Labels))
+	for key, value := range attrs.Labels {
+		labels[key] = value
+	}
+	return BucketMetadata{
+		Location: attrs.Location,
+		Labels:   labels,
+	}
 }
 
 func (g gcsBuckets) CreateBucket(ctx context.Context, name, project, location string, labels map[string]string) error {

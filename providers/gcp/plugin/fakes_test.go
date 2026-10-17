@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -168,23 +169,25 @@ func (m *memSecrets) GetSecretValue(_ context.Context, name string) ([]byte, err
 // memBuckets is an in-memory bucket API for bootstrap fakes.
 type memBuckets struct {
 	mu      sync.Mutex
-	buckets map[string]bool
+	buckets map[string]gcpbootstrap.BucketMetadata
 }
 
 func newMemBuckets() *memBuckets {
-	return &memBuckets{buckets: map[string]bool{}}
+	return &memBuckets{buckets: map[string]gcpbootstrap.BucketMetadata{}}
 }
 
-func (m *memBuckets) BucketExists(_ context.Context, name string) (bool, error) {
+func (m *memBuckets) BucketExists(_ context.Context, name string) (bool, gcpbootstrap.BucketMetadata, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.buckets[name], nil
+	meta, exists := m.buckets[name]
+	meta.Labels = maps.Clone(meta.Labels)
+	return exists, meta, nil
 }
 
-func (m *memBuckets) CreateBucket(_ context.Context, name, _, _ string, _ map[string]string) error {
+func (m *memBuckets) CreateBucket(_ context.Context, name, _, location string, labels map[string]string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.buckets[name] = true
+	m.buckets[name] = gcpbootstrap.BucketMetadata{Location: location, Labels: maps.Clone(labels)}
 	return nil
 }
 
