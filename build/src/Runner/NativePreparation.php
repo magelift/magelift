@@ -82,6 +82,8 @@ final readonly class NativePreparation implements Preparation
             throw new RuntimeException($message);
         }
 
+        $this->assertRegisteredStaticContentThemes($buildRoot, $request->staticContent);
+
         $checksums = [];
         foreach (['app/etc/config.php', 'vendor/autoload.php'] as $path) {
             $checksum = @hash_file('sha256', $buildRoot.'/'.$path);
@@ -246,6 +248,91 @@ final readonly class NativePreparation implements Preparation
 
         return substr($diagnostic, 0, $limit).' [diagnostic output truncated]';
     }
+
+    /**
+     * @param list<array{locale: string, theme: string, strategy?: string, threads?: int}> $staticContent
+     */
+    private function assertRegisteredStaticContentThemes(string $buildRoot, array $staticContent): void
+    {
+        if ($staticContent === []) {
+            return;
+        }
+        $requestedThemes = [];
+        foreach ($staticContent as $content) {
+            $requestedThemes[$content['theme']] = true;
+        }
+        $registeredKeys = $this->queryRegisteredThemeKeys($buildRoot);
+        $registeredDeployNames = self::deployThemeNamesFromRegistrarKeys($registeredKeys);
+        foreach (array_keys($requestedThemes) as $theme) {
+            if (!isset($registeredDeployNames[$theme])) {
+                throw new RuntimeException(sprintf(
+                    'Requested static content theme "%s" is not registered in the Magento installation.',
+                    $theme,
+                ));
+            }
+        }
+    }
+
+    /** @return list<string> */
+    private function queryRegisteredThemeKeys(string $buildRoot): array
+    {
+        $result = $this->runner->run(new \MageLift\Build\Process\ProcessRequest(
+            ['php', '-r', self::THEME_REGISTRAR_QUERY],
+            $buildRoot,
+            [],
+            60.0,
+        ));
+        if ($result->timedOut) {
+            throw new RuntimeException('Registered theme lookup timed out before packaging.');
+        }
+        if ($result->cancelled) {
+            throw new RuntimeException('Registered theme lookup was cancelled before packaging.');
+        }
+        if (!$result->succeeded()) {
+            throw new RuntimeException('Registered theme lookup failed before packaging.');
+        }
+        $stdout = trim($result->stdout);
+        if ($stdout === '') {
+            throw new RuntimeException('Registered theme lookup returned unreadable output.');
+        }
+        try {
+            $decoded = json_decode($stdout, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new RuntimeException('Registered theme lookup returned unreadable output.');
+        }
+        if (!is_array($decoded) || !array_is_list($decoded)) {
+            throw new RuntimeException('Registered theme lookup returned unreadable output.');
+        }
+        $keys = [];
+        foreach ($decoded as $entry) {
+            if (!is_string($entry) || $entry === '') {
+                throw new RuntimeException('Registered theme lookup returned unreadable output.');
+            }
+            $keys[] = $entry;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * @param list<string> $registrarKeys
+     * @return array<string, true>
+     */
+    private static function deployThemeNamesFromRegistrarKeys(array $registrarKeys): array
+    {
+        $names = [];
+        foreach ($registrarKeys as $key) {
+            $slash = strpos($key, '/');
+            if ($slash === false) {
+                continue;
+            }
+            $names[substr($key, $slash + 1)] = true;
+        }
+
+        return $names;
+    }
+
+    private const THEME_REGISTRAR_QUERY = "require 'vendor/autoload.php'; echo json_encode(array_keys((new \\Magento\\Framework\\Component\\ComponentRegistrar())->getPaths(\\Magento\\Framework\\Component\\ComponentRegistrar::THEME)), JSON_THROW_ON_ERROR);";
 
     private function copySource(string $source, string $destination): void
     {

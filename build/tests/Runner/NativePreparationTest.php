@@ -57,6 +57,7 @@ final class NativePreparationTest extends TestCase
         self::assertFileExists($workspace.'/rootfs/vendor/autoload.php');
         self::assertFileDoesNotExist($source.'/generated');
         self::assertSame('unchanged', file_get_contents($source.'/source-only.txt'));
+        self::assertFalse(self::containsThemeRegistrarQuery($runner->requests));
     }
 
     public function testRejectsNonLiteralMagentoConfig(): void
@@ -185,6 +186,49 @@ final class NativePreparationTest extends TestCase
         );
     }
 
+    public function testRejectsUnregisteredStaticContentThemeAfterLifecycle(): void
+    {
+        [$source, $workspace] = self::minimalSource();
+        mkdir($source.'/vendor', 0o700, true);
+        file_put_contents($source.'/app/etc/config.php', "<?php\nreturn ['modules' => ['Vendor_Custom' => 1]];\n");
+        file_put_contents($source.'/vendor/autoload.php', '<?php return true;');
+        $request = str_replace(
+            '"staticContent":[]',
+            '"staticContent":[{"locale":"en_US","theme":"Missing/does-not-exist"}]',
+            self::request($source),
+        );
+        $runner = new SuccessfulRunner();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Missing/does-not-exist');
+        $this->expectExceptionMessage('not registered');
+        try {
+            (new NativePreparation($runner, $workspace, new FixedCapabilities(), new ConfigModuleReader()))
+                ->prepare(PrepareRequest::fromJson($request));
+        } finally {
+            self::assertTrue(self::containsThemeRegistrarQuery($runner->requests));
+        }
+    }
+
+    public function testRejectsUnreadableThemeRegistrarOutput(): void
+    {
+        [$source, $workspace] = self::minimalSource();
+        mkdir($source.'/vendor', 0o700, true);
+        file_put_contents($source.'/app/etc/config.php', "<?php\nreturn ['modules' => ['Vendor_Custom' => 1]];\n");
+        file_put_contents($source.'/vendor/autoload.php', '<?php return true;');
+        $request = str_replace(
+            '"staticContent":[]',
+            '"staticContent":[{"locale":"en_US","theme":"Magento/luma"}]',
+            self::request($source),
+        );
+        $runner = new ThemeRegistrarFailureRunner();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('unreadable output');
+        (new NativePreparation($runner, $workspace, new FixedCapabilities(), new ConfigModuleReader()))
+            ->prepare(PrepareRequest::fromJson($request));
+    }
+
     public function testExecutesConfiguredStaticContentMatrix(): void
     {
         [$source, $workspace] = self::minimalSource();
@@ -213,6 +257,7 @@ final class NativePreparationTest extends TestCase
             ['bin/magento', 'setup:static-content:deploy', '--force', '--language', 'fr_FR', '--theme', 'Vendor/theme', '--no-interaction'],
             array_map(static fn (ProcessRequest $process): array => $process->argv, $runner->requests),
         );
+        self::assertTrue(self::containsThemeRegistrarQuery($runner->requests));
     }
 
     public function testExecutesConfiguredStaticContentStrategyAndThreads(): void
@@ -315,6 +360,20 @@ final class NativePreparationTest extends TestCase
         [$major, $minor] = explode('.', PHP_VERSION);
         return '{"protocolVersion":1,"stage":"prepare","prepare":{"repositoryRoot":"'.$root.'","sourceRevision":"'.str_repeat('a', 40).'","application":{"edition":"open-source","version":"2.4.9","mode":"integrated","webRuntime":"nginx-fpm"},"phpVersion":"'.$major.'.'.$minor.'","composerVersion":"2.10","compatibilityStatus":"supported","inputFiles":[{"path":"source-only.txt","sha256":"'.hash('sha256', 'unchanged').'"}],"staticContent":[]}}';
     }
+
+    /** @param list<ProcessRequest> $requests */
+    private static function containsThemeRegistrarQuery(array $requests): bool
+    {
+        foreach ($requests as $request) {
+            if ($request->argv[0] === 'php'
+                && ($request->argv[1] ?? '') === '-r'
+                && str_contains($request->argv[2] ?? '', 'ComponentRegistrar::THEME')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
 final class SuccessfulRunner implements ProcessRunner
@@ -327,6 +386,9 @@ final class SuccessfulRunner implements ProcessRunner
         $this->requests[] = $request;
         if ($request->argv === ['composer', '--version', '--no-ansi']) {
             return new ProcessResult(0, "Composer version 2.10.2 2026-07-01 11:24:45\n", '');
+        }
+        if (ThemeRegistrarResponses::isQuery($request)) {
+            return ThemeRegistrarResponses::success();
         }
         self::materializeComposerOutput($request);
 
@@ -375,6 +437,29 @@ final class ComposerVersionRunner implements ProcessRunner
         }
 
         SuccessfulRunner::materializeComposerOutput($request);
+        if (ThemeRegistrarResponses::isQuery($request)) {
+            return ThemeRegistrarResponses::success();
+        }
+
+        return new ProcessResult(0, '', '');
+    }
+}
+
+final class ThemeRegistrarFailureRunner implements ProcessRunner
+{
+    /** @var list<ProcessRequest> */
+    public array $requests = [];
+
+    public function run(ProcessRequest $request): ProcessResult
+    {
+        $this->requests[] = $request;
+        if ($request->argv === ['composer', '--version', '--no-ansi']) {
+            return new ProcessResult(0, "Composer version 2.10.2 2026-07-01 11:24:45\n", '');
+        }
+        SuccessfulRunner::materializeComposerOutput($request);
+        if (ThemeRegistrarResponses::isQuery($request)) {
+            return new ProcessResult(0, 'not-json', '');
+        }
 
         return new ProcessResult(0, '', '');
     }
@@ -405,5 +490,27 @@ final class FixedCapabilities implements RequiredCapabilityProvider
     public function capabilitiesFor(PrepareRequest $request): array
     {
         return ['custom.runtime'];
+    }
+}
+
+final class ThemeRegistrarResponses
+{
+    public static function isQuery(ProcessRequest $request): bool
+    {
+        return $request->argv[0] === 'php'
+            && ($request->argv[1] ?? '') === '-r'
+            && str_contains($request->argv[2] ?? '', 'ComponentRegistrar::THEME');
+    }
+
+    public static function success(): ProcessResult
+    {
+        $keys = [
+            'frontend/Magento/blank',
+            'frontend/Magento/luma',
+            'frontend/Vendor/theme',
+            'adminhtml/Magento/backend',
+        ];
+
+        return new ProcessResult(0, json_encode($keys, JSON_THROW_ON_ERROR), '');
     }
 }
