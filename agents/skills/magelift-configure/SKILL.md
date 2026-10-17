@@ -26,6 +26,20 @@ Use this skill before preview or deploy when the service shape is changing.
   sidecar. Private sibling shops may illustrate one of those shapes. They are
   not the only target and they do not certify a cell.
 
+## Start from an existing shop
+
+Run `magelift init` from the shop repository root (the parent of `--config`).
+It requires composer.json, composer.lock, and `bin/magento`, reads the
+locked Magento metapackage (or `magento/magento2-base` for source checkouts),
+and writes a minimal single-environment starter on GCP by default. It does not
+read `app/etc/env.php`, auth.json, or execute shop scripts; existing
+`app/etc/config.php` is optional and unchanged. Use `--provider aws` for the
+experimental AWS starter. If the locked release is outside the compatibility
+catalog or needs a PHP branch other than 8.5, `init` exits before writing;
+author YAML manually with the right `build.php` instead. After a successful
+`init`, review placeholders, commit `magelift.yaml`, then run
+`magelift bootstrap --env test`.
+
 ## Build the shop
 
 Run `magelift build` from the shop repository after committing YAML, the Composer

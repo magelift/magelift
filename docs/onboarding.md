@@ -47,11 +47,10 @@ needs you (or your registrar, Google billing, Adobe account team).
   logging/monitoring for observability. Autopilot also needs
   `roles/iam.serviceAccountUser` on the Compute Engine default
   service account, not only on the project.
-- **Git, with a name and email configured.** Builds inspect the
-  git checkout holding `magelift.yaml` and refuse detached or
-  uncommitted trees; the shop needs a remote for provenance
-  and a committed `composer.lock`. A stock image often has no
-  `git` package and no `user.name`.
+- **Git and a committed shop checkout.** Private repositories and detached
+  HEADs are accepted. Builds need a recorded commit and Composer lock;
+  a local branch or author identity is not required. Pushed builds use an
+  immutable HTTPS provenance URL, including for private repositories.
 - **Docker with buildx on the build host.** `docker buildx version`
   must answer; base images build for `linux/amd64`. Debian's
   own Docker package is too old for this path. Use Docker's
@@ -63,9 +62,9 @@ needs you (or your registrar, Google billing, Adobe account team).
   operator-managed: nothing in the stack creates DNS. After deploy,
   point your names at the load balancer address from
   `magelift outputs` (see Verify).
-- **Composer auth.** Builds need Composer credentials as a
-  `gcp-secret-manager://` reference. Put the reference in YAML,
-  never the value.
+- **Composer auth for private dependencies.** Use the build credential
+  reference `env://COMPOSER_AUTH` for CI, or an existing cloud-secret reference.
+  Public dependencies can build without credentials. Values stay out of YAML.
 - **SMTP relay account (optional).** Alpha sending is operator
   relay: any SMTP relay with host, port, username, and a password
   stored as a `gcp-secret-manager://...` value. Create the relay
@@ -102,26 +101,31 @@ inside the CLI.
 
 ### 2. Template
 
-Run the `magelift` steps from your shop checkout (here `~/shop`);
-the base-image build later runs from a separate MageLift tree
-(`~/magelift-src`).
+Run the `magelift` steps from your shop checkout (here `~/shop`).
+The installed CLI carries its build recipes; no framework checkout is needed.
 
 ```sh
 cd ~/shop
-magelift init --provider gcp
+magelift init
 ```
 
-Fill in your GCP project and domains in `magelift.yaml`. The
-starter matches the alpha recipe (preview preset, baked static
-content, recipe search); staging and production inherit with
-larger presets. Commit the result: builds refuse uncommitted
-trees.
+`init` inspects `composer.json`, `composer.lock`, and `bin/magento`
+in the shop checkout (the directory that contains your `--config`
+file). It infers the locked Magento edition and exact release, then
+writes a minimal `magelift.yaml` with one `test` environment on GCP
+by default (`--provider aws` keeps the experimental AWS starter).
+Fill in `project.name`, `target.gcp.project`, and
+`environments.test.domain`. The starter uses the community alpha
+recipe (PHP 8.5, nginx-fpm, preview preset, baked static content).
+If your locked release needs a different PHP branch, `init` refuses
+before writing; author `magelift.yaml` manually instead. Commit the
+result: builds refuse uncommitted trees.
 
 ### 3. Validate
 
 ```sh
 magelift doctor
-magelift config validate --env preview
+magelift config validate --env test
 ```
 
 `doctor` checks the config, host tooling, and ADC credentials,
@@ -164,7 +168,7 @@ gcloud services enable artifactregistry.googleapis.com \
 ```
 
 ```sh
-magelift bootstrap --env preview
+magelift bootstrap --env test
 ```
 
 Prepares the GCP project: state bucket with versioning, WIF pool,
@@ -173,56 +177,27 @@ flag (that one is AWS-only).
 
 ### 6. Build the application image
 
-Releases never publish base images for prerelease tags, so fetch
-the pinned MageLift tree from the release tarball and build
-yours once (the installer ships a binary; sources come
-separately):
+The user's build host constructs the bundled recipe and publishes the
+application to its selected registry. Builder/runtime stages stay local.
+With the registry prepared and Docker authenticated, run from the shop:
 
 ```sh
-TAG=v0.1.0-alpha.1-rc.22
-mkdir -p ~/magelift-src
-curl -fsSL "https://github.com/magelift/magelift/archive/refs/tags/$TAG.tar.gz" \
-  | tar -xz -C ~/magelift-src --strip-components=1
-cd ~/magelift-src
-```
-
-Create the registry repositories and authenticate Docker, then
-build and push the bases:
-
-```sh
-gcloud artifacts repositories create shop-bases \
-  --repository-format=docker --location=europe-west1 \
-  --project=PROJECT_ID
-gcloud artifacts repositories create shop \
-  --repository-format=docker --location=europe-west1 \
-  --project=PROJECT_ID
-gcloud auth configure-docker europe-west1-docker.pkg.dev
-REG=europe-west1-docker.pkg.dev/PROJECT_ID/shop-bases
-docker buildx build --platform linux/amd64 -f images/php-nginx/Dockerfile \
-  --target builder -t $REG/magelift-builder:8.5 --push .
-docker buildx build --platform linux/amd64 -f images/php-nginx/Dockerfile \
-  --target runtime -t $REG/magelift-nginx:8.5 --push .
-```
-
-Record the pushed digests:
-
-```sh
-gcloud artifacts docker images list \
-  $REG/magelift-builder --include-tags --project=PROJECT_ID
-gcloud artifacts docker images list \
-  $REG/magelift-nginx --include-tags --project=PROJECT_ID
-```
-
-Back in the shop tree, build and push the immutable shop image:
-
-```sh
-cd ~/shop
 magelift build --push \
-  --image europe-west1-docker.pkg.dev/PROJECT_ID/shop/shop:preview \
-  --builder-image "$REG/magelift-builder@sha256:BUILDER_DIGEST" \
-  --runtime-image "$REG/magelift-nginx@sha256:RUNTIME_DIGEST" \
-  --platform linux/amd64
+  --image us-central1-docker.pkg.dev/PROJECT_ID/shop/shop:candidate
 ```
+
+The current workstation path can prepare Artifact Registry with:
+
+```sh
+gcloud artifacts repositories create shop \
+  --repository-format=docker --location=us-central1 --project=PROJECT_ID
+gcloud auth configure-docker us-central1-docker.pkg.dev
+```
+
+Use your own project/repository values. The guided bootstrap/CI path is still
+being completed; this manual setup is not evidence that agency onboarding is
+finished. See [Application builds](builds.md) for optional private cache and
+advanced recipe overrides.
 
 The command prints the pushed digest. Pin it as
 `target.gcp.imageDigest` (or pass `--digest` to deploy and
@@ -237,37 +212,37 @@ encrypted shop data.
 ### 7. Deploy
 
 ```sh
-magelift deploy --env preview --yes
+magelift deploy --env test --yes
 ```
 
-Preview deploys email-disabled unless you set the `email` block.
+The starter keeps email disabled unless you configure the `email` block.
 Every failure carries a typed cause with a next step; see
 When it fails.
 
 ### 8. Verify, per surface
 
 ```sh
-magelift --env preview health --mode runtime
-magelift --env preview outputs --output json
+magelift --env test health --mode runtime
+magelift --env test outputs --output json
 ```
 
-- **HTTPS:** `curl -sI https://preview.example.com/health`
+- **HTTPS:** `curl -sI https://test.example.invalid/health`
   returns 200.
 - **Assets:** prove baked static content serves by fetching one
   stylesheet the homepage references:
   ```sh
-  asset=$(curl -s https://preview.example.com/ | grep -o 'static/[^"]*\.css' | head -1)
-  curl -sI "https://preview.example.com/$asset" | head -1
+  asset=$(curl -s https://test.example.invalid/ | grep -o 'static/[^"]*\.css' | head -1)
+  curl -sI "https://test.example.invalid/$asset" | head -1
   ```
   Expect `200`.
 - **Catalog:** create one simple product in admin (Content is
   empty on a fresh shop; search and media checks need it).
 - **Search:** reindex, then query the storefront:
-  `magelift --env preview exec --service web -- bin/magento indexer:reindex catalogsearch_fulltext`,
-  then `curl -s 'https://preview.example.com/catalogsearch/result/?q=<product>'`
+  `magelift --env test exec --service web -- bin/magento indexer:reindex catalogsearch_fulltext`,
+  then `curl -s 'https://test.example.invalid/catalogsearch/result/?q=<product>'`
   returns the product.
 - **Cron/consumers:** the scheduler runs in the cluster whether
-  your terminal is open or not; `magelift --env preview logs --service cron`
+  your terminal is open or not; `magelift --env test logs --service cron`
   shows recent runs. The DB queue needs no broker health cell
   on preview.
 - **SMTP (relay shops only):** register a new storefront
@@ -288,29 +263,21 @@ magelift --env preview outputs --output json
   (`gcloud storage ls gs://<mediaBucket>/media/`).
   Import/export files share the private bucket under
   `import_export/` and are never URL-addressable.
-- **Cost:** `magelift --env preview cost` prints account-free
+- **Cost:** `magelift --env test cost` prints account-free
   capacity with unpriced items listed; `--live` is not wired on
   GCP and errors rather than guessing. Budgets alert, never cap.
 
-### 9. Expiry
+### 9. Test lifetime
 
-Previews carry `expiresAt`. In production a scheduled job owns
-expiry: the generated CI workflow sweeps on its cron using the
-same credentials as deploy. To exercise the mechanism now:
-
-```sh
-magelift env sweep --dry-run
-magelift env sweep --yes
-```
-
-The sweep destroys only expired, unprotected previews and
-reports residual cost (retained backups with their horizon;
-amounts come from provider billing, never estimates).
+The initial `test` environment has no automatic expiry. Destroy it after the
+trial; budgets alert but do not stop spending. Optional preview lifecycle and
+scheduled cleanup are a separate pilot path. The single-test CI template does
+not create preview or sweep jobs.
 
 ### 10. Teardown
 
 ```sh
-magelift destroy --env preview --yes
+magelift destroy --env test --yes
 ```
 
 Destroys exactly what the provider created and reports the

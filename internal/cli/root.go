@@ -362,10 +362,9 @@ func initCommand(o *options) *cobra.Command {
 				return invalid(fmt.Errorf("--from-acc and --from-upsun are mutually exclusive"))
 			}
 			if provider == "" {
-				provider = "aws"
+				provider = "gcp"
 			}
-			starter, err := starterForProvider(provider)
-			if err != nil {
+			if err := validateStarterProvider(provider); err != nil {
 				return invalid(err)
 			}
 			writePath := o.configPath
@@ -383,6 +382,7 @@ func initCommand(o *options) *cobra.Command {
 			var (
 				data     []byte
 				unmapped []paasimport.UnmappedKey
+				shopInit *initWriteResult
 			)
 			switch {
 			case fromACC:
@@ -406,7 +406,29 @@ func initCommand(o *options) *cobra.Command {
 				}
 				data, unmapped = result.YAML, result.Unmapped
 			default:
+				shop, err := inspectShopSource(shopSourceRoot(o.configPath))
+				if err != nil {
+					return invalid(err)
+				}
+				if err := validateShopForInitRecipe(shop); err != nil {
+					return invalid(err)
+				}
+				starter, err := starterForProvider(provider, shop)
+				if err != nil {
+					return invalid(err)
+				}
 				data = []byte(starter)
+				if err := validateInitStarter(data); err != nil {
+					return invalid(err)
+				}
+				shopInit = &initWriteResult{
+					Path:        writePath,
+					Provider:    strings.ToLower(strings.TrimSpace(provider)),
+					Environment: "test",
+					Edition:     shop.Edition,
+					Release:     shop.Version,
+					Next:        initNextAction(),
+				}
 			}
 			if err := os.MkdirAll(filepath.Dir(writePath), 0o755); err != nil {
 				return err
@@ -422,29 +444,24 @@ func initCommand(o *options) *cobra.Command {
 				}
 				return invalid(fmt.Errorf("import produced %d unmapped key(s); see %s", len(unmapped), sidecar))
 			}
+			if shopInit != nil {
+				return o.write(shopInit)
+			}
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&fromACC, "from-acc", false, "generate magelift.yaml from Adobe Commerce Cloud config")
 	cmd.Flags().BoolVar(&fromUpsun, "from-upsun", false, "generate magelift.yaml from Upsun / Platform.sh config")
 	cmd.Flags().StringVar(&configOut, "config-out", "", "write generated YAML to PATH for review (default: --config path)")
-	cmd.Flags().StringVar(&provider, "provider", "aws", "starter provider: aws or gcp (certified starters only)")
+	cmd.Flags().StringVar(&provider, "provider", "gcp", "starter provider: aws or gcp")
 	return cmd
 }
 
-// starterForProvider returns the starter for a certified provider. The
-// provider check runs before the overwrite check so a bad flag never
-// looks like a file problem. MageLift is the authority for the
-// supported set: other providers have no certified starter in v1.
-func starterForProvider(provider string) (string, error) {
-	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "aws":
-		return starterAWSConfig, nil
-	case "gcp":
-		return starterGCPConfig, nil
-	default:
-		return "", fmt.Errorf("MageLift supports starter providers \"aws\" and \"gcp\" only, got %q", provider)
-	}
+// starterForProvider renders the minimal single-environment starter for the
+// inspected shop. The provider check runs before the overwrite check so a bad
+// flag never looks like a file problem.
+func starterForProvider(provider string, shop inspectedShop) (string, error) {
+	return renderMinimalStarter(provider, shop)
 }
 
 func configCommand(o *options) *cobra.Command {

@@ -70,6 +70,7 @@ func TestInitProviderStartersValidate(t *testing.T) {
 	for _, provider := range []string{"aws", "gcp"} {
 		t.Run(provider, func(t *testing.T) {
 			dir := t.TempDir()
+			writeInitShopFixture(t, dir, "2.4.9", "community")
 			configPath := filepath.Join(dir, "magelift.yaml")
 			var out bytes.Buffer
 			cmd := newCommand(&out, &out, nil)
@@ -91,15 +92,16 @@ func TestInitProviderStartersValidate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := file.Environments(); len(got) != 3 {
-				t.Fatalf("environments = %v, want preview, staging, production", got)
+			if got := file.Environments(); len(got) != 1 || got[0] != "test" {
+				t.Fatalf("environments = %v, want [test]", got)
 			}
 		})
 	}
 }
 
-func TestInitProviderDefaultsToAWS(t *testing.T) {
+func TestInitProviderDefaultsToGCP(t *testing.T) {
 	dir := t.TempDir()
+	writeInitShopFixture(t, dir, "2.4.9", "community")
 	configPath := filepath.Join(dir, "magelift.yaml")
 	var out bytes.Buffer
 	cmd := newCommand(&out, &out, nil)
@@ -111,8 +113,8 @@ func TestInitProviderDefaultsToAWS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "provider: aws") {
-		t.Fatalf("default starter is not AWS:\n%s", data)
+	if !strings.Contains(string(data), "provider: gcp") {
+		t.Fatalf("default starter is not GCP:\n%s", data)
 	}
 }
 
@@ -401,6 +403,7 @@ func TestInitConfigOutUnmappedSidecarUsesStem(t *testing.T) {
 
 func TestInitBareWithYesOverwritesStarter(t *testing.T) {
 	dir := t.TempDir()
+	writeInitShopFixture(t, dir, "2.4.9", "community")
 	configPath := filepath.Join(dir, "magelift.yaml")
 	old := starterConfig + "# marker\n"
 	if err := os.WriteFile(configPath, []byte(old), 0o644); err != nil {
@@ -417,8 +420,11 @@ func TestInitBareWithYesOverwritesStarter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(data) != starterConfig {
-		t.Fatalf("expected starter rewrite; got %q", data)
+	if string(data) == old {
+		t.Fatal("expected overwrite of existing config")
+	}
+	if !strings.Contains(string(data), "environments:\n  test:") {
+		t.Fatalf("expected minimal test environment starter:\n%s", data)
 	}
 	if !strings.Contains(string(data), "mode: integrated") || !strings.Contains(string(data), "webRuntime: nginx-fpm") || !strings.Contains(string(data), "frontName: admin") {
 		t.Fatalf("starter is not an integrated PHP storefront: %s", data)
@@ -488,12 +494,16 @@ func copyTree(t *testing.T, src, dst string) {
 
 func TestInitGCPStarterMatchesAlphaRecipe(t *testing.T) {
 	dir := t.TempDir()
+	writeInitShopFixture(t, dir, "2.4.9", "community")
 	configPath := filepath.Join(dir, "magelift.yaml")
 	var out bytes.Buffer
 	cmd := newCommand(&out, &out, nil)
-	cmd.SetArgs([]string{"--config", configPath, "init", "--provider", "gcp"})
+	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "init", "--provider", "gcp"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("init --provider gcp: %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), `"release": "2.4.9"`) || !strings.Contains(out.String(), `"edition": "open-source"`) {
+		t.Fatalf("json init summary missing detection: %s", out.String())
 	}
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -503,7 +513,7 @@ func TestInitGCPStarterMatchesAlphaRecipe(t *testing.T) {
 	if strings.Contains(text, "\n    openSearchMode: disabled") {
 		t.Fatal("starter pins search off; the alpha recipe serves OpenSearch by default")
 	}
-	for _, want := range []string{"staticContent:", "locales: [en_US]", "#email:", "#  mode: smtp", "docs/onboarding.md"} {
+	for _, want := range []string{"staticContent:", "locales: [en_US]", "us-central1", "test.example.invalid", "environments:\n  test:"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("starter missing %q", want)
 		}
@@ -512,9 +522,9 @@ func TestInitGCPStarterMatchesAlphaRecipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	effective, err := file.Resolve("preview", config.ResolveOptions{})
+	effective, err := file.Resolve("test", config.ResolveOptions{})
 	if err != nil {
-		t.Fatalf("preview resolve: %v", err)
+		t.Fatalf("test resolve: %v", err)
 	}
 	if got := effective.Config.Build.StaticContent.Locales; len(got) != 1 || got[0] != "en_US" {
 		t.Fatalf("staticContent locales = %#v", got)
