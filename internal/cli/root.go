@@ -118,6 +118,7 @@ type options struct {
 	testCostEstimator          platform.CostEstimator
 	fetchProviderLock          func(context.Context, string) (providerhost.Lockfile, error)
 	ensureProviderVerifier     func(context.Context, string) (string, error)
+	providerVerifier           providerhost.BlobVerifier
 	infraOnly                  bool
 	ackMaintenanceDrain        bool
 	skipProviderLock           bool

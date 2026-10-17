@@ -3,6 +3,9 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
+	"github.com/magelift/magelift/internal/cosign"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,7 +37,7 @@ environments:
 extensions: {}
 `
 
-const providersTestLock = `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"aws":{"name":"magelift-provider-aws","version":"v0.0.0-test","protocol":"magelift-v1","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cosign":{"identity":"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v0.0.0-test","issuer":"https://token.actions.githubusercontent.com","bundle":"bundle.json"}}}}`
+const providersTestLock = `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"aws":{"name":"magelift-provider-aws","version":"v0.0.0-test","protocol":"magelift-v1","digest":"sha256:b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78","cosign":{"identity":"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v0.0.0-test","issuer":"https://token.actions.githubusercontent.com","bundle":"bundle.json"}}}}`
 
 func writeProvidersFixture(t *testing.T) (configPath, lockPath string) {
 	t.Helper()
@@ -57,11 +60,15 @@ func TestProvidersInstallReportsBundledBinary(t *testing.T) {
 	if err := os.WriteFile(binary, []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
 	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/cache/cosign", nil }
+	o.providerVerifier = providersStubVerifier{}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install", "--lockfile", lockPath})
 	if err := cmd.Execute(); err != nil {
@@ -87,6 +94,7 @@ func TestProvidersInstallRefusesUnknownProvider(t *testing.T) {
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/cache/cosign", nil }
+	o.providerVerifier = providersStubVerifier{}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", configPath, "providers", "install", "--lockfile", lockPath})
 	err := cmd.Execute()
@@ -128,11 +136,15 @@ func TestProvidersInstallBootstrapsMissingLockfile(t *testing.T) {
 	if err := os.WriteFile(binary, []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
 	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/cache/cosign", nil }
+	o.providerVerifier = providersStubVerifier{}
 	o.fetchProviderLock = func(_ context.Context, version string) (providerhost.Lockfile, error) {
 		if version != "v9.9.9" {
 			t.Fatalf("version = %q", version)
@@ -213,6 +225,9 @@ func TestProvidersInstallBootstrapsFromReleaseShapedVersion(t *testing.T) {
 	if err := os.WriteFile(binary, []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	previous := Version
 	Version = "0.1.0-alpha.1-rc.2"
 	t.Cleanup(func() { Version = previous })
@@ -221,6 +236,7 @@ func TestProvidersInstallBootstrapsFromReleaseShapedVersion(t *testing.T) {
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
 	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/cache/cosign", nil }
+	o.providerVerifier = providersStubVerifier{}
 	o.fetchProviderLock = func(_ context.Context, version string) (providerhost.Lockfile, error) {
 		if version != "v0.1.0-alpha.1-rc.2" {
 			t.Fatalf("version = %q", version)
@@ -266,5 +282,75 @@ func TestProvidersInstallRefusesToReplaceInvalidLock(t *testing.T) {
 	}
 	if string(contents) != "{bogus" {
 		t.Fatalf("invalid lock was replaced: %q", contents)
+	}
+}
+
+type providersStubVerifier struct{ err error }
+
+func (v providersStubVerifier) VerifyBlob(context.Context, string, string, cosign.VerifyOptions) error {
+	return v.err
+}
+
+func TestProvidersBootstrapFailureDoesNotPublishProjectLock(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.executable = func() (string, error) { return filepath.Join(t.TempDir(), "magelift"), nil }
+	o.fetchProviderLock = func(context.Context, string) (providerhost.Lockfile, error) {
+		return providerhost.ParseLock(strings.NewReader(providersTestLock))
+	}
+	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "", fmt.Errorf("fixture verifier unavailable") }
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "providers", "install", "--version", "v9.9.9"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "fixture verifier unavailable") {
+		t.Fatalf("error = %v", err)
+	}
+	if _, err := os.Stat("magelift.providers.lock"); !os.IsNotExist(err) {
+		t.Fatalf("failed install published lock: %v", err)
+	}
+	temps, err := filepath.Glob(".magelift-providers-lock-*")
+	if err != nil || len(temps) != 0 {
+		t.Fatalf("staging files: %v, %v", temps, err)
+	}
+}
+
+func TestProvidersInstallRefusesTamperedBundledBinary(t *testing.T) {
+	configPath, lockPath := writeProvidersFixture(t)
+	binDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(binDir, "magelift-provider-aws"), []byte("tampered"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
+	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/fixture/cosign", nil }
+	o.providerVerifier = providersStubVerifier{}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "providers", "install", "--lockfile", lockPath})
+	if err := cmd.Execute(); !errors.Is(err, providerhost.ErrChecksumMismatch) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestProvidersInstallRefusesInvalidBundledSignature(t *testing.T) {
+	configPath, lockPath := writeProvidersFixture(t)
+	binDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(binDir, "magelift-provider-aws"), []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
+	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/fixture/cosign", nil }
+	o.providerVerifier = providersStubVerifier{err: errors.New("fixture invalid signature")}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "providers", "install", "--lockfile", lockPath})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "fixture invalid signature") {
+		t.Fatalf("error = %v", err)
 	}
 }

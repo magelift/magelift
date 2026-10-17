@@ -74,10 +74,18 @@ func providersInstallCommand(o *options) *cobra.Command {
 				if ferr != nil {
 					return &exitError{code: 3, err: ferr}
 				}
-				if ferr := os.WriteFile("magelift.providers.lock", append(encoded, '\n'), 0o644); ferr != nil {
-					return &exitError{code: 3, err: fmt.Errorf("write bootstrapped lockfile: %w", ferr)}
+				staged, ferr := os.CreateTemp(".", ".magelift-providers-lock-*")
+				if ferr != nil {
+					return &exitError{code: 3, err: fmt.Errorf("stage bootstrapped lockfile: %w", ferr)}
 				}
-				lockFile, lock, bootstrapped = "magelift.providers.lock", fetched, true
+				defer os.Remove(staged.Name())
+				_, writeErr := staged.Write(append(encoded, '\n'))
+				syncErr := staged.Sync()
+				closeErr := staged.Close()
+				if ferr := errors.Join(writeErr, syncErr, closeErr); ferr != nil {
+					return &exitError{code: 3, err: fmt.Errorf("stage bootstrapped lockfile: %w", ferr)}
+				}
+				lockFile, lock, bootstrapped = staged.Name(), fetched, true
 			} else if strings.TrimSpace(version) != "" {
 				return &exitError{code: 3, err: fmt.Errorf("provider lockfile %s already exists; remove it to re-bootstrap at --version %s", lockFile, strings.TrimSpace(version))}
 			}
@@ -88,17 +96,22 @@ func providersInstallCommand(o *options) *cobra.Command {
 			ensure := o.ensureProviderVerifier
 			if ensure == nil {
 				ensure = func(ctx context.Context, dir string) (string, error) {
-					return (&providerhost.VerifierInstaller{CacheDir: dir}).Ensure(ctx)
+					return (&providerhost.VerifierInstaller{CacheDir: dir, Repair: true}).Ensure(ctx)
 				}
 			}
 			verifierPath, err := ensure(cmd.Context(), cacheResolved)
 			if err != nil {
 				return &exitError{code: 3, err: err}
 			}
+			verifier := o.providerVerifier
+			if verifier == nil {
+				verifier = providerhost.NewPreferredVerifier(cacheResolved)
+			}
 			downloader := &providerhost.Downloader{
-				Verifier: providerhost.NewPreferredVerifier(cacheResolved),
+				Verifier: verifier,
 				CacheDir: cacheResolved,
 				LockDir:  filepath.Dir(lockFile),
+				Repair:   true,
 			}
 			type result struct {
 				Provider string `json:"provider"`
@@ -118,6 +131,12 @@ func providersInstallCommand(o *options) *cobra.Command {
 					if !ok {
 						return &exitError{code: 3, err: fmt.Errorf("provider %q ships beside the CLI but no binary was found there; reinstall the CLI release", provider)}
 					}
+					if _, err := providerhost.Load(cmd.Context(), providerhost.Options{
+						Mode: providerhost.ModeSubprocess, Provider: provider, LockPath: lockFile,
+						BinaryPath: binary, Verifier: verifier,
+					}); err != nil {
+						return &exitError{code: 3, err: err}
+					}
 					results = append(results, result{Provider: provider, Version: strings.TrimSpace(artifact.Version), Binary: binary, Bundled: true})
 					continue
 				}
@@ -126,6 +145,13 @@ func providersInstallCommand(o *options) *cobra.Command {
 					return &exitError{code: 3, err: err}
 				}
 				results = append(results, result{Provider: installed.Provider, Version: installed.Version, Binary: installed.Binary, Cached: installed.Cached})
+			}
+			if bootstrapped {
+				// Publish only after successful installation, without replacing a
+				// project pin another process may have created in the meantime.
+				if err := os.Link(lockFile, "magelift.providers.lock"); err != nil {
+					return &exitError{code: 3, err: fmt.Errorf("publish bootstrapped lockfile without replacing an existing pin: %w", err)}
+				}
 			}
 			return o.write(map[string]any{"providers": results, "bootstrapped": bootstrapped, "verifier": verifierPath})
 		},
