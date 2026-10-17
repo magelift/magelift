@@ -98,17 +98,36 @@ func validAdmissionSelection() AdmissionSelection {
 
 func TestValidateAccountPrepDoesNotQueryDeployCatalogs(t *testing.T) {
 	client := validFakeCapabilityAPI()
-	client.services["storage.googleapis.com"] = true
+	client.services["storage.googleapis.com"] = false
 	selection := validAdmissionSelection()
 	if err := ValidateAccountPrep(context.Background(), client, selection); err != nil {
 		t.Fatal(err)
 	}
 	for name := range client.calls {
 		switch name {
-		case "Project", "BillingEnabled", "EnabledServices":
+		case "Project", "BillingEnabled":
 		default:
 			t.Fatalf("account prep called %s", name)
 		}
+	}
+}
+
+func TestValidateAccountPrepStillRejectsWrongProjectAndMissingBilling(t *testing.T) {
+	for _, scenario := range []string{"wrong project", "billing disabled"} {
+		t.Run(scenario, func(t *testing.T) {
+			client := validFakeCapabilityAPI()
+			if scenario == "wrong project" {
+				client.project.ID = "another-project"
+			} else {
+				client.billing = false
+			}
+			if err := ValidateAccountPrep(context.Background(), client, validAdmissionSelection()); err == nil {
+				t.Fatal("unsafe account preparation admitted")
+			}
+			if client.calls["EnabledServices"] != 0 {
+				t.Fatal("account failure should precede API preparation")
+			}
+		})
 	}
 }
 

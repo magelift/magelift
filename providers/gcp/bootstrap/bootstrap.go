@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
 
 var (
@@ -184,14 +182,12 @@ func VerifyAccount(ctx context.Context, gcpProject string) error {
 	if !projectPattern.MatchString(gcpProject) {
 		return errors.New("GCP project ID is invalid")
 	}
-	client, err := storage.NewClient(ctx, option.WithScopes(storage.ScopeReadOnly))
+	client, err := NewWIFClient(ctx)
 	if err != nil {
 		return fmt.Errorf("verify GCP account: %w", err)
 	}
-	defer client.Close()
-	it := client.Buckets(ctx, gcpProject)
-	_, err = it.Next()
-	if err != nil && !errors.Is(err, iterator.Done) {
+	_, err = client.ProjectNumber(ctx, gcpProject)
+	if err != nil {
 		return fmt.Errorf("verify GCP project %q access: %w", gcpProject, err)
 	}
 	return nil

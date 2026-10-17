@@ -27,8 +27,8 @@ type AdmissionSelection struct {
 	Runtime            string
 }
 
-// ValidateAccountPrep checks the project identity, billing, and the
-// storage API bootstrap needs for the state bucket. It does not query
+// ValidateAccountPrep checks project identity and billing prerequisites.
+// Bootstrap enables its required APIs afterward. It does not query
 // Cloud SQL, Memorystore, or GKE catalogs; those belong to deploy.
 func ValidateAccountPrep(ctx context.Context, client CapabilityAPI, selection AdmissionSelection) error {
 	if ctx == nil {
@@ -57,14 +57,6 @@ func ValidateAccountPrep(ctx context.Context, client CapabilityAPI, selection Ad
 	}
 	if !billingEnabled {
 		return fmt.Errorf("GCP project %q has no open billing account", projectID)
-	}
-	const storageAPI = "storage.googleapis.com"
-	services, err := client.EnabledServices(ctx, identity, []string{storageAPI})
-	if err != nil {
-		return fmt.Errorf("check GCP service states: %w", err)
-	}
-	if !services[storageAPI] {
-		return fmt.Errorf("GCP service %q is not enabled for project %q", storageAPI, projectID)
 	}
 	return nil
 }
