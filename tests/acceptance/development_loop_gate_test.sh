@@ -94,7 +94,7 @@ done
 distribution_runner="$(jq -r 'select(.gate=="distribution") | .status' "$RUNNER_GATE" | tail -1)"
 artifact_runner="$(jq -r 'select(.gate=="artifact") | .status' "$RUNNER_GATE" | tail -1)"
 product_runner="$(jq -r 'select(.gate=="gcp-product") | .status' "$RUNNER_GATE" | tail -1)"
-if [[ "$distribution_runner" != PASS || "$product_runner" != PASS ]]; then
+if [[ "$distribution_runner" != PASS || "$product_runner" != SKIP ]]; then
 	printf 'runner fixture gates: distribution=%s product=%s\n' "$distribution_runner" "$product_runner" >&2
 	exit 1
 fi

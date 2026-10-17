@@ -5,6 +5,7 @@
 # maintainer steps; this runner never creates, pushes, undrafts, or deletes
 # the canary ref.
 set -Eeuo pipefail
+umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=development-loop/lib-canary-identity.sh
@@ -38,7 +39,7 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	*)
-		printf 'run-gates: unknown argument %s\n' >&2
+		printf 'run-gates: unknown argument %s\n' "$1" >&2
 		exit 2
 		;;
 	esac
@@ -55,7 +56,11 @@ TAG="$(canary_ref_for_sha "$SHA")" || {
 }
 
 mkdir -p "$(dirname "$GATE_FILE")" "$EVIDENCE_DIR"
+RUN_DIR="$(mktemp -d "$EVIDENCE_DIR/run-${SHA:0:12}.XXXXXX")"
+OUTPUT_GATE_FILE="$GATE_FILE"
+GATE_FILE="$RUN_DIR/gates.jsonl"
 : >"$GATE_FILE"
+export MAGELIFT_DEVLOOP_EVIDENCE_DIR="$RUN_DIR"
 export MAGELIFT_DEVLOOP_GATE_FILE="$GATE_FILE"
 export MAGELIFT_DEVLOOP_FIXTURE="$FIXTURE"
 export MAGELIFT_ACCEPTANCE_DRY_RUN="${MAGELIFT_ACCEPTANCE_DRY_RUN:-1}"
@@ -65,13 +70,31 @@ export MAGELIFT_ACCEPTANCE_RUN_ID="${MAGELIFT_DEVLOOP_RUN_ID:-devloop-${SHA:0:12
 export MAGELIFT_ACCEPTANCE_GENERATED_AT="${MAGELIFT_DEVLOOP_GENERATED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
 run_one_gate() {
-	local gate="$1" script="$2"
-	local rc=0
-	set +e
-	bash "$script" --sha "$SHA" --gate-file "$GATE_FILE"
-	rc=$?
-	set -e
-	return "$rc"
+	local gate="$1" script="$2" rc=0 status result_file="$RUN_DIR/$1.jsonl"
+	# Isolate malformed or incomplete output from the other gates. Logs remain
+	# private and are never copied into the redacted result detail.
+	if bash "$script" --sha "$SHA" --gate-file "$result_file" >"$RUN_DIR/$gate.log" 2>&1; then
+		rc=0
+	else
+		rc=$?
+	fi
+	if [[ ! -f "$result_file" ]] || ! jq -es --arg gate "$gate" '
+		length == 1 and .[0].gate == $gate and
+		(.[0].status == "PASS" or .[0].status == "FAIL" or .[0].status == "SKIP") and
+		(.[0].detail | type == "string") and
+		(.[0].status == "PASS" or (.[0].detail | length > 0))
+	' "$result_file" >/dev/null 2>&1; then
+		devloop_append_gate "$GATE_FILE" "$gate" FAIL 'gate exited without one valid result; inspect private diagnostics'
+		return 1
+	fi
+	status="$(jq -r .status "$result_file")"
+	if [[ "$rc" -ne 0 && "$status" != FAIL ]]; then
+		devloop_append_gate "$GATE_FILE" "$gate" FAIL 'gate exited unsuccessfully after reporting a non-failure; inspect private diagnostics'
+		return 1
+	fi
+	cat "$result_file" >>"$GATE_FILE"
+	printf 'run-gates: %s %s\n' "$gate" "$status"
+	[[ "$rc" -eq 0 && "$status" != FAIL ]]
 }
 
 failures=0
@@ -103,9 +126,14 @@ write_gate_evidence distribution "devloop:distribution:${TAG}"
 write_gate_evidence artifact "devloop:artifact:${TAG}"
 write_gate_evidence gcp-product "devloop:gcp-product:${TAG}"
 
+# Publish the completed aggregate atomically; concurrent runs retain their own
+# private diagnostics and only replace the latest-result pointer at completion.
+cp "$GATE_FILE" "${OUTPUT_GATE_FILE}.tmp-$$"
+mv "${OUTPUT_GATE_FILE}.tmp-$$" "$OUTPUT_GATE_FILE"
+
 if [[ "$failures" -gt 0 ]]; then
-	printf 'run-gates: %s gate(s) failed for %s\n' "$failures" "$TAG" >&2
+	printf 'run-gates: %s gate(s) failed for %s; diagnostics: %s\n' "$failures" "$TAG" "$RUN_DIR" >&2
 	exit 1
 fi
-printf 'run-gates: all gates recorded for %s\n' "$TAG"
+printf 'run-gates: all gates recorded for %s; diagnostics: %s\n' "$TAG" "$RUN_DIR"
 exit 0

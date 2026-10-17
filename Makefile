@@ -8,7 +8,7 @@
 unexport GOMAXPROCS
 export GOMEMLIMIT := $(shell "$(CURDIR)/scripts/go-memlimit.sh")
 
-.PHONY: help generate generate-check cli-docs cli-docs-check certification-docs certification-docs-check fmt fmt-check test sdk-test lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test pulumi-mock-test floci-test-aws floci-gcp-test provider-gcp-build core-leanness local-gates acceptance-dependencies-check acceptance-harness-test aws-acceptance-local aws-recovery-acceptance-local aws-database-recovery-acceptance-local aws-secret-recovery-acceptance-local aws-sqs-acceptance-local aws-cloudwatch-acceptance-local aws-cloudfront-acceptance-local gcp-acceptance-local gcp-collector-acceptance-local gcp-cloudsql-acceptance-local gcp-cloudsql-destroy-retention-acceptance-local gcp-cloudsql-cleanup-ledger-acceptance-local gcp-recovery-acceptance-local gcp-secret-recovery-acceptance-local gcp-pubsub-acceptance-local gcp-observability-acceptance-local gcp-edge-acceptance-local ovh-acceptance-local ovh-recovery-acceptance-local ovh-database-recovery-acceptance-local scaleway-acceptance-local scaleway-recovery-acceptance-local scaleway-secret-recovery-acceptance-local scaleway-observability-acceptance-local fastly-acceptance-local newrelic-acceptance-local newrelic-otlp-acceptance-local skills-test extension-test docs docs-serve workflow-check verify release-smoke ci-act-go
+.PHONY: help generate generate-check cli-docs cli-docs-check certification-docs certification-docs-check fmt fmt-check test test-fast test-community test-race test-race-full sdk-test provider-gcp-test community-test-helpers development-loop-test verify-community lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test pulumi-mock-test floci-test-aws floci-gcp-test provider-gcp-build core-leanness local-gates acceptance-dependencies-check acceptance-harness-test aws-acceptance-local aws-recovery-acceptance-local aws-database-recovery-acceptance-local aws-secret-recovery-acceptance-local aws-sqs-acceptance-local aws-cloudwatch-acceptance-local aws-cloudfront-acceptance-local gcp-acceptance-local gcp-collector-acceptance-local gcp-cloudsql-acceptance-local gcp-cloudsql-destroy-retention-acceptance-local gcp-cloudsql-cleanup-ledger-acceptance-local gcp-recovery-acceptance-local gcp-secret-recovery-acceptance-local gcp-pubsub-acceptance-local gcp-observability-acceptance-local gcp-edge-acceptance-local ovh-acceptance-local ovh-recovery-acceptance-local ovh-database-recovery-acceptance-local scaleway-acceptance-local scaleway-recovery-acceptance-local scaleway-secret-recovery-acceptance-local scaleway-observability-acceptance-local fastly-acceptance-local newrelic-acceptance-local newrelic-otlp-acceptance-local skills-test extension-test docs docs-serve workflow-check verify release-smoke ci-act-go
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-36s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -24,11 +24,40 @@ fmt: ## Format Go sources
 fmt-check: ## Check Go formatting without changing files
 	test -z "$$($(GOFMT) -l $$(find . -type f -name '*.go' -not -path './vendor/*'))"
 
-test: ## Run Go tests with the race detector
+test: test-fast ## Run all three Go module suites without race
+
+test-fast: ## Fast Go tests for root, sdk, and providers/gcp (no race)
+	./scripts/go-test-modules.sh
+
+test-community:
+	./scripts/go-test-modules.sh --community
+
+test-race: ## Race checks for provider/CLI lifecycle, SDK, and GCP operations
+	./scripts/go-test-race-targeted.sh
+
+test-race-full: ## Full root-module race suite (explicit broad check, excludes nested modules)
 	go test -race ./...
 
-sdk-test: ## Run the SDK module suite standalone (no workspace)
+sdk-test: ## Run the SDK module suite standalone with race (GOWORK=off hermeticity)
 	cd sdk && GOWORK=off go test -race ./... -count=1
+
+provider-gcp-test: ## Run the GCP provider module suite (workspace; no race)
+	cd providers/gcp && go test ./... -count=1
+
+community-test-helpers: ## Regression tests for ML-00 make/go/php helper scripts
+	bash tests/acceptance/go_test_modules_test.sh
+	bash tests/acceptance/php_test_helper_test.sh
+	bash tests/acceptance/make_community_targets_test.sh
+
+development-loop-test: ## Offline independent gates and GCP acceptance preflight regressions
+	bash tests/acceptance/development_loop_runner_test.sh
+	bash tests/acceptance/artifact_gate_test.sh
+	bash tests/acceptance/gcp_product_gate_test.sh
+	bash tests/acceptance/gcp_acceptance_preflight_test.sh
+	bash tests/acceptance/gcp_acceptance_ownership_test.sh
+	bash tests/acceptance/development_loop_gate_test.sh
+
+verify-community: test-community test-race php-test lifecycle-golden-check check-clean-room core-leanness community-test-helpers development-loop-test ## Community alpha gate (modules + off-cloud path; no unbounded race)
 
 provider-gcp-build: ## Build the autonomous GCP provider plugin binary
 	go build -o dist/magelift-provider-gcp ./providers/gcp/cmd/magelift-provider-gcp
@@ -57,18 +86,14 @@ release-smoke: ## Serial single-target goreleaser smoke (safe on low-RAM Macs)
 ci-act-go: ## Run Go CI jobs locally via nektos/act (serial; no Actions minutes)
 	./scripts/ci-act-go.sh
 
-php-test: ## Validate and test the Composer package
-	composer validate --working-dir=build --strict
-	composer audit --working-dir=build --locked
-	composer analyse --working-dir=build
-	composer psalm --working-dir=build
-	php build/vendor/bin/phpunit -c build/phpunit.xml --fail-on-deprecation --fail-on-notice --fail-on-warning
+php-test: ## Validate and test the Composer package (host PHP or pinned container)
+	./scripts/php-test.sh
 
 lifecycle-golden: ## Regenerate the Go migration-shell golden from the PHP lifecycle plan
-	php build/bin/magelift-lifecycle-export > internal/platform/testdata/lifecycle-deploy.json
+	./scripts/php-test.sh --lifecycle-golden > internal/platform/testdata/lifecycle-deploy.json
 
 lifecycle-golden-check: ## Fail when the committed golden differs from the PHP plan
-	php build/bin/magelift-lifecycle-export | diff -u internal/platform/testdata/lifecycle-deploy.json -
+	@actual=$$(mktemp); trap 'rm -f "$$actual"' EXIT; ./scripts/php-test.sh --lifecycle-golden >"$$actual" && diff -u internal/platform/testdata/lifecycle-deploy.json "$$actual"
 
 image-test: ## Build and inspect the local PHP runtime image
 	docker buildx bake php-nginx --load
@@ -127,6 +152,11 @@ HARNESS_STEP := bash scripts/acceptance/run-harness-step.sh
 acceptance-harness-test: acceptance-dependencies-check ## Run offline acceptance harness shell tests (serial; no AWS)
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) harness_step_timeout_test.sh -- bash tests/acceptance/harness_step_timeout_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) development_loop_gate_test.sh -- bash tests/acceptance/development_loop_gate_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) development_loop_runner_test.sh -- bash tests/acceptance/development_loop_runner_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) artifact_gate_test.sh -- bash tests/acceptance/artifact_gate_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_product_gate_test.sh -- bash tests/acceptance/gcp_product_gate_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_acceptance_preflight_test.sh -- bash tests/acceptance/gcp_acceptance_preflight_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_acceptance_ownership_test.sh -- bash tests/acceptance/gcp_acceptance_ownership_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) release_canary_predicate_test.sh -- bash tests/acceptance/release_canary_predicate_test.sh
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) evidence_append_test.sh -- bash tests/acceptance/evidence_append_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) lifecycle_guard_test.sh -- bash tests/acceptance/lifecycle_guard_test.sh
@@ -301,7 +331,7 @@ workflow-check: ## Validate GitHub Actions workflow syntax and expressions
 		tests/fixtures/ci/aws/.github/workflows/*.yml \
 		tests/fixtures/ci/gcp/.github/workflows/*.yml
 
-verify: generate-check cli-docs-check fmt-check lint test sdk-test license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
+verify: generate-check cli-docs-check fmt-check lint test-fast test-race-full sdk-test license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
 generate: certification-docs ## Generate configuration, certification, reference, and skill artifacts
 	go generate ./internal/config ./agents
 

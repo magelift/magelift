@@ -4,7 +4,9 @@ Verification layers vs Make targets and CI.
 
 | Layer | Location | How to run | Cloud account? |
 | --- | --- | --- | --- |
-| Go unit / package | `internal/**`, `sdk/**` | `make test` + `make sdk-test` | No |
+| Go unit / package | Root, `sdk/`, `providers/gcp/` | `make test-fast` | No |
+| Community alpha | Core, SDK, GCP, PHP and local contracts | `make verify-community` | No |
+| Targeted race | Provider/CLI lifecycle, SDK, GCP operations | `make test-race` | No |
 | Pulumi mock graphs | `internal/cloud/**` | `make pulumi-mock-test` | No |
 | Offline harness | `tests/acceptance/` | `make acceptance-harness-test` | No |
 | Account-free stack | mocks + harness + Floci | `make local-gates` | No (Docker for Floci) |
@@ -18,7 +20,7 @@ Verification layers vs Make targets and CI.
 
 ## Daily path
 
-1. `make verify`: format, schema/docs drift, lint, race tests, licenses, PHP, MkDocs, actionlint.
+1. `make verify-community` for the GCP alpha. Root AWS, OVH, Scaleway and external-vendor suites are excluded; `make test-fast` keeps all three module suites available. `make verify` adds broader format, generated files, lint, root race, licenses, docs and workflow checks.
 2. `make local-gates` when you change providers, Floci contracts, or acceptance harnesses.
 3. `make floci-test-aws` alone when you change AWS bootstrap, locks, secrets, logs, media restore, ECS candidates, or IAM OIDC.
 4. `make floci-gcp-test` alone when you change GCP object, secret, Pub/Sub, logging, or monitoring SDK paths that floci-gcp covers.

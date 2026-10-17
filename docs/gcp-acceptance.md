@@ -32,6 +32,32 @@ A 2026-08-12 fail-closed infrastructure-only probe confirmed Memorystore
 `MULTI_ZONE`). That is a cache version/topology boundary, not Magento
 application certification.
 
+## Community alpha development loop
+
+Use `make development-loop-test` for the gate and preflight regressions without
+cloud credentials. `make verify-community` includes those tests, the scoped Go
+suites and PHP checks. A successful dry-run records `SKIP` for the product gate;
+passing offline artifact checks also leaves the actual image build `NOT_RUN`.
+Neither result proves that Magento runs on GCP.
+
+The product gate uses the ordered preview Autopilot application catalog. It
+requires an explicitly selected acceptance project and an immutable image. Each
+run gets separate checkpoints, evidence and private logs under
+`.magelift/development-loop/`. A failed gate keeps its diagnostics and does not
+stop the other gates. Tags and public publication require maintainer approval.
+
+Live preflight checks the selected project, enabled APIs, effective ADC and a
+bounded set of create and cleanup permissions. Independent inventory then
+rejects an occupied or unreadable resource prefix before creation. These checks
+do not guarantee that every resource-level condition or quota will permit a run.
+
+An existing auto-named state bucket or encryption key is never implicitly
+adopted for cleanup. External backends and key references must be explicit and
+remain external. Incomplete cleanup preserves recovery state and its passphrase
+and returns a failure. The normal product gate refuses retention, resume,
+infra-only runs and partial catalogs. Authorized debug work uses the harness
+separately and is not a passing product proof.
+
 ## Offline harness shape
 
 GCP shares the AWS acceptance control-flow shape (checkpoint/resume + evidence

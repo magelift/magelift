@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Artifact gate: validates the Magento artifact manifest and runs the existing
-# certification EnsurePipelineArtifact path. A live magelift build --push path
-# runs only when MAGELIFT_DEVLOOP_ARTIFACT_DIGEST is configured; otherwise the
-# offline contract tests are used and no shop image is built.
+# Artifact gate: run existing artifact contract and manifest checks separately
+# from producing a real Magento image. Offline checks never certify an image.
+# Live image production remains explicitly NOT_RUN until configured.
 # Operator actions: pushing and deleting v0.0.0-canary.<sha> are not performed
 # by this script.
 set -Eeuo pipefail
+umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=development-loop/lib-canary-identity.sh
@@ -37,7 +37,7 @@ while [[ $# -gt 0 ]]; do
 		exit 0
 		;;
 	*)
-		printf 'artifact-gate: unknown argument %s\n' >&2
+		printf 'artifact-gate: unknown argument %s\n' "$1" >&2
 		exit 2
 		;;
 	esac
@@ -61,48 +61,27 @@ record_skip() {
 	devloop_append_gate "$GATE_FILE" artifact SKIP "$1"
 }
 
-phpunit_extensions_available() {
-	local ext
-	for ext in dom filter json libxml mbstring tokenizer xmlwriter; do
-		if ! php -m 2>/dev/null | grep -qi "^${ext}$"; then
-			return 1
-		fi
-	done
-	return 0
-}
-
-run_artifact_manifest_tests() {
-	if phpunit_extensions_available; then
-		composer test --working-dir="$ROOT/build" -- tests/Artifact/ArtifactManifestTest.php >/dev/null
-		return
-	fi
-	if ! command -v docker >/dev/null 2>&1; then
-		return 2
-	fi
-	docker run --rm -v "$ROOT/build:/app" -w /app --entrypoint php php:8.5-fpm-trixie \
-		vendor/bin/phpunit tests/Artifact/ArtifactManifestTest.php >/dev/null
-}
+EVIDENCE_DIR="${MAGELIFT_DEVLOOP_EVIDENCE_DIR:-$ROOT/.magelift/development-loop}"
+mkdir -p "$EVIDENCE_DIR"
+WORK="$(mktemp -d "$EVIDENCE_DIR/artifact-${SHA:0:12}.XXXXXX")"
 
 run_offline_contract() {
-	if ! (cd "$ROOT" && go test ./internal/certification/ -count=1 >/dev/null); then
-		record_fail 'EnsurePipelineArtifact certification tests failed'
-		return 1
-	fi
-	if [[ ! -f "$ROOT/build/vendor/autoload.php" ]]; then
-		record_skip 'composer dependencies are not installed in build/'
+	if ! command -v go >/dev/null 2>&1; then
+		record_skip 'Go is unavailable for the offline artifact contract checks; image build NOT_RUN'
 		return 0
 	fi
-	if ! run_artifact_manifest_tests; then
-		local status=$?
-		if [[ "$status" -eq 2 ]]; then
-			record_skip 'PHP extensions required by PHPUnit are not available and no Docker PHP image could run them'
-			return 0
-		fi
-		record_fail 'ArtifactManifestTest.php failed'
+	if ! (cd "$ROOT" && GOMEMLIMIT="$("$ROOT/scripts/go-memlimit.sh")" go test ./internal/certification/ -count=1) >"$WORK/contract.log" 2>&1; then
+		record_fail 'offline artifact contract tests failed; inspect private diagnostics'
 		return 1
 	fi
-	devloop_append_gate "$GATE_FILE" artifact PASS ''
-	return 0
+	if bash "$ROOT/scripts/php-test.sh" --artifact-manifest >"$WORK/manifest.log" 2>&1; then
+		record_skip 'offline artifact contract and manifest checks passed; application image build NOT_RUN'
+	else
+		local status=$?
+		# PHPUnit exit 2 is a test error, not an unavailable-runtime marker.
+		record_fail "artifact manifest checks failed (exit ${status}); inspect private diagnostics"
+		return 1
+	fi
 }
 
 run_live_push() {
@@ -114,7 +93,7 @@ run_live_push() {
 		record_skip 'magelift is not on PATH for build --push'
 		return 0
 	fi
-	printf 'artifact-gate: live magelift build --push is not implemented in this gate; use MAGELIFT_DEVLOOP_FIXTURE=1 or configure the digest for downstream gates\n' >&2
+	printf 'artifact-gate: live image production is not configured in this runner; prepare immutable inputs with the existing build pipeline\n' >&2
 	record_skip 'live magelift build --push is not configured for this runner'
 	return 0
 }

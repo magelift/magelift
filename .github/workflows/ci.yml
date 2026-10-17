@@ -202,7 +202,9 @@ jobs:
           git diff --exit-code
       - run: go build -o /tmp/genconfig ./cmd/genconfig && /tmp/genconfig --check
       - run: go build -o /tmp/gendocs ./cmd/gendocs && /tmp/gendocs --check
-      - run: go test -race ./...
+      - run: go test ./... -count=1
+      - name: Provider process and CLI lifecycle race checks
+        run: go test -race ./internal/providerhost/ ./internal/cli/ -count=1
       - run: go test -tags synthetic ./tests/synthetic/ -count=1
       - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:

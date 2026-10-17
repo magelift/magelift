@@ -21,6 +21,8 @@ source "$ROOT/scripts/acceptance/lib-cloudflare-dns.sh"
 source "$ROOT/scripts/acceptance/lib-cosign.sh"
 # shellcheck source=acceptance/lib-campaign-isolation.sh
 source "$ROOT/scripts/acceptance/lib-campaign-isolation.sh"
+# shellcheck source=gcp-acceptance-preflight.sh
+source "$ROOT/providers/gcp/scripts/gcp-acceptance-preflight.sh"
 
 json_dependency_status=0
 acceptance_campaign_go_memlimit
@@ -419,8 +421,7 @@ generated_state_bucket_name() {
 }
 
 validate_generated_names() {
-	local state_bucket
-	if ! state_bucket="$(generated_state_bucket_name)"; then
+	if ! generated_state_bucket_name >/dev/null; then
 		return 1
 	fi
 	if (( ${#CLUSTER_NAME} > 40 )); then
@@ -567,6 +568,24 @@ fi
 export CLOUDSDK_CORE_PROJECT="$PROJECT"
 export GOOGLE_PROJECT="$PROJECT"
 
+APIS=(
+	compute.googleapis.com
+	container.googleapis.com
+	cloudbilling.googleapis.com
+	sqladmin.googleapis.com
+	secretmanager.googleapis.com
+	servicenetworking.googleapis.com
+	networkconnectivity.googleapis.com
+	serviceconsumermanagement.googleapis.com
+	memorystore.googleapis.com
+)
+
+
+# Read-only project, API and create/cleanup permission checks precede mutation.
+if ! gcp_acceptance_preflight; then
+	exit 2
+fi
+
 digest_is_placeholder() {
 	[[ "$DIGEST" == *sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef* ]]
 }
@@ -641,6 +660,7 @@ if [[ -n "${MAGELIFT_GCP_ACCEPTANCE_BACKEND_URL:-}" ]]; then
 	export PULUMI_BACKEND_URL="$MAGELIFT_GCP_ACCEPTANCE_BACKEND_URL"
 	printf '+ using explicitly configured GCP Pulumi backend %s\n' "$PULUMI_BACKEND_URL"
 	AUTO_STATE_BUCKET=0
+	STATE_BUCKET_ACCEPTANCE_OWNED=0
 	STATE_BUCKET_NAME=""
 else
 	if ! STATE_BUCKET_NAME="$(generated_state_bucket_name)"; then
@@ -649,6 +669,7 @@ else
 	export PULUMI_BACKEND_URL="gs://${STATE_BUCKET_NAME}"
 	printf '+ defaulting PULUMI_BACKEND_URL=%s\n' "$PULUMI_BACKEND_URL"
 	AUTO_STATE_BUCKET=1
+	STATE_BUCKET_ACCEPTANCE_OWNED=0
 fi
 
 # Producer deletes (SQL/Memorystore/GKE/SCP) are async; poll before PSA peering/VPC teardown.
@@ -667,31 +688,24 @@ refresh_gcp_access_token() {
 	return 1
 }
 
-APIS=(
-	compute.googleapis.com
-	container.googleapis.com
-	cloudbilling.googleapis.com
-	sqladmin.googleapis.com
-	secretmanager.googleapis.com
-	servicenetworking.googleapis.com
-	networkconnectivity.googleapis.com
-	serviceconsumermanagement.googleapis.com
-	memorystore.googleapis.com
-)
 
 ensure_acceptance_state_bucket() {
 	if [[ "$AUTO_STATE_BUCKET" != 1 ]]; then
 		return 0
 	fi
 	if gcloud storage buckets describe "gs://${STATE_BUCKET_NAME}" --project="$PROJECT" >/dev/null 2>&1; then
-		printf '+ using existing acceptance Pulumi state bucket gs://%s\n' "$STATE_BUCKET_NAME"
-		return 0
+		if [[ "$STATE_BUCKET_ACCEPTANCE_OWNED" == 1 ]]; then return 0; fi
+		printf 'refusing to adopt a pre-existing state bucket; select a fresh prefix or an explicit external backend\n' >&2
+		return 1
 	fi
 	printf '+ creating acceptance Pulumi state bucket gs://%s\n' "$STATE_BUCKET_NAME"
-	gcloud storage buckets create "gs://${STATE_BUCKET_NAME}" \
+	if ! gcloud storage buckets create "gs://${STATE_BUCKET_NAME}" \
 		--project="$PROJECT" \
 		--location="$REGION" \
-		--uniform-bucket-level-access >/dev/null
+		--uniform-bucket-level-access >/dev/null; then
+		return 1
+	fi
+	STATE_BUCKET_ACCEPTANCE_OWNED=1
 }
 
 if [[ ! -x "$BIN" || "${MAGELIFT_GCP_ACCEPTANCE_REBUILD:-false}" == true ]]; then
@@ -802,7 +816,7 @@ ACCEPTANCE_CHECKPOINT_FINGERPRINT="$({
 		"$INFRA_ONLY" \
 		"$GCP_FINGERPRINT_EDITION" "$PHP_EXTENSIONS" "$GCP_FINGERPRINT_DATABASE" "$GCP_FINGERPRINT_SEARCH" \
 		"$GCP_FINGERPRINT_QUEUE" "$GCP_FINGERPRINT_CACHE" "$MEMORYSTORE_ENGINE_VERSION" "$GCP_FINGERPRINT_WEB_CACHE" "$GCP_FINGERPRINT_EDGE" \
-		"$OPENSEARCH_IMAGE" "$RABBITMQ_IMAGE" "$ENABLE_CLOUD_ARMOR" "$AUTOPILOT_MEMORY_REQUEST" "$SEED_DUMP" "$ENCRYPTION_KEY_SECRET_ID"
+		"$OPENSEARCH_IMAGE" "$RABBITMQ_IMAGE" "$ENABLE_CLOUD_ARMOR" "$AUTOPILOT_MEMORY_REQUEST" "$SEED_DUMP" "$ENCRYPTION_KEY_SECRET_ID" "$GCP_ZONES"
 	printf 'nativeEdge=%s\noriginDomain=%s\noriginTitle=%s\n' "$NATIVE_EDGE_ENABLED" "$ORIGIN_DOMAIN" "$ORIGIN_TITLE"
 	printf '\ncell-catalog:\n'
 	cat "$CELL_CATALOG"
@@ -823,8 +837,10 @@ export MAGELIFT_ACCEPTANCE_CACHE="$GCP_FINGERPRINT_CACHE"
 export MAGELIFT_ACCEPTANCE_WEB_CACHE="$GCP_FINGERPRINT_WEB_CACHE"
 export MAGELIFT_ACCEPTANCE_EDGE="$GCP_FINGERPRINT_EDGE"
 export MAGELIFT_ACCEPTANCE_STACK_ID="${PULUMI_PROJECT}/${STACK_NAME}"
-export MAGELIFT_ACCEPTANCE_COMPUTE_MODE="$(acceptance_shared_compute_mode "$GKE_RUNTIME")"
-export MAGELIFT_ACCEPTANCE_KUBERNETES_MODE="$(acceptance_shared_kubernetes_mode "$GKE_RUNTIME")"
+MAGELIFT_ACCEPTANCE_COMPUTE_MODE="$(acceptance_shared_compute_mode "$GKE_RUNTIME")"
+export MAGELIFT_ACCEPTANCE_COMPUTE_MODE
+MAGELIFT_ACCEPTANCE_KUBERNETES_MODE="$(acceptance_shared_kubernetes_mode "$GKE_RUNTIME")"
+export MAGELIFT_ACCEPTANCE_KUBERNETES_MODE
 gcp_seed_fixture="$(acceptance_seed_fixture_id "$SEED_DUMP")"
 acceptance_export_reuse_boundary \
 	"$gcp_seed_fixture" \
@@ -1479,13 +1495,16 @@ ensure_acceptance_encryption_key() {
 		printf '+ using configured GCP encryption key secret %s\n' "$ENCRYPTION_KEY_SECRET_ID"
 		return 0
 	fi
-	ENCRYPTION_KEY_ACCEPTANCE_OWNED=1
 	if gcloud secrets describe "$ENCRYPTION_KEY_SECRET_ID" --project="$PROJECT" >/dev/null 2>&1; then
-		printf '+ reusing acceptance GCP encryption key secret %s\n' "$ENCRYPTION_KEY_SECRET_ID"
-		return 0
+		if [[ "$ENCRYPTION_KEY_ACCEPTANCE_OWNED" == 1 ]]; then return 0; fi
+		printf 'refusing to adopt a pre-existing encryption key; select a fresh prefix or an explicit external secret reference\n' >&2
+		return 1
 	fi
 	printf '+ creating acceptance GCP encryption key secret %s (value not logged)\n' "$ENCRYPTION_KEY_SECRET_ID"
-	gcloud secrets create "$ENCRYPTION_KEY_SECRET_ID" --project="$PROJECT" --replication-policy=automatic >/dev/null
+	if ! gcloud secrets create "$ENCRYPTION_KEY_SECRET_ID" --project="$PROJECT" --replication-policy=automatic >/dev/null; then
+		return 1
+	fi
+	ENCRYPTION_KEY_ACCEPTANCE_OWNED=1
 	openssl rand -hex 32 | gcloud secrets versions add "$ENCRYPTION_KEY_SECRET_ID" --project="$PROJECT" --data-file=- >/dev/null
 }
 
@@ -1548,19 +1567,27 @@ cleanup() {
 			cleanup_result=FAIL
 		fi
 	fi
-	if ! cleanup_acceptance_wif; then
-		cleanup_result=FAIL
+	# First prove runtime deletion. Keep auxiliary identities, encryption key,
+	# state and its passphrase available if runtime recovery is still needed.
+	if ! assert_clean; then cleanup_result=FAIL; fi
+	if [[ "$cleanup_result" == PASS ]]; then
+		if ! cleanup_acceptance_wif; then cleanup_result=FAIL; fi
+		if ! cleanup_acceptance_encryption_key; then cleanup_result=FAIL; fi
+		# The initial inventory exempted our encryption key while it was in use.
+		# Verify its deletion independently before removing recovery state.
+		if ! ENCRYPTION_KEY_ACCEPTANCE_OWNED=0 assert_clean; then cleanup_result=FAIL; fi
 	fi
-	if ! cleanup_acceptance_encryption_key; then
-		cleanup_result=FAIL
+	if [[ "$cleanup_result" == PASS ]]; then
+		if ! remove_acceptance_state_bucket; then cleanup_result=FAIL; fi
 	fi
-	if ! remove_acceptance_state_bucket; then
-		cleanup_result=FAIL
-	fi
-	cleanup_acceptance_passphrase
-	if ! assert_clean; then
+	if [[ "$cleanup_result" == PASS ]]; then
+		cleanup_acceptance_passphrase
+	else
 		ec=1
-		cleanup_result=FAIL
+		export MAGELIFT_ACCEPTANCE_CLEANUP_REASON="cleanup incomplete; recovery state and its passphrase are preserved"
+		if [[ "$STATE_BUCKET_ACCEPTANCE_OWNED" == 1 ]]; then
+			MAGELIFT_ACCEPTANCE_CLEANUP_LIVE="${MAGELIFT_ACCEPTANCE_CLEANUP_LIVE:+${MAGELIFT_ACCEPTANCE_CLEANUP_LIVE},}gs://${STATE_BUCKET_NAME}"
+		fi
 	fi
 	if [[ -n "$ORIGIN_KUBECONFIG" ]]; then
 		rm -f "$ORIGIN_KUBECONFIG"
@@ -1620,7 +1647,7 @@ acceptance_network_endpoint_group_rows() {
 }
 
 cleanup_acceptance_network_endpoint_groups() {
-	local rows row name zone
+	local rows name zone
 	if ! rows="$(acceptance_network_endpoint_group_rows)"; then
 		return 1
 	fi
@@ -1917,7 +1944,7 @@ issue_producer_deletes() {
 }
 
 remove_acceptance_state_bucket() {
-	if [[ "$AUTO_STATE_BUCKET" != 1 ]]; then
+	if [[ "$AUTO_STATE_BUCKET" != 1 || "$STATE_BUCKET_ACCEPTANCE_OWNED" != 1 ]]; then
 		return 0
 	fi
 	if ! gcloud storage buckets describe "gs://${STATE_BUCKET_NAME}" --project="$PROJECT" >/dev/null 2>&1; then
@@ -2046,6 +2073,23 @@ force_clean_orphans() {
 	gcloud compute addresses delete "${NAME}-${PROFILE}-sql-psa" --global --project="$PROJECT" --quiet 2>/dev/null || true
 	gcloud compute networks delete "$net" --project="$PROJECT" --quiet 2>/dev/null || true
 }
+
+# A fresh acceptance run must not collide with resources from an earlier run.
+# Reuse the independent inventory checks instead of inferring ownership by name.
+assert_acceptance_prefix_fresh() {
+	case "${MAGELIFT_GCP_ACCEPTANCE_RESUME:-0}" in 1|true) return 0 ;; esac
+	local listing
+	if ! assert_clean; then return 1; fi
+	if ! listing="$(gcloud iam workload-identity-pools list --location=global --project="$PROJECT" --format='value(name)' 2>/dev/null)"; then return 1; fi
+	if ! printf '%s\n' "$listing" | prefix_match wif; then return 1; fi
+	if ! listing="$(gcloud iam service-accounts list --project="$PROJECT" --format='value(email)' 2>/dev/null)"; then return 1; fi
+	if ! printf '%s\n' "$listing" | prefix_match service-account; then return 1; fi
+}
+
+if ! assert_acceptance_prefix_fresh; then
+	printf 'acceptance prefix is occupied or could not be checked; no resources will be adopted\n' >&2
+	exit 2
+fi
 
 # Install the cleanup trap before creating the disposable state bucket, then
 # wait until every cleanup helper has been defined before invoking it. A
