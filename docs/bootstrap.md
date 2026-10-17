@@ -65,15 +65,40 @@ magelift ci generate --magelift-version v1.0.0-rc.1
 magelift ci validate --magelift-version v1.0.0-rc.1
 ```
 
+Generation preserves an existing customized workflow and writes a candidate
+beside it. Review the reported diff, then rerun the original generation command
+with `--replace` if you want to adopt the template. Retain your `--path` and
+version flags. Validation checks configuration, presence and YAML syntax;
+`--check-template` additionally requires exact template content. This is not a
+validator for arbitrary GitHub Actions behavior.
+
+
 The generator selects the registered provider/runtime adapter. AWS ECS Fargate uses
 the role variables created by `magelift bootstrap --github-owner --github-repo`.
 GCP GKE uses GitHub federation variables Magelift prints after that same bootstrap:
 `MAGELIFT_GCP_PROJECT_ID`, `MAGELIFT_GCP_REGION`,
 `MAGELIFT_GCP_WORKLOAD_IDENTITY_PROVIDER`, and
-`MAGELIFT_GCP_SERVICE_ACCOUNT`. Magelift derives stack state from `magelift.yaml`
-after bootstrap; do not set a state-backend URL. Also provide the image
-references and the environment-specific preview/staging/production variables
-required by the generated workflow.
+the separate `MAGELIFT_GCP_BUILD_SERVICE_ACCOUNT`,
+`MAGELIFT_GCP_STAGING_SERVICE_ACCOUNT`, `MAGELIFT_GCP_PRODUCTION_SERVICE_ACCOUNT`
+and `MAGELIFT_GCP_PREVIEW_SERVICE_ACCOUNT` variables for the jobs you enable.
+These identities must be provisioned and federated explicitly; the current
+single-identity bootstrap output does not prove that separation is configured.
+The runtime's GKE image-pull identity is another role and needs repository read
+permissions independently of the Pod's application identity.
+
+Magelift derives stack state from `magelift.yaml` after bootstrap; do not set a
+state-backend URL. Set `MAGELIFT_RELEASE_IMAGE` to your application destination
+and `MAGELIFT_REGISTRY` to its exact registry host. Artifact Registry uses the
+GCP federation credential helper. User GHCR uses GITHUB_TOKEN; other registries
+require `MAGELIFT_REGISTRY_USERNAME` and secret `MAGELIFT_REGISTRY_PASSWORD` or an
+explicitly prepared credential flow. The workflow never sends GITHUB_TOKEN to
+an arbitrary registry. Native ECR workflow authentication remains a later AWS
+acceptance check.
+
+The source-build path needs no builder/runtime image variables. Configure
+`build.composer.credentials: env://COMPOSER_AUTH` to consume the optional
+`MAGELIFT_COMPOSER_AUTH` GitHub secret. See [builds](builds.md) for the cache and
+recipe inspection options.
 
 The GCP workflow requests the GitHub OIDC token and exchanges it for short-lived
 credentials. It never reads or writes a service-account key. Before a provider call,
@@ -113,3 +138,17 @@ and resolve to loopback with no credentials or path. Bootstrap S3/KMS clients, t
 state archive, and Secrets Manager/SSM clients honor it; S3 clients use path-style
 requests. For floci-gcp, set `MAGELIFT_GCP_ENDPOINT_URL` to `http://127.0.0.1:4588`
 and `STORAGE_EMULATOR_HOST` to the host:port. Production runs leave the variables unset.
+
+The build job retains the existing manifest, checksum and build result for 14
+days in the user's repository. Staging verifies that handoff before deployment.
+Production dispatch requires `release_digest` and `artifact_run_id` from a
+successful run of the same workflow in the same repository; it does not build.
+Set `MAGELIFT_IMAGE_SIGNING_IDENTITY` and `MAGELIFT_IMAGE_SIGNING_ISSUER` to the
+expected image producer policy, independently of the deployment login.
+Configure required reviewers on protected GitHub environments. Fork PRs do not
+receive build, preview or deployment privileges; labelled preview jobs also
+require a branch in the same repository.
+
+The generated workflow is tested locally as code. A local build or fixture test
+is not evidence of an executed GitHub/GCP workflow; record that acceptance run
+separately before advertising the full alpha path.

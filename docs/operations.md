@@ -242,11 +242,13 @@ number, while branch and commit values remain diagnostic metadata.
 The AWS generator uses the role variables returned by `magelift bootstrap` with
 GitHub flags. The GCP generator uses `MAGELIFT_GCP_PROJECT_ID`,
 `MAGELIFT_GCP_REGION`, `MAGELIFT_GCP_WORKLOAD_IDENTITY_PROVIDER`, and
-`MAGELIFT_GCP_SERVICE_ACCOUNT` for GitHub federation. Magelift derives stack
-state from `magelift.yaml` after bootstrap; `PULUMI_BACKEND_URL` is only a CI
-override. Image references remain required for `build --push`. Promote uses the
-workflow's GitHub login. GCP uses short-lived credentials;
-long-lived service-account keys are not part of the workflow contract.
+separate build and environment service-account variables for GitHub federation
+(see [bootstrap](bootstrap.md#generated-ci-and-pull-request-previews)). Magelift
+derives stack state from `magelift.yaml` after bootstrap. `build --push` needs
+only the final application image destination. Promotion consumes an existing
+build run and signed digest; its expected producer identity/issuer is independent
+of the deployment login. GCP uses short-lived credentials; long-lived
+service-account keys are not part of the workflow contract.
 
 `magelift ci validate` detects a missing, edited, or configuration-drifted workflow
 without contacting a cloud provider. Preview apply and close jobs are serialized by

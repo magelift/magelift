@@ -206,6 +206,7 @@ Options:
 ```text
       --magelift-version string   MageLift release version installed by CI (default "dev")
       --path string               workflow output path
+      --replace                   replace an existing workflow that differs from the MageLift template
 ```
 ### magelift ci validate
 
@@ -218,6 +219,7 @@ magelift ci validate [flags]
 Options:
 
 ```text
+      --check-template            require the workflow to match the current MageLift template exactly
       --magelift-version string   MageLift release version installed by CI (default "dev")
       --path string               workflow output path
 ```

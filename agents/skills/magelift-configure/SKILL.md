@@ -60,3 +60,13 @@ magelift --config magelift.yaml --env staging preview
 
 If a choice is Adobe-supported but the target reports unavailable, do not mark
 the cell certified. Choose another target or add a provider extension.
+
+## Generate user CI safely
+
+`magelift ci generate` creates the workflow when absent and leaves identical
+content untouched. If an existing workflow differs, it preserves that file and
+writes a candidate beside it. Review the reported diff before rerunning the same
+command with `--replace`. Keep any original `--path` and version flags.
+`magelift ci validate` checks project configuration, presence and YAML syntax;
+it does not validate arbitrary GitHub Actions semantics. Add `--check-template`
+only when exact MageLift template freshness is intended.

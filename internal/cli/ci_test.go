@@ -90,7 +90,7 @@ func TestCIGenerateIsDeterministicAndKeepsWorkflowOffStdout(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(workflow)
-	for _, required := range []string{checkoutAction, setupQemuAction, setupBuildxAction, cosignInstallerAction, "MAGELIFT_VERSION: v1.2.3", "cosign verify-blob", "checksums.txt.sigstore.json", "sha256sum -c -", "Install MageLift provider", "magelift providers install", "Build and sign immutable image", "environment: staging", "MAGELIFT_BUILD_ROLE_ARN", `- "staging"`, "--env \"${{ matrix.environment }}\"", "deploy --digest"} {
+	for _, required := range []string{checkoutAction, setupBuildxAction, cosignInstallerAction, "MAGELIFT_VERSION: v1.2.3", "cosign verify-blob", "checksums.txt.sigstore.json", "sha256sum -c -", "Install MageLift provider", "magelift providers install", "Build and sign immutable image", "environment: staging", "MAGELIFT_BUILD_ROLE_ARN", `- "staging"`, "--env \"${{ matrix.environment }}\"", "deploy --digest"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("workflow lacks %q:\n%s", required, text)
 		}
@@ -109,30 +109,68 @@ func TestCIValidateDetectsWorkflowAndConfigDrift(t *testing.T) {
 		t.Fatal(err)
 	}
 	executeCI(t, configPath, "generate")
-	executeCI(t, configPath, "validate")
+	executeCIWithArgs(t, configPath, "validate", "--output", "json")
 
 	workflowPath := filepath.Join(directory, ".github", "workflows", "magelift.yml")
 	workflow, err := os.ReadFile(workflowPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tampered := strings.Replace(string(workflow), "# v7.0.1", "# v7.0.0", 1)
-	if err := os.WriteFile(workflowPath, []byte(tampered), 0o644); err != nil {
+	customized := strings.Replace(string(workflow), "# v7.0.1", "# customized-checkout-pin", 1)
+	customized += "\n      - name: Agency custom check\n        run: echo ok\n"
+	if err := os.WriteFile(workflowPath, []byte(customized), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err = executeCIError(configPath, "validate")
-	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "out of date") {
-		t.Fatalf("workflow drift error = %v", err)
+	executeCIWithArgs(t, configPath, "validate", "--output", "json")
+
+	err = executeCIErrorWithArgs(configPath, "validate", "--check-template")
+	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "does not match the current MageLift template") {
+		t.Fatalf("template freshness error = %v", err)
 	}
 
-	executeCI(t, configPath, "generate")
+	err = executeCIErrorWithArgs(configPath, "generate")
+	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "differs from the MageLift template") || !strings.Contains(err.Error(), "--replace") {
+		t.Fatalf("generate without replace error = %v", err)
+	}
+	stillCustom, err := os.ReadFile(workflowPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(stillCustom, []byte(customized)) {
+		t.Fatal("custom workflow was modified without --replace")
+	}
+	candidates, err := filepath.Glob(workflowPath + ".candidate-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidates) != 1 {
+		t.Fatalf("candidate files = %v", candidates)
+	}
+	candidate, err := os.ReadFile(candidates[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(candidate, stillCustom) {
+		t.Fatal("candidate should carry the rendered template, not the customized workflow")
+	}
+
+	executeCIWithArgs(t, configPath, "generate", "--replace")
+	replaced, err := os.ReadFile(workflowPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(replaced, stillCustom) {
+		t.Fatal("expected --replace to adopt the template")
+	}
+
 	updated := strings.Replace(starterConfig, "  production:\n    inherits: staging\n    account: \"210987654321\"\n    class: production\n    preset: high-availability\n    domain: example.com\n    protection: true\n", "", 1)
 	if err := os.WriteFile(configPath, []byte(updated), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	err = executeCIError(configPath, "validate")
-	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "out of date") {
-		t.Fatalf("config drift error = %v", err)
+	executeCIWithArgs(t, configPath, "validate", "--output", "json")
+	err = executeCIErrorWithArgs(configPath, "validate", "--check-template")
+	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "does not match the current MageLift template") {
+		t.Fatalf("config drift template freshness error = %v", err)
 	}
 }
 
@@ -175,11 +213,10 @@ func TestCIGenerateIncludesProductionApprovalAndPromotion(t *testing.T) {
 			t.Fatalf("production workflow still requires cloud-devops %q:\n%s", forbidden, text)
 		}
 	}
-	// Cosign's own --certificate-identity (pinned release identity in the
-	// Install step) is required; magelift deploy steps must not need one.
-	for _, line := range strings.Split(text, "\n") {
-		if strings.Contains(line, "--certificate-identity") && !strings.Contains(line, "cosign verify-blob") {
-			t.Fatalf("production workflow still requires cloud-devops --certificate-identity:\n%s", line)
+	// The application producer policy is independent of the deployment login.
+	for _, required := range []string{"MAGELIFT_IMAGE_SIGNING_IDENTITY", "MAGELIFT_IMAGE_SIGNING_ISSUER", `--certificate-identity "$SIGNING_IDENTITY"`, `--certificate-oidc-issuer "$SIGNING_ISSUER"`} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("producer trust policy missing %q", required)
 		}
 	}
 }
@@ -224,7 +261,8 @@ func TestCIGenerateGCPUsesFederationAndPRScopedIdentity(t *testing.T) {
 		gcpAuthAction,
 		gcpSetupAction,
 		"MAGELIFT_GCP_WORKLOAD_IDENTITY_PROVIDER",
-		"MAGELIFT_GCP_SERVICE_ACCOUNT",
+		"MAGELIFT_GCP_BUILD_SERVICE_ACCOUNT",
+		"MAGELIFT_GCP_STAGING_SERVICE_ACCOUNT",
 		"--preview-repository",
 		"--preview-number",
 		"--preview-commit",
@@ -263,14 +301,25 @@ func TestCIGenerateRejectsUnsupportedProviderGenerator(t *testing.T) {
 
 func executeCI(t *testing.T, configPath, action string) {
 	t.Helper()
-	if err := executeCIError(configPath, action); err != nil {
+	executeCIWithArgs(t, configPath, action)
+}
+
+func executeCIWithArgs(t *testing.T, configPath, action string, extra ...string) {
+	t.Helper()
+	if err := executeCIErrorWithArgs(configPath, action, extra...); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func executeCIError(configPath, action string) error {
+	return executeCIErrorWithArgs(configPath, action)
+}
+
+func executeCIErrorWithArgs(configPath, action string, extra ...string) error {
 	var stdout, stderr bytes.Buffer
 	command := newCommand(&stdout, &stderr, nil)
-	command.SetArgs([]string{"--config", configPath, "ci", action, "--magelift-version", "v1.2.3"})
+	args := []string{"--config", configPath, "ci", action, "--magelift-version", "v1.2.3"}
+	args = append(args, extra...)
+	command.SetArgs(args)
 	return command.Execute()
 }
