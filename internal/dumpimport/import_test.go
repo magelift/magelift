@@ -2,10 +2,13 @@ package dumpimport_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,6 +17,18 @@ import (
 	"github.com/magelift/magelift/internal/dumpimport"
 	"github.com/magelift/magelift/internal/localdev"
 )
+
+// composeProjectPattern matches Docker Compose project names: start with a
+// letter or digit, then lowercase alphanumerics, hyphens, or underscores.
+var composeProjectPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+
+// composeProjectName derives a Compose project from the full work directory.
+// t.TempDir() leaves are sequential ("001") inside a unique parent, so the
+// basename collides when two root test processes run at once.
+func composeProjectName(workDir string) string {
+	sum := sha256.Sum256([]byte(workDir))
+	return "magelift-dumpimport-" + hex.EncodeToString(sum[:8])
+}
 
 func fixturePath(t *testing.T, name string) string {
 	t.Helper()
@@ -81,7 +96,7 @@ func requireLocalMySQL(t *testing.T) dumpimport.Options {
 	if err := os.WriteFile(composePath, []byte(compose), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	project := "magelift-dumpimport-" + strings.ReplaceAll(filepath.Base(workDir), ".", "")
+	project := composeProjectName(workDir)
 	up := exec.CommandContext(ctx, "docker", "compose", "-f", composePath, "--project-name", project, "up", "-d", "database")
 	up.Dir = workDir
 	if out, err := up.CombinedOutput(); err != nil {
@@ -142,6 +157,28 @@ func requireLocalMySQL(t *testing.T) dumpimport.Options {
 		opts.Port = port
 	}
 	return opts
+}
+
+func TestComposeProjectNameDistinctForSameLeaf(t *testing.T) {
+	const leaf = "001"
+	left := filepath.Join("/tmp", "suite-a", leaf)
+	right := filepath.Join("/tmp", "suite-b", leaf)
+	if filepath.Base(left) != leaf || filepath.Base(right) != leaf {
+		t.Fatalf("leaves = %q %q, want %q", filepath.Base(left), filepath.Base(right), leaf)
+	}
+	a := composeProjectName(left)
+	b := composeProjectName(right)
+	if a == b {
+		t.Fatalf("compose project %q shared by %q and %q", a, left, right)
+	}
+	if composeProjectName(left) != a || composeProjectName(right) != b {
+		t.Fatal("compose project name is not deterministic")
+	}
+	for _, name := range []string{a, b} {
+		if !composeProjectPattern.MatchString(name) {
+			t.Fatalf("invalid compose project %q", name)
+		}
+	}
 }
 
 func TestImportCreatesTablesFromTinySQL(t *testing.T) {
