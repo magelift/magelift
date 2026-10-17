@@ -27,7 +27,7 @@ target "php-nginx-supported" {
       { branch = "8.2", base = "docker.io/library/php:8.2-fpm-trixie@sha256:596175799ca76a93d5d0c3cda7d5f70fccfc86dfdaf97580c1c27e665aba991f" },
       { branch = "8.3", base = "docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328" },
       { branch = "8.4", base = "docker.io/library/php:8.4-fpm-trixie@sha256:59fa733c9af643a122f8a9976119460e35ce76dd0a3f2b9c8f75af8e361a54e2" },
-      { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:70076c1cae0cd0ba6761832417e3a1df3e5560f0544eb0fe40357373e54420fe" },
+      { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc" },
     ]
   }
   name = "php-nginx-${replace(php.branch, ".", "-")}"
@@ -50,7 +50,7 @@ target "php-builder-supported" {
       { branch = "8.2", base = "docker.io/library/php:8.2-fpm-trixie@sha256:596175799ca76a93d5d0c3cda7d5f70fccfc86dfdaf97580c1c27e665aba991f" },
       { branch = "8.3", base = "docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328" },
       { branch = "8.4", base = "docker.io/library/php:8.4-fpm-trixie@sha256:59fa733c9af643a122f8a9976119460e35ce76dd0a3f2b9c8f75af8e361a54e2" },
-      { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:70076c1cae0cd0ba6761832417e3a1df3e5560f0544eb0fe40357373e54420fe" },
+      { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc" },
     ]
   }
   target   = "builder"
@@ -109,7 +109,7 @@ target "php-apache-supported" {
       { branch = "8.2", base = "docker.io/library/php:8.2-fpm-trixie@sha256:596175799ca76a93d5d0c3cda7d5f70fccfc86dfdaf97580c1c27e665aba991f" },
       { branch = "8.3", base = "docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328" },
       { branch = "8.4", base = "docker.io/library/php:8.4-fpm-trixie@sha256:59fa733c9af643a122f8a9976119460e35ce76dd0a3f2b9c8f75af8e361a54e2" },
-      { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:70076c1cae0cd0ba6761832417e3a1df3e5560f0544eb0fe40357373e54420fe" },
+      { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc" },
     ]
   }
   name = "php-apache-${replace(php.branch, ".", "-")}"

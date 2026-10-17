@@ -13,3 +13,13 @@ coverage
 dist
 site
 tasks
+
+# Local sessions, state and credential files are not image inputs.
+.magelift
+.cursor
+.claude
+.agents
+.pulumi
+**/auth.json
+**/.env
+**/.env.*

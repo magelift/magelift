@@ -1,7 +1,7 @@
-# syntax=docker/dockerfile:1.27
+# syntax=docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
 
-ARG PHP_BASE=docker.io/library/php:8.5-fpm-trixie@sha256:70076c1cae0cd0ba6761832417e3a1df3e5560f0544eb0fe40357373e54420fe
-ARG COMPOSER_BASE=docker.io/library/composer:2.10.3@sha256:d8f6343d3fae98107426bc49163ccad46ef85aabd4a27d80a74401fab4aba332
+ARG PHP_BASE=docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc
+ARG COMPOSER_BASE=docker.io/library/composer:2.10.3@sha256:af98f42dfff7c68ba8d53c2164fd9fde1087b7d449514baa38c418b1f6bc4bac
 ARG NGINX_BASE=docker.io/library/nginx:1.30.4-trixie@sha256:d5792f71a9496b833bc08ea834a758c46e2b6a6306c10f4be926f38a656cdc1c
 ARG APCU_VERSION=5.1.28
 ARG REDIS_VERSION=6.3.0
@@ -49,6 +49,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 FROM ${NGINX_BASE} AS nginx
 
 FROM ${PHP_BASE} AS runtime
+
+COPY LICENSE NOTICE /usr/share/doc/magelift/
 
 ARG APP_UID=10001
 ARG APP_GID=10001
@@ -108,6 +110,8 @@ CMD ["php-fpm", "--nodaemonize"]
 # Magento open a database connection during the image build. env.php is
 # applied only when the runtime container starts.
 FROM extensions AS builder
+
+COPY LICENSE NOTICE /usr/share/doc/magelift/
 
 ARG APP_UID=10001
 ARG APP_GID=10001
