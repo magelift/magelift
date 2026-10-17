@@ -354,3 +354,37 @@ func TestProvidersInstallRefusesInvalidBundledSignature(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+func TestProvidersBootstrapPreservesConcurrentProjectPin(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	configPath := filepath.Join(dir, "magelift.yaml")
+	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("bundle.json", []byte("signature fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	binDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(binDir, "magelift-provider-aws"), []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
+	o.fetchProviderLock = func(context.Context, string) (providerhost.Lockfile, error) {
+		return providerhost.ParseLock(strings.NewReader(providersTestLock))
+	}
+	o.ensureProviderVerifier = func(context.Context, string) (string, error) {
+		return "/fixture/cosign", os.WriteFile("magelift.providers.lock", []byte("concurrent project pin"), 0o600)
+	}
+	o.providerVerifier = providersStubVerifier{}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "providers", "install", "--version", "v9.9.9"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "without replacing an existing pin") {
+		t.Fatalf("error = %v", err)
+	}
+	body, err := os.ReadFile("magelift.providers.lock")
+	if err != nil || string(body) != "concurrent project pin" {
+		t.Fatalf("project pin = %q, %v", body, err)
+	}
+}
