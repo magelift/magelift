@@ -29,11 +29,13 @@ const wifOwnershipRefusalHint = "select a fresh MageLift project/environment nam
 
 // IdentitySpec is the Magento-shaped input for GitHub→GCP WIF bootstrap.
 type IdentitySpec struct {
-	Project     string
-	Environment string
-	GCPProject  string
-	GitHubOwner string
-	GitHubRepo  string
+	Project            string
+	Environment        string
+	GCPProject         string
+	GitHubOwner        string
+	GitHubRepo         string
+	GitHubRepositoryID int64
+	GitHubOwnerID      int64
 	// Role selects the CI identity: empty or "deploy" for deployment SA, "build" for image build SA.
 	Role string
 }
@@ -103,6 +105,9 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 	if !validGitHubName(spec.GitHubOwner) || !validGitHubName(spec.GitHubRepo) {
 		return IdentityPlan{}, errors.New("GitHub owner and repository must be valid names")
 	}
+	if spec.GitHubRepositoryID <= 0 || spec.GitHubOwnerID <= 0 {
+		return IdentityPlan{}, errors.New("GitHub repository and owner numeric IDs are required; resolve repository metadata before cloud preparation")
+	}
 	role, err := normalizeIdentityRole(spec.Role)
 	if err != nil {
 		return IdentityPlan{}, err
@@ -134,6 +139,7 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 	saName := "projects/" + spec.GCPProject + "/serviceAccounts/" + saEmail
 	mapping := githubAttributeMapping()
 	condition := githubAttributeCondition(repository, spec.Environment)
+	condition += fmt.Sprintf(" && assertion.repository_id == '%d' && assertion.repository_owner_id == '%d'", spec.GitHubRepositoryID, spec.GitHubOwnerID)
 	sharedMarker := wifSharedOwnershipMarker(spec.Project, spec.Environment)
 	saMarker := wifServiceAccountOwnershipMarker(spec.Project, spec.Environment, role)
 	member := workloadIdentityPrincipal(poolID, "{project_number}", githubEnvironment)

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/storage"
+	"github.com/magelift/magelift/internal/githubci"
 	"github.com/magelift/magelift/internal/platform"
 	gcpbootstrap "github.com/magelift/magelift/providers/gcp/bootstrap"
 	gcpsecrets "github.com/magelift/magelift/providers/gcp/secrets"
@@ -18,9 +19,10 @@ import (
 // Bootstrap implements platform.Bootstrap for GCS DIY state + GitHub WIF identity.
 // Nil factory fields select production GCP clients.
 type Bootstrap struct {
-	NewEnsurer      func(context.Context) (*gcpbootstrap.Bootstrapper, error)
-	NewIdentity     func(context.Context) (*gcpbootstrap.IdentityBootstrapper, error)
-	VerifyAccountFn func(context.Context, string) error
+	NewEnsurer              func(context.Context) (*gcpbootstrap.Bootstrapper, error)
+	NewIdentity             func(context.Context) (*gcpbootstrap.IdentityBootstrapper, error)
+	VerifyAccountFn         func(context.Context, string) error
+	ResolveGitHubRepository func(context.Context, string, string) (githubci.Repository, error)
 }
 
 func (b Bootstrap) VerifyAccount(ctx context.Context, spec gcpstack.Spec) error {
@@ -32,7 +34,7 @@ func (b Bootstrap) VerifyAccount(ctx context.Context, spec gcpstack.Spec) error 
 }
 
 func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.BootstrapRequest) (platform.BootstrapResult, error) {
-	owner, repo, wantGitHub, err := req.GitHubIdentity()
+	identities, err := b.planGitHubIdentities(ctx, spec, req)
 	if err != nil {
 		return platform.BootstrapResult{}, err
 	}
@@ -56,15 +58,7 @@ func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.
 		return platform.BootstrapResult{}, err
 	}
 	details := map[string]any{"state": result}
-	if wantGitHub {
-		identityPlan, err := gcpbootstrap.BuildIdentityPlan(gcpbootstrap.IdentitySpec{
-			Project: spec.Identity.Project, Environment: spec.Identity.Environment,
-			GCPProject:  spec.Identity.GCPProject,
-			GitHubOwner: owner, GitHubRepo: repo,
-		})
-		if err != nil {
-			return platform.BootstrapResult{}, err
-		}
+	if len(identities) > 0 {
 		newIdentity := b.NewIdentity
 		if newIdentity == nil {
 			newIdentity = gcpbootstrap.NewIdentity
@@ -73,14 +67,19 @@ func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.
 		if err != nil {
 			return platform.BootstrapResult{}, err
 		}
-		wif, err := identity.Ensure(ctx, identityPlan)
+		wif, err := identity.Ensure(ctx, identities[0])
+		if err != nil {
+			return platform.BootstrapResult{}, err
+		}
+		build, err := identity.Ensure(ctx, identities[1])
 		if err != nil {
 			return platform.BootstrapResult{}, err
 		}
 		details["wif"] = map[string]any{
-			"pool":           wif.PoolResource,
-			"provider":       wif.ProviderResource,
-			"serviceAccount": wif.ServiceAccountEmail,
+			"pool":                wif.PoolResource,
+			"provider":            wif.ProviderResource,
+			"serviceAccount":      wif.ServiceAccountEmail,
+			"buildServiceAccount": build.ServiceAccountEmail,
 		}
 	}
 	return platform.BootstrapResult{

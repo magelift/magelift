@@ -47,6 +47,11 @@ mapping or condition. IAM updates preserve policy version, conditions, audit
 configuration and etag; a conflict triggers a fresh read before one retry.
 Short existing resource IDs are retained; long IDs receive a deterministic hash.
 
+The condition also pins the immutable repository and repository-owner numeric
+IDs. Bootstrap resolves these IDs and canonical names through the operator's
+existing GitHub login before any cloud resource creation. A renamed or
+transferred repository is not silently adopted.
+
 This establishes the provider's identity construction and reconciliation
 contract. It does not grant registry or deployment permissions by itself. The
 command still needs the account-preparation integration. Local API fixtures do

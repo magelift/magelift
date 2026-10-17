@@ -43,6 +43,10 @@ magelift --env staging destroy --yes
 
 AWS bootstrap also needs `--access-log-bucket`. `cost --live` errors on GCP targets (live Catalog pricing is not wired there); omit `--live` on GCP. `sign` and `promote` use the
 current cloud or CI login; omit Cosign flags.
+For GCP Actions bootstrap, pass --github-owner and --github-repo. It reuses
+GH_TOKEN, GITHUB_TOKEN, or gh auth login to resolve immutable repository IDs
+before cloud creation, then creates separate build and deployment identities.
+Identity creation alone does not prove registry permissions or a live OIDC exchange.
 
 ```sh
 magelift sign --digest IMAGE@sha256:...

@@ -94,10 +94,13 @@ GCP GKE uses GitHub federation variables Magelift prints after that same bootstr
 `MAGELIFT_GCP_PROJECT_ID`, `MAGELIFT_GCP_REGION`,
 `MAGELIFT_GCP_WORKLOAD_IDENTITY_PROVIDER`, and
 the separate `MAGELIFT_GCP_BUILD_SERVICE_ACCOUNT`,
-`MAGELIFT_GCP_STAGING_SERVICE_ACCOUNT`, `MAGELIFT_GCP_PRODUCTION_SERVICE_ACCOUNT`
+`MAGELIFT_GCP_TEST_SERVICE_ACCOUNT`, `MAGELIFT_GCP_STAGING_SERVICE_ACCOUNT`, `MAGELIFT_GCP_PRODUCTION_SERVICE_ACCOUNT`
 and `MAGELIFT_GCP_PREVIEW_SERVICE_ACCOUNT` variables for the jobs you enable.
-These identities must be provisioned and federated explicitly; the current
-single-identity bootstrap output does not prove that separation is configured.
+Bootstrap creates separate build and selected-environment federation identities.
+It resolves the repository and owner numeric IDs through the current GitHub
+login before changing cloud resources. Use GH_TOKEN, GITHUB_TOKEN, or gh auth
+login. Registry and deployment role grants still need the account-preparation
+integration; creating these identities alone does not grant those permissions.
 The runtime's GKE image-pull identity is another role and needs repository read
 permissions independently of the Pod's application identity.
 
@@ -175,4 +178,4 @@ separates impersonation through the `build` and selected shop environments.
 An existing resource with different ownership or federation settings is refused;
 bootstrap does not silently adopt it. IAM reconciliation preserves unrelated
 bindings and conditions. This library behavior is covered by local fixtures;
-command integration and a real GitHub token exchange remain pending.
+project role integration and a real GitHub token exchange remain pending.

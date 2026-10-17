@@ -110,7 +110,7 @@ func (f *fakeWIF) SetServiceAccountIAMPolicy(_ context.Context, resource string,
 
 func TestBuildIdentityPlanWIF(t *testing.T) {
 	t.Parallel()
-	plan, err := BuildIdentityPlan(IdentitySpec{
+	plan, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "shop", Environment: "preview",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "magelift", GitHubRepo: "magelift",
@@ -146,7 +146,7 @@ func TestBuildIdentityPlanWIF(t *testing.T) {
 
 func TestBuildIdentityPlanBuildAndDeployDistinct(t *testing.T) {
 	t.Parallel()
-	base := IdentitySpec{
+	base := IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "shop", Environment: "preview",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "magelift", GitHubRepo: "magelift",
@@ -155,7 +155,7 @@ func TestBuildIdentityPlanBuildAndDeployDistinct(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	build, err := BuildIdentityPlan(IdentitySpec{
+	build, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: base.Project, Environment: base.Environment,
 		GCPProject: base.GCPProject, GitHubOwner: base.GitHubOwner, GitHubRepo: base.GitHubRepo,
 		Role: identityRoleBuild,
@@ -181,7 +181,7 @@ func TestBuildIdentityPlanBuildAndDeployDistinct(t *testing.T) {
 
 func TestBuildIdentityPlanLongNamesDeterministic(t *testing.T) {
 	t.Parallel()
-	spec := IdentitySpec{
+	spec := IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "very-long-magento-project-name", Environment: "high-availability",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "magelift", GitHubRepo: "magelift",
@@ -204,7 +204,7 @@ func TestBuildIdentityPlanLongNamesDeterministic(t *testing.T) {
 
 func TestBuildIdentityPlanAcceptsGitHubNameVariants(t *testing.T) {
 	t.Parallel()
-	plan, err := BuildIdentityPlan(IdentitySpec{
+	plan, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "shop", Environment: "preview",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "My-Agency", GitHubRepo: "Shop.Extension",
@@ -218,12 +218,12 @@ func TestBuildIdentityPlanAcceptsGitHubNameVariants(t *testing.T) {
 }
 
 func TestGitHubProviderTransmitsTheRegularWorkflowClaimsContract(t *testing.T) {
-	plan, err := BuildIdentityPlan(IdentitySpec{Project: "shop", Environment: "staging", GCPProject: "example-gcp-project", GitHubOwner: "magelift", GitHubRepo: "magelift"})
+	plan, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7, Project: "shop", Environment: "staging", GCPProject: "example-gcp-project", GitHubOwner: "magelift", GitHubRepo: "magelift"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Standard workflow_ref exists on normal jobs; job_workflow_ref is reusable-workflow-only.
-	want := "assertion.repository == 'magelift/magelift' && assertion.ref == 'refs/heads/main' && assertion.workflow_ref == 'magelift/magelift/.github/workflows/magelift.yml@refs/heads/main' && (assertion.event_name == 'push' || assertion.event_name == 'workflow_dispatch') && (assertion.environment == 'build' || assertion.environment == 'staging')"
+	want := "assertion.repository == 'magelift/magelift' && assertion.ref == 'refs/heads/main' && assertion.workflow_ref == 'magelift/magelift/.github/workflows/magelift.yml@refs/heads/main' && (assertion.event_name == 'push' || assertion.event_name == 'workflow_dispatch') && (assertion.environment == 'build' || assertion.environment == 'staging') && assertion.repository_id == '42' && assertion.repository_owner_id == '7'"
 	fake := newFakeWIF("123456789012")
 	boot, err := NewIdentityFromClient(fake)
 	if err != nil {
@@ -239,7 +239,7 @@ func TestGitHubProviderTransmitsTheRegularWorkflowClaimsContract(t *testing.T) {
 
 func TestEnsureIdentityCreatesPoolProviderAndBinding(t *testing.T) {
 	t.Parallel()
-	plan, err := BuildIdentityPlan(IdentitySpec{
+	plan, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "shop", Environment: "preview",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "magelift", GitHubRepo: "magelift",
@@ -288,7 +288,7 @@ func TestEnsureIdentityCreatesPoolProviderAndBinding(t *testing.T) {
 
 func TestEnsureBuildAndDeployUseDistinctBindings(t *testing.T) {
 	t.Parallel()
-	spec := IdentitySpec{
+	spec := IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "shop", Environment: "preview",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "magelift", GitHubRepo: "magelift",
@@ -297,7 +297,7 @@ func TestEnsureBuildAndDeployUseDistinctBindings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	buildPlan, err := BuildIdentityPlan(IdentitySpec{
+	buildPlan, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: spec.Project, Environment: spec.Environment,
 		GCPProject: spec.GCPProject, GitHubOwner: spec.GitHubOwner, GitHubRepo: spec.GitHubRepo,
 		Role: identityRoleBuild,
@@ -336,7 +336,7 @@ func TestEnsureBuildAndDeployUseDistinctBindings(t *testing.T) {
 
 func TestEnsureRejectsForeignPoolOwnership(t *testing.T) {
 	t.Parallel()
-	plan, err := BuildIdentityPlan(IdentitySpec{
+	plan, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "shop", Environment: "preview",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "magelift", GitHubRepo: "magelift",
@@ -361,7 +361,7 @@ func TestEnsureRejectsForeignPoolOwnership(t *testing.T) {
 
 func TestEnsurePreservesConditionalBindingsOnIAMUpdate(t *testing.T) {
 	t.Parallel()
-	plan, err := BuildIdentityPlan(IdentitySpec{
+	plan, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "shop", Environment: "preview",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "magelift", GitHubRepo: "magelift",
@@ -412,7 +412,7 @@ func TestEnsurePreservesConditionalBindingsOnIAMUpdate(t *testing.T) {
 
 func TestEnsureIdentityPropagatesLoudFailures(t *testing.T) {
 	t.Parallel()
-	plan, err := BuildIdentityPlan(IdentitySpec{
+	plan, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "shop", Environment: "preview",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "magelift", GitHubRepo: "magelift",
@@ -434,7 +434,7 @@ func TestEnsureIdentityPropagatesLoudFailures(t *testing.T) {
 
 func TestBuildIdentityPlanRejectsWildcardRepo(t *testing.T) {
 	t.Parallel()
-	_, err := BuildIdentityPlan(IdentitySpec{
+	_, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7,
 		Project: "shop", Environment: "preview",
 		GCPProject:  "example-gcp-project",
 		GitHubOwner: "magelift", GitHubRepo: "*",
@@ -486,7 +486,7 @@ func policyHasMember(policy *iam.Policy, member string) bool {
 }
 
 func TestWIFRefusesOwnershipMarkerPrefixCollisions(t *testing.T) {
-	plan, err := BuildIdentityPlan(IdentitySpec{Project: "shop", Environment: "test", GCPProject: "example-gcp-project", GitHubOwner: "magelift", GitHubRepo: "magelift"})
+	plan, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7, Project: "shop", Environment: "test", GCPProject: "example-gcp-project", GitHubOwner: "magelift", GitHubRepo: "magelift"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -507,8 +507,17 @@ func TestWIFRefusesOwnershipMarkerPrefixCollisions(t *testing.T) {
 }
 
 func TestWIFReservesBuildEnvironmentForRoleSeparation(t *testing.T) {
-	_, err := BuildIdentityPlan(IdentitySpec{Project: "shop", Environment: "build", GCPProject: "example-gcp-project", GitHubOwner: "magelift", GitHubRepo: "magelift"})
+	_, err := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7, Project: "shop", Environment: "build", GCPProject: "example-gcp-project", GitHubOwner: "magelift", GitHubRepo: "magelift"})
 	if err == nil {
 		t.Fatal("build and deploy environments must remain distinct")
+	}
+}
+
+func TestIdentityPlanRequiresImmutableRepositoryAndOwnerIDs(t *testing.T) {
+	for _, ids := range [][2]int64{{0, 7}, {42, 0}, {-1, 7}, {42, -1}} {
+		_, err := BuildIdentityPlan(IdentitySpec{Project: "shop", Environment: "test", GCPProject: "example-gcp-project", GitHubOwner: "agency", GitHubRepo: "shop", GitHubRepositoryID: ids[0], GitHubOwnerID: ids[1]})
+		if err == nil {
+			t.Fatalf("accepted unpinned repository IDs %v", ids)
+		}
 	}
 }
