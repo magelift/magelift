@@ -2,7 +2,7 @@ module github.com/magelift/magelift/providers/gcp
 
 go 1.27.0
 
-toolchain go1.27.1
+toolchain go1.27.2
 
 // Magelift requires track the latest published candidate; each release
 // bumps them to its own tags. The go.work workspace resolves local
