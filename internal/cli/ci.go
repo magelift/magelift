@@ -183,9 +183,17 @@ func expectedWorkflow(o *options, flags *ciFlags) ([]byte, string, error) {
 func renderWorkflow(configFile, version string, environments []string, generator ciWorkflowGenerator, targetConfig config.Config, targetKey string) []byte {
 	var workflow strings.Builder
 	buildEnvironment := buildTargetEnvironment(environments)
+	testOnly := len(environments) == 1 && environments[0] == "test"
+	if targetConfig.Target.Provider == "gcp" {
+		buildEnvironment = "build"
+	}
 	workflow.WriteString("name: MageLift CI\n\n")
 	workflow.WriteString("# target: " + targetKey + "\n\n")
-	workflow.WriteString("on:\n  pull_request:\n    types: [opened, synchronize, reopened, labeled, closed]\n  push:\n    branches: [main]\n  schedule:\n    - cron: '17 * * * *'\n  workflow_dispatch:\n    inputs:\n      environment:\n        description: Environment to deploy\n        required: true\n        type: string\n      release_digest:\n        description: Existing signed digest for production promotion\n        type: string\n      artifact_run_id:\n        description: Successful source build run for production promotion\n        type: string\n\n")
+	if testOnly {
+		workflow.WriteString("on:\n  pull_request:\n  push:\n    branches: [main]\n  workflow_dispatch:\n\n")
+	} else {
+		workflow.WriteString("on:\n  pull_request:\n    types: [opened, synchronize, reopened, labeled, closed]\n  push:\n    branches: [main]\n  schedule:\n    - cron: '17 * * * *'\n  workflow_dispatch:\n    inputs:\n      environment:\n        description: Environment to deploy\n        required: true\n        type: string\n      release_digest:\n        description: Existing signed digest for production promotion\n        type: string\n      artifact_run_id:\n        description: Successful source build run for production promotion\n        type: string\n\n")
+	}
 	workflow.WriteString("permissions:\n  contents: read\n\n")
 	workflow.WriteString("jobs:\n  validate:\n    name: Validate ${{ matrix.environment }}\n    runs-on: ubuntu-latest\n")
 	workflow.WriteString("    strategy:\n      fail-fast: false\n      matrix:\n        environment:\n")
@@ -220,6 +228,16 @@ func renderWorkflow(configFile, version string, environments []string, generator
 		workflow.WriteString("\n  preview-sweep:\n    name: Sweep expired previews\n    if: github.event_name == 'schedule'\n    needs: validate\n    runs-on: ubuntu-latest\n    environment: preview\n    permissions:\n      contents: read\n      id-token: write\n    steps:\n")
 		generator.WriteEnvironmentSetup(&workflow, targetConfig, configFile, version, "MAGELIFT_PREVIEW_ROLE_ARN", "")
 		workflow.WriteString("      - name: Destroy expired previews\n        run: |\n          test -n \"${{ vars.MAGELIFT_PREVIEW_ENV }}\"\n          magelift --config " + shellQuote(configFile) + " --env \"${{ vars.MAGELIFT_PREVIEW_ENV }}\" --preview-repository \"${{ github.repository }}\" --no-interaction --yes env sweep\n")
+	}
+	if containsEnvironment(environments, "test") {
+		dispatch := "github.event_name == 'workflow_dispatch'"
+		if !testOnly {
+			dispatch = "(" + dispatch + " && inputs.environment == 'test')"
+		}
+		workflow.WriteString("\n  test:\n    name: Deploy test\n    if: (github.event_name == 'push' || " + dispatch + ") && needs.build.result == 'success'\n    needs: [validate, build]\n    runs-on: ubuntu-latest\n    environment: test\n    concurrency:\n      group: magelift-test-${{ github.repository }}\n      cancel-in-progress: false\n    permissions:\n      contents: read\n      actions: read\n      id-token: write\n    steps:\n")
+		generator.WriteEnvironmentSetup(&workflow, targetConfig, configFile, version, "MAGELIFT_TEST_ROLE_ARN", "")
+		writeBuildArtifactDownload(&workflow, false)
+		workflow.WriteString("      - name: Deploy immutable digest\n        env:\n          DIGEST: ${{ needs.build.outputs.digest }}\n        run: magelift --config " + shellQuote(configFile) + " --env test --no-interaction --yes deploy --digest \"$DIGEST\"\n")
 	}
 	if containsEnvironment(environments, "staging") {
 		workflow.WriteString("\n  staging:\n    name: Deploy staging\n    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')) && needs.build.result == 'success'\n    needs: [validate, build]\n    runs-on: ubuntu-latest\n    environment: staging\n    permissions:\n      contents: read\n      actions: read\n      id-token: write\n    steps:\n")
@@ -275,7 +293,7 @@ func (gcpCIWorkflowGenerator) WriteBuildAuth(workflow *strings.Builder) {
 	writeGCPAuth(workflow, "MAGELIFT_GCP_BUILD_SERVICE_ACCOUNT")
 }
 
-func (gcpCIWorkflowGenerator) WriteEnvironmentSetup(workflow *strings.Builder, cfg config.Config, _ string, version, _, environmentVariable string) {
+func (gcpCIWorkflowGenerator) WriteEnvironmentSetup(workflow *strings.Builder, cfg config.Config, _ string, version, roleVariable, environmentVariable string) {
 	writeWorkflowCheckoutAndInstall(workflow, version)
 	accountVariable := "MAGELIFT_GCP_PREVIEW_SERVICE_ACCOUNT"
 	switch environmentVariable {
@@ -283,6 +301,9 @@ func (gcpCIWorkflowGenerator) WriteEnvironmentSetup(workflow *strings.Builder, c
 		accountVariable = "MAGELIFT_GCP_STAGING_SERVICE_ACCOUNT"
 	case "MAGELIFT_PRODUCTION_ENV":
 		accountVariable = "MAGELIFT_GCP_PRODUCTION_SERVICE_ACCOUNT"
+	}
+	if roleVariable == "MAGELIFT_TEST_ROLE_ARN" {
+		accountVariable = "MAGELIFT_GCP_TEST_SERVICE_ACCOUNT"
 	}
 	project := cfg.Target.GCP.Project
 	region := gcpRegion(cfg)
@@ -299,6 +320,7 @@ func (gcpCIWorkflowGenerator) WriteEnvironmentSetup(workflow *strings.Builder, c
 
 func writeGCPAuth(workflow *strings.Builder, accountVariable string) {
 	workflow.WriteString("      - name: Authenticate to Google Cloud\n        uses: " + gcpAuthAction + "\n        with:\n          project_id: ${{ vars.MAGELIFT_GCP_PROJECT_ID }}\n          workload_identity_provider: ${{ vars.MAGELIFT_GCP_WORKLOAD_IDENTITY_PROVIDER }}\n          service_account: ${{ vars." + accountVariable + " }}\n          create_credentials_file: true\n          export_environment_variables: true\n          cleanup_credentials: true\n")
+	writeGCPIdentityFileRelocation(workflow)
 	workflow.WriteString("      - name: Set up Google Cloud SDK\n        uses: " + gcpSetupAction + "\n        with:\n          project_id: ${{ vars.MAGELIFT_GCP_PROJECT_ID }}\n          version: '589.0.0'\n")
 }
 

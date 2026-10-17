@@ -65,6 +65,14 @@ updates role policies.
 
 ## Generated CI and pull-request previews
 
+The minimal starter produces build and test-deploy jobs. On GCP they use
+separate GitHub environments named `build` and `test`. The workflow moves
+federated credentials into the runner temporary directory before building;
+the Google auth post hook removes them after the job. Customized workflows
+must also keep those credentials outside the shop source. The build refuses
+known root `gha-creds-*.json` files.
+
+
 Generate the workflow from the same configuration that will be deployed:
 
 ```sh

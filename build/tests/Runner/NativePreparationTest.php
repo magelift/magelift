@@ -87,6 +87,24 @@ final class NativePreparationTest extends TestCase
         }
     }
 
+    public function testRejectsRootGhaCredentialsBeforeCreatingWorkspace(): void
+    {
+        [$source, $workspace] = self::minimalSource();
+        file_put_contents($source.'/gha-creds-01234567.json', '{"type":"service_account","private_key":"secret"}');
+        $runner = new SuccessfulRunner();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Move federated GCP credentials out of the repository source');
+        $this->expectExceptionMessage('gha-creds');
+        try {
+            (new NativePreparation($runner, $workspace, new FixedCapabilities(), new ConfigModuleReader()))
+                ->prepare(PrepareRequest::fromJson(self::request($source)));
+        } finally {
+            self::assertDirectoryDoesNotExist($workspace.'/rootfs');
+            self::assertSame([], $runner->requests);
+        }
+    }
+
     public function testRejectsMissingRequiredExtensionBeforeCreatingWorkspace(): void
     {
         [$source, $workspace] = self::minimalSource();

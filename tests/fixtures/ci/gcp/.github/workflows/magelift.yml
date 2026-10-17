@@ -69,7 +69,7 @@ jobs:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment != 'production')
     needs: validate
     runs-on: ubuntu-latest
-    environment: staging
+    environment: build
     permissions:
       contents: read
       packages: write
@@ -106,6 +106,37 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
           cleanup_credentials: true
+      - name: Relocate GCP federated credentials
+        run: |
+          set -eu
+          src="${GOOGLE_GHA_CREDS_PATH:?GOOGLE_GHA_CREDS_PATH is required}"
+          workspace_real="$(realpath -- "${GITHUB_WORKSPACE:?GITHUB_WORKSPACE is required}")"
+          runner_temp="$(realpath -- "${RUNNER_TEMP:?RUNNER_TEMP is required}")"
+          if [ -L "$src" ] || [ ! -f "$src" ]; then
+            echo 'credential file must be a regular file' >&2
+            exit 1
+          fi
+          src_real="$(realpath -- "$src")"
+          case "$src_real" in
+            "$workspace_real"/gha-creds-*.json) ;;
+            *) echo 'unexpected credential file outside GITHUB_WORKSPACE or with an invalid name' >&2; exit 1 ;;
+          esac
+          case "$runner_temp" in
+            "$workspace_real"|"$workspace_real"/*)
+              echo 'configure RUNNER_TEMP outside GITHUB_WORKSPACE' >&2
+              exit 1 ;;
+          esac
+          dest="$(mktemp "$runner_temp/gha-creds-reloc-XXXXXXXX")"
+          cleanup() { rm -f -- "$dest"; }
+          trap cleanup EXIT
+          mv -- "$src" "$dest"
+          chmod 0600 "$dest"
+          {
+            echo "GOOGLE_GHA_CREDS_PATH=$dest"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$dest"
+            echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=$dest"
+          } >>"$GITHUB_ENV"
+          trap - EXIT
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:
@@ -253,6 +284,37 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
           cleanup_credentials: true
+      - name: Relocate GCP federated credentials
+        run: |
+          set -eu
+          src="${GOOGLE_GHA_CREDS_PATH:?GOOGLE_GHA_CREDS_PATH is required}"
+          workspace_real="$(realpath -- "${GITHUB_WORKSPACE:?GITHUB_WORKSPACE is required}")"
+          runner_temp="$(realpath -- "${RUNNER_TEMP:?RUNNER_TEMP is required}")"
+          if [ -L "$src" ] || [ ! -f "$src" ]; then
+            echo 'credential file must be a regular file' >&2
+            exit 1
+          fi
+          src_real="$(realpath -- "$src")"
+          case "$src_real" in
+            "$workspace_real"/gha-creds-*.json) ;;
+            *) echo 'unexpected credential file outside GITHUB_WORKSPACE or with an invalid name' >&2; exit 1 ;;
+          esac
+          case "$runner_temp" in
+            "$workspace_real"|"$workspace_real"/*)
+              echo 'configure RUNNER_TEMP outside GITHUB_WORKSPACE' >&2
+              exit 1 ;;
+          esac
+          dest="$(mktemp "$runner_temp/gha-creds-reloc-XXXXXXXX")"
+          cleanup() { rm -f -- "$dest"; }
+          trap cleanup EXIT
+          mv -- "$src" "$dest"
+          chmod 0600 "$dest"
+          {
+            echo "GOOGLE_GHA_CREDS_PATH=$dest"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$dest"
+            echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=$dest"
+          } >>"$GITHUB_ENV"
+          trap - EXIT
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:
@@ -337,6 +399,37 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
           cleanup_credentials: true
+      - name: Relocate GCP federated credentials
+        run: |
+          set -eu
+          src="${GOOGLE_GHA_CREDS_PATH:?GOOGLE_GHA_CREDS_PATH is required}"
+          workspace_real="$(realpath -- "${GITHUB_WORKSPACE:?GITHUB_WORKSPACE is required}")"
+          runner_temp="$(realpath -- "${RUNNER_TEMP:?RUNNER_TEMP is required}")"
+          if [ -L "$src" ] || [ ! -f "$src" ]; then
+            echo 'credential file must be a regular file' >&2
+            exit 1
+          fi
+          src_real="$(realpath -- "$src")"
+          case "$src_real" in
+            "$workspace_real"/gha-creds-*.json) ;;
+            *) echo 'unexpected credential file outside GITHUB_WORKSPACE or with an invalid name' >&2; exit 1 ;;
+          esac
+          case "$runner_temp" in
+            "$workspace_real"|"$workspace_real"/*)
+              echo 'configure RUNNER_TEMP outside GITHUB_WORKSPACE' >&2
+              exit 1 ;;
+          esac
+          dest="$(mktemp "$runner_temp/gha-creds-reloc-XXXXXXXX")"
+          cleanup() { rm -f -- "$dest"; }
+          trap cleanup EXIT
+          mv -- "$src" "$dest"
+          chmod 0600 "$dest"
+          {
+            echo "GOOGLE_GHA_CREDS_PATH=$dest"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$dest"
+            echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=$dest"
+          } >>"$GITHUB_ENV"
+          trap - EXIT
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:
@@ -416,6 +509,37 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
           cleanup_credentials: true
+      - name: Relocate GCP federated credentials
+        run: |
+          set -eu
+          src="${GOOGLE_GHA_CREDS_PATH:?GOOGLE_GHA_CREDS_PATH is required}"
+          workspace_real="$(realpath -- "${GITHUB_WORKSPACE:?GITHUB_WORKSPACE is required}")"
+          runner_temp="$(realpath -- "${RUNNER_TEMP:?RUNNER_TEMP is required}")"
+          if [ -L "$src" ] || [ ! -f "$src" ]; then
+            echo 'credential file must be a regular file' >&2
+            exit 1
+          fi
+          src_real="$(realpath -- "$src")"
+          case "$src_real" in
+            "$workspace_real"/gha-creds-*.json) ;;
+            *) echo 'unexpected credential file outside GITHUB_WORKSPACE or with an invalid name' >&2; exit 1 ;;
+          esac
+          case "$runner_temp" in
+            "$workspace_real"|"$workspace_real"/*)
+              echo 'configure RUNNER_TEMP outside GITHUB_WORKSPACE' >&2
+              exit 1 ;;
+          esac
+          dest="$(mktemp "$runner_temp/gha-creds-reloc-XXXXXXXX")"
+          cleanup() { rm -f -- "$dest"; }
+          trap cleanup EXIT
+          mv -- "$src" "$dest"
+          chmod 0600 "$dest"
+          {
+            echo "GOOGLE_GHA_CREDS_PATH=$dest"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$dest"
+            echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=$dest"
+          } >>"$GITHUB_ENV"
+          trap - EXIT
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:
@@ -487,6 +611,37 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
           cleanup_credentials: true
+      - name: Relocate GCP federated credentials
+        run: |
+          set -eu
+          src="${GOOGLE_GHA_CREDS_PATH:?GOOGLE_GHA_CREDS_PATH is required}"
+          workspace_real="$(realpath -- "${GITHUB_WORKSPACE:?GITHUB_WORKSPACE is required}")"
+          runner_temp="$(realpath -- "${RUNNER_TEMP:?RUNNER_TEMP is required}")"
+          if [ -L "$src" ] || [ ! -f "$src" ]; then
+            echo 'credential file must be a regular file' >&2
+            exit 1
+          fi
+          src_real="$(realpath -- "$src")"
+          case "$src_real" in
+            "$workspace_real"/gha-creds-*.json) ;;
+            *) echo 'unexpected credential file outside GITHUB_WORKSPACE or with an invalid name' >&2; exit 1 ;;
+          esac
+          case "$runner_temp" in
+            "$workspace_real"|"$workspace_real"/*)
+              echo 'configure RUNNER_TEMP outside GITHUB_WORKSPACE' >&2
+              exit 1 ;;
+          esac
+          dest="$(mktemp "$runner_temp/gha-creds-reloc-XXXXXXXX")"
+          cleanup() { rm -f -- "$dest"; }
+          trap cleanup EXIT
+          mv -- "$src" "$dest"
+          chmod 0600 "$dest"
+          {
+            echo "GOOGLE_GHA_CREDS_PATH=$dest"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$dest"
+            echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE=$dest"
+          } >>"$GITHUB_ENV"
+          trap - EXIT
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:

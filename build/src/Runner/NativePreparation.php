@@ -342,6 +342,11 @@ final readonly class NativePreparation implements Preparation
                 throw new RuntimeException(sprintf('Sensitive source file %s cannot enter the build workspace.', $sensitivePath));
             }
         }
+        foreach (glob(rtrim($source, '/').'/gha-creds-*.json') ?: [] as $federatedCredential) {
+            if (file_exists($federatedCredential) || is_link($federatedCredential)) {
+                throw new RuntimeException('Move federated GCP credentials out of the repository source before build; gha-creds files cannot enter the build workspace.');
+            }
+        }
         if (file_exists($destination)) {
             throw new RuntimeException('Workspace build root already exists.');
         }
