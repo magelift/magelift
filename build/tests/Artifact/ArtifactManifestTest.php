@@ -6,6 +6,7 @@ namespace MageLift\Build\Tests\Artifact;
 
 use InvalidArgumentException;
 use MageLift\Build\Artifact\ArtifactManifest;
+use MageLift\Build\Artifact\BuildRecipe;
 use MageLift\Build\Artifact\CompatibilityStatus;
 use MageLift\Build\Artifact\MagentoEdition;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -13,6 +14,32 @@ use PHPUnit\Framework\TestCase;
 
 final class ArtifactManifestTest extends TestCase
 {
+    public function testOmitsBuildRecipeFromCanonicalJsonWhenAbsent(): void
+    {
+        $manifest = self::manifest();
+
+        self::assertStringNotContainsString('"buildRecipe"', $manifest->toCanonicalJson());
+    }
+
+    public function testEmbedsSuppliedBuildRecipeInCanonicalJson(): void
+    {
+        $recipe = BuildRecipe::fromArray([
+            'sha256' => str_repeat('f', 64),
+            'platform' => 'linux/amd64',
+            'baseImages' => [
+                'PHP_BASE' => 'ghcr.io/magelift/php@sha256:'.str_repeat('1', 64),
+                'COMPOSER_BASE' => 'ghcr.io/magelift/composer@sha256:'.str_repeat('2', 64),
+                'NGINX_BASE' => 'ghcr.io/magelift/nginx@sha256:'.str_repeat('3', 64),
+            ],
+        ]);
+        $manifest = self::manifest(buildRecipe: $recipe);
+
+        self::assertStringContainsString(
+            '"buildRecipe":{"baseImages":{"COMPOSER_BASE":"ghcr.io/magelift/composer@sha256:'.str_repeat('2', 64).'","NGINX_BASE":"ghcr.io/magelift/nginx@sha256:'.str_repeat('3', 64).'","PHP_BASE":"ghcr.io/magelift/php@sha256:'.str_repeat('1', 64).'"},"platform":"linux/amd64","sha256":"'.str_repeat('f', 64).'"}',
+            $manifest->toCanonicalJson(),
+        );
+    }
+
     public function testSerializesCanonicalJsonRegardlessOfMapInsertionOrder(): void
     {
         $first = self::manifest(
@@ -82,6 +109,7 @@ final class ArtifactManifestTest extends TestCase
         array $staticContentMatrix = ['en_US' => ['Magento/luma']],
         array $requiredRuntimeCapabilities = ['database.mysql', 'cache.valkey'],
         CompatibilityStatus $compatibilityStatus = CompatibilityStatus::Supported,
+        ?BuildRecipe $buildRecipe = null,
     ): ArtifactManifest {
         return new ArtifactManifest(
             $sourceRevision,
@@ -99,6 +127,7 @@ final class ArtifactManifestTest extends TestCase
             $staticContentMatrix,
             $requiredRuntimeCapabilities,
             $compatibilityStatus,
+            $buildRecipe,
         );
     }
 }

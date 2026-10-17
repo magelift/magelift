@@ -29,7 +29,20 @@ final class RequestTest extends TestCase
         $request = FinalizeRequest::fromJson($json);
 
         self::assertSame('dist/rootfs.tar', $request->preparedArtifact);
+        self::assertNull($request->buildRecipe);
         self::assertSame($json, $request->toCanonicalJson());
+    }
+
+    public function testParsesAndCanonicalizesOptionalBuildRecipe(): void
+    {
+        $json = '{"protocolVersion":1,"stage":"finalize","finalize":{"preparedArtifact":"dist/rootfs.tar","sourceRevision":"'.str_repeat('a', 40).'","imageDigest":"sha256:'.str_repeat('b', 64).'","buildRecipe":{"sha256":"'.str_repeat('e', 64).'","platform":"linux/arm64","baseImages":{"PHP_BASE":"ghcr.io/magelift/php@sha256:'.str_repeat('1', 64).'","COMPOSER_BASE":"ghcr.io/magelift/composer@sha256:'.str_repeat('2', 64).'","NGINX_BASE":"ghcr.io/magelift/nginx@sha256:'.str_repeat('3', 64).'"}}}}';
+        $request = FinalizeRequest::fromJson($json);
+
+        self::assertNotNull($request->buildRecipe);
+        self::assertSame(str_repeat('e', 64), $request->buildRecipe->sha256);
+        $canonical = $request->toCanonicalJson();
+        self::assertStringContainsString('"baseImages":{"COMPOSER_BASE":', $canonical);
+        self::assertSame($canonical, FinalizeRequest::fromJson($canonical)->toCanonicalJson());
     }
 
     public function testParsesAndCanonicalizesValidatedLifecycleHooks(): void
@@ -115,6 +128,8 @@ final class RequestTest extends TestCase
         yield 'tag' => [str_replace('sha256:'.str_repeat('b', 64), 'app:latest', $valid), 'OCI digest'];
         yield 'parent traversal' => [str_replace('dist/rootfs.tar', '../../rootfs.tar', $valid), 'cannot traverse'];
         yield 'unknown payload key' => [str_replace('"imageDigest":', '"manifestPath":"manifest.json","imageDigest":', $valid), 'unknown key'];
+        yield 'invalid build recipe digest' => [str_replace('"imageDigest":', '"buildRecipe":{"sha256":"bad","platform":"linux/amd64","baseImages":{"PHP_BASE":"ghcr.io/magelift/php@sha256:'.str_repeat('1', 64).'","COMPOSER_BASE":"ghcr.io/magelift/composer@sha256:'.str_repeat('2', 64).'","NGINX_BASE":"ghcr.io/magelift/nginx@sha256:'.str_repeat('3', 64).'"}}, "imageDigest":', $valid), 'lowercase SHA-256 checksum'];
+        yield 'unknown build recipe key' => [str_replace('"imageDigest":', '"buildRecipe":{"sha256":"'.str_repeat('e', 64).'","platform":"linux/amd64","trace":true,"baseImages":{"PHP_BASE":"ghcr.io/magelift/php@sha256:'.str_repeat('1', 64).'","COMPOSER_BASE":"ghcr.io/magelift/composer@sha256:'.str_repeat('2', 64).'","NGINX_BASE":"ghcr.io/magelift/nginx@sha256:'.str_repeat('3', 64).'"}}, "imageDigest":', $valid), 'unknown key'];
     }
 
     private static function prepareJson(): string

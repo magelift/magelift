@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace MageLift\Build\Protocol;
 
+use MageLift\Build\Artifact\BuildRecipe;
+
 final readonly class FinalizeRequest
 {
     private function __construct(
         public string $preparedArtifact,
         public string $sourceRevision,
         public string $imageDigest,
+        public ?BuildRecipe $buildRecipe = null,
     ) {
     }
 
@@ -21,7 +24,7 @@ final readonly class FinalizeRequest
         $payload = ProtocolJson::object($envelope['finalize'], 'finalize');
         ProtocolJson::assertKeys(
             $payload,
-            ['preparedArtifact', 'sourceRevision', 'imageDigest'],
+            ['preparedArtifact', 'sourceRevision', 'imageDigest', 'buildRecipe'],
             ['preparedArtifact', 'sourceRevision', 'imageDigest'],
             'finalize',
         );
@@ -31,23 +34,38 @@ final readonly class FinalizeRequest
             throw new InvalidProtocolRequest('Finalize payload contains a forbidden secret.', previous: $error);
         }
 
+        $buildRecipe = null;
+        if (array_key_exists('buildRecipe', $payload)) {
+            try {
+                $buildRecipe = BuildRecipe::fromArray(ProtocolJson::object($payload['buildRecipe'], 'finalize.buildRecipe'), 'finalize.buildRecipe');
+            } catch (\InvalidArgumentException $error) {
+                throw new InvalidProtocolRequest($error->getMessage(), previous: $error);
+            }
+        }
+
         return new self(
             ProtocolJson::relativePath($payload['preparedArtifact'], 'prepared artifact'),
             ProtocolJson::revision($payload['sourceRevision']),
             ProtocolJson::digest($payload['imageDigest']),
+            $buildRecipe,
         );
     }
 
     public function toCanonicalJson(): string
     {
+        $finalize = [
+            'preparedArtifact' => $this->preparedArtifact,
+            'sourceRevision' => $this->sourceRevision,
+            'imageDigest' => $this->imageDigest,
+        ];
+        if ($this->buildRecipe !== null) {
+            $finalize['buildRecipe'] = $this->buildRecipe->toArray();
+        }
+
         return ProtocolJson::encode([
             'protocolVersion' => ProtocolJson::VERSION,
             'stage' => ProtocolOperation::Finalize->value,
-            'finalize' => [
-                'preparedArtifact' => $this->preparedArtifact,
-                'sourceRevision' => $this->sourceRevision,
-                'imageDigest' => $this->imageDigest,
-            ],
+            'finalize' => $finalize,
         ]);
     }
 }

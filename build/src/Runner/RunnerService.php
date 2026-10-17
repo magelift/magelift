@@ -121,6 +121,7 @@ final readonly class RunnerService
             $staticContent,
             $metadata['requiredRuntimeCapabilities'],
             CompatibilityStatus::from($metadata['compatibilityStatus']),
+            $request->buildRecipe,
         );
         $manifestPath = 'manifests/'.$request->sourceRevision.'.json';
         $contents = $manifest->toCanonicalJson();

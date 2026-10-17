@@ -45,6 +45,20 @@ final class RunnerServiceTest extends TestCase
         }
     }
 
+    public function testFinalizeEmbedsOptionalBuildRecipeInExternalManifest(): void
+    {
+        [$service, $filesystem] = self::service();
+        $service->handle(self::prepareRequest());
+        $digest = 'sha256:'.str_repeat('d', 64);
+        $recipe = '{"sha256":"'.str_repeat('e', 64).'","platform":"linux/amd64","baseImages":{"PHP_BASE":"ghcr.io/magelift/php@sha256:'.str_repeat('1', 64).'","COMPOSER_BASE":"ghcr.io/magelift/composer@sha256:'.str_repeat('2', 64).'","NGINX_BASE":"ghcr.io/magelift/nginx@sha256:'.str_repeat('3', 64).'"}}';
+
+        $service->handle(self::finalizeRequest($digest, '', $recipe));
+
+        $manifestPath = '/runner-state/manifests/'.str_repeat('a', 40).'.json';
+        $manifest = json_decode($filesystem->writes[$manifestPath]['contents'], true, flags: JSON_THROW_ON_ERROR);
+        self::assertEquals(json_decode($recipe, true, flags: JSON_THROW_ON_ERROR), $manifest['buildRecipe']);
+    }
+
     public function testFinalizeWritesCanonicalExternalManifestAtomicallyAndReturnsChecksum(): void
     {
         [$service, $filesystem] = self::service();
@@ -96,10 +110,11 @@ final class RunnerServiceTest extends TestCase
         return '{"protocolVersion":1,"stage":"prepare","prepare":{"repositoryRoot":"/repo","sourceRevision":"'.str_repeat('a', 40).'","application":{"edition":"open-source","version":"2.4.9","mode":"integrated","webRuntime":"nginx-fpm"},"phpVersion":"8.5","composerVersion":"2.10","compatibilityStatus":"unsupported-allowed","inputFiles":[{"path":"composer.lock","sha256":"'.str_repeat('b', 64).'"}],"staticContent":[{"locale":"en_US","theme":"Magento/luma"}]}}';
     }
 
-    private static function finalizeRequest(string $digest, string $revision = ''): string
+    private static function finalizeRequest(string $digest, string $revision = '', string $buildRecipe = ''): string
     {
         $revision = $revision ?: str_repeat('a', 40);
-        return '{"protocolVersion":1,"stage":"finalize","finalize":{"preparedArtifact":"prepared/'.str_repeat('a', 40).'.json","sourceRevision":"'.$revision.'","imageDigest":"'.$digest.'"}}';
+        $recipe = $buildRecipe === '' ? '' : ',"buildRecipe":'.$buildRecipe;
+        return '{"protocolVersion":1,"stage":"finalize","finalize":{"preparedArtifact":"prepared/'.str_repeat('a', 40).'.json","sourceRevision":"'.$revision.'","imageDigest":"'.$digest.'"'.$recipe.'}}';
     }
 }
 

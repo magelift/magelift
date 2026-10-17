@@ -28,6 +28,75 @@ func TestRequestEncodingIsCanonical(t *testing.T) {
 	}
 }
 
+func TestFinalizeWithoutBuildRecipeMatchesGoldenFixture(t *testing.T) {
+	request := Request{ProtocolVersion: 1, Stage: StageFinalize, Finalize: &FinalizeRequest{
+		PreparedArtifact: "dist/rootfs.tar",
+		SourceRevision:   strings.Repeat("a", 40),
+		ImageDigest:      "sha256:" + strings.Repeat("b", 64),
+	}}
+	encoded, err := EncodeRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := `{"protocolVersion":1,"stage":"finalize","finalize":{"preparedArtifact":"dist/rootfs.tar","sourceRevision":"` + strings.Repeat("a", 40) + `","imageDigest":"sha256:` + strings.Repeat("b", 64) + `"}}`
+	if string(encoded) != expected {
+		t.Fatalf("unexpected finalize encoding:\n%s", encoded)
+	}
+}
+
+func TestFinalizeBuildRecipeCanonicalizesBaseImageRoles(t *testing.T) {
+	first := validFinalizeWithBuildRecipe()
+	second := validFinalizeWithBuildRecipe()
+	second.Finalize.BuildRecipe.BaseImages = map[string]string{
+		"NGINX_BASE":    "ghcr.io/magelift/nginx@sha256:" + strings.Repeat("3", 64),
+		"PHP_BASE":      "ghcr.io/magelift/php@sha256:" + strings.Repeat("1", 64),
+		"COMPOSER_BASE": "ghcr.io/magelift/composer@sha256:" + strings.Repeat("2", 64),
+	}
+	firstJSON, err := EncodeRequest(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondJSON, err := EncodeRequest(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(firstJSON, secondJSON) {
+		t.Fatalf("canonical finalize requests differ:\n%s\n%s", firstJSON, secondJSON)
+	}
+	if !bytes.Contains(firstJSON, []byte(`"COMPOSER_BASE"`)) || strings.Index(string(firstJSON), `"COMPOSER_BASE"`) > strings.Index(string(firstJSON), `"PHP_BASE"`) {
+		t.Fatalf("base image roles are not canonical: %s", firstJSON)
+	}
+}
+
+func TestFinalizeRejectsInvalidBuildRecipe(t *testing.T) {
+	valid := validFinalizeWithBuildRecipe()
+	for name, mutate := range map[string]func(*Request){
+		"malformed recipe digest": func(request *Request) {
+			request.Finalize.BuildRecipe.SHA256 = "sha256:" + strings.Repeat("e", 64)
+		},
+		"invalid platform": func(request *Request) {
+			request.Finalize.BuildRecipe.Platform = "linux/ppc64le"
+		},
+		"missing base role": func(request *Request) {
+			delete(request.Finalize.BuildRecipe.BaseImages, "NGINX_BASE")
+		},
+		"unknown base role": func(request *Request) {
+			request.Finalize.BuildRecipe.BaseImages["RUNTIME_BASE"] = "ghcr.io/magelift/runtime@sha256:" + strings.Repeat("4", 64)
+		},
+		"unpinned base ref": func(request *Request) {
+			request.Finalize.BuildRecipe.BaseImages["PHP_BASE"] = "ghcr.io/magelift/php:latest"
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			request := valid
+			mutate(&request)
+			if _, err := EncodeRequest(request); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
 func TestFinalizeValidatesOCIDigest(t *testing.T) {
 	request := Request{ProtocolVersion: 1, Stage: StageFinalize, Finalize: &FinalizeRequest{
 		PreparedArtifact: "dist/rootfs.tar", SourceRevision: strings.Repeat("a", 40), ImageDigest: "sha256:bad",
@@ -132,6 +201,23 @@ func TestRejectsInvalidStagesAndUnsafePaths(t *testing.T) {
 	if _, err := EncodeRequest(request); err == nil || !strings.Contains(err.Error(), "invalid build runner stage") {
 		t.Fatalf("unexpected stage error: %v", err)
 	}
+}
+
+func validFinalizeWithBuildRecipe() Request {
+	return Request{ProtocolVersion: 1, Stage: StageFinalize, Finalize: &FinalizeRequest{
+		PreparedArtifact: "dist/rootfs.tar",
+		SourceRevision:   strings.Repeat("a", 40),
+		ImageDigest:      "sha256:" + strings.Repeat("b", 64),
+		BuildRecipe: &BuildRecipe{
+			SHA256:   strings.Repeat("e", 64),
+			Platform: "linux/arm64",
+			BaseImages: map[string]string{
+				"PHP_BASE":      "ghcr.io/magelift/php@sha256:" + strings.Repeat("1", 64),
+				"COMPOSER_BASE": "ghcr.io/magelift/composer@sha256:" + strings.Repeat("2", 64),
+				"NGINX_BASE":    "ghcr.io/magelift/nginx@sha256:" + strings.Repeat("3", 64),
+			},
+		},
+	}}
 }
 
 func validPrepareRequest() Request {

@@ -42,6 +42,7 @@ final readonly class ArtifactManifest
         public array $staticContentMatrix,
         public array $requiredRuntimeCapabilities,
         public CompatibilityStatus $compatibilityStatus,
+        public ?BuildRecipe $buildRecipe = null,
     ) {
         self::assertMatches($this->sourceRevision, self::REVISION_PATTERN, 'Source revision must be a lowercase 40- or 64-character commit hash.');
         self::assertMatches($this->imageDigest, self::DIGEST_PATTERN, 'Image digest must be a lowercase SHA-256 OCI digest.');
@@ -106,7 +107,7 @@ final readonly class ArtifactManifest
             $staticContentMatrix[$locale] = self::sortedList($themes);
         }
 
-        return [
+        $manifest = [
             'sourceRevision' => $this->sourceRevision,
             'imageDigest' => $this->imageDigest,
             'mageLiftVersion' => $this->mageLiftVersion,
@@ -121,6 +122,11 @@ final readonly class ArtifactManifest
             'requiredRuntimeCapabilities' => self::sortedList($this->requiredRuntimeCapabilities),
             'compatibilityStatus' => $this->compatibilityStatus->value,
         ];
+        if ($this->buildRecipe !== null) {
+            $manifest['buildRecipe'] = $this->buildRecipe->toArray();
+        }
+
+        return $manifest;
     }
 
     private static function assertMatches(string $value, string $pattern, string $message): void

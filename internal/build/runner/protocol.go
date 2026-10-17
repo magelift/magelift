@@ -85,10 +85,17 @@ type PrepareRequest struct {
 	QualityPatches        []string        `json:"qualityPatches,omitempty"`
 }
 
+type BuildRecipe struct {
+	SHA256     string            `json:"sha256"`
+	Platform   string            `json:"platform"`
+	BaseImages map[string]string `json:"baseImages"`
+}
+
 type FinalizeRequest struct {
-	PreparedArtifact string `json:"preparedArtifact"`
-	SourceRevision   string `json:"sourceRevision"`
-	ImageDigest      string `json:"imageDigest"`
+	PreparedArtifact string       `json:"preparedArtifact"`
+	SourceRevision   string       `json:"sourceRevision"`
+	ImageDigest      string       `json:"imageDigest"`
+	BuildRecipe      *BuildRecipe `json:"buildRecipe,omitempty"`
 }
 
 type Response struct {
@@ -126,6 +133,10 @@ var stableID = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
 var phpExtensionName = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
 var composerVersion = regexp.MustCompile(`^2\.\d+(?:\.\d+)?\+?$`)
 var qualityPatchID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+var buildPlatform = regexp.MustCompile(`^linux/(?:amd64|arm64)$`)
+var pinnedRepositoryDigest = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
+
+var requiredBaseImageRoles = []string{"COMPOSER_BASE", "NGINX_BASE", "PHP_BASE"}
 
 func (request Request) Validate() error {
 	var problems []error
@@ -299,11 +310,64 @@ func (request PrepareRequest) validate() error {
 }
 
 func (request FinalizeRequest) validate() error {
-	return errors.Join(
+	var problems []error
+	problems = append(problems,
 		validateRelativePath("prepared artifact", request.PreparedArtifact),
 		validateRevision(request.SourceRevision),
 		validateOCIDigest(request.ImageDigest),
 	)
+	if request.BuildRecipe != nil {
+		problems = append(problems, request.BuildRecipe.validate())
+	}
+	return errors.Join(problems...)
+}
+
+func (recipe BuildRecipe) validate() error {
+	var problems []error
+	if !sha256Checksum.MatchString(recipe.SHA256) {
+		problems = append(problems, errors.New("buildRecipe sha256 must be a lowercase SHA-256 checksum"))
+	}
+	if !buildPlatform.MatchString(recipe.Platform) {
+		problems = append(problems, errors.New("buildRecipe platform must be linux/amd64 or linux/arm64"))
+	}
+	if len(recipe.BaseImages) == 0 {
+		problems = append(problems, errors.New("buildRecipe baseImages cannot be empty"))
+	}
+	seen := make(map[string]struct{}, len(recipe.BaseImages))
+	for role, reference := range recipe.BaseImages {
+		if role != "PHP_BASE" && role != "COMPOSER_BASE" && role != "NGINX_BASE" {
+			problems = append(problems, fmt.Errorf("buildRecipe baseImages contains unknown role %q", role))
+			continue
+		}
+		if _, exists := seen[role]; exists {
+			problems = append(problems, fmt.Errorf("buildRecipe baseImages contains duplicate role %q", role))
+			continue
+		}
+		seen[role] = struct{}{}
+		problems = append(problems, validatePinnedRepositoryDigest("buildRecipe baseImages "+role, reference))
+	}
+	for _, role := range requiredBaseImageRoles {
+		if _, exists := seen[role]; !exists {
+			problems = append(problems, fmt.Errorf("buildRecipe baseImages is missing required role %q", role))
+		}
+	}
+	return errors.Join(problems...)
+}
+
+func validatePinnedRepositoryDigest(name, reference string) error {
+	if reference != strings.TrimSpace(reference) || strings.ContainsAny(reference, "\x00\r\n\t ") {
+		return fmt.Errorf("%s must be a registry-qualified digest reference without whitespace", name)
+	}
+	if strings.Contains(reference, "://") {
+		return fmt.Errorf("%s must not be a URL", name)
+	}
+	if strings.ContainsAny(reference, "|&;$()`\"'<>") {
+		return fmt.Errorf("%s must not contain shell metacharacters", name)
+	}
+	if !pinnedRepositoryDigest.MatchString(reference) {
+		return fmt.Errorf("%s must be a registry-qualified image reference at @sha256 with a lowercase digest", name)
+	}
+	return nil
 }
 
 func (response Response) Validate() error {
@@ -449,6 +513,24 @@ func canonicalRequest(request Request) Request {
 		}
 		sort.Slice(prepare.LifecycleHooks, func(i, j int) bool { return prepare.LifecycleHooks[i].ID < prepare.LifecycleHooks[j].ID })
 		copy.Prepare = &prepare
+	}
+	if request.Finalize != nil && request.Finalize.BuildRecipe != nil {
+		finalize := *request.Finalize
+		recipe := *request.Finalize.BuildRecipe
+		recipe.BaseImages = copyStringMap(recipe.BaseImages)
+		finalize.BuildRecipe = &recipe
+		copy.Finalize = &finalize
+	}
+	return copy
+}
+
+func copyStringMap(values map[string]string) map[string]string {
+	if len(values) == 0 {
+		return map[string]string{}
+	}
+	copy := make(map[string]string, len(values))
+	for key, value := range values {
+		copy[key] = value
 	}
 	return copy
 }

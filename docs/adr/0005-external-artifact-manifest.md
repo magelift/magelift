@@ -43,8 +43,20 @@ Original. Cosign/Sigstore public docs.
 
 The maintainer clarified that the user's CI/CD builds and publishes every image.
 The CLI carries the existing PHP build and Docker recipes; pinned official
-upstream images remain inputs. Builder/runtime images and the application use
-the user's selected OCI repository, with separate tags and immutable base
-references. MageLift does not operate a required image registry. The existing
+upstream images remain inputs. Builder/runtime intermediates stay on the runner. The application uses
+the user's selected OCI repository; its runtime stage comes from the bundled
+recipe and pinned official upstreams. Optional private registry caches are
+separate from the deployable artifact. MageLift does not operate a required image registry. The existing
 manifest and OCI labels retain their traceability roles; no new lock or manifest
 is introduced. Local builds load images without publishing.
+
+Source builds label the bundled recipe SHA256 and its runtime recipe identity.
+Explicit base-image overrides continue to record their immutable image references.
+CI preserves the existing external manifest, its checksum and build result between
+jobs; promotion verifies an existing artifact instead of invoking a builder.
+
+The optional `buildRecipe` member of that same manifest records `sha256`,
+`platform` and the three pinned upstream `baseImages` roles. It is supplied at
+finalization and omitted for older/explicit-base requests. Existing requests
+without the member retain their canonical JSON; provider RPC is unchanged.
+Recipe metadata cannot replace the image's final digest or the source checksums.
