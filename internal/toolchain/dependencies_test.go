@@ -206,6 +206,32 @@ func contains(values []string, wanted string) bool {
 	return false
 }
 
+func TestAutoInstallEligibleExcludesDockerAndCloudAuth(t *testing.T) {
+	cases := []struct {
+		id       string
+		eligible bool
+	}{
+		{id: "docker", eligible: false},
+		{id: "docker-compose", eligible: false},
+		{id: "gcloud", eligible: false},
+		{id: "aws", eligible: false},
+		{id: "kubectl", eligible: true},
+		{id: "cosign", eligible: true},
+	}
+	for _, tc := range cases {
+		spec := DependencySpec{ID: tc.id, Installable: true}
+		if AutoInstallEligible(spec) != tc.eligible {
+			t.Fatalf("AutoInstallEligible(%q) = %v, want %v", tc.id, !tc.eligible, tc.eligible)
+		}
+	}
+	if len(FilterAutoInstallSpecs([]DependencySpec{
+		{ID: "docker", Installable: true},
+		{ID: "cosign", Installable: true},
+	})) != 1 {
+		t.Fatal("FilterAutoInstallSpecs should keep only cosign")
+	}
+}
+
 func TestSpecsForTargetGuidesGcloudForGCP(t *testing.T) {
 	var gcloud *DependencySpec
 	for _, spec := range SpecsForTarget("gcp", "gke-autopilot") {

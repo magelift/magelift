@@ -136,8 +136,18 @@ func NewPreferredVerifier(cacheDir string) BlobVerifier {
 		}
 	}
 	if resolved != "" {
+		if trustedRootCorrupt(resolved) {
+			return failedBlobVerifier{err: fmt.Errorf("%w: cached Sigstore trusted root is corrupt; run `magelift providers install` to repair it", ErrChecksumMismatch)}
+		}
 		if path, err := CachedVerifierPath(resolved); err == nil {
-			return cosignVerifier{client: cosign.NewWithBinary(path)}
+			client := cosign.NewWithBinary(path)
+			if root, err := CachedTrustedRootPath(resolved); err == nil {
+				return cosignVerifier{
+					client:      client,
+					trustedRoot: root,
+				}
+			}
+			return cosignVerifier{client: client}
 		}
 	}
 	return NewCosignVerifier()

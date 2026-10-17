@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	internalcli "github.com/magelift/magelift/internal/cli"
 	awseksops "github.com/magelift/magelift/internal/cloud/aws/eksops"
 	awsops "github.com/magelift/magelift/internal/cloud/aws/ops"
 	ovhstack "github.com/magelift/magelift/internal/cloud/ovh/stack"
@@ -64,27 +65,16 @@ func registerGCPShims(modules *platform.ModuleRegistry) (*platform.ModuleRegistr
 	return modules, nil
 }
 
-// dialGCP loads, verifies, and dials the installed GCP provider plugin
-// through the shared resolver (project locks control the version from
-// the cache; the beside-CLI lock loads the beside-CLI binary). There is
-// no fallback: with no embedded GCP implementation left, a missing or
-// tampered plugin is a hard error naming the failed check.
+// dialGCP acquires, verifies and dials the first-party GCP plugin lazily.
+// The shared resolver preserves project pins. A failed acquisition or trust
+// check is returned without selecting another implementation.
 func dialGCP(ctx context.Context) (*providerhost.Client, error) {
 	executable, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("locate CLI executable for provider discovery: %w", err)
 	}
-	resolved, err := providerhost.Resolve("gcp", providerhost.ResolveOptions{ExecutablePath: executable})
-	if err != nil {
-		return nil, err
-	}
-	loaded, err := providerhost.Load(ctx, providerhost.Options{
-		Mode:       providerhost.ModeSubprocess,
-		Provider:   "gcp",
-		LockPath:   resolved.LockPath,
-		BinaryPath: resolved.Binary,
-		BundlePath: resolved.Bundle,
-		Verifier:   providerhost.NewPreferredVerifier(""),
+	loaded, err := providerhost.Acquire(ctx, "gcp", internalcli.Version, providerhost.AcquireOptions{
+		Resolve: providerhost.ResolveOptions{ExecutablePath: executable}, Progress: os.Stderr,
 	})
 	if err != nil {
 		return nil, err

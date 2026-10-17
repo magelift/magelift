@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/magelift/magelift/internal/cosign"
@@ -47,12 +48,22 @@ func NewCosignVerifier() BlobVerifier {
 }
 
 type cosignVerifier struct {
-	client *cosign.Client
+	client      *cosign.Client
+	trustedRoot string
+}
+
+type failedBlobVerifier struct{ err error }
+
+func (v failedBlobVerifier) VerifyBlob(context.Context, string, string, cosign.VerifyOptions) error {
+	return v.err
 }
 
 func (v cosignVerifier) VerifyBlob(ctx context.Context, bundlePath, binaryPath string, options cosign.VerifyOptions) error {
 	if v.client == nil {
 		return cosign.ErrRunnerRequired
+	}
+	if strings.TrimSpace(v.trustedRoot) != "" && strings.TrimSpace(options.TrustedRoot) == "" {
+		options.TrustedRoot = v.trustedRoot
 	}
 	return v.client.VerifyBlob(ctx, bundlePath, binaryPath, options)
 }

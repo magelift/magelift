@@ -15,3 +15,8 @@ package paths (license file is at the module root):
 
 - github.com/ovh/pulumi-ovh/sdk/v2: Apache License 2.0 (OVHcloud)
 - github.com/ovh/okms-sdk-go: Apache License 2.0 (OVHcloud)
+
+Bundled public trust material:
+
+- Sigstore Public Good Instance trusted_root.json, from sigstore/root-signing
+  (https://github.com/sigstore/root-signing), Apache License 2.0.

@@ -54,19 +54,38 @@ func appendDependencyChecks(report *doctorReport, dependencies toolchain.Depende
 }
 
 func requireDependencies(ctx context.Context, o *options, specs []toolchain.DependencySpec, capability string) error {
-	if len(specs) == 0 {
-		return &exitError{code: 3, err: fmt.Errorf("%s has no valid dependency specification", capability)}
-	}
+	return requireDependenciesWithInstall(ctx, o, specs, capability, false)
+}
+
+func requiredDependencySpecs(specs []toolchain.DependencySpec) []toolchain.DependencySpec {
 	requiredSpecs := make([]toolchain.DependencySpec, 0, len(specs))
 	for _, spec := range specs {
 		if spec.Requirement == toolchain.DependencyRequired {
 			requiredSpecs = append(requiredSpecs, spec)
 		}
 	}
+	return requiredSpecs
+}
+
+func requireDependenciesWithInstall(ctx context.Context, o *options, specs []toolchain.DependencySpec, capability string, tryInstall bool) error {
+	if len(specs) == 0 {
+		return &exitError{code: 3, err: fmt.Errorf("%s has no valid dependency specification", capability)}
+	}
+	requiredSpecs := requiredDependencySpecs(specs)
 	if len(requiredSpecs) == 0 {
 		return nil
 	}
-	report := toolchain.CheckDependencies(ctx, dependencyRunner(o), requiredSpecs)
+	runner := dependencyRunner(o)
+	if tryInstall && shouldOfferDependencyInstall(o) {
+		installSpecs := toolchain.FilterAutoInstallSpecs(requiredSpecs)
+		if len(installSpecs) > 0 {
+			report := toolchain.CheckDependencies(ctx, runner, installSpecs)
+			if err := installMissingDependencies(ctx, o, installSpecs, report); err != nil {
+				return err
+			}
+		}
+	}
+	report := toolchain.CheckDependencies(ctx, runner, requiredSpecs)
 	missing := make([]string, 0)
 	for _, check := range report.Checks {
 		if check.Requirement != toolchain.DependencyRequired || check.Status == toolchain.DependencyAvailable {
@@ -89,11 +108,31 @@ func requireLocalDependencies(ctx context.Context, o *options) error {
 }
 
 func requireTargetDependencies(ctx context.Context, o *options, planned platform.PlannedStack) error {
-	return requireDependencies(ctx, o, toolchain.SpecsForTarget(string(planned.Provider()), string(planned.Runtime())), "cloud operation")
+	specs := toolchain.SpecsForTarget(string(planned.Provider()), string(planned.Runtime()))
+	return requireDependenciesWithInstall(ctx, o, specs, "cloud operation", true)
 }
 
 func requireCosignVerificationDependencies(ctx context.Context, o *options) error {
-	return requireDependencies(ctx, o, toolchain.SpecsForCosignVerification(), "signed release verification")
+	return requireDependenciesWithInstall(ctx, o, toolchain.SpecsForCosignVerification(), "signed release verification", true)
+}
+
+func shouldOfferDependencyInstall(o *options) bool {
+	if o == nil {
+		return false
+	}
+	if o.yes {
+		return true
+	}
+	if o.noInteraction {
+		return false
+	}
+	if o.terminal == nil || !o.terminal.Interactive() {
+		return false
+	}
+	if _, ok := o.terminal.(interface{ Confirm(string) (bool, error) }); ok {
+		return true
+	}
+	return false
 }
 
 func (o *options) confirm(prompt string) (bool, error) {

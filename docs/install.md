@@ -63,8 +63,13 @@ running executable; rerun the upgrade from a second copy in that case.
 
 ## Providers
 
-Release bundles ship the provider plugins beside the CLI. When a lockfile
-points elsewhere, fetch them explicitly after install:
+The GCP provider is acquired on first target activation when it is absent.
+A project `magelift.providers.lock` takes priority; otherwise the CLI uses
+its own release version. No `latest` version is selected. Help, version,
+doctor and configuration validation do not install providers.
+
+To prepare an offline machine or repair a damaged cache, install explicitly
+while online:
 
 ```sh
 magelift providers install
@@ -72,7 +77,26 @@ magelift providers install
 
 Providers come from the target named in your `magelift.yaml`, verified by
 digest and signature before they land in the cache. There is no flag to
-select providers.
+select providers. Automatic acquisition is limited to first-party GCP;
+community provider names in YAML do not authorize a download or execution.
+
+Cache entries are separated by provider, version, OS and architecture.
+Every use verifies content and signature; a corrupt cache fails with a repair
+instruction. Keep the verified cache and project lock available for offline
+use. An offline cache miss cannot be repaired without the matching artifacts.
+Go is needed only for the source installation below.
+
+Signed release operations and remote sessions can offer to install missing
+tools through the existing package-manager allowlist. Review the command
+before confirming, or use `--yes` in a prepared CI environment. Docker and
+cloud authentication remain prerequisites. `magelift doctor` reports missing
+tools; only `doctor --install-dependencies` requests their installation.
+
+Homebrew and Scoop release configuration lives in the project's
+`magelift/homebrew-tap` and `magelift/scoop-bucket` repositories. Native
+installation and cloud execution on macOS and Windows remain unverified for
+this alpha working tree. Use the qualified Linux archive path; WSL is an
+alternative on Windows, with its own Docker access and cloud authentication.
 
 ## From source
 

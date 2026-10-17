@@ -222,6 +222,34 @@ func SpecsForDumpExport(runner DependencyRunner, transport string) []DependencyS
 	return dockerDependencySpecs(DependencyRequired)
 }
 
+// AutoInstallEligible reports whether a missing dependency may be installed
+// automatically during cloud activation. Docker, Compose, and cloud login CLIs
+// stay explicit operator prerequisites; doctor --install-dependencies may still
+// offer Docker when the operator opts in.
+func AutoInstallEligible(spec DependencySpec) bool {
+	if !spec.Installable {
+		return false
+	}
+	switch spec.ID {
+	case "docker", "docker-compose", "gcloud", "aws":
+		return false
+	default:
+		return true
+	}
+}
+
+// FilterAutoInstallSpecs returns the subset of specs that cloud activation may
+// install through the allowlisted package managers.
+func FilterAutoInstallSpecs(specs []DependencySpec) []DependencySpec {
+	filtered := make([]DependencySpec, 0, len(specs))
+	for _, spec := range specs {
+		if AutoInstallEligible(spec) {
+			filtered = append(filtered, spec)
+		}
+	}
+	return filtered
+}
+
 // PlanDependencyInstalls creates explicit package-manager actions for missing
 // dependencies. Installed-but-unusable executables are intentionally excluded:
 // replacing a broken installation needs a separate operator decision.

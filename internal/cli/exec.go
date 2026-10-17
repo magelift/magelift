@@ -105,7 +105,7 @@ func (o *options) runExecTarget(ctx context.Context, target platform.ExecTarget)
 	if launcher == "" {
 		launcher = "aws"
 	}
-	if err := requireDependencies(ctx, o, toolchain.SpecsForLauncher(launcher), "remote session launcher"); err != nil {
+	if err := requireDependenciesWithInstall(ctx, o, toolchain.SpecsForLauncher(launcher), "remote session launcher", true); err != nil {
 		return err
 	}
 	args := append([]string{}, target.Args...)

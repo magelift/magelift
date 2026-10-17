@@ -11,7 +11,30 @@ import (
 	"testing"
 
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/sdk"
 )
+
+type plannedTargetStub struct {
+	provider sdk.ProviderID
+	runtime  sdk.RuntimeID
+}
+
+func (p plannedTargetStub) StackName() string        { return "test-stack" }
+func (p plannedTargetStub) Provider() sdk.ProviderID { return p.provider }
+func (p plannedTargetStub) Runtime() sdk.RuntimeID   { return p.runtime }
+func (p plannedTargetStub) Project() string          { return "test-project" }
+func (p plannedTargetStub) Environment() string      { return "preview" }
+func (p plannedTargetStub) Region() string           { return "europe-west1" }
+func (p plannedTargetStub) CertificationTier() platform.CertificationTier {
+	return platform.TierCertified
+}
+func (p plannedTargetStub) EnvironmentClass() string                              { return "preview" }
+func (p plannedTargetStub) Protected() bool                                       { return false }
+func (p plannedTargetStub) ImageDigest() string                                   { return "" }
+func (p plannedTargetStub) WithImageDigest(string) (platform.PlannedStack, error) { return p, nil }
+func (p plannedTargetStub) TargetDescriptor() sdk.TargetDescriptor {
+	return sdk.TargetDescriptor{Provider: p.provider, Runtime: p.runtime}
+}
 
 type fakeDependencyRunner struct {
 	missing map[string]bool
@@ -40,6 +63,10 @@ func (r *fakeDependencyRunner) Run(_ context.Context, command string, args ...st
 			delete(r.missing, "docker")
 		case "pulumi":
 			delete(r.missing, "pulumi")
+		case "cosign":
+			delete(r.missing, "cosign")
+		case "kubectl":
+			delete(r.missing, "kubectl")
 		}
 	}
 	return []byte("test-version\n"), nil
@@ -209,6 +236,54 @@ func TestInfrastructureDoesNotRequirePulumiCLI(t *testing.T) {
 	}
 	if err != nil && strings.Contains(err.Error(), "pulumi") {
 		t.Fatalf("deploy still requires the pulumi CLI: %v", err)
+	}
+}
+
+func TestRequireCosignInstallRequiresExplicitConfirmation(t *testing.T) {
+	runner := &fakeDependencyRunner{missing: map[string]bool{"cosign": true}}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.dependencyRunner = runner
+	err := requireCosignVerificationDependencies(context.Background(), o)
+	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "cosign") {
+		t.Fatalf("error=%v code=%d", err, ExitCode(err))
+	}
+	for _, call := range runner.calls {
+		if call[0] == "brew" {
+			t.Fatalf("package manager ran without confirmation: %#v", runner.calls)
+		}
+	}
+}
+
+func TestRequireCosignInstallRechecksAfterExplicitInstall(t *testing.T) {
+	runner := &fakeDependencyRunner{missing: map[string]bool{"cosign": true}}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.dependencyRunner, o.yes = runner, true
+	if err := requireCosignVerificationDependencies(context.Background(), o); err != nil {
+		t.Fatal(err)
+	}
+	installed := false
+	for _, call := range runner.calls {
+		if strings.Join(call, " ") == "brew install cosign" {
+			installed = true
+		}
+	}
+	if !installed {
+		t.Fatalf("install calls = %#v", runner.calls)
+	}
+}
+
+func TestRequireTargetDependenciesNeverAutoInstallsDocker(t *testing.T) {
+	runner := &fakeDependencyRunner{missing: map[string]bool{"docker": true}}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.dependencyRunner, o.yes = runner, true
+	planned := plannedTargetStub{provider: sdk.ProviderID("gcp"), runtime: sdk.RuntimeID("gke-autopilot")}
+	if err := requireTargetDependencies(context.Background(), o, planned); err != nil {
+		t.Fatalf("optional docker must not block cloud activation: %v", err)
+	}
+	for _, call := range runner.calls {
+		if call[0] == "brew" {
+			t.Fatalf("docker must stay a prerequisite: %#v", runner.calls)
+		}
 	}
 }
 

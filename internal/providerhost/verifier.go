@@ -95,6 +95,9 @@ func (v *VerifierInstaller) Ensure(ctx context.Context) (string, error) {
 	defer release()
 	want := verifierPins[runtime.GOOS+"/"+runtime.GOARCH]
 	if digestMatches(path, "sha256:"+want) {
+		if _, err := v.ensureTrustedRoot(ctx, cacheDir); err != nil {
+			return "", err
+		}
 		return path, nil
 	}
 	if _, err := os.Lstat(path); err == nil && !v.Repair {
@@ -104,6 +107,9 @@ func (v *VerifierInstaller) Ensure(ctx context.Context) (string, error) {
 	}
 	legacy := filepath.Join(filepath.Dir(filepath.Dir(path)), filepath.Base(path))
 	if digestMatches(legacy, "sha256:"+want) {
+		if _, err := v.ensureTrustedRoot(ctx, cacheDir); err != nil {
+			return "", err
+		}
 		return legacy, nil
 	}
 	base := strings.TrimSpace(v.BaseURL)
@@ -136,6 +142,9 @@ func (v *VerifierInstaller) Ensure(ctx context.Context) (string, error) {
 	defer os.Remove(temporary)
 	if err := os.Rename(temporary, path); err != nil {
 		return "", fmt.Errorf("install verifier: %w", err)
+	}
+	if _, err := v.ensureTrustedRoot(ctx, cacheDir); err != nil {
+		return "", err
 	}
 	return path, nil
 }
@@ -183,6 +192,9 @@ func CachedVerifierPath(cacheDir string) (string, error) {
 	}
 	want, ok := verifierPins[runtime.GOOS+"/"+runtime.GOARCH]
 	if ok && digestMatches(path, "sha256:"+want) {
+		if trustedRootCorrupt(cacheDir) {
+			return "", errVerifierUnavailable
+		}
 		return path, nil
 	}
 	// Legacy entries are usable only when their digest matches this platform.
@@ -192,6 +204,9 @@ func CachedVerifierPath(cacheDir string) (string, error) {
 	}
 	legacy := filepath.Join(filepath.Dir(filepath.Dir(path)), filepath.Base(path))
 	if ok && digestMatches(legacy, "sha256:"+want) {
+		if trustedRootCorrupt(cacheDir) {
+			return "", errVerifierUnavailable
+		}
 		return legacy, nil
 	}
 	return "", errVerifierUnavailable

@@ -59,6 +59,10 @@ type SignOptions struct {
 type VerifyOptions struct {
 	CertificateIdentity string
 	OIDCIssuer          string
+	// TrustedRoot is a filesystem path to a pinned Sigstore trusted_root.json.
+	// When set, cosign verify-blob receives --trusted-root so verification
+	// does not refresh TUF online.
+	TrustedRoot string
 }
 
 func New() *Client {
@@ -166,13 +170,20 @@ func (c *Client) VerifyBlob(ctx context.Context, bundlePath, artifactPath string
 	if cause := context.Cause(ctx); cause != nil {
 		return cause
 	}
-	if err := c.runner.Run(ctx,
-		c.binary(), "verify-blob",
+	args := []string{
+		"verify-blob",
 		"--bundle", bundlePath,
 		"--certificate-identity", options.CertificateIdentity,
 		"--certificate-oidc-issuer", options.OIDCIssuer,
-		artifactPath,
-	); err != nil {
+	}
+	if root := strings.TrimSpace(options.TrustedRoot); root != "" {
+		if !validBlobPath(root) {
+			return ErrInvalidBlobPath
+		}
+		args = append(args, "--trusted-root", root)
+	}
+	args = append(args, artifactPath)
+	if err := c.runner.Run(ctx, c.binary(), args...); err != nil {
 		if cause := context.Cause(ctx); cause != nil {
 			return cause
 		}

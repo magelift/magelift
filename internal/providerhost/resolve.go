@@ -76,12 +76,12 @@ func Resolve(provider string, opts ResolveOptions) (Resolved, error) {
 		} else if !errors.Is(err, ErrCacheMiss) {
 			return Resolved{}, fmt.Errorf("cached provider %q is unusable: %w (run `magelift providers install` to repair it)", id, err)
 		}
-		return Resolved{}, fmt.Errorf("provider %q is not installed beside the CLI or in the cache: run `magelift providers install` to download the locked version", id)
+		return Resolved{}, fmt.Errorf("provider %q is not installed beside the CLI or in the cache: run `magelift providers install` to download the locked version: %w", id, ErrCacheMiss)
 	}
 	binary, bundle, err := ResolveCached(lockPath, id, cacheDir)
 	if err != nil {
 		if errors.Is(err, ErrCacheMiss) {
-			return Resolved{}, fmt.Errorf("provider %q version %s is not in the cache: run `magelift providers install` to download it", id, strings.TrimSpace(artifact.Version))
+			return Resolved{}, fmt.Errorf("provider %q version %s is not in the cache: run `magelift providers install` to download it: %w", id, strings.TrimSpace(artifact.Version), ErrCacheMiss)
 		}
 		return Resolved{}, err
 	}

@@ -388,3 +388,37 @@ func TestProvidersBootstrapPreservesConcurrentProjectPin(t *testing.T) {
 		t.Fatalf("project pin = %q, %v", body, err)
 	}
 }
+
+func TestDefaultLoadProviderAcquiresPinnedGCPFromOfflineCache(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	cache := t.TempDir()
+	t.Setenv("MAGELIFT_PROVIDER_CACHE_DIR", cache)
+	lock := strings.ReplaceAll(providersTestLock, "aws", "gcp")
+	if err := os.WriteFile("magelift.providers.lock", []byte(lock), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	paths, err := providerhost.CachedArtifactPaths(cache, "gcp", "v0.0.0-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(paths.Binary), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paths.Binary, []byte("fake"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(providerhost.CachedBundlePath(paths.Binary), []byte("signature fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.providerVerifier = providersStubVerifier{}
+	o.fetchProviderLock = func(context.Context, string) (providerhost.Lockfile, error) {
+		t.Fatal("project pin must not bootstrap")
+		return providerhost.Lockfile{}, nil
+	}
+	loaded, err := o.defaultLoadProvider(context.Background(), "gcp")
+	if err != nil || loaded.Binary != paths.Binary || loaded.Artifact.Version != "v0.0.0-test" {
+		t.Fatalf("loaded=%+v, error=%v", loaded, err)
+	}
+}

@@ -127,6 +127,48 @@ func TestVerifyBlobUsesExpectedOptions(t *testing.T) {
 	}
 }
 
+func TestVerifyBlobPassesPinnedTrustedRoot(t *testing.T) {
+	runner := &recordingRunner{}
+	client := NewWithRunner(runner)
+	root := "/cache/_verifier/sigstore/trusted_root/6494e21e/trusted_root.json"
+	options := VerifyOptions{
+		CertificateIdentity: "https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v1.2.3",
+		OIDCIssuer:          "https://token.actions.githubusercontent.com",
+		TrustedRoot:         root,
+	}
+	if err := client.VerifyBlob(context.Background(), "/tmp/checksums.sigstore.json", "/tmp/checksums.txt", options); err != nil {
+		t.Fatal(err)
+	}
+	command := runner.command(t)
+	want := []string{
+		"verify-blob", "--bundle", "/tmp/checksums.sigstore.json",
+		"--certificate-identity", options.CertificateIdentity,
+		"--certificate-oidc-issuer", options.OIDCIssuer,
+		"--trusted-root", root,
+		"/tmp/checksums.txt",
+	}
+	if command.name != "cosign" || !reflect.DeepEqual(command.args, want) {
+		t.Fatalf("command = %#v", command)
+	}
+}
+
+func TestVerifyBlobRejectsUnsafeTrustedRootPath(t *testing.T) {
+	runner := &recordingRunner{}
+	client := NewWithRunner(runner)
+	options := VerifyOptions{
+		CertificateIdentity: "identity",
+		OIDCIssuer:          "https://token.actions.githubusercontent.com",
+		TrustedRoot:         "-evil.json",
+	}
+	err := client.VerifyBlob(context.Background(), "/tmp/bundle.json", "/tmp/artifact", options)
+	if !errors.Is(err, ErrInvalidBlobPath) {
+		t.Fatalf("error = %v", err)
+	}
+	if len(runner.commands) != 0 {
+		t.Fatal("cosign was executed")
+	}
+}
+
 func TestRejectsNonDigestAndUnqualifiedReferences(t *testing.T) {
 	tests := []string{
 		"registry.example.invalid/team/shop:latest",

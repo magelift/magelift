@@ -14,16 +14,22 @@ import (
 // plugin, and dial failure fails the command (no fallback).
 const gcpProviderID = "gcp"
 
-// defaultLoadProvider verifies the installed provider artifact through the
-// shared resolver: project locks control the version run (cache), the
-// beside-CLI lock loads the beside-CLI binary. Verification failures stay
-// loud; only a missing binary names the install command.
+// defaultLoadProvider uses lazy first-party acquisition for GCP and the shared
+// resolver for explicit extensions. Project pins win; verification failures
+// never select another provider or version.
 func (o *options) defaultLoadProvider(ctx context.Context, provider string) (providerhost.Loaded, error) {
 	executable := ""
 	if o.executable != nil {
 		if path, err := o.executable(); err == nil {
 			executable = path
 		}
+	}
+	if provider == gcpProviderID {
+		return providerhost.Acquire(ctx, provider, Version, providerhost.AcquireOptions{
+			Resolve:   providerhost.ResolveOptions{ExecutablePath: executable},
+			FetchLock: o.fetchProviderLock, EnsureVerifier: o.ensureProviderVerifier,
+			Verifier: o.providerVerifier, Progress: o.stderr,
+		})
 	}
 	resolved, err := providerhost.Resolve(provider, providerhost.ResolveOptions{ExecutablePath: executable})
 	if err != nil {

@@ -20,8 +20,13 @@ local container. Deploy and bootstrap do not need a Pulumi CLI; that engine
 runs inside the MageLift process. Read the capability and install hint beside
 each failed check before changing the machine.
 
-Use the explicit installer only after reviewing the proposed package-manager
-commands:
+Review package-manager commands before accepting an installation. Signed
+release operations and remote session launchers can offer to install missing
+tools through the same allowlist. Docker and cloud login remain prerequisites.
+In CI, `--yes` authorizes installation; otherwise missing tools produce a
+readiness error without prompting outside an interactive terminal.
+
+To prepare the workstation explicitly:
 
 ```sh
 magelift doctor --install-dependencies
@@ -35,3 +40,12 @@ read-only gate.
 When a tool is present but unreachable, fix its daemon, credentials, or PATH
 first. Do not treat an unreachable Docker daemon or provider session as a
 missing binary.
+
+The first-party GCP provider is acquired only when a command activates that
+target. A valid project lock takes priority over the CLI's fixed release
+version. `help`, `version`, `doctor` and envelope validation do not acquire it.
+For offline preparation or explicit repair, run `magelift providers install`
+while online. A corrupt cache is an error; do not remove or replace a project
+pin to hide a signature, digest or protocol failure. Community provider names
+in YAML do not enable automatic installation. Release archives need no Go
+toolchain on the user's machine.
