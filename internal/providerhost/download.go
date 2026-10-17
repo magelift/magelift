@@ -45,8 +45,8 @@ func DefaultCacheDir() (string, error) {
 // <cache>/<id>/<version>/<goos>_<goarch>/<binary> plus the bundle beside it.
 func CachedArtifactPaths(cacheDir, provider, version string) (ArtifactPaths, error) {
 	id := strings.TrimSpace(provider)
-	if id == "" {
-		return ArtifactPaths{}, errors.New("provider is required")
+	if !safePathSegment(id) {
+		return ArtifactPaths{}, errors.New("provider must be a safe path segment")
 	}
 	if !safePathSegment(version) {
 		return ArtifactPaths{}, fmt.Errorf("provider version %q is not a safe path segment", version)
@@ -64,8 +64,8 @@ func CachedArtifactPaths(cacheDir, provider, version string) (ArtifactPaths, err
 
 func legacyCachedArtifactPaths(cacheDir, provider, version string) (ArtifactPaths, error) {
 	id := strings.TrimSpace(provider)
-	if id == "" {
-		return ArtifactPaths{}, errors.New("provider is required")
+	if !safePathSegment(id) {
+		return ArtifactPaths{}, errors.New("provider must be a safe path segment")
 	}
 	if !safePathSegment(version) {
 		return ArtifactPaths{}, fmt.Errorf("provider version %q is not a safe path segment", version)

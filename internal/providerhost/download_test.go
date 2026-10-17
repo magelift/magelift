@@ -662,3 +662,16 @@ func TestDefaultCacheDirResolves(t *testing.T) {
 		t.Fatalf("unexpected cache dir %q", dir)
 	}
 }
+
+func TestCachedArtifactPathsRejectsProviderTraversal(t *testing.T) {
+	for _, provider := range []string{"", ".", "..", "../foreign", `..\foreign`, "/absolute"} {
+		t.Run(provider, func(t *testing.T) {
+			if _, err := CachedArtifactPaths(t.TempDir(), provider, "v1.0.0"); err == nil {
+				t.Fatalf("accepted provider %q", provider)
+			}
+			if _, err := legacyCachedArtifactPaths(t.TempDir(), provider, "v1.0.0"); err == nil {
+				t.Fatalf("accepted legacy provider %q", provider)
+			}
+		})
+	}
+}
