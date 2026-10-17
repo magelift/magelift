@@ -199,3 +199,33 @@ available, /tmp 11 GiB available, RAM approximately 16 GiB available. No
 cloud resources created by this task so far; AWS budget reservation and
 consumption remain zero. These are workstation measurements, not an estimate
 of remaining GCP credits.
+
+Further ML-02 execution results:
+
+| Check | Result |
+| --- | --- |
+| `go test -race ./internal/providerhost -run 'TestDownloadInstallConcurrent\|TestEnsureVerifier\|TestVerifierLegacy' -count=1` | PASS (2.661s); bounded package/runs only |
+| `go test ./internal/upgrade/ -count=1 -run TestInstall` | PASS; Linux fixtures plus Windows ZIP extraction on Linux, not Windows execution |
+| `bash scripts/install-verify-harness.sh` | PASS (14 checks); local fixture server, not a public release install |
+| `make docs check-clean-room workflow-check` | PASS |
+| `mise exec goreleaser@2.18.3 -- goreleaser check` | PASS; configuration only, no release matrix |
+| `go build -o /tmp/magelift-community-alpha/magelift-current ./cmd/magelift` | PASS |
+| Built CLI `version`, `--help`, sample-shop `config validate` with an empty dedicated provider cache | PASS; cache remained empty |
+
+GoReleaser v2.18.3 was confirmed against the upstream latest release
+(2026-10-09) and installed with mise without changing global activation.
+The local unstripped development CLI above is 439,728,419 bytes; it is not a
+release archive or stripped installed release. Current tool cache and Docker
+image totals remain unmeasured; `docker system df` did not return promptly.
+No cache pruning was performed.
+
+Read-only checks reached the project-owned `magelift/homebrew-tap` and
+`magelift/scoop-bucket`. The configured repositories and archive formats are
+not install evidence. Brew install, Scoop install and native Windows process
+execution remain NOT_RUN. Existing remote manifests refer to an older release.
+
+Preparation for ML-03: registry inspection of both
+`ghcr.io/magelift/magelift-builder:8.5` and
+`ghcr.io/magelift/magelift-nginx:8.5` returned `not found`. No new image was
+published and no old application digest was adopted as the new acceptance
+artifact.
