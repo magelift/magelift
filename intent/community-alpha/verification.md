@@ -384,3 +384,65 @@ not compressed download sizes or an additive installation footprint. No cloud
 resource was created, no AWS budget was reserved or spent, and account credits
 were not measured. Authorized GCP target remains digital-lab-341608,
 us-central1, with a fresh magelift-prefixed acceptance run.
+
+## Maintainer correction — user-owned images
+
+This checkpoint supersedes the ML-03 publication-pending proposal above. The
+maintainer clarified that all builder/runtime/application images are built in
+the user's CI/CD and published to their chosen OCI repository. The earlier
+GHCR publication approval request is cancelled; no permission was inferred.
+No MageLift image publication, tag, branch push or cloud deployment occurred.
+
+Commits: `8619ba3` updates the product plan/roadmap/intent; `a4b108e` removes
+MageLift image publishing from CI; `149643f` ships the existing recipes in the
+CLI and builds the images on the user's Docker engine. No Go installation or
+framework checkout is needed at runtime. No new manifest, registry service,
+plugin framework or provider contract was introduced. CLI-generated bases use
+the same user repository as `--image`, with distinct fingerprinted tags;
+application builds consume the returned base digests. Local builds use private
+invocation tags and captured-ID drift checks, without requiring RepoDigests
+from Docker's classic image store. Official upstream image inputs remain pinned.
+
+Real default-path builds, with no builder/runtime override and run from outside
+the MageLift repository:
+
+- Existing synthetic shop: PASS, exit 0. Image
+  `sha256:7e18ed9a4d67fa93b1c2c5330bf72e8108d81ab0e84d0cf703bc82bc09cbc42e`;
+  existing manifest SHA256
+  `0a0a1d8ce7b8f9d19abb35f3f49c71033627c5c272f8688dd79ce75686412fdc`.
+- Fresh synthetic shop with final resolver refinement: PASS, exit 0. Image
+  `sha256:dacddf60022ede3f1391c948984ae91ca332b84242ae8dfe853b5e0cc39289af`;
+  existing manifest SHA256
+  `067325162b5fc5e3da3a71af50dd6a141a1cac0923040719425f773989413059`.
+
+Both images report pushed=false and manifest CLI version 0.0.0-dev. Runtime
+inspection of the existing-shop image confirmed MageLift_AlphaDisabled remains
+disabled and application YAML/auth.json are absent. Source Git status is clean;
+config.php hash stayed
+`4e4e5adde8a1234f317606cd9f8f1d4a2ecfb62acd6529d7dff7ccac790ffa3e`.
+Raw existing manifests and logs are private under
+`/tmp/magelift-community-alpha/user-owned-images-*`.
+
+Checks: full `MAGELIFT_PHP_TEST_CONTAINER=1 make verify-community docs
+workflow-check cli-docs-check` PASS, exit 0, including 135 PHP tests / 317
+assertions. Focused root/toolchain/CLI/pipeline Go suites PASS; after the local
+RepoDigests refinement, root/toolchain/CLI suites PASS again. Bounded
+`go test -race . ./internal/toolchain -count=1` PASS. Final actionlint PASS.
+Registry-prefix tests exercise GHCR, ECR, Artifact Registry and port-qualified
+names; subprocess fixtures verify push/load flags, same-repository tags,
+metadata digests and fail-closed errors. These are local tests, not evidence of
+actual publication to those services. Generated shipped skill manifest was
+regenerated using `make generate cli-docs`.
+
+Actual user-registry push, remote cold pull, signatures/attestations verification
+and current-source GCP application acceptance remain NOT_RUN. Native ARM,
+Windows/macOS and package-manager qualification remain NOT_RUN. Humanizer was
+applied to human docs; the previously unavailable remove-ai-marks service was
+not rerun and remains NOT_RUN. The earlier real canary secret scan still applies
+to the unchanged PHP packaging path; it was not repeated for these two CLI runs.
+
+Remaining resources: 522 GiB workspace and 6.6 GiB /tmp available. Local images,
+cache, proofs and synthetic sources are retained; no shared Docker resource was
+pruned. No cloud resources created, no AWS budget reserved/spent, remaining
+account credits unmeasured. Registry retention is user-owned: failed pushes
+can leave base images, which MageLift does not delete automatically.
