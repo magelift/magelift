@@ -11,8 +11,8 @@ import (
 func TestResolveUsesDefaultTagsAndExactInspectArgv(t *testing.T) {
 	idA := "sha256:" + strings.Repeat("a", 64)
 	idB := "sha256:" + strings.Repeat("b", 64)
-	runtimeReference := "magelift/php-nginx@" + idB
-	command := &fakeCommand{results: []commandResult{{output: idA + "\n"}, {output: idB + "\r\n"}, {output: runtimeReference + "\n"}}}
+	runtimeReference := DefaultRuntimeTag
+	command := &fakeCommand{results: []commandResult{{output: idA + "\n"}, {output: idB + "\r\n"}}}
 
 	images, err := NewResolver(command, DefaultBuilderTag, DefaultRuntimeTag).Resolve(context.Background())
 	if err != nil {
@@ -24,7 +24,6 @@ func TestResolveUsesDefaultTagsAndExactInspectArgv(t *testing.T) {
 	want := [][]string{
 		{"docker", "image", "inspect", "--format={{.Id}}", DefaultBuilderTag},
 		{"docker", "image", "inspect", "--format={{.Id}}", DefaultRuntimeTag},
-		{"docker", "image", "inspect", "--format={{index .RepoDigests 0}}", DefaultRuntimeTag},
 	}
 	if !reflect.DeepEqual(command.calls, want) {
 		t.Fatalf("calls = %#v, want %#v", command.calls, want)
@@ -49,8 +48,8 @@ func TestResolveStopsWhenBuilderIsUnavailable(t *testing.T) {
 }
 
 func TestResolvePullsMissingImmutableReferences(t *testing.T) {
-	builderRef := "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("a", 64)
-	runtimeRef := "ghcr.io/magelift/magelift-nginx@sha256:" + strings.Repeat("b", 64)
+	builderRef := "registry.example.invalid/team/shop-builder@sha256:" + strings.Repeat("a", 64)
+	runtimeRef := "registry.example.invalid/team/shop-runtime@sha256:" + strings.Repeat("b", 64)
 	builderID := "sha256:" + strings.Repeat("a", 64)
 	runtimeID := "sha256:" + strings.Repeat("b", 64)
 	command := &fakeCommand{results: []commandResult{
@@ -75,8 +74,8 @@ func TestResolvePullsMissingImmutableReferences(t *testing.T) {
 }
 
 func TestResolveReusesCachedImmutableReferencesWithoutPull(t *testing.T) {
-	builderRef := "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("a", 64)
-	runtimeRef := "ghcr.io/magelift/magelift-nginx@sha256:" + strings.Repeat("b", 64)
+	builderRef := "registry.example.invalid/team/shop-builder@sha256:" + strings.Repeat("a", 64)
+	runtimeRef := "registry.example.invalid/team/shop-runtime@sha256:" + strings.Repeat("b", 64)
 	builderID := "sha256:" + strings.Repeat("a", 64)
 	runtimeID := "sha256:" + strings.Repeat("b", 64)
 	command := &fakeCommand{results: []commandResult{
@@ -156,16 +155,16 @@ func (command *fakeCommand) pulls() []string {
 	return pulls
 }
 
-func TestDefaultResolverDoesNotFallBackToLocalTagsBeforePublication(t *testing.T) {
-	if DefaultPublishedBuilderImage != "" && DefaultPublishedRuntimeImage != "" {
-		if !IsImmutableReference(DefaultPublishedBuilderImage) || !IsImmutableReference(DefaultPublishedRuntimeImage) {
-			t.Fatal("release defaults must be immutable")
-		}
-		return
+func TestDefaultResolverUsesLocalTags(t *testing.T) {
+	idA := "sha256:" + strings.Repeat("a", 64)
+	idB := "sha256:" + strings.Repeat("b", 64)
+	command := &fakeCommand{results: []commandResult{{output: idA + "\n"}, {output: idB + "\r\n"}}}
+
+	images, err := DefaultResolver(command).Resolve(context.Background())
+	if err != nil {
+		t.Fatal(err)
 	}
-	command := &fakeCommand{}
-	_, err := DefaultResolver(command).Resolve(context.Background())
-	if !errors.Is(err, ErrReleaseImagesUnavailable) || len(command.calls) != 0 {
-		t.Fatalf("error=%v, docker calls=%v", err, command.calls)
+	if images.BuilderID != idA || images.RuntimeID != idB {
+		t.Fatalf("unexpected images: %#v", images)
 	}
 }

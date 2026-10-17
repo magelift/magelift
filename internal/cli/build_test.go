@@ -26,8 +26,8 @@ func TestBuildPipelineRequestCreatesReleaseRequest(t *testing.T) {
 	request, err := buildPipelineRequest(buildRequestOptions{
 		Push:           true,
 		ImageReference: "ghcr.io/magelift/shop:revision",
-		BuilderImage:   "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("b", 64),
-		RuntimeImage:   "ghcr.io/magelift/magelift-nginx@sha256:" + strings.Repeat("c", 64),
+		BuilderImage:   "registry.example.invalid/team/shop-builder@sha256:" + strings.Repeat("b", 64),
+		RuntimeImage:   "registry.example.invalid/team/shop-runtime@sha256:" + strings.Repeat("c", 64),
 		Repository: source.Repository{
 			Revision:  revision,
 			OriginURL: "https://github.com/acourtiol/shop.git",
@@ -97,8 +97,8 @@ func TestBuildPipelineRequestDefaultsLocalPlatformToLinuxAMD64(t *testing.T) {
 }
 
 func TestBuildPipelineRequestAllowsAdvancedBaseImagesWithoutPush(t *testing.T) {
-	builder := "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("b", 64)
-	runtime := "ghcr.io/magelift/magelift-nginx@sha256:" + strings.Repeat("c", 64)
+	builder := "registry.example.invalid/team/shop-builder@sha256:" + strings.Repeat("b", 64)
+	runtime := "registry.example.invalid/team/shop-runtime@sha256:" + strings.Repeat("c", 64)
 	request, err := buildPipelineRequest(buildRequestOptions{
 		BuilderImage: builder,
 		RuntimeImage: runtime,
@@ -132,9 +132,9 @@ func TestBuildPipelineRequestPushDoesNotRequireExplicitBaseImages(t *testing.T) 
 	}
 }
 
-func TestApplyResolvedImagesUsesPublishedReferences(t *testing.T) {
-	builderRef := "ghcr.io/magelift/magelift-builder@sha256:" + strings.Repeat("a", 64)
-	runtimeRef := "ghcr.io/magelift/magelift-nginx@sha256:" + strings.Repeat("b", 64)
+func TestApplyResolvedImagesUsesUserRegistryReferences(t *testing.T) {
+	builderRef := "registry.example.invalid/team/shop-builder@sha256:" + strings.Repeat("a", 64)
+	runtimeRef := "registry.example.invalid/team/shop-runtime@sha256:" + strings.Repeat("b", 64)
 	request := buildpipeline.Request{}
 	applyResolvedImages(&request, toolchain.Images{
 		BuilderReference: builderRef,
@@ -377,5 +377,42 @@ func TestExplicitARMOverrideRemainsOutsideDefaultQualification(t *testing.T) {
 	request, err := buildPipelineRequest(options)
 	if err != nil || request.Platform != "linux/arm64" {
 		t.Fatalf("explicit advanced override lost: %+v, %v", request, err)
+	}
+}
+
+func TestApplicationImageRepositoryKeepsUserRegistry(t *testing.T) {
+	for _, tc := range []struct{ image, repository string }{
+		{"ghcr.io/team/shop:candidate", "ghcr.io/team/shop"},
+		{"123456789012.dkr.ecr.us-east-1.amazonaws.com/shop:alpha", "123456789012.dkr.ecr.us-east-1.amazonaws.com/shop"},
+		{"us-central1-docker.pkg.dev/project/repository/shop:alpha", "us-central1-docker.pkg.dev/project/repository/shop"},
+		{"registry.example.invalid:5000/team/shop:v1", "registry.example.invalid:5000/team/shop"},
+	} {
+		got, err := applicationImageRepository(tc.image)
+		if err != nil || got != tc.repository {
+			t.Fatalf("%q: %q %v", tc.image, got, err)
+		}
+	}
+	for _, image := range []string{"shop:alpha", "team/shop:alpha", "ghcr.io/team/shop", "ghcr.io/team/shop@sha256:" + strings.Repeat("a", 64), "https://ghcr.io/team/shop:x", "ghcr.io/team/../shop:x", "ghcr.io/team/shop:x\nother", "ghcr.io/team/shop:"} {
+		if _, err := applicationImageRepository(image); err == nil {
+			t.Fatalf("accepted %q", image)
+		}
+	}
+}
+
+func TestApplyResolvedImagesPreservesGeneratedLocalRuntimeTag(t *testing.T) {
+	images := toolchain.Images{BuilderID: "sha256:" + strings.Repeat("a", 64), RuntimeID: "sha256:" + strings.Repeat("b", 64), RuntimeReference: "magelift/php-nginx:recipe-unique"}
+	request := buildpipeline.Request{}
+	applyResolvedImages(&request, images)
+	if request.RuntimeImage != images.RuntimeReference || request.RuntimeImageID != images.RuntimeID {
+		t.Fatalf("lost generated runtime: %+v", request)
+	}
+	after := images
+	after.RuntimeReference = "magelift/php-nginx@" + images.RuntimeID
+	if !sameResolvedRuntime(images, after) {
+		t.Fatal("unchanged local runtime rejected")
+	}
+	after.RuntimeID = "sha256:" + strings.Repeat("c", 64)
+	if sameResolvedRuntime(images, after) {
+		t.Fatal("changed local runtime accepted")
 	}
 }

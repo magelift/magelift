@@ -14,20 +14,15 @@ const (
 	DefaultRuntimeTag = "magelift/php-nginx:local"
 	DefaultPHPBranch  = "8.5"
 	DefaultWebRuntime = "nginx-fpm"
-
-	// Release pins are filled only after publication and anonymous pull verification.
-	DefaultPublishedBuilderImage = ""
-	DefaultPublishedRuntimeImage = ""
 )
 
 const maxImageIDBytes = 80
 
 var (
-	imageIDPattern              = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
-	immutableImageReference     = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
-	ErrImageUnavailable         = errors.New("local Docker image is unavailable")
-	ErrImmutableImageMissing    = errors.New("immutable Docker image is not available locally")
-	ErrReleaseImagesUnavailable = errors.New("community alpha base images are not published yet; contributor qualification requires explicit --builder-image and --runtime-image overrides")
+	imageIDPattern           = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
+	immutableImageReference  = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
+	ErrImageUnavailable      = errors.New("local Docker image is unavailable")
+	ErrImmutableImageMissing = errors.New("immutable Docker image is not available locally")
 )
 
 type Command interface {
@@ -53,10 +48,7 @@ func New() *Resolver {
 }
 
 func DefaultResolver(command Command) *Resolver {
-	if DefaultPublishedBuilderImage == "" || DefaultPublishedRuntimeImage == "" {
-		return &Resolver{command: command, unavailable: ErrReleaseImagesUnavailable}
-	}
-	return NewResolver(command, DefaultPublishedBuilderImage, DefaultPublishedRuntimeImage)
+	return NewResolver(command, DefaultBuilderTag, DefaultRuntimeTag)
 }
 
 func NewResolver(command Command, builderRef, runtimeRef string) *Resolver {
@@ -103,22 +95,16 @@ func (resolver *Resolver) Resolve(ctx context.Context) (Images, error) {
 	return images, nil
 }
 
-func (resolver *Resolver) resolveRuntimeReference(ctx context.Context, runtimeID string) (string, error) {
+func (resolver *Resolver) resolveRuntimeReference(_ context.Context, runtimeID string) (string, error) {
 	if IsImmutableReference(resolver.runtimeRef) {
 		if runtimeID == "" {
 			return "", fmt.Errorf("inspect immutable runtime image reference %q: missing image ID", resolver.runtimeRef)
 		}
 		return resolver.runtimeRef, nil
 	}
-	output, err := resolver.command.Run(ctx, "docker", "image", "inspect", "--format={{index .RepoDigests 0}}", resolver.runtimeRef)
-	if err != nil {
-		return "", fmt.Errorf("inspect immutable runtime image reference %q: %w", resolver.runtimeRef, err)
-	}
-	reference := stripSingleLineEnding(string(output))
-	if !immutableImageReference.MatchString(reference) {
-		return "", fmt.Errorf("inspect %q returned an invalid immutable runtime image reference", resolver.runtimeRef)
-	}
-	return reference, nil
+	// Loaded local images need not have RepoDigests (classic Docker image store).
+	// The caller keeps the captured runtime ID and checks tag drift after build.
+	return resolver.runtimeRef, nil
 }
 
 func (resolver *Resolver) resolveImageID(ctx context.Context, reference string) (string, error) {

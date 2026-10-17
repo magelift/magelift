@@ -11,14 +11,13 @@ magelift build
 Run from the shop repository, with `magelift.yaml` and `composer.lock` committed.
 Existing `app/etc/config.php` is an immutable input; disabled modules stay disabled.
 The default community recipe uses Magento Open Source 2.4.9, PHP 8.5 and
-nginx-fpm. Release pins select the builder and runtime images, and missing
-images are pulled by digest. The default target is `linux/amd64`, including
-on an ARM workstation. Native ARM runtime qualification remains NOT_RUN.
+nginx-fpm on `linux/amd64`, including on an ARM workstation. The CLI ships the
+existing Docker and PHP build recipes with pinned upstream image digests.
+It builds the builder and runtime images on your Docker engine, then builds
+the application. BuildKit can reuse its cache. No MageLift source checkout or
+MageLift image registry is required. Native ARM runtime qualification remains
+NOT_RUN.
 
-This candidate is awaiting base-image publication. Until anonymous pulls are
-verified and release pins are recorded, the default command reports that the
-images are unavailable. Contributor qualification uses explicit local images.
-No framework source build or implicit `latest` image is part of the user path.
 BuildKit temporary bind mounts are created below the user cache so Docker Desktop,
 Colima, and other `/Users`-shared Docker engines can access them. The active Docker
 Buildx builder is used by default; set `BUILDX_BUILDER` when a named builder such as
@@ -26,12 +25,26 @@ Buildx builder is used by default; set `BUILDX_BUILDER` when a named builder suc
 
 ## Push a release candidate
 
-A pushed build requires registry digests for both MageLift base images. Tags are not accepted because they can move between preparation and image creation.
+Run this command in your CI/CD after authenticating Docker to your registry.
+MageLift builds and publishes the builder, runtime and application images in
+the repository you select. Builder/runtime tags include the shipped recipe
+fingerprint; the application consumes their resulting registry digests.
+No image is published to a MageLift-owned namespace.
 
 ```sh
 magelift build --push --image ghcr.io/example/shop:candidate
 ```
 
+The same repository holds all three images, using separate tags; for ECR,
+create that repository and grant CI push/pull permissions. GHCR, ECR,
+Artifact Registry and other OCI registries use the same `--image` option.
+For example, `123456789012.dkr.ecr.us-east-1.amazonaws.com/shop:candidate`
+selects an ECR repository. MageLift uses Docker's configured registry login.
+Registry retention policies must preserve the referenced base digests and
+attestations. Interrupted builds may leave published base images; MageLift
+does not delete registry artifacts automatically.
+
+A local `magelift build` loads images into Docker without publishing them.
 Pushed builds also default to `linux/amd64`. Advanced `--builder-image` and
 `--runtime-image` overrides must be supplied together. Pushed overrides require
 registry digests. Explicit ARM or multiple-platform builds require those

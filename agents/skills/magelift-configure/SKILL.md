@@ -30,9 +30,12 @@ Use this skill before preview or deploy when the service shape is changing.
 
 Run `magelift build` from the shop repository after committing YAML, the Composer
 lock and existing module configuration. The default community recipe is PHP 8.5
-with nginx-fpm on Linux amd64. Verified release image pins are required; a
-missing published catalog produces an availability error, with no local-source
-fallback. Once published, missing pinned images are pulled automatically.
+with nginx-fpm on Linux amd64. Recipes and pinned upstream inputs ship with
+the CLI. The user's Docker engine/CI builds the builder, runtime and application
+images. Local builds do not publish. `magelift build --push --image <registry>/<repository>:<tag>`
+publishes all three into that user-owned repository, consumes the base digests,
+and signs the application. Authenticate Docker first; MageLift has no required
+image registry. No framework source checkout is needed.
 
 Existing disabled modules and declared locales/themes are preserved. Build-time
 credentials use secret references and private mounts. Advanced base overrides

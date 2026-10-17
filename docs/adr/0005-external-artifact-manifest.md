@@ -38,3 +38,13 @@ The same signed digest and manifest pair can move through staging and production
 ## Provenance
 
 Original. Cosign/Sigstore public docs.
+
+### User-owned image production
+
+The maintainer clarified that the user's CI/CD builds and publishes every image.
+The CLI carries the existing PHP build and Docker recipes; pinned official
+upstream images remain inputs. Builder/runtime images and the application use
+the user's selected OCI repository, with separate tags and immutable base
+references. MageLift does not operate a required image registry. The existing
+manifest and OCI labels retain their traceability roles; no new lock or manifest
+is introduced. Local builds load images without publishing.

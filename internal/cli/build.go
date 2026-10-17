@@ -102,7 +102,27 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
-		images, err := resolver.Resolve(cmd.Context())
+		var images toolchain.Images
+		if builderImage == "" && runtimeImage == "" {
+			prefix := ""
+			if push {
+				prefix, err = applicationImageRepository(imageReference)
+				if err != nil {
+					return invalid(err)
+				}
+			}
+			images, err = toolchain.BuildImages(cmd.Context(), o.stderr, tempRoot, defaultBuildPlatform, prefix)
+			if err == nil {
+				if push {
+					resolver = toolchain.NewResolver(toolchain.SystemCommandRunner(), images.BuilderReference, images.RuntimeReference)
+					images, err = resolver.Resolve(cmd.Context())
+				} else {
+					resolver = toolchain.NewResolver(toolchain.SystemCommandRunner(), images.BuilderID, images.RuntimeReference)
+				}
+			}
+		} else {
+			images, err = resolver.Resolve(cmd.Context())
+		}
 		if err != nil {
 			return &exitError{code: 3, err: err}
 		}
@@ -204,7 +224,10 @@ func applyResolvedImages(request *buildpipeline.Request, images toolchain.Images
 			request.RuntimeImage = images.RuntimeReference
 			request.RuntimeImageID = ""
 		} else {
-			request.RuntimeImage = toolchain.DefaultRuntimeTag
+			request.RuntimeImage = images.RuntimeReference
+			if request.RuntimeImage == "" {
+				request.RuntimeImage = toolchain.DefaultRuntimeTag
+			}
 			request.RuntimeImageID = images.RuntimeID
 		}
 	}
@@ -216,10 +239,31 @@ func applyResolvedImages(request *buildpipeline.Request, images toolchain.Images
 }
 
 func sameResolvedRuntime(before, after toolchain.Images) bool {
-	if before.RuntimeReference != "" {
+	if toolchain.IsImmutableReference(before.RuntimeReference) {
 		return before.RuntimeReference == after.RuntimeReference && before.RuntimeID == after.RuntimeID
 	}
 	return before.RuntimeID == after.RuntimeID
+}
+
+// applicationImageRepository keeps base images in the same user-owned repository.
+func applicationImageRepository(reference string) (string, error) {
+	if strings.ContainsAny(reference, "@\x00\r\n\t ") {
+		return "", errors.New("--image requires a registry-qualified repository and explicit tag")
+	}
+	lastSlash := strings.LastIndexByte(reference, '/')
+	lastColon := strings.LastIndexByte(reference, ':')
+	if lastSlash < 1 || lastColon <= lastSlash || lastColon == len(reference)-1 {
+		return "", errors.New("--image requires a registry-qualified repository and explicit tag")
+	}
+	repository, tag := reference[:lastColon], reference[lastColon+1:]
+	host := reference[:strings.IndexByte(reference, '/')]
+	if host != "localhost" && !strings.ContainsAny(host, ".:") {
+		return "", errors.New("--image must name the user's registry")
+	}
+	if !regexp.MustCompile(`^[a-z0-9][a-z0-9.:-]*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)+$`).MatchString(repository) || !regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`).MatchString(tag) {
+		return "", errors.New("--image has an invalid repository or tag")
+	}
+	return repository, nil
 }
 
 func digestReference(imageReference, digest string) (string, error) {
@@ -276,6 +320,9 @@ func buildPipelineRequest(options buildRequestOptions) (buildpipeline.Request, e
 	}
 	if options.ImageReference == "" {
 		return buildpipeline.Request{}, errors.New("--push requires --image")
+	}
+	if _, err := applicationImageRepository(options.ImageReference); err != nil {
+		return buildpipeline.Request{}, err
 	}
 	baseSource := options.SourceURL
 	if baseSource == "" {
