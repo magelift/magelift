@@ -167,3 +167,12 @@ require a branch in the same repository.
 The generated workflow is tested locally as code. A local build or fixture test
 is not evidence of an executed GitHub/GCP workflow; record that acceptance run
 separately before advertising the full alpha path.
+
+The GCP provider's identity reconciler distinguishes build and deployment
+service accounts. Its reference trust accepts the named repository's
+`.github/workflows/magelift.yml` on `main`, for push or manual dispatch, and
+separates impersonation through the `build` and selected shop environments.
+An existing resource with different ownership or federation settings is refused;
+bootstrap does not silently adopt it. IAM reconciliation preserves unrelated
+bindings and conditions. This library behavior is covered by local fixtures;
+command integration and a real GitHub token exchange remain pending.

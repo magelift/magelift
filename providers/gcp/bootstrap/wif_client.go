@@ -22,18 +22,21 @@ const (
 	wifVisibilityDelay    = 2 * time.Second
 	wifTransientAttempts  = 6
 	wifTransientDelay     = 2 * time.Second
+	iamPolicyVersion3     = 3
 )
 
 // WIFPool describes a workload identity pool create/get payload.
 type WIFPool struct {
 	Name        string
 	DisplayName string
+	Description string
 }
 
 // WIFProvider describes an OIDC workload identity pool provider.
 type WIFProvider struct {
 	Name               string
 	DisplayName        string
+	Description        string
 	IssuerURI          string
 	AttributeMapping   map[string]string
 	AttributeCondition string
@@ -41,14 +44,9 @@ type WIFProvider struct {
 
 // WIFServiceAccount is a CI service account used for GitHub federation.
 type WIFServiceAccount struct {
-	Name  string
-	Email string
-}
-
-// WIFBinding is an IAM policy binding on a service account.
-type WIFBinding struct {
-	Role    string
-	Members []string
+	Name        string
+	Email       string
+	Description string
 }
 
 // WIFAPI is the injectable IAM/WIF surface used by IdentityBootstrapper.
@@ -59,9 +57,9 @@ type WIFAPI interface {
 	GetProvider(ctx context.Context, name string) (WIFProvider, error)
 	CreateProvider(ctx context.Context, parent, providerID string, provider WIFProvider) (WIFProvider, error)
 	GetServiceAccount(ctx context.Context, name string) (WIFServiceAccount, error)
-	CreateServiceAccount(ctx context.Context, projectID, accountID, displayName string) (WIFServiceAccount, error)
-	GetServiceAccountIAMPolicy(ctx context.Context, resource string) ([]WIFBinding, error)
-	SetServiceAccountIAMPolicy(ctx context.Context, resource string, bindings []WIFBinding) error
+	CreateServiceAccount(ctx context.Context, projectID, accountID, displayName, description string) (WIFServiceAccount, error)
+	GetServiceAccountIAMPolicy(ctx context.Context, resource string) (*iam.Policy, error)
+	SetServiceAccountIAMPolicy(ctx context.Context, resource string, policy *iam.Policy) error
 }
 
 type iamWIFClient struct {
@@ -102,12 +100,13 @@ func (c iamWIFClient) GetPool(ctx context.Context, name string) (WIFPool, error)
 	if err != nil {
 		return WIFPool{}, mapWIFError("get workload identity pool", err)
 	}
-	return WIFPool{Name: pool.Name, DisplayName: pool.DisplayName}, nil
+	return WIFPool{Name: pool.Name, DisplayName: pool.DisplayName, Description: pool.Description}, nil
 }
 
 func (c iamWIFClient) CreatePool(ctx context.Context, parent, poolID string, pool WIFPool) (WIFPool, error) {
 	op, err := c.iam.Projects.Locations.WorkloadIdentityPools.Create(parent, &iam.WorkloadIdentityPool{
 		DisplayName: pool.DisplayName,
+		Description: pool.Description,
 		Mode:        "FEDERATION_ONLY",
 	}).WorkloadIdentityPoolId(poolID).Context(ctx).Do()
 	if err != nil {
@@ -138,6 +137,7 @@ func (c iamWIFClient) GetProvider(ctx context.Context, name string) (WIFProvider
 	return WIFProvider{
 		Name:               provider.Name,
 		DisplayName:        provider.DisplayName,
+		Description:        provider.Description,
 		IssuerURI:          issuer,
 		AttributeMapping:   provider.AttributeMapping,
 		AttributeCondition: provider.AttributeCondition,
@@ -151,6 +151,7 @@ func (c iamWIFClient) CreateProvider(ctx context.Context, parent, providerID str
 	for attempt := 1; attempt <= wifVisibilityAttempts; attempt++ {
 		op, err = c.iam.Projects.Locations.WorkloadIdentityPools.Providers.Create(parent, &iam.WorkloadIdentityPoolProvider{
 			DisplayName:        provider.DisplayName,
+			Description:        provider.Description,
 			AttributeMapping:   provider.AttributeMapping,
 			AttributeCondition: provider.AttributeCondition,
 			Oidc:               &iam.Oidc{IssuerUri: provider.IssuerURI},
@@ -248,44 +249,109 @@ func (c iamWIFClient) GetServiceAccount(ctx context.Context, name string) (WIFSe
 	if err != nil {
 		return WIFServiceAccount{}, mapWIFError("get service account", err)
 	}
-	return WIFServiceAccount{Name: sa.Name, Email: sa.Email}, nil
+	return WIFServiceAccount{Name: sa.Name, Email: sa.Email, Description: sa.Description}, nil
 }
 
-func (c iamWIFClient) CreateServiceAccount(ctx context.Context, projectID, accountID, displayName string) (WIFServiceAccount, error) {
+func (c iamWIFClient) CreateServiceAccount(ctx context.Context, projectID, accountID, displayName, description string) (WIFServiceAccount, error) {
 	sa, err := c.iam.Projects.ServiceAccounts.Create("projects/"+projectID, &iam.CreateServiceAccountRequest{
 		AccountId: accountID,
 		ServiceAccount: &iam.ServiceAccount{
 			DisplayName: displayName,
+			Description: description,
 		},
 	}).Context(ctx).Do()
 	if err != nil {
 		return WIFServiceAccount{}, fmt.Errorf("create service account: %w", err)
 	}
-	created := WIFServiceAccount{Name: sa.Name, Email: sa.Email}
+	created := WIFServiceAccount{Name: sa.Name, Email: sa.Email, Description: sa.Description}
 	// IAM can report the create operation as successful before the service
 	// account is visible to GetIamPolicy. Wait through that read-after-create
 	// window before the caller applies the workload identity binding.
 	return waitWIFResource(ctx, wifVisibilityDelay, c.GetServiceAccount, created.Name)
 }
 
-func (c iamWIFClient) GetServiceAccountIAMPolicy(ctx context.Context, resource string) ([]WIFBinding, error) {
+func (c iamWIFClient) GetServiceAccountIAMPolicy(ctx context.Context, resource string) (*iam.Policy, error) {
 	policy, err := retryWIFCall(ctx, wifTransientDelay, func() (*iam.Policy, error) {
-		return c.iam.Projects.ServiceAccounts.GetIamPolicy(resource).Context(ctx).Do()
+		return c.iam.Projects.ServiceAccounts.GetIamPolicy(resource).
+			OptionsRequestedPolicyVersion(iamPolicyVersion3).
+			Context(ctx).Do()
 	})
 	if err != nil {
 		return nil, fmt.Errorf("get service account IAM policy: %w", err)
 	}
-	return fromIAMBindings(policy.Bindings), nil
+	return cloneIAMPolicy(policy), nil
 }
 
-func (c iamWIFClient) SetServiceAccountIAMPolicy(ctx context.Context, resource string, bindings []WIFBinding) error {
+func (c iamWIFClient) SetServiceAccountIAMPolicy(ctx context.Context, resource string, policy *iam.Policy) error {
 	_, err := c.iam.Projects.ServiceAccounts.SetIamPolicy(resource, &iam.SetIamPolicyRequest{
-		Policy: &iam.Policy{Bindings: toIAMBindings(bindings)},
+		Policy: cloneIAMPolicy(policy),
 	}).Context(ctx).Do()
 	if err != nil {
 		return fmt.Errorf("set service account IAM policy: %w", err)
 	}
 	return nil
+}
+
+func cloneIAMPolicy(policy *iam.Policy) *iam.Policy {
+	if policy == nil {
+		return &iam.Policy{}
+	}
+	out := &iam.Policy{
+		Etag:    policy.Etag,
+		Version: policy.Version,
+	}
+	if len(policy.AuditConfigs) > 0 {
+		out.AuditConfigs = make([]*iam.AuditConfig, len(policy.AuditConfigs))
+		for i, cfg := range policy.AuditConfigs {
+			if cfg == nil {
+				continue
+			}
+			cloned := &iam.AuditConfig{
+				Service:         cfg.Service,
+				AuditLogConfigs: make([]*iam.AuditLogConfig, len(cfg.AuditLogConfigs)),
+			}
+			for j, logCfg := range cfg.AuditLogConfigs {
+				if logCfg == nil {
+					continue
+				}
+				cloned.AuditLogConfigs[j] = &iam.AuditLogConfig{
+					LogType:         logCfg.LogType,
+					ExemptedMembers: append([]string(nil), logCfg.ExemptedMembers...),
+				}
+			}
+			out.AuditConfigs[i] = cloned
+		}
+	}
+	if len(policy.Bindings) > 0 {
+		out.Bindings = make([]*iam.Binding, len(policy.Bindings))
+		for i, binding := range policy.Bindings {
+			if binding == nil {
+				continue
+			}
+			cloned := &iam.Binding{
+				Role:    binding.Role,
+				Members: append([]string(nil), binding.Members...),
+			}
+			if binding.Condition != nil {
+				cloned.Condition = &iam.Expr{
+					Title:       binding.Condition.Title,
+					Description: binding.Condition.Description,
+					Expression:  binding.Condition.Expression,
+					Location:    binding.Condition.Location,
+				}
+			}
+			out.Bindings[i] = cloned
+		}
+	}
+	return out
+}
+
+func isIAMPolicyConflict(err error) bool {
+	var apiErr *googleapi.Error
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return apiErr.Code == http.StatusConflict
 }
 
 func mapWIFError(op string, err error) error {
@@ -328,23 +394,4 @@ func waitIAMOperation(ctx context.Context, service *iam.Service, op *iam.Operati
 		case <-time.After(2 * time.Second):
 		}
 	}
-}
-
-func fromIAMBindings(bindings []*iam.Binding) []WIFBinding {
-	out := make([]WIFBinding, 0, len(bindings))
-	for _, binding := range bindings {
-		if binding == nil {
-			continue
-		}
-		out = append(out, WIFBinding{Role: binding.Role, Members: append([]string(nil), binding.Members...)})
-	}
-	return out
-}
-
-func toIAMBindings(bindings []WIFBinding) []*iam.Binding {
-	out := make([]*iam.Binding, 0, len(bindings))
-	for _, binding := range bindings {
-		out = append(out, &iam.Binding{Role: binding.Role, Members: append([]string(nil), binding.Members...)})
-	}
-	return out
 }

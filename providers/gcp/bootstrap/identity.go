@@ -2,18 +2,30 @@ package bootstrap
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
+
+	"google.golang.org/api/iam/v1"
 )
 
 const (
-	githubOIDCIssuer           = "https://token.actions.githubusercontent.com"
-	workloadIdentityUserRole   = "roles/iam.workloadIdentityUser"
-	defaultWIFProviderID       = "github"
-	defaultWIFProviderDisplay  = "GitHub Actions"
-	defaultWIFPoolDisplayLimit = 32
+	githubOIDCIssuer             = "https://token.actions.githubusercontent.com"
+	workloadIdentityUserRole     = "roles/iam.workloadIdentityUser"
+	defaultWIFProviderID         = "github"
+	defaultWIFPoolDisplayLimit   = 32
+	maxWorkloadIdentityPoolIDLen = 32
+	maxServiceAccountIDLen       = 30
+	githubWorkflowFile           = ".github/workflows/magelift.yml"
+	githubTrustedRef             = "refs/heads/main"
+	identityRoleDeploy           = "deploy"
+	identityRoleBuild            = "build"
+	githubEnvironmentBuild       = "build"
 )
+
+const wifOwnershipRefusalHint = "select a fresh MageLift project/environment name, or have the resource owner review recorded ownership before adoption"
 
 // IdentitySpec is the Magento-shaped input for GitHub→GCP WIF bootstrap.
 type IdentitySpec struct {
@@ -22,10 +34,15 @@ type IdentitySpec struct {
 	GCPProject  string
 	GitHubOwner string
 	GitHubRepo  string
+	// Role selects the CI identity: empty or "deploy" for deployment SA, "build" for image build SA.
+	Role string
 }
 
 // IdentityPlan is the deterministic WIF resource plan (no live API calls).
 type IdentityPlan struct {
+	Project                string            `json:"project" yaml:"project"`
+	Environment            string            `json:"environment" yaml:"environment"`
+	Role                   string            `json:"role" yaml:"role"`
 	GCPProject             string            `json:"gcpProject" yaml:"gcpProject"`
 	PoolID                 string            `json:"poolId" yaml:"poolId"`
 	PoolName               string            `json:"poolName" yaml:"poolName"`
@@ -38,7 +55,10 @@ type IdentityPlan struct {
 	AttributeMapping       map[string]string `json:"attributeMapping" yaml:"attributeMapping"`
 	AttributeCondition     string            `json:"attributeCondition" yaml:"attributeCondition"`
 	Repository             string            `json:"repository" yaml:"repository"`
+	GitHubEnvironment      string            `json:"githubEnvironment" yaml:"githubEnvironment"`
 	WorkloadIdentityMember string            `json:"workloadIdentityMember" yaml:"workloadIdentityMember"`
+	SharedOwnershipMarker  string            `json:"sharedOwnershipMarker" yaml:"sharedOwnershipMarker"`
+	ServiceAccountMarker   string            `json:"serviceAccountMarker" yaml:"serviceAccountMarker"`
 }
 
 // IdentityResult is the Ensure output used in Bootstrap Details.
@@ -80,33 +100,47 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 	if !projectPattern.MatchString(spec.GCPProject) {
 		return IdentityPlan{}, errors.New("identity bootstrap GCP project ID is invalid")
 	}
-	if !componentPattern.MatchString(spec.GitHubOwner) || !componentPattern.MatchString(spec.GitHubRepo) {
-		return IdentityPlan{}, errors.New("GitHub owner and repository must be lowercase stable names")
+	if !validGitHubName(spec.GitHubOwner) || !validGitHubName(spec.GitHubRepo) {
+		return IdentityPlan{}, errors.New("GitHub owner and repository must be valid names")
+	}
+	role, err := normalizeIdentityRole(spec.Role)
+	if err != nil {
+		return IdentityPlan{}, err
+	}
+	if spec.Environment == githubEnvironmentBuild {
+		return IdentityPlan{}, errors.New("environment build is reserved for the CI build identity; choose a shop environment such as test")
 	}
 	repository := spec.GitHubOwner + "/" + spec.GitHubRepo
-	poolID := "ml-" + spec.Project + "-" + spec.Environment
-	if len(poolID) > 32 {
-		return IdentityPlan{}, errors.New("generated workload identity pool ID exceeds 32 characters")
+	poolID := compactIdentityID(
+		"ml-"+spec.Project+"-"+spec.Environment,
+		maxWorkloadIdentityPoolIDLen,
+		spec.Project+"/"+spec.Environment+"/pool",
+	)
+	saSuffix := "-ci"
+	githubEnvironment := spec.Environment
+	if role == identityRoleBuild {
+		saSuffix = "-build"
+		githubEnvironment = githubEnvironmentBuild
 	}
-	saID := "ml-" + spec.Project + "-" + spec.Environment + "-ci"
-	if len(saID) > 30 {
-		return IdentityPlan{}, errors.New("generated service account ID exceeds 30 characters")
-	}
+	saID := compactIdentityID(
+		"ml-"+spec.Project+"-"+spec.Environment+saSuffix,
+		maxServiceAccountIDLen,
+		spec.Project+"/"+spec.Environment+"/"+role+"/sa",
+	)
 	parent := "projects/" + spec.GCPProject + "/locations/global"
 	poolName := parent + "/workloadIdentityPools/" + poolID
 	providerName := poolName + "/providers/" + defaultWIFProviderID
 	saEmail := saID + "@" + spec.GCPProject + ".iam.gserviceaccount.com"
 	saName := "projects/" + spec.GCPProject + "/serviceAccounts/" + saEmail
-	condition := fmt.Sprintf("assertion.repository == '%s'", repository)
-	mapping := map[string]string{
-		"google.subject":       "assertion.sub",
-		"attribute.actor":      "assertion.actor",
-		"attribute.repository": "assertion.repository",
-	}
-	// Project number is filled during Ensure; plan uses project ID for create parents.
-	member := "principalSet://iam.googleapis.com/projects/{project_number}/locations/global/workloadIdentityPools/" +
-		poolID + "/attribute.repository/" + repository
+	mapping := githubAttributeMapping()
+	condition := githubAttributeCondition(repository, spec.Environment)
+	sharedMarker := wifSharedOwnershipMarker(spec.Project, spec.Environment)
+	saMarker := wifServiceAccountOwnershipMarker(spec.Project, spec.Environment, role)
+	member := workloadIdentityPrincipal(poolID, "{project_number}", githubEnvironment)
 	return IdentityPlan{
+		Project:                spec.Project,
+		Environment:            spec.Environment,
+		Role:                   role,
 		GCPProject:             spec.GCPProject,
 		PoolID:                 poolID,
 		PoolName:               poolName,
@@ -119,7 +153,10 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 		AttributeMapping:       mapping,
 		AttributeCondition:     condition,
 		Repository:             repository,
+		GitHubEnvironment:      githubEnvironment,
 		WorkloadIdentityMember: member,
+		SharedOwnershipMarker:  sharedMarker,
+		ServiceAccountMarker:   saMarker,
 	}, nil
 }
 
@@ -130,6 +167,9 @@ func (b *IdentityBootstrapper) Ensure(ctx context.Context, plan IdentityPlan) (I
 	}
 	if strings.TrimSpace(plan.PoolID) == "" || strings.TrimSpace(plan.ProviderID) == "" || strings.TrimSpace(plan.ServiceAccountID) == "" {
 		return IdentityResult{}, errors.New("identity plan is incomplete")
+	}
+	if strings.TrimSpace(plan.SharedOwnershipMarker) == "" || strings.TrimSpace(plan.ServiceAccountMarker) == "" {
+		return IdentityResult{}, errors.New("identity plan ownership markers are incomplete")
 	}
 	projectNumber, err := b.wif.ProjectNumber(ctx, plan.GCPProject)
 	if err != nil {
@@ -148,10 +188,7 @@ func (b *IdentityBootstrapper) Ensure(ctx context.Context, plan IdentityPlan) (I
 	if err != nil {
 		return IdentityResult{}, err
 	}
-	member := fmt.Sprintf(
-		"principalSet://iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s/attribute.repository/%s",
-		projectNumber, plan.PoolID, plan.Repository,
-	)
+	member := workloadIdentityPrincipal(plan.PoolID, projectNumber, plan.GitHubEnvironment)
 	if err := b.ensureWorkloadIdentityBinding(ctx, sa.Name, member); err != nil {
 		return IdentityResult{}, err
 	}
@@ -174,62 +211,240 @@ func (b *IdentityBootstrapper) Ensure(ctx context.Context, plan IdentityPlan) (I
 func (b *IdentityBootstrapper) ensurePool(ctx context.Context, parent string, plan IdentityPlan) (WIFPool, error) {
 	pool, err := b.wif.GetPool(ctx, plan.PoolName)
 	if err == nil {
+		if err := validateSharedWIFOwnership(plan.SharedOwnershipMarker, pool.DisplayName, pool.Description); err != nil {
+			return WIFPool{}, err
+		}
 		return pool, nil
 	}
 	if !errors.Is(err, ErrWIFNotFound) {
 		return WIFPool{}, err
 	}
-	display := truncateDisplay("magelift " + plan.PoolID)
-	return b.wif.CreatePool(ctx, parent, plan.PoolID, WIFPool{DisplayName: display})
+	marker := plan.SharedOwnershipMarker
+	return b.wif.CreatePool(ctx, parent, plan.PoolID, WIFPool{
+		DisplayName: truncateDisplay(marker),
+		Description: marker,
+	})
 }
 
 func (b *IdentityBootstrapper) ensureProvider(ctx context.Context, poolName string, plan IdentityPlan) (WIFProvider, error) {
 	provider, err := b.wif.GetProvider(ctx, plan.ProviderName)
 	if err == nil {
-		if provider.AttributeCondition != plan.AttributeCondition {
-			return WIFProvider{}, fmt.Errorf("workload identity provider %q attribute condition mismatch", plan.ProviderName)
+		if err := validateSharedWIFOwnership(plan.SharedOwnershipMarker, provider.DisplayName, provider.Description); err != nil {
+			return WIFProvider{}, err
+		}
+		if err := validateExistingProvider(provider, plan); err != nil {
+			return WIFProvider{}, err
 		}
 		return provider, nil
 	}
 	if !errors.Is(err, ErrWIFNotFound) {
 		return WIFProvider{}, err
 	}
+	marker := plan.SharedOwnershipMarker
 	return b.wif.CreateProvider(ctx, poolName, plan.ProviderID, WIFProvider{
-		DisplayName:        defaultWIFProviderDisplay,
+		DisplayName:        truncateDisplay(marker),
+		Description:        marker,
 		IssuerURI:          plan.IssuerURI,
 		AttributeMapping:   plan.AttributeMapping,
 		AttributeCondition: plan.AttributeCondition,
 	})
 }
 
+func validateExistingProvider(provider WIFProvider, plan IdentityPlan) error {
+	if strings.TrimSpace(provider.IssuerURI) != plan.IssuerURI {
+		return fmt.Errorf("workload identity provider %q issuer mismatch: got %q, want %q", plan.ProviderName, provider.IssuerURI, plan.IssuerURI)
+	}
+	if !attributeMappingsEqual(provider.AttributeMapping, plan.AttributeMapping) {
+		return fmt.Errorf("workload identity provider %q attribute mapping mismatch", plan.ProviderName)
+	}
+	if provider.AttributeCondition != plan.AttributeCondition {
+		return fmt.Errorf("workload identity provider %q attribute condition mismatch", plan.ProviderName)
+	}
+	return nil
+}
+
 func (b *IdentityBootstrapper) ensureServiceAccount(ctx context.Context, plan IdentityPlan) (WIFServiceAccount, error) {
 	sa, err := b.wif.GetServiceAccount(ctx, plan.ServiceAccountName)
 	if err == nil {
+		if err := validateServiceAccountOwnership(plan.ServiceAccountMarker, sa.Description); err != nil {
+			return WIFServiceAccount{}, err
+		}
 		return sa, nil
 	}
 	if !errors.Is(err, ErrWIFNotFound) {
 		return WIFServiceAccount{}, err
 	}
-	return b.wif.CreateServiceAccount(ctx, plan.GCPProject, plan.ServiceAccountID, "MageLift CI")
+	display := truncateDisplay(plan.ServiceAccountMarker)
+	return b.wif.CreateServiceAccount(ctx, plan.GCPProject, plan.ServiceAccountID, display, plan.ServiceAccountMarker)
 }
 
 func (b *IdentityBootstrapper) ensureWorkloadIdentityBinding(ctx context.Context, saResource, member string) error {
-	bindings, err := b.wif.GetServiceAccountIAMPolicy(ctx, saResource)
+	policy, err := b.wif.GetServiceAccountIAMPolicy(ctx, saResource)
 	if err != nil {
 		return err
 	}
-	for i := range bindings {
-		if bindings[i].Role != workloadIdentityUserRole {
-			continue
+	updated, changed := mergeUnconditionalWorkloadIdentityMember(policy, member)
+	if !changed {
+		return nil
+	}
+	if err := b.wif.SetServiceAccountIAMPolicy(ctx, saResource, updated); err != nil {
+		if !isIAMPolicyConflict(err) {
+			return err
 		}
-		if containsString(bindings[i].Members, member) {
+		fresh, err := b.wif.GetServiceAccountIAMPolicy(ctx, saResource)
+		if err != nil {
+			return err
+		}
+		retry, changed := mergeUnconditionalWorkloadIdentityMember(fresh, member)
+		if !changed {
 			return nil
 		}
-		bindings[i].Members = append(bindings[i].Members, member)
-		return b.wif.SetServiceAccountIAMPolicy(ctx, saResource, bindings)
+		return b.wif.SetServiceAccountIAMPolicy(ctx, saResource, retry)
 	}
-	bindings = append(bindings, WIFBinding{Role: workloadIdentityUserRole, Members: []string{member}})
-	return b.wif.SetServiceAccountIAMPolicy(ctx, saResource, bindings)
+	return nil
+}
+
+func mergeUnconditionalWorkloadIdentityMember(policy *iam.Policy, member string) (*iam.Policy, bool) {
+	if policy == nil {
+		policy = &iam.Policy{}
+	}
+	for _, binding := range policy.Bindings {
+		if binding == nil || binding.Role != workloadIdentityUserRole {
+			continue
+		}
+		if binding.Condition != nil {
+			continue
+		}
+		if containsString(binding.Members, member) {
+			return policy, false
+		}
+		binding.Members = append(binding.Members, member)
+		return policy, true
+	}
+	policy.Bindings = append(policy.Bindings, &iam.Binding{
+		Role:    workloadIdentityUserRole,
+		Members: []string{member},
+	})
+	return policy, true
+}
+
+func normalizeIdentityRole(role string) (string, error) {
+	role = strings.TrimSpace(strings.ToLower(role))
+	switch role {
+	case "", identityRoleDeploy:
+		return identityRoleDeploy, nil
+	case identityRoleBuild:
+		return identityRoleBuild, nil
+	default:
+		return "", fmt.Errorf("identity role %q is invalid: use build or deploy", role)
+	}
+}
+
+func validGitHubName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" || len(name) > 100 || name == "*" {
+		return false
+	}
+	if strings.Contains(name, "/") || strings.Contains(name, " ") {
+		return false
+	}
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '-' || r == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func githubAttributeMapping() map[string]string {
+	return map[string]string{
+		"google.subject":        "assertion.sub",
+		"attribute.actor":       "assertion.actor",
+		"attribute.repository":  "assertion.repository",
+		"attribute.environment": "assertion.environment",
+	}
+}
+
+func githubAttributeCondition(repository, magentoEnvironment string) string {
+	workflowRef := repository + "/" + githubWorkflowFile + "@" + githubTrustedRef
+	envCheck := fmt.Sprintf(
+		"(assertion.environment == '%s' || assertion.environment == '%s')",
+		celQuote(githubEnvironmentBuild),
+		celQuote(magentoEnvironment),
+	)
+	return fmt.Sprintf(
+		"assertion.repository == '%s' && assertion.ref == '%s' && assertion.workflow_ref == '%s' && (assertion.event_name == 'push' || assertion.event_name == 'workflow_dispatch') && %s",
+		celQuote(repository),
+		celQuote(githubTrustedRef),
+		celQuote(workflowRef),
+		envCheck,
+	)
+}
+
+func workloadIdentityPrincipal(poolID, projectNumber, githubEnvironment string) string {
+	return fmt.Sprintf(
+		"principalSet://iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s/attribute.environment/%s",
+		projectNumber, poolID, githubEnvironment,
+	)
+}
+
+func wifSharedOwnershipMarker(project, environment string) string {
+	return fmt.Sprintf("MageLift project=%s environment=%s", project, environment)
+}
+
+func wifServiceAccountOwnershipMarker(project, environment, role string) string {
+	return fmt.Sprintf("%s role=%s", wifSharedOwnershipMarker(project, environment), role)
+}
+
+func validateSharedWIFOwnership(marker, _, description string) error {
+	if strings.TrimSpace(description) == marker {
+		return nil
+	}
+	return fmt.Errorf(
+		"refusing to mutate workload identity resource: missing ownership marker %q; %s",
+		marker, wifOwnershipRefusalHint,
+	)
+}
+
+func validateServiceAccountOwnership(marker, description string) error {
+	if strings.TrimSpace(description) == marker {
+		return nil
+	}
+	return fmt.Errorf(
+		"refusing to mutate service account: missing ownership marker %q; %s",
+		marker, wifOwnershipRefusalHint,
+	)
+}
+
+func attributeMappingsEqual(got, want map[string]string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for key, wantValue := range want {
+		if got[key] != wantValue {
+			return false
+		}
+	}
+	return true
+}
+
+func compactIdentityID(value string, maxLen int, seed string) string {
+	if len(value) <= maxLen {
+		return value
+	}
+	digest := sha256.Sum256([]byte(seed))
+	suffix := hex.EncodeToString(digest[:])[:8]
+	if maxLen <= len(suffix)+1 {
+		return suffix[:maxLen]
+	}
+	prefixLen := maxLen - len(suffix) - 1
+	prefix := strings.TrimRight(value[:prefixLen], "-")
+	return prefix + "-" + suffix
+}
+
+func celQuote(value string) string {
+	return strings.ReplaceAll(value, "'", "\\'")
 }
 
 func rewriteProjectNumber(name, projectID, projectNumber string) string {
