@@ -41,7 +41,9 @@ mkdir -p \
 	"$WORK/pub/errors" \
 	"$WORK/pub/static/frontend/Magento/luma/en_US/css" \
 	"$WORK/pub/static/frontend/Magento/luma/en_US/requirejs" \
-	"$WORK/pub/static/frontend/Magento/luma/en_US/fonts"
+	"$WORK/pub/static/frontend/Magento/luma/en_US/fonts" \
+	"$WORK/pub/static/frontend/Magento/luma/en_US/jquery/ui-modules/vendor/jquery-color" \
+	"$WORK/pub/vendor"
 printf 'OK-INDEX' >"$WORK/pub/index.php"
 printf 'OK-GET' >"$WORK/pub/get.php"
 printf 'EXECUTED' >"$WORK/pub/media/customer/probe.php"
@@ -54,6 +56,8 @@ printf '<theme/>' >"$WORK/pub/media/theme_customization/layout.xml"
 printf 'body{color:red}' >"$WORK/pub/static/frontend/Magento/luma/en_US/css/styles-m.css"
 printf 'var x=1;' >"$WORK/pub/static/frontend/Magento/luma/en_US/requirejs/require.js"
 printf 'wOFF2' >"$WORK/pub/static/frontend/Magento/luma/en_US/fonts/opensans-400.woff2"
+printf 'var color=1;' >"$WORK/pub/static/frontend/Magento/luma/en_US/jquery/ui-modules/vendor/jquery-color/jquery.color.js"
+printf '<?php echo "EXECUTED";' >"$WORK/pub/vendor/autoload.php"
 cp "$CONF" "$WORK/nginx.conf"
 
 start_stack() {
@@ -167,6 +171,8 @@ expect "${VERSIONED_PREFIX}/css/no-such-file.css" 404
 expect "${STATIC_BASE}/css/no-such-file.css" 404
 expect "${VERSIONED_PREFIX}/evil.php" 403
 expect "${VERSIONED_PREFIX}/evil.phtml" 403
+expect_mime "${VERSIONED_PREFIX}/jquery/ui-modules/vendor/jquery-color/jquery.color.js" 200 'javascript'
+expect /vendor/autoload.php 403
 
 # Negative proof: without version-prefix rewrite, versioned CSS misses (404/HTML).
 awk '
