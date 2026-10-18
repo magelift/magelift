@@ -146,6 +146,32 @@ func TestStateLockCycle(t *testing.T) {
 	}
 }
 
+func TestStateLockAllowsTeardownWithoutImageDigest(t *testing.T) {
+	t.Parallel()
+	server := stateServer(t, newMemObjects())
+	spec := testSpec()
+	spec.AllowExpiredPreview = true
+	spec.Artifact.ImageDigest = ""
+	envelope, plan := planCall(testEnvelope(), storedTestPlan(t, spec))
+	locked, operr := server.StateLock(context.Background(), &sdk.StateLockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan, Owner: "teardown"})
+	if operr != nil {
+		t.Fatal(operr)
+	}
+	if !locked.Locked {
+		t.Fatal("teardown lock acquisition not reported")
+	}
+	if _, operr := server.StateUnlock(context.Background(), &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan}); operr != nil {
+		t.Fatal(operr)
+	}
+
+	strict := testSpec()
+	strict.Artifact.ImageDigest = ""
+	envelope, plan = planCall(testEnvelope(), storedTestPlan(t, strict))
+	if _, operr := server.StateLock(context.Background(), &sdk.StateLockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan, Owner: "deploy"}); operr == nil || !strings.Contains(operr.Message, "artifact image digest") {
+		t.Fatalf("deploy lock error = %v, want the digest check", operr)
+	}
+}
+
 func TestStateBackupRestore(t *testing.T) {
 	t.Parallel()
 	objects := newMemObjects()

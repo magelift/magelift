@@ -27,6 +27,20 @@ func loadSpecCall(envelope sdk.Envelope, plan sdk.StoredPlan) (gcpstack.Spec, *s
 	return loadSpecCallWithValidation(envelope, plan, func(spec gcpstack.Spec) error { return spec.Validate() })
 }
 
+// loadSpecCallForStateMutation accepts a destroy plan that has no image
+// digest. Deploy plans still go through strict validation.
+func loadSpecCallForStateMutation(envelope sdk.Envelope, plan sdk.StoredPlan) (gcpstack.Spec, *sdk.OperationError) {
+	spec, operr := loadSpec(plan.Opaque)
+	if operr != nil {
+		return gcpstack.Spec{}, operr
+	}
+	validate := spec.Validate
+	if spec.AllowExpiredPreview {
+		validate = spec.ValidateAllowExpiredPreview
+	}
+	return loadSpecCallWithValidation(envelope, plan, func(gcpstack.Spec) error { return validate() })
+}
+
 // loadSpecCallForRuntimeObserve is for output-backed read paths that may
 // carry a plan produced without a YAML image digest.
 func loadSpecCallForRuntimeObserve(envelope sdk.Envelope, plan sdk.StoredPlan) (gcpstack.Spec, *sdk.OperationError) {
@@ -112,12 +126,13 @@ func (s *Server) StateStatus(ctx context.Context, req *sdk.StateStatusCall) (*sd
 	return result, nil
 }
 
-// StateLock mirrors State.Lock.
+// StateLock mirrors State.Lock. Teardown plans omit the image digest, so
+// they use the same validation as destroy instead of the deploy check.
 func (s *Server) StateLock(ctx context.Context, req *sdk.StateLockCall) (*sdk.StateLockResult, *sdk.OperationError) {
 	if req == nil {
 		return nil, InvalidError("state lock call is required")
 	}
-	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	spec, operr := loadSpecCallForStateMutation(req.Envelope, req.Plan)
 	if operr != nil {
 		return nil, operr
 	}
@@ -132,7 +147,7 @@ func (s *Server) StateUnlock(ctx context.Context, req *sdk.StateUnlockCall) (*sd
 	if req == nil {
 		return nil, InvalidError("state unlock call is required")
 	}
-	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	spec, operr := loadSpecCallForStateMutation(req.Envelope, req.Plan)
 	if operr != nil {
 		return nil, operr
 	}
