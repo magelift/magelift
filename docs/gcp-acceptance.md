@@ -14,9 +14,9 @@ release and service matrix remains open**. On 2026-08-07, the preview profile
 passed 12 cells with Cloud SQL `MYSQL_8_4`, database-backed messaging, and a
 one-replica OpenSearch workload. Standard and HA Standard each passed 13 cells
 with Cloud SQL `MYSQL_8_4`, RabbitMQ 4.3, pinned OpenSearch 3, and the real B2B
-dump. The 2.4.6-p15 standard and HA Standard runs also passed 13 cells with
-the current images and full dump, but their MySQL engine is not an Adobe-listed
-latest-patch database choice. IDs are redacted in public docs.
+dump. Earlier 2.4.6-p15 standard and HA Standard runs also passed 13 cells with
+the images and full dump of that date, but their MySQL engine is not an Adobe-listed
+latest-patch database choice, and that Magento line is no longer supported. IDs are redacted in public docs.
 Current proof lives in the [evidence pack](evidence/README.md): Autopilot
 Magento 2.4.9 preview is
 [gcap28](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md);
@@ -122,11 +122,12 @@ It intentionally omits `queue:health` because database-backed messaging has no
 broker. It still creates and checks OpenSearch, so it is not a no-search run.
 See [gcap28](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md).
 
-The current 2.4.6-p15 standard shape passed all 13 cells with GKE Autopilot,
+The 2.4.6-p15 standard shape passed all 13 cells with GKE Autopilot,
 one OpenSearch replica, and one RabbitMQ replica. Its HA shape passed all 13
 cells with GKE Standard, three OpenSearch replicas, two RabbitMQ replicas, and
-node-level sysctl support. These are MageLift topology/runtime results; Adobe's
-current 2.4.6-p15 latest-patch row does not list MySQL.
+node-level sysctl support. Those runs stay in the evidence pack. Adobe's
+2.4.6-p15 latest-patch row does not list MySQL, and MageLift no longer accepts
+the line.
 
 The current 2.4.9 standard and HA shapes passed all 13 cells with Cloud SQL
 `MYSQL_8_4`, OpenSearch 3, RabbitMQ 4.3, and the B2B candidate. Those historical
@@ -136,7 +137,7 @@ Memorystore `VALKEY_9_0` (GA) for the 2.4.9 profile and permits
 infrastructure-only probe proves the live `VALKEY_9_0` API mapping, but did not
 run the Magento image, dump, migration, or application cache checks; the full
 application/cache intersection remains open. None of these profiles closes the
-2.4.6-through-2.4.9 matrix.
+2.4.7-through-2.4.9 matrix.
 
 ## Safety rules
 

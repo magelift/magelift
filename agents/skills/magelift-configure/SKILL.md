@@ -13,7 +13,7 @@ Use this skill before preview or deploy when the service shape is changing.
 ## Working rules
 
 - Start with `magelift compatibility catalog` for the exact Adobe patch line.
-- Use the latest patch record for 2.4.6 through 2.4.9. Do not use a version range.
+- Use the latest patch record for 2.4.7 through 2.4.9. Do not use a version range. Magento 2.4.6 is unavailable because it requires PHP 8.2.
 - Separate three facts: Adobe lists the service, MageLift implements the service,
   and the selected provider exposes the required product.
 - Keep `compatibility.allowUnsupported` off unless the exception is deliberate,

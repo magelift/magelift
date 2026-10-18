@@ -35,7 +35,7 @@ already-pinned ecosystem group; major bumps need a human review note.
 For `make verify-community` (the community alpha local gate):
 
 - **Go** toolchain matching [`go.mod`](go.mod) (CI uses `go-version-file`)
-- **PHP 8.2+** and **Composer**, required because the verification gate runs `php-test`
+- **PHP 8.3+** and **Composer**, required because the verification gate runs `php-test`
   on the `build/` Magento package. After clone, once: `composer install --working-dir=build`
 - **MkDocs**, required for `make docs` in the broader verification suite (strict link/nav build)
 

@@ -11,8 +11,8 @@ import (
 
 func TestPlanUsesReleaseSpecificPinnedServices(t *testing.T) {
 	plan, err := Plan(config.BuildSpec{
-		Application: config.Application{Version: "2.4.6-p15"},
-		Build:       config.Build{PHP: "8.2", Composer: config.Composer{Version: "2.2.26+"}, Extensions: []string{"redis", "intl"}},
+		Application: config.Application{Version: "2.4.7-p10"},
+		Build:       config.Build{PHP: "8.3", Composer: config.Composer{Version: "2.10"}, Extensions: []string{"redis", "intl"}},
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -6,7 +6,7 @@ import (
 
 const pluginVersion = "0.1.0"
 
-var firstPartyMagentoReleases = []string{"2.4.6", "2.4.7", "2.4.8", "2.4.9"}
+var firstPartyMagentoReleases = []string{"2.4.7", "2.4.8", "2.4.9"}
 
 type plugin struct {
 	descriptor sdk.WebRuntimeDescriptor

@@ -121,17 +121,8 @@ type localServiceRow struct {
 }
 
 var localReleaseCatalog = map[string]localReleaseRow{
-	"2.4.6": {
-		Release: "2.4.6-p15", PHPBranches: []string{"8.2"}, Composer: "2.2.26",
-		Database:  databaseRows(localServiceRow{Family: "mariadb", Version: "10.11", Image: localMariaDB1011Image}),
-		Cache:     cacheRows(localServiceRow{Family: "valkey", Version: "8.1", Image: localValkey81Image}),
-		Search:    searchRows(localServiceRow{Family: "opensearch", Version: "2", Image: localOpenSearch2Image}),
-		Queue:     queueRows(localServiceRow{Family: "rabbitmq", Version: "4.2", Image: localRabbitMQ42Image}, localServiceRow{Family: "artemis", Version: "2", Image: localArtemis238Image}),
-		WebServer: webServerRows(localServiceRow{Family: "nginx", Version: "1.30"}),
-		WebCache:  webCacheRows(localServiceRow{Family: "none"}, localServiceRow{Family: "varnish", Version: "8", Image: localVarnish8Image}),
-	},
 	"2.4.7": {
-		Release: "2.4.7-p10", PHPBranches: []string{"8.2", "8.3"}, Composer: "2.10",
+		Release: "2.4.7-p10", PHPBranches: []string{"8.3"}, Composer: "2.10",
 		Database: databaseRows(
 			localServiceRow{Family: "mariadb", Version: "10.11", Image: localMariaDB1011Image},
 			localServiceRow{Family: "mariadb", Version: "11.8", Image: localMariaDB118Image},
@@ -276,7 +267,7 @@ func Plan(build config.BuildSpec) (RuntimePlan, error) {
 func PlanFor(build config.BuildSpec, hints CloudHints) (RuntimePlan, error) {
 	row, ok := localReleaseRowFor(build.Application.Version)
 	if !ok {
-		return RuntimePlan{}, fmt.Errorf("no verified local runtime row exists for Magento %q; supported releases are 2.4.6-p15, 2.4.7-p10, 2.4.8-p5, and 2.4.9", build.Application.Version)
+		return RuntimePlan{}, fmt.Errorf("no verified local runtime row exists for Magento %q; supported releases are 2.4.7-p10, 2.4.8-p5, and 2.4.9", build.Application.Version)
 	}
 	if err := validateSharedCompatibility(build, row); err != nil {
 		return RuntimePlan{}, err

@@ -61,7 +61,7 @@ func ReferenceMarkdown() []byte {
 	out.WriteString("`service` (preferred) or pinned `task`, and `container`; use `runtime: kubernetes` with `namespace`, `workload`, and an optional\n")
 	out.WriteString("`container`. These are workload identities only; credentials and application verifiers stay provider-owned.\n\n")
 	out.WriteString("`target.provider: gcp` with `runtime: gke-autopilot` is the certified first-party Magento path for evidenced cells. `runtime: gke-standard` is experimental and remains the node-capable path for workloads such as multi-node OpenSearch.\n")
-	out.WriteString("Historical 2.4.6-p15 and 2.4.9 topology/runtime passes remain scoped evidence. The complete Adobe cache intersection and the rest of the release matrix stay open.\n")
+	out.WriteString("Historical 2.4.6-p15 and 2.4.9 topology/runtime passes remain scoped evidence. MageLift accepts PHP 8.3 and newer, so Magento 2.4.6 is unavailable. The complete Adobe cache intersection and the rest of the release matrix stay open.\n")
 	out.WriteString("Both require `target.gcp.project` and keep GCP topology under\n")
 	out.WriteString("`target.gcp` only. Do not reuse `target.aws` fields for GCP.\n\n")
 	out.WriteString("GCP Memorystore capacity and failure-domain choices are explicit advanced fields: `memorystoreShardCount`,\n")

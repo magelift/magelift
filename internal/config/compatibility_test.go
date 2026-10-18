@@ -14,9 +14,8 @@ func TestSupportedMagentoPHPIntersections(t *testing.T) {
 		{magento: "2.4.9", php: "8.5"},
 		{magento: "2.4.8", php: "8.3"},
 		{magento: "2.4.8-p5", php: "8.4.1"},
-		{magento: "2.4.7-p10", php: "8.2"},
+		{magento: "2.4.7-p10", php: "8.3"},
 		{magento: "2.4.7", php: "8.3"},
-		{magento: "2.4.6-p15", php: "8.2.20"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.magento+"-php-"+tt.php, func(t *testing.T) {
@@ -38,7 +37,7 @@ func TestSupportedMagentoPHPIntersections(t *testing.T) {
 func TestFuturePatchesAreUnsupported(t *testing.T) {
 	for _, version := range []string{"2.4.9-p1", "2.4.8-p6", "2.4.7-p11", "2.4.6-p16", "2.4.5-p18", "2.4.4-p19"} {
 		t.Run(version, func(t *testing.T) {
-			php := "8.2"
+			php := "8.3"
 			if strings.HasPrefix(version, "2.4.9") {
 				php = "8.5"
 			} else if strings.HasPrefix(version, "2.4.8") {
@@ -116,17 +115,17 @@ func TestAdobeListedPHP81LinesAreUnavailable(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "below MageLift's PHP 8.2 minimum") {
+	if err == nil || !strings.Contains(err.Error(), "below MageLift's PHP 8.3 minimum") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestCompatibilityCatalogMetadataAndCopies(t *testing.T) {
 	catalog := CurrentCompatibilityCatalog()
-	if catalog.Metadata.UpdatedAt != "2026-08-12" || catalog.Metadata.AdobeSnapshotAt != "2026-06-01" || len(catalog.Metadata.Sources) != 5 {
+	if catalog.Metadata.UpdatedAt != "2026-10-19" || catalog.Metadata.AdobeSnapshotAt != "2026-06-01" || len(catalog.Metadata.Sources) != 5 {
 		t.Fatalf("metadata = %#v", catalog.Metadata)
 	}
-	if err := catalog.Validate(time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)); err != nil {
+	if err := catalog.Validate(time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)); err != nil {
 		t.Fatalf("catalog validation = %v", err)
 	}
 	if !strings.Contains(catalog.Metadata.Scope, "service choices") {
@@ -141,13 +140,13 @@ func TestCompatibilityCatalogMetadataAndCopies(t *testing.T) {
 func TestCompatibilityCatalogRejectsStaleOrMissingSources(t *testing.T) {
 	catalog := CurrentCompatibilityCatalog()
 	catalog.Metadata.Sources[0].RetrievedAt = "2025-01-01"
-	if err := catalog.Validate(time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)); err == nil || !strings.Contains(err.Error(), "stale") {
+	if err := catalog.Validate(time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)); err == nil || !strings.Contains(err.Error(), "stale") {
 		t.Fatalf("stale source was accepted: %v", err)
 	}
 
 	catalog = CurrentCompatibilityCatalog()
 	catalog.Metadata.Sources[0].URL = ""
-	if err := catalog.Validate(time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)); err == nil || !strings.Contains(err.Error(), "HTTPS") {
+	if err := catalog.Validate(time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)); err == nil || !strings.Contains(err.Error(), "HTTPS") {
 		t.Fatalf("missing source URL was accepted: %v", err)
 	}
 }
@@ -155,7 +154,6 @@ func TestCompatibilityCatalogRejectsStaleOrMissingSources(t *testing.T) {
 func TestCompatibilityCatalogCoversSupportedPHPBranches(t *testing.T) {
 	catalog := CurrentCompatibilityCatalog()
 	want := []PHPBranchSupport{
-		{Branch: "8.2", Status: "security-fixes-only", ActiveSupportUntil: "2024-12-31", SecuritySupportUntil: "2026-12-31"},
 		{Branch: "8.3", Status: "security-fixes-only", ActiveSupportUntil: "2025-12-31", SecuritySupportUntil: "2027-12-31"},
 		{Branch: "8.4", Status: "active", ActiveSupportUntil: "2026-12-31", SecuritySupportUntil: "2028-12-31"},
 		{Branch: "8.5", Status: "active", ActiveSupportUntil: "2027-12-31", SecuritySupportUntil: "2029-12-31"},
@@ -264,7 +262,7 @@ func TestRequirementsForReleaseReturnsCopies(t *testing.T) {
 }
 
 func TestAdobeUnsupportedMySQLFailsClosedUnlessHatch(t *testing.T) {
-	input := withVersions(base, "2.4.6-p15", "8.2")
+	input := withVersions(base, "2.4.7-p10", "8.3")
 	input = strings.Replace(input, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: aws, runtime: ecs-fargate, aws: {catalog: {databaseEngine: rds-mysql, versions: {mysql: 8.0.45, valkey: \"8.1\", openSearch: OpenSearch_2.19}}}}", 1)
 	file, err := Load([]byte(input))
 	if err != nil {

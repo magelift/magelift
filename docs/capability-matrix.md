@@ -34,8 +34,8 @@ not enough.
 | --- | --- | --- | --- | --- |
 | `aws` | `ecs-fargate` | **certified for the evidenced preview tuple** | Magento 2.4.9, `nginx-fpm`, and its recorded catalog services only | full for that exact tuple |
 | `aws` | `eks` | experimental | 2.4.9 Auto Mode Magento + RabbitMQ KEEP `awsek`; self-managed Magento [20260817bf](evidence/aws-eks-self-managed-magento-live-20260817bf.md); HA, edge, OpenSearch, and broader release matrix pending | Runtime health/state exercised live; account-free cost classification now covers the EKS control plane, Auto Mode, managed nodes, self-managed nodes, and Fargate; live EKS Price List queries, broader Observe/Steps, and day-2 certification remain pending |
-| `gcp` | `gke-autopilot` | **certified for evidenced runtime cells** | 2.4.6-p15 is topology/runtime evidence only because GCP Cloud SQL MySQL is Adobe-unsupported for that patch; 2.4.9 preview has live MySQL 8.4 evidence but remains experimental for the full Adobe cache intersection | full (WIF + Secret Manager Composer + logs/exec/secrets/state/health) for the evidenced runtime cells |
-| `gcp` | `gke-standard` | experimental | 2.4.6-p15 HA is topology/runtime evidence only; 2.4.9 Standard and HA have bounded application evidence with MySQL 8.4 and Valkey 9.0, while broader architecture and resilience evidence remain open | full for the evidenced runtime shapes; broader matrix pending |
+| `gcp` | `gke-autopilot` | **certified for evidenced runtime cells** | 2.4.9 preview has live MySQL 8.4 evidence and remains experimental for the full Adobe cache intersection. The 2.4.6-p15 run stays in the evidence pack; that line is no longer supported | full (WIF + Secret Manager Composer + logs/exec/secrets/state/health) for the evidenced runtime cells |
+| `gcp` | `gke-standard` | experimental | 2.4.9 Standard and HA have bounded application evidence with MySQL 8.4 and Valkey 9.0, while broader architecture and resilience evidence remain open. The 2.4.6-p15 HA run stays in the evidence pack; that line is no longer supported | full for the evidenced runtime shapes; broader matrix pending |
 | `ovh` | `mks` | experimental | shared kube.Steps offline (unit) | Observe+Steps+State offline (unit/Floci); Bootstrap/Secrets `ErrNotSupported`; account-free Cost capacity is supported, live OVH pricing is not wired |
 | `scaleway` | `kapsule` | experimental | shared kube.Steps offline (unit) | Observe+Steps+State offline (unit/Floci); Bootstrap `ErrNotSupported`; provider-backed application Secrets use the planned project/region and ownership tags; account-free Cost capacity is supported, live Scaleway pricing is not wired |
 
@@ -294,14 +294,14 @@ The certified GCP tier (GCP-06) covers Autopilot evidenced runtime cells.
 Current proof is the [evidence pack](evidence/README.md): Autopilot Magento
 2.4.9 preview [gcap28](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md)
 (sealed JSONL `evidence/runs/gcp-gke-autopilot-magento-gcap28-20260820.sealed.jsonl`).
-2.4.6-p15 Standard cells used matching
-PHP and Composer contracts but Cloud SQL MySQL is not an Adobe-compatible
-database intersection for that patch. See [gcp-acceptance.md](gcp-acceptance.md).
+Earlier 2.4.6-p15 Standard cells used matching
+PHP and Composer contracts, but Cloud SQL MySQL is not an Adobe-compatible
+database intersection for that patch and the line is no longer supported. See [gcp-acceptance.md](gcp-acceptance.md).
 
 | Preset | Queue | Search | SQL | Memorystore | Apply on credits? |
 | --- | --- | --- | --- | --- | --- |
 | `preview` | `database` | OpenSearch on GKE (1) | ZONAL | `SHARED_CORE_NANO` | **yes** (credit-efficient; 2.4.9 pass) |
-| `standard` | `rabbitmq` on GKE | OpenSearch (1) | REGIONAL | `STANDARD_SMALL` +1 replica | **runtime evidence only for 2.4.6-p15; experimental 2.4.9** |
+| `standard` | `rabbitmq` on GKE | OpenSearch (1) | REGIONAL | `STANDARD_SMALL` +1 replica | **experimental 2.4.9; the 2.4.6-p15 run is historical** |
 | `high-availability` | `rabbitmq`×2 | OpenSearch×3 | REGIONAL | 2 replicas | **bounded 2.4.9 application evidence; broader HA/resilience experimental** |
 
 GKE Standard is experimental. 2.4.9 Standard Magento with Memorystore Valkey

@@ -1,6 +1,6 @@
 # Compatibility
 
-The catalog snapshot is dated 2026-07-23. It records Adobe's latest-patch
+The catalog snapshot is dated 2026-10-19. It records Adobe's latest-patch
 requirements separately from MageLift's implementation status. A catalog match
 does not certify a provider or an architecture.
 
@@ -8,8 +8,11 @@ does not certify a provider or an architecture.
 | --- | --- | --- |
 | 2.4.9 | 8.5 | 2.4.9 |
 | 2.4.8 | 8.3, 8.4 | 2.4.8-p5 |
-| 2.4.7 | 8.2, 8.3 | 2.4.7-p10 |
-| 2.4.6 | 8.2 | 2.4.6-p15 |
+| 2.4.7 | 8.3 | 2.4.7-p10 |
+
+Magento 2.4.6 and older lines are unavailable. Adobe lists PHP 8.2 for 2.4.6
+and PHP 8.1 for 2.4.4 and 2.4.5, all below MageLift's PHP 8.3 floor. Adobe
+still lists PHP 8.2 for 2.4.7; MageLift accepts PHP 8.3 on that line.
 
 The Adobe rows include MariaDB, MySQL where listed, OpenSearch, Elasticsearch
 where listed, RabbitMQ, ActiveMQ Artemis, Valkey, Varnish, nginx, Composer, and

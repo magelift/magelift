@@ -80,7 +80,7 @@ func TestRecipeValidationPreservesExistingMatrixWithoutPublishing(t *testing.T) 
 	for _, cell := range cells {
 		kinds[cell.Image]++
 	}
-	if len(cells) != 12 || kinds["nginx"] != 4 || kinds["builder"] != 4 || kinds["frankenphp-classic"] != 4 {
+	if len(cells) != 9 || kinds["nginx"] != 3 || kinds["builder"] != 3 || kinds["frankenphp-classic"] != 3 {
 		t.Fatalf("existing recipe checks lost: %+v", cells)
 	}
 }

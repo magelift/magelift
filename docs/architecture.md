@@ -21,8 +21,9 @@ compatibility and certification status.
 ## Boundaries
 
 - The RC1 matrix marks AWS ECS Fargate and GCP GKE Autopilot as certified for
-  evidenced cells. GCP GKE Standard is experimental, with current 2.4.6-p15 HA
-  and 2.4.9 MySQL 8.4 passes but no release-wide certification yet. AWS EKS
+  evidenced cells. GCP GKE Standard is experimental, with a recorded 2.4.6-p15 HA
+  pass and current 2.4.9 MySQL 8.4 passes, and no release-wide certification yet.
+  Magento 2.4.6 is no longer a supported line. AWS EKS
   (`aws` / `eks`), OVH (`ovh` / `mks`), and Scaleway
   (`scaleway` / `kapsule`) remain experimental ([ADR 0002](adr/0002-certified-vs-experimental.md)). Evidence, not
   a descriptor, is the authority for a certification claim.

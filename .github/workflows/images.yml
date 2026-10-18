@@ -23,11 +23,6 @@ jobs:
           - image: nginx
             file: images/php-nginx/Dockerfile
             target: runtime
-            php: '8.2'
-            base: docker.io/library/php:8.2-fpm-trixie@sha256:596175799ca76a93d5d0c3cda7d5f70fccfc86dfdaf97580c1c27e665aba991f
-          - image: nginx
-            file: images/php-nginx/Dockerfile
-            target: runtime
             php: '8.3'
             base: docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328
           - image: nginx
@@ -43,11 +38,6 @@ jobs:
           - image: builder
             file: images/php-nginx/Dockerfile
             target: builder
-            php: '8.2'
-            base: docker.io/library/php:8.2-fpm-trixie@sha256:596175799ca76a93d5d0c3cda7d5f70fccfc86dfdaf97580c1c27e665aba991f
-          - image: builder
-            file: images/php-nginx/Dockerfile
-            target: builder
             php: '8.3'
             base: docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328
           - image: builder
@@ -60,11 +50,6 @@ jobs:
             target: builder
             php: '8.5'
             base: docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc
-          - image: frankenphp-classic
-            file: images/frankenphp-classic/Dockerfile
-            target: ''
-            php: '8.2'
-            base: docker.io/dunglas/frankenphp:1.12.7-php8.2-trixie@sha256:3c1ad970186bc0d3b47d0ff3212f9f47dfa0e6c7e5dbb68bec19ed9c6464c466
           - image: frankenphp-classic
             file: images/frankenphp-classic/Dockerfile
             target: ''

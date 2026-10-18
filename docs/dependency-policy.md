@@ -5,10 +5,9 @@ MageLift uses the newest production-suitable dependency compatible with its supp
 - Go declares the latest supported stable toolchain. CI reads `go.mod` rather than duplicating the version.
 - Cobra tracks the latest stable minor release.
 - YAML v4 is used because upstream has frozen v3 except for security maintenance and recommends v4 for new projects. Until v4 reaches a final release, its pinned release candidate must pass all strict-decoding, merge, and provenance tests before each update.
-- The PHP package keeps PHP 8.2 as its runtime floor and tests through PHP 8.5. PHPUnit stays on the latest 11.x release because newer PHPUnit majors would raise the test suite's PHP floor even though the library still supports PHP 8.2.
-- Composer resolves the lock file against PHP 8.2.27, the lowest patch required by
-  the current static-analysis toolchain, so a dependency cannot pass on PHP 8.5 and
-  fail on the PHP 8.2 CI job. The package still declares `^8.2` and CI exercises
+- The PHP package keeps PHP 8.3 as its runtime floor and tests through PHP 8.5. PHPUnit stays on the latest 11.x release.
+- Composer resolves the lock file against PHP 8.3.26, so a dependency cannot pass on PHP 8.5 and
+  fail on the PHP 8.3 CI job. The package declares `^8.3` and CI exercises
   every supported branch.
 - PHPStan and Psalm run on every verification job. Their dynamic JSON and process
   boundary checks are kept in source rather than hidden in a generated baseline.

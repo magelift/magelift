@@ -618,15 +618,15 @@ func TestCellsForTargetAppliesAdobeReleaseCompatibility(t *testing.T) {
 		wantNote     string
 	}{
 		{
-			name:     "mysql is rejected on 2.4.6 latest patch",
+			name:     "mysql is rejected on 2.4.7 latest patch",
 			targetID: "aws/ecs-fargate",
-			release:  "2.4.6-p15",
+			release:  "2.4.7-p10",
 			dimensions: func(dimensions Dimensions) bool {
 				return dimensions.Database == "rds-mysql" && dimensions.Search == "disabled" && dimensions.Queue == "db" && dimensions.Cache == "valkey" && dimensions.WebCache == "none" && dimensions.Edge == "none"
 			},
 			wantStatus:   CapabilityUnsupported,
 			wantRequired: false,
-			wantNote:     "Adobe 2.4.6-p15 marks database/mysql unsupported",
+			wantNote:     "Adobe 2.4.7-p10 marks database/mysql unsupported",
 		},
 		{
 			name:     "mysql is accepted on 2.4.8 latest patch",

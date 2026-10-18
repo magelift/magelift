@@ -1,24 +1,23 @@
 # Container images
 
 `php-nginx` is the common PHP-FPM and nginx base for Magento application images. The
-certified matrix covers PHP 8.2 through 8.5 on Debian Trixie. PHP 8.2 and 8.3
-receive security fixes from PHP upstream, while PHP 8.4 and 8.5 receive active
-support. Magento release lines still tied to PHP 8.1 are not available because
-PHP 8.1 is no longer supported upstream.
+certified matrix covers PHP 8.3 through 8.5 on Debian Trixie. PHP 8.3
+receives security fixes from PHP upstream, while PHP 8.4 and 8.5 receive active
+support. Magento lines whose Adobe row stops below PHP 8.3, including 2.4.6,
+are not available.
 
 | Magento line | MageLift PHP branches |
 | --- | --- |
 | 2.4.9 | 8.5 |
 | 2.4.8 | 8.3, 8.4 |
-| 2.4.7 | 8.2, 8.3 |
-| 2.4.6 | 8.2 |
+| 2.4.7 | 8.3 |
 
 The images use Debian for glibc and third-party extension compatibility. Base
 images are pinned by multi-platform digest and updated through reviewed dependency
 changes.
 
 `frankenphp-classic` and `php-apache` are experimental Adobe-hatch adapters,
-not Adobe-certified runtimes. They are published for the same PHP 8.2 through
+not Adobe-certified runtimes. They are published for the same PHP 8.3 through
 8.5 branches with the `frankenphp-classic-supported` and
 `php-apache-supported` Bake targets.
 

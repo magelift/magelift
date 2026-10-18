@@ -36,7 +36,7 @@ Resilience projection targets are optional advanced settings: use `resilience.pr
 `container`. These are workload identities only; credentials and application verifiers stay provider-owned.
 
 `target.provider: gcp` with `runtime: gke-autopilot` is the certified first-party Magento path for evidenced cells. `runtime: gke-standard` is experimental and remains the node-capable path for workloads such as multi-node OpenSearch.
-Historical 2.4.6-p15 and 2.4.9 topology/runtime passes remain scoped evidence. The complete Adobe cache intersection and the rest of the release matrix stay open.
+Historical 2.4.6-p15 and 2.4.9 topology/runtime passes remain scoped evidence. MageLift accepts PHP 8.3 and newer, so Magento 2.4.6 is unavailable. The complete Adobe cache intersection and the rest of the release matrix stay open.
 Both require `target.gcp.project` and keep GCP topology under
 `target.gcp` only. Do not reuse `target.aws` fields for GCP.
 

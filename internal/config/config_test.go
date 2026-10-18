@@ -1304,8 +1304,8 @@ func TestResolveRejectsIncompatibleAWSNATReplacement(t *testing.T) {
 	}
 }
 
-func TestResolveUsesMagento246RDSMariaDBCompatibilityDefault(t *testing.T) {
-	input := withVersions(base, "2.4.6-p15", "8.2")
+func TestResolveUsesMagento247RDSMariaDBCompatibilityDefault(t *testing.T) {
+	input := withVersions(base, "2.4.7-p10", "8.3")
 	input = strings.Replace(input, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: aws, runtime: ecs-fargate, aws: {}}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
@@ -1319,10 +1319,10 @@ func TestResolveUsesMagento246RDSMariaDBCompatibilityDefault(t *testing.T) {
 		t.Fatal("AWS target was not materialized")
 	}
 	if got := effective.Config.Target.AWS.Catalog.DatabaseEngine; got != "rds-mariadb" {
-		t.Fatalf("Magento 2.4.6 database engine = %q, want rds-mariadb", got)
+		t.Fatalf("Magento 2.4.7 database engine = %q, want rds-mariadb", got)
 	}
 	if got := effective.Config.Target.AWS.Catalog.Versions.MariaDB; got != "10.11.13" {
-		t.Fatalf("Magento 2.4.6 RDS MariaDB default = %q, want 10.11.13", got)
+		t.Fatalf("Magento 2.4.7 RDS MariaDB default = %q, want 10.11.13", got)
 	}
 }
 
@@ -1496,8 +1496,7 @@ func TestRuntimeDefaultsResolveComposerRequirementByRelease(t *testing.T) {
 		php     string
 		want    string
 	}{
-		{release: "2.4.6-p15", php: "8.2", want: "2.2.26+"},
-		{release: "2.4.7-p10", php: "8.2", want: "2.10"},
+		{release: "2.4.7-p10", php: "8.3", want: "2.10"},
 		{release: "2.4.8-p5", php: "8.3", want: "2.10"},
 		{release: "2.4.9", php: "8.5", want: "2.10"},
 	}

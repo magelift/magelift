@@ -7,7 +7,7 @@
     ],
     "license": "Apache-2.0",
     "require": {
-        "php": "^8.2"
+        "php": "^8.3"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.3.1",
@@ -33,7 +33,7 @@
         "allow-plugins": {},
         "sort-packages": true,
         "platform": {
-            "php": "8.2.27"
+            "php": "8.3.26"
         }
     },
     "prefer-stable": true

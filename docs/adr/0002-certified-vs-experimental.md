@@ -26,6 +26,10 @@ Provider-unavailable cells (no adapter or SKU) still fail closed.
 
 `nginx-fpm` is the Adobe-aligned default. `frankenphp-classic` and `php-apache` are Adobe-unsupported plugins that require `compatibility.allowUnsupported` on the current Magento line. Adobe has no row for either plugin, neither is certified, and `frankenphp-worker` remains unregistered.
 
+## Amendment 2026-10-19
+
+MageLift's PHP floor is 8.3. Magento lines whose Adobe row stops below that floor, including 2.4.6, are unavailable. 2.4.7 stays, on PHP 8.3. Recorded 2.4.6 runs stay in the evidence pack.
+
 ## Consequences
 
 CLI, README, and the public site must match the matrix. A live pass on one Magento 2.4.9 shape does not certify every release, edge vendor, or HA profile.

@@ -18,7 +18,7 @@
         <UnusedClass errorLevel="suppress" />
         <PossiblyUnusedMethod errorLevel="suppress" />
         <PossiblyUnusedProperty errorLevel="suppress" />
-        <!-- #[Override] is unavailable on the package's PHP 8.2 floor. -->
+        <!-- #[Override] stays suppressed; the package does not use it. -->
         <MissingOverrideAttribute errorLevel="suppress" />
         <!-- Runtime protocol guards intentionally repeat checks after JSON decoding. -->
         <UnusedFunctionCall errorLevel="suppress" />

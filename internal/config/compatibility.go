@@ -132,7 +132,7 @@ type CompatibilityAssessment struct {
 
 var currentCompatibilityCatalog = CompatibilityCatalog{
 	Metadata: CompatibilityMetadata{
-		UpdatedAt:       "2026-08-12",
+		UpdatedAt:       "2026-10-19",
 		AdobeSnapshotAt: "2026-06-01",
 		Scope:           "Adobe Commerce release requirements and MageLift service choices for the RC1 architecture matrix.",
 		Sources: []CompatibilitySource{
@@ -146,13 +146,12 @@ var currentCompatibilityCatalog = CompatibilityCatalog{
 	Lines: []CompatibilityReleaseLine{
 		{Line: "2.4.9", RecommendedRelease: "2.4.9", PHPBranches: []string{"8.5"}, MaximumPatch: 0, Available: true},
 		{Line: "2.4.8", RecommendedRelease: "2.4.8-p5", PHPBranches: []string{"8.3", "8.4"}, MaximumPatch: 5, Available: true},
-		{Line: "2.4.7", RecommendedRelease: "2.4.7-p10", PHPBranches: []string{"8.2", "8.3"}, MaximumPatch: 10, Available: true},
-		{Line: "2.4.6", RecommendedRelease: "2.4.6-p15", PHPBranches: []string{"8.2"}, MaximumPatch: 15, Available: true},
-		{Line: "2.4.5", RecommendedRelease: "2.4.5-p17", PHPBranches: []string{"8.1"}, MaximumPatch: 17, Available: false, UnavailableReason: "Adobe lists this line with PHP 8.1, which is below MageLift's PHP 8.2 minimum."},
-		{Line: "2.4.4", RecommendedRelease: "2.4.4-p18", PHPBranches: []string{"8.1"}, MaximumPatch: 18, Available: false, UnavailableReason: "Adobe lists this line with PHP 8.1, which is below MageLift's PHP 8.2 minimum."},
+		{Line: "2.4.7", RecommendedRelease: "2.4.7-p10", PHPBranches: []string{"8.3"}, MaximumPatch: 10, Available: true},
+		{Line: "2.4.6", RecommendedRelease: "2.4.6-p15", PHPBranches: []string{"8.2"}, MaximumPatch: 15, Available: false, UnavailableReason: "Adobe lists this line with PHP 8.2, which is below MageLift's PHP 8.3 minimum."},
+		{Line: "2.4.5", RecommendedRelease: "2.4.5-p17", PHPBranches: []string{"8.1"}, MaximumPatch: 17, Available: false, UnavailableReason: "Adobe lists this line with PHP 8.1, which is below MageLift's PHP 8.3 minimum."},
+		{Line: "2.4.4", RecommendedRelease: "2.4.4-p18", PHPBranches: []string{"8.1"}, MaximumPatch: 18, Available: false, UnavailableReason: "Adobe lists this line with PHP 8.1, which is below MageLift's PHP 8.3 minimum."},
 	},
 	PHP: []PHPBranchSupport{
-		{Branch: "8.2", Status: "security-fixes-only", ActiveSupportUntil: "2024-12-31", SecuritySupportUntil: "2026-12-31"},
 		{Branch: "8.3", Status: "security-fixes-only", ActiveSupportUntil: "2025-12-31", SecuritySupportUntil: "2027-12-31"},
 		{Branch: "8.4", Status: "active", ActiveSupportUntil: "2026-12-31", SecuritySupportUntil: "2028-12-31"},
 		{Branch: "8.5", Status: "active", ActiveSupportUntil: "2027-12-31", SecuritySupportUntil: "2029-12-31"},
@@ -187,7 +186,7 @@ var currentCompatibilityCatalog = CompatibilityCatalog{
 		{Release: "2.4.7-p10", Component: CompatibilityWebCache, Option: "varnish", Versions: []string{"8"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.7-p10", Component: CompatibilityWebCache, Option: "none", Status: CompatibilityMageLift, Notes: "Headless and API-only deployments may omit the Varnish layer."},
 		{Release: "2.4.7-p10", Component: CompatibilityWebServer, Option: "nginx", Versions: []string{"1.30"}, Status: CompatibilityAdobeSupported},
-		{Release: "2.4.7-p10", Component: CompatibilityPHP, Option: "php", Versions: []string{"8.2", "8.3"}, Status: CompatibilityAdobeSupported},
+		{Release: "2.4.7-p10", Component: CompatibilityPHP, Option: "php", Versions: []string{"8.3"}, Status: CompatibilityAdobeSupported, Notes: "Adobe also lists PHP 8.2. MageLift accepts PHP 8.3 on this line."},
 		{Release: "2.4.7-p10", Component: CompatibilityEdge, Option: "fastly", Status: CompatibilityMageLift, Notes: "Fastly is an experimental edge migration target, not an Adobe system requirement."},
 
 		{Release: "2.4.8-p5", Component: CompatibilityComposer, Option: "composer", Versions: []string{"2.10"}, Status: CompatibilityAdobeSupported},

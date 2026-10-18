@@ -454,7 +454,7 @@ func joinNotes(existing, addition string) string {
 }
 
 func latestReleases() []string {
-	wanted := map[string]bool{"2.4.6": true, "2.4.7": true, "2.4.8": true, "2.4.9": true}
+	wanted := map[string]bool{"2.4.7": true, "2.4.8": true, "2.4.9": true}
 	result := make([]string, 0, len(wanted))
 	for _, line := range config.CurrentCompatibilityCatalog().Lines {
 		if line.Available && wanted[line.Line] {
