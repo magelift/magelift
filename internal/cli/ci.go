@@ -206,7 +206,11 @@ func renderWorkflow(configFile, version string, environments []string, generator
 	writeProviderInstall(&workflow)
 	workflow.WriteString("      - name: Validate configuration\n        run: magelift --config " + shellQuote(configFile) + " --no-interaction config validate\n")
 	workflow.WriteString("      - name: Resolve environment\n        run: magelift --config " + shellQuote(configFile) + " --env \"${{ matrix.environment }}\" --no-interaction --output json config effective > /dev/null\n")
-	workflow.WriteString("\n  build:\n    name: Build and sign immutable image\n    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment != 'production')\n    needs: validate\n    runs-on: ubuntu-latest\n")
+	buildCondition := "github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.environment != 'production')"
+	if testOnly {
+		buildCondition = "github.event_name == 'push' || github.event_name == 'workflow_dispatch'"
+	}
+	workflow.WriteString("\n  build:\n    name: Build and sign immutable image\n    if: " + buildCondition + "\n    needs: validate\n    runs-on: ubuntu-latest\n")
 	if buildEnvironment != "" {
 		workflow.WriteString("    environment: " + buildEnvironment + "\n")
 	}

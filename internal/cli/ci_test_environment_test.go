@@ -49,7 +49,7 @@ func TestSingleTestWorkflowBuildsAndDeploysWithoutProductionInputs(t *testing.T)
 			if _, ok := workflow.On["schedule"]; ok {
 				t.Fatal("test-only flow has a preview schedule")
 			}
-			if strings.Contains(string(rendered), "release_digest:") || strings.Contains(string(rendered), "artifact_run_id:") || strings.Contains(string(rendered), "inputs.environment == 'test'") {
+			if strings.Contains(string(rendered), "release_digest:") || strings.Contains(string(rendered), "artifact_run_id:") || strings.Contains(string(rendered), "inputs.") {
 				t.Fatal("single test dispatch needs no production/environment inputs")
 			}
 			deploy := workflow.Jobs["test"]

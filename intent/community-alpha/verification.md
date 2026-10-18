@@ -893,3 +893,31 @@ conditional member bindings; the private receipt is retained for scoped cleanup.
 The maintainer prefers an organization-owned acceptance repository. Its final
 visibility and federation update are pending; the prior personal-repository
 permission approval is not silently extended to a different repository.
+
+### S2 increment: organization acceptance and test-only dispatch
+
+The maintainer authorized a public synthetic fixture in the MageLift organization.
+The source snapshot preserves upstream licenses and public patch provenance;
+41,603 files were checked against actual credential values and private target
+identifiers with no matches. No private history or vendor cache was exported.
+The public configuration uses placeholders. Actual target YAML is supplied as
+a nonsecret repository variable by an acceptance-only workflow customization.
+Build/test environments exist with main-only deployment branch policies. The
+organization's Free plan does not support private-repository environments.
+The revised 24-binding plan for the organization repository is approved.
+
+Actionlint on the real single-test generated workflow found an undefined
+inputs.environment reference in its build condition. The generator now accepts
+push or manual dispatch without inputs for that mode, while multi-environment
+production selection is unchanged. The strengthened regression rejects any
+inputs reference in test-only output. Targeted workflow tests and the complete
+CLI package pass; the corrected actual workflow passes actionlint. This fix is
+newer than the second approved canary, whose fixture workflow is customized
+accordingly; no tag is moved. Cloud CI/runtime acceptance remains NOT_RUN.
+
+The organization IAM baseline attempt encountered a 403 when requesting policy
+on an absent registry. This is not recorded as a successful policy read or as
+proof of missing project permission. The baseline must be completed after
+owned prerequisite creation and before CI grants, accounting separately for
+the newly added node baseline grants. Cleanup remains required for both the
+unused personal-repository prerequisites and the active organization run.
