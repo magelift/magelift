@@ -33,12 +33,12 @@ auth.json
 .DS_Store
 
 # AI agent local caches and user-installed third-party skills (not audited for
-# this repository's Apache-2.0 license surface). First-party skills live in
-# agents/skills/ and are tracked. The OKF bundle under .agents/knowledge/ is
-# committed.
+# this repository's Apache-2.0 license surface). First-party user skills live
+# in agents/skills/. The OKF bundle and its maintainer skill are committed.
 .claude/
 .agents/*
 !.agents/knowledge/
+!.agents/skills/
 .agents/knowledge/tools/.ruff_cache/
 .cursor/
 .serena/

@@ -8,7 +8,7 @@ status: stable
 
 # Knowledge conventions
 
-This directory is an [OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle: markdown files with YAML frontmatter. Read and write them directly. A clone does not need a home-directory vault.
+This directory is an [OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle: markdown files with YAML frontmatter. Read and write them directly. A clone does not need a home-directory vault. Maintainer agents load `.agents/skills/okf-maintain` before writing.
 
 Default action is **UPDATE or SKIP**. Create a file only when all of these hold: the fact will still be true after the task, nothing in this bundle or in `AGENTS.md`, the human docs, or the code already says it, and it is one concept. Two new files is the cap for one change. A third means merge. Session diaries, plans, and todos do not belong here.
 

@@ -62,7 +62,7 @@ Layout:
 - `images/`: PHP-FPM + nginx runtime (FrankenPHP classic remains in-tree for provenance; schema rejects it as `application.webRuntime`)
 - `schema/`: generated JSON Schema for `magelift.yaml`
 - `docs/`: MkDocs; ADRs in `docs/adr/`; short evidence pack in `docs/evidence/`
-- `.agents/knowledge/`: agent OKF bundle (tracked; other `.agents/` caches are not)
+- `.agents/knowledge/`: agent OKF bundle (tracked). `.agents/skills/okf-maintain` is the maintainer procedure for that bundle. Other `.agents/` caches are not tracked.
 - `tests/`: Floci and fixtures ([tests/README.md](tests/README.md))
 
 ## Principles

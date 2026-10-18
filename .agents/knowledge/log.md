@@ -2,6 +2,7 @@
 
 ## 2026-10-19
 
+- Maintainer procedure is [okf-maintain](../skills/okf-maintain/SKILL.md). It follows [conventions.md](conventions.md) and does not use a home-directory vault.
 - Authoring rules are [conventions.md](conventions.md). `tools/okf.py` rewrites the indexes and checks the bundle. The earlier `CONVENTIONS.md`, `rebuild-index.py`, and `validate-okf.py` names are gone.
 
 ## 2026-10-18

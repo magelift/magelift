@@ -25,9 +25,10 @@ Always-on layer. Load one skill from the table. Do not paste skill bodies,
   `agents/manifest.json`. Use `make generate`.
 - File session resumes, KEEP run IDs, or facts the code already answers
   into `.agents/knowledge/`. Authoring rules are
-  `.agents/knowledge/conventions.md`. Commit that bundle. Leave `.cursor/`,
-  `.claude/`, other `.agents/` caches, credentials, Pulumi state, and
-  third-party skill packs untracked.
+  `.agents/knowledge/conventions.md`. The maintainer procedure is
+  `.agents/skills/okf-maintain`. Commit that bundle and that skill. Leave
+  `.cursor/`, `.claude/`, other `.agents/` caches, credentials, Pulumi
+  state, and third-party skill packs untracked.
 
 ## Ask first
 
@@ -43,6 +44,7 @@ skills acceptance run. Layout and the local gate are in `CONTRIBUTING.md`.
 | When | Skill |
 | --- | --- |
 | Code, docs, PR, honesty | `contrib/skills/magelift-contribute` |
+| OKF bundle `.agents/knowledge/` | `.agents/skills/okf-maintain` |
 | New `internal/cloud/<provider>/` | `contrib/skills/magelift-provider` |
 | Public extension boundary | `contrib/skills/magelift-extend` |
 | Live matrix cell and evidence | `contrib/skills/magelift-certify` |
