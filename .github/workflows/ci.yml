@@ -1,0 +1,679 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      all:
+        description: Force all path-filtered jobs to run
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    # paths-filter lists PR files via the GitHub API on pull_request events.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      go: ${{ steps.filter.outputs.go == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      sdk: ${{ steps.filter.outputs.sdk == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      provider: ${{ steps.filter.outputs.provider == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      docs: ${{ steps.filter.outputs.docs == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      php: ${{ steps.filter.outputs.php == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      images: ${{ steps.filter.outputs.images == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      scripts: ${{ steps.filter.outputs.scripts == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      workflows: ${{ steps.filter.outputs.workflows == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+      release: ${{ steps.filter.outputs.release == 'true' || (github.event_name == 'workflow_dispatch' && inputs.all) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Push path filtering needs the before-sha locally; credentials stay off
+          # so paths-filter must not git-fetch (PR events use the GitHub API instead).
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          filters: |
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'sdk/go.mod'
+              - 'sdk/go.sum'
+              - 'go.work'
+              - 'go.work.sum'
+              - 'schema/**'
+              - 'Makefile'
+              - '.golangci.yml'
+              # CI Go jobs live here — workflow-only edits must still exercise them.
+              - '.github/workflows/ci.yml'
+              - 'docker-compose.floci.yml'
+              - 'docker-compose.floci-gcp.yml'
+            sdk:
+              - 'sdk/**/*.go'
+              - 'sdk/go.mod'
+              - 'sdk/go.sum'
+              - 'go.work'
+              - 'go.work.sum'
+            provider:
+              - 'providers/**/*.go'
+              - 'providers/gcp/go.mod'
+              - 'providers/gcp/go.sum'
+              - 'sdk/**/*.go'
+              - 'sdk/go.mod'
+              - 'sdk/go.sum'
+              - 'go.work'
+              - 'go.work.sum'
+            docs:
+              - 'docs/**'
+              - 'mkdocs.yml'
+            php:
+              - 'build/**'
+              - 'internal/platform/testdata/lifecycle-deploy.json'
+            images:
+              - 'images/**'
+              - 'docker-bake.hcl'
+              - 'scripts/frankenphp-tls-test.sh'
+              - 'scripts/varnish-test.sh'
+            scripts:
+              - 'scripts/**'
+            workflows:
+              - '.github/workflows/**'
+              - '.github/dependabot.yml'
+            release:
+              - '.goreleaser.yml'
+              - '.goreleaser.yaml'
+              - 'cmd/**'
+
+  cache-prime:
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    # Module download only — compiling was SIGTERM'd ~10m on the private runner (30350692845).
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-
+          lookup-only: true
+      - uses: ./.github/actions/go-memlimit
+      - name: Warm module cache
+        run: go mod download
+      # Explicit save with if: always() — setup-go's post-step never runs when the runner is reaped.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always()
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+
+  lint:
+    name: lint
+    needs: [changes, cache-prime]
+    # Run even when cache-prime fails so a cold lint still gates merges.
+    # Skip Dependabot: go-verify (test + govulncheck) is the dep-bump signal;
+    # the old 6-way matrix burned ~1.6k min in two days mostly on cancelled deps PRs.
+    if: >-
+      ${{ always() && !cancelled()
+      && needs.changes.outputs.go == 'true'
+      && github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          # Pin the binary (not "latest"): v2.13.2 is built with go1.27 for this toolchain.
+          version: v2.13.2
+          args: ./...
+
+  go-verify:
+    needs: [changes, cache-prime, lint]
+    # After lint when present; Dependabot skips lint so this is the sole Go gate.
+    if: ${{ always() && !cancelled() && needs.changes.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    # 25m cancelled rc.16 after every real step passed (post-action cleanup).
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
+      - run: |
+          gofmt="$(go env GOROOT)/bin/gofmt"
+          mapfile -t go_files < <(git ls-files '*.go')
+          "$gofmt" -w "${go_files[@]}"
+          git diff --exit-code
+      - run: go build -o /tmp/genconfig ./cmd/genconfig && /tmp/genconfig --check
+      - run: go build -o /tmp/gendocs ./cmd/gendocs && /tmp/gendocs --check
+      - run: go test ./... -count=1
+      - name: Provider process and CLI lifecycle race checks
+        run: go test -race ./internal/providerhost/ ./internal/cli/ -count=1
+      - run: go test -tags synthetic ./tests/synthetic/ -count=1
+      - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          go-version-file: go.mod
+          go-package: ./...
+      - name: Check Go dependency licenses
+        run: |
+          go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown \
+            --ignore=github.com/ovh/pulumi-ovh \
+            --ignore=github.com/ovh/okms-sdk-go
+
+  sdk-verify:
+    needs: [changes, cache-prime]
+    # Standalone SDK module gate (GOWORK=off hermeticity proves the module needs
+    # no workspace). Cheap: runs for Dependabot too, unlike lint.
+    if: ${{ always() && !cancelled() && needs.changes.outputs.sdk == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
+      - run: GOWORK=off go build ./...
+        working-directory: sdk
+      - run: GOWORK=off go vet ./...
+        working-directory: sdk
+      - run: GOWORK=off go test -race ./... -count=1
+        working-directory: sdk
+      - run: GOWORK=off go mod tidy && git diff --exit-code -- go.mod go.sum
+        working-directory: sdk
+      - name: golangci-lint (SDK module)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13.2
+          args: ./...
+          working-directory: sdk
+      - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          go-version-file: go.mod
+          go-package: ./...
+          work-dir: sdk
+
+  provider-verify:
+    needs: [changes, cache-prime]
+    # Nested GCP provider module: build, vet, full suite, lint, vuln scan.
+    # Runs whenever any Go changes: the provider still imports root
+    # internals, so root edits re-verify it until import decoupling
+    # (alpha-review-corrections 2.1) lands. Workspace mode is correct
+    # here (tree tested against tree); GOWORK=off standalone proofs
+    # belong to the release pipeline, where requires equal the tag.
+    if: ${{ always() && !cancelled() && (needs.changes.outputs.go == 'true' || needs.changes.outputs.provider == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: providers/gcp/go.mod
+          cache: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
+      - run: go build ./...
+        working-directory: providers/gcp
+      - run: go vet ./...
+        working-directory: providers/gcp
+      - run: go test -race ./... -count=1
+        working-directory: providers/gcp
+      - run: go mod tidy && git diff --exit-code -- go.mod go.sum
+        working-directory: providers/gcp
+      - name: golangci-lint (provider module)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.13.2
+          args: ./...
+          working-directory: providers/gcp
+      - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          go-version-file: providers/gcp/go.mod
+          go-package: ./...
+          work-dir: providers/gcp
+
+  docs:
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install MkDocs
+        run: pip install --disable-pip-version-check -r docs/requirements.txt
+      - name: Build docs
+        run: mkdocs build --strict
+
+  php:
+    needs: changes
+    if: needs.changes.outputs.php == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Full matrix on main; PR samples current + previous minor.
+        php-version: ${{ github.event_name == 'push' && fromJSON('["8.2","8.3","8.4","8.5"]') || fromJSON('["8.3","8.5"]') }}
+    defaults:
+      run:
+        working-directory: build
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php-version }}
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: composer validate --strict
+      - run: composer audit --locked
+      - run: composer analyse
+      - run: composer psalm
+      - run: vendor/bin/phpunit --fail-on-deprecation --fail-on-notice --fail-on-warning
+      - run: php bin/magelift-lifecycle-export | diff -u ../internal/platform/testdata/lifecycle-deploy.json -
+
+  container:
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - {branch: '8.2', target: '8-2'}
+          - {branch: '8.3', target: '8-3'}
+          - {branch: '8.4', target: '8-4'}
+          - {branch: '8.5', target: '8-5'}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build runtime and builder
+        run: >-
+          docker buildx bake
+          php-nginx-${{ matrix.php.target }}
+          php-builder-${{ matrix.php.target }}
+          --load
+          --provenance=false
+          --sbom=false
+          --set '*.platform=linux/amd64'
+      - name: Inspect runtime
+        env:
+          PHP_BRANCH: ${{ matrix.php.branch }}
+        run: |
+          image="magelift/php-nginx:${PHP_BRANCH}-local"
+          test "$(docker run --rm "$image" id -u)" = 10001
+          test "$(docker run --rm "$image" php -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" = "$PHP_BRANCH"
+          test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.php.branch" }}')" = "$PHP_BRANCH"
+          test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.nginx.version" }}')" = "1.30.4"
+          test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.web-runtime" }}')" = "php-nginx"
+          docker run --rm "$image" php-fpm --test
+          test "$(docker run --rm --entrypoint nginx "$image" -v 2>&1)" = "nginx version: nginx/1.30.4"
+          docker run --rm --entrypoint nginx "$image" -t -c /etc/nginx/nginx.conf
+          ./scripts/nginx-media-deny-test.sh
+          docker run --rm --read-only --tmpfs /tmp:uid=10001,gid=10001 "$image" php -r 'file_put_contents(sys_get_temp_dir() . "/probe", "ok");'
+          docker run --rm "$image" php -r '$required = ["bcmath", "gd", "intl", "pdo_mysql", "soap", "sockets", "xsl", "zip", "Zend OPcache"]; $missing = array_values(array_filter($required, fn(string $extension): bool => !extension_loaded($extension))); if ($missing !== []) { fwrite(STDERR, "Missing PHP extensions: " . implode(", ", $missing) . PHP_EOL); exit(1); }'
+      - name: Inspect builder
+        env:
+          PHP_BRANCH: ${{ matrix.php.branch }}
+        run: |
+          image="magelift/php-builder:${PHP_BRANCH}-local"
+          runtime="magelift/php-nginx:${PHP_BRANCH}-local"
+          test "$(docker run --rm --entrypoint id "$image" -u)" = 10001
+          test "$(docker run --rm --entrypoint php "$image" -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" = "$PHP_BRANCH"
+          test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.php.base" }}')" = "$(docker image inspect "$runtime" --format '{{ index .Config.Labels "io.magelift.php.base" }}')"
+          docker run --rm --entrypoint composer "$image" --version
+      - name: Scan runtime image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: magelift/php-nginx:${{ matrix.php.branch }}-local
+          format: table
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          trivyignores: .trivyignore
+          exit-code: '1'
+      - name: Scan builder image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: magelift/php-builder:${{ matrix.php.branch }}-local
+          format: table
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+  frankenphp:
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - {branch: '8.2', target: '8-2'}
+          - {branch: '8.3', target: '8-3'}
+          - {branch: '8.4', target: '8-4'}
+          - {branch: '8.5', target: '8-5'}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build and inspect classic adapter
+        env:
+          PHP_BRANCH: ${{ matrix.php.branch }}
+        run: |
+          target="frankenphp-classic-${{ matrix.php.target }}"
+          image="magelift/frankenphp-classic:${PHP_BRANCH}-local"
+          docker buildx bake "$target" --load --provenance=false --sbom=false --set "$target.platform=linux/amd64"
+          test "$(docker run --rm --entrypoint id "$image" -u)" = 10001
+          docker run --rm --entrypoint frankenphp "$image" version
+          MAGELIFT_FRANKENPHP_IMAGE="$image" ./scripts/frankenphp-tls-test.sh
+      - name: Scan frankenphp image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: magelift/frankenphp-classic:${{ matrix.php.branch }}-local
+          format: table
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          trivyignores: .trivyignore
+          exit-code: '1'
+
+  varnish:
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify read-only Varnish sidecar
+        run: ./scripts/varnish-test.sh
+
+  floci-aws:
+    needs: changes
+    # Skip Dependabot: AWS contract suite is unrelated to module bumps and costs
+    # a cold Go compile on every deps PR.
+    if: >-
+      needs.changes.outputs.go == 'true'
+      && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    services:
+      floci:
+        image: floci/floci:2.1.0@sha256:f5aa8c18302cedb4f2385f5c4e455b3efc77fee6bf7b6e5d1712b2817ba102db
+        ports:
+          - 4566:4566
+        env:
+          FLOCI_DEFAULT_REGION: us-east-1
+          FLOCI_DEFAULT_ACCOUNT_ID: '000000000000'
+          FLOCI_STORAGE_MODE: memory
+          FLOCI_AUTH_VALIDATE_SIGNATURES: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/go-memlimit
+      - name: Run Floci AWS contract tests
+        env:
+          MAGELIFT_FLOCI: '1'
+          MAGELIFT_FLOCI_ENDPOINT: http://127.0.0.1:4566
+        run: go test -race -tags=floci ./tests/floci -count=1
+
+  floci-gcp:
+    needs: changes
+    if: >-
+      needs.changes.outputs.go == 'true'
+      && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    services:
+      floci-gcp:
+        image: floci/floci-gcp:0.9.0@sha256:ea29a53b34d04ba05240cdc6833608e43ae2b0a67849e5b97f01a7224e1138ea
+        ports:
+          - 4588:4588
+        env:
+          FLOCI_GCP_HOSTNAME: localhost
+          FLOCI_GCP_BASE_URL: http://localhost:4588
+          FLOCI_GCP_STORAGE_MODE: memory
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/go-memlimit
+      - name: Run floci-gcp contract tests
+        env:
+          MAGELIFT_FLOCI_GCP: '1'
+          MAGELIFT_GCP_ENDPOINT_URL: http://127.0.0.1:4588
+          STORAGE_EMULATOR_HOST: 127.0.0.1:4588
+          SECRET_MANAGER_EMULATOR_HOST: 127.0.0.1:4588
+          PUBSUB_EMULATOR_HOST: 127.0.0.1:4588
+          GOOGLE_CLOUD_PROJECT: floci-local
+        run: go test -race -tags=floci_gcp ./providers/gcp/floci/floci-gcp -count=1
+
+  release-config:
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/go-memlimit
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.18.3
+          args: check
+
+  workflow-lint:
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/go-memlimit
+      - name: Check workflow syntax and expressions
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
+
+  shellcheck:
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check shell scripts
+        run: >-
+          docker run --rm --entrypoint /bin/sh
+          -v "$PWD:/src:ro"
+          koalaman/shellcheck-alpine:v0.11.0@sha256:9955be09ea7f0dbf7ae942ac1f2094355bb30d96fffba0ec09f5432207544002
+          -c 'shellcheck --severity=warning /src/scripts/*.sh'
+
+  acceptance-contracts:
+    name: acceptance contracts
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true' || needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+      - uses: ./.github/actions/go-memlimit
+      - name: Install pinned JSON/YAML tools
+        env:
+          YQ_VERSION: v4.53.3
+          YQ_SHA256: fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y jq
+          yq_path="$RUNNER_TEMP/yq"
+          curl --fail --silent --show-error --location \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" \
+            --output "$yq_path"
+          test "$(sha256sum "$yq_path" | awk '{print $1}')" = "$YQ_SHA256"
+          sudo install -m 0755 "$yq_path" /usr/local/bin/yq
+          jq --version
+          yq --version
+      - name: Run offline acceptance contract suite
+        run: make acceptance-harness-test
+
+  # Single required status check: skipped path-filtered jobs count as OK.
+  result:
+    name: CI passed
+    needs:
+      - changes
+      - cache-prime
+      - lint
+      - go-verify
+      - sdk-verify
+      - docs
+      - php
+      - container
+      - frankenphp
+      - varnish
+      - floci-aws
+      - floci-gcp
+      - provider-verify
+      - release-config
+      - workflow-lint
+      - shellcheck
+      - acceptance-contracts
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate job results
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          needs = json.loads(os.environ["NEEDS_JSON"])
+          # cache-prime is best-effort warm-up; lint + go-verify are the Go gate.
+          soft_fail_ok = {"cache-prime"}
+          bad = sorted(
+              name
+              for name, job in needs.items()
+              if job.get("result") not in ("success", "skipped")
+              and name not in soft_fail_ok
+          )
+          if bad:
+              print("failing jobs:", ", ".join(bad))
+              sys.exit(1)
+          soft = sorted(
+              name
+              for name in soft_fail_ok
+              if needs.get(name, {}).get("result") not in ("success", "skipped", None)
+          )
+          if soft:
+              print("soft-fail (non-blocking):", ", ".join(soft))
+          print("all required jobs succeeded or were skipped by path filters")
+          PY
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}

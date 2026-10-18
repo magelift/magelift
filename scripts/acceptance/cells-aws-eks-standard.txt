@@ -1,0 +1,7 @@
+# Ordered EKS standard cells. The first cell must match the retained config so
+# the harness can record create-once time against a real matrix cell.
+computeMode:auto-mode
+queueMode:rabbitmq
+queueMode:database
+searchMode:disabled
+searchMode:opensearch

@@ -1,0 +1,8 @@
+# OVH MKS preview service shapes. Unsupported Adobe services stay visible in
+# the provider matrix and are not silently substituted here.
+database:mysql
+search:disabled
+queue:database
+cache:valkey
+webCache:none
+edge:none

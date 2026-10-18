@@ -1,0 +1,20 @@
+name: Cap Go memory
+description: >-
+  Set GOMEMLIMIT to 75% of this runner's available RAM.
+  Do not pin GOMAXPROCS or compile -p.
+runs:
+  using: composite
+  steps:
+    - name: Cap Go memory
+      shell: bash
+      run: | # zizmor: ignore[github-env] value is digits plus MiB from MemAvailable, not workflow inputs
+        limit="$(bash "${GITHUB_WORKSPACE}/scripts/go-memlimit.sh")"
+        if [[ ! "$limit" =~ ^[0-9]+MiB$ ]]; then
+          printf 'go-memlimit: expected <digits>MiB, got %s\n' "$limit" >&2
+          exit 1
+        fi
+        {
+          echo "GOMEMLIMIT<<EOF"
+          echo "$limit"
+          echo "EOF"
+        } >> "$GITHUB_ENV"

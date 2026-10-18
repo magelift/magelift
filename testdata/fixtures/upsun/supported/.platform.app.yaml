@@ -1,0 +1,13 @@
+# Synthetic Upsun/Platform.sh app config for MageLift import CI (IMPORT-06 clean-room).
+# php:8.5 matches Magento 2.4.9 catalog (same as ACC supported fixture).
+name: upsun-sample-shop
+type: php:8.5
+relationships:
+  database: "mysql:mysql"
+  redis: "redis:redis"
+  opensearch: "opensearch:opensearch"
+  rabbitmq: "rabbitmq:rabbitmq"
+crons:
+  magento:
+    spec: "*/5 * * * *"
+    cmd: "php bin/magento cron:run"

@@ -1,0 +1,4 @@
+# Fixture ACC routes for the skills acceptance run (synthetic).
+"https://staging.example.invalid/":
+  type: upstream
+  upstream: "fixture-acc-shop:http"

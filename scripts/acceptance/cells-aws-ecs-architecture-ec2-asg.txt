@@ -1,0 +1,4 @@
+# Cold ECS architecture cell: EC2 Auto Scaling capacity provider. Use with a
+# config whose target.runtime is ecs-fargate and computeMode is ec2-asg.
+computeMode:ec2-asg
+queueMode:db

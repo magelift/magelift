@@ -1,0 +1,268 @@
+name: Release Artifacts
+
+on:
+  push:
+    # `sdk/v*` module tags never match: `v*` anchors at the start of the ref name.
+    tags: ['v*']
+
+concurrency:
+  group: release-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      checks: read
+    runs-on: ubuntu-latest
+    # Twelve Pulumi-heavy cross-compiles; warm caches carry the
+    # repeat-release case. Cap Go at 75% of the runner's available RAM
+    # (`scripts/go-memlimit.sh`). Do not pin GOMAXPROCS or go -p.
+    # GoReleaser --parallelism 1 is pipe concurrency: one target at a
+    # time so each compile inherits the full GOMEMLIMIT. Concurrent
+    # targets OOM ubuntu-latest 16GB (rc.16 died mid-matrix with no
+    # compiler error). rc.12 and rc.15 finished the matrix serialized.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: ./.github/actions/go-memlimit
+      # Warm Go caches (shared with CI's go-prime keys): repeat releases
+      # recompile only MageLift packages instead of the Pulumi world.
+      # Restore before compile; save after. lookup-only never downloads.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+      # GoReleaser's SBOM cataloging shells out to syft; without it the
+      # release fails after the builds (seen on v0.0.0-dialproof.3).
+      - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      # Module tags need proxy plus sumdb visibility before packaging:
+      # workspace builds still verify requirement .mod files over the
+      # network on cold caches. The proxy negative-caches unknown
+      # revisions for ~30 minutes, so the first request waits out tag
+      # propagation instead of seeding a miss; two consecutive
+      # downloads then prove the entries are serveable and stable.
+      - name: Wait for module visibility
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GOWORK: "off"
+        run: |
+          sleep 300
+          deadline=$((SECONDS + 7200))
+          for module in "github.com/magelift/magelift" "github.com/magelift/magelift/sdk" "github.com/magelift/magelift/providers/gcp"; do
+            stable=0
+            while [[ "$stable" -lt 2 ]]; do
+              # go mod download, not go list: packaging needs the zip plus
+              # both sumdb entries, and the .mod alone can go visible first.
+              if go mod download "$module@$RELEASE_TAG" >/dev/null 2>&1; then
+                stable=$((stable + 1))
+              else
+                stable=0
+              fi
+              if [[ "$SECONDS" -ge "$deadline" ]]; then
+                echo "module $module@$RELEASE_TAG never became visible" >&2
+                exit 1
+              fi
+              # Plain if, not a trailing && list: a false && tail would
+              # become the loop's (and the step's) exit code and fail a
+              # wait that actually succeeded.
+              if [[ "$stable" -lt 2 ]]; then
+                sleep 60
+              fi
+            done
+          done
+      # Forensics: workspace resolution is what keeps tag builds local;
+      # print it so the next visibility failure starts from evidence.
+      - name: Show module resolution
+        env:
+          GOWORK: ${{ github.workspace }}/go.work
+        run: |
+          go env GOWORK
+          go list -m -f '{{.Path}} {{.Version}} {{.Dir}}' github.com/magelift/magelift
+        working-directory: providers/gcp
+      # Dialproof and commit canary tags take the slim linux/amd64 config
+      # (no SBOM, taps, or attest): same signs/checksum/archive shape, so the
+      # debug loop does not pay the full matrix. Canary refs stay draft.
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        if: "(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
+        with:
+          distribution: goreleaser
+          version: v2.18.3
+          args: release --clean --timeout 30m -f .goreleaser.dialproof.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CGO_ENABLED: "0"
+          # Provider builds run in providers/gcp. Pin the workspace so they
+          # compile this checkout, not the published module in go.mod.
+          GOWORK: ${{ github.workspace }}/go.work
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
+        with:
+          distribution: goreleaser
+          version: v2.18.3
+          args: release --clean --parallelism 1 --timeout 150m
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pushes the brew formula and Scoop manifest to their tap repos.
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          CGO_ENABLED: "0"
+          GOWORK: ${{ github.workspace }}/go.work
+      # The CLI verifies a provider binary against the digest plus
+      # Cosign bundle named in magelift.providers.lock. One lock per
+      # platform (the installed binary has a fixed name); digests come
+      # from the checksums GoReleaser just signed.
+      - name: Generate provider lockfiles
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: go run ./cmd/genproviders --tag "$RELEASE_TAG" --dist dist
+      - name: Upload provider lockfiles
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          bash scripts/release-upload-assets.sh "$RELEASE_TAG" dist/magelift.providers.lock.*
+      - name: Verify provider bundles
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - "$RELEASE_TAG" <<'PY'
+          import json, subprocess, sys
+          tag = sys.argv[1]
+          identity = f"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/{tag}"
+          issuer = "https://token.actions.githubusercontent.com"
+          checksums = {}
+          with open("dist/checksums.txt") as f:
+              for line in f:
+                  parts = line.split()
+                  if len(parts) == 2:
+                      checksums[parts[1]] = parts[0]
+          with open("dist/artifacts.json") as f:
+              artifacts = json.load(f)
+          paths = {}
+          for artifact in artifacts:
+              if artifact.get("type") in ("Binary", "Signature"):
+                  paths[artifact["name"]] = artifact["path"]
+          verified = 0
+          for asset in sorted(checksums):
+              if not asset.startswith("magelift-provider-"):
+                  continue
+              if asset.endswith(".sigstore.json") or asset.endswith(".sbom.json"):
+                  continue
+              bundle = asset + ".sigstore.json"
+              if asset not in paths or bundle not in paths:
+                  print(f"missing binary or bundle for {asset}", file=sys.stderr)
+                  sys.exit(1)
+              subprocess.run(
+                  ["cosign", "verify-blob",
+                   "--bundle", paths[bundle],
+                   "--certificate-identity", identity,
+                   "--certificate-oidc-issuer", issuer,
+                   paths[asset]],
+                  check=True,
+              )
+              verified += 1
+          if verified == 0:
+              print("no provider bundles verified", file=sys.stderr)
+              sys.exit(1)
+          print(f"verified {verified} provider bundles")
+          PY
+      - name: Verify signed checksums
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: >-
+          cosign verify-blob
+          --bundle dist/checksums.txt.sigstore.json
+          --certificate-identity
+          "https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/${RELEASE_TAG}"
+          --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          dist/checksums.txt
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
+        with:
+          subject-checksums: dist/checksums.txt
+      # Pristine consumer proof: the published modules resolve and
+      # compile exactly as tagged, without manifest edits. @version
+      # installs ignore the checkout and build from the proxy with
+      # sumdb verification; the release fails before publish otherwise.
+      - name: Verify published modules
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GOWORK: "off"
+        run: |
+          go install "github.com/magelift/magelift/cmd/magelift@${RELEASE_TAG}"
+          go install "github.com/magelift/magelift/providers/gcp/cmd/magelift-provider-gcp@${RELEASE_TAG}"
+          work="$(mktemp -d)"
+          cd "$work"
+          go mod init magelift-sdk-verify >/dev/null
+          go mod edit "-require=github.com/magelift/magelift/sdk@${RELEASE_TAG}"
+          printf 'package main\nimport _ "github.com/magelift/magelift/sdk"\nfunc main() {}\n' > main.go
+          GOWORK=off go mod tidy
+          GOWORK=off go build -o /dev/null .
+      # The release stays draft until every verification above passes.
+      # Lockfiles upload outside the signed checksum set by construction
+      # (bundles postdate checksums); their authentication policy is the
+      # pinned-publisher design: the CLI refuses lockfiles whose
+      # identity/issuer differ from the release workflow pin, and content
+      # trust stays digest plus bundle-over-pinned-identity.
+      - name: Publish the verified candidate
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
+          CI_RUN="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${SHA}&per_page=1" --jq '.workflow_runs[0].id // empty')"
+          if [[ -z "$CI_RUN" ]]; then
+            printf 'release: no CI workflow run on %s; dispatch: gh workflow run ci.yml --ref %s -f all=true\n' "$SHA" "$RELEASE_TAG" >&2
+            exit 1
+          fi
+          bash scripts/release-checks-gate.sh --sha "$SHA" --run-id "$CI_RUN" --exclude-run "$GITHUB_RUN_ID"
+          gh release edit "$RELEASE_TAG" --draft=false
+      # Save-only: the restore step above is the download. always() so a
+      # late packaging failure still warms the next candidate.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always()
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+  # The cask publishes to the tap during release; this job is the tested
+  # macOS install path the readiness doc requires. A failure fails the
+  # workflow visibly so the tap file gets fixed forward the same day.
+  # Dialproof tags publish no tap, so there is nothing to verify.
+  cask-verify:
+    if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
+    needs: [release]
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+             - name: Install the published cask
+               run: |
+                 brew tap magelift/homebrew-tap
+                 brew trust magelift/tap
+                 brew install --cask magelift
+                 magelift version

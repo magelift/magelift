@@ -1,0 +1,7 @@
+# Ordered self-managed EKS native observability cells. The first cell creates
+# the cold stack; the final cell proves AWS-managed CloudWatch Agent and
+# Fluent Bit application-log delivery, a Container Insights metric, and an
+# EKS control-plane audit stream before exact teardown.
+computeMode:self-managed
+queueMode:database
+observability:cloudwatch

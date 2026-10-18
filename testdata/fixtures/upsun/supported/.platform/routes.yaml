@@ -1,0 +1,4 @@
+# Synthetic Upsun routes for MageLift import CI.
+"https://preview.example.com/":
+  type: upstream
+  upstream: "upsun-sample-shop:http"

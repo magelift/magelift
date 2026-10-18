@@ -1,0 +1,8 @@
+# Scaleway Kapsule preview service shapes. Redis is explicit because the
+# provider adapter does not currently expose managed Valkey.
+database:mysql
+search:disabled
+queue:database
+cache:redis
+webCache:none
+edge:none

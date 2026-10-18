@@ -1,0 +1,7 @@
+# Ordered EKS high-availability cells. Keep the Auto Mode cluster and managed
+# data services warm while toggling only the Kubernetes capability graph.
+computeMode:auto-mode
+queueMode:rabbitmq
+searchMode:disabled
+searchMode:opensearch
+queueMode:database

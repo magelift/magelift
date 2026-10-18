@@ -1,0 +1,27 @@
+schemaVersion: 1
+project:
+  name: ci-aws-fixture
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+build:
+  php: "8.5"
+target:
+  provider: aws
+  runtime: ecs-fargate
+  aws: {}
+defaults:
+  region: eu-west-3
+  preset: preview
+environments:
+  preview:
+    account: "123456789012"
+    class: preview
+    domain: preview.example.com
+    expiresAt: "2030-01-01T00:00:00Z"
+  staging:
+    account: "123456789012"
+    class: staging
+    domain: staging.example.com
+extensions: {}

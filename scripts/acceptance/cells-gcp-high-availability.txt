@@ -1,0 +1,17 @@
+# Ordered GCP high-availability catalog. Create once, update cells, then teardown.
+bootstrap:wif
+composer:sm-write
+composer:sm-read
+day2:secrets
+day2:state
+day2:logs
+day2:exec
+day2:health
+search:health
+migrate:dump
+deploy:candidate
+queue:health
+cost:estimate
+resilience:pod-loss
+resilience:node-loss
+resilience:zone-loss

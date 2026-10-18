@@ -1,0 +1,12 @@
+# Synthetic Upsun unmapped variant; hooks and free-form cron must be reported (D-05).
+name: upsun-unmapped-shop
+type: php:8.5
+relationships:
+  database: "mysql:mysql"
+hooks:
+  build: |
+    npm run something-exotic
+crons:
+  shell-backup:
+    spec: "0 2 * * *"
+    cmd: "/usr/local/bin/backup.sh"
