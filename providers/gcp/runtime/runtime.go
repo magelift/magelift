@@ -240,11 +240,26 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		clusterArgs.RemoveDefaultNodePool = pulumi.Bool(true)
 	} else {
 		clusterArgs.EnableAutopilot = pulumi.Bool(true)
+		// Autopilot node VMs use cluster_autoscaling.auto_provisioning_defaults,
+		// not node_config alone (GKE docs, 2026-10-13).
+		clusterArgs.ClusterAutoscaling = &container.ClusterClusterAutoscalingArgs{
+			AutoProvisioningDefaults: &container.ClusterClusterAutoscalingAutoProvisioningDefaultsArgs{
+				ServiceAccount: pulumi.String(nodeServiceAccount),
+				OauthScopes:    nodeScopes,
+			},
+		}
 	}
 	clusterResources := make([]pulumi.Resource, 0, 2)
 	// Node identities are immutable. Configure new environments without
 	// replacing legacy clusters or pools when their code is updated.
-	nodeIdentityCreationOnly := pulumi.IgnoreChanges([]string{"nodeConfig.serviceAccount", "nodeConfig.oauthScopes"})
+	nodeIdentityIgnoreChanges := []string{"nodeConfig.serviceAccount", "nodeConfig.oauthScopes"}
+	if args.Runtime == "gke-autopilot" {
+		nodeIdentityIgnoreChanges = append(nodeIdentityIgnoreChanges,
+			"clusterAutoscaling.autoProvisioningDefaults.serviceAccount",
+			"clusterAutoscaling.autoProvisioningDefaults.oauthScopes",
+		)
+	}
+	nodeIdentityCreationOnly := pulumi.IgnoreChanges(nodeIdentityIgnoreChanges)
 	cluster, err := container.NewCluster(ctx, name+"-cluster", clusterArgs, parent, nodeIdentityCreationOnly)
 	if err != nil {
 		return nil, fmt.Errorf("create GKE %s cluster: %w", args.Runtime, err)

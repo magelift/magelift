@@ -33,9 +33,11 @@ Edition and tier remain visible to Pulumi; neither is ignored. Creation-only
 zone handling from ADR 0017 remains unchanged.
 
 Tests cover real resource inputs, default preservation, custom limits and
-regional catalog handling. New live Enterprise allocation remains NOT_RUN until
-the acceptance uses the published provider. A stockout is handled through the
-existing diagnostic and retained state, without automatic retries.
+regional catalog handling. Acceptance with published provider 0660426 allocated
+MySQL 8.4 Enterprise with the explicit dedicated tier successfully. Application
+acceptance and migration of an existing Plus instance remain separate checks.
+A stockout is handled through the existing diagnostic and retained state,
+without automatic retries.
 
 ## References
 

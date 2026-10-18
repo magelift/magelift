@@ -209,8 +209,10 @@ and checks noncurrent GCS generations as well as live state before creating a
 key. It refuses existing encrypted state without its original key. Do not
 delete the state secret while state or backups still need it. An environment
 destroy does not remove these bootstrap resources, including the node account.
-New clusters use that account explicitly. Existing clusters keep their original
-node identity: bootstrap does not trigger an immutable cluster replacement.
+New Autopilot clusters use that account through their node autoprovisioning
+defaults; Standard node pools use their node configuration. Existing clusters
+keep their original node identity: bootstrap does not trigger an immutable
+cluster replacement.
 Use a fresh environment for migration; live legacy migration remains unverified.
 
 Deploy reads the remote key into its Pulumi workspace. For an existing stack

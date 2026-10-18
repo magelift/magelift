@@ -17,8 +17,10 @@ repository reader and the project-level roles/container.defaultNodeServiceAccoun
 role. This happens without GitHub options and requires project IAM management
 permission. It does not change the default Compute account's bindings.
 
-New Autopilot clusters and Standard node pools explicitly select the owned
-account and cloud-platform OAuth scope. CI deployment receives actAs on that
+New Autopilot clusters select the owned account and cloud-platform OAuth scope
+through `clusterAutoscaling.autoProvisioningDefaults`. Setting cluster
+`nodeConfig` alone does not select the Autopilot node identity. Standard node
+pools use `nodeConfig`. CI deployment receives actAs on that
 account through the existing reviewed CI permission plan. CI deployment roles
 still require --apply-ci-permissions. No YAML key or provider RPC is added.
 
@@ -45,4 +47,6 @@ key would burden the guided path with an identity choice it can derive safely.
 ## Provenance
 
 Original implementation using public Google IAM, Artifact Registry and GKE
-NodeConfig APIs and the existing Pulumi provider contract.
+cluster autoprovisioning and NodeConfig APIs and the existing Pulumi provider
+contract. Google documents the Autopilot service-account field in
+[Create an Autopilot cluster](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/creating-an-autopilot-cluster).

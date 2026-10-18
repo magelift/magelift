@@ -1264,3 +1264,37 @@ Runtime, HTTPS, application probes, two functional releases, persistence and
 final active-resource cleanup remain NOT_RUN. The network, secrets, bootstrap,
 registry and CI grants remain for this test. Humanizer review is complete;
 remove-ai-marks remains NOT_RUN because its service is unavailable.
+
+### S3 live allocation and Autopilot node-identity correction
+
+Acceptance workflow 39121160075 built and signed the new application image.
+Independent verification passed for the immutable digest, exact user-workflow
+signer, manifest checksum and source revision. BuildKit OCI SBOM and provenance
+are present under the signed image index; they are not separate Cosign
+attestations.
+
+The real Cloud SQL create succeeded in 3 minutes 19 seconds. Native metadata
+shows MySQL 8.4, Enterprise, the explicit dedicated tier and the requested zone,
+with state RUNNABLE. Valkey subsequently became ACTIVE. Grok 4.7 low reviewed the
+allocation captures without fast mode and kept functional acceptance separate.
+The workflow then failed creating GKE: Google requested actAs on the default
+Compute account even though the cluster nodeConfig named the owned account.
+After failure, the encrypted checkpoint contains 37 resources and no pending
+operations. No GKE runtime or acceptance DNS record exists. State and key remain
+available for continuation and eventual teardown.
+
+Google's current Autopilot example selects the node identity through cluster
+node-autoprovisioning defaults. Composer 2.5 added that field and its scopes for
+Autopilot, preserving the Standard inputs and precise creation-only identity
+guards. The graph regression checks the actual Autopilot field; the worker's
+negative run fails with the old nodeConfig-only implementation. Targeted stack
+and runtime tests pass. ADR 0016 and bootstrap guidance describe the distinction.
+No permission was added on the default Compute account.
+
+The complete root/SDK/GCP community gate passes, including targeted race and
+161 PHP tests with 388 assertions. Strict docs, workflow lint, generated checks
+and host-only Linux packaging smoke pass. Independent API/code reviews are
+running. Corrected live GKE creation, image pull, application probes, HTTPS, persistence and final
+cleanup remain NOT_RUN. SQL, Valkey, media preparation, network, bootstrap and
+CI grants remain owned test resources. Humanizer review is complete;
+remove-ai-marks remains NOT_RUN because its service is unavailable.
