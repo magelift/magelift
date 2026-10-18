@@ -852,3 +852,44 @@ write was performed by this check. The published canary still contains the
 old client; the fix requires a new immutable signed candidate before CI grant
 application can be tested. Functional deployments, persistence, runtime pull,
 incident handling and destruction remain NOT_RUN.
+
+### S2 increment: owned GKE node identity
+
+Read-only acceptance IAM inspection found broad preexisting privileges on the
+shared default Compute account. The implementation now derives an owned node
+account, prepares repository reader and the minimum GKE node project role, and
+selects it explicitly for new clusters. Existing immutable node identity fields
+are ignored on updates to avoid implicit replacement. Default-account policies
+are untouched. The CI grant plan validates the owned node before applying grants.
+
+Targeted bootstrap, naming, ops, runtime, stack and plugin tests pass, including
+bounded race runs. One initial test fixture lacked the new injected factory and
+attempted a read against a fictional project (403); the fixture was corrected
+and all six packages pass. No cloud mutation resulted from that fixture. Live
+node creation, pull identity, legacy migration and CI grants remain NOT_RUN.
+The existing acceptance prerequisites remain; no node account, runtime or DNS
+record has yet been created by this increment. Billing remains unmeasured.
+
+The signed installed CLI also built the patched private Magento fixture locally
+in 312.366 seconds without host Go, PHP or Node. The image was not pushed.
+Existing BuildKit cache was available, so this is not a cold-build measurement.
+
+Independent Cursor Composer 2.5 review (non-fast, read-only) found no concrete
+regression in the bounded node-identity diff. Host-only Linux packaging passed
+(31 seconds): archive 63,024,864 bytes, installed CLI 308,506,784 bytes, provider
+208,801,952 bytes; signing/publication were deliberately skipped locally.
+Human prose was reviewed with humanizer. remove-ai-marks is NOT_RUN because its
+local HTTP service is unavailable. The maintainer approved the exact 24-binding
+acceptance IAM plan on the original GCP target; application is still pending.
+Cleanup of all owned test resources and only this run's added IAM bindings is
+required after acceptance, with state/key retention until teardown completes.
+
+The complete MAGELIFT_PHP_TEST_CONTAINER=1 make verify-community docs
+workflow-check cli-docs-check generate-check invocation passed after integration:
+all three Go modules, bounded race checks, PHP, lifecycle/clean-room/helper
+gates, strict MkDocs, actionlint and generated-file consistency. The read-only
+24-binding IAM baseline found no preexisting matching unconditional or
+conditional member bindings; the private receipt is retained for scoped cleanup.
+The maintainer prefers an organization-owned acceptance repository. Its final
+visibility and federation update are pending; the prior personal-repository
+permission approval is not silently extended to a different repository.

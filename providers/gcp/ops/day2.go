@@ -25,6 +25,7 @@ type Bootstrap struct {
 	VerifyAccountFn         func(context.Context, string) error
 	ResolveGitHubRepository func(context.Context, string, string) (githubci.Repository, error)
 	NewPreparation          func(context.Context) (AccountPreparation, error)
+	NewNodeIdentity         func(context.Context) (NodeIdentityPreparation, error)
 	NewCIGrants             func(context.Context) (CIGrantPreparation, error)
 }
 
@@ -86,7 +87,25 @@ func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.
 	if err != nil {
 		return platform.BootstrapResult{}, err
 	}
-	details := map[string]any{"state": result, "statePassphrase": key, "registry": registry}
+	newNodeIdentity := b.NewNodeIdentity
+	if newNodeIdentity == nil {
+		newNodeIdentity = func(ctx context.Context) (NodeIdentityPreparation, error) {
+			return gcpbootstrap.NewNodeIdentityPreparerFromContext(ctx)
+		}
+	}
+	node, err := newNodeIdentity(ctx)
+	if err != nil {
+		return platform.BootstrapResult{}, err
+	}
+	if node == nil {
+		return platform.BootstrapResult{}, errors.New("GKE node identity preparation is not configured")
+	}
+	defer node.Close()
+	nodeIdentity, err := node.Ensure(ctx, preparationPlan, preparationSpec)
+	if err != nil {
+		return platform.BootstrapResult{}, err
+	}
+	details := map[string]any{"state": result, "statePassphrase": key, "registry": registry, "nodeIdentity": nodeIdentity}
 	if len(identities) > 0 {
 		newIdentity := b.NewIdentity
 		if newIdentity == nil {

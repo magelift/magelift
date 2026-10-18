@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/magelift/magelift/providers/gcp/naming"
+
 	artifactregistry "google.golang.org/api/artifactregistry/v1"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/googleapi"
@@ -70,6 +72,19 @@ func TestBuildCIGrantPlanExcludesBuildFromProjectAndSecret(t *testing.T) {
 		if binding.Member == deployMember && binding.Role == roleArtifactRegistryWriter {
 			t.Fatalf("deploy must not be registry writer: %#v", binding)
 		}
+	}
+}
+
+func TestBuildCIGrantPlanUsesOwnedNodeServiceAccount(t *testing.T) {
+	t.Parallel()
+	inputs := testCIGrantInputs(t)
+	plan, err := BuildCIGrantPlan(inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := naming.NodeServiceAccountEmail(inputs.Preparation.Base.GCPProject, inputs.Deploy.Project, inputs.Deploy.Environment)
+	if plan.NodeServiceAccount != want {
+		t.Fatalf("node service account = %q, want %q", plan.NodeServiceAccount, want)
 	}
 }
 
@@ -251,10 +266,23 @@ func (f *fakeProjectIAM) SetProjectIAMPolicy(_ context.Context, _ string, policy
 
 func (f *fakeProjectIAM) Close() error { return nil }
 
+func seedOwnedNodeServiceAccount(wif *fakeWIF, spec Spec) {
+	plan, err := BuildNodeIdentityPlan(spec)
+	if err != nil {
+		panic(err)
+	}
+	wif.accounts[plan.ServiceAccountName] = WIFServiceAccount{
+		Name:        plan.ServiceAccountName,
+		Email:       plan.ServiceAccountEmail,
+		Description: plan.ServiceAccountMarker,
+	}
+}
+
 func testGrantPreparer(t *testing.T, wif *fakeWIF) (*CIGrantPreparer, *fakeRepoIAM, *fakeBucketIAM, *fakeProjectIAM) {
 	if wif == nil {
 		wif = newFakeWIF("249624521501")
 	}
+	seedOwnedNodeServiceAccount(wif, testSpec())
 	marker := wifServiceAccountOwnershipMarker(testSpec().Project, testSpec().Environment, identityRoleDeploy)
 	buildMarker := wifServiceAccountOwnershipMarker(testSpec().Project, testSpec().Environment, identityRoleBuild)
 	deployPlan, _ := BuildIdentityPlan(IdentitySpec{GitHubRepositoryID: 42, GitHubOwnerID: 7, Project: testSpec().Project, Environment: testSpec().Environment, GCPProject: testSpec().GCPProject, GitHubOwner: "magelift", GitHubRepo: "magelift"})
@@ -381,9 +409,32 @@ func TestCIGrantMissingPolicyEtagRefusesBlindOverwrite(t *testing.T) {
 	}
 }
 
+func TestCIGrantRejectsForeignNodeServiceAccountBeforeMutation(t *testing.T) {
+	t.Parallel()
+	wif := newFakeWIF("249624521501")
+	preparer, repoIAM, _, projectIAM := testGrantPreparer(t, wif)
+	plan, _ := BuildNodeIdentityPlan(testSpec())
+	wif.accounts[plan.ServiceAccountName] = WIFServiceAccount{
+		Name: plan.ServiceAccountName, Email: plan.ServiceAccountEmail, Description: "foreign ownership",
+	}
+	err := preparer.Ensure(context.Background(), testCIGrantInputs(t))
+	if err == nil || !strings.Contains(err.Error(), "ownership marker") {
+		t.Fatalf("expected foreign node refusal, got %v", err)
+	}
+	if repoIAM.sets != 0 || projectIAM.sets != 0 {
+		t.Fatal("IAM mutated after foreign node rejection")
+	}
+}
+
 func TestCIGrantsKeepNodeImpersonationOnExactNodeAccount(t *testing.T) {
 	inputs := testCIGrantInputs(t)
-	node := "projects/" + inputs.Preparation.Base.GCPProject + "/serviceAccounts/" + inputs.ProjectNumber + "-compute@developer.gserviceaccount.com"
+	nodePlan, err := BuildNodeIdentityPlan(Spec{
+		Project: inputs.Deploy.Project, Environment: inputs.Deploy.Environment, GCPProject: inputs.Preparation.Base.GCPProject,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := nodePlan.ServiceAccountName
 	wif := newFakeWIF(inputs.ProjectNumber)
 	wif.policies[node] = &iam.Policy{Version: 3, Etag: "node-policy", Bindings: []*iam.Binding{{Role: roleNodeServiceAccountUser, Members: []string{"user:existing@example.invalid"}, Condition: &iam.Expr{Expression: "request.time < timestamp('2027-01-01T00:00:00Z')"}}}}
 	preparer, _, _, _ := testGrantPreparer(t, wif)

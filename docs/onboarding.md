@@ -172,8 +172,13 @@ magelift bootstrap --env test \
   --github-owner YOUR_OWNER --github-repo YOUR_REPO
 ```
 
-Read the returned `ciPermissionPlan` before granting anything. Creating
-the pool, provider, and service accounts does not attach deployment IAM.
+Bootstrap prepares the owned GKE node account and its registry-reader and
+minimum project runtime role, including without GitHub options. It needs
+permission to manage project IAM for that binding. It leaves the default
+Compute account unchanged.
+
+Read the returned `ciPermissionPlan` before granting CI build and deployment
+roles. Creating the federation identities does not attach those deployment roles.
 
 Apply the reviewed grants and write allowlisted nonsecret repository
 variables (`MAGELIFT_GCP_*`, `MAGELIFT_REGISTRY`, `MAGELIFT_RELEASE_IMAGE`,

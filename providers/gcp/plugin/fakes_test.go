@@ -375,9 +375,21 @@ func bootstrapServer(t *testing.T, buckets *memBuckets) *Server {
 		NewPreparation: func(context.Context) (gcpops.AccountPreparation, error) {
 			return &fakeAccountPreparation{t: t, buckets: buckets}, nil
 		},
+		NewNodeIdentity: func(context.Context) (gcpops.NodeIdentityPreparation, error) {
+			return fakeNodeIdentityPreparation{}, nil
+		},
 		VerifyAccountFn: func(context.Context, string) error { return nil },
 	}}
 }
+
+type fakeNodeIdentityPreparation struct{}
+
+func (fakeNodeIdentityPreparation) Ensure(_ context.Context, _ gcpbootstrap.PreparationPlan, spec gcpbootstrap.Spec) (gcpbootstrap.NodeIdentityResult, error) {
+	plan, err := gcpbootstrap.BuildNodeIdentityPlan(spec)
+	return gcpbootstrap.NodeIdentityResult{ServiceAccountName: plan.ServiceAccountName, ServiceAccountEmail: plan.ServiceAccountEmail}, err
+}
+
+func (fakeNodeIdentityPreparation) Close() error { return nil }
 
 // costServer builds a Server with a scripted budget reader.
 func costServer(reader gcpcost.BudgetReader) *Server {

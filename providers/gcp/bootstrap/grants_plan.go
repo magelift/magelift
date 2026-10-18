@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/magelift/magelift/providers/gcp/naming"
 )
 
 const (
@@ -19,12 +21,14 @@ const (
 
 	grantPurposeBuildPushImage        = "CI build identity pushes application images to the owned Artifact Registry repository"
 	grantPurposeDeployPullImage       = "CI deploy identity pulls and verifies application images from the owned Artifact Registry repository"
-	grantPurposeNodePullImage         = "GKE default compute service account pulls application images from the owned Artifact Registry repository"
+	grantPurposeNodePullImage         = "GKE node service account pulls application images from the owned Artifact Registry repository"
 	grantPurposeDeployStateSecret     = "CI deploy identity reads the owned Pulumi state passphrase secret"
 	grantPurposeDeployStateBucket     = "CI deploy identity manages encrypted Pulumi state objects in the owned GCS bucket"
 	grantPurposeDeployStateBucketMeta = "CI deploy identity reads owned state bucket metadata"
 	grantPurposeDeployProjectGraph    = "CI deploy identity provisions the Magento environment (project-wide IAM; administrator review required)"
-	grantPurposeNodeGKEMinimum        = "GKE default compute service account minimum role for node workloads (project-wide IAM)"
+	grantPurposeNodeGKEMinimum        = "GKE node service account minimum role for node workloads (project-wide IAM)"
+
+	identityRoleGKENode = "gke-node"
 
 	grantScopeResource = "resource"
 	grantScopeProject  = "project"
@@ -101,7 +105,7 @@ func BuildCIGrantPlan(inputs CIGrantInputs) (CIGrantPlan, error) {
 	if err != nil {
 		return CIGrantPlan{}, err
 	}
-	nodeEmail := defaultComputeServiceAccountEmail(projectNumber)
+	nodeEmail := naming.NodeServiceAccountEmail(project, inputs.Deploy.Project, inputs.Deploy.Environment)
 	nodeMember := "serviceAccount:" + nodeEmail
 
 	bindings := []CIGrantBinding{
@@ -116,7 +120,7 @@ func BuildCIGrantPlan(inputs CIGrantInputs) (CIGrantPlan, error) {
 		},
 		{
 			Resource: repoResource, Member: nodeMember, Role: roleArtifactRegistryReader,
-			Scope: grantScopeResource, Purpose: grantPurposeNodePullImage, IdentityRole: "gke-default-node",
+			Scope: grantScopeResource, Purpose: grantPurposeNodePullImage, IdentityRole: identityRoleGKENode,
 		},
 		{
 			Resource: secretResource, Member: deployMember, Role: roleSecretAccessor,
@@ -149,7 +153,7 @@ func BuildCIGrantPlan(inputs CIGrantInputs) (CIGrantPlan, error) {
 		Scope:        grantScopeProject,
 		Purpose:      grantPurposeNodeGKEMinimum,
 		ScopeNote:    grantProjectScopeNote,
-		IdentityRole: "gke-default-node",
+		IdentityRole: identityRoleGKENode,
 	})
 	return CIGrantPlan{
 		GCPProject:         project,
@@ -212,9 +216,9 @@ func validateCIGrantInputs(inputs CIGrantInputs) error {
 	if err := validateIdentityPlanOwnership(build); err != nil {
 		return err
 	}
-	expectedNode := defaultComputeServiceAccountEmail(projectNumber)
-	if expectedNode == "" {
-		return errors.New("default compute service account email is invalid")
+	expectedNode := naming.NodeServiceAccountEmail(gcpProject, wantProject, wantEnvironment)
+	if expectedNode == "" || !strings.Contains(expectedNode, "@") {
+		return errors.New("owned node service account email is invalid")
 	}
 	return nil
 }
@@ -250,12 +254,4 @@ func serviceAccountMember(plan IdentityPlan) (string, error) {
 		return "", fmt.Errorf("identity plan service account email %q does not match derived email %q", email, wantEmail)
 	}
 	return "serviceAccount:" + email, nil
-}
-
-func defaultComputeServiceAccountEmail(projectNumber string) string {
-	projectNumber = strings.TrimSpace(projectNumber)
-	if projectNumber == "" {
-		return ""
-	}
-	return projectNumber + "-compute@developer.gserviceaccount.com"
 }

@@ -1,10 +1,14 @@
 package naming
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
 )
+
+const maxGCPServiceAccountIDLen = 30
 
 var nonName = regexp.MustCompile(`[^a-z0-9-]+`)
 
@@ -70,6 +74,34 @@ func NodePoolName(project, environment string) string {
 		base = strings.TrimRight(base[:39], "-")
 	}
 	return base
+}
+
+// NodeServiceAccountID returns a deterministic GCP service account ID (<=30
+// characters, starts with a letter) for the MageLift-owned GKE node identity.
+func NodeServiceAccountID(magentoProject, environment string) string {
+	value := "ml-" + sanitize(magentoProject) + "-" + sanitize(environment) + "-nodes"
+	return compactServiceAccountID(value, magentoProject+"/"+environment+"/nodes/sa")
+}
+
+// NodeServiceAccountEmail returns the node service account email in the target GCP project.
+func NodeServiceAccountEmail(gcpProject, magentoProject, environment string) string {
+	id := NodeServiceAccountID(magentoProject, environment)
+	project := strings.TrimSpace(gcpProject)
+	return id + "@" + project + ".iam.gserviceaccount.com"
+}
+
+func compactServiceAccountID(value string, seed string) string {
+	if len(value) <= maxGCPServiceAccountIDLen {
+		return value
+	}
+	digest := sha256.Sum256([]byte(seed))
+	suffix := hex.EncodeToString(digest[:])[:8]
+	if maxGCPServiceAccountIDLen <= len(suffix)+1 {
+		return suffix[:maxGCPServiceAccountIDLen]
+	}
+	prefixLen := maxGCPServiceAccountIDLen - len(suffix) - 1
+	prefix := strings.TrimRight(value[:prefixLen], "-")
+	return prefix + "-" + suffix
 }
 
 // FormatURL builds an https URL from a load balancer address.

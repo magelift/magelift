@@ -188,10 +188,34 @@ func (p *CIGrantPreparer) CheckOwnedResources(ctx context.Context, inputs CIGran
 	if err := validateExistingStateBucket(prep.Base, bucketMeta); err != nil {
 		return err
 	}
+	if err := p.checkNodeServiceAccountOwnership(ctx, inputs); err != nil {
+		return err
+	}
 	if err := p.checkServiceAccountOwnership(ctx, inputs.Deploy); err != nil {
 		return err
 	}
 	return p.checkServiceAccountOwnership(ctx, inputs.Build)
+}
+
+func (p *CIGrantPreparer) checkNodeServiceAccountOwnership(ctx context.Context, inputs CIGrantInputs) error {
+	prep := inputs.Preparation
+	wantProject := strings.TrimSpace(prep.Base.Labels["magelift-project"])
+	wantEnvironment := strings.TrimSpace(prep.Base.Labels["magelift-environment"])
+	project := strings.TrimSpace(prep.Base.GCPProject)
+	plan, err := BuildNodeIdentityPlan(Spec{
+		Project:     wantProject,
+		Environment: wantEnvironment,
+		GCPProject:  project,
+		Region:      prep.Base.Region,
+	})
+	if err != nil {
+		return err
+	}
+	sa, err := p.wif.GetServiceAccount(ctx, plan.ServiceAccountName)
+	if err != nil {
+		return fmt.Errorf("CI grants require an existing owned GKE node service account: %w", err)
+	}
+	return validateOwnedNodeServiceAccount(plan, sa)
 }
 
 func (p *CIGrantPreparer) checkServiceAccountOwnership(ctx context.Context, plan IdentityPlan) error {

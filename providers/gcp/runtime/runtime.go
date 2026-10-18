@@ -196,6 +196,8 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	skipAwait := kube.SkipAwaitAnnotations()
 
 	clusterName := naming.ClusterNameForRuntime(args.MagentoProject, args.Environment, args.Runtime)
+	nodeServiceAccount := naming.NodeServiceAccountEmail(args.Project, args.MagentoProject, args.Environment)
+	nodeScopes := pulumi.StringArray{pulumi.String("https://www.googleapis.com/auth/cloud-platform"), pulumi.String("https://www.googleapis.com/auth/userinfo.email")}
 	ipAllocationPolicy := &container.ClusterIpAllocationPolicyArgs{
 		ClusterIpv4CidrBlock:  pulumi.String("/17"),
 		ServicesIpv4CidrBlock: pulumi.String("/22"),
@@ -218,6 +220,10 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		},
 		DeletionProtection: pulumi.Bool(false),
 		ResourceLabels:     pulumi.ToStringMap(args.Labels),
+		NodeConfig: &container.ClusterNodeConfigArgs{
+			ServiceAccount: pulumi.String(nodeServiceAccount),
+			OauthScopes:    nodeScopes,
+		},
 	}
 	if strings.TrimSpace(args.KubernetesVersion) != "" {
 		clusterArgs.MinMasterVersion = pulumi.String(args.KubernetesVersion)
@@ -236,7 +242,10 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		clusterArgs.EnableAutopilot = pulumi.Bool(true)
 	}
 	clusterResources := make([]pulumi.Resource, 0, 2)
-	cluster, err := container.NewCluster(ctx, name+"-cluster", clusterArgs, parent)
+	// Node identities are immutable. Configure new environments without
+	// replacing legacy clusters or pools when their code is updated.
+	nodeIdentityCreationOnly := pulumi.IgnoreChanges([]string{"nodeConfig.serviceAccount", "nodeConfig.oauthScopes"})
+	cluster, err := container.NewCluster(ctx, name+"-cluster", clusterArgs, parent, nodeIdentityCreationOnly)
 	if err != nil {
 		return nil, fmt.Errorf("create GKE %s cluster: %w", args.Runtime, err)
 	}
@@ -250,11 +259,13 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 			InitialNodeCount: pulumi.Int(args.StandardNodeCount),
 			NodeLocations:    pulumi.ToStringArray(args.Zones),
 			NodeConfig: &container.NodePoolNodeConfigArgs{
-				MachineType: pulumi.String(args.StandardNodeType),
-				DiskType:    pulumi.String(args.StandardNodeDiskType),
-				DiskSizeGb:  pulumi.Int(args.StandardNodeDiskSizeGiB),
-				ImageType:   pulumi.String(args.StandardNodeImageType),
-				Spot:        pulumi.Bool(args.StandardNodeSpot),
+				ServiceAccount: pulumi.String(nodeServiceAccount),
+				OauthScopes:    nodeScopes,
+				MachineType:    pulumi.String(args.StandardNodeType),
+				DiskType:       pulumi.String(args.StandardNodeDiskType),
+				DiskSizeGb:     pulumi.Int(args.StandardNodeDiskSizeGiB),
+				ImageType:      pulumi.String(args.StandardNodeImageType),
+				Spot:           pulumi.Bool(args.StandardNodeSpot),
 				LinuxNodeConfig: &container.NodePoolNodeConfigLinuxNodeConfigArgs{
 					Sysctls: pulumi.StringMap{"vm.max_map_count": pulumi.String("262144")},
 				},
@@ -268,7 +279,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 				MinNodeCount: pulumi.Int(args.StandardNodeMinCount),
 				MaxNodeCount: pulumi.Int(args.StandardNodeMaxCount),
 			},
-		}, parent, pulumi.DependsOn([]pulumi.Resource{cluster}))
+		}, parent, nodeIdentityCreationOnly, pulumi.DependsOn([]pulumi.Resource{cluster}))
 		if err != nil {
 			return nil, fmt.Errorf("create GKE Standard node pool: %w", err)
 		}

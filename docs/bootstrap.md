@@ -189,8 +189,12 @@ a real GitHub token exchange remains an acceptance check.
 
 GCP bootstrap enables missing reference APIs, ensures the state bucket,
 initializes its state passphrase in Secret Manager, and creates the user's
-Docker Artifact Registry repository. It returns the image destination and
-secret version reference. The caller needs permission to create these
+Docker Artifact Registry repository. It also creates an owned GKE node service
+account, grants it reader on that repository and the project-level
+`roles/container.defaultNodeServiceAccount` role. This runtime preparation
+runs even without GitHub options; it needs project IAM policy management
+permission. It returns the image destination, node identity and secret version
+reference. The caller needs permission to create these
 resources. If Service Usage itself is unavailable, the error names that
 prerequisite. GitHub CI grants require the explicit --apply-ci-permissions option.
 
@@ -198,7 +202,10 @@ The passphrase stays at version 1. Bootstrap uses the existing deployment lock
 and checks noncurrent GCS generations as well as live state before creating a
 key. It refuses existing encrypted state without its original key. Do not
 delete the state secret while state or backups still need it. An environment
-destroy does not remove these bootstrap resources.
+destroy does not remove these bootstrap resources, including the node account.
+New clusters use that account explicitly. Existing clusters keep their original
+node identity: bootstrap does not trigger an immutable cluster replacement.
+Use a fresh environment for migration; live legacy migration remains unverified.
 
 Deploy reads the remote key into its Pulumi workspace. For an existing stack
 or recovery, an explicit PULUMI_CONFIG_PASSPHRASE or

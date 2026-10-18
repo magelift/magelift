@@ -52,7 +52,13 @@ selected project, not only names with the MageLift prefix. Rerun with
 derived nonsecret repository variables. Existing different values are refused;
 workflow and environment protections are preserved. Identity creation alone
 does not prove registry permissions or a live OIDC exchange.
-GCP bootstrap also prepares its registry and immutable remote state-key reference.
+GCP bootstrap also prepares its registry, immutable remote state-key reference,
+and an owned GKE node account with repository reader and the project-level
+roles/container.defaultNodeServiceAccount role. This baseline runs without
+GitHub options and needs project IAM management permission. New clusters use
+the owned account; existing clusters keep their immutable node identity.
+Use a fresh environment for migration. Environment destruction retains these
+bootstrap resources; never modify the shared default Compute account.
 Keep that secret while state or backups need it. Explicit Pulumi passphrase
 environment variables remain available for existing stacks and recovery.
 

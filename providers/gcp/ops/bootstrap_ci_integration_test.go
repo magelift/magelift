@@ -12,6 +12,7 @@ import (
 	"github.com/magelift/magelift/internal/githubci"
 	"github.com/magelift/magelift/internal/platform"
 	gcpbootstrap "github.com/magelift/magelift/providers/gcp/bootstrap"
+	"github.com/magelift/magelift/providers/gcp/naming"
 	"google.golang.org/api/iam/v1"
 )
 
@@ -101,6 +102,9 @@ func ciIntegrationBootstrap(t *testing.T, tracker *trackingCIGrants, wireGrants 
 		NewPreparation: func(context.Context) (AccountPreparation, error) { return prep, nil },
 		NewEnsurer:     func(context.Context) (*gcpbootstrap.Bootstrapper, error) { return ensurer, nil },
 		NewIdentity:    func(context.Context) (*gcpbootstrap.IdentityBootstrapper, error) { return identity, nil },
+		NewNodeIdentity: func(context.Context) (NodeIdentityPreparation, error) {
+			return &integrationNodeIdentity{preparation: prep}, nil
+		},
 	}
 	if wireGrants {
 		if tracker == nil {
@@ -138,10 +142,11 @@ func (g *trackingCIGrants) Close() error {
 }
 
 type integrationAccountPrep struct {
-	t         *testing.T
-	buckets   *integrationBuckets
-	apisReady bool
-	keyReady  bool
+	t             *testing.T
+	buckets       *integrationBuckets
+	apisReady     bool
+	keyReady      bool
+	registryReady bool
 }
 
 func (p *integrationAccountPrep) EnsureAPIs(context.Context, gcpbootstrap.PreparationPlan, gcpbootstrap.Spec) error {
@@ -168,6 +173,7 @@ func (p *integrationAccountPrep) EnsureRepository(_ context.Context, plan gcpboo
 	if !p.keyReady {
 		p.t.Fatal("registry preparation preceded state initialization")
 	}
+	p.registryReady = true
 	return gcpbootstrap.RepositoryResult{
 		RepositoryID: plan.RegistryID,
 		Location:     plan.RegistryLocation,
@@ -177,6 +183,27 @@ func (p *integrationAccountPrep) EnsureRepository(_ context.Context, plan gcpboo
 }
 
 func (p *integrationAccountPrep) Close() error { return nil }
+
+type integrationNodeIdentity struct {
+	preparation *integrationAccountPrep
+	ensureCalls int
+	closeCalls  int
+	failEnsure  error
+}
+
+func (n *integrationNodeIdentity) Ensure(_ context.Context, _ gcpbootstrap.PreparationPlan, spec gcpbootstrap.Spec) (gcpbootstrap.NodeIdentityResult, error) {
+	n.ensureCalls++
+	if n.failEnsure != nil {
+		return gcpbootstrap.NodeIdentityResult{}, n.failEnsure
+	}
+	if !n.preparation.registryReady {
+		return gcpbootstrap.NodeIdentityResult{}, errors.New("node identity preceded owned registry preparation")
+	}
+	email := naming.NodeServiceAccountEmail(spec.GCPProject, spec.Project, spec.Environment)
+	return gcpbootstrap.NodeIdentityResult{ServiceAccountName: "projects/" + spec.GCPProject + "/serviceAccounts/" + email, ServiceAccountEmail: email}, nil
+}
+
+func (n *integrationNodeIdentity) Close() error { n.closeCalls++; return nil }
 
 type integrationBuckets struct {
 	mu      sync.Mutex
@@ -308,4 +335,50 @@ func cloneIntegrationIAMPolicy(policy *iam.Policy) *iam.Policy {
 		}
 	}
 	return &out
+}
+
+func TestBootstrapLaptopPreparesNodeIdentityWithoutCIGrants(t *testing.T) {
+	b := ciIntegrationBootstrap(t, nil, false)
+	prep, err := b.NewPreparation(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := &integrationNodeIdentity{preparation: prep.(*integrationAccountPrep)}
+	b.NewNodeIdentity = func(context.Context) (NodeIdentityPreparation, error) { return node, nil }
+	b.ResolveGitHubRepository = func(context.Context, string, string) (githubci.Repository, error) {
+		t.Fatal("GitHub lookup for laptop bootstrap")
+		return githubci.Repository{}, nil
+	}
+	result, err := b.Ensure(context.Background(), gcpTestSpec(), platform.BootstrapRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.ensureCalls != 1 || node.closeCalls != 1 {
+		t.Fatalf("node ensure=%d close=%d", node.ensureCalls, node.closeCalls)
+	}
+	if result.Details["nodeIdentity"] == nil {
+		t.Fatal("missing node identity metadata")
+	}
+}
+
+func TestBootstrapNodeFailureStopsBeforeCIIdentityCreation(t *testing.T) {
+	b := ciIntegrationBootstrap(t, nil, false)
+	prep, err := b.NewPreparation(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused := errors.New("node permission preparation refused")
+	node := &integrationNodeIdentity{preparation: prep.(*integrationAccountPrep), failEnsure: refused}
+	b.NewNodeIdentity = func(context.Context) (NodeIdentityPreparation, error) { return node, nil }
+	b.NewIdentity = func(context.Context) (*gcpbootstrap.IdentityBootstrapper, error) {
+		t.Fatal("CI identity creation continued after node failure")
+		return nil, nil
+	}
+	result, err := b.Ensure(context.Background(), gcpTestSpec(), ciBootstrapRequest(false))
+	if !errors.Is(err, refused) || result.BackendURL != "" {
+		t.Fatalf("unexpected result=%#v error=%v", result, err)
+	}
+	if node.closeCalls != 1 {
+		t.Fatal("node client not closed on failure")
+	}
 }
