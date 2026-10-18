@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 )
@@ -93,21 +94,43 @@ func MagentoProbeShell(searchEndpoint string, checkReachability bool, expectedEn
 			script += " && test \"$(bin/magento config:show catalog/search/engine)\" = '" + shellQuote(strings.TrimSpace(expectedEngine)) + "'"
 		}
 		if checkReachability {
-			script += " && curl -fsS --max-time 10 '" + shellQuote(searchEndpoint) + "' -o /dev/null"
+			script += " && curl -fsS --max-time 10 '" + shellQuote(probeSearchReachabilityURL(searchEndpoint)) + "' -o /dev/null"
 		}
 	}
 	return []string{"/bin/sh", "-ec", script}
 }
 
 // probeSearchHost extracts the hostname Magento must be configured with.
-// Unparseable endpoints compare literally so exotic-but-consistent setups
-// keep working while garbage fails against real configuration.
+// Explicit http(s) URLs use the URL host without port; bare service names and
+// host:port endpoints reuse magentoSearchTarget so the probe matches env.php.
 func probeSearchHost(endpoint string) string {
 	trimmed := strings.TrimSpace(endpoint)
-	if parsed, err := url.Parse(trimmed); err == nil && parsed.Hostname() != "" {
-		return parsed.Hostname()
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		if parsed, err := url.Parse(trimmed); err == nil && parsed.Hostname() != "" {
+			return parsed.Hostname()
+		}
 	}
-	return trimmed
+	host, _, _, _ := magentoSearchTarget(trimmed)
+	return host
+}
+
+// probeSearchReachabilityURL is the unsigned curl target for readiness checks.
+// Scheme URLs are passed through unchanged (port, path, query). Bare names and
+// host:port values follow magentoSearchTarget, including AWS managed-domain TLS.
+func probeSearchReachabilityURL(endpoint string) string {
+	trimmed := strings.TrimSpace(endpoint)
+	if trimmed == "" {
+		return trimmed
+	}
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		return trimmed
+	}
+	host, port, httpsMode, _ := magentoSearchTarget(trimmed)
+	scheme := "http"
+	if httpsMode == "1" {
+		scheme = "https"
+	}
+	return (&url.URL{Scheme: scheme, Host: net.JoinHostPort(host, port)}).String()
 }
 
 func shellQuote(value string) string {

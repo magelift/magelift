@@ -57,6 +57,12 @@ Job retry; inspect the failing step and database before retrying. A partially
 initialized database is preserved and may need repair before another attempt.
 See [ADR 0021](adr/0021-empty-magento-database-bootstrap.md).
 
+Magento readiness checks the database, configured search engine and endpoint.
+Bare OpenSearch service names use HTTP on port 9200, matching runtime settings;
+explicit HTTP(S) endpoints retain their configured port and path. SigV4-only
+endpoints skip the unsigned reachability request. See
+[ADR 0012](adr/0012-search-proof-shapes.md).
+
 Production requests need an approval and a digest-pinned signed image. Deployment
 re-verifies the promoted digest against its recorded certificate identity and OIDC
 issuer before any infrastructure mutation. A rollback is another forward deployment.

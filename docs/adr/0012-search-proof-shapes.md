@@ -65,6 +65,15 @@ response, recycle plus re-query output, destroy plus clean assertion,
 and the spend line. Certification claims wait for these artifacts;
 no matrix or release-readiness edits land with this decision.
 
+### Readiness endpoint interpretation
+
+Readiness uses the same hostname and default port mapping as Magento runtime
+configuration. A bare service name uses HTTP on 9200; a bare explicit port is
+retained. Explicit HTTP(S) URLs retain their scheme, port and path. The existing
+AWS managed-domain TLS inference is shared with runtime configuration. SigV4-only
+endpoints still skip unsigned reachability checks. Database and configured-engine
+checks remain required.
+
 ## Consequences
 
 - Phase 2 runs the two cells without re-litigating shape or budget.

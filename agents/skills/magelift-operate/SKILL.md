@@ -16,6 +16,8 @@ or change the selected environment.
 - Select the environment explicitly with `--env` in automation.
 - Run `magelift health --mode config` before a live operation.
 - Use `magelift health --mode runtime` after deploy, rollback, or a provider change.
+- A healthy database alone does not prove search. Readiness also checks the
+  configured engine and endpoint; bare OpenSearch service names use port 9200.
 - GCP outputs, exec, logs, tunnels and health in outputs/runtime mode read the
   existing stack without a YAML image digest or local build journal. Deploy and preview still
   require the immutable artifact. Destroy does not require a build.
