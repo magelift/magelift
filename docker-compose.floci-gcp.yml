@@ -1,6 +1,6 @@
 services:
   floci-gcp:
-    image: floci/floci-gcp:0.9.0@sha256:ea29a53b34d04ba05240cdc6833608e43ae2b0a67849e5b97f01a7224e1138ea
+    image: floci/floci-gcp:0.11.0@sha256:eae9683d806ceb643bcb36aee97cdb8cad13c3e2959cd053bf40e481994fde12
     ports:
       - "4588:4588"
     environment:

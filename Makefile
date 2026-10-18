@@ -8,8 +8,6 @@
 unexport GOMAXPROCS
 export GOMEMLIMIT := $(shell "$(CURDIR)/scripts/go-memlimit.sh")
 
-.PHONY: help generate generate-check cli-docs cli-docs-check certification-docs certification-docs-check fmt fmt-check test test-fast test-community test-race test-race-full sdk-test provider-gcp-test community-test-helpers development-loop-test verify-community lint license-check check-clean-room php-test image-test frankenphp-image-test builder-image-test varnish-test build-e2e-test pulumi-mock-test floci-test-aws floci-gcp-test provider-gcp-build core-leanness local-gates acceptance-dependencies-check acceptance-harness-test aws-acceptance-local aws-recovery-acceptance-local aws-database-recovery-acceptance-local aws-secret-recovery-acceptance-local aws-sqs-acceptance-local aws-cloudwatch-acceptance-local aws-cloudfront-acceptance-local gcp-acceptance-local gcp-collector-acceptance-local gcp-cloudsql-acceptance-local gcp-cloudsql-destroy-retention-acceptance-local gcp-cloudsql-cleanup-ledger-acceptance-local gcp-recovery-acceptance-local gcp-secret-recovery-acceptance-local gcp-pubsub-acceptance-local gcp-observability-acceptance-local gcp-edge-acceptance-local ovh-acceptance-local ovh-recovery-acceptance-local ovh-database-recovery-acceptance-local scaleway-acceptance-local scaleway-recovery-acceptance-local scaleway-secret-recovery-acceptance-local scaleway-observability-acceptance-local fastly-acceptance-local newrelic-acceptance-local newrelic-otlp-acceptance-local skills-test extension-test docs docs-serve workflow-check verify release-smoke ci-act-go
-
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target>\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-36s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
@@ -44,7 +42,7 @@ sdk-test: ## Run the SDK module suite standalone with race (GOWORK=off hermetici
 provider-gcp-test: ## Run the GCP provider module suite (workspace; no race)
 	cd providers/gcp && go test ./... -count=1
 
-community-test-helpers: ## Regression tests for ML-00 make/go/php helper scripts
+community-test-helpers: ## Regression tests for the make, Go, and PHP helper scripts
 	bash tests/acceptance/go_test_modules_test.sh
 	bash tests/acceptance/php_test_helper_test.sh
 	bash tests/acceptance/make_community_targets_test.sh
@@ -149,76 +147,113 @@ HARNESS_TEST_TIMEOUT ?= 120
 HARNESS_BUILD_TIMEOUT ?= 900
 HARNESS_STEP := bash scripts/acceptance/run-harness-step.sh
 
+# mode step. fast and dry use the 120s ceiling. build uses the long ceiling.
+# clean and leftover pass an extra argument to the same stub test.
+# A *_test.sh path is tests/acceptance. A gcp- script is the GCP provider
+# runner. Every other name is a root scripts/ runner.
+HARNESS_STEPS := \
+	fast harness_step_timeout_test.sh \
+	fast development_loop_gate_test.sh \
+	fast development_loop_runner_test.sh \
+	fast artifact_gate_test.sh \
+	fast gcp_product_gate_test.sh \
+	fast gcp_acceptance_preflight_test.sh \
+	fast gcp_acceptance_ownership_test.sh \
+	fast release_canary_predicate_test.sh \
+	dry evidence_append_test.sh \
+	fast lifecycle_guard_test.sh \
+	fast cloudflare_dns_helper_test.sh \
+	fast cutover_dns_cloudflare_test.sh \
+	fast lib_cosign_test.sh \
+	fast go_memlimit_test.sh \
+	fast aws_dry_run_no_account_test.sh \
+	fast gcp_dry_run_no_account_test.sh \
+	fast scaleway_dry_run_no_account_test.sh \
+	fast campaign_isolation_test.sh \
+	fast aws_seed_task_definition_test.sh \
+	fast shared_evidence_test.sh \
+	build evidence_seal_test.sh \
+	fast aws_harness_shape_test.sh \
+	fast aws_database_recovery_harness_shape_test.sh \
+	fast scaleway_database_recovery_harness_shape_test.sh \
+	fast ovh_database_recovery_harness_shape_test.sh \
+	fast aws_cloudfront_harness_shape_test.sh \
+	build gcp_edge_harness_shape_test.sh \
+	fast checkpoint_fingerprint_test.sh \
+	fast cleanup_ledger_helper_test.sh \
+	fast k8s_harness_shape_test.sh \
+	dry checkpoint_resume_test.sh \
+	fast checkpoint_run_id_test.sh \
+	fast checkpoint_cleanup_state_test.sh \
+	fast recovery_lifecycle_guard_test.sh \
+	fast acceptance_lifecycle_guard_test.sh \
+	fast matrix_tier_guard_test.sh \
+	fast port_coverage_floci_gate_test.sh \
+	clean assert_clean_stub_test.sh \
+	leftover assert_clean_stub_test.sh \
+	fast assert_clean_prerequisite_test.sh \
+	dry gcp_harness_shape_test.sh \
+	fast gcp_collector_harness_shape_test.sh \
+	fast gcp_gke_native_observability_harness_shape_test.sh \
+	fast aws_collector_harness_shape_test.sh \
+	fast gcp_cloudsql_harness_shape_test.sh \
+	fast gcp_cloudsql_destroy_retention_harness_shape_test.sh \
+	fast gcp_cloudsql_cleanup_ledger_harness_shape_test.sh \
+	fast gcp_recovery_harness_shape_test.sh \
+	fast gcp_secret_recovery_harness_shape_test.sh \
+	fast cold_baseline_ledger_test.sh \
+	fast magento_env_contract_test.sh \
+	fast seed_dump_contract_test.sh \
+	fast custom_extension_clean_cache_test.sh \
+	fast newrelic_harness_shape_test.sh \
+	dry ovh-acceptance-local.sh \
+	dry scaleway-acceptance-local.sh \
+	dry aws-cloudwatch-acceptance-local.sh \
+	dry aws-recovery-acceptance-local.sh \
+	dry aws-database-recovery-acceptance-local.sh \
+	dry aws-secret-recovery-acceptance-local.sh \
+	dry ovh-recovery-acceptance-local.sh \
+	dry gcp-observability-acceptance-local.sh \
+	dry gcp-recovery-acceptance-local.sh \
+	dry gcp_pubsub_harness_shape_test.sh \
+	dry gcp-secret-recovery-acceptance-local.sh \
+	dry scaleway-recovery-acceptance-local.sh \
+	dry scaleway-secret-recovery-acceptance-local.sh \
+	dry scaleway-observability-acceptance-local.sh \
+	dry scaleway-database-recovery-acceptance-local.sh
+
 acceptance-harness-test: acceptance-dependencies-check ## Run offline acceptance harness shell tests (serial; no AWS)
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) harness_step_timeout_test.sh -- bash tests/acceptance/harness_step_timeout_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) development_loop_gate_test.sh -- bash tests/acceptance/development_loop_gate_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) development_loop_runner_test.sh -- bash tests/acceptance/development_loop_runner_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) artifact_gate_test.sh -- bash tests/acceptance/artifact_gate_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_product_gate_test.sh -- bash tests/acceptance/gcp_product_gate_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_acceptance_preflight_test.sh -- bash tests/acceptance/gcp_acceptance_preflight_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_acceptance_ownership_test.sh -- bash tests/acceptance/gcp_acceptance_ownership_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) release_canary_predicate_test.sh -- bash tests/acceptance/release_canary_predicate_test.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) evidence_append_test.sh -- bash tests/acceptance/evidence_append_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) lifecycle_guard_test.sh -- bash tests/acceptance/lifecycle_guard_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) cloudflare_dns_helper_test.sh -- bash tests/acceptance/cloudflare_dns_helper_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) cutover_dns_cloudflare_test.sh -- bash tests/acceptance/cutover_dns_cloudflare_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) lib_cosign_test.sh -- bash tests/acceptance/lib_cosign_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) go_memlimit_test.sh -- bash tests/acceptance/go_memlimit_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_dry_run_no_account_test.sh -- bash tests/acceptance/aws_dry_run_no_account_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_dry_run_no_account_test.sh -- bash tests/acceptance/gcp_dry_run_no_account_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway_dry_run_no_account_test.sh -- bash tests/acceptance/scaleway_dry_run_no_account_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) campaign_isolation_test.sh -- bash tests/acceptance/campaign_isolation_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_seed_task_definition_test.sh -- bash tests/acceptance/aws_seed_task_definition_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) shared_evidence_test.sh -- bash tests/acceptance/shared_evidence_test.sh
-	@$(HARNESS_STEP) $(HARNESS_BUILD_TIMEOUT) 'evidence_seal_test.sh (builds magelift; can take several minutes)' -- bash tests/acceptance/evidence_seal_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_harness_shape_test.sh -- bash tests/acceptance/aws_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_database_recovery_harness_shape_test.sh -- bash tests/acceptance/aws_database_recovery_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway_database_recovery_harness_shape_test.sh -- bash tests/acceptance/scaleway_database_recovery_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) ovh_database_recovery_harness_shape_test.sh -- bash tests/acceptance/ovh_database_recovery_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_cloudfront_harness_shape_test.sh -- bash tests/acceptance/aws_cloudfront_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_BUILD_TIMEOUT) 'gcp_edge_harness_shape_test.sh (go run magento-waf-rules)' -- bash tests/acceptance/gcp_edge_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) checkpoint_fingerprint_test.sh -- bash tests/acceptance/checkpoint_fingerprint_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) cleanup_ledger_helper_test.sh -- bash tests/acceptance/cleanup_ledger_helper_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) k8s_harness_shape_test.sh -- bash tests/acceptance/k8s_harness_shape_test.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) checkpoint_resume_test.sh -- bash tests/acceptance/checkpoint_resume_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) checkpoint_run_id_test.sh -- bash tests/acceptance/checkpoint_run_id_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) checkpoint_cleanup_state_test.sh -- bash tests/acceptance/checkpoint_cleanup_state_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) recovery_lifecycle_guard_test.sh -- bash tests/acceptance/recovery_lifecycle_guard_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) acceptance_lifecycle_guard_test.sh -- bash tests/acceptance/acceptance_lifecycle_guard_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) matrix_tier_guard_test.sh -- bash tests/acceptance/matrix_tier_guard_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) port_coverage_floci_gate_test.sh -- bash tests/acceptance/port_coverage_floci_gate_test.sh
-	@MAGELIFT_ACCEPTANCE_AWS_STUB=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) 'assert_clean_stub_test.sh --clean' -- bash tests/acceptance/assert_clean_stub_test.sh --clean
-	@MAGELIFT_ACCEPTANCE_AWS_STUB=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) 'assert_clean_stub_test.sh --leftover' -- bash tests/acceptance/assert_clean_stub_test.sh --leftover; test $$? -eq 1
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) assert_clean_prerequisite_test.sh -- bash tests/acceptance/assert_clean_prerequisite_test.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_harness_shape_test.sh -- bash tests/acceptance/gcp_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_collector_harness_shape_test.sh -- bash tests/acceptance/gcp_collector_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_gke_native_observability_harness_shape_test.sh -- bash tests/acceptance/gcp_gke_native_observability_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_collector_harness_shape_test.sh -- bash tests/acceptance/aws_collector_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_cloudsql_harness_shape_test.sh -- bash tests/acceptance/gcp_cloudsql_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_cloudsql_destroy_retention_harness_shape_test.sh -- bash tests/acceptance/gcp_cloudsql_destroy_retention_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_cloudsql_cleanup_ledger_harness_shape_test.sh -- bash tests/acceptance/gcp_cloudsql_cleanup_ledger_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_recovery_harness_shape_test.sh -- bash tests/acceptance/gcp_recovery_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_secret_recovery_harness_shape_test.sh -- bash tests/acceptance/gcp_secret_recovery_harness_shape_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) cold_baseline_ledger_test.sh -- bash tests/acceptance/cold_baseline_ledger_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) magento_env_contract_test.sh -- bash tests/acceptance/magento_env_contract_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) seed_dump_contract_test.sh -- bash tests/acceptance/seed_dump_contract_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) custom_extension_clean_cache_test.sh -- bash tests/acceptance/custom_extension_clean_cache_test.sh
-	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) newrelic_harness_shape_test.sh -- bash tests/acceptance/newrelic_harness_shape_test.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) ovh-acceptance-local.sh -- bash scripts/ovh-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway-acceptance-local.sh -- bash scripts/scaleway-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws-cloudwatch-acceptance-local.sh -- bash scripts/aws-cloudwatch-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws-recovery-acceptance-local.sh -- bash scripts/aws-recovery-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws-database-recovery-acceptance-local.sh -- bash scripts/aws-database-recovery-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws-secret-recovery-acceptance-local.sh -- bash scripts/aws-secret-recovery-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) ovh-recovery-acceptance-local.sh -- bash scripts/ovh-recovery-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp-observability-acceptance-local.sh -- bash providers/gcp/scripts/gcp-observability-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp-recovery-acceptance-local.sh -- bash providers/gcp/scripts/gcp-recovery-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp_pubsub_harness_shape_test.sh -- bash tests/acceptance/gcp_pubsub_harness_shape_test.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) gcp-secret-recovery-acceptance-local.sh -- bash providers/gcp/scripts/gcp-secret-recovery-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway-recovery-acceptance-local.sh -- bash scripts/scaleway-recovery-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway-secret-recovery-acceptance-local.sh -- bash scripts/scaleway-secret-recovery-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway-observability-acceptance-local.sh -- bash scripts/scaleway-observability-acceptance-local.sh
-	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) scaleway-database-recovery-acceptance-local.sh -- bash scripts/scaleway-database-recovery-acceptance-local.sh
+	@set -eu; \
+	set -- $(HARNESS_STEPS); \
+	while [ "$$#" -gt 0 ]; do \
+	mode="$$1"; step="$$2"; shift 2; \
+	case "$$step" in \
+	*_test.sh) path="tests/acceptance/$$step" ;; \
+	gcp-*) path="providers/gcp/scripts/$$step" ;; \
+	*) path="scripts/$$step" ;; \
+	esac; \
+	timeout="$(HARNESS_TEST_TIMEOUT)"; \
+	label="$$step"; \
+	extra=""; \
+	prefix=""; \
+	case "$$mode" in \
+	fast) ;; \
+	dry) prefix="MAGELIFT_ACCEPTANCE_DRY_RUN=1" ;; \
+	build) timeout="$(HARNESS_BUILD_TIMEOUT)"; \
+	case "$$step" in \
+	evidence_seal_test.sh) label="evidence_seal_test.sh (builds magelift; can take several minutes)" ;; \
+	gcp_edge_harness_shape_test.sh) label="gcp_edge_harness_shape_test.sh (go run magento-waf-rules)" ;; \
+	esac ;; \
+	clean) prefix="MAGELIFT_ACCEPTANCE_AWS_STUB=1"; extra="--clean"; label="assert_clean_stub_test.sh --clean" ;; \
+	leftover) prefix="MAGELIFT_ACCEPTANCE_AWS_STUB=1"; extra="--leftover"; label="assert_clean_stub_test.sh --leftover" ;; \
+	*) printf 'unknown harness mode %s\n' "$$mode" >&2; exit 2 ;; \
+	esac; \
+	set +e; \
+	env $$prefix $(HARNESS_STEP) "$$timeout" "$$label" -- bash "$$path" $$extra; \
+	rc=$$?; \
+	set -e; \
+	if [ "$$mode" = leftover ]; then test "$$rc" -eq 1; else test "$$rc" -eq 0; fi; \
+	done
 
 acceptance-dependencies-check: ## Verify jq/yq v4 and shared acceptance command preflight before mutation
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) dependency_preflight_test.sh -- bash tests/acceptance/dependency_preflight_test.sh
@@ -350,3 +385,6 @@ certification-docs: ## Generate source-dated capability, architecture, and resil
 
 certification-docs-check: ## Check source-dated certification coverage for drift
 	go run ./cmd/gencertdocs --check
+
+# Every named target is an action. Derived so a new target cannot miss .PHONY.
+.PHONY: $(shell awk -F: '/^[a-zA-Z0-9_-]+:/ {print $$1}' $(firstword $(MAKEFILE_LIST)))

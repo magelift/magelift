@@ -464,12 +464,12 @@ Adobe-gated pin is Aurora 3.11/3.12; unaimed 8.4 fails closed.
 
 Use `make floci-test-aws` for account-free bootstrap, state, lock, versioned-media
 restore, ECS runtime health, ephemeral candidate registration, Secrets Manager, and
-CloudWatch Logs tests against digest-pinned Floci AWS 1.7.0. Use
-`make floci-gcp-test` for GCS, Secret Manager, Pub/Sub, Logging, and Monitoring contracts against digest-pinned floci-gcp 0.7.0.
+CloudWatch Logs tests against digest-pinned Floci AWS 2.3.0. Use
+`make floci-gcp-test` for GCS, Secret Manager, Pub/Sub, Logging, and Monitoring contracts against digest-pinned floci-gcp 0.11.0.
 Emulators do not replace a real-cloud pass: GitHub Actions OIDC token exchange,
 Autopilot, Memorystore, Armor, managed TLS, and Magento Cloud SQL PITR still need
 packed live sessions ([certification sessions](certification-sessions.md)).
-Floci AWS 1.7.0 does close IAM Create/Get/Tag OpenID Connect Provider
+Floci AWS 2.3.0 does close IAM Create/Get/Tag OpenID Connect Provider
 (`TestIAMOpenIDConnectProviderAgainstFloci`).
 See [Local AWS acceptance](aws-acceptance.md). The composed Pulumi target is tested
 separately with provider mocks, including preview, standard, and high-availability
