@@ -2,8 +2,9 @@
 
 ## Resume — 2026-10-18, plan v1.3
 
-Next action: let fixture CI build and deploy the corrected image on the
-retained stack. Do not recreate GKE, SQL, or the network.
+Next action: publish a canary that contains the anchored static deny,
+then deploy one second image with the homepage release marker. Do not
+recreate GKE, SQL, or the network.
 
 Already found:
 
@@ -26,39 +27,32 @@ Already found:
   for stack `magelift-org249-ec2a332-test-gcp-gke-autopilot`. Private
   receipts and probes live under
   `~/.cache/magelift-community-alpha-20261018/private-acceptance/`.
-- Running image, web and cron:
-  `us-central1-docker.pkg.dev/digital-lab-341608/magelift-digital-lab-341608-us-central1-26ec30e1a1-test-images/magelift-org249-ec2a332@sha256:c2340933af4b4c08d70b550313ab3818bb0a919f59b9dfd44cea108aaebf2519`.
-  Public nginx has no `/static/version*` rewrite. Browser on that digest:
-  product `magelift-org249-ec2a332-probe` renders
-  "MageLift acceptance persistence marker", and catalog search for that SKU
-  lists the same product. Versioned CSS, fonts, logo and `require.js` are
-  404. Add to Cart stays disabled. No mixed-content host showed up; the
-  failures are same-origin static 404s. Screenshot:
-  `r1-browser/search-results.png` in the private cache.
-  A side listener using commit `3659aa3`'s nginx rules, on port 8081 only,
-  served that versioned CSS as `200 text/css` (297247 bytes) and
-  `require.js` as `200 application/javascript`, and returned 403 for a
-  static `.php` path and `/media/customer/`. The public port 8080 stayed
-  404. That listener was stopped. It is a docroot proof of the committed
-  file, not a new image.
-- Catalog search HTML: PASS on this digest for the synthetic SKU above.
-  Styled storefront and working storefront JS remain FAIL until the image
-  contains `3659aa3`.
-- Readiness cause: reproduced on the live pod. Magento engine is
-  `opensearch`, hostname `magelift-org249-ec2a332-test-search`, port 9200.
-  `curl` to `http://<that-host>/` exits 28 after 10s. `curl` to
-  `http://<that-host>:9200/` returns 200. That matches CI run
-  `39135412332` and the bare-host URL fix in `88cec0d`. The corrected
-  probe command has not been redeployed. The web container's Kubernetes
-  probe is still HTTP `/health` on 8080; that is not the failed Magento
-  readiness Job.
-- Cron on the running image: PASS. Probe
-  `php cron-probe.php proof 2026-10-18T16:33:29Z` exited 0 with 16
-  successful `cron_schedule` rows finished after that bound, including
-  `indexer_update_all_views` at 16:34:31Z. The cron Deployment command is
-  the natural `cron:run` loop; this call did not invoke `cron:run`. Repeat
-  after the workload rolls onto the corrected image. Earlier wrong-format
-  calls stay "control not executed".
+- Earlier digest `sha256:c2340933` had no versioned-static rewrite. That
+  observation stays historical. Fixture CI run `39153317832` succeeded:
+  validate, build, and deploy.
+  Web and cron now run
+  `sha256:d43e7f3e82fdae753b538cb8468ef4b04f33ba22131d81ee5c63968a9a57f18b`.
+  Homepage CSS, fonts, logo and `require.js` are HTTP 200 with the expected
+  types. Browser search for the synthetic SKU lists the persistence marker,
+  and the product page shows price `$12.34`, stock, and an enabled Add to
+  Cart. One static file still returns 403:
+  `jquery/ui-modules/vendor/jquery-color/jquery.color.js`, because the root
+  deny matched that vendor segment. Commit `9b9ac89` anchors the deny and
+  passes `scripts/nginx-media-deny-test.sh`. It is not in this image.
+- Catalog search and the styled storefront: PASS on digest
+  `d43e7f3e` except that one vendor-segment static 403.
+- Cron on this image: PASS. Probe
+  `php cron-probe.php proof 2026-10-18T18:37:32Z` returned success rows
+  finished after that bound, including `indexer_update_all_views` and
+  `consumers_runner`. The cron command remains the natural `cron:run` loop.
+- DB queue on this image: PASS. Enqueue created message 2 on
+  `magelift.org249.ec2a332`; the MySQL driver consumed and acknowledged it
+  (`status` 4, body match).
+- Media on this image: PASS. Catalog marker is HTTPS 200 text/plain.
+  `/media/customer/...` is 403. Anonymous GCS `storage.objects.get` is 403.
+- Readiness: PASS for this deploy. Run `39153317832` finished the deploy
+  job, which is the Magento readiness probe after migrations. The earlier
+  bare-host search failure was CI run `39135412332`.
 
 `make verify-community` on this dirty tree passed on 2026-10-18
 (root, SDK, GCP, targeted race, 172 PHP tests / 418 assertions,
