@@ -60,7 +60,10 @@ GitHub Actions signing uses the job's OIDC identity and requires `id-token:
 write`; it does not impersonate the deployment account for signing. Explicit
 token overrides remain available for advanced automation.
 Builder/runtime intermediates stay on the runner; the final build consumes the
-bundled pinned runtime recipe. Optional `build.cache` configures separate registry
+bundled pinned runtime recipe. Rebuild the application in user CI to receive
+runtime recipe fixes; promotion of an older digest keeps its original bytes.
+Versioned static URLs resolve to prebuilt files, without runtime static generation.
+Optional `build.cache` configures separate registry
 cache references; keep private layers and release caches out of fork jobs.
 `build.composer.credentials: env://COMPOSER_AUTH` accepts CI credentials through
 the existing private secret mount. `build --export-recipe <new-directory>` exports

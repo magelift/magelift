@@ -18,6 +18,12 @@ the application. BuildKit can reuse its cache. No MageLift source checkout or
 MageLift image registry is required. Native ARM runtime qualification remains
 NOT_RUN.
 
+The nginx runtime maps Magento's numeric static-version URL prefix to the same
+prebuilt files under pub/static. It serves missing static assets as 404 and keeps
+script and private-media denials. Updating the bundled runtime recipe requires
+rebuilding the user's application image through CI; promoting an older digest
+does not apply the new nginx configuration.
+
 BuildKit temporary bind mounts are created below the user cache so Docker Desktop,
 Colima, and other `/Users`-shared Docker engines can access them. The active Docker
 Buildx builder is used by default; set `BUILDX_BUILDER` when a named builder such as
