@@ -181,7 +181,10 @@ func (s *Server) Plan(ctx context.Context, req *sdk.PlanRequest) (*sdk.PlanResul
 	}}, nil
 }
 
-// Preview runs the Pulumi preview for a stored plan.
+// Preview runs the Pulumi preview for a stored plan. Destroy planning
+// records AllowExpiredPreview on that plan; this path then uses teardown
+// validation and a destroy preview. Apply stays on strict Validate.
+// Observe plans leave the flag false, so a missing digest still fails here.
 func (s *Server) Preview(ctx context.Context, req *sdk.StackCall) (*sdk.LifecycleResult, *sdk.OperationError) {
 	if req == nil {
 		return nil, InvalidError("stack call is required")
@@ -193,7 +196,11 @@ func (s *Server) Preview(ctx context.Context, req *sdk.StackCall) (*sdk.Lifecycl
 	if operr := checkEnvelope(req.Envelope, req.Plan, spec); operr != nil {
 		return nil, operr
 	}
-	if err := spec.Validate(); err != nil {
+	validate := spec.Validate
+	if spec.AllowExpiredPreview {
+		validate = spec.ValidateAllowExpiredPreview
+	}
+	if err := validate(); err != nil {
 		return nil, InvalidError(err.Error())
 	}
 	metadata, operr := previewMetadata(req.PreviewMetadataJSON)
@@ -206,7 +213,11 @@ func (s *Server) Preview(ctx context.Context, req *sdk.StackCall) (*sdk.Lifecycl
 	}
 	planned := gcpstack.SpecPlanned{Spec: spec}
 	var diagnostics cappedBuffer
-	changes, err := backend.Preview(ctx, automation.Request{Target: planned.TargetDescriptor(), Preview: metadata}, &diagnostics)
+	changes, err := backend.Preview(ctx, automation.Request{
+		Target:  planned.TargetDescriptor(),
+		Preview: metadata,
+		Destroy: spec.AllowExpiredPreview,
+	}, &diagnostics)
 	if err != nil {
 		return nil, withDiagnostics(mapError(err), diagnostics.lines())
 	}

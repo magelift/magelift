@@ -27,6 +27,9 @@ func NewPulumiBackend(stack *auto.Stack) *PulumiBackend {
 
 type pulumiStack interface {
 	Preview(context.Context, ...optpreview.Option) (auto.PreviewResult, error)
+	// PreviewDestroy is auto.Stack.PreviewDestroy: pulumi destroy --preview-only.
+	// RunProgram is disabled so a global environment setting cannot run the program.
+	PreviewDestroy(context.Context, ...optdestroy.Option) (auto.PreviewResult, error)
 	Up(context.Context, ...optup.Option) (auto.UpResult, error)
 	Destroy(context.Context, ...optdestroy.Option) (auto.DestroyResult, error)
 	Outputs(context.Context) (auto.OutputMap, error)
@@ -34,6 +37,8 @@ type pulumiStack interface {
 	SetTag(context.Context, string, string) error
 	Info(context.Context) (auto.StackSummary, error)
 }
+
+var _ pulumiStack = (*auto.Stack)(nil)
 
 func newPulumiBackend(stack pulumiStack) *PulumiBackend {
 	return &PulumiBackend{stack: stack}
@@ -53,10 +58,7 @@ func (b *PulumiBackend) Preview(ctx context.Context, request Request, diagnostic
 	if err := b.preparePreview(ctx, request, request.Destroy); err != nil {
 		return nil, err
 	}
-	result, err := b.stack.Preview(ctx,
-		optpreview.ProgressStreams(diagnostics),
-		optpreview.ErrorProgressStreams(diagnostics),
-	)
+	result, err := b.preview(ctx, request, diagnostics)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +67,21 @@ func (b *PulumiBackend) Preview(ctx context.Context, request Request, diagnostic
 		changes[string(operation)] = count
 	}
 	return changes, nil
+}
+
+// preview routes a destroy request to PreviewDestroy. It never calls Up or Destroy.
+func (b *PulumiBackend) preview(ctx context.Context, request Request, diagnostics io.Writer) (auto.PreviewResult, error) {
+	if request.Destroy {
+		return b.stack.PreviewDestroy(ctx,
+			optdestroy.ProgressStreams(diagnostics),
+			optdestroy.ErrorProgressStreams(diagnostics),
+			optdestroy.RunProgram(false),
+		)
+	}
+	return b.stack.Preview(ctx,
+		optpreview.ProgressStreams(diagnostics),
+		optpreview.ErrorProgressStreams(diagnostics),
+	)
 }
 
 func (b *PulumiBackend) Update(ctx context.Context, request Request, diagnostics io.Writer) (map[string]int, error) {
@@ -94,6 +111,7 @@ func (b *PulumiBackend) Destroy(ctx context.Context, request Request, diagnostic
 	result, err := b.stack.Destroy(ctx,
 		optdestroy.ProgressStreams(diagnostics),
 		optdestroy.ErrorProgressStreams(diagnostics),
+		optdestroy.RunProgram(false),
 	)
 	if err != nil {
 		return nil, err

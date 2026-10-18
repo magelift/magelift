@@ -11,12 +11,15 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optdestroy"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optpreview"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto/optup"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 )
 
 type ownershipTestStack struct {
-	tags       map[string]string
-	resources  int
-	operations []string
+	tags               map[string]string
+	resources          int
+	operations         []string
+	lastDestroyPreview *optdestroy.Options
+	lastDestroy        *optdestroy.Options
 }
 
 func (s *ownershipTestStack) Preview(context.Context, ...optpreview.Option) (auto.PreviewResult, error) {
@@ -24,13 +27,30 @@ func (s *ownershipTestStack) Preview(context.Context, ...optpreview.Option) (aut
 	return auto.PreviewResult{}, nil
 }
 
+func (s *ownershipTestStack) PreviewDestroy(_ context.Context, opts ...optdestroy.Option) (auto.PreviewResult, error) {
+	s.operations = append(s.operations, "preview-destroy")
+	parsed := &optdestroy.Options{}
+	for _, opt := range opts {
+		opt.ApplyOption(parsed)
+	}
+	s.lastDestroyPreview = parsed
+	if len(parsed.ProgressStreams) > 0 {
+		_, _ = parsed.ProgressStreams[0].Write([]byte("destroy-preview\n"))
+	}
+	return auto.PreviewResult{ChangeSummary: map[apitype.OpType]int{apitype.OpDelete: 2}}, nil
+}
+
 func (s *ownershipTestStack) Up(context.Context, ...optup.Option) (auto.UpResult, error) {
 	s.operations = append(s.operations, "update")
 	return auto.UpResult{}, nil
 }
 
-func (s *ownershipTestStack) Destroy(context.Context, ...optdestroy.Option) (auto.DestroyResult, error) {
+func (s *ownershipTestStack) Destroy(_ context.Context, opts ...optdestroy.Option) (auto.DestroyResult, error) {
 	s.operations = append(s.operations, "destroy")
+	s.lastDestroy = &optdestroy.Options{}
+	for _, opt := range opts {
+		opt.ApplyOption(s.lastDestroy)
+	}
 	return auto.DestroyResult{}, nil
 }
 

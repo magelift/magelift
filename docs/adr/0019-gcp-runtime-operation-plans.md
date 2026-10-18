@@ -21,12 +21,18 @@ remain in force. Account-only bootstrap planning keeps its existing meaning.
 
 The flag is used during planning and is not stored in the opaque spec or a
 second manifest. Output and runtime-observation handlers validate the resulting
-scope. Apply and preview validate a complete deployment spec before constructing
-a backend, so an artifact-less operation plan cannot deploy anything.
+scope. Apply and ordinary preview validate a complete deployment spec before
+constructing a backend, so an operation plan without an artifact cannot deploy
+anything.
 
-Destroy uses the existing teardown validation, which also permits an absent
-image. It retains the target ownership, protected-environment and expired-preview
-rules. Teardown does not require an application build.
+Destroy planning uses the existing teardown validation, which also permits an
+absent image. Its preview uses Pulumi PreviewDestroy against the saved state,
+instead of running the application deployment program. Teardown explicitly
+disables RunProgram, including when a global Pulumi setting enables it. The existing teardown
+scope selects this path; runtime-observation plans do not. Apply always retains
+strict deployment validation. Target ownership, protected-environment and
+expired-preview rules remain in force. Teardown does not require an application
+build.
 
 No YAML key, RPC method, protocol version or StoredPlan shape changes. Older
 providers ignore the optional request field and reject the missing digest.
@@ -37,5 +43,5 @@ signature, digest and publisher checks are unchanged.
 
 Regressions cover flag forwarding, its default value, artifact-less runtime
 planning, malformed digests, rejection by apply and preview before backend
-construction, and teardown without an update. Live distributed runtime operations
+construction, and teardown preview without an application update. Live distributed runtime operations
 remain an acceptance check.
