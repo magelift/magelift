@@ -220,6 +220,19 @@ existing passphrase or rotate it. These paths have local regression coverage;
 real project permissions and state decryption remain acceptance checks.
 
 
+## Cloud SQL placement and capacity
+
+New SQL instances prefer the first resolved `target.gcp.zones` entry. Existing
+instances keep their current zone when the CLI is updated or the list is
+reordered. Regional secondary placement stays Google-managed. See
+[ADR 0017](adr/0017-gcp-sql-zone-preference.md).
+
+A listed tier does not guarantee available capacity. After `ERROR_STOCKOUT`,
+inspect the failed creation operation and current inventory. For a new instance,
+put another compatible zone first and retry the same digest after the failed
+operation is resolved. Preserve the state and resources already created.
+The CLI does not retry this failure automatically.
+
 ## Review and apply GCP CI permissions
 
 Prepare the account and inspect the returned ciPermissionPlan first:

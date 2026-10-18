@@ -24,3 +24,4 @@ Each ADR states context, decision, consequences, alternatives, and provenance.
 - [ADR 0014](0014-distribution-trust.md): One fail-closed trust policy for installer, updater, core load, and provider download.
 - [ADR 0015](0015-gcp-bootstrap-state-key.md): GCP bootstrap prerequisites and an immutable remote Pulumi state passphrase.
 - [ADR 0016](0016-gcp-owned-node-identity.md): Owned GKE node identity and creation-only cluster identity selection.
+- [ADR 0017](0017-gcp-sql-zone-preference.md): Cloud SQL primary-zone preference for new instances and safe capacity recovery.

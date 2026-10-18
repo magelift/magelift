@@ -1094,3 +1094,32 @@ reported 21 unchanged resources. No image rebuild or state deletion occurred.
 A focused follow-up now wires the already resolved zone preference into new
 SQL instances, with an ignore-changes guard for existing database placement.
 Runtime, TLS, persistence and destruction remain NOT_RUN.
+
+### S3 increment: explicit SQL creation placement and capacity diagnostics
+
+The second hardware-family attempt also returned native capacity failure while
+21 resources stayed unchanged. The provider now passes the first existing
+resolved zones entry into new Cloud SQL primary location preference. Direct
+component calls without a zone retain Google selection. The nested zone field
+is ignored on subsequent changes so a CLI upgrade does not implicitly move an
+existing database. Regional secondary placement, tier, protection and backups
+are unchanged. No new YAML or provider operation was added.
+
+Cursor Composer 2.5 (non-fast) implemented the bounded change and Pulumi mocks
+for explicit/absent zone, first-zone stack mapping and the creation-only RPC
+option. Root added a scoped diagnostic for the actual Cloud SQL create-capacity
+error: project/environment/region, infra-update phase, retained state, inspection
+and zone selection as the next action, with retryable=false. Apply tests verify
+that diagnostic and exactly one backend update; unrelated errors and destruction
+keep their previous behavior. Targeted diagnostic tests pass.
+
+A new signed provider is required before the live chosen-zone retry. Live new-zone
+creation, legacy database relocation behavior, runtime, TLS, two functional
+releases and cleanup remain NOT_RUN. The current partial checkpoint and owned
+resources remain available for controlled resumption. Billing is not measured.
+The initial combined race run found one GCP graph assertion still expecting
+the old OpenSearch tag alias. It now expects the explicit current version while
+retaining its digest-pin check. Final database/stack/plugin race suites all pass;
+strict docs, workflow lint and generated consistency also pass. Human prose was
+reviewed with humanizer; remove-ai-marks remains NOT_RUN because its service is
+unavailable. No live chosen-zone mutation has yet run with these new binaries.

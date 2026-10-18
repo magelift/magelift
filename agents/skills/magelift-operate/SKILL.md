@@ -73,3 +73,9 @@ magelift --env staging rollback --ack-forward-only --to-sequence 2
 Record the command, environment, image digest, result, and any resources left
 after teardown. A green CLI exit code is not proof that an external DNS record
 or manually created resource was removed.
+
+For Cloud SQL creation ERROR_STOCKOUT, inspect the failed operation and resource
+inventory before retrying. Preserve the state. New instances prefer the first
+target.gcp.zones entry; select another compatible zone and reuse the same digest.
+Existing instances keep their zone on CLI upgrades or reordered placement lists.
+No automatic retry or deletion of an existing database is implied.

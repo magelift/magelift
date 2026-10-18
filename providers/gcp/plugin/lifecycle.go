@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 
@@ -247,11 +248,31 @@ func (s *Server) runStackMutation(ctx context.Context, req *sdk.StackCall, destr
 		changes, err = backend.Update(ctx, request, &diagnostics)
 	}
 	if err != nil {
-		return nil, withDiagnostics(mapError(err), diagnostics.lines())
+		failure := mapError(err)
+		if !destroying {
+			failure = withSQLCapacityGuidance(failure, spec)
+		}
+		return nil, withDiagnostics(failure, diagnostics.lines())
 	}
 	summary := summarizeChanges(changes)
 	result := &sdk.LifecycleResult{Summary: summary, Diagnostics: diagnostics.lines()}
 	return result, nil
+}
+
+func withSQLCapacityGuidance(failure *sdk.OperationError, spec gcpstack.Spec) *sdk.OperationError {
+	if failure == nil {
+		return nil
+	}
+	message := strings.ToLower(failure.Message)
+	if !strings.Contains(message, "create instance") ||
+		(!strings.Contains(message, "error_stockout") && !strings.Contains(message, "zone or region does not have sufficient resources")) {
+		return failure
+	}
+	failure.Code = sdk.ErrCodeUpstream
+	failure.Retryable = false
+	failure.Message = fmt.Sprintf("project=%s gcpProject=%s environment=%s region=%s stage=infra-update outcome=failed; state retained\n%s\nNext: inspect the failed Cloud SQL creation operation and current resource inventory. For a new instance, choose another compatible primary zone first in target.gcp.zones, then deploy the same digest. Do not remove the state or retry automatically.",
+		spec.Identity.Project, spec.Identity.GCPProject, spec.Identity.Environment, spec.Identity.Region, failure.Message)
+	return failure
 }
 
 // withDiagnostics appends the redacted tail of captured progress to a typed

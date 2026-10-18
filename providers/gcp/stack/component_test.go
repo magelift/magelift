@@ -319,7 +319,7 @@ func TestProgramBuildsStandardPresetGraph(t *testing.T) {
 					t.Fatal("OpenSearch StatefulSet must have one container")
 				}
 				containerValue := containers[0].ObjectValue()
-				if !strings.Contains(containerValue["image"].StringValue(), "opensearchproject/opensearch:3@sha256:") {
+				if !strings.Contains(containerValue["image"].StringValue(), "opensearchproject/opensearch:3.9.0@sha256:") {
 					t.Fatalf("OpenSearch StatefulSet must use the Adobe-compatible default image: %v", containerValue["image"])
 				}
 				readiness, ok := containerValue["readinessProbe"]

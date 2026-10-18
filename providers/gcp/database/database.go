@@ -37,6 +37,9 @@ type Args struct {
 	BackupLocation          string
 	DeletionProtection      bool
 	Labels                  map[string]string
+	// Preferred primary zone for a new instance. Empty leaves zone selection
+	// to Cloud SQL.
+	Zone string
 }
 
 type Component struct {
@@ -203,32 +206,41 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		}
 	}
 
-	instance, err := sql.NewDatabaseInstance(ctx, name, &sql.DatabaseInstanceArgs{
-		Project:         pulumi.String(args.Project),
-		Name:            pulumi.String(name),
-		DatabaseVersion: pulumi.String(databaseVersion),
-		Region:          pulumi.String(args.Region),
-		Settings: &sql.DatabaseInstanceSettingsArgs{
-			Tier:             pulumi.String(args.Tier),
-			Edition:          pulumi.String(edition),
-			AvailabilityType: pulumi.String(availability),
-			DatabaseFlags: sql.DatabaseInstanceSettingsDatabaseFlagArray{
-				&sql.DatabaseInstanceSettingsDatabaseFlagArgs{
-					Name:  pulumi.String(logBinTrustFunctionCreatorsFlag),
-					Value: pulumi.String("on"),
-				},
+	settings := &sql.DatabaseInstanceSettingsArgs{
+		Tier:             pulumi.String(args.Tier),
+		Edition:          pulumi.String(edition),
+		AvailabilityType: pulumi.String(availability),
+		DatabaseFlags: sql.DatabaseInstanceSettingsDatabaseFlagArray{
+			&sql.DatabaseInstanceSettingsDatabaseFlagArgs{
+				Name:  pulumi.String(logBinTrustFunctionCreatorsFlag),
+				Value: pulumi.String("on"),
 			},
-			BackupConfiguration: backupConfiguration,
-			FinalBackupConfig:   finalBackup,
-			IpConfiguration: &sql.DatabaseInstanceSettingsIpConfigurationArgs{
-				Ipv4Enabled:    pulumi.Bool(false),
-				PrivateNetwork: args.NetworkSelfLink,
-			},
-			UserLabels:                pulumi.ToStringMap(args.Labels),
-			DeletionProtectionEnabled: pulumi.BoolPtr(args.DeletionProtection),
 		},
+		BackupConfiguration: backupConfiguration,
+		FinalBackupConfig:   finalBackup,
+		IpConfiguration: &sql.DatabaseInstanceSettingsIpConfigurationArgs{
+			Ipv4Enabled:    pulumi.Bool(false),
+			PrivateNetwork: args.NetworkSelfLink,
+		},
+		UserLabels:                pulumi.ToStringMap(args.Labels),
+		DeletionProtectionEnabled: pulumi.BoolPtr(args.DeletionProtection),
+	}
+	if zone := strings.TrimSpace(args.Zone); zone != "" {
+		settings.LocationPreference = &sql.DatabaseInstanceSettingsLocationPreferenceArgs{
+			Zone: pulumi.StringPtr(zone),
+		}
+	}
+	// Preferred zone is creation-only; ignore later drift so existing instances
+	// are not replaced when policy zones are introduced on CLI upgrade.
+	sqlZoneCreationOnly := pulumi.IgnoreChanges([]string{"settings.locationPreference.zone"})
+	instance, err := sql.NewDatabaseInstance(ctx, name, &sql.DatabaseInstanceArgs{
+		Project:            pulumi.String(args.Project),
+		Name:               pulumi.String(name),
+		DatabaseVersion:    pulumi.String(databaseVersion),
+		Region:             pulumi.String(args.Region),
+		Settings:           settings,
 		DeletionProtection: pulumi.Bool(args.DeletionProtection),
-	}, parent, pulumi.DependsOn([]pulumi.Resource{connection}))
+	}, parent, pulumi.DependsOn([]pulumi.Resource{connection}), sqlZoneCreationOnly)
 	if err != nil {
 		return nil, fmt.Errorf("create Cloud SQL instance: %w", err)
 	}

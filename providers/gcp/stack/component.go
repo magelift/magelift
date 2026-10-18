@@ -79,6 +79,10 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 	if err != nil {
 		return nil, fmt.Errorf("create GCP network: %w", err)
 	}
+	sqlZone := ""
+	if len(spec.Policy.Zones) > 0 {
+		sqlZone = spec.Policy.Zones[0]
+	}
 	component.Database, err = database.New(ctx, naming.CloudSQLInstance(spec.Identity.Project, spec.Identity.Environment), database.Args{
 		Project: spec.Identity.GCPProject, Region: spec.Identity.Region,
 		NetworkID: component.Network.NetworkID.ToStringOutput(), NetworkSelfLink: component.Network.NetworkSelfLink,
@@ -89,6 +93,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 		BackupStartTime: spec.Catalog.CloudSQLBackupStartTime, BackupLocation: spec.Catalog.CloudSQLBackupLocation,
 		DeletionProtection: spec.Catalog.CloudSQLDeletionProtection,
 		Labels:             spec.Identity.Labels,
+		Zone:               sqlZone,
 	}, append(childOpts, pulumi.DependsOn([]pulumi.Resource{component.Network}))...)
 	if err != nil {
 		return nil, fmt.Errorf("create GCP database: %w", err)
