@@ -2199,36 +2199,28 @@ gcp_apply_magento_storefront_base_url() {
 	fi
 }
 
-# bootstrap:wif; Ensure WIF on the project PLUS Act or gcloud STS/WIF exchange proof.
-# Ensure-only is forbidden (D-05 / GCP-01).
+# bootstrap:wif; Ensure WIF on the project plus a gcloud impersonation exchange.
+# Ensure-only is forbidden (D-05 / GCP-01). Impersonation checks IAM. A
+# GitHub-signed OIDC exchange is the acceptance shop workflow.
 prove_wif_token_exchange() {
-	local ci_sa pool_hint proof_log
+	local ci_sa pool_hint
 	if [[ "${MAGELIFT_GCP_WIF_ENSURE_ONLY:-}" == "1" || "${MAGELIFT_GCP_WIF_ENSURE_ONLY:-}" == "true" ]]; then
-		printf 'bootstrap:wif refused: MAGELIFT_GCP_WIF_ENSURE_ONLY forbids Ensure-only (need Act or STS exchange)\n' >&2
+		printf 'bootstrap:wif refused: MAGELIFT_GCP_WIF_ENSURE_ONLY forbids Ensure-only\n' >&2
 		return 1
-	fi
-	proof_log="${MAGELIFT_GCP_WIF_ACT_LOG:-}"
-	if [[ -n "$proof_log" && -f "$proof_log" ]] && grep -Eqi 'WIF token exchange succeeded|token exchange' "$proof_log"; then
-		printf '+ bootstrap:wif Act proof accepted from %s\n' "$proof_log"
-		return 0
-	fi
-	if [[ "${MAGELIFT_GCP_WIF_ACT_PROOF:-}" == "1" || "${MAGELIFT_GCP_WIF_ACT_PROOF:-}" == "true" ]]; then
-		printf '+ bootstrap:wif Act proof flag MAGELIFT_GCP_WIF_ACT_PROOF=1 (operator attested Act smoke)\n'
-		return 0
 	fi
 	# Bootstrap SA ID is ml-<project>-<env>-ci (internal/cloud/gcp/bootstrap/identity.go).
 	ci_sa="${MAGELIFT_GCP_WIF_SERVICE_ACCOUNT:-ml-${NAME}-${PROFILE}-ci@${PROJECT}.iam.gserviceaccount.com}"
 	pool_hint="${MAGELIFT_GCP_WIF_PROVIDER:-}"
-	printf '+ bootstrap:wif attempting gcloud STS/impersonation token exchange for %s\n' "$ci_sa"
+	printf '+ bootstrap:wif attempting gcloud impersonation token exchange for %s\n' "$ci_sa"
 	if [[ -n "$pool_hint" ]]; then
 		printf '+ bootstrap:wif provider=%s\n' "$pool_hint"
 	fi
 	if TOKEN="$(gcloud auth print-access-token --impersonate-service-account="$ci_sa" --project="$PROJECT" 2>/dev/null)" \
 		&& [[ -n "$TOKEN" ]]; then
-		printf '+ bootstrap:wif STS/impersonation token exchange ok (token not logged)\n'
+		printf '+ bootstrap:wif impersonation token exchange ok (token not logged)\n'
 		return 0
 	fi
-	printf 'bootstrap:wif FAILED: need Act proof (MAGELIFT_GCP_WIF_ACT_LOG or MAGELIFT_GCP_WIF_ACT_PROOF=1) or gcloud STS/WIF exchange; Ensure-only is not enough\n' >&2
+	printf 'bootstrap:wif FAILED: gcloud impersonation of the CI service account did not return a token; Ensure-only is not enough\n' >&2
 	return 1
 }
 

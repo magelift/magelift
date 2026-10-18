@@ -92,9 +92,9 @@ pass documented in the [evidence pack](evidence/README.md).
 
 Catalog order (teardown is EXIT, not a cell):
 
-1. `bootstrap:wif`: Ensure WIF **plus** Act or gcloud STS/WIF token-exchange
-   proof (`MAGELIFT_GCP_WIF_ACT_LOG` / `MAGELIFT_GCP_WIF_ACT_PROOF=1` or
-   impersonation exchange). Ensure-only is refused.
+1. `bootstrap:wif`: Ensure WIF plus a `gcloud` impersonation token exchange.
+   Ensure-only is refused. Impersonation checks IAM on the CI service
+   account. The GitHub OIDC exchange runs in the acceptance shop workflow.
 2. `composer:sm-write` / `composer:sm-read`: Secret Manager Composer creds
    (`gcp-secret-manager://`); no nil-success.
 3. `day2:secrets` / `day2:state` / `day2:logs` / `day2:exec` / `day2:health`
@@ -295,8 +295,6 @@ Optional env:
 | `MAGELIFT_GCP_ACCEPTANCE_RESUME` | unset | Skip create-once when stack already up |
 | `MAGELIFT_GCP_EXEC_RETRY_ATTEMPTS` | `10` | Retries for the specific GKE `No agent available` exec error |
 | `MAGELIFT_GCP_EXEC_RETRY_INTERVAL_SECS` | `30` | Delay between those exec retries |
-| `MAGELIFT_GCP_WIF_ACT_LOG` | unset | Act smoke log proving token exchange |
-| `MAGELIFT_GCP_WIF_ACT_PROOF` | unset | Operator-attested Act proof (`=1`) |
 | `MAGELIFT_DUMPIMPORT_RUNNER` | unset | Set `kube` for private Cloud SQL dump cell |
 | `GOOGLE_APPLICATION_CREDENTIALS` | auto from gcloud login | Preferred; refreshable ADC |
 | `GOOGLE_OAUTH_ACCESS_TOKEN` | avoided when ADC exists | Static token; expires mid-Up |
@@ -404,9 +402,9 @@ guidance and the offline preflight test.
 - Memorystore Valkey needs a regional Service Connection Policy
   (`serviceClass=gcp-memorystore`). Created by the GCP cache component.
 - Non-preview presets remain spend-gated (not free-tier certified).
-- GitHub WIF CI proof is **Act-only** until hosted Actions minutes return. See
-  [gcp-experimental.md](gcp-experimental.md#github-wif-act-only-until-minutes-return)
-  and `.github/workflows/gcp-wif-act-smoke.yml`. Do not commit SA keys.
+- This repository does not run a GitHub WIF workflow. The hosted exchange is
+  the acceptance shop workflow. See
+  [gcp-experimental.md](gcp-experimental.md#github-wif). Do not commit SA keys.
 - Live dump cell requires `MAGELIFT_DUMPIMPORT_RUNNER=kube` (+ mysql client pod
   when the Magento image lacks `mysql`); evidenced on the Autopilot certified
   path.

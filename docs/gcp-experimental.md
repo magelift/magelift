@@ -8,7 +8,7 @@ AWS ECS Fargate and GCP GKE Autopilot are the two certified first-party Magento
 origins ([ADR 0002](adr/0002-certified-vs-experimental.md)).
 
 **Still experimental / not certified:** GKE Standard as a release-wide target,
-hosted GitHub Actions WIF (Act-only until minutes return), the complete Valkey 9
+hosted GitHub Actions WIF, the complete Valkey 9
 runtime/cache boundary, and community providers. The adapter now selects
 Memorystore `VALKEY_9_0` (GA) for Adobe Commerce 2.4.9 by default and accepts
 `VALKEY_9_1` only as an explicit Preview profile. A bounded real-account
@@ -73,48 +73,20 @@ privileged initialization, so HA selects Standard; see Google's
 [Autopilot security measures](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-security)
 and [Standard node system configuration](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/node-system-config).
 
-## GitHub WIF (Act-only until minutes return)
+## GitHub WIF
 
 Bootstrap `Ensure` provisions a workload identity pool, GitHub OIDC provider
 (`https://token.actions.githubusercontent.com`), attribute condition
 `assertion.repository == 'magelift/magelift'`, and a CI service account with
 `roles/iam.workloadIdentityUser`. Details expose `wif.provider` / `wif.serviceAccount`
-(never `"deferred"`).
+(never `"deferred"`). Do not commit a service-account key.
 
-Hosted Actions minutes are exhausted. Matrix evidence stays **Act-only** until
-minutes return. Do not enable this workflow as a required hosted check.
-
-### Run via Act
-
-After bootstrap, pass the provider resource name and SA email (WIF names only;
-never `credentials_json` or SA JSON keys):
-
-```bash
-act -W .github/workflows/gcp-wif-act-smoke.yml workflow_dispatch \
-  -s GCP_WORKLOAD_IDENTITY_PROVIDER='projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/github' \
-  -s GCP_SERVICE_ACCOUNT='ml-PROJECT-ENV-ci@GCP_PROJECT.iam.gserviceaccount.com'
-```
-
-Workflow: `.github/workflows/gcp-wif-act-smoke.yml` in the repository
-(`google-github-actions/auth`, `permissions.id-token: write`).
-
-### Fallback: documented gcloud STS exchange
-
-Without Act, prove federation with ADC + IAM Credentials / STS (no SA key file):
-
-```bash
-# 1) Obtain a GitHub OIDC-shaped subject is CI-only; locally use gcloud print-identity-token
-#    against a workload that already federates, or exchange after Act once.
-# 2) Generate an access token for the CI SA via WIF (example shape):
-gcloud iam service-accounts get-iam-policy \
-  "ml-shop-preview-ci@${GCP_PROJECT}.iam.gserviceaccount.com"
-# Confirm principalSet member for attribute.repository/magelift/magelift exists.
-# 3) Token mint (when a valid federated credential is available):
-gcloud auth print-access-token --impersonate-service-account \
-  "ml-shop-preview-ci@${GCP_PROJECT}.iam.gserviceaccount.com"
-```
-
-Record the matrix row as Act-only (or `gcloud` STS dry-run) until hosted minutes return.
+This repository does not run that token exchange. The hosted workflow is
+`magelift.yml` in
+[acceptance-magento-249](https://github.com/magelift/acceptance-magento-249).
+A local acceptance cell can impersonate the CI service account with `gcloud`.
+That checks IAM on the account. It does not present a token signed by
+`token.actions.githubusercontent.com`.
 
 ## Offline verification
 
