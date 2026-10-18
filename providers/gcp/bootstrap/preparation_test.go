@@ -521,9 +521,9 @@ type fakeLocks struct {
 func (f *fakeLocks) Close() error { return nil }
 
 func (f *fakeLocks) Acquire(ctx context.Context, _, _, _, _ string) (func(context.Context) error, error) {
+	f.mu.Lock()
 	f.acquires++
 	if f.serial {
-		f.mu.Lock()
 		if f.held {
 			f.mu.Unlock()
 			return nil, errors.New("deployment lock is held")
@@ -537,6 +537,7 @@ func (f *fakeLocks) Acquire(ctx context.Context, _, _, _, _ string) (func(contex
 			return nil
 		}, nil
 	}
+	f.mu.Unlock()
 	return func(context.Context) error { return nil }, nil
 }
 
