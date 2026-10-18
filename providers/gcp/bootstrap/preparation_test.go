@@ -14,7 +14,7 @@ func testSpec() Spec {
 	return Spec{
 		Project:     "shop",
 		Environment: "preview",
-		GCPProject:  "digital-lab-341608",
+		GCPProject:  "example-project",
 		Region:      "europe-west1",
 	}
 }
@@ -91,7 +91,7 @@ func TestBuildPreparationPlanDeterministic(t *testing.T) {
 	if first.StateSecretLabels["magelift-purpose"] != purposePulumiStatePassphrase {
 		t.Fatalf("secret purpose = %q", first.StateSecretLabels["magelift-purpose"])
 	}
-	if !strings.HasPrefix(first.ImageBase, "europe-west1-docker.pkg.dev/digital-lab-341608/") {
+	if !strings.HasPrefix(first.ImageBase, "europe-west1-docker.pkg.dev/example-project/") {
 		t.Fatalf("image base = %q", first.ImageBase)
 	}
 }
@@ -309,7 +309,7 @@ func TestBuildPreparationPlanCompactsLongNames(t *testing.T) {
 	spec := Spec{
 		Project:     "shop",
 		Environment: highAvailabilityEnvironment,
-		GCPProject:  "digital-lab-341608",
+		GCPProject:  "example-project",
 		Region:      "europe-west1",
 	}
 	plan, err := BuildPreparationPlan(spec)
