@@ -107,7 +107,7 @@ jobs:
         if: "(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         with:
           distribution: goreleaser
-          version: v2.18.1
+          version: v2.18.3
           args: release --clean --timeout 30m -f .goreleaser.dialproof.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -119,7 +119,7 @@ jobs:
         if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         with:
           distribution: goreleaser
-          version: v2.18.1
+          version: v2.18.3
           args: release --clean --parallelism 1 --timeout 150m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
