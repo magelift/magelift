@@ -1,0 +1,139 @@
+site_name: MageLift
+site_description: Open-source Magento CLI for your AWS or GCP account. ACC/Upsun-shaped YAML, certified on ECS Fargate and GKE Autopilot.
+site_url: https://magelift.dev/docs/
+repo_url: https://github.com/magelift/magelift
+repo_name: magelift/magelift
+docs_dir: docs
+strict: true
+exclude_docs: |
+  evidence/current-capability-coverage.md
+  evidence/runs/**
+theme:
+  name: material
+  custom_dir: docs/overrides
+  logo: assets/logo.png
+  favicon: assets/favicon.svg
+  # Colors come from docs/stylesheets/magelift.v3.css (landing-page tokens),
+  # not from Material's named palette — keep this to scheme + toggle only.
+  # Bump the .vN filename on every edit: extra_css is not fingerprinted,
+  # and browsers cache the old one aggressively under mkdocs serve.
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+  font:
+    text: Source Sans 3
+    code: IBM Plex Mono
+extra_css:
+  - stylesheets/magelift.v3.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/magelift/magelift
+    - icon: fontawesome/solid/globe
+      link: https://magelift.dev/
+# Journey-first tree: a new reader walks Start -> Migrate -> Operate.
+# Cloud targets and Reference are lookup sections; Project is meta.
+nav:
+  - Home: index.md
+  - Start:
+      - Install: install.md
+      - Getting started: getting-started.md
+      - GCP onboarding: onboarding.md
+      - Local vs cloud: local-vs-cloud.md
+      - Compare to PaaS: compare-paas.md
+      - FAQ: faq.md
+  - Migrate:
+      - Leave PaaS in a weekend: weekend-migrate.md
+      - Migrate from ACC / Platform.sh: migrating-from-paas.md
+      - Brownfield attach: brownfield-attach.md
+      - ece-tools parity: ece-parity.md
+  - Operate:
+      - Configuration: configuration.md
+      - CLI reference: cli-reference.md
+      - Secrets: secrets.md
+      - Day-2 operations: operations.md
+      - Alpha recipe: alpha-recipe.md
+      - Application builds: builds.md
+      - Storefront recipes: storefront-recipes.md
+      - Compatibility: compatibility.md
+      - Benchmarking: benchmarks.md
+  - Cloud targets:
+      - Capability matrix: capability-matrix.md
+      - AWS bootstrap: bootstrap.md
+      - AWS acceptance: aws-acceptance.md
+      - GCP acceptance: gcp-acceptance.md
+      - Packed RC1 sessions: certification-sessions.md
+      - Experimental:
+          - AWS EKS: aws-eks-experimental.md
+          - GCP notes: gcp-experimental.md
+          - OVH MKS: ovh-experimental.md
+          - Scaleway Kapsule: scaleway-experimental.md
+  - Reference:
+      - Architecture: architecture.md
+      - Adding a provider: adding-a-provider.md
+      - Provenance: provenance.md
+      - ADRs:
+          - Process: adr/README.md
+          - "0001 YAML-only CLI": adr/0001-yaml-only-cli.md
+          - "0002 Certified vs experimental": adr/0002-certified-vs-experimental.md
+          - "0003 Portable vs topology": adr/0003-portable-contracts-vs-topology.md
+          - "0004 Ports and adapters": adr/0004-ports-and-adapters.md
+          - "0005 Artifact manifest": adr/0005-external-artifact-manifest.md
+          - "0006 Local Compose": adr/0006-generated-local-compose.md
+          - "0007 GitHub OIDC roles": adr/0007-github-oidc-roles.md
+          - "0008 Provider load path": adr/0008-provider-load-path.md
+          - "0009 Dump seed and attach": adr/0009-dump-seed-and-attach.md
+          - "0010 Live certification": adr/0010-live-certification.md
+          - "0011 Subprocess Dial proof": adr/0011-subprocess-dial-proof.md
+          - "0012 Search proof shapes": adr/0012-search-proof-shapes.md
+          - "0013 Provider plugin contract": adr/0013-provider-plugin-contract.md
+          - "0014 Distribution trust": adr/0014-distribution-trust.md
+          - "0015 GCP bootstrap state key": adr/0015-gcp-bootstrap-state-key.md
+          - "0016 Owned GKE node identity": adr/0016-gcp-owned-node-identity.md
+          - "0017 Cloud SQL zone preference": adr/0017-gcp-sql-zone-preference.md
+          - "0018 Cloud SQL edition": adr/0018-gcp-explicit-sql-edition.md
+          - "0019 GCP runtime operation plans": adr/0019-gcp-runtime-operation-plans.md
+          - "0020 GCP native edge address": adr/0020-gcp-native-edge-address.md
+          - "0021 Empty database bootstrap": adr/0021-empty-magento-database-bootstrap.md
+  - Project:
+      - Versioning: versioning.md
+      - Release readiness: release-readiness.md
+      - Publishing: publishing.md
+      - Roadmap: post-beta-roadmap.md
+      - Evidence: evidence/README.md
+      - Lint policy: lint-policy.md
+      - Dependency policy: dependency-policy.md
+      - GitHub labels: github-labels.md
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - toc:
+      permalink: true

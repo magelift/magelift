@@ -1,0 +1,58 @@
+schemaVersion: 1
+project:
+  name: sample-shop
+application:
+  edition: open-source
+  version: 2.4.9
+  mode: integrated
+  webRuntime: nginx-fpm
+  magento:
+    frontName: admin
+build:
+  php: "8.5"
+  extensions: [apcu, bcmath, ftp, gd, intl, mbstring, opcache, pdo_mysql, redis, soap, sockets, sodium, xsl, zip]
+  composer:
+    version: "2.10"
+    credentials: aws-secrets-manager://magelift/composer
+  staticContent:
+    locales: [en_US]
+    themes: [Magento/luma]
+target:
+  provider: aws
+  runtime: ecs-fargate
+  aws:
+    catalog:
+      # preview default is db; standard and high-availability default to ecs-rabbitmq when unset.
+      queueMode: db
+defaults:
+  region: eu-west-3
+  preset: preview
+environments:
+  preview:
+    account: "123456789012"
+    class: preview
+    preset: preview
+    domain: preview.example.com
+    expiresAt: "2026-12-31T23:59:59Z"
+    monthlyBudgetCents: 5000
+  staging:
+    inherits: preview
+    account: "123456789012"
+    class: staging
+    preset: standard
+    domain: staging.example.com
+    target:
+      aws:
+        catalog:
+          queueMode: ecs-rabbitmq
+  production:
+    inherits: staging
+    account: "210987654321"
+    class: production
+    preset: high-availability
+    domain: example.com
+    protection: true
+local:
+  email:
+    mode: mailpit
+extensions: {}

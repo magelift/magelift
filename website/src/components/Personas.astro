@@ -1,0 +1,116 @@
+---
+import { personas } from "../data/content.js";
+---
+<section class="section personas-section" id="who-it-is-for" data-reveal>
+  <h2>{personas.heading}</h2>
+  <p class="lede">{personas.lede}</p>
+
+  <div class="personas" data-personas>
+    <div class="tablist" role="tablist" aria-label={personas.heading}>
+      {personas.tabs.map((tab, i) => (
+        <button
+          type="button"
+          role="tab"
+          id={`persona-tab-${i}`}
+          aria-selected={i === 0 ? "true" : "false"}
+          aria-controls={`persona-panel-${i}`}
+          tabindex={i === 0 ? 0 : -1}
+          data-tab={i}
+        >
+          {tab.label}
+        </button>
+      ))}
+      <span class="tab-ink" data-tab-ink aria-hidden="true"></span>
+    </div>
+
+    {personas.tabs.map((tab, i) => (
+      <article
+        role="tabpanel"
+        id={`persona-panel-${i}`}
+        aria-labelledby={`persona-tab-${i}`}
+        hidden={i !== 0}
+        data-panel={i}
+      >
+        <h3>{tab.pain}</h3>
+        <p class="panel-body">{tab.body}</p>
+        <p class="panel-proof"><span aria-hidden="true">$ </span>{tab.proof}</p>
+      </article>
+    ))}
+  </div>
+</section>
+
+<style>
+  .personas {
+    margin-top: 1.75rem;
+    max-width: 52rem;
+  }
+  .tablist {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .tablist [role="tab"] {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0.65rem 0.9rem;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: var(--radius) var(--radius) 0 0;
+    transition: color 160ms ease;
+  }
+  .tablist [role="tab"]:hover {
+    color: var(--ink);
+  }
+  .tablist [role="tab"][aria-selected="true"] {
+    color: var(--accent);
+  }
+  .tab-ink {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    width: 0;
+    background: var(--accent);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+  [role="tabpanel"] {
+    padding: 1.5rem 0 0.25rem;
+  }
+  [role="tabpanel"] h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(1.25rem, 2vw, 1.5rem);
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin: 0 0 0.65rem;
+    max-width: 26ch;
+    text-wrap: balance;
+  }
+  .panel-body {
+    margin: 0;
+    color: var(--muted);
+    max-width: 44rem;
+    text-wrap: pretty;
+  }
+  .panel-proof {
+    margin: 1rem 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    border-left: 2px solid var(--accent);
+    padding-left: 0.75rem;
+  }
+  @media (max-width: 640px) {
+    .tablist [role="tab"] {
+      padding: 0.6rem 0.65rem;
+      font-size: 0.95rem;
+    }
+  }
+</style>

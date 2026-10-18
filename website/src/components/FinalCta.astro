@@ -1,0 +1,50 @@
+---
+import { finalCta } from "../data/content.js";
+---
+<section class="final" data-reveal>
+  <div class="final-copy">
+    <h2>{finalCta.heading}</h2>
+    <p>{finalCta.body}</p>
+  </div>
+  <div class="cta-row">
+    <a class="btn btn-primary" href={finalCta.primaryCta.href}>{finalCta.primaryCta.label}</a>
+    <a class="btn btn-ghost" href={finalCta.secondaryCta.href}>{finalCta.secondaryCta.label}</a>
+  </div>
+</section>
+
+<style>
+  .final {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    background: var(--bg1);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: 1.9rem 1.6rem;
+    margin-top: 1rem;
+    margin-bottom: 3rem;
+  }
+  .final-copy h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(1.4rem, 2.4vw, 1.75rem);
+    margin: 0 0 0.45rem;
+    letter-spacing: -0.025em;
+  }
+  .final-copy p {
+    max-width: 34rem;
+    margin: 0;
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+  .final .cta-row {
+    margin-top: 0;
+  }
+  @media (max-width: 900px) {
+    .final .cta-row {
+      margin-top: 0.5rem;
+    }
+  }
+</style>

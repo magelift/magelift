@@ -1,0 +1,72 @@
+---
+import { targets } from "../data/content.js";
+---
+<section class="section" data-reveal>
+  <h2>{targets.heading}</h2>
+  <p class="lede">{targets.lede}</p>
+
+  <ul class="target-list">
+    {targets.rows.map((row) => (
+      <li>
+        <span class="target-name">{row.target}</span>
+        <span class:list={["chip", row.status]}>{row.status}</span>
+      </li>
+    ))}
+  </ul>
+
+  <p class="section-links">
+    {targets.links.map((link, i) => (
+      <>
+        {i > 0 && <span class="sep" aria-hidden="true">·</span>}
+        <a href={link.href}>{link.label}</a>
+      </>
+    ))}
+  </p>
+</section>
+
+<style>
+  .target-list {
+    list-style: none;
+    margin: 1.25rem 0 0;
+    padding: 0;
+    max-width: 44rem;
+    border-top: 1px solid var(--rule);
+  }
+  .target-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.95rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .target-name {
+    font-weight: 600;
+  }
+  .chip {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.18rem 0.6rem;
+    border-radius: 999px;
+    text-transform: capitalize;
+  }
+  .chip.certified {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .chip.experimental {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--rule-strong);
+  }
+  .section-links {
+    margin-top: 1.15rem;
+    color: var(--muted);
+  }
+  .section-links .sep {
+    margin: 0 0.45rem;
+    color: var(--rule-strong);
+  }
+</style>

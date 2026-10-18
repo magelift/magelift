@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MageLift">
+  <rect width="64" height="64" rx="14" fill="#EEF2F6"/>
+  <!-- Crane hook -->
+  <path fill="none" stroke="#0B1220" stroke-width="2.2" stroke-linecap="round"
+        d="M32 8v6M28 16c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5"/>
+  <path fill="none" stroke="#0B1220" stroke-width="1.6" stroke-linecap="round"
+        d="M32 16l-9 6M32 16l9 6"/>
+  <!-- Isometric M frame (simplified) -->
+  <path fill="#0B1220"
+        d="M14 48V22l9 12 9-12 9 12 9-12v26h-7V34l-7.5 10L32 36l-4.5 8L20 34v14H14z"/>
+  <!-- Teal lift chevron inside -->
+  <path fill="#0F766E" d="M32 22l8 7h-5v7h-6v-7h-5l8-7z"/>
+</svg>

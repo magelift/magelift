@@ -1,0 +1,62 @@
+# ADR 0005: Artifact manifest lives outside the image
+
+- Status: Accepted
+- Date: 2026-08-22
+
+## Context
+
+The artifact manifest must name the OCI image by digest. Embedding the finalized manifest in the image would change that digest. Rebuild loops follow.
+
+## Decision
+
+The finalized artifact manifest is external to the application image. MageLift writes it after BuildKit returns the digest.
+
+1. `prepare` records deterministic pre-digest metadata (source revision, Magento edition, PHP, modules, checksums, static content matrix, required capabilities).
+2. `finalize` accepts only that prepared output plus BuildKit's `containerimage.digest`. It does not re-inspect the tree.
+
+The CLI supplies its semantic version to the isolated PHP runner through a
+public environment value; standalone package invocations retain their own
+version default. Builder/runtime identities are OCI labels within the final
+image digest. These additions keep the external manifest schema and runner
+JSON protocol unchanged.
+
+Neither step records secret values. Promotion, sign, and rollback use the digest in the external manifest.
+
+`magelift build --push`, `sign`, and `promote` use the operator's current cloud or CI login. Cosign keyless identity is Sigstore OIDC (Actions, Google SA), not Artifact Registry or ECR native signatures. The YAML-only path does not require Cosign flags.
+
+Cloud-native image signatures are not a substitute for MageLift's signed release journal.
+
+## Consequences
+
+The same signed digest and manifest pair can move through staging and production. Republishing a digest to another registry does not copy Sigstore signatures; resign or copy signatures explicitly.
+
+## Alternatives considered
+
+- Manifest inside the image: rejected (digest cycle).
+- Cloud-provider signing as the Magento release identity: rejected (wrong trust root).
+
+## Provenance
+
+Original. Cosign/Sigstore public docs.
+
+### User-owned image production
+
+The maintainer clarified that the user's CI/CD builds and publishes every image.
+The CLI carries the existing PHP build and Docker recipes; pinned official
+upstream images remain inputs. Builder/runtime intermediates stay on the runner. The application uses
+the user's selected OCI repository; its runtime stage comes from the bundled
+recipe and pinned official upstreams. Optional private registry caches are
+separate from the deployable artifact. MageLift does not operate a required image registry. The existing
+manifest and OCI labels retain their traceability roles; no new lock or manifest
+is introduced. Local builds load images without publishing.
+
+Source builds label the bundled recipe SHA256 and its runtime recipe identity.
+Explicit base-image overrides continue to record their immutable image references.
+CI preserves the existing external manifest, its checksum and build result between
+jobs; promotion verifies an existing artifact instead of invoking a builder.
+
+The optional `buildRecipe` member of that same manifest records `sha256`,
+`platform` and the three pinned upstream `baseImages` roles. It is supplied at
+finalization and omitted for older/explicit-base requests. Existing requests
+without the member retain their canonical JSON; provider RPC is unchanged.
+Recipe metadata cannot replace the image's final digest or the source checksums.

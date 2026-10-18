@@ -1,0 +1,46 @@
+---
+import { footer } from "../data/content.js";
+---
+<footer class="wrap">
+  <div class="row">
+    <span>© {new Date().getFullYear()} MageLift contributors</span>
+    <nav aria-label="Footer">
+      {footer.links.map((link) => (
+        <a href={link.href}>{link.label}</a>
+      ))}
+    </nav>
+  </div>
+  <p class="trademark">{footer.trademark}</p>
+</footer>
+
+<style>
+  footer {
+    padding: 2rem 0 3rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+  }
+  nav {
+    display: flex;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  nav a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  nav a:hover {
+    color: var(--ink);
+  }
+  .trademark {
+    margin: 0;
+  }
+</style>

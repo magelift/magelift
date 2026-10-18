@@ -1,0 +1,105 @@
+---
+import { faqs, docsUrl } from "../data/content.js";
+---
+<section class="section" id="faq" aria-labelledby="faq-heading" data-reveal>
+  <h2 id="faq-heading">FAQ</h2>
+  <p class="lede">
+    Common questions. Longer versions live in the{" "}
+    <a href={`${docsUrl}faq/`}>docs FAQ</a> and{" "}
+    <a href="/pricing.md">pricing</a> page.
+  </p>
+
+  <div class="faq-list">
+    {faqs.map((item) => (
+      <details name="faq">
+        <summary>
+          <span>{item.q}</span>
+          <span class="chev" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </span>
+        </summary>
+        <div class="details-body">
+          <p>{item.a}</p>
+        </div>
+      </details>
+    ))}
+  </div>
+</section>
+
+<style>
+  .faq-list {
+    margin-top: 1.25rem;
+    max-width: 46rem;
+    border-top: 1px solid var(--rule);
+  }
+  details {
+    border-bottom: 1px solid var(--rule);
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.02rem;
+    color: var(--ink);
+    transition: color 160ms ease;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary:hover {
+    color: var(--accent);
+  }
+  .chev {
+    flex-shrink: 0;
+    display: inline-flex;
+    color: var(--muted);
+    transition: transform 220ms ease;
+  }
+  details[open] .chev {
+    transform: rotate(180deg);
+  }
+  .details-body p {
+    margin: 0;
+    padding: 0 2.5rem 1.1rem 0;
+    color: var(--muted);
+    line-height: 1.5;
+    max-width: 42rem;
+    text-wrap: pretty;
+  }
+
+  /* Modern exclusive-accordion + smooth height animation.
+     interpolate-size is Chrome 129+/Safari 26+; elsewhere details snap open. */
+  @supports (interpolate-size: allow-keywords) {
+    :root {
+      interpolate-size: allow-keywords;
+    }
+    details::details-content {
+      height: 0;
+      overflow: clip;
+      transition:
+        height 240ms ease,
+        content-visibility 240ms ease allow-discrete;
+    }
+    details[open]::details-content {
+      height: auto;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chev {
+      transition: none;
+    }
+    @supports (interpolate-size: allow-keywords) {
+      details::details-content {
+        transition: none;
+      }
+    }
+  }
+</style>
