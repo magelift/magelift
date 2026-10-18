@@ -52,11 +52,19 @@ func writeBuildAndArchive(w *strings.Builder, configFile string) {
         run: |
           set -eu
           test -n "$MAGELIFT_RELEASE_IMAGE"
+          image="$MAGELIFT_RELEASE_IMAGE"
+          case "${image##*/}" in
+            *:*) ;;
+            *)
+              printf '%s' "$GITHUB_SHA" | grep -Eq '^[a-f0-9]{40}$'
+              image="$image:$GITHUB_SHA"
+              ;;
+          esac
           build_dir="$RUNNER_TEMP/magelift-build"
           result="$build_dir/build-result.json"
           mkdir -p "$build_dir"
           magelift --config ` + shellQuote(configFile) + ` --no-interaction --output json build --push \
-            --image "$MAGELIFT_RELEASE_IMAGE" > "$result"
+            --image "$image" > "$result"
           digest="$(jq -er '.image.imageReference + "@" + .image.digest' "$result")"
           cp -- "$(jq -er '.manifest' "$result")" "$build_dir/manifest.json"
           checksum="$(jq -er '.manifestSha256 | select(test("^[a-f0-9]{64}$"))' "$result")"

@@ -93,10 +93,18 @@ jobs:
           for required in MAGELIFT_RELEASE_IMAGE MAGELIFT_BUILDER_IMAGE MAGELIFT_RUNTIME_IMAGE; do
             test -n "${!required}"
           done
+          image="$MAGELIFT_RELEASE_IMAGE"
+          case "${image##*/}" in
+            *:*) ;;
+            *)
+              printf '%s' "$GITHUB_SHA" | grep -Eq '^[a-f0-9]{40}$'
+              image="$image:$GITHUB_SHA"
+              ;;
+          esac
           mkdir -p "$RUNNER_TEMP/magelift-build"
           result="$RUNNER_TEMP/magelift-build/build-result.json"
           magelift --config 'magelift.yaml' --no-interaction --output json build --push \
-            --image "$MAGELIFT_RELEASE_IMAGE" \
+            --image "$image" \
             --builder-image "$MAGELIFT_BUILDER_IMAGE" \
             --runtime-image "$MAGELIFT_RUNTIME_IMAGE" > "$result"
           digest="$(jq -er '.image.imageReference + "@" + .image.digest' "$result")"

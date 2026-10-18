@@ -102,3 +102,5 @@ explicit --magelift-version naming an available signed release. A single test
 environment uses push or manual dispatch without production selection inputs.
 Keep generated build results and credential files outside the checkout when
 customizing CI. The build requires a clean committed Git source.
+An untagged MAGELIFT_RELEASE_IMAGE repository gets the source GITHUB_SHA tag;
+an explicitly tagged destination is preserved, including registries with ports.

@@ -3,7 +3,7 @@
     "name": "magelift-configure",
     "description": "Configure MageLift YAML and choose an Adobe-compatible architecture. Use when selecting PHP, database, search, queue, cache, Varnish, edge, or provider options.",
     "version": "1.0.0",
-    "digest": "eda3fd5e6560d8912c1ed0d0d875964b2e44969ad096c0892e4c188140789a0b",
+    "digest": "4c501a43446e58bec4b34dc29fa7b98c066ad6855a88d5e57f71d90077971786",
     "sources": [
       "embedded",
       "skills-cli"

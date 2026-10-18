@@ -88,10 +88,18 @@ jobs:
         run: |
           set -eu
           test -n "$MAGELIFT_RELEASE_IMAGE"
+          image="$MAGELIFT_RELEASE_IMAGE"
+          case "${image##*/}" in
+            *:*) ;;
+            *)
+              printf '%s' "$GITHUB_SHA" | grep -Eq '^[a-f0-9]{40}$'
+              image="$image:$GITHUB_SHA"
+              ;;
+          esac
           mkdir -p "$RUNNER_TEMP/magelift-build"
           result="$RUNNER_TEMP/magelift-build/build-result.json"
           magelift --config 'magelift.yaml' --no-interaction --output json build --push \
-            --image "$MAGELIFT_RELEASE_IMAGE" > "$result"
+            --image "$image" > "$result"
           digest="$(jq -er '.image.imageReference + "@" + .image.digest' "$result")"
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 

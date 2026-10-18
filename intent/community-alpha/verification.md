@@ -974,3 +974,19 @@ received the same output-location correction. The second real Actions run is
 in progress. Functional GCP, image publication and runtime pull remain NOT_RUN
 until that run supplies evidence. Bootstrap resources and CI grants remain for
 the active tests and must be removed afterward.
+
+### S2 increment: repository image tagging
+
+The second real CI run passed the clean-source check and then refused the
+bootstrap image destination because it had no explicit tag. The generator now
+appends the validated GitHub source SHA to an untagged repository and preserves
+an explicit tag. Shell-executed tests cover both forms, registry ports, missing
+SHA and invalid SHA, with invalid inputs stopped before builder invocation.
+The fake builder checks the actual image argument and emits valid JSON. The
+Cursor worker stopped with a looping error without edits; root completed the
+bounded change and its regression locally. Targeted tests pass. The third real
+Actions run has reached the actual build step. The published canary's generator
+still needs these reviewed workflow corrections; its build command protections
+are retained. No runtime or DNS has yet been created.
+The full CLI package, refreshed renderer fixtures, workflow lint, generated
+consistency and strict docs also pass for the image-tag correction.

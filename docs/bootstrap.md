@@ -185,6 +185,10 @@ bootstrap does not silently adopt it. IAM reconciliation preserves unrelated
 bindings and conditions. This library behavior is covered by local fixtures;
 a real GitHub token exchange remains an acceptance check.
 
+An untagged `MAGELIFT_RELEASE_IMAGE` destination receives the source commit SHA
+as its tag in CI. An explicitly tagged destination is preserved. Build results
+stay in the runner temporary directory so the source checkout remains clean.
+
 ## GCP registry and state key
 
 GCP bootstrap enables missing reference APIs, ensures the state bucket,
