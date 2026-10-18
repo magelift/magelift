@@ -1229,3 +1229,38 @@ Live Enterprise creation with a distributed candidate is NOT_RUN. So are the
 functional application, HTTPS, two functional releases, persistence and final
 active-environment cleanup. The owned network, secrets, bootstrap, registry and
 CI grants remain for the controlled continuation. Billing remains unmeasured.
+
+### S3 distributed Enterprise candidate and acceptance restart
+
+Commit 0660426 is published as an immutable Linux/amd64 canary. Release workflow
+39120102768 succeeded. Independent checks verified both file checksums, both
+Sigstore bundles against the exact tag workflow identity and GitHub issuer,
+and the archive's reported version. The release is a prerelease and is not
+latest. No central application or helper image was published.
+
+Cursor Grok 4.7 high and Composer 2.5 independently reviewed the scoped change,
+without fast mode, and found no concrete defect. Both reran targeted tests.
+Their reviews distinguish regional catalog admission from available capacity.
+The version-agnostic custom-tier admission check also admits valid MySQL 8.0
+dedicated shapes; the engine defaults and edition mapping remain unchanged.
+
+A fresh installation from the public tag passed in 4.93 seconds with an empty
+cache and no host Go, PHP, Node or Cosign. Provider installation from the
+published lockfile passed signature and publisher checks. The first operator
+script attempts failed because an explicit lockfile path did not exist, then
+because a version bootstrap was requested with an existing lockfile. Using the
+published lockfile without the bootstrap flag succeeded; no product change was
+needed.
+
+The distributed candidate's real Enterprise preview passed: 31 creates,
+21 unchanged, no deletion or replacement. The preview used the previously signed
+application digest in a private temporary config. The CI config contains no
+image digest. Acceptance fixture commit 014f62fc updates only its pinned CLI and
+provider lockfile. Actionlint and customized-workflow validation pass. Workflow
+39121160075 has started; it will build and sign a new application image in the
+user repository before deploying the explicit Enterprise tier.
+
+Runtime, HTTPS, application probes, two functional releases, persistence and
+final active-resource cleanup remain NOT_RUN. The network, secrets, bootstrap,
+registry and CI grants remain for this test. Humanizer review is complete;
+remove-ai-marks remains NOT_RUN because its service is unavailable.
