@@ -2,6 +2,7 @@ package ops
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"strings"
@@ -23,6 +24,7 @@ type Bootstrap struct {
 	NewIdentity             func(context.Context) (*gcpbootstrap.IdentityBootstrapper, error)
 	VerifyAccountFn         func(context.Context, string) error
 	ResolveGitHubRepository func(context.Context, string, string) (githubci.Repository, error)
+	NewPreparation          func(context.Context) (AccountPreparation, error)
 }
 
 func (b Bootstrap) VerifyAccount(ctx context.Context, spec gcpstack.Spec) error {
@@ -38,11 +40,26 @@ func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.
 	if err != nil {
 		return platform.BootstrapResult{}, err
 	}
-	plan, err := gcpbootstrap.BuildPlan(gcpbootstrap.Spec{
+	preparationSpec := gcpbootstrap.Spec{
 		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
 		GCPProject: spec.Identity.GCPProject, Region: spec.Identity.Region,
-	})
+	}
+	preparationPlan, err := gcpbootstrap.BuildPreparationPlan(preparationSpec)
 	if err != nil {
+		return platform.BootstrapResult{}, err
+	}
+	newPreparation := b.NewPreparation
+	if newPreparation == nil {
+		newPreparation = func(ctx context.Context) (AccountPreparation, error) {
+			return gcpbootstrap.NewAccountPreparerFromContext(ctx)
+		}
+	}
+	preparer, err := newPreparation(ctx)
+	if err != nil {
+		return platform.BootstrapResult{}, err
+	}
+	defer preparer.Close()
+	if err := preparer.EnsureAPIs(ctx, preparationPlan, preparationSpec); err != nil {
 		return platform.BootstrapResult{}, err
 	}
 	newEnsurer := b.NewEnsurer
@@ -53,11 +70,19 @@ func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.
 	if err != nil {
 		return platform.BootstrapResult{}, err
 	}
-	result, err := ensurer.Ensure(ctx, plan)
+	result, err := ensurer.Ensure(ctx, preparationPlan.Base)
 	if err != nil {
 		return platform.BootstrapResult{}, err
 	}
-	details := map[string]any{"state": result}
+	key, err := preparer.EnsureStatePassphrase(ctx, preparationPlan, preparationSpec, "bootstrap-"+rand.Text())
+	if err != nil {
+		return platform.BootstrapResult{}, err
+	}
+	registry, err := preparer.EnsureRepository(ctx, preparationPlan, preparationSpec)
+	if err != nil {
+		return platform.BootstrapResult{}, err
+	}
+	details := map[string]any{"state": result, "statePassphrase": key, "registry": registry}
 	if len(identities) > 0 {
 		newIdentity := b.NewIdentity
 		if newIdentity == nil {
@@ -84,6 +109,7 @@ func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.
 	}
 	return platform.BootstrapResult{
 		BackendURL: gcpbootstrap.BackendURL(result.Plan),
+		KeyRef:     key.VersionName,
 		Details:    details,
 	}, nil
 }

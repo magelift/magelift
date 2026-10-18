@@ -22,3 +22,4 @@ Each ADR states context, decision, consequences, alternatives, and provenance.
 - [ADR 0012](0012-search-proof-shapes.md): Search proof shapes and AWS spend cap; live runs in Phase 2.
 - [ADR 0013](0013-provider-plugin-contract.md): Versioned typed operations protocol; nested provider modules; lockstep alpha.
 - [ADR 0014](0014-distribution-trust.md): One fail-closed trust policy for installer, updater, core load, and provider download.
+- [ADR 0015](0015-gcp-bootstrap-state-key.md): GCP bootstrap prerequisites and an immutable remote Pulumi state passphrase.

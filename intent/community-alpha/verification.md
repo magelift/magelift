@@ -679,3 +679,38 @@ Next useful work is guided account bootstrap: API/registry/state preparation,
 owned scoped build/deploy/pull identities, derived CI settings and real acceptance
 on the authorized GCP target. S3 functional/release/cleanup acceptance and the
 outside-person trial remain pending. S4/S5 are still conditional pilot work.
+
+## S2 increment: shop init, CI identity and managed GCP prerequisites
+
+The CLI inspects the existing shop and generates one GCP `test` environment.
+Project names now fit GCP planning limits, including numeric and long Composer
+names. Generated CI separates build and test identities, relocates Google
+credentials outside the shop and gives GitHub ambient OIDC precedence for
+signing. Bootstrap resolves immutable GitHub repository/owner IDs before cloud
+creation, pins the normal workflow claims, creates distinct build/deploy service
+accounts, and preserves unrelated IAM conditions, etags and audit configuration.
+
+GCP bootstrap now ensures missing APIs, the owned state bucket, an immutable
+Secret Manager state passphrase at version 1 and the user's Docker Artifact
+Registry repository. Key initialization reuses the deployment lock and existing
+GCS adapter, checks archived object generations, refuses prior encrypted state
+without its key and releases locks with an independent bounded context. Pulumi
+receives backend URL and passphrase together in workspace-scoped environment
+variables. Explicit passphrase/file overrides remain available for recovery.
+No secret bytes enter bootstrap output or the provider RPC contract.
+
+Executed locally with Go 1.27.2 and containerized PHP 8.5.11:
+
+- `MAGELIFT_PHP_TEST_CONTAINER=1 make verify-community docs workflow-check cli-docs-check generate-check`: PASS (exit 0); root, SDK and GCP modules independently, bounded race gates, clean-room, lifecycle and development-loop harnesses, docs and generated references. PHP: 161 tests, 388 assertions.
+- Additional GCP `go test -race ./bootstrap ./state ./plugin -count=1 -timeout=120s`: PASS.
+- Targeted automation, GitHub client, CLI/skills and GCP bootstrap/state/ops/plugin/secrets suites: PASS.
+- Native GCS HTTP fixture: PASS; request includes `versions=true` and a deleted checkpoint generation prevents treating state as absent. Review replaced the duplicate storage adapter and removed a test-global mutable Pulumi factory.
+
+S2 remains open: CI project/resource role grants and GitHub variable setup are
+not yet integrated. Real GCP IAM/CEL evaluation, remote-key decryption, GitHub
+workflow execution and a new signed release/install remain NOT_RUN. No cloud
+resource was created by this increment, no image/tag/release was published, and
+no protected resource was destroyed. Cloud spend/reservation remains 0; AWS
+credit coverage remains unverified. Proofs are retained in the private local
+acceptance directory; its existing /tmp path resolves to disk storage. The
+remove-ai-marks service remains unavailable (NOT_RUN).

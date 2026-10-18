@@ -83,8 +83,27 @@ func (s *Store) GetSecretValue(ctx context.Context, name string) ([]byte, error)
 	return s.client.GetSecretValue(ctx, name)
 }
 
+// Close releases an owned native Secret Manager client when present.
+func (s *Store) Close() error {
+	if s == nil || s.client == nil {
+		return nil
+	}
+	closer, ok := s.client.(interface{ Close() error })
+	if !ok {
+		return nil
+	}
+	return closer.Close()
+}
+
 type smClient struct {
 	client *secretmanager.Client
+}
+
+func (s smClient) Close() error {
+	if s.client == nil {
+		return nil
+	}
+	return s.client.Close()
 }
 
 func (s smClient) List(ctx context.Context, project string) ([]Meta, error) {

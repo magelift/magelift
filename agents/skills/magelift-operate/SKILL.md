@@ -47,6 +47,9 @@ For GCP Actions bootstrap, pass --github-owner and --github-repo. It reuses
 GH_TOKEN, GITHUB_TOKEN, or gh auth login to resolve immutable repository IDs
 before cloud creation, then creates separate build and deployment identities.
 Identity creation alone does not prove registry permissions or a live OIDC exchange.
+GCP bootstrap also prepares its registry and immutable remote state-key reference.
+Keep that secret while state or backups need it. Explicit Pulumi passphrase
+environment variables remain available for existing stacks and recovery.
 
 ```sh
 magelift sign --digest IMAGE@sha256:...

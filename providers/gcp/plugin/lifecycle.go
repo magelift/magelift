@@ -55,7 +55,11 @@ func (a pulumiAutomation) Outputs(ctx context.Context) (auto.OutputMap, error) {
 }
 
 func defaultNewStack(ctx context.Context, stackName string, spec gcpstack.Spec, backendURL string) (Automation, error) {
-	stack, err := automation.NewInlineStackWithBackend(ctx, stackName, gcpstack.Program(spec), backendURL)
+	passphraseEnv, err := pulumiPassphraseEnvForStack(ctx, spec)
+	if err != nil {
+		return nil, err
+	}
+	stack, err := automation.NewInlineStackWithEnvironment(ctx, stackName, gcpstack.Program(spec), backendURL, passphraseEnv)
 	if err != nil {
 		return nil, err
 	}

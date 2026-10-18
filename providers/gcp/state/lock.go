@@ -82,6 +82,14 @@ func NewGCS(ctx context.Context, bucket, project, environment string) (*Manager,
 	if err != nil {
 		return nil, fmt.Errorf("create GCS client: %w", err)
 	}
+	return NewGCSFromClient(client, bucket, project, environment)
+}
+
+// NewGCSFromClient reuses a caller-owned GCS client. The caller closes it.
+func NewGCSFromClient(client *storage.Client, bucket, project, environment string) (*Manager, error) {
+	if client == nil {
+		return nil, errors.New("GCS client is required")
+	}
 	return NewManager(gcsObjects{client: client}, bucket, project, environment)
 }
 

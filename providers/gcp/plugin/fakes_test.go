@@ -371,7 +371,10 @@ func bootstrapServer(t *testing.T, buckets *memBuckets) *Server {
 		t.Fatal(err)
 	}
 	return &Server{Bootstrap: gcpops.Bootstrap{
-		NewEnsurer:      func(context.Context) (*gcpbootstrap.Bootstrapper, error) { return ensurer, nil },
+		NewEnsurer: func(context.Context) (*gcpbootstrap.Bootstrapper, error) { return ensurer, nil },
+		NewPreparation: func(context.Context) (gcpops.AccountPreparation, error) {
+			return &fakeAccountPreparation{t: t, buckets: buckets}, nil
+		},
 		VerifyAccountFn: func(context.Context, string) error { return nil },
 	}}
 }

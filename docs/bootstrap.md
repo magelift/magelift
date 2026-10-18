@@ -179,3 +179,24 @@ An existing resource with different ownership or federation settings is refused;
 bootstrap does not silently adopt it. IAM reconciliation preserves unrelated
 bindings and conditions. This library behavior is covered by local fixtures;
 project role integration and a real GitHub token exchange remain pending.
+
+## GCP registry and state key
+
+GCP bootstrap enables missing reference APIs, ensures the state bucket,
+initializes its state passphrase in Secret Manager, and creates the user's
+Docker Artifact Registry repository. It returns the image destination and
+secret version reference. The caller needs permission to create these
+resources. If Service Usage itself is unavailable, the error names that
+prerequisite. CI role grants remain a separate integration step.
+
+The passphrase stays at version 1. Bootstrap uses the existing deployment lock
+and checks noncurrent GCS generations as well as live state before creating a
+key. It refuses existing encrypted state without its original key. Do not
+delete the state secret while state or backups still need it. An environment
+destroy does not remove these bootstrap resources.
+
+Deploy reads the remote key into its Pulumi workspace. For an existing stack
+or recovery, an explicit PULUMI_CONFIG_PASSPHRASE or
+PULUMI_CONFIG_PASSPHRASE_FILE takes precedence. Bootstrap does not convert an
+existing passphrase or rotate it. These paths have local regression coverage;
+real project permissions and state decryption remain acceptance checks.
