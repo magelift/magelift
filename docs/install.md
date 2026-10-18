@@ -18,9 +18,15 @@ Install the `magelift` CLI, then continue with [getting started](getting-started
 Requires a Go toolchain matching [`go.mod`](https://github.com/magelift/magelift/blob/main/go.mod):
 
 ```sh
-go install github.com/magelift/magelift/cmd/magelift@main
+git clone https://github.com/magelift/magelift.git
+cd magelift
+go install ./cmd/magelift
 magelift version
 ```
+
+Run that from the checkout so the workspace file selects the modules in that
+commit. `go install github.com/magelift/magelift/cmd/magelift@main` links the
+CLI to the last published SDK module, which is an older candidate.
 
 A binary built from source does not pass release verification. There is no
 bypass flag.

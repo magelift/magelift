@@ -27,10 +27,14 @@ cells are production-supported.
 
 ## Install
 
-With the Go toolchain named in [`go.mod`](go.mod):
+With the Go toolchain named in [`go.mod`](go.mod), install from a checkout of
+this commit. `go install github.com/magelift/magelift/cmd/magelift@main` links
+the CLI to the last published SDK module, which is an older candidate.
 
 ```sh
-go install github.com/magelift/magelift/cmd/magelift@main
+git clone https://github.com/magelift/magelift.git
+cd magelift
+go install ./cmd/magelift
 magelift version
 ```
 

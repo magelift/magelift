@@ -48,8 +48,14 @@ GCP omits `--access-log-bucket`. Do not set a state-backend URL.
 
 ## Pull-request CI previews
 
-No MageLift release is published yet. Until a tag exists, CI can install
-the CLI with `go install github.com/magelift/magelift/cmd/magelift@main`.
+No MageLift release is published yet. Until a tag exists, CI installs the
+CLI from a checkout:
+
+```sh
+git clone --depth 1 https://github.com/magelift/magelift.git "$RUNNER_TEMP/magelift"
+go install "$RUNNER_TEMP/magelift/cmd/magelift"
+```
+
 After a release exists, generate and validate the workflow at that
 immutable version (`v1.2.3` below is a placeholder):
 

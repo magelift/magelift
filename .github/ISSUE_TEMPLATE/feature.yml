@@ -30,7 +30,8 @@ body:
       options:
         - Docs / DX only
         - Certified AWS path
-        - Experimental provider (e.g. GCP)
+        - Certified GCP path
+        - Experimental provider (EKS, GKE Standard, OVH, Scaleway)
         - Community / custom binary
         - Unsure
     validations:

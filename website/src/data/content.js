@@ -24,9 +24,10 @@ export const hero = {
 
 export const terminal = {
   title: 'preview · eu-north-1',
-  copyCommand: 'go install github.com/magelift/magelift/cmd/magelift@main',
+  copyCommand: 'git clone --depth 1 https://github.com/magelift/magelift.git && cd magelift && go install ./cmd/magelift',
   lines: [
-    { type: 'cmd', text: 'go install github.com/magelift/magelift/cmd/magelift@main' },
+    { type: 'cmd', text: 'git clone --depth 1 https://github.com/magelift/magelift.git' },
+    { type: 'cmd', text: 'cd magelift && go install ./cmd/magelift' },
     { type: 'cmd', text: 'magelift config validate --env preview' },
     { type: 'out', text: 'ok  magelift.yaml · compatibility checks passed', tone: 'ok' },
     { type: 'cmd', text: 'magelift preview --env preview' },
@@ -74,7 +75,7 @@ export const how = {
   heading: 'From install to preview',
   lede: 'Certified path today: AWS ECS Fargate and GCP GKE Autopilot. Stay on free-tier-safe shapes until you mean to spend.',
   steps: [
-    'No release is published yet. Install with go install github.com/magelift/magelift/cmd/magelift@main, then run magelift version.',
+    'No release is published yet. Clone the repo and run go install ./cmd/magelift, then magelift version.',
     'Copy examples/sample-shop/magelift.yaml, fill in account and secret refs, then magelift config validate.',
     'Bootstrap once, then preview and deploy on a certified target. Destroy when the spike is done.',
   ],

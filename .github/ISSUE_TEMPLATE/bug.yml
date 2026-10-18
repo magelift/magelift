@@ -24,7 +24,8 @@ body:
         - CLI
         - Configuration / schema
         - AWS provider
-        - GCP provider (experimental)
+        - GCP GKE Autopilot
+        - Experimental provider (EKS, GKE Standard, OVH, Scaleway)
         - Builds / images
         - Local development
         - Documentation

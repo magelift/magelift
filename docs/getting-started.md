@@ -27,7 +27,9 @@ No release is published yet. Install from source, as described in
 [Install](install.md):
 
 ```sh
-go install github.com/magelift/magelift/cmd/magelift@main
+git clone https://github.com/magelift/magelift.git
+cd magelift
+go install ./cmd/magelift
 magelift version
 ```
 
@@ -115,7 +117,12 @@ magelift ci validate --magelift-version v1.2.3
 
 `v1.2.3` is a placeholder. `ci generate` requires an immutable release
 version, and no release is published yet. Until a tag exists, install the
-CLI in CI with `go install github.com/magelift/magelift/cmd/magelift@main`.
+CLI in CI from a checkout:
+
+```sh
+git clone --depth 1 https://github.com/magelift/magelift.git "$RUNNER_TEMP/magelift"
+go install "$RUNNER_TEMP/magelift/cmd/magelift"
+```
 
 Then follow [bootstrap](bootstrap.md) for the CI variables Magelift prints.
 

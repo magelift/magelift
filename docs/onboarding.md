@@ -86,7 +86,9 @@ No release is published yet. Install from source. The Go toolchain
 must match [`go.mod`](https://github.com/magelift/magelift/blob/main/go.mod):
 
 ```sh
-go install github.com/magelift/magelift/cmd/magelift@main
+git clone https://github.com/magelift/magelift.git
+cd magelift
+go install ./cmd/magelift
 magelift version
 ```
 
