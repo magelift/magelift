@@ -233,6 +233,19 @@ put another compatible zone first and retry the same digest after the failed
 operation is resolved. Preserve the state and resources already created.
 The CLI does not retry this failure automatically.
 
+MySQL 8.4 defaults to Enterprise Plus with `db-perf-optimized-N-2`. An explicit
+dedicated-core tier such as `target.gcp.cloudSqlTier: db-custom-2-7680` selects
+Enterprise while retaining MySQL 8.4. That example requests 2 vCPUs and 7680 MB
+of memory. The provider validates custom size limits and regional dedicated-core
+support; available capacity still depends on Google. Shared-core and N4 custom
+tiers are outside this override. See [ADR 0018](adr/0018-gcp-explicit-sql-edition.md)
+and [Google's edition overview](https://docs.cloud.google.com/sql/docs/mysql/editions-intro).
+
+Keeping the existing tier keeps its edition. Changing an existing Plus database
+to a dedicated custom tier can request a downgrade with downtime. Preview and
+test that change outside production. The CLI does not select this alternative
+automatically after a stockout.
+
 ## Review and apply GCP CI permissions
 
 Prepare the account and inspect the returned ciPermissionPlan first:

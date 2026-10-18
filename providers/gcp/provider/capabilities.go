@@ -15,6 +15,7 @@ import (
 	container "cloud.google.com/go/container/apiv1"
 	containerpb "cloud.google.com/go/container/apiv1/containerpb"
 	"github.com/magelift/magelift/providers/gcp/auth"
+	gcpdatabase "github.com/magelift/magelift/providers/gcp/database"
 	"golang.org/x/oauth2"
 	cloudbilling "google.golang.org/api/cloudbilling/v1"
 	"google.golang.org/api/cloudresourcemanager/v1"
@@ -270,8 +271,22 @@ func (c *SDKCapabilityClient) CloudSQLTier(ctx context.Context, projectID, regio
 	if result == nil {
 		return false, errors.New("GCP Cloud SQL returned no tier catalog")
 	}
+	custom := strings.HasPrefix(tier, "db-custom-")
+	if custom && gcpdatabase.ValidateTier(gcpdatabase.DatabaseVersionMySQL84, tier) != nil {
+		return false, nil
+	}
 	for _, candidate := range result.Items {
-		if candidate == nil || candidate.Tier != tier {
+		if candidate == nil {
+			continue
+		}
+		matches := candidate.Tier == tier
+		// Custom CPU/memory combinations are not enumerated by tiers.list.
+		// A regional N1 dedicated-core entry establishes series support;
+		// numeric limits were checked above. This does not promise capacity.
+		if custom && (strings.HasPrefix(candidate.Tier, "db-n1-standard-") || strings.HasPrefix(candidate.Tier, "db-n1-highmem-")) {
+			matches = true
+		}
+		if !matches {
 			continue
 		}
 		for _, candidateRegion := range candidate.Region {

@@ -75,7 +75,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if err := ValidateTier(databaseVersion, args.Tier); err != nil {
 		return nil, err
 	}
-	edition, err := EditionForDatabaseVersion(databaseVersion)
+	edition, err := EditionForDatabaseVersionAndTier(databaseVersion, args.Tier)
 	if err != nil {
 		return nil, err
 	}

@@ -40,6 +40,14 @@ author YAML manually with the right `build.php` instead. After a successful
 `init`, review placeholders, commit `magelift.yaml`, then run
 `magelift bootstrap --env test`.
 
+For GCP MySQL 8.4, the default tier remains Enterprise Plus N2. An explicit
+`target.gcp.cloudSqlTier: db-custom-2-7680` selects Enterprise dedicated core
+with 2 vCPUs and 7680 MB memory. Custom sizes are validated, and regional support
+does not guarantee capacity. Shared-core and N4 custom tiers are outside this
+override. Preview an explicit tier change on an existing Plus database and test
+outside production: an edition downgrade can cause downtime. No automatic tier
+change follows a stockout.
+
 ## Build the shop
 
 Run `magelift build` from the shop repository after committing YAML, the Composer

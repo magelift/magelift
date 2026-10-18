@@ -1189,3 +1189,43 @@ activated. Credit coverage and remaining budget are NOT_VERIFIED, so no AWS
 resources or paid tests were started. GCP billing and peak build memory remain
 unmeasured. Runtime, HTTPS, search, cron, DB queue, persistence and the final
 active-environment destruction are still NOT_RUN.
+
+### S3 increment: explicit Enterprise tier for the capacity fallback
+
+The subsequent N2 requests in the other selected zones also ended in native
+ERROR_STOCKOUT. Each failed creation was outside the checkpoint. After checking
+ownership, creation time, finished operations and the absence of pending state
+operations, only the failed native instance was removed. Checkpoint bytes stayed
+unchanged. The final failed instance is absent; the retained checkpoint still
+contains 22 resources. No SQL, GKE or DNS runtime is currently deployed for this acceptance.
+
+Current Google documentation supports MySQL 8.4 on Enterprise as well as Plus.
+Cursor Grok 4.7 medium checked that feature against official documentation;
+Composer 2.5 implemented the bounded tier-aware selection, both non-fast.
+The existing default remains Plus/N2. An explicit valid dedicated custom tier
+selects Enterprise, with CPU/memory limits checked before planning. Existing
+MySQL 8.0 behavior and creation-only zone handling stay unchanged. No YAML field,
+manifest or RPC change was added. ADR 0018, bootstrap guidance and the configure
+skill describe the explicit choice and possible downtime when changing an
+existing Plus database.
+
+The live tier catalog returned 41 predefined rows and no custom combinations.
+Admission now validates a custom shape against a matching regional dedicated
+series while retaining the catalog read and its error handling. Exact N2/C4A
+regional checks are unchanged. HTTP-backed regressions cover absent custom
+combinations, wrong region, invalid size, unrelated series and catalog failure.
+A read-only development probe against the real API admitted both the proposed
+custom shape and the existing N2 tier. No instance was created; allocation capacity remains
+untested for that shape.
+
+Integrated database/provider/stack/plugin/cost tests pass, as do bounded race
+checks for database/provider/stack/plugin. The complete root/SDK/GCP community
+gate passes, including 161 PHP tests and 388 assertions. Strict docs, workflow
+lint, generated consistency and the host-only release smoke pass. The skill
+manifest was regenerated. Humanizer review is complete; remove-ai-marks remains
+NOT_RUN because its local service is unavailable.
+
+Live Enterprise creation with a distributed candidate is NOT_RUN. So are the
+functional application, HTTPS, two functional releases, persistence and final
+active-environment cleanup. The owned network, secrets, bootstrap, registry and
+CI grants remain for the controlled continuation. Billing remains unmeasured.
