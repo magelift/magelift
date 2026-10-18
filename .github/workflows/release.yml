@@ -54,7 +54,7 @@ jobs:
           cosign-release: v3.1.3
       # GoReleaser's SBOM cataloging shells out to syft; without it the
       # release fails after the builds (seen on v0.0.0-dialproof.3).
-      - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
       # Module tags need proxy plus sumdb visibility before packaging:
       # workspace builds still verify requirement .mod files over the
       # network on cold caches. The proxy negative-caches unknown
@@ -103,7 +103,7 @@ jobs:
       # Dialproof and commit canary tags take the slim linux/amd64 config
       # (no SBOM, taps, or attest): same signs/checksum/archive shape, so the
       # debug loop does not pay the full matrix. Canary refs stay draft.
-      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         if: "(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         with:
           distribution: goreleaser
@@ -115,7 +115,7 @@ jobs:
           # Provider builds run in providers/gcp. Pin the workspace so they
           # compile this checkout, not the published module in go.mod.
           GOWORK: ${{ github.workspace }}/go.work
-      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         with:
           distribution: goreleaser
