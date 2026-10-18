@@ -100,3 +100,5 @@ An installed release defaults to its own immutable version; the CLI normalizes
 the optional leading v to the release tag. A development binary needs an
 explicit --magelift-version naming an available signed release. A single test
 environment uses push or manual dispatch without production selection inputs.
+Keep generated build results and credential files outside the checkout when
+customizing CI. The build requires a clean committed Git source.

@@ -88,9 +88,11 @@ jobs:
         run: |
           set -eu
           test -n "$MAGELIFT_RELEASE_IMAGE"
+          mkdir -p "$RUNNER_TEMP/magelift-build"
+          result="$RUNNER_TEMP/magelift-build/build-result.json"
           magelift --config 'magelift.yaml' --no-interaction --output json build --push \
-            --image "$MAGELIFT_RELEASE_IMAGE" > build-result.json
-          digest="$(jq -er '.image.imageReference + "@" + .image.digest' build-result.json)"
+            --image "$MAGELIFT_RELEASE_IMAGE" > "$result"
+          digest="$(jq -er '.image.imageReference + "@" + .image.digest' "$result")"
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 
   staging:

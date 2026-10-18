@@ -93,11 +93,13 @@ jobs:
           for required in MAGELIFT_RELEASE_IMAGE MAGELIFT_BUILDER_IMAGE MAGELIFT_RUNTIME_IMAGE; do
             test -n "${!required}"
           done
+          mkdir -p "$RUNNER_TEMP/magelift-build"
+          result="$RUNNER_TEMP/magelift-build/build-result.json"
           magelift --config 'magelift.yaml' --no-interaction --output json build --push \
             --image "$MAGELIFT_RELEASE_IMAGE" \
             --builder-image "$MAGELIFT_BUILDER_IMAGE" \
-            --runtime-image "$MAGELIFT_RUNTIME_IMAGE" > build-result.json
-          digest="$(jq -er '.image.imageReference + "@" + .image.digest' build-result.json)"
+            --runtime-image "$MAGELIFT_RUNTIME_IMAGE" > "$result"
+          digest="$(jq -er '.image.imageReference + "@" + .image.digest' "$result")"
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 
   preview:

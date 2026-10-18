@@ -52,15 +52,16 @@ func writeBuildAndArchive(w *strings.Builder, configFile string) {
         run: |
           set -eu
           test -n "$MAGELIFT_RELEASE_IMAGE"
+          build_dir="$RUNNER_TEMP/magelift-build"
+          result="$build_dir/build-result.json"
+          mkdir -p "$build_dir"
           magelift --config ` + shellQuote(configFile) + ` --no-interaction --output json build --push \
-            --image "$MAGELIFT_RELEASE_IMAGE" > build-result.json
-          digest="$(jq -er '.image.imageReference + "@" + .image.digest' build-result.json)"
-          mkdir -p "$RUNNER_TEMP/magelift-build"
-          cp build-result.json "$RUNNER_TEMP/magelift-build/"
-          cp -- "$(jq -er '.manifest' build-result.json)" "$RUNNER_TEMP/magelift-build/manifest.json"
-          checksum="$(jq -er '.manifestSha256 | select(test("^[a-f0-9]{64}$"))' build-result.json)"
-          printf '%s  manifest.json\n' "$checksum" > "$RUNNER_TEMP/magelift-build/manifest.sha256"
-          (cd "$RUNNER_TEMP/magelift-build" && sha256sum -c manifest.sha256)
+            --image "$MAGELIFT_RELEASE_IMAGE" > "$result"
+          digest="$(jq -er '.image.imageReference + "@" + .image.digest' "$result")"
+          cp -- "$(jq -er '.manifest' "$result")" "$build_dir/manifest.json"
+          checksum="$(jq -er '.manifestSha256 | select(test("^[a-f0-9]{64}$"))' "$result")"
+          printf '%s  manifest.json\n' "$checksum" > "$build_dir/manifest.sha256"
+          (cd "$build_dir" && sha256sum -c manifest.sha256)
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 `)
 	w.WriteString("      - name: Retain existing artifact manifest\n        uses: " + uploadArtifactAction + "\n" + `        with:

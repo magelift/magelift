@@ -952,3 +952,25 @@ No runtime or DNS record exists yet; functional deployment remains NOT_RUN.
 The maintainer has granted autonomous GCP decisions and reiterated complete
 owned-resource cleanup after confirmed tests. Existing shared resources and
 preexisting IAM remain outside cleanup scope.
+
+### S2 increment: real CI cleanliness failure
+
+The first organization Actions run passed validation and the actual build
+identity's Google federation/registry authentication, then stopped before image
+creation: the acceptance customization rewrote tracked YAML, and the generated
+build step redirected stdout to an untracked checkout file before the CLI's
+source cleanliness check. No runtime was deployed. Both failures are retained
+in the private run log; the clean-source protection is unchanged.
+
+Acceptance YAML now lives in an ignored root configuration file; the tracked
+placeholder stays intact. Local validation of the actual ignored configuration
+passed with an empty git status. Generated build results now live directly
+under RUNNER_TEMP before invoking the CLI. A Cursor Composer 2.5 worker
+(non-fast) added a shell-executed clean-Git regression with a fake builder,
+checksum verification and handoff checks. Targeted tests and full CLI/source
+suites pass. Renderer fixtures were refreshed through their update test;
+workflow lint and generated consistency pass. The two older example workflows
+received the same output-location correction. The second real Actions run is
+in progress. Functional GCP, image publication and runtime pull remain NOT_RUN
+until that run supplies evidence. Bootstrap resources and CI grants remain for
+the active tests and must be removed afterward.
