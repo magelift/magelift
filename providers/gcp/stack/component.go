@@ -329,6 +329,7 @@ func (c *Component) Outputs() pulumi.Map {
 		"securityPolicyName":                   c.Edge.SecurityPolicyName,
 		"nativeEdgeBackendConfigName":          c.Edge.BackendConfigName,
 		"nativeEdgeIngressName":                c.Edge.IngressName,
+		"nativeEdgeIngressAddress":             c.Edge.IngressAddress,
 	}
 	if c.Observability != nil {
 		outputs["observabilityDashboardId"] = c.Observability.DashboardID

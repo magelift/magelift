@@ -38,6 +38,7 @@ type Component struct {
 	IngressName        pulumi.StringOutput
 	CertificateName    pulumi.StringOutput
 	ApplicationURL     pulumi.StringOutput
+	IngressAddress     pulumi.StringOutput
 	NativeEdgeEnabled  bool
 	NativeProvider     string
 	DomainName         string
@@ -80,6 +81,8 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.DomainName = args.DomainName
 	component.TLS = args.TLS
 	component.SecurityEnabled = args.Enabled
+	component.ApplicationURL = pulumi.String("").ToStringOutput()
+	component.IngressAddress = pulumi.String("").ToStringOutput()
 	if component.NativeEdgeEnabled {
 		component.BackendConfigName = pulumi.String(name + "-backend").ToStringOutput()
 		component.IngressName = pulumi.String(name + "-ingress").ToStringOutput()
@@ -89,7 +92,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	if !args.Enabled {
 		component.SecurityPolicyName = pulumi.String("").ToStringOutput()
-		_ = ctx.RegisterResourceOutputs(component, pulumi.Map{"securityPolicyName": component.SecurityPolicyName, "backendConfigName": component.BackendConfigName, "ingressName": component.IngressName, "certificateName": component.CertificateName, "applicationURL": component.ApplicationURL})
+		_ = ctx.RegisterResourceOutputs(component, component.resourceOutputs())
 		return component, nil
 	}
 	if strings.TrimSpace(args.Project) == "" {
@@ -118,7 +121,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		}
 	}
 	component.SecurityPolicyName = policy.Name
-	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{"securityPolicyName": component.SecurityPolicyName, "backendConfigName": component.BackendConfigName, "ingressName": component.IngressName, "certificateName": component.CertificateName, "applicationURL": component.ApplicationURL}); err != nil {
+	if err := ctx.RegisterResourceOutputs(component, component.resourceOutputs()); err != nil {
 		return nil, err
 	}
 	return component, nil
@@ -180,23 +183,52 @@ func Attach(ctx *pulumi.Context, name string, component *Component, args AttachA
 		return fmt.Errorf("create GKE native edge Ingress: %w", err)
 	}
 	component.ApplicationURL = ingress.Status.ApplyT(func(status *networkingv1.IngressStatus) string {
-		if status == nil || status.LoadBalancer == nil || len(status.LoadBalancer.Ingress) == 0 {
-			return ""
-		}
-		entry := status.LoadBalancer.Ingress[0]
-		scheme := "http"
-		if component.TLS {
-			scheme = "https"
-		}
-		if entry.Ip != nil && *entry.Ip != "" {
-			return scheme + "://" + *entry.Ip
-		}
-		if entry.Hostname != nil && *entry.Hostname != "" {
-			return scheme + "://" + *entry.Hostname
-		}
-		return ""
+		return nativeEdgeApplicationURL(component.DomainName, component.TLS, nativeEdgeIngressAddress(status))
 	}).(pulumi.StringOutput)
-	return ctx.RegisterResourceOutputs(component, pulumi.Map{"securityPolicyName": component.SecurityPolicyName, "backendConfigName": component.BackendConfigName, "ingressName": component.IngressName, "certificateName": component.CertificateName, "applicationURL": component.ApplicationURL})
+	component.IngressAddress = ingress.Status.ApplyT(func(status *networkingv1.IngressStatus) string {
+		return nativeEdgeIngressAddress(status)
+	}).(pulumi.StringOutput)
+	return ctx.RegisterResourceOutputs(component, component.resourceOutputs())
+}
+
+func (c *Component) resourceOutputs() pulumi.Map {
+	return pulumi.Map{
+		"securityPolicyName": c.SecurityPolicyName,
+		"backendConfigName":  c.BackendConfigName,
+		"ingressName":        c.IngressName,
+		"certificateName":    c.CertificateName,
+		"applicationURL":     c.ApplicationURL,
+		"ingressAddress":     c.IngressAddress,
+	}
+}
+
+// nativeEdgeIngressAddress is the load balancer IP or hostname once the
+// Ingress status has one. An empty result means the edge is not ready.
+func nativeEdgeIngressAddress(status *networkingv1.IngressStatus) string {
+	if status == nil || status.LoadBalancer == nil || len(status.LoadBalancer.Ingress) == 0 {
+		return ""
+	}
+	entry := status.LoadBalancer.Ingress[0]
+	if entry.Ip != nil && strings.TrimSpace(*entry.Ip) != "" {
+		return strings.TrimSpace(*entry.Ip)
+	}
+	if entry.Hostname != nil && strings.TrimSpace(*entry.Hostname) != "" {
+		return strings.TrimSpace(*entry.Hostname)
+	}
+	return ""
+}
+
+// nativeEdgeApplicationURL is the browser and health URL. It uses the
+// configured domain only after the load balancer has published an address.
+func nativeEdgeApplicationURL(domain string, tls bool, ingressAddress string) string {
+	if strings.TrimSpace(domain) == "" || strings.TrimSpace(ingressAddress) == "" {
+		return ""
+	}
+	scheme := "http"
+	if tls {
+		scheme = "https"
+	}
+	return scheme + "://" + strings.TrimSpace(domain)
 }
 
 func validNativeProvider(provider string) bool {

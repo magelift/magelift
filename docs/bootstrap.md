@@ -283,3 +283,12 @@ These options extend the existing bootstrap request; the provider RPC operation
 and SDK manifest remain unchanged. An older provider that cannot confirm the
 grants is refused by the CLI. Local tests cover the request and IAM policies;
 a real CI token exchange and deployment must be recorded separately.
+
+## GCP native edge DNS
+
+With native edge and customer-managed DNS, read `nativeEdgeIngressAddress` from
+the stack outputs and point the configured shop hostname to that address.
+`applicationURL` uses the configured hostname and TLS scheme once an Ingress
+address exists. Verify DNS, certificate activation and storefront health before
+using the endpoint; an allocated address alone does not establish readiness.
+See [ADR 0020](adr/0020-gcp-native-edge-address.md).
