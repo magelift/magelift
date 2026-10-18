@@ -10,7 +10,7 @@
     "build:site": "bash ./scripts/build-site.sh"
   },
   "dependencies": {
-    "astro": "7.3.2",
+    "astro": "7.3.8",
     "motion": "^13.2.0"
   },
   "allowScripts": {
