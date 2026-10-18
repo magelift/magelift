@@ -39,6 +39,7 @@ auth.json
 .claude/
 .agents/*
 !.agents/knowledge/
+.agents/knowledge/tools/.ruff_cache/
 .cursor/
 .serena/
 skills-lock.json

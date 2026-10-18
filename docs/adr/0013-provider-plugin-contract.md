@@ -17,8 +17,9 @@ narrow JSON proof (`request_json` / `plan_json` / `result_json` /
 equality between CLI and provider artifact, silent fallback to embedded
 execution on plugin failure, and day-2 ports staying in-process.
 
-`intent/audit.md` (F01-F03, F15) finds that boundary unfinished: calling it
-done would mislead every consumer and contributor. This ADR promotes the proof
+The pre-publication audit (F01-F03, F15) found that boundary unfinished. Those
+notes were not kept in the public tree. Calling the boundary done would
+mislead every consumer and contributor. This ADR promotes the proof
 into the versioned contract that followers implement. It changes the target
 rules; it does not rewrite the history that 0008/0011 record.
 
@@ -184,8 +185,8 @@ this ADR's letter. Reconciled position for the alpha:
 
 ## Provenance
 
-`intent/audit.md` F01-F03/F15, `intent/0.1.0-alpha-review.md` R05,
-`intent/alpha-review-corrections/spec.md`, `intent/provider-plugin-contract/spec.md`,
+Pre-publication audit F01-F03/F15 and review R05. The intent notes were not
+published. Code:
 `sdk/modules.go`, `internal/platform/public_module.go`,
 `internal/providerhost/hostproto/ping.proto`, `internal/config`,
 `internal/registry/registry.go`, ADRs 0003/0004/0008/0011.

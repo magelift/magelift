@@ -81,9 +81,11 @@ Map jobs → verify targets: `generate-check` / `cli-docs-check` / `fmt-check` /
 `test` / `license-check` in `go-verify`; `php-test` in `php`; `docs` in `docs`;
 `workflow-check` in `workflow-lint`.
 
+The runs below predate the public history. Their commits are not on this `main`, so they are not proof that the current tree passed force-all.
+
 | Run | Date | Outcome |
 | --- | --- | --- |
-| [35382767735](https://github.com/magelift/magelift/actions/runs/35382767735) | 2026-09-18 | force-all green on `wip/all-local-work` `@d5f781a` (lint, go-verify, provider-verify, acceptance, images, varnish, floci, php, docs, CI passed) |
+| [35382767735](https://github.com/magelift/magelift/actions/runs/35382767735) | 2026-09-18 | force-all green on a pre-import branch (lint, go-verify, provider-verify, acceptance, images, varnish, floci, php, docs, CI passed) |
 | [30836267745](https://github.com/magelift/magelift/actions/runs/30836267745) | 2026-08-03 | force-all green (lint, go-verify, images, varnish, floci, php, docs) |
 
 ## `go test -race` measurement
@@ -99,7 +101,7 @@ provider extracts shrink that graph later. Fit is measured, not assumed.
 | --- | --- | --- | --- | --- |
 | Local (sample) | `go test -race ./internal/lintcoverage/ ./internal/usererr/ -count=1` | ~4.7s | ~102 MiB | pass (narrow sample only) |
 | Local (full race) | `go test -race ./... -count=1` | deferred-local | deferred-local | Prefer CI. `GOMEMLIMIT` is 75% of available RAM. |
-| CI `go-verify` (public `ubuntu-latest`) | `go test -race ./...` | ~12m | n/a | pass on run 30836267745 (older 2 vCPU / 7 GB class) |
+| CI `go-verify` (public `ubuntu-latest`) | `go test -race ./...` | ~12m | n/a | pass on pre-import run 30836267745 (older 2 vCPU / 7 GB class); not this history |
 
 If CI fails on memory or the runner is reaped with no test output, partition the
 test step by the same six package groups as the lint matrix; do not raise

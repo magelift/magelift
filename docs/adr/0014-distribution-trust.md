@@ -7,7 +7,8 @@
 
 The installer verified provenance only when Cosign happened to be present
 with a retrievable bundle; otherwise a checksum from the same untrusted
-path was the whole story (`intent/audit.md` F11). Generated CI compiled
+path was the whole story (pre-publication audit F11; the note was not
+published). Generated CI compiled
 the toolchain in the customer job instead of using release binaries, and
 the SDK resolved inside `go.work` but not as a published dependency (F07).
 No complete provider download path existed (F02 distribution half). The
@@ -75,7 +76,7 @@ or variable exists.
 
 ## Provenance
 
-`intent/audit.md` F02/F07/F11, `intent/verified-provider-distribution/spec.md`,
+Pre-publication audit F02/F07/F11. The intent notes were not published. Code:
 `website/public/install.sh`, `internal/upgrade`, `internal/providerhost`,
 `internal/cli/ci.go`, `cmd/genproviders`, `tests/distribution`, ADRs
 0005/0008/0011/0013.

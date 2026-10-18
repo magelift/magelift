@@ -1,6 +1,6 @@
 # Suggested GitHub labels
 
-Create these when the repo is public so issues and PRs stay sortable.
+These labels exist on the public repo. Use them so issues and PRs stay sortable.
 
 | Label | Use |
 | --- | --- |
@@ -18,5 +18,5 @@ Create these when the repo is public so issues and PRs stay sortable.
 | `security` | SECURITY.md / advisory follow-ups |
 
 Issue templates already set `bug` and `enhancement`. Add one area or provider
-label with the type label. Seed at least three `good first issue` items before
-the public announce (typos, matrix wording, sample-shop clarity).
+label with the type label. Open a `good first issue` when there is a real
+≤30-minute docs, test, or example task. Do not keep placeholder issues open.

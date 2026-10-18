@@ -74,10 +74,8 @@ Layout:
 - Record design inputs in `docs/provenance.md`; keep third-party notices.
 - Never commit credentials, customer data, build artifacts, or Pulumi state.
 
-The maintainer-approved community implementation plan authorizes ML-00 through
-ML-09 in dependency order. ML-06 through ML-09 do not block milestone A.
-Additional work still follows the intent process. Live tests require an explicitly
-authorized acceptance target; a local green gate is not live cloud evidence.
+Live tests require an explicitly authorized acceptance target. A local green
+gate is not live cloud evidence.
 
 ## Changes
 
