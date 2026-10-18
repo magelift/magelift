@@ -4,3 +4,5 @@ parameters:
     paths:
         - src
     tmpDir: .phpstan
+    bootstrapFiles:
+        - stubs/initial-database-bootstrap.stub.php

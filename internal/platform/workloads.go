@@ -38,16 +38,19 @@ func MagentoMigrationShell() []string {
 			panic("lifecycle golden holds an empty command")
 		}
 		switch command[0] {
-		case "bin/magento", "composer":
+		case "bin/magento", "composer", "php":
 		default:
 			panic(fmt.Sprintf("lifecycle golden executable %q is not allowed", command[0]))
 		}
-		for _, arg := range command[1:] {
+		for argIndex, arg := range command[1:] {
+			if command[0] == "php" && len(command) == 3 && command[1] == "-r" && argIndex == 1 && strings.TrimSpace(arg) != "" {
+				continue
+			}
 			if strings.TrimSpace(arg) == "" || strings.ContainsAny(arg, " \t\n\"'") {
 				panic(fmt.Sprintf("lifecycle golden argument %q needs quoting support", arg))
 			}
 		}
-		parts = append(parts, strings.Join(command, " "))
+		parts = append(parts, renderLifecycleCommand(command))
 	}
 	if len(parts) == 0 {
 		panic("lifecycle golden holds no commands")
@@ -109,6 +112,14 @@ func probeSearchHost(endpoint string) string {
 
 func shellQuote(value string) string {
 	return strings.ReplaceAll(value, "'", "'\\''")
+}
+
+func renderLifecycleCommand(command []string) string {
+	if len(command) == 3 && command[0] == "php" && command[1] == "-r" {
+		return "php -r '" + shellQuote(command[2]) + "'"
+	}
+
+	return strings.Join(command, " ")
 }
 
 // MagentoQueueArgsFor starts the named Magento consumers, or Magento's default async worker.

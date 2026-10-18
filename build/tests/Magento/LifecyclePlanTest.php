@@ -34,6 +34,7 @@ final class LifecyclePlanTest extends TestCase
         ]];
         yield 'package' => [Phase::Package, []];
         yield 'deploy' => [Phase::Deploy, [
+            ['php', ...\MageLift\Build\Magento\InitialDatabaseBootstrap::lifecyclePhpArguments()],
             ['bin/magento', 'setup:upgrade', '--keep-generated', '--no-interaction'],
             ['bin/magento', 'app:config:import', '--no-interaction'],
             ['bin/magento', 'cache:clean'],
@@ -49,9 +50,13 @@ final class LifecyclePlanTest extends TestCase
             static fn ($command): array => $command->argv(),
             (new LifecyclePlan())->commandsFor(Phase::Deploy),
         );
+        $bootstrap = null;
         $upgrade = null;
         $import = null;
         foreach ($commands as $index => $command) {
+            if (($command[0] ?? '') === 'php') {
+                $bootstrap = $index;
+            }
             if (($command[1] ?? '') === 'setup:upgrade') {
                 $upgrade = $index;
             }
@@ -60,8 +65,14 @@ final class LifecyclePlanTest extends TestCase
             }
         }
 
+        self::assertNotNull($bootstrap);
         self::assertNotNull($upgrade);
         self::assertNotNull($import);
+        self::assertLessThan(
+            $upgrade,
+            $bootstrap,
+            'initial database bootstrap must run before setup:upgrade on an empty database',
+        );
         self::assertLessThan(
             $import,
             $upgrade,

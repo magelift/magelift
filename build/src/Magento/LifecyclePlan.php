@@ -94,6 +94,10 @@ final class LifecyclePlan implements PlanInterface, StepCommandProvider
             ],
             Phase::Package => [],
             Phase::Deploy => [
+                // On a zero-table database, setup:upgrade can fail before schema
+                // exists. The bootstrap helper runs official schema/data upgrades
+                // only in that case, then the canonical deploy quartet continues.
+                new Command(Executable::Php, InitialDatabaseBootstrap::lifecyclePhpArguments()),
                 // setup:upgrade creates core tables, including flag. app:config:import
                 // reads flag on a fresh database and fails with SQLSTATE 42S02 if it
                 // runs first, which leaves the shop returning HTTP 500.

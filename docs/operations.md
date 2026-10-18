@@ -49,6 +49,14 @@ image. Destroy can remove an owned environment without an application build;
 its protection and ownership checks still apply. See
 [ADR 0019](adr/0019-gcp-runtime-operation-plans.md).
 
+For a database with zero tables, the deployment migration first runs Magento's
+schema and data upgrade commands, then the normal upgrade, configuration import
+and cache commands. An existing database skips this initial step. This does not
+create an administrator. A failed migration stops deployment without an automatic
+Job retry; inspect the failing step and database before retrying. A partially
+initialized database is preserved and may need repair before another attempt.
+See [ADR 0021](adr/0021-empty-magento-database-bootstrap.md).
+
 Production requests need an approval and a digest-pinned signed image. Deployment
 re-verifies the promoted digest against its recorded certificate identity and OIDC
 issuer before any infrastructure mutation. A rollback is another forward deployment.

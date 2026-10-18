@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <psalm
     errorLevel="6"
+    allFunctionsGlobal="true"
     resolveFromConfigFile="true"
     findUnusedBaselineEntry="true"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -9,6 +10,7 @@
 >
     <projectFiles>
         <directory name="src" />
+        <file name="bin/ensure-initial-database.runtime.php" />
     </projectFiles>
     <issueHandlers>
         <MissingFile errorLevel="error" />

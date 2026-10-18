@@ -2,6 +2,7 @@ package platform
 
 import (
 	"encoding/json"
+	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
@@ -21,6 +22,18 @@ func TestMagentoQueueArgsForNamedConsumers(t *testing.T) {
 	}
 }
 
+func TestRenderLifecycleCommandKeepsInlinePHPInOneShellArgument(t *testing.T) {
+	payload := "a'b " + "$(printf injected) ; " + "`printf injected`\n# comment"
+	command := "php() { test \"$#\" -eq 2 && test \"$1\" = -r && printf '%s' \"$2\"; }; " + renderLifecycleCommand([]string{"php", "-r", payload})
+	got, err := exec.Command("/bin/sh", "-ec", command).CombinedOutput()
+	if err != nil {
+		t.Fatalf("shell: %v: %s", err, got)
+	}
+	if string(got) != payload {
+		t.Fatalf("shell changed inline PHP: %q", got)
+	}
+}
+
 func TestMagentoMigrationShellRendersGoldenSequence(t *testing.T) {
 	shell := MagentoMigrationShell()
 	if len(shell) != 3 || shell[0] != "/bin/sh" || shell[1] != "-ec" {
@@ -35,7 +48,7 @@ func TestMagentoMigrationShellRendersGoldenSequence(t *testing.T) {
 	}
 	var want []string
 	for _, command := range append(append([][]string{}, golden.Deploy...), golden.PostDeploy...) {
-		want = append(want, strings.Join(command, " "))
+		want = append(want, renderLifecycleCommand(command))
 	}
 	if shell[2] != strings.Join(want, " && ") {
 		t.Fatalf("migration shell = %q, want golden render %q", shell[2], strings.Join(want, " && "))
@@ -43,10 +56,11 @@ func TestMagentoMigrationShellRendersGoldenSequence(t *testing.T) {
 	if strings.Contains(shell[2], "setup:static-content:deploy") {
 		t.Fatalf("migration shell = %q, want no deploy-time static-content deploy", shell[2])
 	}
+	bootstrap := strings.Index(shell[2], "setup:db-schema:upgrade")
 	upgrade := strings.Index(shell[2], "setup:upgrade")
 	importCmd := strings.Index(shell[2], "app:config:import")
-	if upgrade < 0 || importCmd < 0 || upgrade > importCmd {
-		t.Fatalf("migration shell = %q, want setup:upgrade before app:config:import", shell[2])
+	if bootstrap < 0 || upgrade < 0 || importCmd < 0 || bootstrap > upgrade || upgrade > importCmd {
+		t.Fatalf("migration shell = %q, want initial database bootstrap before setup:upgrade before app:config:import", shell[2])
 	}
 }
 
