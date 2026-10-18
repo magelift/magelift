@@ -2,9 +2,9 @@
 
 ## Resume — 2026-10-18, plan v1.3
 
-Next action: export the private proof bundle, stop this fixture from
-deploying on push, then destroy the retained stack and check the native
-inventory. Do not recreate GKE, SQL, or the network.
+Next action: bring the public alpha docs in line with this campaign.
+Do not recreate the stack. Publication of a stable tag still needs
+explicit approval.
 
 Already found:
 
@@ -75,9 +75,22 @@ clean-room, community acceptance doubles). `scripts/nginx-media-deny-test.sh`
 passed: versioned static maps to on-disk CSS, and the pre-fix config
 still 404s.
 
-Blockers: gcloud user tokens need reauth; Application Default Credentials
-can list this project and the preview above used them. No second mutation
-agent. Cleanup NOT_STARTED.
+Cleanup of this campaign: the first destroy removed GKE, Cloud SQL, and
+Valkey, then stopped on the Service Networking connection while no producer
+instance remained. The Compute peering was removed, that connection was
+dropped from Pulumi state, and a later destroy deleted the remaining 25
+resources, including the network and media bucket. A native reread found no
+campaign cluster, SQL instance, network, address, DNS record, image
+repository, service account, state bucket, or state key. Other project
+networks, the `chantelle.cloud` zone, and unrelated disks were left.
+Cleanup of this campaign is PASS for those objects. State lock still
+requires an image digest on teardown in the published canary; the fix is
+`4654976` and was not in the binary that destroyed the stack, which used
+`--skip-lock`.
+
+Blockers: stable tag and protected merge still need explicit approval.
+gcloud user tokens for the organization account need reauth; Application
+Default Credentials were used for the inventory. No second mutation agent.
 
 Historical sections below stay as written.
 
