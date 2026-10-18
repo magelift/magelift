@@ -1,6 +1,6 @@
 ---
 type: lesson
-title: MkDocs 2.0 breaks Material — docs toolchain exit options
+title: MkDocs 2.0 breaks Material: docs toolchain exit options
 description: MkDocs 2.0 (rewrite, no plugins, TOML config, no migration path) will never run Material for MkDocs; our pins protect today's builds, and the planned exits are Zensical or Astro Starlight.
 tags: [mkdocs, material, docs, zensical, starlight]
 status: stable
@@ -10,7 +10,7 @@ generated:
   at: 2026-08-04
 ---
 
-# MkDocs 2.0 breaks Material — docs toolchain exit options
+# MkDocs 2.0 breaks Material: docs toolchain exit options
 
 Material for MkDocs 9.7.2+ prints a build warning about MkDocs 2.0. Facts from
 the Material team's analysis (squidfunk blog, 2026-02-18, updated through
@@ -34,12 +34,12 @@ extensions. No third-party plugins.
 
 Exit options, to revisit when 2.0 gets a release date or Zensical matures:
 
-1. **Zensical** (Material team's SSG) — targets drop-in MkDocs 1.x
+1. **Zensical** (Material team's SSG): targets drop-in MkDocs 1.x
    compatibility; smallest migration.
-2. **Astro Starlight** — converges docs into `website/` (one npm toolchain,
+2. **Astro Starlight**: converges docs into `website/` (one npm toolchain,
    one design system; the landing is the only site). Cost: port nav config,
    the extrahead override, and pymdownx admonitions to Starlight syntax.
-3. **Stay on 1.x/9.x** — acceptable medium term; risk is unmaintained-core rot.
+3. **Stay on 1.x/9.x**: acceptable medium term; risk is unmaintained-core rot.
 
 Decision recorded 2026-08-04: stay put, revisit in ~6 months. To silence the
 build warning: `NO_MKDOCS_2_WARNING=1`.

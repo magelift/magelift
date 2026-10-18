@@ -15,7 +15,7 @@ npm run dev
 ```
 
 Docs locally: from repo root, `make docs-serve` (pinned MkDocs Material in the
-repo venv — a system/Homebrew mkdocs does not bundle the theme).
+repo venv: a system/Homebrew mkdocs does not bundle the theme).
 
 ## Production build (landing + docs)
 

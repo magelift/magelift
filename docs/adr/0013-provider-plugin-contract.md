@@ -17,7 +17,7 @@ narrow JSON proof (`request_json` / `plan_json` / `result_json` /
 equality between CLI and provider artifact, silent fallback to embedded
 execution on plugin failure, and day-2 ports staying in-process.
 
-`intent/audit.md` (F01–F03, F15) finds that boundary unfinished: calling it
+`intent/audit.md` (F01-F03, F15) finds that boundary unfinished: calling it
 done would mislead every consumer and contributor. This ADR promotes the proof
 into the versioned contract that followers implement. It changes the target
 rules; it does not rewrite the history that 0008/0011 record.
@@ -72,7 +72,7 @@ block bytes passed to ValidateConfig and Plan. The cloud resource model is
 not forced to a lowest common denominator. The core accepts any well-formed
 provider ID at parse; unknown providers fail at resolution, not at parse:
 no installed compatible plugin is a fail-closed error naming the provider ID,
-the required protocol version, and the install action — never a silent
+the required protocol version, and the install action: never a silent
 substitution.
 
 ### Negotiation and fail-closed compatibility
@@ -184,7 +184,7 @@ this ADR's letter. Reconciled position for the alpha:
 
 ## Provenance
 
-`intent/audit.md` F01–F03/F15, `intent/0.1.0-alpha-review.md` R05,
+`intent/audit.md` F01-F03/F15, `intent/0.1.0-alpha-review.md` R05,
 `intent/alpha-review-corrections/spec.md`, `intent/provider-plugin-contract/spec.md`,
 `sdk/modules.go`, `internal/platform/public_module.go`,
 `internal/providerhost/hostproto/ping.proto`, `internal/config`,

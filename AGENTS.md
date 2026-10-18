@@ -50,7 +50,7 @@ rewrite, and cloud spend outside the envelope in `intent/ROADMAP.md`.
 ## Do
 
 - Active work follows `intent/ROADMAP.md` and `IMPLEMENTATION_PLAN.md`
-  (v1.3). Lots R0–R4 close the GCP community alpha. S0–S2 stay delivered;
+  (v1.3). Lots R0-R4 close the GCP community alpha. S0-S2 stay delivered;
   S4/S5 follow pilots. These replace ML-xx priorities, rather than adding
   requirements. One lot is active at a time. The plan is execution
   authority for these lots. Do not open another spec or plan approval for
@@ -99,7 +99,7 @@ and is only for dogfooding user flows or the skills acceptance run.
 | Tag, GoReleaser, Cosign, GHCR | `contrib/skills/magelift-release` |
 | `website/` + MkDocs | `contrib/skills/magelift-site` |
 
-User track — dogfooding and skills acceptance only:
+User track: dogfooding and skills acceptance only:
 
 | When | Skill |
 | --- | --- |

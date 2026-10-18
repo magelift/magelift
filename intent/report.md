@@ -191,8 +191,8 @@ The following facts were observed on 2026-09-22:
 - Plan boxes 1.4 and 5.1 remained open.
 - The roadmap still described box 1.4 as waiting on a candidate after rc.15,
   although rc.22 existed.
-- The rc.22 GCP provider binaries were approximately 199–213 MB per platform.
-- The rc.22 CLI archives were approximately 57–65 MB per platform.
+- The rc.22 GCP provider binaries were approximately 199-213 MB per platform.
+- The rc.22 CLI archives were approximately 57-65 MB per platform.
 
 The HTTP 500 has not been assigned a root cause in this report. Logs from the
 web, PHP-FPM, deploy job, and Magento exception paths are required before
@@ -414,8 +414,8 @@ For alpha:
 Bundling first-party provider binaries into the CLI archive would simplify one
 installation step but harm the architecture that AWS needs:
 
-- the currently published raw GCP provider asset is roughly 199–213 MB while
-  the compressed CLI archive is roughly 57–65 MB, so embedding providers would
+- the currently published raw GCP provider asset is roughly 199-213 MB while
+  the compressed CLI archive is roughly 57-65 MB, so embedding providers would
   materially enlarge every installation even before AWS is added;
 - adding AWS would make every user download every provider;
 - a GCP provider security fix would require republishing the full CLI archive;

@@ -75,7 +75,7 @@ Static content is baked into the image at build (the PHP lifecycle plan owns
 it); deploy-time migration runs config import, schema upgrade, and cache
 operations only, and serving containers receive baked assets by image-digest
 identity. Deploy success means the intended rollout plus a passing serving
-request and bounded Magento probe — scheduler settlement alone never
+request and bounded Magento probe: scheduler settlement alone never
 reports success.
 
 The preview alpha supports compatible migrations only (additive,
@@ -90,7 +90,7 @@ For any production deploy that may carry one:
 1. Take a fresh backup (database plus media export) and confirm it restores.
 2. Enable maintenance mode (`bin/magento maintenance:enable`).
 3. Drain writers yourself: stop cron and queue consumers; confirm no active writers.
-4. Deploy with `--ack-maintenance-drain`, attesting steps 1–3.
+4. Deploy with `--ack-maintenance-drain`, attesting steps 1-3.
 5. Verify health output, then disable maintenance mode.
 6. Scale consumers and cron back; watch the first scheduled runs.
 

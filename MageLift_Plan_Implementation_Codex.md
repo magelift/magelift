@@ -1,9 +1,9 @@
-# MageLift — Plan Codex pour un mainteneur solo et des agences Magento
+# MageLift. Plan Codex pour un mainteneur solo et des agences Magento
 
 **Superseded as the active queue by `IMPLEMENTATION_PLAN.md` (v1.3).**
 This file stays as the v1.2 record. Do not execute its checklists in parallel.
 
-**Version : 1.2 — 18 octobre 2026**  
+**Version 1.2, 18 octobre 2026**  
 **Remplace intégralement les versions 1.0 et 1.1 ; ce n’est pas une liste d’exigences supplémentaire.**  
 **Dépôt :** `magelift/magelift`  
 **Base :** `wip/all-local-work`. Dernier SHA identifié dans l’analyse précédente : `3ac1b844a7117752f3a5045054587508c16dcf6c`. Relever le HEAD réel avant de travailler.  
@@ -102,9 +102,9 @@ Inversement, ne pas laisser durablement une frontière en cours de migration mul
 
 ## 4. Lots exécutables
 
-Les nouveaux IDs S0–S5 remplacent les anciens ML-xx dans la roadmap active. Les tâches déjà implémentées restent acquises après vérification ; ne pas les refaire. S0–S3 conduisent à l’alpha. S4 et S5 sont ensuite priorisés selon les pilotes et peuvent avancer indépendamment.
+Les nouveaux IDs S0-S5 remplacent les anciens ML-xx dans la roadmap active. Les tâches déjà implémentées restent acquises après vérification ; ne pas les refaire. S0-S3 conduisent à l’alpha. S4 et S5 sont ensuite priorisés selon les pilotes et peuvent avancer indépendamment.
 
-### S0 — Une boucle de correction utilisable
+### S0: Une boucle de correction utilisable
 
 **Zones :** `AGENTS.md`, `intent/ROADMAP.md`, `Makefile`, CI et tests des modules concernés, scripts de développement existants.
 
@@ -117,7 +117,7 @@ Les nouveaux IDs S0–S5 remplacent les anciens ML-xx dans la roadmap active. Le
 
 **Sortie :** un contributeur peut modifier le code concerné et tester sa correction sans compte cloud. Une session reprend le travail restant au lieu de recommencer un audit global.
 
-### S1 — Construire avec le logiciel distribué, pas avec ton workspace
+### S1: Construire avec le logiciel distribué, pas avec ton workspace
 
 **Zones :** `images/`, `build/`, `internal/build/`, `internal/toolchain/`, `internal/cli/build.go`, manifeste existant, distribution CLI/providers.
 
@@ -133,7 +133,7 @@ Les nouveaux IDs S0–S5 remplacent les anciens ML-xx dans la roadmap active. Le
 
 **Sortie :** la recette est utilisable sans accès à ton workspace, sans construire une image centrale et sans manipuler les détails de packaging. Un défaut périphérique de registre ne bloque pas le chemin de référence.
 
-### S2 — Préparer la petite agence et sa CI
+### S2: Préparer la petite agence et sa CI
 
 **Zones :** initialisation existante, `internal/cli/bootstrap.go`, bootstrap GCP, `internal/cli/ci.go`, configuration, onboarding.
 
@@ -149,11 +149,11 @@ Les nouveaux IDs S0–S5 remplacent les anciens ML-xx dans la roadmap active. Le
 
 **Sortie :** on ne renvoie plus une agence sans DevOps à une longue liste de manipulations IAM. Ce qui nécessite réellement son administrateur ou registrar est identifié séparément et une seule fois.
 
-### S3 — Livrer une alpha exploitable et supportable
+### S3: Livrer une alpha exploitable et supportable
 
 **Zones :** opérations et déploiement existants, `doctor`, logs/health/exec, `internal/usererr/`, skills, docs, release.
 
-1. Exécuter le parcours S1–S2 sur la recette GCP existante : GKE Autopilot, nginx/PHP-FPM, Cloud SQL, Valkey, OpenSearch et médias GCS privés. Vérifier la combinaison Magento/services contre les exigences applicables au moment de l’essai. La queue DB reste le choix alpha, avec ses limites ; ne pas lancer une migration de broker générale.
+1. Exécuter le parcours S1-S2 sur la recette GCP existante : GKE Autopilot, nginx/PHP-FPM, Cloud SQL, Valkey, OpenSearch et médias GCS privés. Vérifier la combinaison Magento/services contre les exigences applicables au moment de l’essai. La queue DB reste le choix alpha, avec ses limites ; ne pas lancer une migration de broker générale.
 2. Vérifier HTTP applicatif, asset, création/lecture de donnée synthétique, recherche réellement indexée, cron, queue et médias autorisés/interdits. Déployer une deuxième release avec un changement observable et vérifier la persistance des données. Les migrations sont contrôlées une fois ; elles ne tournent pas à chaque démarrage de réplique.
 3. Traiter un incident utile : configuration erronée, credential expiré ou migration échouée. Indiquer projet, environnement, étape fautive, résultat connu et prochaine action. Une relance ne doit pas lancer simultanément deux migrations. Pas de retry aveugle d’une opération non démontrée idempotente ; ne pas supprimer l’état pour débloquer l’outil.
 4. Livrer dès l’alpha les sorties JSON et non interactives des commandes importantes, plus des skills exactes. Ne pas imposer MCP ni compte LLM. `doctor` doit être utilisable avant que l’installation ou le déploiement ne réussisse ; un contrôle local ne nécessite pas de credentials cloud.
@@ -164,7 +164,7 @@ Les nouveaux IDs S0–S5 remplacent les anciens ML-xx dans la roadmap active. Le
 
 **Sortie alpha :** installation, initialisation, bootstrap, CI, déploiement fonctionnel, deuxième release, diagnostic d’échec et nettoyage sont démontrés sur une recette. Publier avec ses limites, sans attendre S4/S5, une console ou la certification des autres providers. Les bugs non bloquants restent publics ; ne pas recommander une migration de production sur cette seule preuve.
 
-### S4 — Accompagner une boutique existante avant d’élargir l’exploitation
+### S4: Accompagner une boutique existante avant d’élargir l’exploitation
 
 Ce lot se déclenche avec un premier pilote agence. Son objectif n’est pas la HA universelle.
 
@@ -177,7 +177,7 @@ Ce lot se déclenche avec un premier pilote agence. Son objectif n’est pas la 
 
 **Sortie :** un pilote peut essayer sa boutique sans risquer la production source, vérifier sa restauration et identifier qui prend en charge les incidents. Une réussite sur une boutique ne prouve pas toutes les extensions Magento.
 
-### S5 — Rendre AWS utile sans en faire un second projet
+### S5: Rendre AWS utile sans en faire un second projet
 
 Réutiliser les tests et l’architecture AWS ECS existants. Sur une seule recette, dans l’enveloppe autorisée, vérifier build/push ECR utilisateur, pull runtime, déploiement, quelques opérations, deuxième release et nettoyage. GCP ne sert pas de substitut à ces essais. Conserver des statuts expérimentaux pour ce qui n’a pas été essayé.
 
@@ -274,7 +274,7 @@ Applique CODEX_IMPLEMENTATION_PLAN.md version 1.2. Il remplace les anciens
 plans ; n’additionne pas leurs exigences.
 
 Reprends la branche existante depuis wip/all-local-work, sans réécriture
-ni écrasement du travail local. Commence par S0, puis S1–S3 pour l’alpha.
+ni écrasement du travail local. Commence par S0, puis S1-S3 pour l’alpha.
 Vérifie ce qui est déjà implémenté ; ne le refais pas.
 
 Priorités : recettes construites dans la CI utilisateur, registre choisi
@@ -308,10 +308,10 @@ Les références précédemment examinées restent utiles pour localiser les mod
 
 Documentation primaire consultée le 18 octobre 2026 ; relire les versions applicables lors de l’implémentation :
 
-- Google Cloud, fédération d’identité pour la CI : `https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines` — permissions, conditions de confiance et identités courtes.
-- Google Cloud, GKE et Artifact Registry : `https://docs.cloud.google.com/artifact-registry/docs/integrate-gke` — permissions de pull distinctes des credentials du build.
-- Pulumi Automation API : `https://www.pulumi.com/docs/iac/concepts/automation-api/` — orchestration et outillage sous-jacent.
+- Google Cloud, fédération d’identité pour la CI : `https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines`: permissions, conditions de confiance et identités courtes.
+- Google Cloud, GKE et Artifact Registry : `https://docs.cloud.google.com/artifact-registry/docs/integrate-gke`: permissions de pull distinctes des credentials du build.
+- Pulumi Automation API : `https://www.pulumi.com/docs/iac/concepts/automation-api/`: orchestration et outillage sous-jacent.
 - Docker, cache registry : `https://docs.docker.com/build/cache/backends/registry/` ; secrets : `https://docs.docker.com/build/building/secrets/`.
-- GoReleaser, Homebrew Casks : `https://goreleaser.com/customization/publish/homebrew_casks/` ; Scoop : `https://goreleaser.com/customization/publish/scoop/` — publication des métadonnées depuis la chaîne de release.
+- GoReleaser, Homebrew Casks : `https://goreleaser.com/customization/publish/homebrew_casks/` ; Scoop : `https://goreleaser.com/customization/publish/scoop/`: publication des métadonnées depuis la chaîne de release.
 
 **Décision finale : moins de choix initiaux et de chantiers transverses ; davantage d’automatisation sur le parcours concret de l’agence. Ne pas transférer la complexité du mainteneur aux utilisateurs pour pouvoir appeler le produit simple.**

@@ -38,14 +38,14 @@
 
 ## Motion
 
-1. Hero copy + terminal rise on load — staggered springs (`[data-enter]`)  
-2. Section reveal on scroll — spring, opacity + 16px y, `inView` at 15%  
+1. Hero copy + terminal rise on load: staggered springs (`[data-enter]`)  
+2. Section reveal on scroll: spring, opacity + 16px y, `inView` at 15%  
 3. Terminal live-typing loop (static transcript when motion is reduced)  
 4. Button `:active` scale 0.98  
 
 Honor `prefers-reduced-motion`. Springs via Motion (vanilla `motion` package), scroll effects via `animation-timeline` behind `@supports`.
 
-Fonts are self-hosted variable woff2 in `public/fonts/` — no Google Fonts `<link>`.
+Fonts are self-hosted variable woff2 in `public/fonts/`: no Google Fonts `<link>`.
 
 ## Anti-patterns (do not reintroduce)
 

@@ -34,12 +34,12 @@ homebrew_casks:
 
 Migration gotchas from the official deprecation page:
 
-- Do **not** carry over `directory: Formula` — casks default to `Casks/`.
+- Do **not** carry over `directory: Formula`: casks default to `Casks/`.
 - Migrating an existing tap formula: add `tap_migrations.json`
   (`{"magelift": "magelift"}`) and delete `Formula/magelift.rb` so brew moves
   users to the cask. Fresh taps (ours) need no migration file.
 - Scoop conventions: manifest goes in `bucket/`, and the Windows archive
-  should be zip — added as a `format_overrides` entry for `goos: windows`.
+  should be zip: added as a `format_overrides` entry for `goos: windows`.
 
 Verified 2026-08-04 against https://goreleaser.com/deprecations#brews and
 `goreleaser check` (v2.12.7 binary, config targets v2.17 schema).

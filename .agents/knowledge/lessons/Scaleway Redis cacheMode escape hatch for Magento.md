@@ -13,7 +13,7 @@ generated:
   at: '2026-07-20T00:59:21.514935000+00:00'
 ---
 
-Scaleway experimental MageLift adapter uses Managed Redis with explicit cacheMode=redis because Scaleway has no managed Valkey. Magento 2.4.9+ prefers Valkey; document the escape hatch and revisit when Scaleway ships Valkey. Pulumi provider is community pulumiverse/pulumi-scaleway — pin versions.
+Scaleway experimental MageLift adapter uses Managed Redis with explicit cacheMode=redis because Scaleway has no managed Valkey. Magento 2.4.9+ prefers Valkey; document the escape hatch and revisit when Scaleway ships Valkey. Pulumi provider is community pulumiverse/pulumi-scaleway: pin versions.
 
 # Related
 

@@ -30,7 +30,7 @@ Overrides MASTER for https://magelift.dev/
   always present for assistive tech).
 - Persona tabs: WAI tablist, sliding ink bar spring, panel crossfade.
 - Hero grid overlay drifts on scroll via `animation-timeline: scroll(root)`
-  behind `@supports`, `0–100dvh` range.
+  behind `@supports`, `0-100dvh` range.
 - FAQ answers animate open via `::details-content` + `interpolate-size`.
 - Button `:active` scale 0.98.
 - All motion gated on `prefers-reduced-motion`; hidden-tab WAAPI freezes

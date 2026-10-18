@@ -40,7 +40,7 @@ GitHub Pages with `actions/deploy-pages`. PRs build only; only a `main`
 push deploys.
 
 Custom domain: `magelift.dev` (via `website/public/CNAME`); `www` redirects
-to the apex. Docs live at `/docs/` inside the same deploy — there is no
+to the apex. Docs live at `/docs/` inside the same deploy: there is no
 separate docs host, redirect file, or header file.
 
 ## Copy rules

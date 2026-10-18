@@ -19,7 +19,7 @@ independent provider boundary already implemented.
 ## Evidence
 
 [The architecture report](../report.md) records that rc.22 provider artifacts
-are roughly 199–213 MB per platform while CLI archives are roughly 57–65 MB.
+are roughly 199-213 MB per platform while CLI archives are roughly 57-65 MB.
 
 [Provider lock](../../internal/providerhost/lock.go),
 [download](../../internal/providerhost/download.go),

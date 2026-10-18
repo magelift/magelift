@@ -1,6 +1,6 @@
-# MageLift — Reprise Cursor : uniquement le reste à faire
+# MageLift. Reprise Cursor: uniquement le reste à faire
 
-**Version 1.3 — 18 octobre 2026.** Remplace le plan v1.2 comme file de travail active ; ne pas additionner les anciennes checklists.  
+**Version 1.3, 18 octobre 2026.** Remplace le plan v1.2 comme file de travail active ; ne pas additionner les anciennes checklists.  
 **Exécution :** Cursor, avec Grok 4.7 et/ou Composer 2.5 au choix du mainteneur. Aucune dépendance à Codex.  
 **Objectif immédiat :** terminer l’acceptance Magento 2.4.9 sur les ressources GCP déjà présentes, intégrer les dernières corrections au logiciel distribué, nettoyer la campagne, puis publier une alpha communautaire bornée.
 
@@ -13,7 +13,7 @@
 | `magelift/magelift` | `reboot/community-alpha` | `1d1d1f23890c0d4843e0b368e7ade066fcef475f` |
 | `magelift/acceptance-magento-249` | `main` | `e4e133ee085a8de780d90fac937d11525b80fadf` |
 
-L’historique comprend 79 commits MageLift depuis `3ac1b844a7117752f3a5045054587508c16dcf6c`, et 11 commits de la fixture. Le code, les rapports et les derniers jobs CI ont été lus pour ce plan ; aucun test ou inventaire GCP n’a été exécuté par son auteur. Les modifications locales de la session Codex ne sont pas visibles sur GitHub. **Relever le vrai HEAD et le travail non committé avant toute action ; ces SHA ne sont pas des instructions de reset.** [S1–S4]
+L’historique comprend 79 commits MageLift depuis `3ac1b844a7117752f3a5045054587508c16dcf6c`, et 11 commits de la fixture. Le code, les rapports et les derniers jobs CI ont été lus pour ce plan ; aucun test ou inventaire GCP n’a été exécuté par son auteur. Les modifications locales de la session Codex ne sont pas visibles sur GitHub. **Relever le vrai HEAD et le travail non committé avant toute action ; ces SHA ne sont pas des instructions de reset.** [S1-S4]
 
 ### État transmis par le mainteneur, à préserver
 
@@ -54,9 +54,9 @@ R4 peut être préparé en parallèle des attentes cloud, sans modifier l’infr
 
 Une preuve existante valable ferme l’item correspondant. Ne rejouer que ce qui est absent, devenu invalide par une correction, ou nécessaire au contrôle final de l’artefact réellement distribué.
 
-## R0 — Reprendre la session, pas le projet
+## R0: Reprendre la session, pas le projet
 
-**Zones :** les deux checkouts locaux, `AGENTS.md`, `intent/ROADMAP.md`, début et dernières sections de `intent/community-alpha/verification.md`, fichiers de travail ignorés `.magelift/`, configuration d’acceptance et CI. [S2–S4]
+**Zones :** les deux checkouts locaux, `AGENTS.md`, `intent/ROADMAP.md`, début et dernières sections de `intent/community-alpha/verification.md`, fichiers de travail ignorés `.magelift/`, configuration d’acceptance et CI. [S2-S4]
 
 1. Relever `git status`, branches, HEAD, commits locaux non poussés et changements depuis les SHA ci-dessus, dans les deux dépôts. Ne pas lancer `reset --hard`, `clean -fd`, checkout forcé, rebase ou restauration automatique. Préserver les changements des assets, scripts de sonde, données synthétiques et preuves de navigateur.
 2. Retrouver les commandes réellement utilisées par Codex et le dernier compte rendu local. Chercher dans les dossiers ciblés ; ne pas parcourir tout Magento/vendor pour chaque diagnostic. Distinguer fichiers modifiés sur disque, corrections injectées dans un conteneur et corrections déjà incluses dans une image signée.
@@ -67,7 +67,7 @@ Une preuve existante valable ferme l’item correspondant. Ne rejouer que ce qui
 
 **Sortie :** les deux workspaces et la stack sont identifiés, les corrections locales sont préservées, aucune ressource n’est recréée. L’observation recherche est classée « preuve retrouvée » ou « réussite rapportée, à raccorder à un digest », jamais « implémentation à recommencer ».
 
-## R1 — Fermer les derniers contrôles applicatifs
+## R1: Fermer les derniers contrôles applicatifs
 
 ### R1a. Assets et navigateur
 
@@ -102,7 +102,7 @@ wait for migrate Job: job failed: Job has reached the specified backoff limit
 
 **Sortie R1 :** assets et cron ont un résultat explicite ; la cause de readiness est corrigée ou précisément bloquée. Les corrections nécessaires sont localisées et testables. Aucun changement de topologie n’a été introduit pour résoudre un défaut d’assets ou de sonde.
 
-## R2 — Valider le chemin distribué et la seconde release
+## R2: Valider le chemin distribué et la seconde release
 
 **Zones :** corrections R1, pipeline/release existants, `.github/workflows/magelift.yml` et `magelift.providers.lock` de la fixture, contrats de déploiement, observations et sondes existantes.
 
@@ -135,7 +135,7 @@ Relever avant teardown la configuration de runner réellement utilisée, les dur
 
 **Sortie R2 :** le parcours GCP annoncé et sa seconde release sont prouvés avec les corrections distribuées ; les limites restantes sont nommées. Les résultats sont exportés hors du stockage qui va être détruit. **Passer à R3 sans attendre la publication publique.**
 
-## R3 — Nettoyer la campagne temporaire GCP
+## R3: Nettoyer la campagne temporaire GCP
 
 **But :** aucun runtime de test laissé inutilement actif ; aucun objet étranger supprimé. Ce teardown est à la fois la fermeture de campagne et le test du chemin destroy.
 
@@ -170,11 +170,11 @@ Vérifier notamment les objets créés hors checkpoint après un échec, les dis
 
 Si la session s’interrompt avant la fin des tests, enregistrer la rétention explicite et le prochain contrôle, sans destruction précipitée. Si les tests sont durablement bloqués, ne pas garder indéfiniment la campagne allumée : fournir au mainteneur un état expurgé et une décision ciblée de conservation ou nettoyage. Ne jamais demander à recréer tout le projet par défaut.
 
-## R4 — Fermer la distribution et les documents, sans nouvelle campagne
+## R4: Fermer la distribution et les documents, sans nouvelle campagne
 
 **Zones :** README, `docs/onboarding.md`, `docs/release-readiness.md`, installation, `SUPPORT.md`, skills concernés, rapport courant, README de la fixture, workflows de release et publication du site.
 
-1. Mettre les statuts actuels en accord avec R1–R3. Le README d’acceptance et plusieurs paragraphes du rapport sont plus anciens que les derniers runs : corriger le résumé actuel et garder les anciens essais comme historique, pas les convertir rétroactivement en succès. Ne pas confondre fixture GitHub source avec toutes les installations Composer/Adobe Commerce.
+1. Mettre les statuts actuels en accord avec R1-R3. Le README d’acceptance et plusieurs paragraphes du rapport sont plus anciens que les derniers runs : corriger le résumé actuel et garder les anciens essais comme historique, pas les convertir rétroactivement en succès. Ne pas confondre fixture GitHub source avec toutes les installations Composer/Adobe Commerce.
 2. Décrire une seule recette Magento Open Source 2.4.9, avec les patches de sécurité déjà identifiés dans `ACCEPTANCE_SECURITY_PATCHES.md`, le tuple réellement utilisé, ses limites et son environnement de test. Ne pas appliquer une nouvelle vague de mises à jour pour embellir le plan ; une vulnérabilité bloquante nouvelle se traite explicitement. [S7]
 3. Vérifier l’onboarding contre les commandes distribuées : starter simple, bootstrap, CI utilisateur non écrasée, image et registre utilisateur, sortie de déploiement, diagnostic et teardown. Pas de retour aux étapes manuelles de fabrication des bases MageLift ni à un accès obligatoire au workspace du mainteneur.
 4. Préparer l’intégration depuis `reboot/community-alpha` vers la branche/canal réellement publié. `main` ancien ne doit pas continuer à fournir un installateur/site et un guide incompatibles avec le logiciel recommandé. La preuve d’un installateur extrait d’un tag ne vaut pas preuve de l’URL publique habituelle. Faire les smoke tests de distribution depuis le canal annoncé, sans reprovisionner Magento.
@@ -184,7 +184,7 @@ Si la session s’interrompt avant la fin des tests, enregistrer la rétention e
 
 **Sortie R4 :** alpha communautaire publiée, ou candidat prêt explicitement en attente d’approbation ; documentation cohérente ; aucun test GCP conservé pour faire vitrine. Une éventuelle documentation sur les identifiants cloud reste expurgée.
 
-## 3. Ce qui reste après l’alpha, mais ne doit pas retarder R0–R4
+## 3. Ce qui reste après l’alpha, mais ne doit pas retarder R0-R4
 
 | Travail restant | Déclenchement et limite |
 |---|---|
@@ -248,9 +248,9 @@ Si un accès manque, note le blocage précis et avance sur les tâches indépend
 
 - **[S1] Historique MageLift** : https://github.com/magelift/magelift/compare/3ac1b844a7117752f3a5045054587508c16dcf6c...1d1d1f23890c0d4843e0b368e7ade066fcef475f
 - **[S2] Roadmap actuelle** : https://github.com/magelift/magelift/blob/1d1d1f23890c0d4843e0b368e7ade066fcef475f/intent/ROADMAP.md
-- **[S3] Rapport de vérification** : https://github.com/magelift/magelift/blob/1d1d1f23890c0d4843e0b368e7ade066fcef475f/intent/community-alpha/verification.md — commencer par le résumé courant et la fin, pas par les anciens ML-00.
+- **[S3] Rapport de vérification** : https://github.com/magelift/magelift/blob/1d1d1f23890c0d4843e0b368e7ade066fcef475f/intent/community-alpha/verification.md: commencer par le résumé courant et la fin, pas par les anciens ML-00.
 - **[S4] Fixture et historique** : https://github.com/magelift/acceptance-magento-249/commits/e4e133ee085a8de780d90fac937d11525b80fadf/ ; README-ACCEPTANCE.md et workflow au même SHA.
-- **[S5] Dernier run examiné** : https://github.com/magelift/acceptance-magento-249/actions/runs/39135412332 — tentative 2 ; job de déploiement 117701195464, job build 117701195605.
+- **[S5] Dernier run examiné** : https://github.com/magelift/acceptance-magento-249/actions/runs/39135412332: tentative 2 ; job de déploiement 117701195464, job build 117701195605.
 - **[S6] Teardown sans exécution du programme** : https://github.com/magelift/magelift/commit/1d1d1f23890c0d4843e0b368e7ade066fcef475f
 - **[S7] Patches déjà documentés** : https://github.com/magelift/acceptance-magento-249/blob/e4e133ee085a8de780d90fac937d11525b80fadf/ACCEPTANCE_SECURITY_PATCHES.md
 

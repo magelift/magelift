@@ -17,7 +17,7 @@ Default proof order for MageLift:
 2. Offline harness dry-runs and shape checks (`make acceptance-harness-test`)
 3. Floci AWS (`make floci-test-aws`) and floci-gcp (`make floci-gcp-test`)
 
-`make local-gates` runs 1–3. `make verify` stays the contributor lint/unit/docs gate and does not start Docker emulators.
+`make local-gates` runs 1-3. `make verify` stays the contributor lint/unit/docs gate and does not start Docker emulators.
 
 Live AWS, OVH, Scaleway, Cloudflare, New Relic, and Fastly exist only when an E2E cell is still required to certify. Those accounts run on free credits or free plans: one bounded smoke, then destroy. GCP has unlimited credits and is the thorough Magento-wired live path. Emulators never certify Autopilot, Memorystore, Armor, managed TLS, or Magento Cloud SQL PITR.
 

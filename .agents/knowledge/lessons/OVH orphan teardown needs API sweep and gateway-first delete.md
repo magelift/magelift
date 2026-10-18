@@ -36,5 +36,5 @@ only Gen-3 (b3/c3/r3, 23 flavors) is. b3-8 (2 vCPU / 8 GB) is the smallest
 balanced MKS flavor in PAR and MIL.
 
 Run discipline: launch with TTL 7200 (a 3600s TTL expired mid-failure and met
-the since-fixed destroy-after-expiry bug) and do not interrupt — see
+the since-fixed destroy-after-expiry bug) and do not interrupt: see
 [EXIT traps cannot be the cleanup authority](./EXIT%20traps%20cannot%20be%20the%20cleanup%20authority.md).

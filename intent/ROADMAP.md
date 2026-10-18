@@ -35,14 +35,14 @@ console or mandatory AWS extraction blocks the test alpha.
 
 | Lot | Current state | Remaining outcome |
 | --- | --- | --- |
-| S0 — usable correction loop | Community gates pass across root/SDK/GCP with bounded race and current PHP; original module/theme overlay built and checked in a real image | Preserve fast local work without a cloud account or release tag dependency |
-| S1 — build with distributed software | Active carryover: embedded source recipe, local/default builds, optional cache, image/manifest trace, verified provider acquisition and local OCI registry proofs | Real QPT, optional Cloud Patches, changed hotfix/local-cache and fresh extracted-archive/cold-BuildKit builds pass; remote signed CI/runtime acceptance remains with S2/S3 |
-| S2 — guided agency and CI preparation | Single-test init/CI, isolated federation, owned registry/state-key/node bootstrap, explicit CI grants and non-overwriting GitHub-variable setup pass local regression gates | Demonstrate repeated bootstrap and real authorized private-repository GCP CI, runtime pull and observed runner/resource use |
-| S3 — supportable alpha | Existing deploy/ops/doctor/JSON/skills retained; local-only doctor and voluntary metadata export in verification; Linux packaging smoke passes | Functional GCP scenario, second release and persistence, useful incident, final diagnostic/install/release evidence and independent cleanup |
-| S4 — agency pilot | Deferred until a real pilot; existing dump/import/media and local runtime stay available | Isolated shop trial and restoration proof before real commercial data recommendations; requested previews and second-runner recovery |
-| S5 — useful AWS | Experimental path retained; targeted tests within budget | One grouped ECR/ECS scenario and cleanup; extraction only if a measured problem justifies it |
+| S0: usable correction loop | Community gates pass across root/SDK/GCP with bounded race and current PHP; original module/theme overlay built and checked in a real image | Preserve fast local work without a cloud account or release tag dependency |
+| S1: build with distributed software | Active carryover: embedded source recipe, local/default builds, optional cache, image/manifest trace, verified provider acquisition and local OCI registry proofs | Real QPT, optional Cloud Patches, changed hotfix/local-cache and fresh extracted-archive/cold-BuildKit builds pass; remote signed CI/runtime acceptance remains with S2/S3 |
+| S2: guided agency and CI preparation | Single-test init/CI, isolated federation, owned registry/state-key/node bootstrap, explicit CI grants and non-overwriting GitHub-variable setup pass local regression gates | Demonstrate repeated bootstrap and real authorized private-repository GCP CI, runtime pull and observed runner/resource use |
+| S3: supportable alpha | Existing deploy/ops/doctor/JSON/skills retained; local-only doctor and voluntary metadata export in verification; Linux packaging smoke passes | Functional GCP scenario, second release and persistence, useful incident, final diagnostic/install/release evidence and independent cleanup |
+| S4: agency pilot | Deferred until a real pilot; existing dump/import/media and local runtime stay available | Isolated shop trial and restoration proof before real commercial data recommendations; requested previews and second-runner recovery |
+| S5: useful AWS | Experimental path retained; targeted tests within budget | One grouped ECR/ECS scenario and cleanup; extraction only if a measured problem justifies it |
 
-S0–S3 lead to the alpha. S4/S5 follow according to pilots and do not become
+S0-S3 lead to the alpha. S4/S5 follow according to pilots and do not become
 retroactive publication gates. Former ML-06 through ML-09 obligations are not
 an active backlog merely because they appeared in the older plan. Console,
 MCP, universal plugin stability and extra providers have the triggers in plan

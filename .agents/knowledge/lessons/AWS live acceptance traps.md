@@ -35,7 +35,7 @@ change).
 ## VPC OpenSearch: omit VpcId, create the legacy SLR
 
 The provider rejects an explicit `vpc_options.vpc_id` ("Value for
-unconfigurable attribute") — it is derived from the subnets, so drop it
+unconfigurable attribute"): it is derived from the subnets, so drop it
 (fixed 095e0d7). Domain CREATE then still fails ValidationException ("must
 enable a service-linked role ... to access your VPC") even when
 `AWSServiceRoleForAmazonOpenSearchService` exists: the VPC path checks the

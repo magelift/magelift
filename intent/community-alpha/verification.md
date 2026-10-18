@@ -1,6 +1,6 @@
 # Community alpha implementation verification
 
-## Resume — 2026-10-18, plan v1.3
+## Resume: 2026-10-18, plan v1.3
 
 Next action: bring the public alpha docs in line with this campaign.
 Do not recreate the stack. Publication of a stable tag still needs
@@ -100,7 +100,7 @@ The maintainer supplied `MageLift_Plan_Implementation_Codex.md` (plan v1.0,
 2026-10-17). There was no `CODEX_IMPLEMENTATION_PLAN.md` in the checkout.
 The local root `go.mod` and `go.work` toolchain changes were preserved.
 
-## ML-00 — complete (local scope)
+## ML-00: complete (local scope)
 
 Existing implementation retained: provider process cleanup, Execute cleanup on
 success/error/cancellation, and setup:upgrade before app:config:import.
@@ -172,7 +172,7 @@ n8n-dlab has one of those seven enabled. Region, IAM permissions, owned prefix,
 immutable artifact and cleanup inventory still need verification before mutation.
 
 
-## ML-01 — local implementation verified; live product proof pending
+## ML-01: local implementation verified; live product proof pending
 
 The existing canary `e840adff5dd5ddfe5f165b2a0d44584a90d4c14d` is still draft.
 `GH_REPO=magelift/magelift MAGELIFT_DEVLOOP_FIXTURE=0 bash scripts/development-loop/distribution-gate.sh --sha e840adff5dd5ddfe5f165b2a0d44584a90d4c14d --gate-file .magelift/development-loop/ml01-canary/distribution.jsonl`
@@ -405,7 +405,7 @@ prerelease metadata. The current official PHP 8.5 FPM Trixie image resolves to
 `sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc`
 and an actual Linux amd64 run reports PHP 8.5.11. No image was published.
 
-## ML-03 — local build verification; publication pending
+## ML-03: local build verification; publication pending
 
 Implementation commits: `b2ac1d2` (current image inputs and context exclusions),
 `5e59e33` (registered themes), `5064ea3` (image resolution and trace),
@@ -479,7 +479,7 @@ resource was created, no AWS budget was reserved or spent, and account credits
 were not measured. Authorized GCP target remains digital-lab-341608,
 us-central1, with a fresh magelift-prefixed acceptance run.
 
-## Maintainer correction — user-owned images
+## Maintainer correction: user-owned images
 
 This checkpoint supersedes the ML-03 publication-pending proposal above. The
 maintainer clarified that all builder/runtime/application images are built in
@@ -548,11 +548,11 @@ the CLI and reviewed the final source/diff. An optional Grok 4.7 medium
 interrupted (exit 130); independent agent review is NOT_RUN, not a pass.
 
 
-## Plan 1.2 / S1–S2 checkpoint — 2026-10-18
+## Plan 1.2 / S1-S2 checkpoint: 2026-10-18
 
 The maintainer's v1.2 replaces earlier requirements. The earlier report above
 about publishing builder/runtime tags is historical: commit 499a08e keeps those
-intermediates local and publishes only the application. S0–S3 lead to the test
+intermediates local and publishes only the application. S0-S3 lead to the test
 alpha; pilot-triggered S4/S5 are not publication gates. No tag or publication
 has been performed.
 
@@ -668,7 +668,7 @@ No upstream package source/catalog is added to MageLift, and no Adobe credential
 are invented or requested. These install failures are not passing patch tests.
 
 
-## S1 decisive local acceptance / S2 initial integration — 2026-10-18
+## S1 decisive local acceptance / S2 initial integration: 2026-10-18
 
 S1 real hotfix build passed with local BuildKit cache: the compiled custom-theme
 CSS changed to #228844 through m2-hotfixes while source stayed #1255a3 and Git

@@ -289,7 +289,7 @@ not claimed here.
   VPC-native on private subnets with private Standard nodes
   (`providers/gcp/runtime/runtime.go`); the control-plane endpoint
   stays public by default and no Kubernetes network policies are
-  installed — stated here as the shipped posture, not as a claim of
+  installed: stated here as the shipped posture, not as a claim of
   hardening. The public surface is the load balancer by storefront
   design; a rule-by-rule edge audit stays with the full review.
 - Artifact trust: reviewed. Images build once and promote by digest; `magelift

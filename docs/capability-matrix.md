@@ -221,7 +221,7 @@ is infrastructure-only.
 | Kapsule | `kapsuleVersion`, `nodeType`, `nodeCount` | n/a | implemented | experimental |
 | Replicas | `desiredWebReplicas`, `queueConsumerCount` | n/a | implemented | experimental |
 | RDB | `databaseNodeType`, `databaseHighAvailability`, backup, `databaseEncryptionAtRest` | Adobe MySQL row per patch | implemented | experimental |
-| Cache | `cacheMode: redis`, `redisVersion`, `redisClusterSize` (1 standalone, 2 HA, 3–6 cluster) | Adobe prefers Valkey; Scaleway has Redis | implemented | experimental; mismatch stays visible |
+| Cache | `cacheMode: redis`, `redisVersion`, `redisClusterSize` (1 standalone, 2 HA, 3-6 cluster) | Adobe prefers Valkey; Scaleway has Redis | implemented | experimental; mismatch stays visible |
 | Cockpit | first-party log/metric/trace sources | n/a | implemented | experimental; sources are not Magento delivery evidence |
 | Day-2 | Bootstrap | n/a | `ErrNotSupported` | unavailable |
 | Day-2 | application Secrets | n/a | planned project/region tags | experimental; live CRUD pending |

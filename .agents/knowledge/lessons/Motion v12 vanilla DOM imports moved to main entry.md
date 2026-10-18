@@ -25,5 +25,5 @@ import { animate, inView, scroll } from "motion";
 
 `animate` on DOM elements uses WAAPI springs; `inView` wraps
 IntersectionObserver; `scroll` wraps scroll listeners. Check the installed
-package's exports before trusting doc snippets — the package consolidated
+package's exports before trusting doc snippets: the package consolidated
 subpaths when Framer Motion rebranded to Motion.

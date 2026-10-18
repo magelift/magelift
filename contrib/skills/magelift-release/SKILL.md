@@ -137,7 +137,7 @@ deferred without saying so. The local community gate is
 `make verify-community`, not `make test-race-full`.
 
 Workflow `run` blocks execute under `bash -e`: never end a loop body
-with a bare `&&` list — when the test is false it becomes the step's
+with a bare `&&` list: when the test is false it becomes the step's
 exit code and fails a step that actually succeeded (seen on rc.5).
 Use a plain `if`.
 

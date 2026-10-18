@@ -14,4 +14,4 @@ generated:
 
 `go-verify` also runs `gofmt -w` then `git diff --exit-code`, so a dirty worktree fails even when format is fine.
 
-After a failed Act run, stop leftover `catthehacker/ubuntu:act-latest` containers. Do not stop unrelated containers. If the Mac data volume is ~100% full, `go clean -cache` is the large reclaim (tens of GiB). Substitute a host `golangci-lint run` plus Floci/harness — not another Act lint while disk is tight.
+After a failed Act run, stop leftover `catthehacker/ubuntu:act-latest` containers. Do not stop unrelated containers. If the Mac data volume is ~100% full, `go clean -cache` is the large reclaim (tens of GiB). Substitute a host `golangci-lint run` plus Floci/harness: not another Act lint while disk is tight.
