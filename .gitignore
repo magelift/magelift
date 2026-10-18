@@ -1,0 +1,52 @@
+# Generated documentation
+/site/
+
+# Build and test output
+/bin/
+/dist/
+/coverage/
+*.out
+/build/vendor/
+/build/.phpunit.cache/
+/build/.phpstan/
+
+# Marketing site deps / build
+/website/node_modules/
+/website/dist/
+/website/.astro/
+/website/public/docs/
+/website/public/sitemap.txt
+/website/public/sitemap.xml
+
+# Local state and credentials
+.env
+.env.*
+!.env.example
+.magelift/
+.pulumi/
+.codebase-memory/
+auth.json
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+
+# AI agent local caches and user-installed third-party skills (not audited for
+# this repository's Apache-2.0 license surface). First-party skills live in
+# agents/skills/ and are tracked. The OKF bundle under .agents/knowledge/ is
+# committed.
+.claude/
+.agents/*
+!.agents/knowledge/
+.cursor/
+.serena/
+skills-lock.json
+
+# Local planning / agent scratch (never commit to the public remote)
+.planning/
+/tasks/
+.wrangler/
+.cloudflare/
+.venv/
+go.work.sum

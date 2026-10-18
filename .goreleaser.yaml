@@ -1,0 +1,150 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+# Local packaging smoke: use scripts/release-smoke-local.sh or make release-smoke
+# (dialproof config, host only). Full multi-platform matrices belong on CI.
+# Cap Go with GOMEMLIMIT from scripts/go-memlimit.sh; do not pin
+# GOMAXPROCS. Hosted release.yml passes --parallelism 1 so the
+# twelve-target matrix runs one compile at a time.
+
+project_name: magelift
+
+builds:
+  - id: magelift
+    main: ./cmd/magelift
+    binary: magelift
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
+      - -X github.com/magelift/magelift/internal/cli.Version={{ .Version }}
+  # Autonomous provider: built from its nested module (providers/gcp owns
+  # its go.mod), same matrix as the CLI, same lockstep version for alpha.
+  # The binary reports its version via Describe; keep the main.Version
+  # ldflag or releases ship as v0.0.0-dev.
+  - id: magelift-provider-gcp
+    dir: providers/gcp
+    main: ./cmd/magelift-provider-gcp
+    binary: magelift-provider-gcp
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
+      - -X main.Version={{ .Version }}
+
+archives:
+  - id: cli
+    ids: [magelift]
+    formats: [tar.gz]
+    # Scoop convention is zip; tar.gz stays for brew/install.sh on unix.
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - agents/README.md
+      - agents/manifest.json
+      - agents/skills/**/SKILL.md
+  # Provider binaries upload raw beside the CLI archives (default binary name
+  # template). Windows .exe handling and bundle upload are verified on the
+  # first tag release; see ADR 0011.
+  - id: provider-gcp
+    ids: [magelift-provider-gcp]
+    formats: [binary]
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+sboms:
+  - artifacts: archive
+
+signs:
+  - id: checksum
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+  - id: provider-gcp
+    cmd: cosign
+    # Per-binary bundle for the provider artifacts. signs (unlike
+    # binary_signs) runs at release time only, so the local `build` smoke
+    # stays offline. The CLI verifies the installed provider binary against
+    # this bundle before Dial.
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: binary
+    ids: [provider-gcp]
+
+# Homebrew cask with binary stanzas: goreleaser deprecated brews (formula
+# generation) in v2.16 in favor of homebrew_casks; casks install binaries on
+# macOS and Linuxbrew alike. Casks live in Casks/ (default) — no Formula dir.
+# HOMEBREW_TAP_GITHUB_TOKEN is currently acourtiol's OAuth token (repo scope);
+# upgrade path: a GitHub App with contents:write on homebrew-tap + scoop-bucket.
+homebrew_casks:
+  - name: magelift
+    # The cask ships the CLI only: two binaries share every OS/arch
+    # archive combination since the provider split, and one tap
+    # handles a single archive per combination.
+    ids:
+      - cli
+    repository:
+      owner: magelift
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://magelift.dev
+    description: Open-source Magento CLI for your AWS or GCP account
+    license: Apache-2.0
+    binaries:
+      - magelift
+
+scoops:
+  - name: magelift
+    # Same single-archive rule as the cask: scoop ships the CLI.
+    ids:
+      - cli
+    repository:
+      owner: magelift
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: bucket
+    homepage: https://magelift.dev
+    description: Open-source Magento CLI for your AWS or GCP account
+    license: Apache-2.0
+
+release:
+  # Fail before the six-arch Pulumi compile if GitHub cannot publish this tag
+  # (missing token, or an immutable release that cannot be updated).
+  preflight:
+    fail_on_error: true
+  # Channels: every release stays draft until the workflow verifies the full
+  # artifact set (bundles, checksums, lockfiles) and publishes it. Every
+  # release is a prerelease and never "latest": hyphen tags (rc, alpha,
+  # beta) must not become the default install channel. Flip prerelease and
+  # make_latest only for the first stable release, and update install.sh,
+  # the upgrade channel, and docs/install.md together.
+  draft: true
+  prerelease: true
+  make_latest: false
+
+changelog:
+  use: github-native
