@@ -158,8 +158,8 @@ func NewProjectIAMClient(ctx context.Context, opts ...option.ClientOption) (Proj
 func (c *sdkProjectIAM) Close() error { return nil }
 
 func (c *sdkProjectIAM) GetProjectIAMPolicy(ctx context.Context, projectID string) (*cloudresourcemanager.Policy, error) {
-	resource := "projects/" + projectID
-	policy, err := c.client.Projects.GetIamPolicy(resource, &cloudresourcemanager.GetIamPolicyRequest{
+	// Resource Manager v1 adds projects/ in its generated request path.
+	policy, err := c.client.Projects.GetIamPolicy(projectID, &cloudresourcemanager.GetIamPolicyRequest{
 		Options: &cloudresourcemanager.GetPolicyOptions{RequestedPolicyVersion: iamPolicyVersion3},
 	}).Context(ctx).Do()
 	if err != nil {
@@ -169,8 +169,7 @@ func (c *sdkProjectIAM) GetProjectIAMPolicy(ctx context.Context, projectID strin
 }
 
 func (c *sdkProjectIAM) SetProjectIAMPolicy(ctx context.Context, projectID string, policy *cloudresourcemanager.Policy) error {
-	resource := "projects/" + projectID
-	_, err := c.client.Projects.SetIamPolicy(resource, &cloudresourcemanager.SetIamPolicyRequest{
+	_, err := c.client.Projects.SetIamPolicy(projectID, &cloudresourcemanager.SetIamPolicyRequest{
 		Policy: cloneCRMPolicy(policy),
 	}).Context(ctx).Do()
 	if err != nil {

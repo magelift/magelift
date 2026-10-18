@@ -802,3 +802,53 @@ published. The authorized private source repository and local proof/image caches
 remain. No new GCP resources or DNS records exist from these increments. AWS
 spend/reservation remains 0; credits remain unverified. macOS, Windows and the
 outside-person trial are NOT_RUN. S4/S5 remain outside the alpha's critical path.
+
+## Signed canary and first live bootstrap increment
+
+The maintainer explicitly approved pushing the community-alpha branch and the
+immutable canary tag for commit ce1b74196039f60171ad3049b95d005d181b54f2. Its
+existing release workflow completed successfully (run 39083042658). The
+Linux/amd64 candidate was published as a prerelease with latest disabled after
+independent verification of both artifact SHA-256 values, the checksum and
+provider Sigstore bundles against the exact tag workflow identity/issuer, and
+the extracted CLI version. No central application/builder/runtime image was
+published. Release archive: 63,025,777 bytes; installed CLI: 308,510,880 bytes;
+provider: 208,777,376 bytes.
+
+The installer fetched from that immutable public tag passed without host Go,
+PHP, Node or Cosign (4.653 seconds). Provider installation from a fresh cache
+passed without those tools (5.424 seconds, cached=false, bundled=false), including
+pinned Cosign 3.1.3 acquisition. The hosted website installer is still the older
+implementation; its publication is pending and the release notes identify the
+versioned installer. Generated CI verifies the release assets directly.
+
+The authorized private acceptance fixture now carries official Magento Open
+Source 2.4.9 CE isolated security fixes for July through October 2026 plus the
+separate CVE-2026-75650 fix. A second clean source copy passed all five dry-runs
+and applications with fuzz=0 and no ignored hunks. All 74 runtime source files
+match that strict result; PHP 8.5.11 syntax checks passed for 58 files. A
+reapplication-generated duplicate nginx rule was removed by comparing the clean
+strict result. The upstream CVT matrix is NOT_RUN for the GitHub-source lock
+layout; no CVT protection claim is made. Official download hashes/proofs stay
+private. No upstream patch catalog or engine was copied into MageLift.
+
+Two real bootstrap commands succeeded on the authorized GCP acceptance target.
+They returned the same backend, immutable state-key version, CI variables and
+24-binding permission plan. CI permissions were not applied. The second run
+took 14.840 seconds. A harness used backendUrl instead of backendURL after the
+first command had already succeeded; it was corrected and the saved native
+results were compared. Initial invocation of local build with a push-only image
+flag was correctly refused; the documented local build is running separately.
+No runtime or DNS record has been created. The acceptance state bucket, state
+secret, empty user registry and owned federation identities now remain for the
+ongoing run; billing amounts are not yet measured. AWS remains unused.
+
+A read-only project IAM preflight found an actual client defect: Resource
+Manager v1 expects a bare project ID and the client added a duplicate projects/
+prefix, producing HTTP 400. Exact native-URL tests reproduce failures for both
+get and set before the fix. They pass with bootstrap/ops/plugin race suites
+after the fix, and a real read-only policy request succeeds. No project IAM
+write was performed by this check. The published canary still contains the
+old client; the fix requires a new immutable signed candidate before CI grant
+application can be tested. Functional deployments, persistence, runtime pull,
+incident handling and destruction remain NOT_RUN.

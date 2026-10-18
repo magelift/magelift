@@ -107,7 +107,7 @@ func TestProjectIAMClientGetRequestsVersion3(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, ":getIamPolicy") {
+		if r.Method == http.MethodPost && r.URL.EscapedPath() == "/v1/projects/example-gcp-project:getIamPolicy" {
 			var req cloudresourcemanager.GetIamPolicyRequest
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				t.Errorf("decode body: %v", err)
@@ -137,6 +137,36 @@ func TestProjectIAMClientGetRequestsVersion3(t *testing.T) {
 	}
 	if policy.Etag != "crm" {
 		t.Fatalf("policy=%#v", policy)
+	}
+}
+
+func TestProjectIAMClientSetUsesV1ProjectIDPath(t *testing.T) {
+	t.Parallel()
+	var received cloudresourcemanager.SetIamPolicyRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.EscapedPath() != "/v1/projects/example-gcp-project:setIamPolicy" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
+			t.Errorf("decode policy: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		writeJSON(w, map[string]any{"version": float64(3), "etag": "crm-after"})
+	}))
+	defer srv.Close()
+	client, err := NewProjectIAMClient(context.Background(), option.WithHTTPClient(srv.Client()), option.WithEndpoint(srv.URL+"/"), option.WithoutAuthentication())
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := &cloudresourcemanager.Policy{Version: 3, Etag: "crm-before", Bindings: []*cloudresourcemanager.Binding{{Role: "roles/viewer", Members: []string{"serviceAccount:ci@example-gcp-project.iam.gserviceaccount.com"}}}}
+	if err := client.SetProjectIAMPolicy(context.Background(), "example-gcp-project", policy); err != nil {
+		t.Fatal(err)
+	}
+	if received.Policy == nil || received.Policy.Etag != policy.Etag || len(received.Policy.Bindings) != 1 {
+		t.Fatalf("policy metadata dropped: %#v", received.Policy)
 	}
 }
 
