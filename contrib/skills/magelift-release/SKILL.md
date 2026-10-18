@@ -1,7 +1,7 @@
 ---
 name: magelift-release
 description: >-
-  Cut MageLift releases: GoReleaser, Cosign identities, GHCR image names, and
+  Cut MageLift releases: GoReleaser, Cosign identities, user image registries, and
   local release smoke. Use when tagging, fixing release workflows, or verifying
   packaging before v1.0.0-rc or stable tags.
 version: 1.0.0
@@ -33,15 +33,20 @@ After the org move, public paths are:
 | Module | `github.com/magelift/magelift` |
 | Repo | `https://github.com/magelift/magelift` |
 | Cosign release identity | `https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/<tag>` |
-| Cosign images identity | `https://github.com/magelift/magelift/.github/workflows/images.yml@refs/tags/<tag>` |
-| GHCR | `ghcr.io/magelift/magelift-{nginx,builder,frankenphp-classic}` |
+
+Application images are built and signed in the user's CI and published to the
+user's selected registry. Their signing identity belongs to that workflow;
+it is independent of the MageLift release identity above. MageLift distributes
+build recipes with the CLI and does not publish central builder/runtime images.
 
 Do not reintroduce `acourtiol/magelift` in workflows or ldflags.
 
 ## Images workflow
 
-`.github/workflows/images.yml` skips prerelease tags (semver `-rc` / `-beta`).
-Stable semver tags only unless that `if` is intentionally changed.
+`.github/workflows/images.yml` is a manually dispatched recipe validation
+workflow with read-only repository permissions. It builds locally on the runner
+without publishing images and does not run on release tags. User application
+images are handled by their generated CI workflow.
 
 ## Candidate tag sequence
 
