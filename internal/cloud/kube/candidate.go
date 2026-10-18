@@ -377,7 +377,9 @@ func migrationJob(name string, request CandidateRequest) *batchv1.Job {
 	env = append(env, DatabaseCredentialEnvVars(request.DatabaseSecretName)...)
 	env = append(env, EncryptionKeyEnvVars(request.EncryptionKeySecretName)...)
 	env = append(env, QueuePasswordEnvVars(request.QueuePasswordSecretName)...)
-	backoff := int32(2)
+	// A failed migration can leave database changes behind. Another attempt
+	// requires an explicit deployment invocation after inspecting the failure.
+	backoff := int32(0)
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
