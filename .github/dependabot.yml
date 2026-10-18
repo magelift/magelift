@@ -1,11 +1,14 @@
 version: 2
 updates:
   # Each Go module is its own directory. sdk/go.mod has no third-party
-  # requirements, so it is not listed.
+  # requirements, so it is not listed. The seven-day cooldown is the
+  # minimum the Actions Security workflow accepts.
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 3
     labels: [dependencies, go]
     commit-message:
@@ -30,6 +33,8 @@ updates:
     directory: /providers/gcp
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 3
     labels: [dependencies, go]
     commit-message:
@@ -49,6 +54,8 @@ updates:
     directory: /build
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies, php]
     commit-message:
@@ -61,6 +68,8 @@ updates:
     directory: /website
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies]
     commit-message:
@@ -70,6 +79,8 @@ updates:
     directory: /docs
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies]
     commit-message:
@@ -79,6 +90,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies, ci]
     commit-message:
@@ -92,6 +105,8 @@ updates:
     directory: /images/php-nginx
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies, docker]
     commit-message:
@@ -101,6 +116,8 @@ updates:
     directory: /images/php-apache
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies, docker]
     commit-message:
@@ -110,6 +127,8 @@ updates:
     directory: /images/frankenphp-classic
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies, docker]
     commit-message:

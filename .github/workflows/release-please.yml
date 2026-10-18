@@ -1,8 +1,9 @@
 name: Release Please
 
+# Manual. A push run fails because this repository does not allow Actions
+# to open pull requests, and a successful run would open a 0.x release from
+# the 0.0.0 manifest. Run this when cutting the first public tag.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

@@ -54,5 +54,5 @@ blobs until Support clears them; a normal `git clone` does not fetch `refs/pull/
 | Private vulnerability reporting | Done |
 | `good first issue` label | The label exists. The August onboarding issues (#38, #42, #44) are closed; the docs they named already cover those links. |
 | Hosted CI on this `main` | Green on [39172860659](https://github.com/magelift/magelift/actions/runs/39172860659). The August force-all run is from before the public history and is not this tree. |
-| Org setting: Actions can create PRs (Release Please) | Confirm in org Actions permissions (needs admin UI / `admin:org`) |
+| Release Please | Manual (`workflow_dispatch`) until the first public tag. Actions on this repo cannot open pull requests, and the manifest is still `0.0.0`. |
 | Cut `v1.0.0-rc.1` | After readiness gates stay Closed and CI is green |
