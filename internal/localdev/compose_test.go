@@ -69,7 +69,7 @@ func TestComposeArgsEnableOptionalCapabilityProfiles(t *testing.T) {
 
 func TestComposeTemplateIncludesMagentoCapabilityServices(t *testing.T) {
 	template := composeTestTemplate(t, config.LocalRuntime{})
-	for _, service := range []string{"search:", "queue:", "env_file:", "local.env", "opensearchproject/opensearch:3@sha256:", "rabbitmq:4.2-management@sha256:", `MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME: "search"`, `MAGENTO_DC_QUEUE__AMQP__HOST: "queue"`, "MAGELIFT_LOCAL_HTTPS_PORT:-8443", "local.php.ini", "valkey-cli", "condition: service_healthy", "healthcheck:"} {
+	for _, service := range []string{"search:", "queue:", "env_file:", "local.env", "opensearchproject/opensearch:3.9.0@sha256:", "rabbitmq:4.2-management@sha256:", `MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME: "search"`, `MAGENTO_DC_QUEUE__AMQP__HOST: "queue"`, "MAGELIFT_LOCAL_HTTPS_PORT:-8443", "local.php.ini", "valkey-cli", "condition: service_healthy", "healthcheck:"} {
 		if !strings.Contains(template, service) {
 			t.Fatalf("ComposeTemplate does not contain %q", service)
 		}

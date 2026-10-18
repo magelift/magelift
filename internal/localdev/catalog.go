@@ -24,7 +24,7 @@ const (
 	localValkey81Image    = "valkey/valkey:8.1@sha256:495e4fecdc98ee48a20b207726caa5ab6451e0fac3642a9be10d9e70b3068df6"
 	localValkey9Image     = "valkey/valkey:9@sha256:3acc0687f2a2e1091fae6450d7842dd658c941338cf0a873ddd9e14b9e4ea4dd"
 	localOpenSearch2Image = "opensearchproject/opensearch:2@sha256:8690b204fe914c60ca76d451ac73bc0481e034d32d3779944c8caca56a2b003f"
-	localOpenSearch3Image = "opensearchproject/opensearch:3@sha256:bcc1797519726ceb6d651d4a3e60b7c30da91793914a8dfe75fd441d4f641509"
+	localOpenSearch3Image = "opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c"
 	localRabbitMQ42Image  = "rabbitmq:4.2-management@sha256:a2751b3b5eed89e47ebbd5e776de0d6d85d924002773933ab881da49c073b85d"
 	localRedis72Image     = "redis:7.2@sha256:6461ca4ac0c5c9d81d53685c3bf76aa81f464a9de6cf3a97b80a1da8d1bb1de4"
 	localArtemis238Image  = "apache/activemq-artemis:2.38.0-alpine@sha256:1867bc96210790b41ae139713ac63d69920c55a6cd8684c35205dd3fb4973b33"

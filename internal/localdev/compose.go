@@ -44,7 +44,7 @@ const ComposeTemplate = `services:
 
   search:
     profiles: ["search"]
-    image: ${MAGELIFT_LOCAL_SEARCH_IMAGE:-opensearchproject/opensearch:3@sha256:bcc1797519726ceb6d651d4a3e60b7c30da91793914a8dfe75fd441d4f641509}
+    image: ${MAGELIFT_LOCAL_SEARCH_IMAGE:-opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c}
     environment:
       discovery.type: single-node
       DISABLE_SECURITY_PLUGIN: "true"

@@ -1071,3 +1071,26 @@ Public DNS nameservers match the selected Cloud DNS zone; the other proposed
 zone does not match public delegation and will not be written. No DNS record
 has been created. State and existing infrastructure remain retained for the
 active acceptance; all owned cloud resources require cleanup after tests.
+
+### S3 increment: current OpenSearch image
+
+The official OpenSearch release API reports stable 3.9.0. Its published
+multi-platform image index and both architecture descriptors were inspected;
+the previous default digest matches neither the current index nor its platform
+manifests. Shared Kubernetes, local Compose/catalog and the existing GCP harness
+now pin the explicit 3.9.0 tag and its verified registry index digest. This stays
+within the Adobe OpenSearch 3 requirement; it does not certify every 3.x release.
+
+The local Compose regression initially expected the old tag prefix. That
+expectation now checks the new explicit version while retaining the digest-pin
+requirement. The integrated localdev/CLI/platform/providerhost suites pass;
+shared search compiles, and the acceptance shell parses. Live search indexing
+against 3.9.0 is NOT_RUN until the application reaches its runtime. The next
+acceptance configuration uses the same explicit image through its existing
+openSearchImage option, so the recipe and defaults agree.
+
+The alternative SQL hardware attempt also ended with ERROR_STOCKOUT; Pulumi
+reported 21 unchanged resources. No image rebuild or state deletion occurred.
+A focused follow-up now wires the already resolved zone preference into new
+SQL instances, with an ignore-changes guard for existing database placement.
+Runtime, TLS, persistence and destruction remain NOT_RUN.
