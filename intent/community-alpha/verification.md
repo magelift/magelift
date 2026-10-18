@@ -1123,3 +1123,69 @@ retaining its digest-pin check. Final database/stack/plugin race suites all pass
 strict docs, workflow lint and generated consistency also pass. Human prose was
 reviewed with humanizer; remove-ai-marks remains NOT_RUN because its service is
 unavailable. No live chosen-zone mutation has yet run with these new binaries.
+
+### S3 increment: published SQL-zone canary and cold consumer
+
+The signed Linux/amd64 canary at `f2da15a` is published as a prerelease,
+with latest disabled. [Release workflow 39116061792](https://github.com/magelift/magelift/actions/runs/39116061792)
+passed. Independent verification checked both archive/provider checksums,
+the checksum and provider Sigstore bundles against the exact tag identity,
+and the CLI version before publication. A fresh installation from the tagged
+installer passed in 5.483 seconds with Go, PHP, Node and Cosign absent from
+PATH. Provider acquisition from the release lock also passed. Local doctor
+and its voluntary metadata export passed in that restricted environment;
+the export has mode 0600. The hosted website installer is still unchanged.
+
+The acceptance repository now uses that provider lock and a workflow generated
+by the installed CLI without a version override. Actionlint and customized
+workflow validation pass. The old imageDigest injection workaround was removed.
+The real build passed with Docker 29.9.1. Independent checks bind the manifest
+checksum, image digest and source revision; the image signature verifies against
+the acceptance workflow identity, and its OCI SBOM/provenance attachments exist.
+Runtime pull remains unproved until a workload starts.
+
+A preview against the retained state reported 31 creations and 21 unchanged
+resources, with no deletion or replacement. The new request reached Google as
+MySQL 8.4 in the explicitly selected primary zone. This proves the initial
+--digest handoff and zone mapping with the distributed binaries. Google then
+returned ERROR_STOCKOUT. The CLI printed project/environment/region, infra-update,
+failed outcome, retained state and the safe next instruction through the actual
+provider RPC path. Retryable=false is unit evidence; that field is not printed
+by this live command.
+
+After the native CREATE operation finished, the failed instance remained
+outside the checkpoint. A fresh checkpoint inventory contained 22 resources,
+no SQL instance and no pending operations. The operator checked its ownership,
+creation time and failed state before deleting only that failed native instance.
+The checkpoint stayed byte-identical. The failed deploy job is now resumed in
+another explicit zone with the same signed image; validation and build are reused.
+No state was removed or rewritten. This capacity recovery does not prove a
+functional application or the required second release with persistent data.
+
+### S3 increment: probe review and cleanup of the superseded fixture
+
+Cursor Grok 4.7 high reviewed the functional probes before live use. Two probe
+errors were fixed: acknowledgement reads the actual queue relation primary key,
+and media checks an exact remote read after writing. PHP 8.5.11 lint passes.
+The read-only cron probe requires a successful job executed and finished inside
+the acceptance window. Lint and four invalid-input/missing-environment checks
+pass. All live functional probe modes remain NOT_RUN.
+
+The unused personal-fixture bootstrap has been cleaned up. Its registry was
+empty and its bucket contained only two historical released lease versions,
+with no Pulumi stack or backup. Exact receipts and ownership metadata bounded
+the deletion of that registry, federation, two service accounts, bucket and
+state-key secret. Project-wide account listing confirms both accounts are absent;
+permission-denied responses from individual get calls were not used as proof.
+The active organization bootstrap and its three service accounts remain intact.
+Google retains the old federation pool in DELETED state until 2026-11-17;
+it cannot authenticate workloads. Secrets with unproven ownership and preexisting
+IAM were preserved.
+Final cleanup of the active acceptance resources is still required after tests.
+
+AWS CLI 2.38.1 was acquired separately from the official signed installer.
+Default-account identity works, but GetCredits returns IAM user access not
+activated. Credit coverage and remaining budget are NOT_VERIFIED, so no AWS
+resources or paid tests were started. GCP billing and peak build memory remain
+unmeasured. Runtime, HTTPS, search, cron, DB queue, persistence and the final
+active-environment destruction are still NOT_RUN.
