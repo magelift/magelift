@@ -1298,3 +1298,32 @@ running. Corrected live GKE creation, image pull, application probes, HTTPS, per
 cleanup remain NOT_RUN. SQL, Valkey, media preparation, network, bootstrap and
 CI grants remain owned test resources. Humanizer review is complete;
 remove-ai-marks remains NOT_RUN because its service is unavailable.
+
+### S3 verified Autopilot candidate and controlled resume
+
+Cursor Grok 4.7 medium verified the Google and installed-provider API shape;
+Grok 4.7 high independently reviewed the scoped code and tests. Both non-fast
+reviews found no concrete defect. The parent reproduced the expected negative
+regression in an isolated worktree using the new test with the previous runtime,
+then removed that worktree. The corrected implementation's complete community
+gate and packaging smoke pass. Preserved NodeConfig inputs have no provider
+schema conflict, but acceptance of the combined request still needs live GKE.
+Legacy identity migration remains unverified.
+
+Release workflow 39123025743 succeeded for commit f6cd96a. Independent verification
+passed two checksums, two exact-tag Sigstore identities and the archive version.
+The immutable canary remains a prerelease, never latest, with no central images.
+A fresh-cache installation from its public tag passed in 4.597 seconds without
+host Go, PHP, Node or Cosign. Provider acquisition from the published lockfile
+passed. Operator kubectl 1.37.1 was downloaded from the current official stable
+release and its checksum verified in the isolated acceptance cache.
+
+The real distributed preview against retained state passed: 17 creates,
+35 unchanged, no deletion or replacement. SQL and Valkey stay allocated.
+Acceptance fixture commit e2445a80 updates only the pinned CLI and provider
+lockfile; the cloud config is unchanged. Actionlint and customized-workflow
+validation pass. Workflow 39124065614 has started to build the next signed user
+image and resume deployment. Corrected GKE creation, runtime pull, functional
+probes, HTTPS, persistence, second functional release and final cleanup remain
+NOT_RUN. State, key and owned resources remain available for this continuation.
+Humanizer review is complete; remove-ai-marks remains NOT_RUN (service unavailable).
