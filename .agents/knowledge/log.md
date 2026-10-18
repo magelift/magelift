@@ -1,5 +1,9 @@
 # Log
 
+## 2026-10-18
+
+- Removed 92 lessons that restated code, harness diaries, drafts, or experimental-provider archaeology. Kept the GCP alpha traps, the certified AWS Fargate traps, and the cross-cutting rules for teardown, signatures, and image build.
+
 ## 2026-09-22
 
 - Updated [Magento image builds must not see a runtime env.php](lessons/Magento%20image%20builds%20must%20not%20see%20a%20runtime%20env.php.md): the builder stage must `apt-get upgrade` before installing git and unzip. The image is scanned on its own, and installing git does not upgrade Debian packages the PHP base already has fixes for.

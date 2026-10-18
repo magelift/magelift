@@ -1,8 +1,7 @@
 ---
 type: lesson
 title: RDS ManageMasterUserPassword secret only has username password
-description: AWS RDS/Aurora ManageMasterUserPassword secrets contain only username and password JSON keys
- : not host, port, or dbname.
+description: AWS RDS/Aurora ManageMasterUserPassword secrets contain only username and password JSON keys, not host, port, or dbname.
 tags:
 - rds
 - secrets

@@ -31,6 +31,3 @@ after rollback learned to copy promote metadata. Create-once now promotes the
 pullable digest with `MAGELIFT_GCP_CERTIFICATE_IDENTITY` before
 `deploy:candidate`. Promote still fail-closes on unsigned or mutable
 references. Schema mismatch still needs two Magento schemas.
-
-Do not reuse prefixes `gcha23`, `gcap24`-`gcap28`, `gcha28`-`gcha36`. Live
-mismatch proof: [`Schema-mismatch rollback needs two Cosign-signed Magento epochs`](Schema-mismatch%20rollback%20needs%20two%20Cosign-signed%20Magento%20epochs.md).

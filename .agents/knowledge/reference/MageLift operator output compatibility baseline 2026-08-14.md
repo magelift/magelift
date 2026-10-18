@@ -43,7 +43,3 @@ returns before a launcher is started.
 When changing these contracts, add deterministic JSON, YAML, and table tests,
 keep existing flags and successful exit codes stable, and document any
 intentional output addition in the CLI reference.
-
-# Related
-
-See [MageLift generated CI previews must be PR-scoped](../lessons/MageLift%20generated%20CI%20previews%20must%20be%20PR-scoped%202026-08-14.md) for the analogous identity and lifecycle compatibility boundary.
