@@ -161,6 +161,7 @@ acceptance-harness-test: acceptance-dependencies-check ## Run offline acceptance
 	@MAGELIFT_ACCEPTANCE_DRY_RUN=1 $(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) evidence_append_test.sh -- bash tests/acceptance/evidence_append_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) lifecycle_guard_test.sh -- bash tests/acceptance/lifecycle_guard_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) cloudflare_dns_helper_test.sh -- bash tests/acceptance/cloudflare_dns_helper_test.sh
+	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) cutover_dns_cloudflare_test.sh -- bash tests/acceptance/cutover_dns_cloudflare_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) lib_cosign_test.sh -- bash tests/acceptance/lib_cosign_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) go_memlimit_test.sh -- bash tests/acceptance/go_memlimit_test.sh
 	@$(HARNESS_STEP) $(HARNESS_TEST_TIMEOUT) aws_dry_run_no_account_test.sh -- bash tests/acceptance/aws_dry_run_no_account_test.sh
