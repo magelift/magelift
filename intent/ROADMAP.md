@@ -48,8 +48,8 @@ an active backlog merely because they appeared in the older plan. Console,
 MCP, universal plugin stability and extra providers have the triggers in plan
 section 7, not unconditional implementation commitments.
 
-The old [published-build-images intent](published-build-images/intent.md) is
-superseded. Keep useful Docker sources/tests; do not execute central publishing.
+The old published-build-images intent is superseded. Keep useful Docker
+sources and tests. Do not publish central MageLift images.
 The former alpha-loop/provider/build reports under
 [community-alpha](community-alpha/verification.md) record what actually ran;
 they do not prove the new guided agency path or a cloud run by themselves.
