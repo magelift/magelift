@@ -106,3 +106,5 @@ An untagged MAGELIFT_RELEASE_IMAGE repository gets the source GITHUB_SHA tag;
 an explicitly tagged destination is preserved, including registries with ports.
 Artifact handoff uses repository@sha256 references: the publication tag is
 removed from the reference passed to deploy, while its digest stays unchanged.
+The generated build job installs a pinned Docker Engine before Buildx; it
+does not depend on the runner image's older bundled Docker version.

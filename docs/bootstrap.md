@@ -188,6 +188,8 @@ a real GitHub token exchange remains an acceptance check.
 An untagged `MAGELIFT_RELEASE_IMAGE` destination receives the source commit SHA
 as its tag in CI. An explicitly tagged destination is preserved. Build results
 stay in the runner temporary directory so the source checkout remains clean.
+The build job installs a pinned Docker Engine before Buildx instead of using
+the runner image's bundled version.
 
 ## GCP registry and state key
 

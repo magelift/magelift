@@ -1052,3 +1052,22 @@ the failed deploy job was retriggered, retaining the successful build artifact
 and the existing infrastructure. This is a bounded capacity recovery, not a
 blind retry or a whole-environment recreation. Functional application tests,
 persistence, TLS and final cleanup remain NOT_RUN.
+
+### S3 increment: current CI engine and observed runner capacity
+
+Completed hosted build logs show 4 CPUs and 15.61 GiB total memory. This is
+observed capacity, not measured peak build use. The hosted runner bundled
+Docker 28.0.4, despite the current Buildx/BuildKit pins. The generated build
+job now installs Docker 29.9.1 through the official setup action 5.5.0 pinned
+to its exact commit before Buildx. Both latest versions were checked against
+the publishers' release APIs. Existing examples and renderer fixtures match.
+Local CLI/platform/providerhost integration passes; execution of this new
+engine setup on the hosted runner remains NOT_RUN until the next workflow.
+
+Only the failed deployment job was restarted after capacity triage. Its new
+Cloud SQL request uses the supported alternative tier in the same region, and
+Google reports PENDING_CREATE. The prior successful image build is reused.
+Public DNS nameservers match the selected Cloud DNS zone; the other proposed
+zone does not match public delegation and will not be written. No DNS record
+has been created. State and existing infrastructure remain retained for the
+active acceptance; all owned cloud resources require cleanup after tests.

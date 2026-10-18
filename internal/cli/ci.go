@@ -14,6 +14,8 @@ import (
 )
 
 const checkoutAction = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1"
+const setupDockerAction = "docker/setup-docker-action@2bf61fb9464cc67f0cbdeabed6aa0380accd1c70 # v5.5.0"
+const dockerEngineRelease = "v29.9.1"
 const setupBuildxAction = "docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1"
 const dockerLoginAction = "docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0"
 const configureAWSAction = "aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4"
@@ -220,6 +222,7 @@ func renderWorkflow(configFile, version string, environments []string, generator
 	}
 	workflow.WriteString("    permissions:\n      contents: read\n      packages: write\n      id-token: write\n      attestations: write\n    outputs:\n      digest: ${{ steps.build.outputs.digest }}\n    steps:\n")
 	workflow.WriteString("      - uses: " + checkoutAction + "\n        with:\n          persist-credentials: false\n")
+	workflow.WriteString("      - uses: " + setupDockerAction + "\n        with:\n          version: " + dockerEngineRelease + "\n")
 	workflow.WriteString("      - uses: " + setupBuildxAction + "\n        with:\n          version: v0.38.0\n          driver-opts: image=moby/buildkit:v0.34.0\n      - uses: " + cosignInstallerAction + "\n        with:\n          cosign-release: " + cosignRelease + "\n")
 	generator.WriteBuildAuth(&workflow)
 	writeRegistryBuildAuth(&workflow, targetConfig.Target.Provider == "gcp")
