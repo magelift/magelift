@@ -2,12 +2,18 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"net/rpc"
 
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/magelift/magelift/sdk"
 )
+
+// errCannotEncodeOperation is a payload-free transport failure. It is
+// returned only when an operation error cannot be stored on the response,
+// so the host cannot treat a dropped failure as success.
+var errCannotEncodeOperation = errors.New("plugin rpc: cannot encode operation error")
 
 // HandshakeConfig gates transport compatibility before Describe negotiates
 // operation semantics. The core client builds the identical config from the
@@ -84,84 +90,192 @@ func dispatch[Resp any](s *RPCServer, operation sdk.Operation, version string, r
 	select {
 	case out := <-done:
 		if out.operr != nil {
-			setError(resp, out.operr)
+			if !setError(resp, out.operr) {
+				return errCannotEncodeOperation
+			}
 			return nil
 		}
 		if out.result != nil {
+			if resp == nil {
+				return errCannotEncodeOperation
+			}
 			*resp = *out.result
 		}
 		return nil
 	case <-ctx.Done():
-		setError(resp, &sdk.OperationError{
+		if !setError(resp, &sdk.OperationError{
 			Code:      sdk.ErrCodeTimeout,
 			Message:   string(operation) + " timed out; reconcile before retrying",
 			Retryable: timeout.RetryableOnTimeout,
-		})
+		}) {
+			return errCannotEncodeOperation
+		}
 		return nil
 	}
 }
 
-// setError stores a typed error on a result value. Every result type carries
-// an Error field; the type switch keeps the mapping compile-checked.
-func setError[Resp any](resp *Resp, operr *sdk.OperationError) {
-	switch result := any(resp).(type) {
+// setError stores a typed error on a result value. It returns false when
+// resp is nil or its concrete type is not mapped, so dispatch fails closed
+// instead of dropping the failure. The type switch stays reflection-free.
+func setError(resp any, operr *sdk.OperationError) bool {
+	if resp == nil || operr == nil {
+		return false
+	}
+	switch result := resp.(type) {
 	case *sdk.DescribeResponse:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.ValidateConfigResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.PlanResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.LifecycleResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.OutputsResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.DestroyLeftoverBackupsResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.BootstrapVerifyResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.BootstrapEnsureResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.StateStatusResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.StateLockResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.StateUnlockResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.StateBackupResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.StateRestoreResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.SecretListResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.SecretSetResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.SecretRemoveResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.SecretReadResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.TailLogsResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.CheckRuntimeResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.PrepareExecResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.PrepareTunnelResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.CostInputsResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.InventoryResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.DeleteResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.EdgePlanResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.EdgeExecuteResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.ResiliencePlanResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
 	case *sdk.ResilienceExecuteResult:
+		if result == nil {
+			return false
+		}
 		result.Error = operr
+	case *sdk.DeployAppPhaseResult:
+		if result == nil {
+			return false
+		}
+		result.Error = operr
+	case *sdk.MediaTransferResult:
+		if result == nil {
+			return false
+		}
+		result.Error = operr
+	default:
+		return false
 	}
+	return true
 }
 
 func (s *RPCServer) Describe(req *sdk.DescribeRequest, resp *sdk.DescribeResponse) error {
