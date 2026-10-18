@@ -323,3 +323,29 @@ func executeCIErrorWithArgs(configPath, action string, extra ...string) error {
 	command.SetArgs(args)
 	return command.Execute()
 }
+
+func TestCIWorkflowNormalizesInstalledReleaseVersion(t *testing.T) {
+	directory := t.TempDir()
+	configPath := filepath.Join(directory, "magelift.yaml")
+	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, version := range []string{"1.2.3", "1.2.3-rc.1", "0.0.0-canary.2e75d313b03d53dd7cfe694297032bf8d69cc2ed"} {
+		t.Run(version, func(t *testing.T) {
+			actual, _, err := expectedWorkflow(&options{configPath: configPath}, &ciFlags{version: version})
+			if err != nil {
+				t.Fatal(err)
+			}
+			tagged, _, err := expectedWorkflow(&options{configPath: configPath}, &ciFlags{version: "v" + version})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(actual, tagged) {
+				t.Fatal("installed and tag versions produce different workflows")
+			}
+			if !bytes.Contains(actual, []byte("MAGELIFT_VERSION: v"+version)) {
+				t.Fatal("workflow does not install the immutable release tag")
+			}
+		})
+	}
+}

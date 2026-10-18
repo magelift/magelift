@@ -921,3 +921,34 @@ proof of missing project permission. The baseline must be completed after
 owned prerequisite creation and before CI grants, accounting separately for
 the newly added node baseline grants. Cleanup remains required for both the
 unused personal-repository prerequisites and the active organization run.
+
+### S2 increment: signed candidate and real organization bootstrap
+
+The second approved immutable canary completed its release workflow successfully.
+Independent verification passed both SHA-256 checks, both Sigstore bundles with
+the exact tag workflow identity/issuer, and the extracted CLI version before
+publication as a non-latest prerelease. Archive: 63,021,155 bytes; CLI:
+308,510,880 bytes; provider: 208,801,952 bytes. Installation from the immutable
+tag passed in 5.134 seconds and fresh provider installation in 5.139 seconds,
+without host Go/PHP/Node/Cosign. The public fixture now pins the verified lock.
+
+Real signed-CLI base bootstrap passed in 53.738 seconds. The complete 24-binding
+policy baseline then passed: only the two node bindings added by this base
+preparation were present; no conditional matches. Applying CI permissions and
+configuring GitHub variables passed in 37.005 seconds. Repeating that command
+passed in 30.743 seconds, with identical backend, key reference, permission plan
+and CI variables. The earlier absent-registry 403 is superseded by this real
+policy read, not suppressed. Cleanup records distinguish the two base-added
+bindings from foreign preexisting policy.
+
+Using the installed binary also reproduced a CI version normalization defect:
+GoReleaser's installed version lacks v while generation required it. Explicit
+--magelift-version with the exact canary passes on the distributed binary. The
+source now normalizes either spelling to the immutable tag; full CLI tests
+pass, including stable/prerelease/canary equivalence regressions. The second
+canary remains immutable and requires that explicit flag. The customized user
+workflow passes actionlint and ci validate and has started its real GitHub run.
+No runtime or DNS record exists yet; functional deployment remains NOT_RUN.
+The maintainer has granted autonomous GCP decisions and reiterated complete
+owned-resource cleanup after confirmed tests. Existing shared resources and
+preexisting IAM remain outside cleanup scope.

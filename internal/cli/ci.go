@@ -166,7 +166,11 @@ func expectedWorkflow(o *options, flags *ciFlags) ([]byte, string, error) {
 			return nil, "", fmt.Errorf("environment %s: %w", environment, err)
 		}
 	}
-	if !releaseVersionPattern.MatchString(flags.version) {
+	version := flags.version
+	if !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	if !releaseVersionPattern.MatchString(version) {
 		return nil, "", errors.New("ci generation requires an immutable MageLift release version such as v1.2.3")
 	}
 	projectRoot := filepath.Dir(filepath.Clean(o.configPath))
@@ -176,7 +180,7 @@ func expectedWorkflow(o *options, flags *ciFlags) ([]byte, string, error) {
 	} else if !filepath.IsAbs(path) {
 		path = filepath.Join(projectRoot, path)
 	}
-	workflow := renderWorkflow(filepath.Base(o.configPath), flags.version, environments, generator, targetConfig, targetKey)
+	workflow := renderWorkflow(filepath.Base(o.configPath), version, environments, generator, targetConfig, targetKey)
 	return workflow, filepath.Clean(path), nil
 }
 
