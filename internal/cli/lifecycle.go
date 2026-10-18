@@ -195,7 +195,11 @@ func (o *options) applyDestroyBackupRetention(ctx context.Context, planned platf
 }
 
 func (o *options) executeInfrastructure(ctx context.Context, name string, operation func(context.Context, infrastructureBackend, automation.Request) (infrastructureResult, error), digestOverride string) (infrastructureResult, error) {
-	environment, planned, err := o.planStack(name == "destroy")
+	planDigest := digestOverride
+	if name == "destroy" {
+		planDigest = ""
+	}
+	environment, planned, err := o.planStackWithDigest(platform.PlanOptions{AllowExpiredPreview: name == "destroy"}, planDigest)
 	if err != nil {
 		return infrastructureResult{}, invalid(err)
 	}
@@ -509,6 +513,13 @@ func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedS
 }
 
 func (o *options) planStackWith(opts platform.PlanOptions) (string, platform.PlannedStack, error) {
+	return o.planStackWithDigest(opts, "")
+}
+
+// planStackWithDigest plans with digestOverride written onto a copy of the
+// resolved target block. An empty override leaves the resolved config untouched.
+// Destroy and other planStackWith callers pass an empty override.
+func (o *options) planStackWithDigest(opts platform.PlanOptions, digestOverride string) (string, platform.PlannedStack, error) {
 	o.resolvedPreviewIdentity = nil
 	if o.modules == nil {
 		return "", nil, errors.New("stack module registry is required")
@@ -518,15 +529,63 @@ func (o *options) planStackWith(opts platform.PlanOptions) (string, platform.Pla
 		return "", nil, err
 	}
 	o.resolvedPreviewIdentity = effective.Config.PreviewIdentity
+	cfg := effective.Config
+	if digestOverride != "" {
+		cfg, err = configWithImageDigest(cfg, digestOverride)
+		if err != nil {
+			return "", nil, err
+		}
+	}
 	if opts.Context == nil {
 		opts.Context = o.planContext
 	}
-	_, planned, err := o.modules.Plan(effective.Config, environment, opts)
+	_, planned, err := o.modules.Plan(cfg, environment, opts)
 	if err != nil {
 		return "", nil, err
 	}
 	warnExperimentalTarget(o.stderr, planned)
 	return environment, planned, nil
+}
+
+// configWithImageDigest copies the provider target substruct before setting
+// ImageDigest. Config is passed by value, but AWS/GCP/OVH/Scaleway targets are
+// pointers; assigning the field in place would mutate the resolved config.
+func configWithImageDigest(cfg config.Config, digest string) (config.Config, error) {
+	switch cfg.Target.Provider {
+	case "aws":
+		if cfg.Target.AWS == nil {
+			return config.Config{}, errors.New("target.aws is required to apply the deployment digest")
+		}
+		copied := *cfg.Target.AWS
+		copied.ImageDigest = digest
+		cfg.Target.AWS = &copied
+	case "gcp":
+		if cfg.Target.GCP == nil {
+			return config.Config{}, errors.New("target.gcp is required to apply the deployment digest")
+		}
+		copied := *cfg.Target.GCP
+		copied.ImageDigest = digest
+		cfg.Target.GCP = &copied
+	case "ovh":
+		if cfg.Target.OVH == nil {
+			return config.Config{}, errors.New("target.ovh is required to apply the deployment digest")
+		}
+		copied := *cfg.Target.OVH
+		copied.ImageDigest = digest
+		cfg.Target.OVH = &copied
+	case "scaleway":
+		if cfg.Target.Scaleway == nil {
+			return config.Config{}, errors.New("target.scaleway is required to apply the deployment digest")
+		}
+		copied := *cfg.Target.Scaleway
+		copied.ImageDigest = digest
+		cfg.Target.Scaleway = &copied
+	default:
+		// External modules retain their existing typed override through
+		// PlannedStack.WithImageDigest after their initial plan.
+		return cfg, nil
+	}
+	return cfg, nil
 }
 
 // experimentalTargetWarningFmt is the TRUST-01 stderr line. Keep factual: tier,

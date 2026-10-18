@@ -1000,10 +1000,11 @@ Cosign independently verified the image against the exact organization workflow
 main identity and GitHub issuer, using temporary registry credentials removed
 after verification. This proves user-registry publication, not runtime pull.
 
-The deploy job then refused tag@digest at provider-plan validation, before
-runtime creation. The existing GCP artifact contract requires repository@digest.
-The generator and its handoff verification now remove only a trailing image
-tag; registry ports are preserved and the image digest is unchanged. Shell
+The deploy job refused its artifact at provider-plan validation, before
+runtime creation. The generated reference was normalized from tag@digest to
+repository@digest: handoff now removes only a trailing image tag, preserving
+registry ports and the image digest. The refusal persisted in both forms;
+the later call-chain investigation below identifies the actual cause. Shell
 regressions cover canonical output and the existing corruption/different-digest
 refusals. The fourth Actions run uses that correction. No provider contract,
 manifest or source cleanliness protection was changed.
@@ -1014,3 +1015,40 @@ handoff has its own targeted/full CLI and workflow consistency checks. Current
 resources include the owned bootstrap prerequisites, added CI grants and an
 actual acceptance image; runtime, DNS, persistence and destruction remain
 NOT_RUN. All owned cloud resources still require final cleanup.
+
+### S3 increment: bind the image before the initial provider plan
+
+The fourth run reproduced the refusal with a canonical reference. Source and
+call-chain inspection showed that executeInfrastructure called provider planning
+before applying --digest. The fresh init file had no target image, so provider
+validation saw an empty image. The GCP digest pattern accepts tagged references;
+the earlier format diagnosis was too narrow. Canonical handoff remains consistent
+with the existing digestReference helper, but did not fix this ordering defect.
+
+A Cursor Grok 4.7 high worker (non-fast) implemented a resolved-target copy before
+the initial plan. Root preserved external modules' existing typed override path
+rather than rejecting unknown provider names. The disk file and original target
+pointers are unchanged. Regression coverage refuses empty/stale/malformed images
+on the first Plan, checks backend ordering, all four first-party target copies,
+explicit planning context, and existing destroy behavior. Full CLI, platform and
+providerhost tests pass after integration. The provider RPC, YAML and manifest
+contracts are unchanged. The correction awaits a new distributed candidate.
+
+The signed canary can proceed when its existing target.imageDigest field is
+pinned before planning. A read-only cost invocation passed in 8.493 seconds with
+that configuration; it reports capacity and unavailable price data, not a bill.
+The fifth real CI run used this documented acceptance-only workaround, created
+21 Pulumi resources and stopped on Cloud SQL ERROR_STOCKOUT in the selected
+region. Native CREATE operation status is DONE with that code. The failed SQL
+instance later disappeared from both list and get; no manual delete occurred.
+The encrypted checkpoint is retained, with 22 recorded resources and no pending
+operations. An initial inventory reader used the export wrapper instead of
+checkpoint.latest; the saved state was intact and the corrected inventory is
+used for decisions. No state was removed or rewritten.
+
+The existing cloudSqlTier option now selects another supported 2-vCPU/16-GiB
+hardware family in the same region. Google lists that tier for the region. Only
+the failed deploy job was retriggered, retaining the successful build artifact
+and the existing infrastructure. This is a bounded capacity recovery, not a
+blind retry or a whole-environment recreation. Functional application tests,
+persistence, TLS and final cleanup remain NOT_RUN.
