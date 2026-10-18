@@ -57,6 +57,8 @@ type IdentityPlan struct {
 	AttributeMapping       map[string]string `json:"attributeMapping" yaml:"attributeMapping"`
 	AttributeCondition     string            `json:"attributeCondition" yaml:"attributeCondition"`
 	Repository             string            `json:"repository" yaml:"repository"`
+	GitHubRepositoryID     int64             `json:"githubRepositoryId" yaml:"githubRepositoryId"`
+	GitHubOwnerID          int64             `json:"githubOwnerId" yaml:"githubOwnerId"`
 	GitHubEnvironment      string            `json:"githubEnvironment" yaml:"githubEnvironment"`
 	WorkloadIdentityMember string            `json:"workloadIdentityMember" yaml:"workloadIdentityMember"`
 	SharedOwnershipMarker  string            `json:"sharedOwnershipMarker" yaml:"sharedOwnershipMarker"`
@@ -159,6 +161,8 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 		AttributeMapping:       mapping,
 		AttributeCondition:     condition,
 		Repository:             repository,
+		GitHubRepositoryID:     spec.GitHubRepositoryID,
+		GitHubOwnerID:          spec.GitHubOwnerID,
 		GitHubEnvironment:      githubEnvironment,
 		WorkloadIdentityMember: member,
 		SharedOwnershipMarker:  sharedMarker,

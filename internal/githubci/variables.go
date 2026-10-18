@@ -31,10 +31,7 @@ type createVariableRequest struct {
 // with a different value produce ErrVariableConflict without revealing the
 // stored value.
 func (c *Client) EnsureVariable(ctx context.Context, owner, repo, name, value string) (EnsureVariableResult, error) {
-	if err := validateVariableName(name); err != nil {
-		return EnsureVariableResult{}, err
-	}
-	if err := validateVariableValue(value); err != nil {
+	if err := ValidateVariable(name, value); err != nil {
 		return EnsureVariableResult{}, err
 	}
 	base, err := repoPath(owner, repo)

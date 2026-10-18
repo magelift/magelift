@@ -27,26 +27,22 @@ needs you (or your registrar, Google billing, Adobe account team).
   `magelift doctor` mints a token to prove ADC works and tells
   you which half is missing; on CI runners it skips the check
   explicitly.
-- **API grants for the identity that deploys.** This is the CI
-  service account after `magelift bootstrap`, and also a VM or
-  workstation service account if that identity runs deploy.
-  Bootstrap mints the workload identity pool, provider, and
-  service account plus the repository impersonation binding.
-  Granting API roles on the project stays an operator IAM step.
-  Cover artifactregistry admin (the registry create command
-  needs repositories.create; writer is not enough), compute,
-  container, sqladmin, servicenetworking (Cloud SQL private
-  IP peering; `roles/servicenetworking.networksAdmin`),
-  networkconnectivity (Memorystore service connection
-  policies; `roles/networkconnectivity.consumerNetworkAdmin`),
-  iam (the media identity; `roles/iam.serviceAccountCreator`),
-  secretmanager, storage (object admin does not create
-  HMAC keys; `roles/storage.hmacKeyAdmin` does), serviceusage, memorystore (deploy
-  creates the Valkey instance; `roles/memorystore.admin` is the
-  predefined role that includes it), plus billing read and
-  logging/monitoring for observability. Autopilot also needs
-  `roles/iam.serviceAccountUser` on the Compute Engine default
-  service account, not only on the project.
+- **IAM for whoever runs bootstrap and deploy.** On a workstation
+  that is your Application Default Credentials identity: it must
+  be able to create bootstrap resources (state bucket, your
+  Artifact Registry repository, Secret Manager entries, and
+  missing reference APIs when Service Usage allows) and to run
+  `magelift deploy`. MageLift does not grant those roles to a
+  human login. For GitHub Actions, bootstrap with
+  `--github-owner` and `--github-repo` creates separate build and
+  deploy federation identities. The first run returns a
+  `ciPermissionPlan` (registry-scoped push/pull, state bucket and
+  passphrase access, node image pull, and project-wide deployment
+  roles). Federation alone does not apply that plan. Review it
+  with the project administrator, prefer a dedicated test
+  project, then rerun with `--apply-ci-permissions`. Project IAM
+  in the plan is not limited to MageLift-named resources; see
+  [Bootstrap](bootstrap.md).
 - **Git and a committed shop checkout.** Private repositories and detached
   HEADs are accepted. Builds need a recorded commit and Composer lock;
   a local branch or author identity is not required. Pushed builds use an
@@ -55,9 +51,11 @@ needs you (or your registrar, Google billing, Adobe account team).
   must answer; base images build for `linux/amd64`. Debian's
   own Docker package is too old for this path. Use Docker's
   current Debian packages, which include the buildx plugin.
-- **A registry you can push to.** The step below creates an
-  Artifact Registry repository; adapt the commands if you use
-  another registry.
+- **A registry you can push to.** GCP bootstrap creates your
+  Docker Artifact Registry repository in the configured region and
+  returns the image destination. CI and builds target that user
+  registry (or another registry you configure); MageLift does not
+  host application images centrally.
 - **Domain ownership and DNS.** The zone and its records stay
   operator-managed: nothing in the stack creates DNS. After deploy,
   point your names at the load balancer address from
@@ -154,49 +152,75 @@ git commit -m "Pin the provider release"
 
 ### 5. Bootstrap
 
-Admission checks that the project APIs are enabled; enable them
-first (one command, idempotent):
-
-```sh
-gcloud services enable artifactregistry.googleapis.com \
-  compute.googleapis.com container.googleapis.com \
-  cloudbilling.googleapis.com memorystore.googleapis.com \
-  secretmanager.googleapis.com serviceusage.googleapis.com \
-  sqladmin.googleapis.com storage.googleapis.com \
-  logging.googleapis.com monitoring.googleapis.com \
-  --project=PROJECT_ID
-```
-
 ```sh
 magelift bootstrap --env test
 ```
 
-Prepares the GCP project: state bucket with versioning, WIF pool,
-provider, and service account. GCP needs no access-log bucket
-flag (that one is AWS-only).
+Prepares the GCP project: enables missing reference APIs when the
+caller can use Service Usage, creates the versioned state bucket and
+state passphrase secret, your Artifact Registry repository, and
+returns the image destination plus registry host. GCP needs no
+access-log bucket flag (that one is AWS-only).
+
+**GitHub CI (optional).** When deploys run in GitHub Actions, pass the
+repository slug. Bootstrap resolves immutable owner and repository IDs
+through your GitHub login (`GH_TOKEN`, `GITHUB_TOKEN`, or `gh auth
+login`) before changing cloud resources:
+
+```sh
+magelift bootstrap --env test \
+  --github-owner YOUR_OWNER --github-repo YOUR_REPO
+```
+
+Read the returned `ciPermissionPlan` before granting anything. Creating
+the pool, provider, and service accounts does not attach deployment IAM.
+
+Apply the reviewed grants and write allowlisted nonsecret repository
+variables (`MAGELIFT_GCP_*`, `MAGELIFT_REGISTRY`, `MAGELIFT_RELEASE_IMAGE`,
+and signing metadata for the generated workflow). `--configure-github`
+requires `--apply-ci-permissions` on the same command:
+
+```sh
+magelift bootstrap --env test \
+  --github-owner YOUR_OWNER --github-repo YOUR_REPO \
+  --apply-ci-permissions --configure-github
+```
+
+Repository variables are created when absent, left unchanged when they
+already hold the same value, and refused when a name exists with a
+different value. Bootstrap does not edit workflow files, environment
+protection rules, or secrets (Composer auth stays in GitHub secrets when
+needed). Configure GitHub environments named `build` and `test` for the
+starter workflow; add reviewers on protected environments. Details and
+the full variable list are in [Bootstrap](bootstrap.md).
+
+Generate and validate CI from the same `magelift.yaml` you will deploy:
+
+```sh
+magelift ci generate
+magelift ci validate
+```
+
+A development binary must pass `--magelift-version` naming an available
+signed release (the same tag you installed in step 1). Generation never
+pulls builder images from a central MageLift registry; the workflow builds
+from your shop source and pushes to your configured registry.
 
 ### 6. Build the application image
 
-The user's build host constructs the bundled recipe and publishes the
-application to its selected registry. Builder/runtime stages stay local.
-With the registry prepared and Docker authenticated, run from the shop:
+Your build host (workstation or the `build` job in CI) constructs the
+bundled recipe and publishes the application image. Builder and runtime
+stages stay local to the build. After bootstrap, authenticate Docker to
+your registry host (for example `gcloud auth configure-docker
+REGION-docker.pkg.dev`), then run from the shop:
 
 ```sh
 magelift build --push \
-  --image us-central1-docker.pkg.dev/PROJECT_ID/shop/shop:candidate
+  --image REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:candidate
 ```
 
-The current workstation path can prepare Artifact Registry with:
-
-```sh
-gcloud artifacts repositories create shop \
-  --repository-format=docker --location=us-central1 --project=PROJECT_ID
-gcloud auth configure-docker us-central1-docker.pkg.dev
-```
-
-Use your own project/repository values. The guided bootstrap/CI path is still
-being completed; this manual setup is not evidence that agency onboarding is
-finished. See [Application builds](builds.md) for optional private cache and
+Use the image destination from bootstrap output instead of guessing
+paths. See [Application builds](builds.md) for optional private cache and
 advanced recipe overrides.
 
 The command prints the pushed digest. Pin it as

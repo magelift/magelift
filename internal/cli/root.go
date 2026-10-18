@@ -111,6 +111,7 @@ type options struct {
 	executable              func() (string, error)
 	// Test doubles for day-2 ports (override Module* resolution).
 	testBootstrap              platform.Bootstrap
+	newBootstrapGitHub         func(context.Context) (bootstrapGitHubClient, error)
 	testState                  platform.State
 	testSecrets                platform.Secrets
 	testRuntimeObserve         platform.RuntimeObserve

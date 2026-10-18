@@ -14,7 +14,7 @@ the bucket owner review its recorded ownership; do not relabel another bucket
 to bypass the check. This guard checks labels and region, not the cloud project
 number.
 
-## Laptop (certified AWS or GCP)
+## Laptop
 
 Log in with `aws` or `gcloud`, then:
 
@@ -76,10 +76,12 @@ known root `gha-creds-*.json` files.
 Generate the workflow from the same configuration that will be deployed:
 
 ```sh
-magelift ci generate --magelift-version v1.0.0-rc.1
-magelift ci validate --magelift-version v1.0.0-rc.1
+magelift ci generate
+magelift ci validate
 ```
 
+Generation uses the installed MageLift release version. Development binaries
+need an explicit --magelift-version naming an available signed release.
 Generation preserves an existing customized workflow and writes a candidate
 beside it. Review the reported diff, then rerun the original generation command
 with `--replace` if you want to adopt the template. Retain your `--path` and
@@ -99,8 +101,9 @@ and `MAGELIFT_GCP_PREVIEW_SERVICE_ACCOUNT` variables for the jobs you enable.
 Bootstrap creates separate build and selected-environment federation identities.
 It resolves the repository and owner numeric IDs through the current GitHub
 login before changing cloud resources. Use GH_TOKEN, GITHUB_TOKEN, or gh auth
-login. Registry and deployment role grants still need the account-preparation
-integration; creating these identities alone does not grant those permissions.
+login. Bootstrap returns the registry and deployment permission plan separately.
+Review it before rerunning with --apply-ci-permissions. Creating federation
+identities alone does not grant those permissions.
 The runtime's GKE image-pull identity is another role and needs repository read
 permissions independently of the Pod's application identity.
 
@@ -161,8 +164,10 @@ The build job retains the existing manifest, checksum and build result for 14
 days in the user's repository. Staging verifies that handoff before deployment.
 Production dispatch requires `release_digest` and `artifact_run_id` from a
 successful run of the same workflow in the same repository; it does not build.
-Set `MAGELIFT_IMAGE_SIGNING_IDENTITY` and `MAGELIFT_IMAGE_SIGNING_ISSUER` to the
-expected image producer policy, independently of the deployment login.
+The guided GCP setup derives `MAGELIFT_IMAGE_SIGNING_IDENTITY` and
+`MAGELIFT_IMAGE_SIGNING_ISSUER` from the repository workflow, independently of
+the deployment login. Advanced workflows can configure their producer policy
+explicitly.
 Configure required reviewers on protected GitHub environments. Fork PRs do not
 receive build, preview or deployment privileges; labelled preview jobs also
 require a branch in the same repository.
@@ -178,7 +183,7 @@ separates impersonation through the `build` and selected shop environments.
 An existing resource with different ownership or federation settings is refused;
 bootstrap does not silently adopt it. IAM reconciliation preserves unrelated
 bindings and conditions. This library behavior is covered by local fixtures;
-project role integration and a real GitHub token exchange remain pending.
+a real GitHub token exchange remains an acceptance check.
 
 ## GCP registry and state key
 
@@ -187,7 +192,7 @@ initializes its state passphrase in Secret Manager, and creates the user's
 Docker Artifact Registry repository. It returns the image destination and
 secret version reference. The caller needs permission to create these
 resources. If Service Usage itself is unavailable, the error names that
-prerequisite. CI role grants remain a separate integration step.
+prerequisite. GitHub CI grants require the explicit --apply-ci-permissions option.
 
 The passphrase stays at version 1. Bootstrap uses the existing deployment lock
 and checks noncurrent GCS generations as well as live state before creating a
@@ -200,3 +205,39 @@ or recovery, an explicit PULUMI_CONFIG_PASSPHRASE or
 PULUMI_CONFIG_PASSPHRASE_FILE takes precedence. Bootstrap does not convert an
 existing passphrase or rotate it. These paths have local regression coverage;
 real project permissions and state decryption remain acceptance checks.
+
+
+## Review and apply GCP CI permissions
+
+Prepare the account and inspect the returned ciPermissionPlan first:
+
+```sh
+magelift bootstrap --env test --github-owner YOUR_OWNER --github-repo YOUR_REPO
+```
+
+The build identity gets Artifact Registry writer on the owned repository. The
+node identity gets repository reader. Deployment receives access to the state
+bucket and key, node impersonation, and the service roles needed to provision
+the test stack. The listed project roles apply across the selected GCP project;
+they are not restricted to resources with a MageLift name. Review that scope
+with the project administrator and prefer a dedicated test project.
+
+Apply the reviewed grants and configure the nonsecret repository variables:
+
+```sh
+magelift bootstrap --env test --github-owner YOUR_OWNER --github-repo YOUR_REPO \
+  --apply-ci-permissions --configure-github
+magelift ci generate
+```
+
+The GitHub step verifies the immutable repository and owner IDs again before
+writing. It reuses matching variables and refuses an existing different value.
+It does not change workflow files, environment protection rules or repository
+secrets. A partial setup can be rerun. Keep Composer credentials in the user's
+GitHub secret settings when the shop needs them. Custom registry authentication
+still follows the selected registry's documented flow.
+
+These options extend the existing bootstrap request; the provider RPC operation
+and SDK manifest remain unchanged. An older provider that cannot confirm the
+grants is refused by the CLI. Local tests cover the request and IAM policies;
+a real CI token exchange and deployment must be recorded separately.

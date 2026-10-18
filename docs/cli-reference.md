@@ -67,6 +67,8 @@ Options:
 
 ```text
       --access-log-bucket string   existing AWS log bucket (AWS only)
+      --apply-ci-permissions       apply reviewed GCP CI IAM grants (GCP only)
+      --configure-github           write allowlisted GitHub repository variables after CI permissions are applied (GCP only)
       --github-owner string        optional GitHub owner for Actions deploys
       --github-repo string         optional GitHub repository for Actions deploys
 ```

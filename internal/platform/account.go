@@ -13,9 +13,10 @@ import (
 // BootstrapRequest is Magento-shaped account preparation input.
 // Provider product fields stay inside adapters.
 type BootstrapRequest struct {
-	AccessLogBucket string
-	GitHubOwner     string
-	GitHubRepo      string
+	AccessLogBucket    string
+	GitHubOwner        string
+	GitHubRepo         string
+	ApplyCIPermissions bool `json:"applyCIPermissions,omitempty"`
 }
 
 // GitHubIdentity returns the GitHub Actions identity Magelift should create.

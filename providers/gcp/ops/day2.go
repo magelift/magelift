@@ -25,6 +25,7 @@ type Bootstrap struct {
 	VerifyAccountFn         func(context.Context, string) error
 	ResolveGitHubRepository func(context.Context, string, string) (githubci.Repository, error)
 	NewPreparation          func(context.Context) (AccountPreparation, error)
+	NewCIGrants             func(context.Context) (CIGrantPreparation, error)
 }
 
 func (b Bootstrap) VerifyAccount(ctx context.Context, spec gcpstack.Spec) error {
@@ -39,6 +40,9 @@ func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.
 	identities, err := b.planGitHubIdentities(ctx, spec, req)
 	if err != nil {
 		return platform.BootstrapResult{}, err
+	}
+	if req.ApplyCIPermissions && len(identities) == 0 {
+		return platform.BootstrapResult{}, errors.New("CI permission grants require --github-owner and --github-repo")
 	}
 	preparationSpec := gcpbootstrap.Spec{
 		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
@@ -105,6 +109,36 @@ func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.
 			"provider":            wif.ProviderResource,
 			"serviceAccount":      wif.ServiceAccountEmail,
 			"buildServiceAccount": build.ServiceAccountEmail,
+		}
+		inputs, err := ciGrantInputs(preparationPlan, identities, wif.ProviderResource)
+		if err != nil {
+			return platform.BootstrapResult{}, err
+		}
+		grantPlan, err := gcpbootstrap.BuildCIGrantPlan(inputs)
+		if err != nil {
+			return platform.BootstrapResult{}, err
+		}
+		details["ciPermissionPlan"] = grantPlan
+		details["ciPermissionsApplied"] = false
+		details["ciVariables"] = ciVariables(preparationPlan, identities, wif.ProviderResource)
+		details["githubRepositoryId"] = fmt.Sprintf("%d", identities[0].GitHubRepositoryID)
+		details["githubOwnerId"] = fmt.Sprintf("%d", identities[0].GitHubOwnerID)
+		if req.ApplyCIPermissions {
+			newGrants := b.NewCIGrants
+			if newGrants == nil {
+				newGrants = func(ctx context.Context) (CIGrantPreparation, error) {
+					return gcpbootstrap.NewCIGrantPreparerFromContext(ctx)
+				}
+			}
+			grants, err := newGrants(ctx)
+			if err != nil {
+				return platform.BootstrapResult{}, err
+			}
+			defer grants.Close()
+			if err := grants.Ensure(ctx, inputs); err != nil {
+				return platform.BootstrapResult{}, err
+			}
+			details["ciPermissionsApplied"] = true
 		}
 	}
 	return platform.BootstrapResult{

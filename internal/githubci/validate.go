@@ -18,6 +18,9 @@ var allowedVariableNames = map[string]struct{}{
 	"MAGELIFT_GCP_WORKLOAD_IDENTITY_PROVIDER": {},
 	"MAGELIFT_GCP_BUILD_SERVICE_ACCOUNT":      {},
 	"MAGELIFT_GCP_TEST_SERVICE_ACCOUNT":       {},
+	"MAGELIFT_GCP_STAGING_SERVICE_ACCOUNT":    {},
+	"MAGELIFT_GCP_PRODUCTION_SERVICE_ACCOUNT": {},
+	"MAGELIFT_GCP_PREVIEW_SERVICE_ACCOUNT":    {},
 	"MAGELIFT_REGISTRY":                       {},
 	"MAGELIFT_RELEASE_IMAGE":                  {},
 	"MAGELIFT_IMAGE_SIGNING_IDENTITY":         {},
@@ -31,6 +34,14 @@ var sensitiveNameSubstrings = []string{
 
 var credentialValuePrefixes = []string{
 	"ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_",
+}
+
+// ValidateVariable checks the nonsecret CI reference contract before any writes.
+func ValidateVariable(name, value string) error {
+	if err := validateVariableName(name); err != nil {
+		return err
+	}
+	return validateVariableValue(value)
 }
 
 func validateRepoSegment(segment, label string) error {

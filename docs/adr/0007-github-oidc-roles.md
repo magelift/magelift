@@ -53,7 +53,25 @@ existing GitHub login before any cloud resource creation. A renamed or
 transferred repository is not silently adopted.
 
 This establishes the provider's identity construction and reconciliation
-contract. It does not grant registry or deployment permissions by itself. The
-command still needs the account-preparation integration. Local API fixtures do
-not prove Google CEL evaluation or a GitHub-to-GCP token exchange; both remain
-acceptance checks.
+contract. The command returns the permission plan and applies it only with
+--apply-ci-permissions. Optional --configure-github writes the derived
+nonsecret references after checking immutable repository identity again.
+Local API fixtures do not prove Google CEL evaluation or a GitHub-to-GCP token
+exchange; both remain acceptance checks.
+
+## GCP permission application
+
+The build identity receives writer on the owned Artifact Registry repository.
+The reference node account receives reader there, and deployment receives
+serviceAccountUser on that exact node account. State access is granted on the
+owned bucket and immutable key. Deployment also needs project-level service
+roles for the Pulumi graph; the plan labels that project-wide scope explicitly.
+It does not claim a resource-name restriction for those roles. Owner, Editor,
+project IAM administrator and service-account key administrator are not granted.
+
+Bootstrap returns this plan by default. Applying it is explicit, preserves
+foreign conditional bindings and audit configuration, and requires etags.
+A conflict is reread before one retry. Missing ownership, project-number drift
+or a plan whose resource names differ from the deterministic recipe stops the
+operation before IAM writes. The CLI requires an affirmative provider result
+before configuring GitHub variables. No provider RPC operation is added.

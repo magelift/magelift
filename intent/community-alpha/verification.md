@@ -714,3 +714,47 @@ no protected resource was destroyed. Cloud spend/reservation remains 0; AWS
 credit coverage remains unverified. Proofs are retained in the private local
 acceptance directory; its existing /tmp path resolves to disk storage. The
 remove-ai-marks service remains unavailable (NOT_RUN).
+
+## S2 increment: explicit CI grants and repository setup
+
+Bootstrap now returns a permission plan before applying CI resource/project
+roles. `--apply-ci-permissions` explicitly applies the reviewed plan;
+`--configure-github` additionally creates allowlisted nonsecret repository
+variables without overwriting existing values. Immutable repository/owner IDs
+are checked again before variable writes. Build, deployment and node-pull
+identities remain distinct. Project-level deployment roles cover the whole GCP
+project; they are not restricted to resource prefixes. Prefer a dedicated test
+project and review that scope before applying it.
+
+Native IAM clients preserve unrelated bindings, conditions, audit configuration
+and etags, reject unowned resources and a foreign project number, and reread
+policies after a conflict. The node impersonation grant targets the exact
+Compute Engine service account. Integration tests exercise the complete
+bootstrap path: default planning never constructs the grants client, explicit
+application ensures/closes it once, and an apply failure never returns success.
+
+Executed checks:
+
+- `MAGELIFT_PHP_TEST_CONTAINER=1 make verify-community docs workflow-check cli-docs-check generate-check`: PASS (exit 0), including independent root/SDK/GCP suites, bounded race checks, clean-room, acceptance harnesses, strict docs, actionlint and generated references. PHP: 161 tests, 388 assertions.
+- Targeted CLI/platform/GitHub and GCP bootstrap/ops/plugin suites: PASS.
+- CLI/GitHub/automation race suite: PASS.
+- GCP bootstrap/ops/plugin race suite: PASS after fixing an unsynchronized counter in the existing concurrent-lock test fixture. The initial race run failed; its failure and the corrected run are retained separately.
+- Additional complete ops integration race suite: PASS.
+- Actual CLI init and config validation against clean Magento Open Source 2.4.9: PASS. Current compatible Composer dependencies were resolved with PHP 8.5.11 and Composer 2.10.3; the resolver reported no security advisories.
+
+The maintainer authorized a private user acceptance repository. A clean official
+Magento 2.4.9 source and its generated single-test configuration are committed
+there. No upstream workflows were imported, and no Actions run has started.
+The configured acceptance project is active with billing enabled; the dedicated
+acceptance DNS name is absent and available. These are read checks, not proof
+of cloud permissions, federation, TLS or a working deployment.
+
+Real CI grants, GitHub variable writes, remote-state decryption, runtime image
+pull and end-to-end workflow execution remain NOT_RUN. No GCP resource or DNS
+record was created by this increment, no application image or MageLift release
+was published, and no protected destruction occurred. The private source
+repository remains for the authorized acceptance. AWS spend/reservation remains
+0 and its credit coverage is unverified. Local proof storage has 479 GiB free;
+/tmp has 11 GiB free. S2 acceptance and S3 functional/release/cleanup proof stay
+open; S4/S5 do not block the alpha. Humanizer was applied to prose; the local
+remove-ai-marks service remains unavailable (NOT_RUN).

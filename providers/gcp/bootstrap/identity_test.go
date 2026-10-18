@@ -97,7 +97,7 @@ func (f *fakeWIF) CreateServiceAccount(_ context.Context, projectID, accountID, 
 func (f *fakeWIF) GetServiceAccountIAMPolicy(_ context.Context, resource string) (*iam.Policy, error) {
 	policy := f.policies[resource]
 	if policy == nil {
-		return &iam.Policy{Version: 1}, nil
+		return &iam.Policy{Version: 1, Etag: "wif-initial"}, nil
 	}
 	return cloneIAMPolicy(policy), nil
 }
