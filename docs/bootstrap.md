@@ -210,7 +210,8 @@ key. It refuses existing encrypted state without its original key. Do not
 delete the state secret while state or backups still need it. An environment
 destroy does not remove these bootstrap resources, including the node account.
 New Autopilot clusters use that account through their node autoprovisioning
-defaults; Standard node pools use their node configuration. Existing clusters
+defaults and omit the Google-computed cluster `nodeConfig`; Standard clusters
+and node pools use their explicit node configuration. Existing clusters
 keep their original node identity: bootstrap does not trigger an immutable
 cluster replacement.
 Use a fresh environment for migration; live legacy migration remains unverified.

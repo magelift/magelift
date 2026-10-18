@@ -220,10 +220,6 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		},
 		DeletionProtection: pulumi.Bool(false),
 		ResourceLabels:     pulumi.ToStringMap(args.Labels),
-		NodeConfig: &container.ClusterNodeConfigArgs{
-			ServiceAccount: pulumi.String(nodeServiceAccount),
-			OauthScopes:    nodeScopes,
-		},
 	}
 	if strings.TrimSpace(args.KubernetesVersion) != "" {
 		clusterArgs.MinMasterVersion = pulumi.String(args.KubernetesVersion)
@@ -238,6 +234,10 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	if args.Runtime == "gke-standard" {
 		clusterArgs.InitialNodeCount = pulumi.Int(args.StandardNodeCount)
 		clusterArgs.RemoveDefaultNodePool = pulumi.Bool(true)
+		clusterArgs.NodeConfig = &container.ClusterNodeConfigArgs{
+			ServiceAccount: pulumi.String(nodeServiceAccount),
+			OauthScopes:    nodeScopes,
+		}
 	} else {
 		clusterArgs.EnableAutopilot = pulumi.Bool(true)
 		// Autopilot node VMs use cluster_autoscaling.auto_provisioning_defaults,
@@ -252,12 +252,14 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	clusterResources := make([]pulumi.Resource, 0, 2)
 	// Node identities are immutable. Configure new environments without
 	// replacing legacy clusters or pools when their code is updated.
-	nodeIdentityIgnoreChanges := []string{"nodeConfig.serviceAccount", "nodeConfig.oauthScopes"}
+	var nodeIdentityIgnoreChanges []string
 	if args.Runtime == "gke-autopilot" {
-		nodeIdentityIgnoreChanges = append(nodeIdentityIgnoreChanges,
+		nodeIdentityIgnoreChanges = []string{
 			"clusterAutoscaling.autoProvisioningDefaults.serviceAccount",
 			"clusterAutoscaling.autoProvisioningDefaults.oauthScopes",
-		)
+		}
+	} else {
+		nodeIdentityIgnoreChanges = []string{"nodeConfig.serviceAccount", "nodeConfig.oauthScopes"}
 	}
 	nodeIdentityCreationOnly := pulumi.IgnoreChanges(nodeIdentityIgnoreChanges)
 	cluster, err := container.NewCluster(ctx, name+"-cluster", clusterArgs, parent, nodeIdentityCreationOnly)

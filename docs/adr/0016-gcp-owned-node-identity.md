@@ -19,8 +19,9 @@ permission. It does not change the default Compute account's bindings.
 
 New Autopilot clusters select the owned account and cloud-platform OAuth scope
 through `clusterAutoscaling.autoProvisioningDefaults`. Setting cluster
-`nodeConfig` alone does not select the Autopilot node identity. Standard node
-pools use `nodeConfig`. CI deployment receives actAs on that
+Autopilot omits the top-level `nodeConfig`: GKE computes that block, and
+sending it can make a subsequent Pulumi preview replace the cluster. Standard
+clusters and node pools retain their explicit `nodeConfig`. CI deployment receives actAs on that
 account through the existing reviewed CI permission plan. CI deployment roles
 still require --apply-ci-permissions. No YAML key or provider RPC is added.
 

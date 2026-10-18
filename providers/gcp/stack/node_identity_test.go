@@ -13,8 +13,6 @@ const ownedNodeServiceAccount = "ml-shop-staging-nodes@example-gcp-project.iam.g
 
 var (
 	autopilotClusterIgnoreChanges = []string{
-		"nodeConfig.serviceAccount",
-		"nodeConfig.oauthScopes",
 		"clusterAutoscaling.autoProvisioningDefaults.serviceAccount",
 		"clusterAutoscaling.autoProvisioningDefaults.oauthScopes",
 	}
@@ -87,8 +85,9 @@ func assertIgnoreChangesExact(t *testing.T, res pulumi.MockResourceArgs, expecte
 }
 
 func assertAutopilotClusterNodeIdentity(t *testing.T, res pulumi.MockResourceArgs) {
-	node := res.Inputs["nodeConfig"].ObjectValue()
-	assertNodeIdentityOnNodeConfig(t, node)
+	if nodeVal, ok := res.Inputs["nodeConfig"]; ok && nodeVal.HasValue() {
+		t.Fatalf("Autopilot cluster must not set explicit nodeConfig: %v", nodeVal)
+	}
 
 	autoscalingVal, ok := res.Inputs["clusterAutoscaling"]
 	if !ok || !autoscalingVal.IsObject() {
