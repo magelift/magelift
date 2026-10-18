@@ -1327,3 +1327,58 @@ image and resume deployment. Corrected GKE creation, runtime pull, functional
 probes, HTTPS, persistence, second functional release and final cleanup remain
 NOT_RUN. State, key and owned resources remain available for this continuation.
 Humanizer review is complete; remove-ai-marks remains NOT_RUN (service unavailable).
+
+### S3 first live runtime, migration failure and safe recovery preview
+
+Workflow 39124065614 failed after provisioning. The user CI built and signed
+its own application image; independent checks passed for the exact workflow
+identity, source revision, digest and manifest. The real GKE Autopilot cluster
+became RUNNING with the owned node identity in its autoprovisioning defaults.
+Web/PHP containers pulled the private image without imagePullSecrets and became
+ready. SQL remained RUNNABLE and Valkey ACTIVE. This proves initial image pull,
+not a pull after CI credentials expire or a healthy Magento application.
+
+The initial infrastructure update completed. Migration then failed on an empty
+database: Magento search validation tried to resolve the default website before
+creating its tables. Cloud Logging retained the failure from all three Job
+attempts. The read-only database check found zero tables. The native hostname
+passed strict TLS verification but returned HTTP 500. It is not an application
+success, and certificate-controller activation was not separately established.
+
+Two defects compounded the failure. Kubernetes Job backoff retried the migration
+twice; backoff is now zero. The provider RPC error mapper omitted application
+phase results, allowing the CLI to continue after failure; phase and media
+transfer errors now propagate, with fail-closed handling for unmapped response
+types. Focused regression tests pass for both changes.
+
+A distributed read-only preview of the retained stack then proposed 16
+replacements rooted at Autopilot's top-level nodeConfig. The earlier statement
+that preserving this block had no provider conflict was insufficient: Google
+accepted creation but computed state caused a later replacement. That preview
+was never applied. Autopilot now omits this computed block and keeps its owned
+identity through autoprovisioning defaults. Standard inputs remain explicit.
+Native applicationURL now uses the configured hostname, with the raw address
+available separately for customer-managed DNS. Runtime, edge and stack tests
+pass. A read-only source preview from isolated commit c0f532b reports zero
+creates, deletes or replacements, one Kubernetes-provider update and 51 same.
+This developer probe does not establish distributed-candidate acceptance.
+
+The independent local raw-proof review passes all 33 recorded stages and their
+capture hashes. With the signed application image, official schema and data
+upgrade subcommands on an empty database allow the existing lifecycle quartet
+to complete twice. Database status exits zero both times; an inserted PDO marker
+keeps its ID, the crypt-key comparison stays true and no administrator is
+created. All scoped local containers, volumes and networks were removed. This
+proves the upstream sequence locally, not Magento product/CMS persistence on GCP.
+The production bootstrap helper is still being integrated and verified.
+
+The encrypted checkpoint contains 54 resources and no pending operations.
+GKE, SQL, Valkey, media, search storage, networking, native ingress and its cloud
+load balancer, customer-managed test DNS, registry, bootstrap and CI grants
+remain for continuation. Exact controller resource IDs and the PVC disk handle
+are recorded privately for teardown. Preserve the state and original key until
+all owned runtime and backup residuals are resolved. Billing remains unmeasured.
+Functional storefront, indexed search, cron, queue, private-media checks, a
+second functional release, persistence and final cleanup remain NOT_RUN.
+Humanizer review is complete; remove-ai-marks remains NOT_RUN because its local
+service is unavailable.
