@@ -1420,3 +1420,53 @@ GCP cleanup remain NOT_RUN. The same owned GCP resources and DNS record remain;
 state and original key are retained. No paid AWS test or new cloud stack was
 started. Humanizer review is complete; remove-ai-marks remains NOT_RUN because
 its service is unavailable.
+
+### S3 teardown preview, complete gates and delayed-credential pull
+
+Commit 1d1d1f2 resolves the runtime-plan review finding. Destroy's preliminary
+preview now uses Pulumi PreviewDestroy against state, with the same ownership
+checks. Expired environments and absent image digests are accepted only by the
+teardown scope. Apply and ordinary preview remain strict. RunProgram is
+explicitly false for both destroy preview and destroy, including when the
+operator's global Pulumi setting enables it. No RPC method or protocol field
+was added for this correction.
+
+The installed SDK's real file-backend proof succeeds without invoking an inline
+program, including with PULUMI_RUN_PROGRAM enabled and RunProgram explicitly
+false. Private test state and workspace files were removed; the parent also
+removed the exact workspace metadata its first probe created under Pulumi home.
+Unit regressions cover dispatch, expiry, malformed digests, strict apply,
+ownership mismatch, diagnostics and CLI preview-before-destroy sequencing.
+Targeted automation, CLI and plugin packages pass after the explicit option.
+
+The complete community gate passes across root, SDK and GCP, including bounded
+race checks, 172 PHP tests and 418 assertions, lifecycle-golden, clean-room,
+core leanness and acceptance-script doubles. Generated consistency, CLI reference,
+workflow lint and strict docs pass. The host-only Linux packaging smoke passes;
+it does not sign or publish, and no local multi-target matrix ran. Its archive
+was 63,048,608 bytes, installed CLI 308,535,456 bytes and provider 208,769,184 bytes.
+The local fmt-check sees two ignored acceptance helpers and fails; those local
+files were preserved. Formatting passes on a clean checkout of the candidate.
+Both temporary source-preview and formatting worktrees were removed.
+
+Cursor Grok 4.7 low, medium and high plus Composer 2.5 were used without fast
+mode. The independent schema review passes within the shipped effective-config
+contract. It does not extend support to non-default database ports or claim a
+general shell-argument contract for future lifecycle commands. Parent checks
+verified the integrated proof's raw hashes and current generated source.
+
+A later real Autopilot Job used the existing signed private image with Always
+pull policy, no imagePullSecrets, no mounted secrets and no service-account
+token. It ran only php -v after the previous acceptance CI credentials expired.
+Kubernetes recorded Pulling and Pulled (520 ms), then PHP 8.5.11 succeeded.
+Layers could be cached. The Job and owned pods were deleted and absence checked.
+This strengthens runtime-pull evidence; it does not prove application health.
+
+Canary workflow 39134197894 is building commit 1d1d1f2. Publication still awaits
+successful CI, independent checksums/signatures and version checks. Distributed
+recovery, functional application probes, the second functional release,
+persistence and final GCP cleanup remain NOT_RUN. The existing GCP stack,
+customer-managed test DNS, bootstrap and IAM resources remain for continuation;
+state and key are retained. GCP cost/state and several legacy paths still use
+strict image planning. Humanizer review is complete; remove-ai-marks remains
+NOT_RUN because its service is unavailable.
