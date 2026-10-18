@@ -758,3 +758,47 @@ repository remains for the authorized acceptance. AWS spend/reservation remains
 /tmp has 11 GiB free. S2 acceptance and S3 functional/release/cleanup proof stay
 open; S4/S5 do not block the alpha. Humanizer was applied to prose; the local
 remove-ai-marks service remains unavailable (NOT_RUN).
+
+## S3 increment: local doctor and voluntary diagnostic export
+
+`doctor --local` now works without cloud credentials, including before a valid
+configuration exists. It reports local tool checks and explicitly skips cloud
+credential probes. `doctor --export NEW_FILE` writes a voluntary local JSON
+metadata file with mode 0600 and refuses existing files and symlinks. It does
+not upload anything. The default doctor behavior and invalid-input exit code
+remain unchanged; local readiness failures exit 4.
+
+The export uses a separate typed field allowlist. It includes known version,
+OS/architecture, built-in target categories, check categories/statuses/counts
+and known required/optional classifications. It never copies the rich console
+report. Environment suffixes become a generic category; unknown targets, check
+identifiers and arbitrary version/status strings are omitted or categorized.
+Free-text diagnostics, config values, names, account IDs, paths, tokens, URLs,
+raw logs and dumps are excluded. Raw extension logs remain a separate manual
+review task; this export makes no claim to redact arbitrary log contents.
+
+Executed checks:
+
+- CLI and skills regression/race suites: PASS after review tightened categorical allowlists and fixed generation ordering. An intermediate strict-shape failure after adding the requirement enum and a stale skill digest failure were corrected; failed and corrected logs are retained separately.
+- Actual stripped CLI build: PASS. With PATH unavailable, an empty HOME and nonexistent ADC, the missing-config local run exports metadata and exits 4; the valid GCP shop local run exits 0, reports five missing optional tools and one skipped credential check. Both exports are mode 0600 and omit the configured project, domain and path.
+- Strict docs, generated references/manifest checks and actionlint: PASS.
+- Linux/amd64 GoReleaser packaging smoke: PASS with the current CLI/provider source. Archive 63,022,545 bytes, installed CLI 308,506,784 bytes, provider 208,781,472 bytes, excluding tools and Docker images. This smoke skips signing, SBOM and publication; it is not a signed-install proof.
+- Current upstream GoReleaser release is v2.18.3, verified through the official release API; CI and release workflows now use it consistently with local smoke.
+- Bootstrap/ops race suite after switching newly added fixtures to a fictional project: PASS.
+
+Cursor Composer 2.5 non-fast implemented the bounded doctor slice; parent review
+added stricter categorical privacy checks and actual binary smoke. No framework,
+provider protocol or additional manifest was introduced. Humanizer was applied
+to prose; remove-ai-marks remains unavailable (NOT_RUN).
+
+The new source is not yet distributed as a signed release. Actual GCP CI,
+remote state, two functional deployments with persistence, runtime incident,
+TLS/DNS and independent cleanup remain NOT_RUN. A new first-party signed
+candidate is required to exercise this source through the normal fail-closed
+provider installer; a local binary or custom signing identity cannot substitute.
+Public tags/publication still require the maintainer's explicit approval. No
+MageLift tag was created or pushed; no application image or cloud runtime was
+published. The authorized private source repository and local proof/image caches
+remain. No new GCP resources or DNS records exist from these increments. AWS
+spend/reservation remains 0; credits remain unverified. macOS, Windows and the
+outside-person trial are NOT_RUN. S4/S5 remain outside the alpha's critical path.

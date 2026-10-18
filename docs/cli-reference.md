@@ -433,7 +433,9 @@ magelift doctor [flags]
 Options:
 
 ```text
+      --export string          write an allowlisted local diagnostic JSON report to a new file (mode 0600)
       --install-dependencies   install missing allowlisted dependencies after confirmation
+      --local                  skip cloud credential probes; still run local toolchain checks
 ```
 ## magelift edge
 

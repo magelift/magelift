@@ -1,5 +1,13 @@
 # Publishing
 
+The current milestone is the community alpha in `intent/ROADMAP.md`.
+Its scoped release gates are in [Release readiness](release-readiness.md).
+MageLift releases the CLI, provider and bundled build recipes. Application images
+are built in the user's CI and published to the user's chosen registry.
+MageLift does not publish central builder/runtime images.
+
+## Historical v1.0.0 publishing notes
+
 Notes for the public `v1.0.0` surface. AWS ECS Fargate and GCP GKE Autopilot are
 already certified. This milestone is packaging, docs, and repo trust - not a new
 round of paid cloud cells.

@@ -14,6 +14,24 @@ Run the readiness check before a new workstation setup or a CI job:
 magelift doctor
 ```
 
+Before cloud login, use `magelift doctor --local`. It skips credential probes
+and reports missing or invalid configuration alongside local checks without
+acquiring a provider. It does not install tools unless separately requested.
+
+To create a voluntary local support report:
+
+```sh
+magelift doctor --local --export doctor-metadata.json
+```
+
+The new JSON file is mode 0600; existing files and symlinks are refused. Its
+fixed field allowlist includes known CLI/OS/target categories, check statuses,
+counts and required/optional tool classifications. Names, paths, account IDs,
+config values, free-text errors, tool
+output, URLs, tokens and logs are omitted. There is no upload. The full console
+report remains private diagnostic output; review raw logs separately before
+sharing any, because extension data is not covered by this export contract.
+
 The report separates required tools from optional capabilities. A cloud target
 does not require Docker unless the selected command actually builds or runs a
 local container. Deploy and bootstrap do not need a Pulumi CLI; that engine

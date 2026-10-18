@@ -14,6 +14,30 @@ prints all readiness checks, including failures, before exiting. Exit code 4 mea
 the file parsed but one or more resolved contracts are invalid; read and schema
 errors use the invalid-input exit code 2.
 
+Use `magelift doctor --local` before cloud login or deployment. It checks local
+tools and configuration without probing cloud credentials or downloading a
+provider. Missing or invalid configuration is reported with the other checks;
+local readiness failures exit 4. Installing tools still requires the separate
+`--install-dependencies` option and its normal confirmation.
+
+For a local support report, run:
+
+```sh
+magelift doctor --local --export doctor-metadata.json
+```
+
+The new file has mode 0600; existing files and symlinks are refused. The export
+contains the known CLI version, OS/architecture, known target category and check
+categories/statuses/counts and known required/optional tool classifications.
+Missing optional tools remain distinct from failed checks. It omits project and
+environment names, account IDs,
+paths, configuration values, free-text errors, tool output, tokens, URLs and logs.
+Unknown target categories and arbitrary version strings are omitted. The full
+console report remains separate and can contain private diagnostic details.
+Nothing is uploaded. Review any raw logs separately before sharing them; an
+extension can put private data in its logs. An export also works with missing
+configuration; without `--local`, invalid-input failures retain exit 2.
+
 When `preview`, `deploy`, or `destroy` fails because another Pulumi update
 holds the stack lock, the command exits 5 with a wait-and-retry sentence
 instead of the generic failure, so CI can tell a collision from a graph bug.

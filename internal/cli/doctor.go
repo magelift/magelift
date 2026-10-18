@@ -38,16 +38,24 @@ type doctorReport struct {
 
 func doctorCommand(o *options) *cobra.Command {
 	var installDependencies bool
+	var localMode bool
+	var exportPath string
 	command := &cobra.Command{Use: "doctor", Short: "Check this project and print the next Magelift command", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		file, err := o.load()
-		if err != nil {
-			return invalid(err)
+		file, loadErr := o.load()
+		if loadErr != nil && !localMode && exportPath == "" {
+			return invalid(loadErr)
 		}
-		report := inspectProject(o.configPath, file)
-		for _, check := range credentialChecks(cmd.Context(), file, dependencyRunner(o), o.getenv) {
-			report.Checks = append(report.Checks, check)
-			if check.Status == "failed" {
-				report.Status = "failed"
+		report := buildDoctorReport(o.configPath, file, loadErr)
+		if localMode {
+			for _, check := range localModeCredentialSkips(file) {
+				report.Checks = append(report.Checks, check)
+			}
+		} else if file != nil {
+			for _, check := range credentialChecks(cmd.Context(), file, dependencyRunner(o), o.getenv) {
+				report.Checks = append(report.Checks, check)
+				if check.Status == "failed" {
+					report.Status = "failed"
+				}
 			}
 		}
 		specs := dependencySpecsForDoctor(file)
@@ -59,6 +67,11 @@ func doctorCommand(o *options) *cobra.Command {
 				if writeErr := o.write(report); writeErr != nil {
 					return writeErr
 				}
+				if exportPath != "" {
+					if err := writeDoctorExport(exportPath, report, file); err != nil {
+						return err
+					}
+				}
 				return err
 			}
 			dependencies = toolchain.CheckDependencies(cmd.Context(), dependencyRunner(o), specs)
@@ -68,12 +81,22 @@ func doctorCommand(o *options) *cobra.Command {
 		if err := o.write(report); err != nil {
 			return err
 		}
+		if exportPath != "" {
+			if err := writeDoctorExport(exportPath, report, file); err != nil {
+				return err
+			}
+		}
+		if loadErr != nil && !localMode {
+			return invalid(loadErr)
+		}
 		if report.Status != "ok" {
 			return &exitError{code: doctorExitUnhealthy, err: errors.New("project readiness checks failed")}
 		}
 		return nil
 	}}
 	command.Flags().BoolVar(&installDependencies, "install-dependencies", false, "install missing allowlisted dependencies after confirmation")
+	command.Flags().BoolVar(&localMode, "local", false, "skip cloud credential probes; still run local toolchain checks")
+	command.Flags().StringVar(&exportPath, "export", "", "write an allowlisted local diagnostic JSON report to a new file (mode 0600)")
 	return command
 }
 
