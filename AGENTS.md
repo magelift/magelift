@@ -24,8 +24,8 @@ Always-on layer only. Load one skill from the tables below. Do not paste skill b
   path that is known to fail stays failed until a real run says otherwise.
 - Freelance `magelift deploy`/`destroy` against a non-acceptance account.
   Live GCP uses the dedicated acceptance project. The community-alpha
-  campaign teardown is recorded in `intent/community-alpha/verification.md`;
-  do not recreate that campaign for docs, an install smoke, or a tag.
+  campaign was torn down; do not recreate it for docs, an install smoke,
+  or a tag.
   AWS stays targeted: about USD 150 of announced credits, at most USD 100
   of planned test spend, USD 50 held back, and no card spend after credits
   run out. OVH, Scaleway, Cloudflare, New Relic, and Fastly stay light
@@ -123,6 +123,5 @@ User track: dogfooding and skills acceptance only:
 | `docs/` | MkDocs; ADRs; short evidence pack |
 | `.agents/knowledge/` | Repo OKF bundle (agents) |
 | `tests/` | Floci and fixtures |
-| `intent/` | Community-alpha verification record |
 | `scripts/` | Acceptance harnesses (per-provider local runners) |
 | `examples/` | Sample shop plus clean-room custom CLI |
