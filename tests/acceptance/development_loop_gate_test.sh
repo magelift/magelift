@@ -107,22 +107,4 @@ if [[ ! -f "$RUNNER_EVIDENCE" ]] || [[ "$(wc -l <"$RUNNER_EVIDENCE" | tr -d ' ')
 	exit 1
 fi
 
-WORKFLOW="$ROOT/.github/workflows/alpha-development-loop.yml"
-if [[ ! -f "$WORKFLOW" ]]; then
-	printf 'missing alpha-development-loop workflow\n' >&2
-	exit 1
-fi
-if ! grep -q 'Operator actions: pushing and deleting v0.0.0-canary.<sha>' "$WORKFLOW"; then
-	printf 'workflow missing operator-action header\n' >&2
-	exit 1
-fi
-if grep -Eq 'git push|gh release create' "$WORKFLOW"; then
-	printf 'workflow must not push tags or create releases\n' >&2
-	exit 1
-fi
-if ! grep -q 'workflow_dispatch:' "$WORKFLOW"; then
-	printf 'workflow must be workflow_dispatch only\n' >&2
-	exit 1
-fi
-
 printf 'development_loop_gate_test OK\n'

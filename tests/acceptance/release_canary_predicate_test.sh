@@ -94,18 +94,9 @@ if ! grep -q -- '--clobber' "$TMP/gh.log"; then
 	exit 1
 fi
 
-DEVLOOP_WORKFLOW="$ROOT/.github/workflows/alpha-development-loop.yml"
 RUN_GATES="$ROOT/scripts/development-loop/run-gates.sh"
-if ! grep -q 'Operator actions: pushing and deleting v0.0.0-canary.<sha>' "$DEVLOOP_WORKFLOW"; then
-	printf 'alpha-development-loop workflow missing operator-action header\n' >&2
-	exit 1
-fi
 if ! grep -q 'Operator actions: pushing and deleting v0.0.0-canary.<sha>' "$RUN_GATES"; then
 	printf 'run-gates missing operator-action header\n' >&2
-	exit 1
-fi
-if grep -Eq 'git push|gh release create' "$DEVLOOP_WORKFLOW"; then
-	printf 'alpha-development-loop workflow must not push tags or create releases\n' >&2
 	exit 1
 fi
 

@@ -1,12 +1,11 @@
 version: 2
 updates:
-  # Pulumi provider SDKs live in go.mod (no Dependabot "pulumi" ecosystem).
+  # Each Go module is its own directory. sdk/go.mod has no third-party
+  # requirements, so it is not listed.
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 7
     open-pull-requests-limit: 3
     labels: [dependencies, go]
     commit-message:
@@ -28,22 +27,28 @@ updates:
       go-dependencies:
         patterns: ["*"]
   - package-ecosystem: gomod
-    directory: /sdk
+    directory: /providers/gcp
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 7
     open-pull-requests-limit: 3
     labels: [dependencies, go]
     commit-message:
       prefix: chore
       include: scope
+    groups:
+      pulumi:
+        patterns:
+          - "github.com/pulumi/*"
+      google-cloud:
+        patterns:
+          - "cloud.google.com/*"
+          - "google.golang.org/*"
+      go-dependencies:
+        patterns: ["*"]
   - package-ecosystem: composer
     directory: /build
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies, php]
     commit-message:
@@ -52,13 +57,29 @@ updates:
     groups:
       composer-dependencies:
         patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /website
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    labels: [dependencies]
+    commit-message:
+      prefix: chore
+      include: scope
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    labels: [dependencies]
+    commit-message:
+      prefix: chore
+      include: scope
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
     labels: [dependencies, ci]
     commit-message:
       prefix: chore
@@ -66,67 +87,31 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
-  - package-ecosystem: pip
-    directory: /docs
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 5
-    labels: [dependencies, docs]
-    commit-message:
-      prefix: chore
-      include: scope
-  - package-ecosystem: npm
-    directory: /website
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 5
-    labels: [dependencies, docs]
-    commit-message:
-      prefix: chore
-      include: scope
+  # Dependabot accepts one directory per Docker entry.
   - package-ecosystem: docker
     directory: /images/php-nginx
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies, docker]
     commit-message:
       prefix: chore
       include: scope
-    groups:
-      docker-base-images:
-        patterns: ["*"]
   - package-ecosystem: docker
     directory: /images/php-apache
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies, docker]
     commit-message:
       prefix: chore
       include: scope
-    groups:
-      docker-base-images:
-        patterns: ["*"]
   - package-ecosystem: docker
     directory: /images/frankenphp-classic
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 7
     open-pull-requests-limit: 2
     labels: [dependencies, docker]
     commit-message:
       prefix: chore
       include: scope
-    groups:
-      frankenphp-base-image:
-        patterns: ["*"]
