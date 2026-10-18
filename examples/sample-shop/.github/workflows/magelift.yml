@@ -107,7 +107,7 @@ jobs:
             --image "$image" \
             --builder-image "$MAGELIFT_BUILDER_IMAGE" \
             --runtime-image "$MAGELIFT_RUNTIME_IMAGE" > "$result"
-          digest="$(jq -er '.image.imageReference + "@" + .image.digest' "$result")"
+          digest="$(jq -er '.image | (.imageReference | sub(":[^/:]+$"; "")) + "@" + .digest' "$result")"
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 
   preview:

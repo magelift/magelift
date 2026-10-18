@@ -104,3 +104,5 @@ Keep generated build results and credential files outside the checkout when
 customizing CI. The build requires a clean committed Git source.
 An untagged MAGELIFT_RELEASE_IMAGE repository gets the source GITHUB_SHA tag;
 an explicitly tagged destination is preserved, including registries with ports.
+Artifact handoff uses repository@sha256 references: the publication tag is
+removed from the reference passed to deploy, while its digest stays unchanged.

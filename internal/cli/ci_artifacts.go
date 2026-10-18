@@ -65,7 +65,7 @@ func writeBuildAndArchive(w *strings.Builder, configFile string) {
           mkdir -p "$build_dir"
           magelift --config ` + shellQuote(configFile) + ` --no-interaction --output json build --push \
             --image "$image" > "$result"
-          digest="$(jq -er '.image.imageReference + "@" + .image.digest' "$result")"
+          digest="$(jq -er '.image | (.imageReference | sub(":[^/:]+$"; "")) + "@" + .digest' "$result")"
           cp -- "$(jq -er '.manifest' "$result")" "$build_dir/manifest.json"
           checksum="$(jq -er '.manifestSha256 | select(test("^[a-f0-9]{64}$"))' "$result")"
           printf '%s  manifest.json\n' "$checksum" > "$build_dir/manifest.sha256"
@@ -115,7 +115,7 @@ func writeBuildArtifactDownload(w *strings.Builder, promotion bool) {
         run: |
           set -eu
           sha256sum -c manifest.sha256
-          test "$(jq -er '.image.imageReference + "@" + .image.digest' build-result.json)" = "$DIGEST"
+          test "$(jq -er '.image | (.imageReference | sub(":[^/:]+$"; "")) + "@" + .digest' build-result.json)" = "$DIGEST"
           test "$(jq -er '.imageDigest' manifest.json)" = "${DIGEST##*@}"
 `)
 }

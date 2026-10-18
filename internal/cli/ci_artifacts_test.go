@@ -62,9 +62,9 @@ func TestGeneratedArtifactHandoffRejectsCorruptionAndDifferentDigest(t *testing.
 			if err := os.WriteFile(filepath.Join(dir, "build-result.json"), []byte(result), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			requested := "registry.example.invalid/shop:candidate@" + digest
+			requested := "registry.example.invalid/shop@" + digest
 			if scenario == "different digest" {
-				requested = "registry.example.invalid/shop:candidate@sha256:" + strings.Repeat("b", 64)
+				requested = "registry.example.invalid/shop@sha256:" + strings.Repeat("b", 64)
 			}
 			cmd := exec.Command("bash", "-c", script)
 			cmd.Dir = dir
@@ -240,7 +240,7 @@ jq -n \
 			if err != nil {
 				t.Fatal(err)
 			}
-			wantDigest := tc.want + "@sha256:" + strings.Repeat("c", 64)
+			wantDigest := tc.want[:strings.LastIndex(tc.want, ":")] + "@sha256:" + strings.Repeat("c", 64)
 			if !strings.Contains(string(got), "digest="+wantDigest) {
 				t.Fatalf("GITHUB_OUTPUT=%q want digest=%s", got, wantDigest)
 			}

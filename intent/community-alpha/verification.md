@@ -990,3 +990,27 @@ still needs these reviewed workflow corrections; its build command protections
 are retained. No runtime or DNS has yet been created.
 The full CLI package, refreshed renderer fixtures, workflow lint, generated
 consistency and strict docs also pass for the image-tag correction.
+
+### S2/S3 increment: signed application image and canonical handoff
+
+The third organization run built, pushed and signed the actual application
+image in 250 seconds (build step start/end timestamps). Its manifest artifact
+was downloaded independently: checksum, image digest and source revision match.
+Cosign independently verified the image against the exact organization workflow
+main identity and GitHub issuer, using temporary registry credentials removed
+after verification. This proves user-registry publication, not runtime pull.
+
+The deploy job then refused tag@digest at provider-plan validation, before
+runtime creation. The existing GCP artifact contract requires repository@digest.
+The generator and its handoff verification now remove only a trailing image
+tag; registry ports are preserved and the image digest is unchanged. Shell
+regressions cover canonical output and the existing corruption/different-digest
+refusals. The fourth Actions run uses that correction. No provider contract,
+manifest or source cleanliness protection was changed.
+
+The complete community/docs/workflow/generated gate passed on the preceding
+image-tag correction, including 161 PHP tests and 388 assertions. Canonical
+handoff has its own targeted/full CLI and workflow consistency checks. Current
+resources include the owned bootstrap prerequisites, added CI grants and an
+actual acceptance image; runtime, DNS, persistence and destruction remain
+NOT_RUN. All owned cloud resources still require final cleanup.

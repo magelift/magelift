@@ -100,7 +100,7 @@ jobs:
           result="$RUNNER_TEMP/magelift-build/build-result.json"
           magelift --config 'magelift.yaml' --no-interaction --output json build --push \
             --image "$image" > "$result"
-          digest="$(jq -er '.image.imageReference + "@" + .image.digest' "$result")"
+          digest="$(jq -er '.image | (.imageReference | sub(":[^/:]+$"; "")) + "@" + .digest' "$result")"
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 
   staging:
