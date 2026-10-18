@@ -2,7 +2,7 @@
 
 ## 2026-10-19
 
-- Authoring rules now live in [CONVENTIONS.md](CONVENTIONS.md), with `tools/rebuild-index.py` and `tools/validate-okf.py`. The bundle does not depend on a home-directory vault.
+- Authoring rules are [conventions.md](conventions.md). `tools/okf.py` rewrites the indexes and checks the bundle. The earlier `CONVENTIONS.md`, `rebuild-index.py`, and `validate-okf.py` names are gone.
 
 ## 2026-10-18
 
