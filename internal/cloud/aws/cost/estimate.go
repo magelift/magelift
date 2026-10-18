@@ -1,0 +1,493 @@
+// Package cost implements platform.CostEstimator for AWS ECS and EKS targets.
+package cost
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
+	awspricing "github.com/magelift/magelift/internal/cloud/aws/pricing"
+	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
+)
+
+// PricingClient looks up current AWS on-demand prices (live mode only).
+type PricingClient interface {
+	Estimate(context.Context, awspricing.Query) (awspricing.Price, error)
+}
+
+// Estimator is the AWS cost adapter.
+type Estimator struct {
+	// NewPricing builds a live PricingClient; nil uses awspricing.New.
+	NewPricing func(context.Context, string) (PricingClient, error)
+	// NewBudgetReader builds the read-only AWS Budgets client; nil uses the
+	// default SDK client.
+	NewBudgetReader func(context.Context, string) (BudgetReader, error)
+}
+
+// Estimate reports account-free catalog capacity or live AWS Price List totals.
+func (e Estimator) Estimate(ctx context.Context, planned platform.PlannedStack, cfg config.Config, opts platform.CostOptions) (platform.CostReport, error) {
+	if planned == nil {
+		return platform.CostReport{}, errors.New("planned stack is required")
+	}
+	runtime := string(planned.Runtime())
+	if runtime == "" {
+		runtime = "ecs-fargate"
+	}
+	if runtime == "eks" {
+		if opts.Live {
+			return platform.CostReport{}, fmt.Errorf("AWS live cost estimation is not available for runtime %q yet; use account-free mode for capacity classification", runtime)
+		}
+		return e.withBudget(ctx, cfg, planned.Region(), accountFreeEKS(cfg, planned.Environment(), planned.Region()), opts)
+	}
+	if runtime != "ecs-fargate" {
+		return platform.CostReport{}, fmt.Errorf("cost estimation is not available for runtime %q yet", runtime)
+	}
+	if !opts.Live {
+		return e.withBudget(ctx, cfg, planned.Region(), accountFree(cfg, planned.Environment(), planned.Region()), opts)
+	}
+	newPricing := e.NewPricing
+	if newPricing == nil {
+		newPricing = func(ctx context.Context, region string) (PricingClient, error) {
+			return awspricing.New(ctx, region)
+		}
+	}
+	client, err := newPricing(ctx, planned.Region())
+	if err != nil {
+		return platform.CostReport{}, err
+	}
+	report, err := live(ctx, cfg, planned.Environment(), planned.Region(), client)
+	if err != nil {
+		return platform.CostReport{}, err
+	}
+	return e.withBudget(ctx, cfg, planned.Region(), report, opts)
+}
+
+func (e Estimator) withBudget(ctx context.Context, cfg config.Config, region string, report platform.CostReport, opts platform.CostOptions) (platform.CostReport, error) {
+	if !opts.Budget {
+		return report, nil
+	}
+	accountID := strings.TrimSpace(cfg.Account)
+	if accountID == "" {
+		return platform.CostReport{}, errors.New("AWS budget lookup requires account")
+	}
+	newReader := e.NewBudgetReader
+	if newReader == nil {
+		newReader = NewBudgetReader
+	}
+	reader, err := newReader(ctx, region)
+	if err != nil {
+		return platform.CostReport{}, fmt.Errorf("create AWS budget reader: %w", err)
+	}
+	budget, err := reader.Read(ctx, accountID)
+	if err != nil {
+		return platform.CostReport{}, err
+	}
+	if strings.EqualFold(strings.TrimSpace(cfg.Class), "preview") {
+		report.Budget = previewEnvironmentBudgetReport(report.Environment, budget)
+		return report, nil
+	}
+	report.Budget = &budget
+	return report, nil
+}
+
+func previewEnvironmentBudgetReport(environment string, account platform.CostBudgetReport) *platform.CostBudgetReport {
+	return &platform.CostBudgetReport{
+		Scope:      "preview/" + environment,
+		Source:     account.Source,
+		ObservedAt: account.ObservedAt,
+		Freshness:  account.Freshness,
+		State:      platform.CostBudgetNotConfigured,
+		Budgets:    []platform.CostBudget{},
+		Notice:     "preview environments do not inherit account or production AWS budgets; no preview-owned budget is configured",
+	}
+}
+
+func accountFree(cfg config.Config, environment, region string) platform.CostReport {
+	report := newAccountFreeReport(cfg, environment, region)
+	if cfg.Target.AWS == nil {
+		report.Estimated = []platform.CostEstimatedItem{{Resource: "MageLift preset", Configuration: valueOrUnknown(report.Preset) + " topology; exact capacity is not configured"}}
+		report.Unsupported = append(report.Unsupported, platform.CostUnsupportedItem{Resource: "service capacity", Reason: "target.aws.catalog is not configured"})
+		return report
+	}
+
+	catalog := cfg.Target.AWS.Catalog
+	report.Estimated = append(report.Estimated,
+		platform.CostEstimatedItem{Resource: "ECS Fargate web service", Configuration: fmt.Sprintf("%d tasks, %d CPU units, %d MiB each", catalog.Fargate.DesiredCount, catalog.Fargate.CPU, catalog.Fargate.MemoryMiB)},
+		platform.CostEstimatedItem{Resource: "ElastiCache Valkey", Configuration: fmt.Sprintf("%s, %d replicas", valueOrUnknown(catalog.Valkey.NodeType), catalog.Valkey.ReplicaCount)},
+		databaseCostEstimate(catalog, report.Preset),
+	)
+	if item, ok := searchCostEstimate(catalog, report.Preset); ok {
+		report.Estimated = append(report.Estimated, item)
+	}
+	report.Estimated = append(report.Estimated, queueCostEstimate(catalog.QueueMode, report.Preset, catalog.RabbitMQ.InstanceType))
+	if notice := previewExpensiveCatalogNotice(catalog, report.Preset, cfg.Class); notice != "" {
+		if report.Notice != "" {
+			report.Notice += " "
+		}
+		report.Notice += notice
+	}
+	return report
+}
+
+func previewExpensiveCatalogNotice(catalog config.AWSCatalog, preset, class string) string {
+	if !strings.EqualFold(strings.TrimSpace(class), "preview") && preset != "preview" {
+		return ""
+	}
+	var flags []string
+	mode := catalog.QueueMode
+	if mode == "amazon-mq" {
+		flags = append(flags, "Amazon MQ is production-scale for preview")
+	}
+	if catalog.Search.InstanceCount > 0 && strings.TrimSpace(catalog.Search.InstanceType) != "" {
+		flags = append(flags, "provisioned OpenSearch is expensive for preview")
+	}
+	if catalog.Aurora.InstanceCount > 1 {
+		flags = append(flags, "multi-instance Aurora is expensive for preview")
+	}
+	if len(flags) == 0 {
+		return ""
+	}
+	return "Preview catalog flags: " + strings.Join(flags, "; ") + "."
+}
+
+func newAccountFreeReport(cfg config.Config, environment, region string) platform.CostReport {
+	if region == "" {
+		region = cfg.Defaults.Region
+	}
+	preset := cfg.Preset
+	if preset == "" {
+		preset = cfg.Defaults.Preset
+	}
+	report := platform.CostReport{
+		Environment: environment, Provider: cfg.Target.Provider, Region: region, Preset: preset,
+		Mode: "account-free", Currency: "USD", MonthlyBudgetCents: cfg.MonthlyBudgetCents,
+		Priced: []platform.CostPricedItem{}, MonthlyTotalCents: nil,
+		Notice: "Account-free mode does not call AWS or claim current prices. Capacity is derived from magelift.yaml; use magelift cost --live when current AWS prices are available.",
+		Unsupported: []platform.CostUnsupportedItem{
+			{Resource: "AWS unit prices", Reason: "current regional prices require live AWS Pricing data"},
+			{Resource: "usage-based services", Reason: "data transfer, requests, storage growth, logs, WAF, CloudFront, and NAT processing depend on workload measurements"},
+		},
+	}
+	return report
+}
+
+func accountFreeEKS(cfg config.Config, environment, region string) platform.CostReport {
+	report := newAccountFreeReport(cfg, environment, region)
+	if cfg.Target.AWS == nil {
+		report.Estimated = []platform.CostEstimatedItem{{Resource: "MageLift preset", Configuration: valueOrUnknown(report.Preset) + " topology; exact EKS capacity is not configured"}}
+		report.Unsupported = append(report.Unsupported, platform.CostUnsupportedItem{Resource: "service capacity", Reason: "target.aws.catalog is not configured"})
+		return report
+	}
+
+	catalog := cfg.Target.AWS.Catalog
+	report.Estimated = append(report.Estimated, eksComputeCostEstimates(catalog.EKS, report.Preset)...)
+	report.Estimated = append(report.Estimated,
+		platform.CostEstimatedItem{Resource: "ElastiCache Valkey", Configuration: fmt.Sprintf("%s, %d replicas", valueOrUnknown(catalog.Valkey.NodeType), catalog.Valkey.ReplicaCount)},
+		databaseCostEstimate(catalog, report.Preset),
+	)
+	if item, ok := eksSearchCostEstimate(catalog.EKS, report.Preset); ok {
+		report.Estimated = append(report.Estimated, item)
+	}
+	report.Estimated = append(report.Estimated, eksQueueCostEstimate(catalog.EKS, report.Preset))
+	return report
+}
+
+func eksComputeCostEstimates(catalog config.AWSCatalogEKS, preset string) []platform.CostEstimatedItem {
+	mode := catalog.ComputeMode
+	if mode == "" {
+		mode = "auto-mode"
+	}
+	version := valueOrUnknown(catalog.KubernetesVersion)
+	items := []platform.CostEstimatedItem{{
+		Resource:      "Amazon EKS control plane",
+		Configuration: fmt.Sprintf("1 cluster, Kubernetes %s, %s", version, mode),
+	}}
+
+	replicas := catalog.DesiredWebReplicas
+	cpu := valueOrUnknown(catalog.CPURequest)
+	memory := valueOrUnknown(catalog.MemoryRequest)
+	switch mode {
+	case "managed-node-groups", "self-managed":
+		items = append(items, platform.CostEstimatedItem{
+			Resource: modeLabel(mode),
+			Configuration: fmt.Sprintf("%d-%d nodes, %d desired, %s; %d web replicas at %s CPU / %s memory",
+				catalog.NodeMinSize, catalog.NodeMaxSize, catalog.NodeDesiredSize, valueOrUnknown(catalog.NodeInstanceType), replicas, cpu, memory),
+		})
+	case "fargate":
+		items = append(items, platform.CostEstimatedItem{
+			Resource:      "EKS Fargate compute",
+			Configuration: fmt.Sprintf("%d web replicas at %s CPU / %s memory", replicas, cpu, memory),
+		})
+	default:
+		items = append(items, platform.CostEstimatedItem{
+			Resource:      "EKS Auto Mode compute",
+			Configuration: fmt.Sprintf("%d web replicas at %s CPU / %s memory; node capacity managed by EKS", replicas, cpu, memory),
+		})
+	}
+	return items
+}
+
+func modeLabel(mode string) string {
+	if mode == "self-managed" {
+		return "EKS self-managed nodes"
+	}
+	return "EKS managed node groups"
+}
+
+func eksSearchCostEstimate(catalog config.AWSCatalogEKS, preset string) (platform.CostEstimatedItem, bool) {
+	mode := catalog.SearchMode
+	if mode == "" {
+		if preset == "preview" {
+			mode = "disabled"
+		} else {
+			mode = "opensearch"
+		}
+	}
+	if mode == "disabled" {
+		return platform.CostEstimatedItem{}, false
+	}
+	return platform.CostEstimatedItem{
+		Resource:      "OpenSearch on EKS",
+		Configuration: fmt.Sprintf("%d StatefulSet replicas; storage and worker capacity are separate EKS inputs", maxInt(catalog.SearchReplicas, 1)),
+	}, true
+}
+
+func eksQueueCostEstimate(catalog config.AWSCatalogEKS, preset string) platform.CostEstimatedItem {
+	mode := catalog.QueueMode
+	if mode == "" {
+		if preset == "preview" {
+			mode = "database"
+		} else {
+			mode = "rabbitmq"
+		}
+	}
+	if mode == "database" {
+		return platform.CostEstimatedItem{Resource: "Magento queue", Configuration: "database-backed on EKS; no broker"}
+	}
+	return platform.CostEstimatedItem{
+		Resource:      "RabbitMQ on EKS",
+		Configuration: fmt.Sprintf("%d StatefulSet replicas and %d queue consumers; storage and worker capacity are separate EKS inputs", maxInt(catalog.QueueReplicas, 1), maxInt(catalog.QueueConsumerCount, 1)),
+	}
+}
+
+func databaseCostEstimate(catalog config.AWSCatalog, preset string) platform.CostEstimatedItem {
+	engine := catalog.DatabaseEngine
+	if engine == "" {
+		engine = "aurora-mysql"
+	}
+	switch engine {
+	case "rds-mysql":
+		return platform.CostEstimatedItem{
+			Resource:      "RDS MySQL",
+			Configuration: fmt.Sprintf("%s × %d", valueOrUnknown(catalog.Aurora.InstanceClass), maxInt(catalog.Aurora.InstanceCount, 1)),
+		}
+	default:
+		if preset == "preview" && catalog.Aurora.InstanceClass == "" {
+			return platform.CostEstimatedItem{Resource: "Aurora Serverless v2", Configuration: fmt.Sprintf("%.2f-%.2f ACU", catalog.Aurora.MinimumACU, catalog.Aurora.MaximumACU)}
+		}
+		if catalog.Aurora.InstanceCount > 0 && catalog.Aurora.InstanceClass != "" {
+			return platform.CostEstimatedItem{Resource: "Aurora MySQL", Configuration: fmt.Sprintf("%d x %s", catalog.Aurora.InstanceCount, valueOrUnknown(catalog.Aurora.InstanceClass))}
+		}
+		return platform.CostEstimatedItem{Resource: "Aurora Serverless v2", Configuration: fmt.Sprintf("%.2f-%.2f ACU", catalog.Aurora.MinimumACU, catalog.Aurora.MaximumACU)}
+	}
+}
+
+func searchCostEstimate(catalog config.AWSCatalog, preset string) (platform.CostEstimatedItem, bool) {
+	mode := catalog.SearchMode
+	if mode == "" {
+		if preset == "preview" {
+			mode = "serverless"
+		} else {
+			mode = "provisioned"
+		}
+	}
+	switch mode {
+	case "disabled":
+		return platform.CostEstimatedItem{}, false
+	case "serverless":
+		return platform.CostEstimatedItem{Resource: "OpenSearch Serverless", Configuration: fmt.Sprintf("up to %.2f indexing OCU and %.2f search OCU", catalog.Search.MaximumIndexingOCU, catalog.Search.MaximumSearchOCU)}, true
+	default:
+		if catalog.Search.InstanceCount < 1 || catalog.Search.InstanceType == "" {
+			return platform.CostEstimatedItem{}, false
+		}
+		return platform.CostEstimatedItem{Resource: "OpenSearch", Configuration: fmt.Sprintf("%d x %s data nodes", catalog.Search.InstanceCount, valueOrUnknown(catalog.Search.InstanceType))}, true
+	}
+}
+
+func queueCostEstimate(queueMode, preset, instanceType string) platform.CostEstimatedItem {
+	mode := queueMode
+	if mode == "" {
+		if preset == "preview" {
+			mode = "db"
+		} else {
+			mode = "ecs-rabbitmq"
+		}
+	}
+	switch mode {
+	case "db":
+		return platform.CostEstimatedItem{Resource: "Magento queue", Configuration: "database-backed; no broker"}
+	case "ecs-rabbitmq":
+		return platform.CostEstimatedItem{Resource: "ECS RabbitMQ broker", Configuration: "1 Fargate task (512 CPU / 1024 MiB); typically far cheaper than Amazon MQ"}
+	case "ecs-artemis":
+		return platform.CostEstimatedItem{Resource: "ECS Artemis broker", Configuration: "1 Fargate task (512 CPU / 1024 MiB); experimental Magento AMQP path"}
+	default:
+		return platform.CostEstimatedItem{Resource: "Amazon MQ for RabbitMQ", Configuration: "3 x " + valueOrUnknown(instanceType)}
+	}
+}
+
+func live(ctx context.Context, cfg config.Config, environment, region string, estimator PricingClient) (platform.CostReport, error) {
+	report := accountFree(cfg, environment, region)
+	report.Mode = "live"
+	report.Priced = []platform.CostPricedItem{}
+	report.Estimated = liveUnpricedEstimates(cfg)
+	report.Unsupported = []platform.CostUnsupportedItem{
+		{Resource: "usage-based services", Reason: "data transfer, requests, storage growth, logs, WAF, CloudFront, and NAT processing depend on workload measurements"},
+	}
+	if cfg.Target.AWS == nil {
+		return report, errors.New("target.aws is required for live pricing")
+	}
+	queries := livePriceQueries(cfg)
+	if len(queries) == 0 {
+		return report, errors.New("the selected catalog has no priceable capacity inputs")
+	}
+	var total int64
+	currency := "USD"
+	for _, query := range queries {
+		price, err := estimator.Estimate(ctx, query)
+		if err != nil {
+			if errors.Is(err, awspricing.ErrNoPrice) {
+				report.Unsupported = append(report.Unsupported, platform.CostUnsupportedItem{Resource: query.Resource, Reason: err.Error()})
+				continue
+			}
+			return report, err
+		}
+		total += price.MonthlyCents
+		if price.Currency != "" {
+			currency = price.Currency
+		}
+		report.Priced = append(report.Priced, platform.CostPricedItem{Resource: price.Resource, MonthlyCents: price.MonthlyCents, Basis: price.Basis})
+	}
+	report.Currency = currency
+	if len(report.Priced) > 0 {
+		report.MonthlyTotalCents = &total
+	}
+	if len(report.Unsupported) == 1 {
+		report.Notice = "Live mode queried AWS on-demand prices for the selected capacity. Usage-based charges remain unsupported until workload measurements are available."
+	} else {
+		report.Notice = "Live mode queried AWS on-demand prices, but some selected capacities had no matching product. Review unsupported items before treating the total as a budget."
+	}
+	return report, nil
+}
+
+func liveUnpricedEstimates(cfg config.Config) []platform.CostEstimatedItem {
+	if cfg.Target.AWS == nil {
+		return nil
+	}
+	catalog := cfg.Target.AWS.Catalog
+	preset := cfg.Preset
+	if preset == "" {
+		preset = cfg.Defaults.Preset
+	}
+	items := []platform.CostEstimatedItem{
+		{Resource: "CloudWatch, S3, CloudFront, WAF, and NAT", Configuration: "usage-based charges require workload measurements"},
+	}
+	db := databaseCostEstimate(catalog, preset)
+	db.Configuration += "; workload utilization is not priced"
+	items = append(items, db)
+	if search, ok := searchCostEstimate(catalog, preset); ok {
+		search.Configuration += "; workload utilization is not priced"
+		items = append(items, search)
+	}
+	items = append(items, queueCostEstimate(catalog.QueueMode, preset, catalog.RabbitMQ.InstanceType))
+	return items
+}
+
+func livePriceQueries(cfg config.Config) []awspricing.Query {
+	catalog := cfg.Target.AWS.Catalog
+	queries := make([]awspricing.Query, 0, 8)
+	if catalog.Fargate.DesiredCount > 0 && catalog.Fargate.CPU > 0 {
+		queries = append(queries, awspricing.Query{
+			Resource: "ECS Fargate vCPU", ServiceCode: "AmazonECS", UsageTypeContains: "Fargate-vCPU-Hours",
+			Filters:  map[string]string{"productFamily": "Compute"},
+			Quantity: float64(catalog.Fargate.DesiredCount) * float64(catalog.Fargate.CPU) / 1024, Basis: fmt.Sprintf("%d tasks × %.2f vCPU × 730 hours", catalog.Fargate.DesiredCount, float64(catalog.Fargate.CPU)/1024),
+		})
+	}
+	if catalog.Fargate.DesiredCount > 0 && catalog.Fargate.MemoryMiB > 0 {
+		queries = append(queries, awspricing.Query{
+			Resource: "ECS Fargate memory", ServiceCode: "AmazonECS", UsageTypeContains: "Fargate-GB-Hours",
+			Filters:  map[string]string{"productFamily": "Compute"},
+			Quantity: float64(catalog.Fargate.DesiredCount) * float64(catalog.Fargate.MemoryMiB) / 1024, Basis: fmt.Sprintf("%d tasks × %.2f GiB × 730 hours", catalog.Fargate.DesiredCount, float64(catalog.Fargate.MemoryMiB)/1024),
+		})
+	}
+	if catalog.Valkey.NodeType != "" {
+		queries = append(queries, awspricing.Query{
+			Resource: "ElastiCache Valkey", ServiceCode: "AmazonElastiCache", UsageTypeContains: "NodeUsage",
+			Filters:  map[string]string{"productFamily": "Cache Instance", "cacheEngine": "Valkey", "instanceType": catalog.Valkey.NodeType},
+			Quantity: float64(catalog.Valkey.ReplicaCount + 1), Basis: fmt.Sprintf("%d nodes × 730 hours", catalog.Valkey.ReplicaCount+1),
+		})
+	}
+	if catalog.Aurora.InstanceClass != "" && catalog.Aurora.InstanceCount > 0 {
+		engine := catalog.DatabaseEngine
+		if engine == "" {
+			engine = "aurora-mysql"
+		}
+		if engine == "rds-mysql" {
+			queries = append(queries, awspricing.Query{
+				Resource: "RDS MySQL", ServiceCode: "AmazonRDS", UsageTypeContains: "InstanceUsage",
+				Filters:  map[string]string{"productFamily": "Database Instance", "databaseEngine": "MySQL", "instanceType": catalog.Aurora.InstanceClass},
+				Quantity: float64(catalog.Aurora.InstanceCount), Basis: fmt.Sprintf("%d instances × 730 hours", catalog.Aurora.InstanceCount),
+			})
+		} else {
+			queries = append(queries, awspricing.Query{
+				Resource: "Aurora MySQL", ServiceCode: "AmazonRDS", UsageTypeContains: "InstanceUsage",
+				Filters:  map[string]string{"productFamily": "Database Instance", "databaseEngine": "Aurora MySQL", "instanceType": catalog.Aurora.InstanceClass},
+				Quantity: float64(catalog.Aurora.InstanceCount), Basis: fmt.Sprintf("%d instances × 730 hours", catalog.Aurora.InstanceCount),
+			})
+		}
+	}
+	if catalog.Search.InstanceType != "" && catalog.Search.InstanceCount > 0 && catalog.SearchMode != "disabled" {
+		queries = append(queries, awspricing.Query{
+			Resource: "OpenSearch data nodes", ServiceCode: "AmazonES", UsageTypeContains: "ESInstance",
+			Filters:  map[string]string{"productFamily": "Amazon OpenSearch Service Instance", "instanceType": catalog.Search.InstanceType},
+			Quantity: float64(catalog.Search.InstanceCount), Basis: fmt.Sprintf("%d data nodes × 730 hours", catalog.Search.InstanceCount),
+		})
+	}
+	if catalog.RabbitMQ.InstanceType != "" {
+		mode := catalog.QueueMode
+		if mode == "" {
+			preset := cfg.Preset
+			if preset == "" {
+				preset = cfg.Defaults.Preset
+			}
+			if preset == "preview" {
+				mode = "db"
+			} else {
+				mode = "ecs-rabbitmq"
+			}
+		}
+		if mode == "amazon-mq" {
+			queries = append(queries, awspricing.Query{
+				Resource: "Amazon MQ for RabbitMQ", ServiceCode: "AmazonMQ", UsageTypeContains: "RabbitMQ-3-InstanceUsage",
+				Filters:  map[string]string{"productFamily": "Broker Instances", "instanceType": strings.TrimPrefix(catalog.RabbitMQ.InstanceType, "mq.")},
+				Quantity: 3, Basis: "3 brokers × 730 hours",
+			})
+		}
+	}
+	return queries
+}
+
+func maxInt(v, floor int) int {
+	if v < floor {
+		return floor
+	}
+	return v
+}
+
+func valueOrUnknown(value string) string {
+	if value == "" {
+		return "unknown"
+	}
+	return value
+}
