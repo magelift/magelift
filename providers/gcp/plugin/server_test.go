@@ -23,10 +23,15 @@ func testSpec() gcpstack.Spec {
 			Region: "europe-west1", EnvironmentClass: "staging", Preset: sdk.PresetStandard,
 			Runtime: "gke-autopilot", Labels: map[string]string{"magelift-managed-by": "magelift"},
 		},
-		Application:  gcpstack.Application{Edition: "open-source", Version: "2.4.9", Mode: "integrated", WebRuntime: "nginx-fpm"},
-		Artifact:     gcpstack.Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)},
-		Policy:       gcpstack.NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c"}},
-		Catalog:      gcpstack.CatalogSelection{CloudSQLTier: "db-perf-optimized-N-2", CloudSQLAvailability: "REGIONAL", ValkeyRequirement: "9", MemorystoreEngineVersion: "VALKEY_9_0", MemorystoreNodeType: "STANDARD_SMALL", AutopilotCPURequest: "500m", AutopilotMemoryRequest: "1Gi", DesiredWebReplicas: 2},
+		Application: gcpstack.Application{Edition: "open-source", Version: "2.4.9", Mode: "integrated", WebRuntime: "nginx-fpm"},
+		Artifact:    gcpstack.Artifact{ImageDigest: "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)},
+		Policy:      gcpstack.NetworkPolicy{NetworkCIDR: "10.20.0.0/16", Zones: []string{"europe-west1-b", "europe-west1-c"}},
+		Catalog: gcpstack.CatalogSelection{
+			CloudSQLTier: "db-perf-optimized-N-2", CloudSQLAvailability: "REGIONAL", ValkeyRequirement: "9",
+			MemorystoreEngineVersion: "VALKEY_9_0", MemorystoreNodeType: "STANDARD_SMALL",
+			AutopilotCPURequest: "500m", AutopilotMemoryRequest: "1Gi", DesiredWebReplicas: 2,
+			SearchMode: "disabled", QueueMode: "database",
+		},
 		Dependencies: gcpstack.Dependencies{DatabaseName: "magento", MasterUsername: "magento", EncryptionKeySecret: "magento-crypt-key"},
 	}
 }
@@ -201,6 +206,81 @@ func TestPlanAccountOnlySkipsImageAndEncryptionKey(t *testing.T) {
 	}
 	if !spec.AccountOnly || spec.Artifact.ImageDigest != "" || spec.Dependencies.EncryptionKeySecret != "" {
 		t.Fatalf("account plan = %#v", spec)
+	}
+}
+
+func TestPlanRuntimeObserveAllowsAbsentDigest(t *testing.T) {
+	t.Parallel()
+	server := &Server{Admission: stubAdmission{}}
+	request := testPlanRequest()
+	request.RuntimeObserve = true
+	request.TargetBlock = []byte("project: example-gcp-project\nregion: europe-west1\nnetworkCidr: 10.20.0.0/16\nencryptionKeySecret: magento-crypt-key\n")
+	result, operr := server.Plan(context.Background(), request)
+	if operr != nil {
+		t.Fatal(operr)
+	}
+	var spec gcpstack.Spec
+	if err := json.Unmarshal(result.Plan.Opaque, &spec); err != nil {
+		t.Fatal(err)
+	}
+	if spec.AccountOnly || spec.Artifact.ImageDigest != "" {
+		t.Fatalf("observe plan = %#v", spec)
+	}
+}
+
+func TestDeployOperationsRejectObservePlanBeforeBackend(t *testing.T) {
+	t.Parallel()
+	for _, operation := range []string{"apply", "preview"} {
+		t.Run(operation, func(t *testing.T) {
+			backend := &stubAutomation{update: map[string]int{"create": 1}}
+			constructed := false
+			server := &Server{NewStack: func(context.Context, string, gcpstack.Spec, string) (Automation, error) {
+				constructed = true
+				return backend, nil
+			}}
+			spec := testSpec()
+			spec.Artifact.ImageDigest = ""
+			envelope, plan := testEnvelope(), storedTestPlan(t, spec)
+			envelope.StackName = plan.StackName
+			request := &sdk.StackCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan}
+			var operr *sdk.OperationError
+			if operation == "apply" {
+				_, operr = server.Apply(context.Background(), request)
+			} else {
+				_, operr = server.Preview(context.Background(), request)
+			}
+			if operr == nil || operr.Code != sdk.ErrCodeInvalid || !strings.Contains(operr.Message, "artifact image digest") {
+				t.Fatalf("%s error = %v", operation, operr)
+			}
+			if constructed || len(backend.calls) != 0 {
+				t.Fatalf("invalid plan reached backend: constructed=%v calls=%v", constructed, backend.calls)
+			}
+		})
+	}
+}
+
+func TestDestroyEmptyDigestPlanSucceedsWithoutUpdate(t *testing.T) {
+	t.Parallel()
+	backend := &stubAutomation{destroy: map[string]int{"delete": 2}}
+	server := &Server{Admission: stubAdmission{}, NewStack: func(context.Context, string, gcpstack.Spec, string) (Automation, error) {
+		return backend, nil
+	}}
+	request := testPlanRequest()
+	request.AllowExpiredPreview = true
+	request.TargetBlock = []byte("project: example-gcp-project\nregion: europe-west1\nnetworkCidr: 10.20.0.0/16\nencryptionKeySecret: magento-crypt-key\n")
+	planned, operr := server.Plan(context.Background(), request)
+	if operr != nil {
+		t.Fatal(operr)
+	}
+	envelope := testEnvelope()
+	envelope.StackName = planned.Plan.StackName
+	envelope.StateBackendURL = planned.Plan.StateBackendURL
+	_, operr = server.Destroy(context.Background(), &sdk.StackCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: planned.Plan})
+	if operr != nil {
+		t.Fatal(operr)
+	}
+	if len(backend.calls) != 1 || backend.calls[0] != "destroy" {
+		t.Fatalf("backend calls = %v", backend.calls)
 	}
 }
 

@@ -21,15 +21,30 @@ import (
 	"github.com/magelift/magelift/sdk"
 )
 
-// loadSpecCall unmarshals and cross-checks a plan-scoped call. Every
-// plan-scoped handler starts here so the integrity check cannot be skipped.
+// loadSpecCall unmarshals and cross-checks a plan-scoped call for mutating
+// lifecycle paths. Deploy validation stays strict.
 func loadSpecCall(envelope sdk.Envelope, plan sdk.StoredPlan) (gcpstack.Spec, *sdk.OperationError) {
+	return loadSpecCallWithValidation(envelope, plan, func(spec gcpstack.Spec) error { return spec.Validate() })
+}
+
+// loadSpecCallForRuntimeObserve is for output-backed read paths that may
+// carry a plan produced without a YAML image digest.
+func loadSpecCallForRuntimeObserve(envelope sdk.Envelope, plan sdk.StoredPlan) (gcpstack.Spec, *sdk.OperationError) {
+	return loadSpecCallWithValidation(envelope, plan, func(spec gcpstack.Spec) error { return spec.ValidateForRuntimeObserve() })
+}
+
+func loadSpecCallWithValidation(envelope sdk.Envelope, plan sdk.StoredPlan, validate func(gcpstack.Spec) error) (gcpstack.Spec, *sdk.OperationError) {
 	spec, operr := loadSpec(plan.Opaque)
 	if operr != nil {
 		return gcpstack.Spec{}, operr
 	}
 	if operr := checkEnvelope(envelope, plan, spec); operr != nil {
 		return gcpstack.Spec{}, operr
+	}
+	if validate != nil {
+		if err := validate(spec); err != nil {
+			return gcpstack.Spec{}, InvalidError(err.Error())
+		}
 	}
 	return spec, nil
 }
@@ -244,7 +259,7 @@ func (s *Server) TailLogs(ctx context.Context, req *sdk.TailLogsCall) (*sdk.Tail
 	if req == nil {
 		return nil, InvalidError("tail logs call is required")
 	}
-	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	spec, operr := loadSpecCallForRuntimeObserve(req.Envelope, req.Plan)
 	if operr != nil {
 		return nil, operr
 	}
@@ -300,7 +315,7 @@ func (s *Server) CheckRuntime(ctx context.Context, req *sdk.CheckRuntimeCall) (*
 	if req == nil {
 		return nil, InvalidError("check runtime call is required")
 	}
-	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	spec, operr := loadSpecCallForRuntimeObserve(req.Envelope, req.Plan)
 	if operr != nil {
 		return nil, operr
 	}
@@ -324,7 +339,7 @@ func (s *Server) PrepareExec(ctx context.Context, req *sdk.PrepareExecCall) (*sd
 	if req == nil {
 		return nil, InvalidError("prepare exec call is required")
 	}
-	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	spec, operr := loadSpecCallForRuntimeObserve(req.Envelope, req.Plan)
 	if operr != nil {
 		return nil, operr
 	}
@@ -352,7 +367,7 @@ func (s *Server) PrepareTunnel(ctx context.Context, req *sdk.PrepareTunnelCall) 
 	if req == nil {
 		return nil, InvalidError("prepare tunnel call is required")
 	}
-	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	spec, operr := loadSpecCallForRuntimeObserve(req.Envelope, req.Plan)
 	if operr != nil {
 		return nil, operr
 	}

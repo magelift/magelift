@@ -257,9 +257,34 @@ func (s Spec) ValidateAccount() error {
 	return s.validate(validateOptions{accountOnly: true})
 }
 
+// ValidateForRuntimeObserve is restricted to output-backed read paths. It
+// keeps full structural and security checks while permitting an absent image
+// digest. Malformed non-empty digests still fail.
+func (s Spec) ValidateForRuntimeObserve() error {
+	return s.validate(validateOptions{runtimeObserve: true})
+}
+
 type validateOptions struct {
 	allowExpiredPreview bool
 	accountOnly         bool
+	runtimeObserve      bool
+}
+
+func (s Spec) artifactDigestProblems(options validateOptions) []error {
+	if options.accountOnly {
+		return nil
+	}
+	d := strings.TrimSpace(s.Artifact.ImageDigest)
+	if options.runtimeObserve || options.allowExpiredPreview {
+		if d != "" && !digest.MatchString(d) {
+			return []error{errors.New("artifact image digest must be repository@sha256:...")}
+		}
+		return nil
+	}
+	if !digest.MatchString(d) {
+		return []error{errors.New("artifact image digest must be repository@sha256:...")}
+	}
+	return nil
 }
 
 func (s Spec) validate(options validateOptions) error {
@@ -322,9 +347,7 @@ func (s Spec) validate(options validateOptions) error {
 	if s.Identity.Preset != sdk.PresetPreview && s.Identity.Preset != sdk.PresetStandard && s.Identity.Preset != sdk.PresetHighAvailability {
 		problems = append(problems, fmt.Errorf("invalid preset %q", s.Identity.Preset))
 	}
-	if !options.accountOnly && !digest.MatchString(s.Artifact.ImageDigest) {
-		problems = append(problems, errors.New("artifact image digest must be repository@sha256:..."))
-	}
+	problems = append(problems, s.artifactDigestProblems(options)...)
 	if _, err := netip.ParsePrefix(s.Policy.NetworkCIDR); err != nil {
 		problems = append(problems, fmt.Errorf("network CIDR: %w", err))
 	}

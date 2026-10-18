@@ -334,6 +334,58 @@ func gcpDeploymentInputs() PlanInputs {
 	}
 }
 
+func TestPlanFromInputsDeployRejectsMissingImage(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Target.ImageDigest = ""
+	if _, err := PlanFromInputs(in); err == nil || !strings.Contains(err.Error(), "artifact image digest") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestPlanFromInputsRuntimeObserveAllowsAbsentDigest(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.RuntimeObserve = true
+	in.Target.ImageDigest = ""
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.AccountOnly {
+		t.Fatal("observe plan was marked account-only")
+	}
+	if err := spec.Validate(); err == nil {
+		t.Fatal("strict validate accepted an observe-shaped spec without digest")
+	}
+	if err := spec.ValidateForRuntimeObserve(); err != nil {
+		t.Fatalf("observe validate: %v", err)
+	}
+}
+
+func TestPlanFromInputsRuntimeObserveRejectsMalformedDigest(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.RuntimeObserve = true
+	in.Target.ImageDigest = "ghcr.io/magelift/magento:latest"
+	if _, err := PlanFromInputs(in); err == nil || !strings.Contains(err.Error(), "artifact image digest") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestPlanFromInputsTeardownAllowsAbsentDigest(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.AllowExpiredPreview = true
+	in.Target.ImageDigest = ""
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := spec.Validate(); err == nil {
+		t.Fatal("strict validate accepted teardown plan without digest")
+	}
+	if err := spec.ValidateAllowExpiredPreview(); err != nil {
+		t.Fatalf("teardown validate: %v", err)
+	}
+}
+
 func TestPlanFromInputsAccountOnlySkipsImageAndEncryptionKey(t *testing.T) {
 	in := gcpDeploymentInputs()
 	in.AccountOnly = true

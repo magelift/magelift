@@ -16,6 +16,10 @@ or change the selected environment.
 - Select the environment explicitly with `--env` in automation.
 - Run `magelift health --mode config` before a live operation.
 - Use `magelift health --mode runtime` after deploy, rollback, or a provider change.
+- GCP outputs, exec, logs, tunnels and health in outputs/runtime mode read the
+  existing stack without a YAML image digest or local build journal. Deploy and preview still
+  require the immutable artifact. Destroy does not require a build.
+- With `nginx-fpm`, select `--container php-fpm` for PHP/Magento exec commands.
 - Treat `outputs` as data. Do not paste secrets into tickets or agent prompts.
 - Use `destroy --yes` only for the exact environment you intend to remove.
 - `exec --service deploy` is rejected by design; read deploy logs instead.

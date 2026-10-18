@@ -26,7 +26,11 @@ type PlanOptions struct {
 	// require a built image or an encryption-key secret, and it does not
 	// query catalogs that exist only for deploy.
 	AccountOnly bool
-	Context     context.Context
+	// RuntimeObserve plans output-backed read paths (exec, logs, tunnel,
+	// runtime health). Deploy, preview, apply, and destroy must leave it
+	// false.
+	RuntimeObserve bool
+	Context        context.Context
 }
 
 // PlannedStack is an opaque, validated stack plan produced by a StackModule.

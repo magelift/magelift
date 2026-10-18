@@ -34,6 +34,7 @@ type PlanInputs struct {
 	AllowUnsupported    bool
 	AllowExpiredPreview bool
 	AccountOnly         bool
+	RuntimeObserve      bool
 }
 
 func PlanFromInputs(in PlanInputs) (Spec, error) {
@@ -314,6 +315,8 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 	switch {
 	case in.AccountOnly:
 		validate = spec.ValidateAccount
+	case in.RuntimeObserve:
+		validate = spec.ValidateForRuntimeObserve
 	case in.AllowExpiredPreview:
 		validate = spec.ValidateAllowExpiredPreview
 	}

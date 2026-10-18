@@ -472,7 +472,7 @@ func joinReleaseError(err, releaseErr error) error {
 
 func outputsCommand(o *options) *cobra.Command {
 	return &cobra.Command{Use: "outputs", Short: "Read outputs from the selected environment", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		environment, planned, err := o.planStack(false)
+		environment, planned, err := o.planStackForRuntimeObserve()
 		if err != nil {
 			return invalid(err)
 		}
@@ -510,6 +510,12 @@ func outputsCommand(o *options) *cobra.Command {
 
 func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedStack, error) {
 	return o.planStackWith(platform.PlanOptions{AllowExpiredPreview: allowExpiredPreview})
+}
+
+// planStackForRuntimeObserve plans for output-backed read paths (exec, logs,
+// tunnel, runtime health) without requiring target.imageDigest in YAML.
+func (o *options) planStackForRuntimeObserve() (string, platform.PlannedStack, error) {
+	return o.planStackWith(platform.PlanOptions{RuntimeObserve: true})
 }
 
 func (o *options) planStackWith(opts platform.PlanOptions) (string, platform.PlannedStack, error) {

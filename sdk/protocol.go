@@ -242,6 +242,10 @@ type PlanRequest struct {
 	// planning leaves it false and still requires the image digest and
 	// encryption-key secret.
 	AccountOnly bool `json:"accountOnly,omitempty"`
+	// RuntimeObserve asks for a plan used only by output-backed read paths.
+	// It permits an absent image digest at plan time without setting
+	// AccountOnly. Deploy and destroy planning leave it false.
+	RuntimeObserve bool `json:"runtimeObserve,omitempty"`
 }
 
 // PlanResult carries the stored plan or a typed validation failure.

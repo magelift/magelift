@@ -62,7 +62,7 @@ func (o *options) runHealth(ctx context.Context, mode string) (health.Report, er
 	case "config":
 		report.Checks = o.configHealthChecks(effective.Config)
 	case "outputs":
-		_, planned, err := o.planStack(false)
+		_, planned, err := o.planStackForRuntimeObserve()
 		if err != nil {
 			return health.Report{}, invalid(err)
 		}

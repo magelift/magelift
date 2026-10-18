@@ -175,7 +175,7 @@ func (o *options) prepareRemoteCommand(ctx context.Context, service, container s
 }
 
 func (o *options) plannedOutputs(ctx context.Context) (string, platform.PlannedStack, map[string]any, error) {
-	environment, planned, err := o.planStack(false)
+	environment, planned, err := o.planStackForRuntimeObserve()
 	if err != nil {
 		return "", nil, nil, invalid(err)
 	}

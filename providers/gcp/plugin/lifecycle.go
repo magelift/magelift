@@ -144,6 +144,7 @@ func (s *Server) Plan(ctx context.Context, req *sdk.PlanRequest) (*sdk.PlanResul
 		AllowUnsupported:    req.AllowUnsupported,
 		AllowExpiredPreview: req.AllowExpiredPreview,
 		AccountOnly:         req.AccountOnly,
+		RuntimeObserve:      req.RuntimeObserve,
 	})
 	if err != nil {
 		return nil, InvalidError(err.Error())
@@ -192,6 +193,9 @@ func (s *Server) Preview(ctx context.Context, req *sdk.StackCall) (*sdk.Lifecycl
 	if operr := checkEnvelope(req.Envelope, req.Plan, spec); operr != nil {
 		return nil, operr
 	}
+	if err := spec.Validate(); err != nil {
+		return nil, InvalidError(err.Error())
+	}
 	metadata, operr := previewMetadata(req.PreviewMetadataJSON)
 	if operr != nil {
 		return nil, operr
@@ -229,6 +233,13 @@ func (s *Server) runStackMutation(ctx context.Context, req *sdk.StackCall, destr
 	}
 	if operr := checkEnvelope(req.Envelope, req.Plan, spec); operr != nil {
 		return nil, operr
+	}
+	if destroying {
+		if err := spec.ValidateAllowExpiredPreview(); err != nil {
+			return nil, InvalidError(err.Error())
+		}
+	} else if err := spec.Validate(); err != nil {
+		return nil, InvalidError(err.Error())
 	}
 	metadata, operr := previewMetadata(req.PreviewMetadataJSON)
 	if operr != nil {
@@ -304,6 +315,9 @@ func (s *Server) Outputs(ctx context.Context, req *sdk.StackCall) (*sdk.OutputsR
 	}
 	if operr := checkEnvelope(req.Envelope, req.Plan, spec); operr != nil {
 		return nil, operr
+	}
+	if err := spec.ValidateForRuntimeObserve(); err != nil {
+		return nil, InvalidError(err.Error())
 	}
 	backend, err := s.newStack(ctx, req.Plan.StackName, spec, backendURLFor(req.Plan, req.Envelope))
 	if err != nil {

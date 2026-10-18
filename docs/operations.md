@@ -42,6 +42,13 @@ When `preview`, `deploy`, or `destroy` fails because another Pulumi update
 holds the stack lock, the command exits 5 with a wait-and-retry sentence
 instead of the generic failure, so CI can tell a collision from a graph bug.
 
+After a GCP CI deployment, outputs, exec, logs, tunnels and health in
+outputs/runtime mode use existing stack outputs. They do not require an image digest in the YAML or a
+local build journal. Deploy and preview still require the immutable application
+image. Destroy can remove an owned environment without an application build;
+its protection and ownership checks still apply. See
+[ADR 0019](adr/0019-gcp-runtime-operation-plans.md).
+
 Production requests need an approval and a digest-pinned signed image. Deployment
 re-verifies the promoted digest against its recorded certificate identity and OIDC
 issuer before any infrastructure mutation. A rollback is another forward deployment.

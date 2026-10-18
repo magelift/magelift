@@ -167,8 +167,21 @@ func TestShimPlan(t *testing.T) {
 	if !strings.Contains(string(captured.TargetBlock), "example-gcp-project") {
 		t.Fatalf("target block = %s", captured.TargetBlock)
 	}
-	if captured.Runtime != "gke-autopilot" || captured.ValkeyRequirement != "9" || !captured.AllowExpiredPreview || captured.AccountOnly {
+	if captured.Runtime != "gke-autopilot" || captured.ValkeyRequirement != "9" || !captured.AllowExpiredPreview || captured.AccountOnly || captured.RuntimeObserve {
 		t.Fatalf("request = %#v", captured)
+	}
+}
+
+func TestShimPlanForwardsRuntimeObserve(t *testing.T) {
+	t.Parallel()
+	caller := &stubCaller{respond: planResponder(cannedStoredPlan())}
+	module := shimTestModule(t, caller)
+	if _, err := module.Plan(shimTestConfig(), "staging", platform.PlanOptions{RuntimeObserve: true}); err != nil {
+		t.Fatal(err)
+	}
+	captured, ok := caller.args[0].(*sdk.PlanRequest)
+	if !ok || !captured.RuntimeObserve {
+		t.Fatalf("request = %#v", caller.args[0])
 	}
 }
 

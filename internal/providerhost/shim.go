@@ -108,6 +108,7 @@ type retainedInputs struct {
 	allowUnsupported    bool
 	allowExpiredPreview bool
 	accountOnly         bool
+	runtimeObserve      bool
 }
 
 func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
@@ -159,6 +160,7 @@ func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.P
 		allowUnsupported:    cfg.Compatibility.AllowUnsupported,
 		allowExpiredPreview: opts.AllowExpiredPreview,
 		accountOnly:         opts.AccountOnly,
+		runtimeObserve:      opts.RuntimeObserve,
 	}
 	return m.replan(planContext(opts), inputs)
 }
@@ -184,6 +186,7 @@ func (m *ShimModule) replan(ctx context.Context, inputs retainedInputs) (*ShimPl
 		AllowUnsupported:    inputs.allowUnsupported,
 		AllowExpiredPreview: inputs.allowExpiredPreview,
 		AccountOnly:         inputs.accountOnly,
+		RuntimeObserve:      inputs.runtimeObserve,
 	})
 	if err != nil {
 		return nil, err

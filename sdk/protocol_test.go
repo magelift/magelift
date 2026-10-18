@@ -3,6 +3,7 @@ package sdk
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -184,5 +185,23 @@ func TestPluginMethodsCoverAllOperations(t *testing.T) {
 	}
 	if _, err := PluginMethod("nope"); err == nil {
 		t.Error("PluginMethod(unknown) succeeded, want error")
+	}
+}
+
+func TestPlanRequestRuntimeObserveDefaultsFalse(t *testing.T) {
+	t.Parallel()
+	var decoded PlanRequest
+	if err := json.Unmarshal([]byte(`{"protocolVersion":"1.0"}`), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.RuntimeObserve || decoded.AccountOnly {
+		t.Fatalf("defaults = %#v", decoded)
+	}
+	encoded, err := json.Marshal(&PlanRequest{ProtocolVersion: ProtocolV1, RuntimeObserve: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"runtimeObserve":true`) {
+		t.Fatalf("encoded = %s", encoded)
 	}
 }

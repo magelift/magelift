@@ -30,13 +30,14 @@ type digestProbeKey struct{}
 // digestProbe refuses an empty, stale, or malformed digest on Plan, which is
 // the provider boundary that runs before WithImageDigest.
 type digestProbe struct {
-	stale         string
-	refuse        bool
-	plans         []string
-	allowExpired  []bool
-	contexts      []context.Context
-	backendOpened bool
-	backendDigest string
+	stale          string
+	refuse         bool
+	plans          []string
+	allowExpired   []bool
+	runtimeObserve []bool
+	contexts       []context.Context
+	backendOpened  bool
+	backendDigest  string
 }
 
 func (p *digestProbe) Descriptor() sdk.TargetDescriptor {
@@ -64,8 +65,9 @@ func (p *digestProbe) Plan(cfg config.Config, environment string, opts platform.
 	}
 	p.plans = append(p.plans, digest)
 	p.allowExpired = append(p.allowExpired, opts.AllowExpiredPreview)
+	p.runtimeObserve = append(p.runtimeObserve, opts.RuntimeObserve)
 	p.contexts = append(p.contexts, opts.Context)
-	if p.refuse && (digest == "" || digest == p.stale || !deployDigestPattern.MatchString(digest)) {
+	if p.refuse && !opts.RuntimeObserve && (digest == "" || digest == p.stale || !deployDigestPattern.MatchString(digest)) {
 		return nil, fmt.Errorf("refusing image digest %q", digest)
 	}
 	return stubPlanned{
@@ -217,6 +219,60 @@ func TestPlanStackWithPreservesContextAndEmptyDigest(t *testing.T) {
 	}
 	if probe.plans[0] != "" || probe.plans[1] != "" || !probe.allowExpired[1] || probe.allowExpired[0] {
 		t.Fatalf("plans=%v expired=%v", probe.plans, probe.allowExpired)
+	}
+}
+
+func TestPlannedOutputsUsesRuntimeObservePlan(t *testing.T) {
+	path, _ := writeFreshGCPConfig(t, "")
+	probe := &digestProbe{refuse: true}
+	o := digestDeployOptions(t, path, probe)
+	if _, _, _, err := o.plannedOutputs(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(probe.runtimeObserve) != 1 || !probe.runtimeObserve[0] {
+		t.Fatalf("runtimeObserve = %v", probe.runtimeObserve)
+	}
+}
+
+func TestOutputCommandsUseRuntimeObservePlan(t *testing.T) {
+	for _, operation := range []string{"outputs", "health-outputs"} {
+		t.Run(operation, func(t *testing.T) {
+			path, original := writeFreshGCPConfig(t, "")
+			probe := &digestProbe{refuse: true}
+			o := digestDeployOptions(t, path, probe)
+			if operation == "outputs" {
+				cmd := newCommandWithOptions(o)
+				cmd.SetArgs([]string{"--config", path, "--env", "test", "--output", "json", "outputs"})
+				if err := cmd.Execute(); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if _, err := o.runHealth(context.Background(), "outputs"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			assertConfigUnchanged(t, path, original)
+			if len(probe.runtimeObserve) != 1 || !probe.runtimeObserve[0] || !probe.backendOpened {
+				t.Fatalf("runtimeObserve=%v backend=%v", probe.runtimeObserve, probe.backendOpened)
+			}
+		})
+	}
+}
+
+func TestDeployPlanNeverSetsRuntimeObserve(t *testing.T) {
+	path, original := writeFreshGCPConfig(t, "")
+	probe := &digestProbe{}
+	o := digestDeployOptions(t, path, probe)
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "--env", "test", "--output", "json", "deploy", "--digest", freshDeployDigest})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	assertConfigUnchanged(t, path, original)
+	for _, observe := range probe.runtimeObserve {
+		if observe {
+			t.Fatal("deploy planning set RuntimeObserve")
+		}
 	}
 }
 
