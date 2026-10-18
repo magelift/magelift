@@ -24,7 +24,8 @@ Always-on layer. Load one skill from the table. Do not paste skill bodies,
 - Hand-edit generated schema, the CLI reference, certification coverage, or
   `agents/manifest.json`. Use `make generate`.
 - File session resumes, KEEP run IDs, or facts the code already answers
-  into `.agents/knowledge/`. Commit that bundle. Leave `.cursor/`,
+  into `.agents/knowledge/`. Authoring rules are
+  `.agents/knowledge/CONVENTIONS.md`. Commit that bundle. Leave `.cursor/`,
   `.claude/`, other `.agents/` caches, credentials, Pulumi state, and
   third-party skill packs untracked.
 

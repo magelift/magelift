@@ -1,5 +1,9 @@
 # Log
 
+## 2026-10-19
+
+- Authoring rules now live in [CONVENTIONS.md](CONVENTIONS.md), with `tools/rebuild-index.py` and `tools/validate-okf.py`. The bundle does not depend on a home-directory vault.
+
 ## 2026-10-18
 
 - Removed 92 lessons that restated code, harness diaries, drafts, or experimental-provider archaeology. Kept the GCP alpha traps, the certified AWS Fargate traps, and the cross-cutting rules for teardown, signatures, and image build.

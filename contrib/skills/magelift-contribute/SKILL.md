@@ -62,7 +62,7 @@ GoReleaser config; the full matrix stays on CI.
 - Marking experimental cells as production-ready
 - Registering only `infra.RegisterTarget` without `cmd/magelift` module wiring
 - Committing `.claude/`, `.cursor/`, `.agents/` caches, or vendored third-party skills
-- Omitting `.agents/knowledge/` (that bundle is tracked)
+- Omitting `.agents/knowledge/` (that bundle is tracked; its authoring rules are `.agents/knowledge/CONVENTIONS.md`)
 - Running full multi-platform GoReleaser matrices as a local smoke test
 - Filing session resumes or KEEP run IDs into `.agents/knowledge/`
 - Using a private sibling Magento shop as certification evidence or as the
