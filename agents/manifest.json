@@ -43,7 +43,7 @@
     "name": "magelift-operate",
     "description": "Operate a MageLift environment after deployment. Use for status, health, logs, safe Magento commands, release promotion, rollback, and teardown.",
     "version": "1.0.0",
-    "digest": "699aacc220328c819f5d20be6fae3fa5c5710ea7a5b4fae3feaf4d4aee8def3f",
+    "digest": "7a44792a529c92d6415200059367a28356fb721b2dc2f51f524a9292b67f4544",
     "sources": [
       "embedded",
       "skills-cli"

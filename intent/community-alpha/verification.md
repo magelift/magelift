@@ -1382,3 +1382,41 @@ Functional storefront, indexed search, cron, queue, private-media checks, a
 second functional release, persistence and final cleanup remain NOT_RUN.
 Humanizer review is complete; remove-ai-marks remains NOT_RUN because its local
 service is unavailable.
+
+### S3 integrated empty-database migration proof
+
+Commit c7e5300 adds an optional runtime-observation planning scope, so outputs,
+exec, logs, tunnels and health in outputs/runtime mode do not need the CI digest
+copied into YAML. Deploy and ordinary preview still reject missing or malformed
+images before backend construction. Targeted CLI, providerhost, SDK, plugin and
+stack tests pass. Independent review found that destroy's existing preliminary
+preview also needs a teardown path; that correction is in progress. The direct
+Destroy stub test alone does not establish the complete CLI teardown flow.
+
+Commit cbb05a3 embeds the initial-database helper through the existing PHP plan
+and generated Go lifecycle. A first implementation depended on a builder-only
+path and was corrected before acceptance. The parent also removed blocking
+sequential pipe drains, preserved subprocess exit codes, and bounded unexpected
+configuration errors without exposing exception details. PHP 8.5.11 validation,
+static analysis and all 172 tests with 418 assertions pass. Targeted platform,
+Kubernetes migration and POSIX shell-argument tests pass.
+
+The actual Go-rendered migration shell was captured and executed twice in the
+signed reference application image, with no Composer build package installed
+inside it. The authoritative local run passes all 21 stages and raw capture
+hashes. The empty database becomes 360 tables, with default websites and stores,
+zero administrators and the same configured crypt key. Database status exits
+zero. A second shell run skips initial bootstrap, preserves marker ID 1 and
+again reports healthy database status. The marker is a synthetic PDO row, not
+Magento product/CMS persistence. Two earlier operator-script attempts stopped
+before the migration shell ran; they are not successful product runs. Every
+scoped Docker container, volume and network was removed.
+
+A later read-only controller check now reports the native certificate and its
+domain Active. The previously observed strict HTTPS result was HTTP 500, so
+application health remains failed until the corrected distributed deployment.
+Live functional probes, two functional releases, product persistence and final
+GCP cleanup remain NOT_RUN. The same owned GCP resources and DNS record remain;
+state and original key are retained. No paid AWS test or new cloud stack was
+started. Humanizer review is complete; remove-ai-marks remains NOT_RUN because
+its service is unavailable.

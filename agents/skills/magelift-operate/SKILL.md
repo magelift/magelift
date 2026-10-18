@@ -20,6 +20,9 @@ or change the selected environment.
   existing stack without a YAML image digest or local build journal. Deploy and preview still
   require the immutable artifact. Destroy does not require a build.
 - With `nginx-fpm`, select `--container php-fpm` for PHP/Magento exec commands.
+- First deployment initializes schema/data only when the database has zero tables.
+  A migration failure stops without automatic retries. Preserve a partial database
+  for diagnosis and repair; do not clear it to force initialization.
 - Treat `outputs` as data. Do not paste secrets into tickets or agent prompts.
 - Use `destroy --yes` only for the exact environment you intend to remove.
 - `exec --service deploy` is rejected by design; read deploy logs instead.
