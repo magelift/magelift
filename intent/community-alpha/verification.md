@@ -2,9 +2,8 @@
 
 ## Resume — 2026-10-18, plan v1.3
 
-Next action: publish the verified canary as a prerelease, point the fixture
-at that version, and redeploy the user image on the retained stack. Do not
-recreate GKE, SQL, or the network.
+Next action: let fixture CI build and deploy the corrected image on the
+retained stack. Do not recreate GKE, SQL, or the network.
 
 Already found:
 
@@ -12,11 +11,11 @@ Already found:
   `reboot/community-alpha` and on origin. Canary tag
   `v0.0.0-canary.3659aa34533066b37d5bbd5a49b77bd083723647` finished release
   run `39151763166`. Local checks passed for `checksums.txt`, its Sigstore
-  bundle, and the linux/amd64 provider bundle. The GitHub release is still
-  a draft: the canary workflow skips the undraft step. Fixture checkout
-  `/home/alex/workspace/acceptance-magento-249` is `main` at
-  `e4e133ee085a8de780d90fac937d11525b80fadf`, even with origin. Ignored
-  `magelift.acceptance.yaml` is absent from that fresh clone.
+  bundle, and the linux/amd64 provider bundle. The release is a published
+  prerelease; the canary workflow leaves that step manual. Fixture `main`
+  commit `198d0f14` pins that canary. A preview of the retained stack with
+  the current digest reported 51 unchanged resources and one update of the
+  Kubernetes provider. No GKE, SQL, or network replacement was proposed.
 - Retained campaign, read-only: project `digital-lab-341608`, region
   `us-central1`, cluster `magelift-org249-ec2a332-test-gke` RUNNING, SQL
   `magelift-org249-ec2a332-test-sql` MYSQL_8_4 RUNNABLE. Workloads web and
@@ -67,9 +66,9 @@ clean-room, community acceptance doubles). `scripts/nginx-media-deny-test.sh`
 passed: versioned static maps to on-disk CSS, and the pre-fix config
 still 404s.
 
-Blockers: fixture CI cannot download the canary while the release stays a
-draft. gcloud user tokens need reauth; Application Default Credentials can
-list this project. No second mutation agent. Cleanup NOT_STARTED.
+Blockers: gcloud user tokens need reauth; Application Default Credentials
+can list this project and the preview above used them. No second mutation
+agent. Cleanup NOT_STARTED.
 
 Historical sections below stay as written.
 
