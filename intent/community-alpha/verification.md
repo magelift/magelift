@@ -2,9 +2,9 @@
 
 ## Resume — 2026-10-18, plan v1.3
 
-Next action: publish a canary that contains the anchored static deny,
-then deploy one second image with the homepage release marker. Do not
-recreate GKE, SQL, or the network.
+Next action: export the private proof bundle, stop this fixture from
+deploying on push, then destroy the retained stack and check the native
+inventory. Do not recreate GKE, SQL, or the network.
 
 Already found:
 
@@ -50,9 +50,24 @@ Already found:
   (`status` 4, body match).
 - Media on this image: PASS. Catalog marker is HTTPS 200 text/plain.
   `/media/customer/...` is 403. Anonymous GCS `storage.objects.get` is 403.
-- Readiness: PASS for this deploy. Run `39153317832` finished the deploy
-  job, which is the Magento readiness probe after migrations. The earlier
-  bare-host search failure was CI run `39135412332`.
+- Readiness: PASS. Run `39153317832` finished the first corrected deploy.
+  The earlier bare-host search failure was CI run `39135412332`.
+- Second image: CI run `39156876510` attempt 1 built
+  `sha256:f4762c57dc3763130d287d57e4497c200c08b2041151d1cf080ba4e14f036249`,
+  migrated, and updated only the Kubernetes provider plus the web and cron
+  Deployments. Its storefront probe then failed:
+  `Magento HTTP probe did not complete` (5s client timeout immediately
+  after rollout). Attempt 2 redeployed that same digest without rebuilding
+  and succeeded. The homepage now shows `magelift-org249-release-2`. The
+  original product, price, and search still resolve. `jquery.color.js`
+  under the static vendor segment is HTTP 200 `application/javascript`.
+  Cron on this image: PASS for bound `2026-10-18T19:18:53Z`, including
+  `indexer_update_all_views` and `consumers_runner`.
+- `make verify-community` passed on `94a9c57` (172 PHP tests / 418
+  assertions, targeted race, clean-room). Canary
+  `v0.0.0-canary.94a9c57f04eddca08bba09611e7e2e0ec3584c96` is a published
+  prerelease after local checksum and provider-bundle verification.
+  Release run `39155817946`.
 
 `make verify-community` on this dirty tree passed on 2026-10-18
 (root, SDK, GCP, targeted race, 172 PHP tests / 418 assertions,
