@@ -2,10 +2,10 @@
 
 Updated: 2026-10-18.
 
-The maintainer's [implementation plan](../MageLift_Plan_Implementation_Codex.md)
-version 1.2 replaces versions 1.0/1.1 and their ML-xx priorities. It is execution
-authority; no repeated spec/plan approval is needed for each subtask. Existing
-verified work is retained. Historical reports remain historical evidence.
+The active [implementation plan](../IMPLEMENTATION_PLAN.md) is v1.3. It
+replaces plan v1.2 and the ML-xx priorities. It is execution authority; no
+repeated spec/plan approval is needed for each subtask. Existing verified
+work is retained. Historical reports remain historical evidence.
 Tags/publication, history rewrite, protected destruction and spending outside
 the envelope still require approval. Never destroy foreign resources.
 
@@ -60,9 +60,13 @@ GCP acceptance is authorized in `digital-lab-341608` (the maintainer also
 previously allowed `n8n-dlab` if rights required it). Prefer the selected
 `us-central1` reference region, whose compared compute/SQL components tied
 for the lowest inspected prices. Recheck the exact service/cost assumptions
-before mutations; credits do not prove zero gross cost. Every run gets its
-own fresh `magelift-` prefix, owner record, bounded lifetime and cleanup.
-No unapproved retained debug environment.
+before mutations; credits do not prove zero gross cost. The current
+community-alpha campaign keeps its existing project, region, stack, state
+and key until the final verified teardown in `IMPLEMENTATION_PLAN.md`.
+Do not mint a fresh prefix or destroy that stack to rerun a probe. After
+that teardown, new runs go back to a fresh `magelift-` prefix, an owner
+record, a bounded lifetime and cleanup. No other unapproved retained debug
+environment.
 
 The configured default AWS account is authorized for targeted acceptance.
 The announced credits are approximately USD150: at most USD100 planned test

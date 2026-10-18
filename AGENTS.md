@@ -26,9 +26,12 @@ Always-on layer only. Load one skill from the tables below. Do not paste skill b
   Live GCP uses the dedicated acceptance project. AWS stays targeted and
   inside the envelope in `intent/ROADMAP.md`. OVH, Scaleway, Cloudflare,
   New Relic, and Fastly stay light smoke and do not block the alpha. Load
-  `magelift-certify` before a live mutation; destroy on exit; no KEEP unless
-  a retained debug cell records an owner, expiry, inventory, and destroy
-  procedure. CLI exit is not the only cleanup for an interrupted run.
+  `magelift-certify` before a live mutation. The retained community-alpha
+  campaign in `IMPLEMENTATION_PLAN.md` stays up through its last required
+  test, then a verified teardown; do not destroy it on session or CLI exit.
+  Other cells still destroy on exit. No KEEP unless a retained debug cell
+  records an owner, expiry, inventory, and destroy procedure. CLI exit is
+  not the only cleanup for an interrupted run.
 - Commit `.cursor/`, `.claude/`, `.agents/` caches, credentials, Pulumi state,
   or third-party skill packs. Do commit `.agents/knowledge/`.
 - Share Pulumi components behind `if provider ==`. Topology stays in
@@ -46,13 +49,13 @@ rewrite, and cloud spend outside the envelope in `intent/ROADMAP.md`.
 
 ## Do
 
-- Active work follows `intent/ROADMAP.md` and maintainer plan v1.2: S0–S3
-  lead to the test alpha; S4/S5 follow pilots. These replace ML-xx priorities,
-  rather than adding requirements. One lot is active at a time. The plan is
-  execution authority for these lots. Do not open another spec or plan
-  approval for each subtask. A checked box in an older plan is re-verified,
-  not rebuilt. Pause unfinished work outside the active lot. Do not mark it
-  done.
+- Active work follows `intent/ROADMAP.md` and `IMPLEMENTATION_PLAN.md`
+  (v1.3). Lots R0–R4 close the GCP community alpha. S0–S2 stay delivered;
+  S4/S5 follow pilots. These replace ML-xx priorities, rather than adding
+  requirements. One lot is active at a time. The plan is execution
+  authority for these lots. Do not open another spec or plan approval for
+  each subtask. A checked box in an older plan is re-verified, not rebuilt.
+  Pause unfinished work outside the active lot. Do not mark it done.
 - Smallest correct change. Fix a capability that already exists before adding
   a second version of it. Wire CLI modules through `cmd/magelift` /
   `platform.ModuleRegistry`. `infra.RegisterTarget` alone does not ship

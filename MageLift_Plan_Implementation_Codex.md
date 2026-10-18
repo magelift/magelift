@@ -1,5 +1,8 @@
 # MageLift — Plan Codex pour un mainteneur solo et des agences Magento
 
+**Superseded as the active queue by `IMPLEMENTATION_PLAN.md` (v1.3).**
+This file stays as the v1.2 record. Do not execute its checklists in parallel.
+
 **Version : 1.2 — 18 octobre 2026**  
 **Remplace intégralement les versions 1.0 et 1.1 ; ce n’est pas une liste d’exigences supplémentaire.**  
 **Dépôt :** `magelift/magelift`  
