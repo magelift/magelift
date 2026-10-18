@@ -54,7 +54,7 @@ jobs:
           cosign-release: v3.1.3
       # GoReleaser's SBOM cataloging shells out to syft; without it the
       # release fails after the builds (seen on v0.0.0-dialproof.3).
-      - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
       # Module tags need proxy plus sumdb visibility before packaging:
       # workspace builds still verify requirement .mod files over the
       # network on cold caches. The proxy negative-caches unknown
