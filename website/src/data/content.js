@@ -1,14 +1,10 @@
-// Single source of truth for landing-page copy.
-// Voice rules: direct, technical, honest. No em dashes. Sentence case.
-// Claims must stay verifiable against docs/ (capability-matrix, release-readiness).
-
 export const docsUrl = '/docs/';
 export const githubUrl = 'https://github.com/magelift/magelift';
 
 export const nav = {
   links: [
     { label: 'Docs', href: docsUrl },
-    { label: 'vs PaaS', href: `${docsUrl}compare-paas/` },
+    { label: 'Compare hosting', href: `${docsUrl}compare-paas/` },
     { label: 'FAQ', href: `${docsUrl}faq/` },
     { label: 'GitHub', href: githubUrl },
   ],
@@ -16,103 +12,96 @@ export const nav = {
 };
 
 export const hero = {
-  h1: 'Run Magento in your own AWS or GCP account.',
-  lede: 'Open-source CLI with ACC/Upsun-shaped YAML. The store runs in your account, on your invoice.',
+  h1: 'Run Magento in your own cloud account.',
+  lede: 'Define your Magento services in PHP. Run the shop locally, share a preview for review, and promote the same image to production.',
   primaryCta: { label: 'Install the CLI', href: `${docsUrl}install/` },
   secondaryCta: { label: 'Get started', href: `${docsUrl}getting-started/` },
 };
 
 export const terminal = {
-  title: 'preview · eu-north-1',
+  title: 'Try the sample shop locally',
   copyCommand: 'git clone --depth 1 https://github.com/magelift/magelift.git && cd magelift && go install ./cmd/magelift',
   lines: [
     { type: 'cmd', text: 'git clone --depth 1 https://github.com/magelift/magelift.git' },
     { type: 'cmd', text: 'cd magelift && go install ./cmd/magelift' },
-    { type: 'cmd', text: 'magelift config validate --env preview' },
-    { type: 'out', text: 'ok  magelift.yaml · compatibility checks passed', tone: 'ok' },
-    { type: 'cmd', text: 'magelift preview --env preview' },
-    { type: 'out', text: 'plan  ecs-fargate · digest promote · no mutate', tone: 'dim' },
-    { type: 'cmd', text: 'magelift deploy --env preview --yes' },
-    { type: 'out', text: 'deployed  https://preview.example.shop', tone: 'ok' },
-    { type: 'cmd', text: 'magelift destroy --env preview --yes' },
-    { type: 'out', text: 'destroyed · teardown reported', tone: 'dim' },
+    { type: 'cmd', text: 'cd examples/sample-shop' },
+    { type: 'cmd', text: 'magelift --env preview config validate' },
+    { type: 'cmd', text: 'magelift env diff staging production' },
   ],
 };
 
 export const proof = [
-  { k: 'License', v: 'Apache-2.0', note: 'Source, NOTICE, and a license check in CI.' },
-  { k: 'AWS', v: 'ECS Fargate certified', note: 'Production path with acceptance evidence.' },
-  { k: 'GCP', v: 'GKE Autopilot certified', note: 'Production path with acceptance evidence.' },
-  { k: 'Measured', v: '10m31s', note: 'Time to preview on the documented eu-north-1 run.' },
+  { k: 'License', v: 'Apache-2.0', note: 'Your cloud provider bills you directly.' },
+  { k: 'AWS', v: 'ECS Fargate', note: 'Recorded Magento deployments.' },
+  { k: 'Google Cloud', v: 'GKE Autopilot', note: 'Recorded Magento deployments.' },
+  { k: 'Azure', v: 'AKS', note: 'Tested with Pulumi mocks and Floci.' },
 ];
 
 export const personas = {
-  heading: 'Who it is for',
-  lede: 'MageLift is an open-source CLI and YAML config for Magento Open Source and Adobe Commerce in your AWS or GCP account. The YAML shape will feel familiar if you have used ACC or Upsun.',
+  heading: 'Working with a shop',
+  lede: 'The same PHP project describes staging, UAT, production and pull-request previews.',
   tabs: [
     {
-      label: 'Agency tech lead',
-      pain: 'Your PaaS bill grows with every shop you sign.',
-      body: 'Each client gets previews you can spin up, share, and destroy when the work is done. Config follows the ACC/Upsun shape your team already reads, and magelift cost gives AWS shape estimates before you spend anything.',
-      proof: 'Preview, share a URL, destroy. Protected destroys need --yes.',
+      label: 'Review a change',
+      pain: 'Give reviewers a shop of their own',
+      body: 'Apply the magelift-preview label to a reviewed pull request in your repository. The generated workflow deploys that revision and removes the preview when you remove the label, close the PR or reach its expiry.',
+      proof: 'magelift env diff staging production',
     },
     {
-      label: 'SME shop owner',
-      pain: 'No DevOps hire, and no appetite for a blank Terraform repo.',
-      body: 'The docs speak Magento, the certified targets are the only production paths, and your store lives in an AWS or GCP account that you own from day one. Weekend migration guides cover config, dump, media, and DNS cutover.',
-      proof: 'Moving off ACC or Upsun starts with magelift init --from-acc or --from-upsun.',
+      label: 'Move a shop',
+      pain: 'Bring an existing Magento project',
+      body: 'Import service settings from Adobe Commerce Cloud or Upsun. Review the entries that need attention, then rehearse the database and media transfer in staging before you switch traffic.',
+      proof: 'magelift init --from-upsun --provider gcp',
     },
     {
-      label: 'Platform engineer',
-      pain: 'DIY stacks drift, and a PaaS hides the parts you need to audit.',
-      body: 'IAM stays inside your account. Images build once and promote by digest. The capability matrix states in writing which cells are certified and which are experimental.',
-      proof: 'After the first release, archives include checksums and an SBOM.',
+      label: 'Connect a storefront',
+      pain: 'Use Magento behind your frontend',
+      body: 'Keep the native Magento storefront or host a headless frontend separately. Configure its allowed origin in PHP and look up the Magento GraphQL endpoint for each environment.',
+      proof: 'magelift env status staging',
     },
   ],
 };
 
 export const how = {
-  heading: 'From install to preview',
-  lede: 'Certified path today: AWS ECS Fargate and GCP GKE Autopilot. Stay on free-tier-safe shapes until you mean to spend.',
+  heading: 'Set up a shop',
+  lede: 'Start with your Magento checkout, or add --new to have Composer create a shop.',
   steps: [
-    'No release is published yet. Clone the repo and run go install ./cmd/magelift, then magelift version.',
-    'Copy examples/sample-shop/magelift.yaml, fill in account and secret refs, then magelift config validate.',
-    'Bootstrap once, then preview and deploy on a certified target. Destroy when the spike is done.',
+    'Install the CLI from the MageLift checkout with go install ./cmd/magelift.',
+    'In the shop repository, run magelift init --provider aws, gcp or azure. Start Magento with magelift dev.',
+    'Connect your cloud account, push a signed shop image to your registry and review the infrastructure changes with magelift preview.',
   ],
   links: [
     { label: 'Getting started', href: `${docsUrl}getting-started/` },
     { label: 'GCP onboarding', href: `${docsUrl}onboarding/` },
-    { label: 'Leave PaaS in a weekend', href: `${docsUrl}weekend-migrate/` },
+    { label: 'Migration checklist', href: `${docsUrl}weekend-migrate/` },
   ],
-  yaml: [
-    { text: 'project:' },
-    { text: '  name: sample-shop' },
-    { text: 'application:' },
-    { text: '  edition: open-source' },
-    { text: '  version: 2.4.9' },
-    { text: 'target:' },
-    { text: '  provider: aws' },
-    { text: '  runtime: ecs-fargate' },
-    { text: 'environments:' },
-    { text: '  preview:' },
-    { text: '    class: preview' },
-    { text: '    domain: preview.example.com' },
-    { text: '    monthlyBudgetCents: 5000', hl: true },
-    { text: '    expiresAt: "2026-12-31T23:59:59Z"', hl: true },
-    { text: '  production:' },
-    { text: '    inherits: staging' },
-    { text: '    preset: high-availability' },
-    { text: '    protection: true' },
+  project: [
+    { text: '<?php' },
+    { text: 'use MageLift\\{Environment, Project, Service};' },
+    { text: '' },
+    { text: '$db = new Service(family: "mysql", version: "8.4");', hl: true },
+    { text: 'return new Project([' },
+    { text: '    "services" => ["database" => $db],' },
+    { text: '    "environments" => [' },
+    { text: '        "preview" => new Environment([' },
+    { text: '            "previewTtl" => "168h",' },
+    { text: '        ], class: "preview"),' },
+    { text: '        "production" => new Environment([' },
+    { text: '            "protection" => true,' },
+    { text: '        ], preset: "high-availability"),', hl: true },
+    { text: '    ],' },
+    { text: ']);' },
   ],
-  yamlCaption: 'Trimmed from examples/sample-shop/magelift.yaml. Preview environments carry a validated budget with alerts and an expiry date.',
+  projectCaption: 'Both environments inherit MySQL 8.4. Production uses the high-availability preset.',
 };
 
 export const targets = {
-  heading: 'Certified targets',
-  lede: 'Only certified cells are production-supported. Experimental targets are labeled, and they stay labeled until they pass acceptance.',
+  heading: 'Cloud targets',
+  lede: 'Compare the tests and recorded runs for each cloud adapter.',
   rows: [
-    { target: 'AWS ECS Fargate', status: 'certified' },
-    { target: 'GCP GKE Autopilot', status: 'certified' },
+    { target: 'AWS ECS Fargate', status: 'implemented' },
+    { target: 'GCP GKE Autopilot', status: 'implemented' },
+    { target: 'Azure AKS', status: 'experimental' },
     { target: 'AWS EKS · GCP GKE Standard · OVH MKS · Scaleway Kapsule', status: 'experimental' },
   ],
   links: [
@@ -122,46 +111,46 @@ export const targets = {
 };
 
 export const trust = {
-  heading: 'Boring where it counts',
-  lede: 'There is no SaaS subscription for the CLI. The software is free; the cloud bill is yours.',
+  heading: 'Billing and releases',
+  lede: 'You choose the registry and the cloud account that pay for each shop.',
   items: [
-    { h: 'Apache-2.0', p: 'Source and NOTICE in the repo. The license check runs in CI.' },
-    { h: 'Digest promote', p: 'Build once, promote by digest. Mutable tags are not the default path.' },
-    { h: 'Verifiable releases', p: 'The first tag ships archives with checksums and an SBOM.' },
-    { h: 'Independent', p: 'Not affiliated with Adobe. Product names appear only to describe compatibility.' },
+    { h: 'Apache-2.0', p: 'The open-source CLI carries no license fee.' },
+    { h: 'Image promotion', p: 'Staging and production can deploy the same signed image digest.' },
+    { h: 'Verifiable releases', p: 'The release workflow signs checksums and generates a software bill of materials.' },
+    { h: 'Independent', p: 'MageLift is independent of Adobe.' },
   ],
 };
 
 export const faqs = [
   {
     q: 'What is MageLift?',
-    a: 'An open-source CLI plus ACC/Upsun-shaped YAML for Magento Open Source and Adobe Commerce in your AWS or GCP account. You run it against your own cloud; MageLift does not host stores.',
+    a: 'MageLift runs Magento Open Source or licensed Adobe Commerce in your own cloud account. Your team defines services and environments in PHP.',
   },
   {
     q: 'Is MageLift a Magento hosting provider?',
-    a: 'No. It is Apache-2.0 software you run in your account. ACC and Upsun rent you a platform; MageLift targets infrastructure you already control.',
+    a: 'Your cloud provider hosts the store. Your team owns the account and operates the infrastructure with MageLift.',
   },
   {
     q: 'How much does MageLift cost?',
-    a: 'The CLI is free under Apache-2.0. AWS or GCP bills you for compute, data, and network. Run magelift cost for AWS shape estimates, and destroy preview stacks when you are done with them.',
+    a: 'The CLI is free. Your cloud provider charges for resources while they exist. On AWS, magelift cost estimates the selected configuration before deployment.',
   },
   {
-    q: 'Which clouds are certified for production?',
-    a: 'AWS ECS Fargate and GCP GKE Autopilot. AWS EKS, GCP GKE Standard, OVH MKS, and Scaleway Kapsule are experimental and not production-supported yet.',
+    q: 'Which cloud targets can I use?',
+    a: 'AWS ECS Fargate and GCP GKE Autopilot have recorded Magento runs. Azure AKS has resource tests with Pulumi mocks and API tests with Floci. The capability matrix lists the evidence for each path.',
   },
   {
     q: 'Can I migrate from Adobe Commerce Cloud or Upsun?',
-    a: 'Yes. Import config with magelift init --from-acc or --from-upsun. Dump, media, and DNS cutover are covered in the migration guides.',
+    a: 'Import the project settings with magelift init --from-acc or --from-upsun. Follow the migration guide to move the database and media and switch DNS.',
   },
   {
     q: 'Is MageLift affiliated with Adobe?',
-    a: 'No. MageLift is independent of Adobe Inc. Magento and Adobe Commerce are Adobe trademarks; the names are used only to describe compatibility.',
+    a: 'MageLift is an independent project. Magento and Adobe Commerce are trademarks of Adobe Inc.',
   },
 ];
 
 export const finalCta = {
-  heading: 'Read the docs first',
-  body: 'Install takes one command. Validate the sample shop, then decide whether a certified preview belongs in your account.',
+  heading: 'Try MageLift locally',
+  body: 'Validate the sample project or start Magento in your existing shop with Docker Compose.',
   primaryCta: { label: 'Install the CLI', href: `${docsUrl}install/` },
   secondaryCta: { label: 'Get started', href: `${docsUrl}getting-started/` },
 };

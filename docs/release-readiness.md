@@ -1,5 +1,16 @@
 # Public release readiness
 
+## First release
+
+The public release covers AWS ECS Fargate, GCP GKE Autopilot and Azure AKS together. Each adapter must exercise its advertised operations through the installed CLI. Record the Magento release, image digest, provider, topology, checks performed and outcome. A Pulumi mock, a Floci API contract and a full Magento deployment answer different questions.
+
+Before tagging, verify the PHP starter for existing and new shops, both PaaS import paths, native storefront and GraphQL access, stable environments, PR creation and cleanup, protected production promotion, and the backup/restore path for the deployed resources. Run the account-free checks in [the contributor guide](https://github.com/magelift/magelift/blob/main/CONTRIBUTING.md) and follow the acceptance-account rules for any live test. Adobe Commerce testing uses a licensed fixture supplied by its operator.
+
+## Earlier release campaigns
+
+The dated entries below describe the release candidates and terminology used at the time.
+
+
 ## Community alpha milestone A (2026-10-17)
 
 The current release scope is the GCP community alpha. Require

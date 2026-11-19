@@ -1,6 +1,6 @@
 ---
 title: MageLift docs
-description: Docs for MageLift, an open-source Magento CLI and YAML for AWS, GCP, Scaleway, and OVHcloud architecture profiles. Install, migrate from ACC/Upsun, capability matrix.
+description: Docs for MageLift, a PHP-configured Magento deployment CLI. Install, migrate from ACC/Upsun, capability matrix.
 hide:
   - toc
 ---
@@ -11,7 +11,7 @@ hide:
 <div markdown>
 <h1 class="mdx-hero__title">Run Magento in your own cloud account.</h1>
 
-<p class="mdx-hero__lede">Open-source CLI with ACC/Upsun-shaped YAML. The store runs in your account, on your invoice. MageLift does not host stores; you pay your cloud provider directly.</p>
+<p class="mdx-hero__lede">Configure your Magento shop in PHP. Start it locally with Docker and deploy it to your AWS, Google Cloud or Azure account.</p>
 
 <div class="mdx-hero__cta" markdown>
 [Install the CLI](install.md){ .md-button .md-button--primary }
@@ -20,34 +20,33 @@ hide:
 </div>
 </div>
 
-Pricing: [the CLI is free](https://magelift.dev/pricing.md); cloud spend is
-yours. First public tag target: `v1.0.0-rc.1` ([versioning](versioning.md)).
+Your cloud provider bills the resources to your account. [MageLift pricing](https://magelift.dev/pricing.md)
 
 ## Pick a path
 
 <div class="grid cards" markdown>
 
--   **Install and first preview**
+-   **Start a shop locally**
 
     ---
 
-    Get the CLI, validate the sample shop, run a preview you can destroy.
+    Install the CLI and start your existing Magento checkout.
 
     [Install](install.md) · [Getting started](getting-started.md)
 
--   **Leave a PaaS**
+-   **Move an existing store**
 
     ---
 
-    Import ACC or Upsun config, move data and media, cut over DNS.
+    Import settings from Adobe Commerce Cloud or Upsun and rehearse the cutover.
 
-    [Weekend migrate](weekend-migrate.md) · [Full migration](migrating-from-paas.md)
+    [Cutover checklist](weekend-migrate.md) · [Full migration](migrating-from-paas.md)
 
--   **Operate day-2**
+-   **Operate a store**
 
     ---
 
-    Deploys, secrets, cost checks, and protected destroys on certified targets.
+    Inspect logs, manage secrets and check costs.
 
     [Operations](operations.md) · [CLI reference](cli-reference.md)
 
@@ -55,15 +54,15 @@ yours. First public tag target: `v1.0.0-rc.1` ([versioning](versioning.md)).
 
     ---
 
-    Certified targets are the only production paths; the matrix says why.
+    Find test results for your provider, runtime and operation.
 
     [Capability matrix](capability-matrix.md) · [Compare PaaS](compare-paas.md)
 
--   **Stay offline first**
+-   **Compare local and cloud**
 
     ---
 
-    Local targets for exploration before any cloud spend.
+    See which services run locally and which need a cloud account.
 
     [Local vs cloud](local-vs-cloud.md)
 
@@ -77,14 +76,13 @@ yours. First public tag target: `v1.0.0-rc.1` ([versioning](versioning.md)).
 
 </div>
 
-## Certified vs experimental
+## Cloud targets
 
-!!! success "Certified for production"
-    AWS ECS Fargate, GCP GKE Autopilot.
-
-!!! warning "Experimental"
-    AWS EKS, GCP GKE Standard, OVH MKS, Scaleway Kapsule. Exploration only until
-    the matrix marks their target cells certified.
+Start a PHP project for AWS ECS Fargate, GCP GKE Autopilot, or Azure AKS.
+AWS and GCP have historical live Magento runs. Azure has Pulumi graph and
+Floci coverage. Use the evidence for the individual operation when choosing
+a deployment target. AWS EKS, GCP GKE Standard, OVH MKS and Scaleway Kapsule
+have experimental adapters. [Recorded capabilities](capability-matrix.md)
 
 ## Contribute
 

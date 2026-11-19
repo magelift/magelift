@@ -1,10 +1,6 @@
 # Versioning and contract freeze
 
-MageLift uses [Semantic Versioning](https://semver.org/) from the first public
-tag, `v1.0.0-rc.1`. Treat this document as the RC freeze surface once that tag
-ships. `1.0.0-rc.1` is a SemVer pre-release. It does not claim full `1.0.0`
-compatibility; see the RC stability statement below for what is locked vs
-reserved.
+MageLift uses [Semantic Versioning](https://semver.org/) for releases. The proposed first public tag is `v1.0.0-rc.1`. The following commitments take effect when it ships.
 
 ## RC freeze surface
 
@@ -13,13 +9,13 @@ Breaking changes to any of the following require a documented RC break note
 
 | Surface | Frozen meaning |
 | --- | --- |
-| `magelift.yaml` `schemaVersion` | Additive fields OK; removals/renames bump |
+| `magelift.php` `schemaVersion` | Additive fields OK; removals/renames bump |
 | CLI command names | `deploy`, `preview`, `destroy`, day-2 verbs stay |
 | Exit codes | Documented CLI exit codes stay stable |
-| AWS ECS Fargate certified cells | See [capability-matrix.md](capability-matrix.md); honesty labels for OpenSearch |
-| Provider IDs | `aws` / `gcp` / `ovh` / `scaleway` string IDs |
+| AWS ECS Fargate cells | See [capability-matrix.md](capability-matrix.md); recorded coverage for OpenSearch |
+| Provider IDs | `aws`, `gcp`, `azure`, `ovh` and `scaleway` string IDs |
 | Provider lockfile schema | `magelift.providers.lock` `schemaVersion: 1`, SDK API `"v1"` |
-| Provider `Execute` RPC | Operation names and result shape stay (`preview`, `up`, `destroy`, `outputs`, `validate-request`) |
+| Provider `Execute` RPC | Operation names and result shape stay (including `validate-config`, `plan`, `preview`, `apply`, `destroy` and `outputs`) |
 
 Experimental cells and providers may still return `ErrNotSupported` or change
 without a bump when clearly labeled experimental.
@@ -31,11 +27,11 @@ series** unless a documented RC break note lands in CHANGELOG / this document:
 
 | Surface | Stable meaning |
 | --- | --- |
-| `magelift.yaml` `schemaVersion` | Additive fields OK; removals/renames need an RC break note |
+| `magelift.php` `schemaVersion` | Additive fields OK; removals/renames need an RC break note |
 | CLI verb names | `deploy`, `preview`, `destroy`, day-2 verbs stay |
 | Documented exit codes | Stay stable |
-| Provider ID strings | `aws` / `gcp` / `ovh` / `scaleway` |
-| Certified AWS ECS honesty labels | OpenSearch / free-tier labels in the capability matrix |
+| Provider ID strings | `aws`, `gcp`, `azure`, `ovh` and `scaleway` |
+| Archived AWS ECS test results | OpenSearch / free-tier labels in the capability matrix |
 | `sdk` | `Target` / `Capability` / `Hook` shapes stay |
 | `platform.StackModule` | Module registration and core stack-module contract stay, subject to the shared-Kubernetes reservation below |
 | Provider extension boundary | Lockfile schema `1`, SDK API `"v1"`, `Execute` operation names and result shape stay |
@@ -53,15 +49,13 @@ for EKS / GKE / MKS / Kapsule modules during the RC series without waiting for a
 major `v2` bump. Callers must not treat those kube-shaped `platform` ports as
 frozen for the full RC series.
 
-## OpenSearch honesty
+## OpenSearch coverage
 
-- **Certified wiring:** SigV4 proxy sidecar + Magento env (offline mocks).
-- **Certified free-tier cell:** `searchMode: disabled`.
-- **Not claimed green on MageLift acceptance:** live Magento search data-plane
-  (index/query/reconnect/IAM) until a paid pass; see [release-readiness.md](release-readiness.md).
+- Pulumi mocks check the SigV4 proxy sidecar and the Magento environment settings.
+- The historical free-tier run used `searchMode: disabled`.
+- Live Magento index, query, reconnect and IAM coverage is recorded in [release-readiness.md](release-readiness.md).
 - External ops evidence: prior Terraform Magento+OpenSearch work
-  ([sources/prior-terraform-opensearch.md](sources/prior-terraform-opensearch.md)); private
-  employer repos are not named.
+  [Prior OpenSearch deployment](sources/prior-terraform-opensearch.md)
 
 ## Changelog
 

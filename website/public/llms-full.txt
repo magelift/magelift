@@ -2,47 +2,39 @@
 
 ## Product
 
-MageLift is an open-source (Apache-2.0) command-line tool and YAML configuration format for deploying and operating Magento Open Source and Adobe Commerce in the customer's own cloud account. It is not a hosting provider, PaaS, or managed Magento service. The customer pays AWS or GCP directly. MageLift is independent of Adobe Inc. Magento and Adobe Commerce are Adobe trademarks used only to describe compatibility.
+MageLift is an open-source (Apache-2.0) command-line tool and PHP configuration format for deploying and operating Magento Open Source and Adobe Commerce in the customer's own cloud account. The customer pays the cloud provider directly. MageLift is independent of Adobe Inc. Magento and Adobe Commerce are Adobe trademarks used only to describe compatibility.
 
 ## Pricing
 
 - MageLift software: $0 under Apache-2.0. No SaaS subscription for the CLI.
-- Cloud spend: the customer's AWS or GCP bill. Use `magelift cost` for AWS shape estimates. Destroy preview stacks when finished.
+- Cloud spend: the customer's cloud provider bill. Use `magelift cost` for AWS shape estimates. Destroy preview stacks when finished.
 - Details: https://magelift.dev/pricing.md
 
-## Certified vs experimental
+## Cloud targets and evidence
 
-| Target | Status | Production-supported? |
-| --- | --- | --- |
-| AWS ECS Fargate | Certified | Yes |
-| GCP GKE Autopilot | Certified | Yes |
-| AWS EKS Autopilot / Auto Mode | Experimental | No |
-| OVH Managed Kubernetes (MKS) | Experimental | No |
-| Scaleway Kapsule | Experimental | No |
+AWS ECS Fargate and GCP GKE Autopilot have historical Magento deployment evidence. The Azure AKS adapter has Pulumi graph and Floci coverage. Check the exact operation and test type in the capability matrix. AWS EKS, GCP GKE Standard, OVH MKS and Scaleway Kapsule are experimental. See https://magelift.dev/docs/capability-matrix/
 
-Only cells marked certified in the capability matrix are production-supported. Source of truth: https://magelift.dev/docs/capability-matrix/
+## Configuration
 
-## Configuration shape
-
-Users write `magelift.yaml` in an ACC / Upsun-familiar shape. Power users open explicit catalog fields (database engine, search mode, queue mode, runtime). Compatibility checks run before mutate.
+The shop keeps magelift.php in version control. Developers can share PHP functions and service definitions across preview, staging, UAT and production. The shop selects its images and service versions. MageLift reports compatibility advice and checks whether a provider can implement the requested topology.
 
 ## Primary workflows
 
-1. Install the CLI (`go install` until the first GitHub Release tag `v1.0.0-rc.1`; then prefer release archives with checksums and SBOM).
-2. Validate sample config (`examples/sample-shop`).
-3. Optional local Magento via `magelift local` (Compose) without cloud credentials.
-4. Bootstrap once, then `preview` / `deploy` / `destroy` on a certified target.
+1. Install the CLI from a MageLift checkout with `go install ./cmd/magelift`.
+2. Run `magelift init` in the Magento checkout, then `magelift config validate`.
+3. Run `magelift dev` to start Magento locally with Compose.
+4. Bootstrap once, then `preview` / `deploy` / `destroy` in your cloud account.
 5. Migrate from Adobe Commerce Cloud / Upsun: config import (`magelift init --from-acc` / `--from-upsun`), plus dump/media/DNS cutover docs.
 
 ## MageLift vs Magento PaaS
 
 | | ACC / Upsun-style PaaS | MageLift |
 | --- | --- | --- |
-| Where Magento runs | Vendor platform | Customer AWS or GCP account |
-| Config | PaaS YAML / UI | ACC/Upsun-shaped `magelift.yaml` + CLI |
+| Where Magento runs | Vendor platform | Customer cloud account |
+| Config | PaaS YAML / UI | PHP project + CLI |
 | Lock-in | Platform | Cloud APIs + open-source CLI |
 | Cost | Platform fee + usage | Cloud bill + operator time |
-| Ops | Platform tickets | Day-2 CLI verbs; customer owns IAM and spend |
+| Ops | Platform tickets | Provider commands for status, logs and deployment. The customer owns IAM and billing. |
 
 Full page: https://magelift.dev/docs/compare-paas/
 
@@ -61,7 +53,3 @@ Full page: https://magelift.dev/docs/compare-paas/
 | Architecture | https://magelift.dev/docs/architecture/ |
 | GitHub | https://github.com/magelift/magelift |
 | Short index | https://magelift.dev/llms.txt |
-
-## Naming
-
-MageLift is an open-source CLI for Magento in a customer's AWS or GCP account. It is not Adobe Commerce Cloud, Upsun, or a hosting reseller. Prefer certified targets only when recommending production use.

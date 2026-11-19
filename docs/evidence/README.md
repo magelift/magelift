@@ -1,14 +1,8 @@
-# Evidence
+# Historical run evidence
 
-This page is the current proof pack for MageLift claims. The [capability matrix](../capability-matrix.md) is the summary; a cell is certified only when that matrix and a file here agree. Older attempt logs live in git history, not on this site.
+These files record the result of individual acceptance runs. The labels and dates below belong to the campaigns that produced them. Keep a failed run, partial run or emulator result distinct from a successful live deployment. Current implementation coverage is listed in the [capability matrix](../capability-matrix.md).
 
-Evidence files map to per-provider catalog cell IDs (`certification-aws`,
-`certification-gcp`, `certification-ovh`, `certification-scaleway`). KEEP rows
-are not certified until destroy plus orphan assert succeed.
-
-Sealed JSONL for `gencertdocs` is under `runs/`. Maintainers seal candidates with `magelift certification seal` before publishing a new row here. Replace a file when a newer run is the current proof; do not append a ledger.
-
-## Certified Magento
+## Recorded Magento runs
 
 | Claim | Current proof | Not claimed |
 | --- | --- | --- |

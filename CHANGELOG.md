@@ -10,8 +10,10 @@ are prepared with Conventional Commits and Release Please.
 
 - Public repository under `github.com/magelift/magelift` with site at
   [magelift.dev](https://magelift.dev/) (docs under `/docs/`).
-- Certified targets: AWS ECS Fargate and GCP GKE Autopilot (acceptance evidence
-  under `docs/evidence/`).
+- PHP project configuration, environment comparisons, a local Magento quickstart and pull-request previews. Removing the preview label or closing the pull request schedules teardown.
+- Account-free provider checks run against Floci for AWS, GCP and Azure. Generated shop workflows deploy the reviewed image digest to the shop’s own account.
+- An Azure AKS provider with Pulumi and Floci tests. AWS ECS Fargate and GCP GKE Autopilot have dated Magento acceptance runs. [Provider coverage](docs/capability-matrix.md)
+- Imports from Adobe Commerce Cloud, Upsun Flex and Upsun Fixed, including multi-app repositories.
 - First-party agent skills under `agents/skills/` for Cursor, Claude Code, and Codex.
 - RC contract for the first public tag `v1.0.0-rc.1`; see
   [docs/versioning.md](docs/versioning.md).

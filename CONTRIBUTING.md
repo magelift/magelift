@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. Open an issue before a large change.
+Open an issue before starting a large change so maintainers can discuss the design.
 
 ## Agents
 
@@ -59,15 +59,15 @@ Layout:
 - `internal/`: CLI, config, deploy, automation, `platform`, `cloud/<provider>`
 - `sdk/`: portable Target / Capability / Hook types
 - `build/`: Composer Magento package (not the Go build tree)
-- `images/`: PHP-FPM + nginx runtime (FrankenPHP classic remains in-tree for provenance; schema rejects it as `application.webRuntime`)
-- `schema/`: generated JSON Schema for `magelift.yaml`
+- `images/`: optional nginx/PHP-FPM, Apache and FrankenPHP classic build recipes
+- `schema/`: generated JSON Schema for `magelift.php`
 - `docs/`: MkDocs; ADRs in `docs/adr/`; short evidence pack in `docs/evidence/`
 - `.agents/knowledge/`: agent OKF bundle (tracked). `.agents/skills/okf-maintain` is the maintainer procedure for that bundle. Other `.agents/` caches are not tracked.
 - `tests/`: Floci and fixtures ([tests/README.md](tests/README.md))
 
 ## Principles
 
-- Keep the normal user path YAML-only.
+- Use `magelift.php` for shop configuration. The PaaS importers read their vendors’ YAML formats.
 - Prefer per-provider adapters over shared cloud graphs (ADR 0003, 0004).
 - Keep config and deploy behavior deterministic.
 - Do not copy private or employer-owned source, docs, IDs, or secrets.
@@ -94,12 +94,14 @@ otherwise.
 | Goal | Command |
 | --- | --- |
 | Community alpha local gate | `make verify-community` |
-| Fast Go suites: root, SDK, GCP workspace | `make test-fast` |
+| Go suites for the CLI, SDK, GCP and Azure | `make test-fast` |
 | Broader verification suite | `make verify` |
 | Account-free stack (mocks + harness + Floci) | `make local-gates` |
 | Pulumi mock graphs | `make pulumi-mock-test` |
 | Account-free AWS paths | `make floci-test-aws` |
 | Account-free GCP paths | `make floci-gcp-test` |
+| Account-free Azure paths | `make floci-azure-test` |
+| Shop workflow with a local registry | `make ci-act-project` |
 | Real AWS (destroy on exit; light smoke) | `make aws-acceptance-local`; read `docs/aws-acceptance.md` |
 | Real GCP (reference recipe; destroy on exit) | `make gcp-acceptance-local`; read `docs/gcp-acceptance.md` |
 

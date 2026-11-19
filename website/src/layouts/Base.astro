@@ -25,18 +25,16 @@ const { title, description, schema } = Astro.props;
     <meta property="og:site_name" content="MageLift" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:url" content="https://magelift.dev/" />
-    <meta property="og:title" content="MageLift: Magento on AWS and GCP" />
+    <meta property="og:title" content={title} />
     <meta
-      property="og:description"
-      content="Open-source CLI and ACC/Upsun-shaped YAML for Magento in your own AWS or GCP account. Certified on ECS Fargate and GKE Autopilot."
+      property="og:description" content={description}
     />
     <meta property="og:image" content="https://magelift.dev/media/logo.png" />
     <meta property="og:image:alt" content="MageLift logo" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="MageLift: Magento on AWS and GCP" />
+    <meta name="twitter:title" content={title} />
     <meta
-      name="twitter:description"
-      content="Open-source Magento CLI for your AWS or GCP account. Free software; you pay the cloud bill."
+      name="twitter:description" content={description}
     />
     <meta name="twitter:image" content="https://magelift.dev/media/logo.png" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

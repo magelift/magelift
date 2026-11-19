@@ -20,35 +20,40 @@ Pulumi state for destroy ownership.
 
 Example shape (illustrative):
 
-```yaml
-target:
-  provider: aws
-  runtime: ecs-fargate
-  aws:
-    vpcCidr: "10.0.0.0/16"
-    availabilityZones: [eu-west-3a, eu-west-3b]
-    encryptionKeySecretArn: aws-secrets-manager://…
-    existing:
-      network:
-        provider: aws
-        kind: network
-        externalId: vpc-0abc123
-      publicSubnetIds: [subnet-pub-a, subnet-pub-b]
-      privateSubnetIds: [subnet-priv-a, subnet-priv-b]
-      dataSubnetIds: [subnet-data-a, subnet-data-b]
-      database:
-        provider: aws
-        kind: database
-        externalId: db-magento-prod
-        secretArn: arn:aws:secretsmanager:eu-west-3:123456789012:secret:magento/db
-        endpoint: magento.xxxxx.eu-west-3.rds.amazonaws.com
+Use this array for the `target` entry in `magelift.php`.
+
+```php
+$target = [
+    'provider' => 'aws',
+    'runtime' => 'ecs-fargate',
+    'aws' => [
+        'vpcCidr' => '10.0.0.0/16',
+        'availabilityZones' => ['eu-west-3a', 'eu-west-3b'],
+        'encryptionKeySecretArn' => 'aws-secrets-manager://…',
+        'existing' => [
+            'network' => [
+                'provider' => 'aws',
+                'kind' => 'network',
+                'externalId' => 'vpc-0abc123',
+            ],
+            'publicSubnetIds' => ['subnet-pub-a', 'subnet-pub-b'],
+            'privateSubnetIds' => ['subnet-priv-a', 'subnet-priv-b'],
+            'dataSubnetIds' => ['subnet-data-a', 'subnet-data-b'],
+            'database' => [
+                'provider' => 'aws',
+                'kind' => 'database',
+                'externalId' => 'db-magento-prod',
+                'secretArn' => 'arn:aws:secretsmanager:eu-west-3:123456789012:secret:magento/db',
+                'endpoint' => 'magento.xxxxx.eu-west-3.rds.amazonaws.com',
+            ],
+        ],
+    ],
+];
 ```
 
 ## What cannot be attached (this milestone)
 
-- Cloud SQL (or any GCP managed DB): not a configuration key. GCP GKE
-  Autopilot is certified for greenfield Magento deploy, but brownfield DB
-  adopt remains AWS-only this milestone.
+- On GCP, use the database service binding to connect to an existing MySQL-compatible endpoint. The AWS resource-ID settings on this page apply to AWS only. [Existing service connections](service-bindings.md)
 - Non-AWS VPC / DB: OVH, Scaleway, and multi-cloud attach are out of scope.
 - Import into Pulumi state for destroy ownership: MageLift references
   existing IDs; it does not claim the cloud resource so that `destroy` would

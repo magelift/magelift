@@ -22,7 +22,7 @@ version: 1.0.0
    the ADR and the human page in the same change. Human docs and website copy
    go through humanizer, then remove-ai-marks.
 5. Layout is the contributor map in `CONTRIBUTING.md`.
-6. When a change adds or alters CLI behavior or `magelift.yaml` keys, update
+6. When a change adds or alters CLI behavior or `magelift.php` keys, update
    the matching user skill in the same change so skills never drift behind
    the CLI they describe.
 
@@ -35,9 +35,7 @@ composer install --working-dir=build
 make verify-community
 ```
 
-The community gate covers the root, SDK and GCP modules independently; nested
-modules are not covered by root `go test ./...`. `make test-fast` runs the three
-Go suites without race. `make test-race` runs bounded race checks. The broader
+The community gate runs the CLI, SDK, GCP and Azure module tests. Root `go test ./...` skips nested modules. Use `make test-fast` to run all four suites without race instrumentation. `make test-race` runs bounded race checks. The broader
 `make verify` suite remains available; it is not the alpha publication threshold.
 
 Narrow loops while iterating:

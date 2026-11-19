@@ -1,29 +1,16 @@
 # MageLift
 
-Deploy Magento Open Source and Adobe Commerce in your own AWS or GCP account
-with ACC/Upsun-shaped YAML and a CLI. You keep the cloud account. MageLift does
-not host stores.
+MageLift runs Magento Open Source and licensed Adobe Commerce projects in your cloud account. Define the project in PHP, start a shop locally with `magelift dev`, and deploy a digest from your own registry. Teams can use Magento’s native storefront or connect a separately deployed headless frontend.
 
-No release is published yet. `main` is the GCP community alpha, and it is not
-a stable release. The first public tag target is `v1.0.0-rc.1`. Until that tag
-exists, install from source. Gates are in
-[docs/release-readiness.md](docs/release-readiness.md).
+From an existing Magento shop with a Composer lock, choose a destination and inspect its environments.
 
-**Site:** [magelift.dev](https://magelift.dev/) · **Docs:** [magelift.dev/docs](https://magelift.dev/docs/)
+```sh
+magelift init --provider gcp
+magelift dev
+magelift env diff staging production
+```
 
-## Scope
-
-The alpha path for a new shop is GCP GKE Autopilot.
-
-| Target | Status |
-| --- | --- |
-| GCP GKE Autopilot | Certified |
-| AWS ECS Fargate | Certified |
-| AWS EKS, GCP GKE Standard, OVH MKS, Scaleway Kapsule | Experimental |
-
-See the [capability matrix](docs/capability-matrix.md) and
-[ADR 0002](docs/adr/0002-certified-vs-experimental.md). Only certified
-cells are production-supported.
+The same project defines staging, UAT, production and pull-request previews. Cloud adapters cover AWS ECS Fargate, GCP GKE Autopilot and Azure AKS at different levels of implementation. MageLift publishes test results for individual paths. The shop owns its service versions, credentials and production acceptance. [Provider coverage](docs/capability-matrix.md) · [Getting started](docs/getting-started.md) · [Moving from Upsun or Adobe Commerce Cloud](docs/migrating-from-paas.md)
 
 ## Install
 

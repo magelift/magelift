@@ -1,43 +1,13 @@
-# Pricing: MageLift
+# What MageLift costs
 
-## MageLift software
+The MageLift CLI is free under the Apache-2.0 license. Your cloud provider bills you directly for the resources in your account. You also need your own entitlement if you use licensed Adobe Commerce. [License](https://github.com/magelift/magelift/blob/main/LICENSE)
 
-- Price: $0
-- License: [Apache-2.0](https://github.com/magelift/magelift/blob/main/LICENSE)
-- Limits: none on the CLI (you operate inside your own cloud quotas)
-- Includes: config validate, preview, deploy, destroy, day-2 ops on certified targets, ACC/Upsun-shaped YAML, local Compose path (`magelift local`)
+| What you run | What to budget for |
+| --- | --- |
+| A stable environment | Compute, database capacity, search, cache, network traffic, logs and backups |
+| A pull-request preview | The resources the preview creates and any ongoing cost of shared infrastructure |
+| An existing service | The service’s current charges, including any capacity or traffic the shop adds |
 
-There is no MageLift SaaS subscription, seat fee, or "contact sales" plan for the open-source CLI.
+On AWS, run `magelift cost --env preview` to estimate the configured resources. Check unpriced items and actual usage in your provider’s billing console. Budget alerts notify you about spend. A preview’s expiry makes it eligible for the scheduled cleanup job.
 
-## Cloud spend (AWS or GCP bills you)
-
-MageLift creates resources in your account. Typical costs:
-
-| Item | Who bills you | Notes |
-| --- | --- | --- |
-| Compute, database, network, logs | AWS or GCP | Prefer free-tier-safe shapes for previews when you can |
-| Managed search / brokers | AWS or GCP | Prefer `searchMode: disabled` and `queueMode: db` until you mean to spend |
-| MageLift CLI / YAML | Nobody | Free open source |
-
-Estimate AWS catalog shapes:
-
-```sh
-magelift cost --env preview
-```
-
-Destroy when done:
-
-```sh
-magelift destroy --env preview --yes
-```
-
-## Support
-
-- Community: [SUPPORT.md](https://github.com/magelift/magelift/blob/main/SUPPORT.md)
-- Security: [SECURITY.md](https://github.com/magelift/magelift/blob/main/SECURITY.md)
-
-## Related
-
-- Compare to rented Magento PaaS: https://magelift.dev/docs/compare-paas/
-- Install: https://magelift.dev/docs/install/
-- Capability matrix: https://magelift.dev/docs/capability-matrix/
+[Compare hosting options](https://magelift.dev/docs/compare-paas/) · [Provider coverage](https://magelift.dev/docs/capability-matrix/) · [Community support](https://github.com/magelift/magelift/blob/main/SUPPORT.md)

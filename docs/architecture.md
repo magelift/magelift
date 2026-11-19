@@ -2,34 +2,22 @@
 
 ## Product promise
 
-A Magento developer adds `magelift.yaml` to an existing repository and uses one native
-CLI to deploy and operate a production-grade environment in their own cloud account.
-The supported path is Magelift commands only: `doctor`, `bootstrap`, `deploy`,
-`health`, `destroy`. Operators should not need Pulumi, Kubernetes, Cosign, or
-GitHub federation commands on a laptop preview.
-
-Presets keep YAML small for agencies and small e-merchants coming from Adobe Commerce
-Cloud or Upsun. Power users open catalog escape hatches
-([capability matrix](capability-matrix.md)). Headless means Magento
-`application.mode: headless|integrated`; storefront frameworks stay external.
-
-MageLift provisions resources in the user's cloud account. It does not proxy cloud
-billing or add a resource markup. The user chooses the provider, runtime, managed
-services, edge layer, and telemetry destination, subject to the selected target's
-compatibility and certification status.
+A shop keeps its deployment settings in `magelift.php`. The project can share
+functions and values across staging, UAT, production and pull-request previews.
+`magelift dev` starts the local Compose environment. The cloud path uses
+`bootstrap`, `preview`, `deploy`, `health` and `destroy`. The team owns the cloud
+account, version choices and registry. Headless projects deploy the Magento API
+and connect a separately hosted storefront.
 
 ## Boundaries
 
-- The RC1 matrix marks AWS ECS Fargate and GCP GKE Autopilot as certified for
-  evidenced cells. GCP GKE Standard is experimental, with a recorded 2.4.6-p15 HA
-  pass and current 2.4.9 MySQL 8.4 passes, and no release-wide certification yet.
-  Magento 2.4.6 is no longer a supported line. AWS EKS
-  (`aws` / `eks`), OVH (`ovh` / `mks`), and Scaleway
-  (`scaleway` / `kapsule`) remain experimental ([ADR 0002](adr/0002-certified-vs-experimental.md)). Evidence, not
-  a descriptor, is the authority for a certification claim.
+- AWS ECS Fargate and GCP GKE Autopilot have historical live runs. Azure AKS has
+  resource graph, provider lifecycle and Floci tests. Use the record for the
+  specific operation, runtime and date. GCP GKE Standard, AWS EKS, OVH MKS and
+  Scaleway Kapsule have experimental adapters. [Provider evidence](capability-matrix.md)
 - Stable interfaces may exist for config, lifecycle, and capabilities;
   experimental targets must be labeled in docs and CLI output.
-- The CLI orchestrates; Pulumi owns durable infrastructure.
+- The CLI runs the deployment steps. Pulumi tracks infrastructure in the shop’s state backend.
 - The core owns configuration envelopes, command UX, plugin discovery, trust,
   locking, and orchestration policy. Providers own cloud implementation, stack
   execution, and operating capabilities, reached over versioned typed
@@ -41,18 +29,15 @@ compatibility and certification status.
   `magelift build --push`, `sign`, and `promote` use the operator's current
   cloud or CI login. Cosign keyless identity remains Sigstore OIDC under the
   hood (Actions, Google SA), not Artifact Registry or ECR native signatures.
-  The YAML-only path does not require Cosign flags.
+  The PHP project does not require Cosign flags.
 - Secrets are references resolved at runtime, never plaintext config.
-- Unsupported Magento/service combinations fail before mutate unless an auditable
-  override accepts the risk.
-- No shared Pulumi components that switch on provider. Each cloud owns topology
-  under `internal/cloud/<provider>/` until Order 5 moves providers to nested
-  `providers/<name>/` modules per ADR 0013.
+- The CLI warns about service versions outside the Adobe snapshot. A provider rejects requests it cannot implement, such as a service family with no adapter.
+- Each provider builds its own resource graph. GCP and Azure run in separate Go modules under `providers/`. AWS resources live under `internal/cloud/aws/`.
 
 ## System shape
 
-The control plane is the `magelift` CLI: load typed YAML, resolve an environment,
-validate compatibility, then drive build, Pulumi, and ops. On certified AWS the
+The control plane is the `magelift` CLI: evaluate trusted PHP, resolve an environment,
+report version advice, then drive build, Pulumi and operations. On AWS ECS the
 request path is Route 53, CloudFront, WAF, ALB, and private ECS Fargate. Managed
 AWS services hold state; S3 is the media path. GCP maps Magento onto GKE Autopilot
 for the smaller path and GKE Standard when a workload needs node-level kernel
@@ -63,8 +48,7 @@ Magento migrate candidates run as GKE Jobs through the shared `deployflow` port.
 The PHP package exposes a lifecycle DAG: validate, build, package, deploy,
 post-deploy. The build runner runs the first three without runtime credentials.
 Deploy and post-deploy run after connectivity and runtime config injection.
-Extensions use stable logical IDs, not raw provider schemas. Normal projects stay
-YAML-only.
+Extensions use stable logical IDs, not raw provider schemas. Normal projects use PHP.
 
 Artifact manifest creation has a pre-digest prepare step and a post-build finalize
 step. The finalized manifest stays outside the image and binds the prepared metadata
@@ -90,7 +74,7 @@ The public extension boundary receives `sdk.EdgeIntent` and
 `sdk.ObservabilityIntent`, plus the optional typed `sdk.ProjectionTarget` inside
 `sdk.ResilienceIntent` for cache/search rebuild workloads. An extension owns
 provider credentials, VCL or policy artifacts, telemetry exporters, and resource lifecycle;
-it does not re-parse YAML or receive raw SDK argument maps. First-party adapters
+the core passes it the resolved settings. First-party adapters
 provision or validate the native graphs for AWS CloudWatch, GCP GKE plus Cloud
 Monitoring, Scaleway Cockpit, and the OVHcloud MKS audit stream. Their coverage
 is signal-specific and remains explicit in the plan; a destination resource is
@@ -105,7 +89,7 @@ marker/NRQL probe proves queryable data-plane delivery, and the provider-owned
 Go adapter has an offline-tested NerdGraph/NRQL marker verifier. Collector
 lifecycle and signal-specific operational evidence remain open.
 
-The web runtime sits on the portable side of this boundary. `nginx-fpm` is the Adobe-aligned default. `frankenphp-classic` and `php-apache` are Adobe-unsupported plugins that require `compatibility.allowUnsupported`; Adobe has no row for either and neither is certified. `frankenphp-worker` is unregistered. The default ECS task uses an nginx HTTP container and a PHP-FPM container built from the same immutable image. Integrated tasks add the pinned Varnish 8.0.2
+The web runtime sits on the portable side of this boundary. `nginx-fpm` is the Adobe-aligned default. `frankenphp-classic` and `php-apache` are Adobe-unsupported plugins that produce a warning; Adobe has no row for either and neither is certified. `frankenphp-worker` is unregistered. The default ECS task uses an nginx HTTP container and a PHP-FPM container built from the same immutable image. Integrated tasks add the pinned Varnish 8.0.2
 sidecar on port 6081 and route the load balancer through it to nginx on port 8080.
 The Varnish container uses a writable root like the other Magento containers;
 its VSM lives at `/tmp/varnish` on the image filesystem (`-n /tmp/varnish`),
@@ -115,11 +99,7 @@ nginx on port 8080. The selected application mode is passed to the application
 container as a runtime contract, so integrated and headless deployments can change
 request wiring without changing the public provider boundary.
 
-Certified v1 targets are AWS ECS Fargate and GCP GKE Autopilot. Other runtimes and
-clouds implement `sdk` Target contracts and register a `platform.StackModule`.
-Each provider keeps capabilities explicit and must pass the shared Magento
-acceptance suite before certification. Portable YAML is not a lowest-common-denominator
-cloud catalog.
+The CLI selects a provider and runtime from the project. Each adapter declares the operations it implements. The capability matrix shows what has been exercised for each runtime. [Provider capabilities](capability-matrix.md)
 
 ### AWS Magento product matrix
 
@@ -134,7 +114,7 @@ escape hatches, not every AWS SKU.
 | `natReplacementMode` | `none` or `auto-scaling`; omitted defaults to automatic replacement for multi-AZ fck-nat | - |
 | `natInstanceType` | ARM64 Graviton fck-nat size; omitted defaults to cost-optimized `t4g.nano` | x86 instance types are rejected for the first-party ARM64 AMI |
 | `databaseEngine` | `rds-mysql` | `aurora-mysql` (experimental-warn; unverifiable on maintainer free-tier). Adobe gate is Aurora 3.11/3.12. Unaimed Aurora 8.4 fails closed. A private shop on Aurora 8.4 is an example, not the certified pin. |
-| Managed database durability | RDS backup and maintenance windows, deletion protection, automated-backup deletion policy | Aurora inherits the same YAML knobs but is not a certified apply cell |
+| Managed database durability | RDS backup and maintenance windows, deletion protection, automated-backup deletion policy | Aurora inherits the same settings but is not a certified apply cell |
 | Valkey snapshot durability | ElastiCache snapshot retention and daily snapshot window | `0` explicitly disables automatic snapshots; Valkey remains reconstructible state |
 | `searchMode` | `disabled` (preview / free-tier) | `serverless` (AOSS + Magento SigV4 sidecar) and `provisioned` (unsigned HTTPS:443 in-VPC). Both remain experimental until matrix + evidence say otherwise. A private Magento-on-AWS shop may illustrate the provisioned path. It does not certify MageLift. |
 | Queue (`catalog.queueMode`) | `db` (preview default), `ecs-rabbitmq` (standard/HA default when unset) | Explicit `amazon-mq` remains experimental-warn. EKS `database` or `rabbitmq` pending live certification. `ecs-artemis` remains experimental. |
@@ -144,11 +124,7 @@ escape hatches, not every AWS SKU.
 See [aws-eks-experimental.md](aws-eks-experimental.md) for the EKS path and
 [gcp-experimental.md](gcp-experimental.md) for GCP implementation notes.
 
-Evidence tiers differ: Pulumi mocks prove composition, Floci AWS and floci-gcp
-prove selected API contracts without an account, and packed live sessions
-([certification sessions](certification-sessions.md)) prove Magento on GCP then
-AWS. Emulators do not certify Autopilot, Armor, managed TLS, or Magento Cloud
-SQL PITR. Mocks alone do not certify a matrix cell for production use.
+Pulumi mocks check resources and their configuration. Floci exercises selected AWS, GCP and Azure APIs. Only a live record establishes what happened in that particular account, region and shop. [Historical acceptance sessions](certification-sessions.md)
 
 Coming from Adobe Commerce Cloud or Platform.sh? Start with
 [migrating-from-paas.md](migrating-from-paas.md).
@@ -161,13 +137,12 @@ See [ADR 0003](adr/0003-portable-contracts-vs-topology.md) and
 
 Provider-neutral code: `internal/platform` (stack modules, Magento output keys,
 env bindings), `internal/automation`, `internal/deploy`, `internal/infra` (SDK
-extension index), `internal/topology`, and `sdk`. Providers live under
-`internal/cloud/<provider>/`.
+extension index), `internal/topology`, and `sdk`. AWS, OVH and Scaleway adapters live under `internal/cloud/`. GCP and Azure have separate modules under `providers/`.
 
 AWS packages today include `bootstrap`, `secrets`, `target`, `network`,
 `security`, `ingress`, `runtime`, `edge`, `database`, `cache`, `search`, `queue`,
 `storage`, `observability`, `operations`, `deployment`, `stack`, and `state`.
-GCP ships as an autonomous plugin module under `providers/gcp/` (own go.mod, versioned typed net/rpc protocol); the core talks to it through a plugin-backed shim, never in-process.
+The CLI loads the GCP and Azure plugins through a signed binary and a versioned net/rpc interface. Each plugin owns its Pulumi program and Go module.
 
 **CLI deploy path:** `platform.ModuleRegistry` selects a `StackModule` by
 provider + runtime. Magento lock and candidate steps are optional via
@@ -180,15 +155,13 @@ not replace module registration.
 
 The SDK registry indexes targets, capabilities, typed transforms, and lifecycle
 hooks by stable IDs. Transforms stay type-checked at the boundary. Hook discovery
-is deterministic by phase and ID. The default CLI ships the first-party AWS, GCP,
-OVH, and Scaleway modules. Third-party modules use a custom binary that calls
+is deterministic by phase and ID. The default CLI ships the first-party AWS, GCP, Azure, OVH and Scaleway targets. Third-party modules use a custom binary that calls
 `cli.NewWithExtensions` with an explicit `sdk.Module` ([ADR 0008](adr/0008-provider-load-path.md)).
 
 The AWS stack package composes a validated plan: catalog values from the caller,
 Pulumi outputs between capabilities, separate providers for regional vs
 CloudFront/WAF resources. Each capability validates typed inputs before register.
-The planner checks Magento release against Adobe's AWS service versions.
-`allowUnsupported` is the only recorded exception path. An existing-network
+The planner checks Magento releases against the dated Adobe service snapshot and warns about deviations. Provider availability is checked separately. An existing-network
 reference can supply VPC and subnets; MageLift then skips routing, NAT, and VPC
 endpoints for that network.
 
@@ -261,7 +234,7 @@ Reviewed for the alpha recipe; each item names its evidence or stays explicitly
 open. A full security review and penetration test remain outstanding and are
 not claimed here.
 
-- Secret references: reviewed. YAML carries references only; validation
+- Secret references: reviewed. The project carries references only; validation
   rejects plaintext for Composer credentials, Magento variables, email
   credentials, and edge tokens (`internal/config/config.go`). GCP consumes
   Secret Manager values through Kubernetes Secrets referenced by `SecretKeyRef`
@@ -269,7 +242,7 @@ not claimed here.
   wire (`internal/cloud/kube/secrets.go`,
   `providers/gcp/plugin/server.go`).
 - Log redaction: reviewed within its design boundary. Reference-only config
-  keeps secret values out of YAML, logs, and evidence; `env dump` warns its
+  keeps secret values out of the PHP project, logs, and evidence; `env dump` warns its
   output is unsanitized unless `--sanitize` (mailbox-address hashing only,
   not certified anonymization) and database passwords travel via environment
   variables unprinted (`internal/cli/env.go`). No global log-scanning
@@ -316,7 +289,7 @@ environment account. `magelift local init` creates a small Docker Compose projec
 and `magelift local up`, `status`, `logs`, `exec`, `down`, and `reset` manage it. The
 default services are MySQL and Valkey. Starting the app profile also starts the
 pinned OpenSearch and RabbitMQ services, so a local Magento install exercises the
-same capability names as a deployed environment. nginx with PHP-FPM is the default local web runtime. `frankenphp-classic` and `php-apache` are Adobe-unsupported plugins that require `compatibility.allowUnsupported`; they are not certified. The catalog can select Artemis over RabbitMQ and Varnish in front of nginx when those image and health contracts are available. `frankenphp-worker` is unregistered.
+same capability names as a deployed environment. nginx with PHP-FPM is the default local web runtime. `frankenphp-classic` and `php-apache` are Adobe-unsupported plugins that produce a warning; they are not certified. The catalog can select Artemis over RabbitMQ and Varnish in front of nginx when those image and health contracts are available. `frankenphp-worker` is unregistered.
 
 The local workflow provides fast source synchronization, deterministic reset commands,
 service logs, and direct Magento command execution. `magelift local seed` provides a
@@ -332,7 +305,7 @@ It does not promise identical managed-service behavior; tests that depend on AWS
 semantics still run against an ephemeral AWS environment.
 
 Preview queueing uses Magento's database queue. Certified AWS queue cells are
-`db` and `ecs-rabbitmq`. Standard and high-availability YAML that omits
+`db` and `ecs-rabbitmq`. Standard and high-availability configuration that omits
 `catalog.queueMode` selects `ecs-rabbitmq`. Explicit `amazon-mq` remains
 experimental-warn, not certified. Amazon MQ clusters span three availability
 zones, so that experimental shape needs three private queue subnets even when
@@ -368,5 +341,5 @@ AWS EKS, OVH (`ovh` / `mks`), and Scaleway (`scaleway` / `kapsule`) stay
 experimental. See
 [gcp-experimental.md](gcp-experimental.md), [ovh-experimental.md](ovh-experimental.md),
 and [scaleway-experimental.md](scaleway-experimental.md). Later clouds
-register another adapter without expanding portable YAML into a lowest-common-denominator
+register another adapter without expanding the portable configuration into a lowest-common-denominator
 cloud schema.

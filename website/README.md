@@ -10,7 +10,7 @@ Public surface for https://magelift.dev/
 
 ```sh
 cd website
-npm install
+npm ci
 npm run dev
 ```
 
@@ -27,5 +27,5 @@ npm run build:site
 
 The Public site workflow deploys `dist/` to GitHub Pages on pushes to `main`.
 
-Do not invent certified claims. Copy status wording from
-[docs/capability-matrix.md](../../docs/capability-matrix.md).
+For claims about a provider, check the operation and date in
+[provider coverage](../docs/capability-matrix.md).

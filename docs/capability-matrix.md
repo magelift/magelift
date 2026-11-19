@@ -1,34 +1,28 @@
-# Capability matrix
+# Provider capabilities and test evidence
 
-Presets (`preview`, `standard`, `high-availability`) keep day-one YAML small.
-Power users set explicit catalog fields. Only cells marked **certified** are
-production-supported on the acceptance path.
+The PHP configuration describes the desired Magento environment. The adapter for the selected provider determines what resources and operations MageLift can implement. Each shop chooses Magento, PHP and service versions and validates them against its application.
 
-Adobe-unsupported combinations fail before mutate unless
-`compatibility.allowUnsupported` records that Adobe hatch. The hatch does not
-recertify a cell and does not apply to MageLift-experimental or
-provider-unavailable targets. Experimental cells warn and continue; the warning
-names MageLift. They may still return `ErrNotSupported` on some day-2 commands.
-Provider-unavailable cells fail closed.
+| Target | Implementation and evidence |
+| --- | --- |
+| AWS ECS Fargate | Pulumi resource graph, Go lifecycle tests, Floci AWS SDK tests and archived acceptance runs |
+| GCP GKE Autopilot | Provider plugin, Pulumi resource graph, Kubernetes workload tests, Floci GCP SDK tests and archived acceptance runs |
+| Azure AKS | AKS and MySQL resource graphs, dedicated and shared cluster modes, migration and rollout tests, Floci Blob and Key Vault, and local PHP/MySQL TLS tests. Live Azure deployment remains unverified |
+| AWS EKS, GCP GKE Standard, OVH and Scaleway | Additional adapters with operation-specific coverage |
 
-Headless in MageLift means Magento `application.mode: headless|integrated`
-(API, CORS, media, edge). Storefront frameworks (Next.js, PWA, etc.) stay outside
-the CLI; wire them with Magento outputs and your usual frontend deploy tool.
+Go tests check configuration and lifecycle behavior. Pulumi mocks record resource registrations, inputs and dependencies. Floci exercises individual cloud APIs over the network. Each live record names its cloud, region, release, topology and outcome. MageLift makes no certification claim. [Tests](https://github.com/magelift/magelift/tree/main/tests) · [Historical run evidence](evidence/README.md)
 
-Shared evidence rules for the `certification-matrix` catalog family live in
-this matrix plus [the evidence pack](evidence/README.md): a cell is certified
-only when both agree. Implemented cells belong in the per-provider catalogs
-below. Tracking those cells only inside a packed multi-provider campaign is
-not enough.
+## Earlier acceptance campaigns
 
-| Catalog spec | Certified subset today | Experimental, withheld, or named gap until tuple evidence |
+The tables below use the `certification-matrix` catalog and labels in effect when the campaigns ran. A historical result applies to the recorded release, region and services. The table at the top describes the adapters shipped today.
+
+| Archived catalog | Subset recorded at the time | Experimental, withheld, or named gap until tuple evidence |
 | --- | --- | --- |
 | `certification-aws` | ECS Fargate preview Magento (`nginx-fpm`) with the recorded catalog services | `managed-instances`, `eks`, `aurora-mysql`, `amazon-mq`, Magento search data-plane (`serverless` / `provisioned`), HA, FrankenPHP, Apache, X-Ray |
 | `certification-gcp` | GKE Autopilot evidenced runtime cells | `gke-standard`, HA, Cloud Armor Magento `requestBodiesToExclude`, Cloud SQL attach, Pub/Sub Magento modules |
 | `certification-ovh` | empty | every `mks` cell; Bootstrap/Secrets stay `ErrNotSupported` |
 | `certification-scaleway` | empty | every `kapsule` cell; Bootstrap stays `ErrNotSupported`; cache family is Redis |
 
-## Providers and runtimes
+## Providers and runtimes in the archived campaigns
 
 | Provider | Runtime | Tier | Magento deploy Ops | Day-2 (logs/exec/secrets/state) |
 | --- | --- | --- | --- | --- |
@@ -43,18 +37,15 @@ On targets without Magento deploy Ops, `magelift deploy` refuses unless you pass
 `--infra-only` (infrastructure graph update only). With the flag, Magento migrate,
 cutover, and health are skipped and announced on stderr.
 
-Multi-cloud is claimed for the two certified first-party targets
-(`aws`/`ecs-fargate` and `gcp`/`gke-autopilot`) per
-([ADR 0002](adr/0002-certified-vs-experimental.md)). Community providers
-remain experimental.
+These campaigns covered AWS ECS Fargate and GCP GKE Autopilot. The archived records use the terminology defined at the time. [ADR 0002](adr/0002-certified-vs-experimental.md)
 
 ## AWS implemented catalog (`certification-aws`)
 
-Adobe / MageLift / certified are separate columns. An omitted YAML combination
+Adobe / MageLift / certified are separate columns. An omitted configuration
 must fail closed or be typed unavailable. Private Magento-on-AWS shops may
 illustrate one wiring; they do not certify a cell.
 
-| Dimension | YAML | Adobe | MageLift | Status |
+| Dimension | Project setting | Adobe | MageLift | Status |
 | --- | --- | --- | --- | --- |
 | Runtime | `ecs-fargate` | n/a (infra) | implemented | **certified** for the evidenced preview tuple |
 | Runtime | `eks` | n/a | implemented | experimental |
@@ -106,7 +97,7 @@ cell is not production certification of any other topology.
 | Search | `catalog.searchMode` | `disabled` (preview / free-tier) | `serverless` and provisioned OpenSearch remain experimental. Provisioned passed infrastructure-only in [mlaw1](evidence/aws-ecs-fargate-packed-keep-mlaw1-20260915.md) (reindex/query/recycle logs not collected). MageLift has no certified live Magento search data-plane evidence on AWS. |
 | Cache | managed Valkey | certified shapes per preset | - |
 | Queue | `catalog.queueMode` | `db` (preview default), `ecs-rabbitmq` (unset standard/HA default) | Explicit `amazon-mq` is experimental-warn; `ecs-artemis` has live preview evidence but remains experimental; EKS database/RabbitMQ KEEP `awsek` exists, while Amazon MQ and full EKS certification remain deferred |
-| Web runtime | `application.webRuntime` | `nginx-fpm` on the evidenced AWS preview tuple | Adobe lists nginx on this Magento line. `frankenphp-classic` and `php-apache` are Adobe-unsupported plugins that require `compatibility.allowUnsupported`; neither has an Adobe row or certification. `frankenphp-worker` is unregistered. |
+| Web runtime | `application.webRuntime` | `nginx-fpm` on the evidenced AWS preview tuple | Adobe lists nginx on this Magento line. `frankenphp-classic` and `php-apache` are Adobe-unsupported plugins that produce a warning; neither has an Adobe row or certification. `frankenphp-worker` is unregistered. |
 | Edge | CloudFront + WAF | certified on Fargate | deferred on EKS |
 | Compute launch | Fargate (default) | **certified** | ECS Managed Instances (MI), post-beta cost path; prior Magento-on-AWS ops used MI + RI for RabbitMQ/web density |
 
@@ -149,7 +140,7 @@ Keep one preview stack up and iterate cells; destroy once at the end.
 | `queueMode: db` | yes | real-account acceptance | Default preview; harness create-once + cell PASS 2026-07-29 |
 | `queueMode: ecs-rabbitmq` | yes | real-account acceptance | Same stack cell-update 2026-07-29 (Cloud Map SRV + queue SG HTTPS egress) |
 | `queueMode: ecs-artemis` | yes (experimental) | real-account acceptance | Same stack cell-update 2026-08-06; still experimental because this is one preview shape and not a HA certification |
-| `queueMode: amazon-mq` | **no** | - | Skip apply on disposable accounts; see unverifiable. Explicit `amazon-mq` remains experimental-warn; unset standard/HA YAML now selects `ecs-rabbitmq`. |
+| `queueMode: amazon-mq` | **no** | - | Skip apply on disposable accounts; see unverifiable. Explicit `amazon-mq` remains experimental-warn; standard and HA presets default to `ecs-rabbitmq`. |
 | OpenSearch serverless/provisioned | **avoid apply** | Pulumi mocks | Preview-only on free-tier; live SigV4 = unverifiable here |
 
 Measured first create (2026-07-21, eu-north-1 free-tier): **~10m31s** Pulumi apply for
@@ -194,7 +185,7 @@ is infrastructure-only.
 Gateway, floating IP, and CNI failures are separate cells. Do not infer custom
 gateway routing from `privateNetworkRoutingAsDefault`.
 
-| Dimension | YAML | Adobe | MageLift | Status |
+| Dimension | Project setting | Adobe | MageLift | Status |
 | --- | --- | --- | --- | --- |
 | Runtime | `mks` | n/a | implemented | experimental |
 | MKS plan | `mksPlan`: `free` / `standard` | n/a | implemented | experimental |
@@ -215,7 +206,7 @@ and New Relic; destroy always; no KEEP. Vendors attach to a GCP origin.
 Magento runtime stays `not-run` if that cap is spent elsewhere. Current proof
 is infrastructure-only.
 
-| Dimension | YAML | Adobe | MageLift | Status |
+| Dimension | Project setting | Adobe | MageLift | Status |
 | --- | --- | --- | --- | --- |
 | Runtime | `kapsule` | n/a | implemented | experimental |
 | Kapsule | `kapsuleVersion`, `nodeType`, `nodeCount` | n/a | implemented | experimental |
@@ -267,11 +258,10 @@ the plan so a matrix run cannot silently move to another cluster API version.
 ## GCP implemented catalog (`certification-gcp`)
 
 Presets (`preview` / `standard` / `high-availability`) fill omitted
-`target.gcp` fields. The agency API is the explicit YAML dimensions, not the
-preset name. Autopilot certified status does not transfer to Standard, HA,
+`target.gcp` fields. Projects can override each of these settings independently of the preset. Autopilot certified status does not transfer to Standard, HA,
 Armor Magento exclusion, Cloud SQL attach, or Pub/Sub Magento modules.
 
-| Dimension | YAML | Adobe | MageLift | Status |
+| Dimension | Project setting | Adobe | MageLift | Status |
 | --- | --- | --- | --- | --- |
 | Runtime | `gke-autopilot` | n/a | implemented | **certified** for evidenced runtime cells |
 | Runtime | `gke-standard` | n/a | implemented | experimental |

@@ -89,7 +89,7 @@ running executable; rerun the upgrade from a second copy in that case.
 
 ## Providers
 
-The GCP provider is acquired on first target activation when it is absent.
+The CLI can download the GCP and Azure plugins the first time you use the corresponding target.
 A project `magelift.providers.lock` takes priority; otherwise the CLI uses
 its own release version. No `latest` version is selected. Help, version,
 doctor and configuration validation do not install providers.
@@ -101,12 +101,14 @@ while online:
 magelift providers install
 ```
 
-Providers come from the target named in your `magelift.yaml`, verified by
+Providers come from the target named in your `magelift.php`, verified by
 digest and signature before they land in the cache. There is no flag to
-select providers. Automatic acquisition is limited to first-party GCP;
-community provider names in YAML do not authorize a download or execution.
+select providers. Automatic downloads are available for the first-party GCP and Azure plugins. A community provider must be installed explicitly.
 
 Cache entries are separated by provider, version, OS and architecture.
+Run `magelift extensions list` to inspect the installed GCP and Azure plugins.
+An `unverified` entry means the resolver or signature check failed. Inspect the
+project lock and run `magelift providers install` to repair the selected plugin.
 Every use verifies content and signature; a corrupt cache fails with a repair
 instruction. Keep the verified cache and project lock available for offline
 use. An offline cache miss cannot be repaired without the matching artifacts.
@@ -129,4 +131,4 @@ authentication.
 
 - Local Magento without cloud credentials: [local vs cloud](local-vs-cloud.md)
 - Sample config: `examples/sample-shop/` in the repository
-- Cloud preview: [getting started](getting-started.md#4-cloud-preview-certified)
+- Cloud preview: [getting started](getting-started.md#connect-the-cloud)

@@ -1,100 +1,25 @@
 ---
-title: Compare MageLift to ACC / Upsun
-description: MageLift vs Adobe Commerce Cloud and Upsun. Own-cloud Magento with ACC/Upsun-shaped YAML versus a rented Magento PaaS. Cost model, lock-in, and the AWS, GCP, Scaleway, and OVHcloud target matrix.
+title: Compare MageLift with Adobe Commerce Cloud and Upsun
+description: Compare hosting, configuration, costs and operational responsibilities when moving a Magento shop into your cloud account.
 ---
 
-# Compare MageLift to ACC / Upsun
+# Compare MageLift with Adobe Commerce Cloud and Upsun
 
-Adobe Commerce Cloud and Upsun-style products run Magento on their platform.
-MageLift is free open-source software that runs Magento in your AWS, GCP,
-Scaleway, or OVHcloud account with familiar YAML. You pay the cloud bill and
-control IAM.
+With Adobe Commerce Cloud or Upsun you buy a platform to run your store. With MageLift you operate Magento in your own cloud account. That gives your team control over service versions and capacity. It also makes your team responsible for access, backups, restores, upgrades and incident response.
 
-Cost numbers here are illustrative. Plug in your own quotes.
-
-## Audience
-
-- Agencies with roughly 3-20 Magento shops that have (or want) cloud accounts
-- SME Magento owners who can follow YAML/CLI docs without a dedicated DevOps hire
-
-## PaaS vs MageLift
-
-| | Adobe Commerce Cloud / Upsun-style PaaS | MageLift |
+| Decision | Adobe Commerce Cloud or Upsun | MageLift |
 | --- | --- | --- |
-| Where Magento runs | Vendor-managed platform | Your AWS, GCP, Scaleway, or OVHcloud account |
-| Config shape | PaaS YAML / UI | ACC/Upsun-shaped `magelift.yaml` + CLI |
-| Lock-in | Platform + often region/tooling | Cloud APIs + open-source CLI (Apache-2.0) |
-| Cost model | Platform fee + usage | Cloud bill (and your time). `magelift cost` estimates AWS shapes |
-| Software fee | Platform subscription | $0 for MageLift ([pricing](https://magelift.dev/pricing.md)) |
-| Ops | Ticket / platform runbooks | Day-2 verbs on certified targets; you own IAM and spend |
+| Where does the shop run? | On the vendor’s platform | AWS ECS Fargate, GCP GKE Autopilot or Azure AKS with a starter project |
+| How do we configure it? | The platform’s YAML files and management tools | PHP in the shop repository |
+| Who handles incidents? | The vendor and your team under your support agreement | Your team, with cloud logs, metrics and MageLift’s provider-specific commands |
+| What do we pay for? | Your platform agreement and usage | Cloud resources and your team’s time. The CLI is free under Apache-2.0. |
 
-MageLift keeps billing in your account, uses ACC/Upsun-shaped YAML, and ships
-under Apache-2.0. Certified targets are listed in the capability matrix. Preview
-stacks can be destroyed when you are done.
+## Compare costs for the same shop
 
-ACC / Upsun-style PaaS gives you a vendor-operated platform and tickets, with less
-raw cloud surface for small teams. You pay a platform fee and accept platform
-lock-in; Magento runs on rented infrastructure you do not fully control.
+Include compute, database capacity, backups, storage, search, message brokers, traffic and retained logs. A preview can share compute and still have its own billable database. On AWS, run `magelift cost --env preview` for a starting estimate and check the unpriced items against your provider’s rates. Compare both options using the same traffic and availability requirements. [Operations and cost](operations.md) · [Pricing](https://magelift.dev/pricing.md)
 
-## What is production-supported
+## Rehearse the move
 
-| Target | Status |
-| --- | --- |
-| AWS ECS Fargate | Certified |
-| GCP GKE Autopilot | Certified |
-| AWS EKS / OVH / Scaleway | Experimental |
+Run `magelift init --from-acc` or `magelift init --from-upsun` in the shop checkout and choose the destination with `--provider`. The importer writes the settings it can translate and names anything you need to review. Restore the database and media together in staging, then test checkout, background jobs and recovery before changing DNS. If you already own the AWS network or database, you can attach those resources. [Migration guide](migrating-from-paas.md) · [Cutover checklist](weekend-migrate.md) · [Existing AWS resources](brownfield-attach.md)
 
-Details: [capability matrix](capability-matrix.md). Experimental targets are not
-production-supported.
-
-## Cost assumptions
-
-Use `magelift cost --env preview` for AWS catalog shapes. Typical preview docs
-assume:
-
-- A region that fits your account's free-tier story where relevant
-- `searchMode: disabled` or other free-tier-safe search
-- Database queues on preview (`queueMode: db`); prefer `ecs-rabbitmq` when you
-  need a broker without Amazon MQ pricing
-- Destroy when the spike is done
-
-MageLift does not claim a fixed monthly savings figure. Compare against your PaaS
-quote with the same traffic and catalog assumptions.
-
-## Migration
-
-Config import (`magelift init --from-acc` / `--from-upsun`), dump seed, media, and
-DNS cutover: [migrating-from-paas](migrating-from-paas.md) and
-[weekend-migrate](weekend-migrate.md). Existing AWS VPC/RDS:
-[brownfield-attach](brownfield-attach.md).
-
-## FAQ
-
-### Is MageLift cheaper than Adobe Commerce Cloud?
-
-It can be, but MageLift does not publish a fixed savings number. You replace the
-platform fee with your selected cloud bill plus operator time. Run `magelift cost` and
-compare to your PaaS quote on the same assumptions.
-
-### Will my Magento team recognize the config?
-
-`magelift.yaml` follows ACC/Upsun habits. Power users open the capability matrix
-for explicit catalog fields.
-
-### Can I leave PaaS in a weekend?
-
-Packaging and checklist: [weekend-migrate](weekend-migrate.md). Full dump/DNS
-cutover depth: [migrating-from-paas](migrating-from-paas.md).
-
-## Trust
-
-- Apache-2.0 and `NOTICE`
-- First release ships archives with checksums / SBOM (GoReleaser); images use Cosign on GHCR
-- Hosted CI runs on the public repo ([release-readiness](release-readiness.md));
-  path-filtered green on `main` is required before `v1.0.0-rc.1`
-
-## Next
-
-[Getting started](getting-started.md) → `examples/sample-shop/` in the repo →
-[FAQ](faq.md) →
-[CONTRIBUTING](https://github.com/magelift/magelift/blob/main/CONTRIBUTING.md).
+AWS and GCP have recorded Magento runs for specific configurations. Azure has Pulumi resource tests and local Floci API tests. Check what was exercised for the configuration you plan to use. [Provider evidence](capability-matrix.md)

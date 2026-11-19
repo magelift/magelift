@@ -8,7 +8,7 @@ Each ADR states context, decision, consequences, alternatives, and provenance.
 
 ## Current decisions
 
-- [ADR 0001](0001-yaml-only-cli.md): YAML-only CLI in the user's account. Not a host.
+- [ADR 0001](0001-yaml-only-cli.md): PHP project configuration in the shop’s cloud account.
 - [ADR 0002](0002-certified-vs-experimental.md): Certified vs experimental. Evidence is authority.
 - [ADR 0003](0003-portable-contracts-vs-topology.md): Portable Magento contracts vs per-cloud topology.
 - [ADR 0004](0004-ports-and-adapters.md): Ports and adapters, including day-2 `Has*` ports.

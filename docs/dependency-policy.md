@@ -1,39 +1,16 @@
-# Dependency policy
+# Updating dependencies
 
-MageLift uses the newest production-suitable dependency compatible with its supported runtime floor. Updates are automated, reviewed, locked, and verified by the complete test suite.
+Use the newest stable release that works on the oldest runtime MageLift supports. Keep the version constraint and lockfile together. A service version that a shop selects in `magelift.php` belongs to that shop.
 
-- Go declares the latest supported stable toolchain. CI reads `go.mod` rather than duplicating the version.
-- Cobra tracks the latest stable minor release.
-- YAML v4 is used because upstream has frozen v3 except for security maintenance and recommends v4 for new projects. Until v4 reaches a final release, its pinned release candidate must pass all strict-decoding, merge, and provenance tests before each update.
-- The PHP package keeps PHP 8.3 as its runtime floor and tests through PHP 8.5. PHPUnit stays on the latest 11.x release.
-- Composer resolves the lock file against PHP 8.3.26, so a dependency cannot pass on PHP 8.5 and
-  fail on the PHP 8.3 CI job. The package declares `^8.3` and CI exercises
-  every supported branch.
-- PHPStan and Psalm run on every verification job. Their dynamic JSON and process
-  boundary checks are kept in source rather than hidden in a generated baseline.
-- Docker base images are pinned by multi-platform digest. The FrankenPHP classic adapter currently uses the Debian Trixie PHP 8.5 image from the 1.12.7 release; Dependabot tracks Docker digest updates.
-- Pulumi Automation API and cloud provider SDKs that MageLift implements are direct
-  Go dependencies. Their versions are pinned in `go.mod`, checked with
-  `go list -m -u all`, and exercised by Pulumi mock graph tests. Additional cloud
-  SDKs enter the module only when that target is implemented.
-- Magento and PHP support data is date-stamped in the compatibility catalog. The AWS
-  stack planner applies the service-version combinations from [Adobe's system
-  requirements](https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements)
-  before it registers infrastructure resources. PHP branch support follows the
-  [PHP supported versions](https://www.php.net/supported-versions.php) page.
+| Component | Where to update it | What to check |
+| --- | --- | --- |
+| Go and Pulumi | Root, SDK and provider modules, plus `go.work` | Run `make test-fast`. Check new major module paths separately. For provider upgrades, inspect Pulumi resource graphs and any changes to resource names, defaults or replacement behavior. |
+| PHP build library | `build/composer.json` and `build/composer.lock` | Resolve against the PHP 8.3 platform in the manifest. Run PHPUnit, PHPStan and Psalm with `make php-test`. The optional PHP 8.6 CI job tests the build library. Magento runtime recipes cover PHP 8.3 through 8.5. |
+| CLI config decoding | Go modules and the PHP project evaluator | Check strict decoding, environment inheritance and where each resolved setting came from. The YAML decoder also reads vendor migration inputs. |
+| Website and docs | `website/package.json`, its npm lockfile and `docs/requirements.txt` | Run `npm ci` and `npm run build:site` in `website/`. The build includes the strict MkDocs check. |
+| Containers and emulators | Dockerfile, Bake and Compose image references | Use a published image digest for each supported architecture. Build the affected recipe and run the corresponding runtime or Floci tests. |
+| GitHub Actions | Repository workflows and the shop workflow generator | Resolve the action’s release tag to its commit. For an annotated tag, pin the underlying commit. Regenerate the sample workflows and run `make workflow-check` and `make ci-act-project`. |
 
-Dependabot opens the dependency update pull requests. Go modules, Composer packages, and GitHub Actions use separate update groups so their tests and release risks stay visible.
+Dependabot checks the Go, Composer, npm, Python, Docker and Actions dependencies weekly. Review major upgrades for API changes and new runtime requirements. For PHP branch lifetimes and Magento service recommendations, consult the upstream tables. [PHP support dates](https://www.php.net/supported-versions.php) · [Adobe Commerce system requirements](https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements)
 
-CI also runs Go vulnerability and license checks, CodeQL for Go, and Trivy
-against every published Debian PHP runtime, builder, and FrankenPHP classic image
-for each supported PHP branch. `go-licenses` ignores `github.com/ovh/pulumi-ovh`
-and `github.com/ovh/okms-sdk-go` because their Apache-2.0 LICENSE files sit at
-the module root while nested Go packages are not classified; those licenses are
-recorded in `NOTICE`. Shellcheck validates repository shell scripts, and
-actionlint validates workflow syntax and expressions;
-Zizmor audits GitHub Actions workflows for unsafe
-permissions, unpinned actions, and injection paths. A finding blocks the relevant job until it is fixed,
-explicitly accepted with evidence, or removed from the supported release.
-
-The CLI reference is generated from the Cobra command tree. `make cli-docs-check`
-fails when command names, flags, or descriptions drift from `docs/cli-reference.md`.
+CI runs Go vulnerability and license checks, CodeQL, ShellCheck, actionlint and zizmor. Trivy scans the locally built PHP images. The root licenses for the OVH Pulumi and OKMS Go packages are listed in `NOTICE` because the license scanner cannot classify their nested packages. Changes to CLI help belong in the Cobra command. Run `make generate cli-docs` to update generated files and the CLI reference.

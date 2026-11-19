@@ -12,9 +12,9 @@ import FinalCta from "../components/FinalCta.astro";
 import Footer from "../components/Footer.astro";
 import { faqs } from "../data/content.js";
 
-const title = "MageLift: Magento on AWS and GCP (open-source CLI)";
+const title = "MageLift | Magento on AWS, Google Cloud and Azure";
 const description =
-  "Open-source Magento CLI with ACC/Upsun-shaped YAML. Run Magento Open Source and Adobe Commerce in your AWS or GCP account. Certified on ECS Fargate and GKE Autopilot. The software is free; you pay the cloud bill.";
+  "Configure Magento in PHP, run it locally and deploy to your AWS, Google Cloud or Azure account. MageLift supports the native storefront and separately hosted headless frontends.";
 
 const schema = {
   "@context": "https://schema.org",
@@ -27,7 +27,7 @@ const schema = {
       logo: "https://magelift.dev/media/logo.png",
       sameAs: ["https://github.com/magelift/magelift"],
       description:
-        "Open-source Magento deployment CLI for AWS and GCP. Not a hosting provider.",
+        "Open-source Magento deployment CLI for AWS, Google Cloud and Azure.",
     },
     {
       "@type": "WebSite",
@@ -35,7 +35,7 @@ const schema = {
       url: "https://magelift.dev/",
       name: "MageLift",
       description:
-        "Deploy Magento in your own AWS or GCP account with ACC/Upsun-shaped YAML.",
+        "Deploy Magento in your AWS, Google Cloud or Azure account with a PHP project file.",
       publisher: { "@id": "https://magelift.dev/#org" },
       inLanguage: "en",
     },
@@ -55,44 +55,44 @@ const schema = {
         "@type": "Offer",
         price: "0",
         priceCurrency: "USD",
-        description: "Open-source CLI is free; you pay your AWS or GCP bill.",
+        description: "The CLI is free. Your cloud provider bills your account.",
       },
       featureList: [
-        "ACC/Upsun-shaped magelift.yaml",
-        "Certified AWS ECS Fargate",
-        "Certified GCP GKE Autopilot",
-        "Preview, deploy, destroy day-2 CLI",
-        "Local Compose Magento path",
+        "Programmable PHP project configuration",
+        "AWS ECS Fargate",
+        "GCP GKE Autopilot",
+        "Azure AKS",
+        "Staging, UAT, production and pull-request previews",
+        "Local Magento with Docker Compose",
         "PaaS config import from ACC and Upsun",
       ],
       description:
-        "Open-source CLI and YAML to run Magento Open Source and Adobe Commerce in your own AWS or GCP account.",
+        "Open-source CLI and PHP configuration to run Magento Open Source and Adobe Commerce in your AWS, Google Cloud or Azure account.",
       isAccessibleForFree: true,
       creator: { "@id": "https://magelift.dev/#org" },
     },
     {
       "@type": "HowTo",
-      name: "Deploy Magento with MageLift on a certified cloud target",
+      name: "Deploy Magento with MageLift in your cloud account",
       description:
-        "Install the MageLift CLI, validate sample YAML, then preview Magento on AWS ECS Fargate or GCP GKE Autopilot.",
-      totalTime: "PT1H",
+        "Install the CLI, initialize a shop and inspect its planned infrastructure.",
       step: [
         {
           "@type": "HowToStep",
           name: "Install the CLI",
-          text: "No release is published yet. Clone the repo and run go install ./cmd/magelift, then magelift version.",
+          text: "From a MageLift checkout, run go install ./cmd/magelift.",
           url: "https://magelift.dev/docs/install/",
         },
         {
           "@type": "HowToStep",
-          name: "Validate sample config",
-          text: "Copy examples/sample-shop/magelift.yaml, fill account and secret refs, then run magelift config validate.",
+          name: "Configure the shop",
+          text: "Run magelift init in the Magento checkout, set the cloud account and secret references, then run magelift config validate.",
           url: "https://magelift.dev/docs/getting-started/",
         },
         {
           "@type": "HowToStep",
           name: "Preview and destroy",
-          text: "Bootstrap once, then preview and deploy on a certified target. Destroy when the spike is done.",
+          text: "Bootstrap the account and review the planned resources with magelift preview. Destroy a temporary environment when testing ends.",
           url: "https://magelift.dev/docs/getting-started/",
         },
       ],

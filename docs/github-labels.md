@@ -12,7 +12,7 @@ These labels exist on the public repo. Use them so issues and PRs stay sortable.
 | `provider/scaleway` | Experimental Scaleway adapter |
 | `area/cli` | Cobra commands |
 | `area/docs` | MkDocs, ADRs, CONTRIBUTING, marketing |
-| `area/config` | YAML schema and validation |
+| `area/config` | PHP project format, schema and validation |
 | `area/build` | Images, Composer package, BuildKit |
 | `experimental` | Behavior that may break without a minor bump |
 | `security` | SECURITY.md / advisory follow-ups |

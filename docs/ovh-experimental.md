@@ -13,18 +13,22 @@ Certified paths remain AWS ECS Fargate and GCP GKE Autopilot. Validated with Pul
 
 ## Target
 
-```yaml
-target:
-  provider: ovh
-  runtime: mks
-  ovh:
-    serviceName: your-ovh-public-cloud-project-id
-    apiEndpoint: ovh-eu
-    region: EU-WEST-PAR
-    networkCidr: 10.30.0.0/16
-    zones: [eu-west-par-a, eu-west-par-b, eu-west-par-c]
-    imageDigest: ghcr.io/org/magento@sha256:...
-    encryptionKeySecret: magento-crypt-key
+Use this array for the `target` entry in `magelift.php`.
+
+```php
+$target = [
+    'provider' => 'ovh',
+    'runtime' => 'mks',
+    'ovh' => [
+        'serviceName' => 'your-ovh-public-cloud-project-id',
+        'apiEndpoint' => 'ovh-eu',
+        'region' => 'EU-WEST-PAR',
+        'networkCidr' => '10.30.0.0/16',
+        'zones' => ['eu-west-par-a', 'eu-west-par-b', 'eu-west-par-c'],
+        'imageDigest' => 'ghcr.io/org/magento@sha256:...',
+        'encryptionKeySecret' => 'magento-crypt-key',
+    ],
+];
 ```
 
 `zones` are MKS availability-zone identifiers inside the selected OVH region;
@@ -44,7 +48,7 @@ current Gen 3 `b3-8` node flavor. The official Valkey capability page lists
 7.2, 8.0, and 8.1; the authenticated EU-WEST-PAR availability catalog also
 currently returns 9.0 and 9.1. The preview preset uses the current
 availability-admitted Discovery one-node shape; standard and high-availability
-use the current Production two-node shape. Advanced YAML may select the
+use the current Production two-node shape. The project can select the
 documented or catalog-admitted discovery/essential, business/production, or
 enterprise/advanced plan family, exact flavor, version, node count, backup
 settings, and regions.

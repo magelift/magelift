@@ -60,7 +60,7 @@ Status vocabulary: `closed` | `intentional-gap`.
 
 ## D-07 env and relationship allowlist (ECE-04)
 
-Frozen v1 importer allowlist. Mapped keys become reviewable `magelift.yaml`;
+Frozen v1 importer allowlist. Mapped keys become reviewable `magelift.php`;
 everything else is reported in `magelift.unmapped.md` (or stem sidecar) with
 non-zero exit; never a silent drop (D-05 / 04-03).
 
@@ -76,9 +76,9 @@ non-zero exit; never a silent drop (D-05 / 04-03).
 | OpenSearch / Elasticsearch relationship | closed | `target.aws.catalog.searchMode` intent (e.g. serverless) + runtime search env. |
 | RabbitMQ / AMQP relationship | closed | `target.aws.catalog.queueMode` (e.g. ecs-rabbitmq) + runtime queue env. |
 | Magento `cron:run` crontab entries | closed | `application.cron` list of `{schedule, command}`. |
-| Free-form shell crontab entries | intentional-gap | Reported unmapped; not rewritten into portable YAML. |
-| Long-tail stage / variables env beyond this allowlist | intentional-gap | Examples: `MYSQL_USE_SLAVE_CONNECTION`, `REDIS_BACKEND`, `NPROC`, `PHP_*` tuning, `SKIP_HTML_MINIFICATION`, `CLEAN_STATIC_FILES`, `WARM_UP_PAGES`, `SCD_MATRIX`, `SCD_MAX_EXEC_TIME`, `ERROR_REPORT_DIR_NESTING_LEVEL`, `ENABLE_EVENTING`, Xdebug flags. Appear in unmapped sidecar; operators edit `magelift.yaml` by hand. |
-| Dumping raw `MAGENTO_DC_*` blocks into YAML | intentional-gap | Runtime adapters already emit `MAGENTO_DC_*` from capabilities; importers map relationships/intent only. |
+| Free-form shell crontab entries | intentional-gap | Reported unmapped; the shop must configure its scheduler. |
+| Long-tail stage / variables env beyond this allowlist | intentional-gap | Examples: `MYSQL_USE_SLAVE_CONNECTION`, `REDIS_BACKEND`, `NPROC`, `PHP_*` tuning, `SKIP_HTML_MINIFICATION`, `CLEAN_STATIC_FILES`, `WARM_UP_PAGES`, `SCD_MATRIX`, `SCD_MAX_EXEC_TIME`, `ERROR_REPORT_DIR_NESTING_LEVEL`, `ENABLE_EVENTING`, Xdebug flags. Appear in unmapped sidecar; operators edit `magelift.php` by hand. |
+| Dumping raw `MAGENTO_DC_*` blocks into the PHP project | intentional-gap | Runtime adapters already emit `MAGENTO_DC_*` from capabilities; importers map relationships/intent only. |
 
 ## Operator notes
 

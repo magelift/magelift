@@ -22,11 +22,11 @@ import { how } from "../data/content.js";
       </p>
     </div>
 
-    <figure class="yaml-panel">
-      <pre><code>{how.yaml.map((line) => (
-        <span class:list={["yaml-line", { hl: line.hl }]}>{line.text}{"\n"}</span>
+    <figure class="project-panel">
+      <pre><code>{how.project.map((line) => (
+        <span class:list={["project-line", { hl: line.hl }]}>{line.text}{"\n"}</span>
       ))}</code></pre>
-      <figcaption>{how.yamlCaption}</figcaption>
+      <figcaption>{how.projectCaption}</figcaption>
     </figure>
   </div>
 </section>
@@ -73,7 +73,7 @@ import { how } from "../data/content.js";
     margin: 0 0.45rem;
     color: var(--rule-strong);
   }
-  .yaml-panel {
+  .project-panel {
     margin: 0;
     background: var(--panel);
     border: 1px solid var(--rule);
@@ -81,7 +81,7 @@ import { how } from "../data/content.js";
     box-shadow: var(--shadow);
     overflow: hidden;
   }
-  .yaml-panel pre {
+  .project-panel pre {
     margin: 0;
     padding: 1rem 1.05rem;
     overflow-x: auto;
@@ -90,17 +90,17 @@ import { how } from "../data/content.js";
     line-height: 1.62;
     color: #1e293b;
   }
-  .yaml-line {
+  .project-line {
     display: block;
     padding: 0 0.35rem;
     margin: 0 -0.35rem;
     border-radius: 2px;
   }
-  .yaml-line.hl {
+  .project-line.hl {
     background: var(--accent-soft);
     box-shadow: inset 2px 0 0 var(--accent);
   }
-  .yaml-panel figcaption {
+  .project-panel figcaption {
     padding: 0.7rem 1.05rem;
     border-top: 1px solid var(--rule);
     background: var(--bg1);

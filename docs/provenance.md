@@ -6,7 +6,7 @@ generated distributions must maintain that separately.
 | Area | Origin | Public source or method | Allowed use | Status |
 | --- | --- | --- | --- | --- |
 | Configuration and deploy lifecycle | New MageLift design informed by public product behavior | Public ece-tools documentation and source under its own license | Concepts and independently implemented interfaces; no copied identifiers or text | Recorded |
-| ACC / Upsun → `magelift.yaml` importers | Clean-room Phase 4 (`internal/paasimport`) | Public Adobe / Upsun config file docs + fixture shapes; no vendored PaaS trees | Generate reviewable YAML via `magelift init --from-acc` / `--from-upsun`; foreign schemas rejected by `schemaVersion` probe | Recorded |
+| ACC / Upsun → `magelift.php` importers | Clean-room Phase 4 (`internal/paasimport`) | Public Adobe / Upsun config file docs + fixture shapes; no vendored PaaS trees | Generate reviewable PHP via `magelift init --from-acc` / `--from-upsun`; foreign schemas rejected by `schemaVersion` probe | Recorded |
 | Magento patch lifecycle | Clean-room PHP build (`PatchLifecycle`, `PatchApplier`) | Public Adobe patch-order documentation plus project-installed upstream executables; no vendored Cloud Patches source or Quality Patches database | Delegate required Cloud Patches, configured Quality Patches, and local hotfix ordering to the target's locked tools; retain an argv-safe idempotent custom fallback | Recorded |
 | Environment-centric CLI experience | Clean-room behavioral observation | Public Upsun CLI documentation and normal public CLI use | User-experience lessons only | Recorded |
 | Infrastructure orchestration | New MageLift design | Pulumi Automation API and state backend documentation | Public APIs and documented behavior | Recorded |

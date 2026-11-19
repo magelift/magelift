@@ -16,21 +16,25 @@ Certified paths remain AWS ECS Fargate and GCP GKE Autopilot. Validated with Pul
 
 ## Target
 
-```yaml
-target:
-  provider: scaleway
-  runtime: kapsule
-  scaleway:
-    projectId: 11111111-1111-1111-1111-111111111111
-    region: fr-par
-    zone: fr-par-1              # primary managed-cache zone
-    zones: [fr-par-1, fr-par-2] # one Kapsule pool per listed zone
-    networkCidr: 10.40.0.0/16
-    cacheMode: redis          # escape hatch: Scaleway has no managed Valkey yet
-    redisVersion: 8.6.6       # query the provider catalog before changing this
-    kapsuleVersion: 1.36.4    # query the provider catalog before changing this
-    imageDigest: ghcr.io/org/magento@sha256:...
-    encryptionKeySecret: magento-crypt-key
+Use this array for the `target` entry in `magelift.php`.
+
+```php
+$target = [
+    'provider' => 'scaleway',
+    'runtime' => 'kapsule',
+    'scaleway' => [
+        'projectId' => '11111111-1111-1111-1111-111111111111',
+        'region' => 'fr-par',
+        'zone' => 'fr-par-1',
+        'zones' => ['fr-par-1', 'fr-par-2'],
+        'networkCidr' => '10.40.0.0/16',
+        'cacheMode' => 'redis',
+        'redisVersion' => '8.6.6',
+        'kapsuleVersion' => '1.36.4',
+        'imageDigest' => 'ghcr.io/org/magento@sha256:...',
+        'encryptionKeySecret' => 'magento-crypt-key',
+    ],
+];
 ```
 
 ## What this stack provisions
@@ -69,7 +73,7 @@ Kapsule worker placement. When more than one zone is configured, MageLift create
 one node pool per zone and distributes `nodeCount` across those pools; `nodeCount`
 must be at least the number of configured zones. Web and queue Deployments receive
 strict Kubernetes zone-spread constraints when their replica count can cover all
-configured zones. This keeps the YAML setting connected to the actual worker and
+configured zones. The setting controls the worker and
 workload topology instead of treating it as metadata.
 
 The preview preset may use one zone. Standard requires at least two configured
