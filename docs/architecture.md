@@ -21,7 +21,7 @@ AWS, Google Cloud and Azure each ship a `magelift-provider-<name>` executable fr
 | Google Cloud | GKE Autopilot, experimental GKE Standard | GKE, Cloud SQL, private connectivity, Cloud Storage, workload identity and Cloud Monitoring |
 | Azure | Experimental AKS | Dedicated or shared AKS, MySQL Flexible Server, Azure Files, Blob Storage and Key Vault |
 
-The existing OVHcloud MKS and Scaleway Kapsule adapters are opt-in, compiled into the CLI and maintained under `internal/cloud/`. New first-party providers follow the plugin layout. Resource support varies by runtime. The capability guide distinguishes mock resource graphs, emulator requests and dated runs in a real account. [Capability guide](capability-matrix.md) · [Add a provider](adding-a-provider.md)
+Set `MAGELIFT_EXPERIMENTAL_PROVIDERS=1` to enable AWS EKS, OVHcloud MKS or Scaleway Kapsule. The OVHcloud and Scaleway adapters are compiled into the CLI and maintained under `internal/cloud/`. New first-party providers follow the plugin layout. Resource support varies by runtime. The capability guide distinguishes mock resource graphs, emulator requests and dated runs in a real account. [Capability guide](capability-matrix.md) · [Add a provider](adding-a-provider.md)
 
 ### AWS Magento product matrix
 

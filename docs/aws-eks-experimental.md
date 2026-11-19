@@ -1,6 +1,6 @@
 # Experimental AWS target (EKS Autopilot / Auto Mode)
 
-The EKS adapter is experimental. The `awsek` acceptance run deployed Magento 2.4.9 with RabbitMQ on Auto Mode and removed the environment. [AWS resource coverage](architecture.md#aws-magento-product-matrix) · [Evidence terminology](adr/0002-certified-vs-experimental.md)
+Set `MAGELIFT_EXPERIMENTAL_PROVIDERS=1` to enable the EKS runtime in the AWS plugin. EKS is experimental. The `awsek` acceptance run deployed Magento 2.4.9 with RabbitMQ on Auto Mode and removed the environment. [AWS resource coverage](architecture.md#aws-magento-product-matrix) · [Evidence terminology](adr/0002-certified-vs-experimental.md)
 
 ## Target
 
