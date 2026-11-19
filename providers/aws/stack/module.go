@@ -90,7 +90,7 @@ func (Module) Plan(cfg config.Config, environment string, opts platform.PlanOpti
 		if err := id.Validate(); err != nil {
 			return nil, err
 		}
-		return Planned{stateOnly: true, Spec: Spec{Identity: id, Lifecycle: Lifecycle{Protection: cfg.Protection}, Dependencies: Dependencies{KMSKeyARN: cfg.Target.AWS.KMSKeyARN}, Artifact: Artifact{ImageDigest: cfg.Target.AWS.ImageDigest}}}, nil
+		return Planned{stateOnly: true, Spec: Spec{Identity: id, Existing: attachedResources(cfg.Project.Name, environment, cfg.Target.AWS.Existing), Lifecycle: Lifecycle{Protection: cfg.Protection}, Dependencies: Dependencies{KMSKeyARN: cfg.Target.AWS.KMSKeyARN}, Artifact: Artifact{ImageDigest: cfg.Target.AWS.ImageDigest}}}, nil
 	}
 	spec, err := PlanFromConfigWithOptions(cfg, environment, PlanOptions{AllowExpiredPreview: opts.AllowExpiredPreview})
 	if err != nil {

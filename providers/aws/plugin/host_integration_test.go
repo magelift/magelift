@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/sdk"
@@ -53,6 +54,22 @@ func TestInstalledAWSProviderPlansThroughTheHost(t *testing.T) {
 			}
 			if _, err := platform.ModuleCostEstimator(shim).Estimate(t.Context(), planned, cfg, platform.CostOptions{}); err != nil {
 				t.Fatal(err)
+			}
+			if runtime == "ecs-fargate" {
+				t.Run("attached database", func(t *testing.T) {
+					attached := *target
+					attached.Existing.Database = &config.AWSExistingDatabase{Provider: "aws", Kind: "database", ExternalID: "shop-db"}
+					shop := cfg
+					shop.Target.AWS = &attached
+					teardown, err := shim.Plan(shop, req.Envelope.Environment, platform.PlanOptions{Context: t.Context(), AllowExpiredPreview: true})
+					if err != nil {
+						t.Fatal(err)
+					}
+					report := teardown.(platform.BrownfieldAttach)
+					if !reflect.DeepEqual(report.AdoptedResourceLines(), []string{"ADOPT database shop-db"}) || report.RefuseAdoptedMutation(platform.AdoptIntentReplace) == nil {
+						t.Fatal("attached database lost its ownership protection")
+					}
+				})
 			}
 			t.Run("local Pulumi outputs", func(t *testing.T) {
 				if _, err := exec.LookPath("pulumi"); err != nil {

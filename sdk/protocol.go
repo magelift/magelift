@@ -209,9 +209,19 @@ type Envelope struct {
 	Domain             string `json:"domain,omitempty"`
 }
 
+// AdoptedResource identifies an existing resource the shop continues to own.
+type AdoptedResource struct {
+	Kind       string `json:"kind"`
+	ExternalID string `json:"externalId"`
+	Label      string `json:"label,omitempty"`
+}
+
+func (r AdoptedResource) Line() string { return fmt.Sprintf("ADOPT %s %s", r.Kind, r.ExternalID) }
+
 // StoredPlan is a provider plan: stable identity fields the core may read
 // plus opaque bytes the core stores uninspected and returns verbatim.
 type StoredPlan struct {
+	Adopted         []AdoptedResource          `json:"adopted,omitempty"`
 	StackName       string                     `json:"stackName"`
 	Provider        string                     `json:"provider"`
 	Runtime         string                     `json:"runtime"`

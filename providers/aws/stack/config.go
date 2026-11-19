@@ -119,23 +119,8 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	if nativeEdgeEnabled(edgeIntent) {
 		hostedZoneRef = &hostedZone
 	}
-	var existingNetwork *sdk.ExistingResourceRef
-	var existingDatabase *sdk.ExistingResourceRef
-	existingPublicSubnets := append([]string(nil), aws.Existing.PublicSubnetIDs...)
-	existingPrivateSubnets := append([]string(nil), aws.Existing.PrivateSubnetIDs...)
-	existingDataSubnets := append([]string(nil), aws.Existing.DataSubnetIDs...)
-	existingDatabaseSecretARN := ""
-	existingDatabaseEndpoint := ""
-	if aws.Existing.Network != nil {
-		ref := sdk.ExistingResourceRef{ID: sdk.ResourceID(cfg.Project.Name + "-" + environment + "-network"), Provider: sdk.ProviderID(aws.Existing.Network.Provider), Kind: sdk.ExistingResourceKind(aws.Existing.Network.Kind), ExternalID: aws.Existing.Network.ExternalID}
-		existingNetwork = &ref
-	}
-	if aws.Existing.Database != nil {
-		ref := sdk.ExistingResourceRef{ID: sdk.ResourceID(cfg.Project.Name + "-" + environment + "-database"), Provider: sdk.ProviderID(aws.Existing.Database.Provider), Kind: sdk.ExistingResourceKind(aws.Existing.Database.Kind), ExternalID: aws.Existing.Database.ExternalID}
-		existingDatabase = &ref
-		existingDatabaseSecretARN = aws.Existing.Database.SecretARN
-		existingDatabaseEndpoint = aws.Existing.Database.Endpoint
-	}
+	existing := attachedResources(cfg.Project.Name, environment, aws.Existing)
+
 	status := "compatible"
 	if err := config.ValidateAWSProviderConstraints(cfg); err != nil {
 		return Spec{}, err
@@ -168,8 +153,8 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		Artifact:    Artifact{ImageDigest: aws.ImageDigest, CompatibilityStatus: status},
 		Lifecycle:   Lifecycle{ExpiresAt: expiresAt, MonthlyBudgetCents: cfg.MonthlyBudgetCents, Protection: cfg.Protection},
 		Existing: ExistingResources{
-			Network: existingNetwork, PublicSubnetIDs: existingPublicSubnets, PrivateSubnetIDs: existingPrivateSubnets, DataSubnetIDs: existingDataSubnets,
-			Database: existingDatabase, DatabaseSecretARN: existingDatabaseSecretARN, DatabaseEndpoint: existingDatabaseEndpoint,
+			Network: existing.Network, PublicSubnetIDs: existing.PublicSubnetIDs, PrivateSubnetIDs: existing.PrivateSubnetIDs, DataSubnetIDs: existing.DataSubnetIDs,
+			Database: existing.Database, DatabaseSecretARN: existing.DatabaseSecretARN, DatabaseEndpoint: existing.DatabaseEndpoint,
 			HostedZone: hostedZoneRef, Certificate: cloudFrontCertificateRef, ALBCertificate: &albCertificate, SNSTopicARN: aws.SNSTopicARN,
 		},
 		Dependencies:  Dependencies{KMSKeyARN: aws.KMSKeyARN, CacheSecretARN: aws.CacheSecretARN, SessionSecretARN: aws.SessionSecretARN, QueueSecretARN: aws.QueueSecretARN, EncryptionKeyARN: aws.EncryptionKeySecretARN, DatabaseName: aws.DatabaseName, MasterUsername: aws.MasterUsername},
@@ -330,4 +315,19 @@ func resolveQueueMode(value string, preset sdk.PresetID) string {
 		return strings.TrimSpace(value)
 	}
 	return defaultQueueMode(preset)
+}
+
+func attachedResources(project, environment string, existing config.AWSExistingResources) ExistingResources {
+	result := ExistingResources{PublicSubnetIDs: append([]string(nil), existing.PublicSubnetIDs...), PrivateSubnetIDs: append([]string(nil), existing.PrivateSubnetIDs...), DataSubnetIDs: append([]string(nil), existing.DataSubnetIDs...)}
+	if existing.Network != nil {
+		ref := sdk.ExistingResourceRef{ID: sdk.ResourceID(project + "-" + environment + "-network"), Provider: sdk.ProviderID(existing.Network.Provider), Kind: sdk.ExistingResourceKind(existing.Network.Kind), ExternalID: existing.Network.ExternalID}
+		result.Network = &ref
+	}
+	if existing.Database != nil {
+		ref := sdk.ExistingResourceRef{ID: sdk.ResourceID(project + "-" + environment + "-database"), Provider: sdk.ProviderID(existing.Database.Provider), Kind: sdk.ExistingResourceKind(existing.Database.Kind), ExternalID: existing.Database.ExternalID}
+		result.Database = &ref
+		result.DatabaseSecretARN = existing.Database.SecretARN
+		result.DatabaseEndpoint = existing.Database.Endpoint
+	}
+	return result
 }

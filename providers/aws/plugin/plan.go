@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -68,6 +69,11 @@ func projectConfig(req *sdk.PlanRequest, target *config.AWSTarget) config.Config
 		Email:         config.EmailConfig{Mode: email.Mode, Host: email.Host, Port: email.Port, Username: email.Username, From: email.From, Credential: email.Credential},
 		Compatibility: config.Compatibility{AllowUnsupported: req.AllowUnsupported}, Services: req.Services,
 	}
+	cfg.Edge.NativeProvider = req.Edge.NativeProvider
+	cfg.Edge.ExternalProvider = req.Edge.ExternalProvider
+	cfg.Edge.Mode = req.Edge.Mode
+	cfg.Observability.NativeProvider = req.Observability.NativeProvider
+	cfg.Observability.ExternalProvider = req.Observability.ExternalProvider
 	if email.ManagedDomain != "" || email.ManagedHostedZoneID != "" {
 		cfg.Email.Managed = &config.EmailManaged{Domain: email.ManagedDomain, HostedZoneID: email.ManagedHostedZoneID}
 	}
@@ -85,6 +91,14 @@ func (s *Server) Plan(req *sdk.PlanRequest, resp *sdk.PlanResult) error {
 			return invalid(err)
 		}
 		cfg := projectConfig(req, target)
+		if !req.AccountOnly && !req.AllowExpiredPreview {
+			if err := errors.Join(platform.ValidateFirstPartyEdge(cfg), platform.ValidateFirstPartyObservability(cfg)); err != nil {
+				return invalid(err)
+			}
+			if req.Runtime == "eks" && req.Edge.NativeProvider != "" {
+				return invalid(errors.New("EKS does not manage a native edge; configure the Kubernetes ingress or an external edge"))
+			}
+		}
 		if problems := config.ValidateAWSTarget(cfg); len(problems) > 0 {
 			return invalid(errors.New(strings.Join(problems, ", ")))
 		}
@@ -139,6 +153,9 @@ func (s *Server) Plan(req *sdk.PlanRequest, resp *sdk.PlanResult) error {
 		}
 		backend := planned.(interface{ StateBackendURL() string }).StateBackendURL()
 		resp.Plan = sdk.StoredPlan{Provider: "aws", Runtime: req.Runtime, StackName: planned.StackName(), Tier: sdk.ExtensionCertificationTier(planned.CertificationTier()), ImageDigest: planned.ImageDigest(), StateBackendURL: backend, Opaque: opaque}
+		if body.ECS != nil {
+			resp.Plan.Adopted = stack.AdoptReport(*body.ECS)
+		}
 		return nil
 	})
 }
@@ -146,11 +163,11 @@ func (s *Server) Plan(req *sdk.PlanRequest, resp *sdk.PlanResult) error {
 func checked(envelope sdk.Envelope, plan sdk.StoredPlan) (stored, platform.StackModule, platform.PlannedStack, error) {
 	var b stored
 	if err := json.Unmarshal(plan.Opaque, &b); err != nil || b.Envelope != envelope || plan.Provider != "aws" || strings.TrimSpace(envelope.Account) == "" {
-		return b, nil, nil, invalid(errors.New("AWS plan does not belong to the requested environment"))
+		return b, nil, nil, integrity("AWS plan does not belong to the requested environment")
 	}
 	m, err := module(plan.Runtime)
 	if err != nil {
-		return b, nil, nil, invalid(err)
+		return b, nil, nil, integrity(err.Error())
 	}
 	var p platform.PlannedStack
 	switch {
@@ -159,7 +176,7 @@ func checked(envelope sdk.Envelope, plan sdk.StoredPlan) (stored, platform.Stack
 	case b.EKS != nil && b.ECS == nil && plan.Runtime == "eks":
 		p = eksops.Planned{Spec: *b.EKS}
 	default:
-		return b, nil, nil, invalid(errors.New("AWS stored plan has a different runtime"))
+		return b, nil, nil, integrity("AWS stored plan has a different runtime")
 	}
 	var identity stack.Identity
 	if b.ECS != nil {
@@ -167,22 +184,29 @@ func checked(envelope sdk.Envelope, plan sdk.StoredPlan) (stored, platform.Stack
 	} else {
 		identity = b.EKS.Identity
 	}
+	var adopted []sdk.AdoptedResource
+	if b.ECS != nil {
+		adopted = stack.AdoptReport(*b.ECS)
+	}
+	if !slices.Equal(adopted, plan.Adopted) {
+		return b, nil, nil, integrity("attached resources differ from the planned stack")
+	}
 	if identity.Project != envelope.Project || identity.Environment != envelope.Environment ||
 		identity.Region != envelope.Region || identity.AccountID != envelope.Account ||
 		identity.EnvironmentClass != envelope.EnvironmentClass || string(identity.Preset) != envelope.Preset ||
 		p.Protected() != envelope.Protected {
-		return b, nil, nil, invalid(errors.New("AWS stored plan identity differs from the requested environment"))
+		return b, nil, nil, integrity("AWS stored plan identity differs from the requested environment")
 	}
 	if p.StackName() != plan.StackName || plan.StackName != envelope.StackName ||
 		plan.Tier != sdk.ExtensionCertificationTier(p.CertificationTier()) ||
 		p.ImageDigest() != plan.ImageDigest || p.(interface{ StateBackendURL() string }).StateBackendURL() != plan.StateBackendURL {
-		return b, nil, nil, invalid(errors.New("AWS stored plan metadata differs from the planned stack"))
+		return b, nil, nil, integrity("AWS stored plan metadata differs from the planned stack")
 	}
 	return b, m, p, nil
 }
 
 func withPlan(version string, failure **sdk.OperationError, envelope sdk.Envelope, plan sdk.StoredPlan, run func(context.Context, platform.StackModule, platform.PlannedStack) error) error {
-	return respond(version, failure, 30*time.Minute, func(ctx context.Context) error {
+	return respond(version, failure, 45*time.Minute, func(ctx context.Context) error {
 		_, m, p, err := checked(envelope, plan)
 		if err != nil {
 			return err

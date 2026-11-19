@@ -128,3 +128,41 @@ func TestStateOnlyPlansDoNotRequireAnImageOrNetwork(t *testing.T) {
 		})
 	}
 }
+
+func TestAWSPlanRejectsCloudSettingsFromAnotherProvider(t *testing.T) {
+	for _, runtime := range []string{"ecs-fargate", "eks"} {
+		for _, change := range []func(*sdk.PlanRequest){func(r *sdk.PlanRequest) { r.Edge.NativeProvider = "cloud-cdn" }, func(r *sdk.PlanRequest) { r.Observability.NativeProvider = "google-cloud-operations" }} {
+			req := shopRequest(t, runtime)
+			change(req)
+			var result sdk.PlanResult
+			if err := new(Server).Plan(req, &result); err != nil || result.Error == nil || result.Error.Code != sdk.ErrCodeInvalid {
+				t.Fatalf("%s accepted mismatched telemetry or edge: %v %v", runtime, err, result.Error)
+			}
+		}
+	}
+}
+
+func TestAttachedDatabaseSurvivesTeardownPlanning(t *testing.T) {
+	req := shopRequest(t, "ecs-fargate")
+	req.AllowExpiredPreview = true
+	target, err := parseTarget(req.TargetBlock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target.Existing.Database = &config.AWSExistingDatabase{Provider: "aws", Kind: "database", ExternalID: "existing-shop-db"}
+	req.TargetBlock, err = yaml.Marshal(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result sdk.PlanResult
+	if err := new(Server).Plan(req, &result); err != nil || result.Error != nil {
+		t.Fatalf("teardown plan: %v %v", err, result.Error)
+	}
+	if len(result.Plan.Adopted) != 1 || result.Plan.Adopted[0].Line() != "ADOPT database existing-shop-db" {
+		t.Fatalf("missing existing database: %v", result.Plan.Adopted)
+	}
+	result.Plan.Adopted = nil
+	if _, _, _, err := checked(req.Envelope, result.Plan); err == nil {
+		t.Fatal("edited adoption report accepted")
+	}
+}

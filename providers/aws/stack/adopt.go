@@ -1,24 +1,11 @@
 package stack
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/sdk"
 )
 
-// AdoptEntry is one operator-visible adopted resource (D-01 / ATTACH-01).
-type AdoptEntry struct {
-	Kind       string
-	ExternalID string
-	Label      string
-}
-
-// Line returns the stable ADOPT preview line (e.g. "ADOPT network vpc-…").
-func (e AdoptEntry) Line() string {
-	return fmt.Sprintf("ADOPT %s %s", e.Kind, e.ExternalID)
-}
+type AdoptEntry = sdk.AdoptedResource
 
 // AdoptReport lists existing resources MageLift references without owning
 // (D-01 / ATTACH-03). Network and database entries are independent.
@@ -49,50 +36,15 @@ func AdoptReport(spec Spec) []AdoptEntry {
 	return entries
 }
 
-// RefuseAdoptedMutation fails closed when intent is destroy or replace of an
-// adopted network or database MageLift does not own (D-02 / ATTACH-03). Preview
-// and Magento-scoped update/destroy of MageLift-owned children pass Intent "".
+// RefuseAdoptedMutation protects resources referenced from the shop's existing account.
 func RefuseAdoptedMutation(spec Spec, intent platform.AdoptMutationIntent) error {
-	return refuseAdoptedMutation(spec, intent)
+	return platform.AdoptedResources(AdoptReport(spec)).RefuseAdoptedMutation(intent)
 }
 
-func refuseAdoptedMutation(spec Spec, intent platform.AdoptMutationIntent) error {
-	if intent != platform.AdoptIntentDestroy && intent != platform.AdoptIntentReplace {
-		return nil
-	}
-	entries := AdoptReport(spec)
-	if len(entries) == 0 {
-		return nil
-	}
-	parts := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		label := entry.Label
-		if label == "" {
-			label = entry.Kind
-		}
-		parts = append(parts, fmt.Sprintf("%s (%s)", label, entry.ExternalID))
-	}
-	noun := "resource"
-	if len(parts) > 1 {
-		noun = "resources"
-	}
-	return fmt.Errorf("adopted %s %s: MageLift does not own this resource", noun, strings.Join(parts, ", "))
-}
-
-// AdoptedResourceLines implements platform.BrownfieldAttach.
 func (p Planned) AdoptedResourceLines() []string {
-	entries := AdoptReport(p.Spec)
-	if len(entries) == 0 {
-		return nil
-	}
-	lines := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		lines = append(lines, entry.Line())
-	}
-	return lines
+	return platform.AdoptedResources(AdoptReport(p.Spec)).AdoptedResourceLines()
 }
 
-// RefuseAdoptedMutation implements platform.BrownfieldAttach.
 func (p Planned) RefuseAdoptedMutation(intent platform.AdoptMutationIntent) error {
-	return refuseAdoptedMutation(p.Spec, intent)
+	return RefuseAdoptedMutation(p.Spec, intent)
 }

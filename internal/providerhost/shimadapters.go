@@ -407,3 +407,11 @@ func writePluginDiagnostics(diagnostics io.Writer, lines []string) {
 		_, _ = io.WriteString(diagnostics, line+"\n")
 	}
 }
+
+func (p *ShimPlanned) AdoptedResourceLines() []string {
+	return platform.AdoptedResources(p.stored.Adopted).AdoptedResourceLines()
+}
+
+func (p *ShimPlanned) RefuseAdoptedMutation(intent platform.AdoptMutationIntent) error {
+	return platform.AdoptedResources(p.stored.Adopted).RefuseAdoptedMutation(intent)
+}
