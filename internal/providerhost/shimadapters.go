@@ -37,6 +37,11 @@ func NewShimEdgeAdapter(ctx context.Context, client *Client, planned platform.Pl
 	if described.Edge == nil {
 		return nil, errors.New("provider did not advertise a native edge adapter")
 	}
+	for _, operation := range []sdk.Operation{sdk.OpEdgePlan, sdk.OpEdgeExecute} {
+		if err := sdk.RequireOperation(described.Operations, operation, "1.0"); err != nil {
+			return nil, fmt.Errorf("native edge adapter is missing %s: %w", operation, err)
+		}
+	}
 	return &ShimEdgeAdapter{client: client, envelope: shim.inputs.envelope, stored: shim.stored, descriptor: *described.Edge}, nil
 }
 
