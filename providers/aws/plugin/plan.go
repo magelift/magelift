@@ -105,7 +105,7 @@ func (s *Server) Plan(req *sdk.PlanRequest, resp *sdk.PlanResult) error {
 		body := stored{Envelope: req.Envelope, AccountOnly: req.AccountOnly, DestroyOnly: req.AllowExpiredPreview, ObserveOnly: req.RuntimeObserve}
 		var planned platform.PlannedStack
 		if req.Runtime == "ecs-fargate" && !req.AccountOnly && !req.AllowExpiredPreview {
-			spec, err := stack.PlanFromConfigWithOptions(cfg, req.Envelope.Environment, stack.PlanOptions{Intents: &stack.ResolvedIntents{Edge: req.Edge, Observability: req.Observability, UseDefaultEdge: req.UseProviderDefaultEdge}})
+			spec, err := stack.PlanFromConfigWithOptions(cfg, req.Envelope.Environment, stack.PlanOptions{RuntimeObserve: req.RuntimeObserve, Intents: &stack.ResolvedIntents{Edge: req.Edge, Observability: req.Observability, UseDefaultEdge: req.UseProviderDefaultEdge}})
 			if err != nil {
 				return invalid(err)
 			}

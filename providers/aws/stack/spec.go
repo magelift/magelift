@@ -234,19 +234,25 @@ type ServiceVersions struct {
 }
 
 func (s Spec) Validate() error {
-	return s.validate(false)
+	return s.validate(false, false)
+}
+
+// ValidateForRuntimeObserve permits an absent image digest for output-backed
+// day-two operations while retaining all other deployment structure checks.
+func (s Spec) ValidateForRuntimeObserve() error {
+	return s.validate(false, true)
 }
 
 // ValidateAllowExpiredPreview is restricted to teardown planning. It keeps
 // every structural and security check while allowing an already expired
 // preview to be converted into a destroy request.
 func (s Spec) ValidateAllowExpiredPreview() error {
-	return s.validate(true)
+	return s.validate(true, false)
 }
 
-func (s Spec) validate(allowExpiredPreview bool) error {
+func (s Spec) validate(allowExpiredPreview, allowMissingDigest bool) error {
 	var problems []error
-	problems = append(problems, s.Identity.Validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Lifecycle.validate(s.Identity.EnvironmentClass == "preview", allowExpiredPreview), s.Existing.validate(s.Edge), s.Dependencies.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset, s.ExternalSearchEndpoint != ""), sdk.ValidateEdgeIntent(s.Edge), sdk.ValidateObservabilityIntent(s.Observability))
+	problems = append(problems, s.Identity.Validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset, s.Catalog.QueueMode, allowMissingDigest), s.Lifecycle.validate(s.Identity.EnvironmentClass == "preview", allowExpiredPreview), s.Existing.validate(s.Edge), s.Dependencies.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset, s.ExternalSearchEndpoint != ""), sdk.ValidateEdgeIntent(s.Edge), sdk.ValidateObservabilityIntent(s.Observability))
 	if s.Existing.Network != nil {
 		if s.Policy.NatMode == NatModeFckNat || strings.TrimSpace(s.Policy.NatTopology) != "" || strings.TrimSpace(s.Policy.NatReplacementMode) != "" || strings.TrimSpace(s.Policy.NatInstanceType) != "" {
 			problems = append(problems, errors.New("existing network owns egress; fck-nat and NAT topology/replacement settings cannot be selected"))
@@ -284,9 +290,9 @@ func (a Application) validate() error {
 	return errors.Join(problems...)
 }
 
-func (a Artifact) validate(preset sdk.PresetID, queueMode string) error {
+func (a Artifact) validate(preset sdk.PresetID, queueMode string, allowMissingDigest bool) error {
 	var problems []error
-	if !digest.MatchString(a.ImageDigest) {
+	if !(allowMissingDigest && strings.TrimSpace(a.ImageDigest) == "") && !digest.MatchString(a.ImageDigest) {
 		problems = append(problems, errors.New("artifact image must be a registry digest"))
 	}
 	if a.CompatibilityStatus != "compatible" && a.CompatibilityStatus != "unsupported-allowed" {

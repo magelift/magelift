@@ -72,6 +72,36 @@ func TestAWSPlansAreOfflineAndRetainTheSelectedRuntime(t *testing.T) {
 	}
 }
 
+func TestAWSRuntimeObservePlanAllowsMissingDigestButDeployPlanDoesNot(t *testing.T) {
+	req := shopRequest(t, "ecs-fargate")
+	target, err := parseTarget(req.TargetBlock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target.ImageDigest = ""
+	req.TargetBlock, err = yaml.Marshal(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.RuntimeObserve = true
+	var observed sdk.PlanResult
+	if err := new(Server).Plan(req, &observed); err != nil || observed.Error != nil {
+		t.Fatalf("runtime observe plan: %v %v", err, observed.Error)
+	}
+	if observed.Plan.ImageDigest != "" {
+		t.Fatalf("runtime observe plan has unexpected image digest %q", observed.Plan.ImageDigest)
+	}
+	if _, _, planned, err := checked(req.Envelope, observed.Plan); err != nil || planned.ImageDigest() != "" {
+		t.Fatalf("checked runtime observe plan = %v, %v", planned, err)
+	}
+
+	req.RuntimeObserve = false
+	var deploy sdk.PlanResult
+	if err := new(Server).Plan(req, &deploy); err != nil || deploy.Error == nil || deploy.Error.Code != sdk.ErrCodeInvalid || !strings.Contains(deploy.Error.Message, "registry digest") {
+		t.Fatalf("deploy plan without image digest error = %v %v", err, deploy.Error)
+	}
+}
+
 func TestAWSAdmittedPlanRetainsServicesAndManagedEmail(t *testing.T) {
 	req := shopRequest(t, "ecs-fargate")
 	req.Admit = true

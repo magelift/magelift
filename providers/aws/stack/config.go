@@ -21,6 +21,7 @@ import (
 // lifecycle operation.
 type PlanOptions struct {
 	AllowExpiredPreview bool
+	RuntimeObserve      bool
 	Intents             *ResolvedIntents
 }
 
@@ -202,6 +203,9 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		spec.Catalog.SearchMode = SearchModeDisabled
 	}
 	validate := spec.Validate
+	if options.RuntimeObserve {
+		validate = spec.ValidateForRuntimeObserve
+	}
 	if options.AllowExpiredPreview && preset == sdk.PresetPreview && !expiresAt.IsZero() && expiresAt.Before(time.Now().UTC()) {
 		validate = spec.ValidateAllowExpiredPreview
 		spec.AllowExpiredPreview = true

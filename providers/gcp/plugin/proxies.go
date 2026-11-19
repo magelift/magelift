@@ -15,7 +15,7 @@ func (s *Server) EdgePlan(ctx context.Context, req *sdk.EdgePlanCall) (*sdk.Edge
 	if req == nil {
 		return nil, InvalidError("edge plan call is required")
 	}
-	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	spec, operr := loadSpecCallForRuntimeObserve(req.Envelope, req.Plan)
 	if operr != nil {
 		return nil, operr
 	}
@@ -46,7 +46,7 @@ func (s *Server) EdgeExecute(ctx context.Context, req *sdk.EdgeExecuteCall) (*sd
 	if req == nil {
 		return nil, InvalidError("edge execute call is required")
 	}
-	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	spec, operr := loadSpecCallForRuntimeObserve(req.Envelope, req.Plan)
 	if operr != nil {
 		return nil, operr
 	}

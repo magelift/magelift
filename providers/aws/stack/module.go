@@ -92,7 +92,7 @@ func (Module) Plan(cfg config.Config, environment string, opts platform.PlanOpti
 		}
 		return Planned{stateOnly: true, Spec: Spec{Identity: id, Existing: attachedResources(cfg.Project.Name, environment, cfg.Target.AWS.Existing), Lifecycle: Lifecycle{Protection: cfg.Protection}, Dependencies: Dependencies{KMSKeyARN: cfg.Target.AWS.KMSKeyARN}, Artifact: Artifact{ImageDigest: cfg.Target.AWS.ImageDigest}}}, nil
 	}
-	spec, err := PlanFromConfigWithOptions(cfg, environment, PlanOptions{AllowExpiredPreview: opts.AllowExpiredPreview})
+	spec, err := PlanFromConfigWithOptions(cfg, environment, PlanOptions{AllowExpiredPreview: opts.AllowExpiredPreview, RuntimeObserve: opts.RuntimeObserve})
 	if err != nil {
 		return nil, err
 	}
