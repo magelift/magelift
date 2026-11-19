@@ -346,12 +346,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	kubeconfig := pulumi.ToSecret(generateKubeconfig(ctx, args.Project, cluster.Name, cluster.Endpoint, cluster.MasterAuth)).(pulumi.StringOutput)
-	providerArgs := &kubernetes.ProviderArgs{Kubeconfig: kubeconfig, ClusterIdentifier: cluster.ID().ToStringOutput()}
+	providerArgs := kubernetes.ProviderArgs{Kubeconfig: kubeconfig, ClusterIdentifier: cluster.ID().ToStringOutput()}
 	providerName := name + "-k8s"
 	if args.Namespace != "" {
 		providerName += "-cluster"
 	}
-	clusterProvider, err := kubernetes.NewProvider(ctx, providerName, providerArgs, parent, pulumi.DependsOn(clusterResources))
+	clusterProvider, err := kubernetes.NewProvider(ctx, providerName, &providerArgs, parent, pulumi.DependsOn(clusterResources))
 	if err != nil {
 		return nil, fmt.Errorf("create Kubernetes provider for GKE %s: %w", args.Runtime, err)
 	}
@@ -362,8 +362,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		if err != nil {
 			return nil, fmt.Errorf("create preview namespace: %w", err)
 		}
-		providerArgs.Namespace = pulumi.StringPtr(args.Namespace)
-		k8sProvider, err = kubernetes.NewProvider(ctx, name+"-k8s", providerArgs, parent, pulumi.DependsOn([]pulumi.Resource{namespace}))
+		workloadArgs := providerArgs
+		workloadArgs.Namespace = pulumi.StringPtr(args.Namespace)
+		k8sProvider, err = kubernetes.NewProvider(ctx, name+"-k8s", &workloadArgs, parent, pulumi.DependsOn([]pulumi.Resource{namespace}))
 		if err != nil {
 			return nil, fmt.Errorf("create preview Kubernetes provider: %w", err)
 		}

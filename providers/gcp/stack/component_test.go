@@ -828,12 +828,22 @@ func TestPreviewPoolReadsSharedClusterAndCreatesIsolatedWorkloads(t *testing.T) 
 				}
 			}
 		case "pulumi:providers:kubernetes":
-			if v, ok := res.Inputs["namespace"]; ok && v.IsString() && v.StringValue() == spec.Namespace {
-				found["provider"] = true
+			ns := res.Inputs["namespace"]
+			switch {
+			case strings.HasSuffix(res.Name, "-k8s-cluster"):
+				found["clusterProvider"] = true
+				if !ns.IsNull() {
+					t.Errorf("cluster provider has a preview namespace: %v", ns)
+				}
+			case strings.HasSuffix(res.Name, "-k8s"):
+				found["workloadProvider"] = true
+				if !ns.IsString() || ns.StringValue() != spec.Namespace {
+					t.Errorf("preview provider namespace = %v, want %s", ns, spec.Namespace)
+				}
 			}
 		}
 	}
-	for _, name := range []string{"cluster", "database", "cache", "namespace", "serviceAccount", "provider", "internalPolicy", "webPolicy"} {
+	for _, name := range []string{"cluster", "database", "cache", "namespace", "serviceAccount", "clusterProvider", "workloadProvider", "internalPolicy", "webPolicy"} {
 		if !found[name] {
 			t.Errorf("missing %s", name)
 		}
