@@ -232,6 +232,11 @@ func TestIdentityPlanIsRepoScopedAndLeastPrivilege(t *testing.T) {
 	if plan.CIRoleARN == plan.StateRoleARN || plan.BuildRoleARN == plan.CIRoleARN || !strings.Contains(plan.CIPermissionsPolicy, "ecs:RegisterTaskDefinition") || !strings.Contains(plan.CIPermissionsPolicy, "iam:PassRole") || !strings.Contains(plan.CIPermissionsPolicy, "role/magelift-*") || !strings.Contains(plan.BuildPermissionsPolicy, "secretsmanager:GetSecretValue") || strings.Contains(plan.BuildPermissionsPolicy, `"Action":"*"`) || strings.Contains(plan.CIPermissionsPolicy, `"Action":"*"`) {
 		t.Fatalf("CI identity is not explicitly scoped: role=%q policy=%s", plan.CIRoleARN, plan.CIPermissionsPolicy)
 	}
+	for _, action := range []string{"cloudfront:GetDistribution", "cloudfront:GetDistributionConfig", "cloudfront:ListDistributions", "cloudfront:CreateInvalidation", "cloudfront:GetInvalidation"} {
+		if !strings.Contains(plan.CIPermissionsPolicy, `"`+action+`"`) {
+			t.Errorf("CI role lacks %s for native edge operations", action)
+		}
+	}
 	if !strings.Contains(plan.CITrustPolicy, "repo:magelift/magelift:environment:production") {
 		t.Fatal("CI trust policy is not repository scoped")
 	}

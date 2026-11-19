@@ -13,6 +13,7 @@ func validSpec() Spec {
 	certificate := sdk.ExistingResourceRef{ID: "certificate", Provider: "aws", Kind: sdk.ExistingCertificate, ExternalID: "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"}
 	albCertificate := sdk.ExistingResourceRef{ID: "alb-certificate", Provider: "aws", Kind: sdk.ExistingCertificate, ExternalID: "arn:aws:acm:eu-west-3:123456789012:certificate/11111111-1111-1111-1111-111111111111"}
 	return Spec{
+		Edge:         sdk.EdgeIntent{OwnershipMarker: "magelift/edge/shop-preview-1"},
 		Identity:     Identity{Project: "shop", Environment: "preview-1", AccountID: "123456789012", Region: "eu-west-3", EnvironmentClass: "preview", Preset: sdk.PresetPreview},
 		Application:  Application{Edition: "open-source", Version: "2.4.9", Mode: "integrated", WebRuntime: "nginx-fpm"},
 		Artifact:     Artifact{ImageDigest: "ghcr.io/magelift/shop@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", CompatibilityStatus: "compatible", RequiredRuntimeCapabilities: []sdk.CapabilityID{sdk.CapabilityDatabaseMySQL, sdk.CapabilityCacheValkey}},

@@ -330,7 +330,8 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	}
 	if nativeEdgeEnabled(spec.Edge) {
 		component.Edge, err = edge.New(ctx, name+"-edge", edge.Args{
-			DomainName: spec.Policy.ApplicationDomain, FrontName: spec.Application.Magento.FrontName, HostedZone: *spec.Existing.HostedZone, Certificate: *spec.Existing.Certificate,
+			OwnershipMarker: spec.Edge.OwnershipMarker,
+			DomainName:      spec.Policy.ApplicationDomain, FrontName: spec.Application.Magento.FrontName, HostedZone: *spec.Existing.HostedZone, Certificate: *spec.Existing.Certificate,
 			Origin: edge.ALBOrigin{DNSName: component.Ingress.DNSName, ARNInput: component.Ingress.LoadBalancerARN}, GlobalAWS: providers.Global, Security: edge.DefaultSecurityPolicy(), Tags: tags,
 		}, global...)
 		if err != nil {

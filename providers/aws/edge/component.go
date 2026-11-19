@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/magelift/magelift/sdk"
 	awsprovider "github.com/pulumi/pulumi-aws/sdk/v7/go/aws"
@@ -35,14 +36,15 @@ type ALBOrigin struct {
 }
 
 type Args struct {
-	DomainName  string
-	FrontName   string
-	HostedZone  sdk.ExistingResourceRef
-	Certificate sdk.ExistingResourceRef
-	Origin      ALBOrigin
-	GlobalAWS   *awsprovider.Provider
-	Security    SecurityPolicy
-	Tags        map[string]string
+	DomainName      string
+	FrontName       string
+	OwnershipMarker string
+	HostedZone      sdk.ExistingResourceRef
+	Certificate     sdk.ExistingResourceRef
+	Origin          ALBOrigin
+	GlobalAWS       *awsprovider.Provider
+	Security        SecurityPolicy
+	Tags            map[string]string
 }
 
 type Component struct {
@@ -54,6 +56,10 @@ type Component struct {
 
 func New(ctx *pulumi.Context, name string, args Args, options ...pulumi.ResourceOption) (*Component, error) {
 	if err := validateArgs(name, args); err != nil {
+		return nil, err
+	}
+	comment, err := ownershipComment(args.OwnershipMarker)
+	if err != nil {
 		return nil, err
 	}
 	component := &Component{}
@@ -82,6 +88,7 @@ func New(ctx *pulumi.Context, name string, args Args, options ...pulumi.Resource
 	}
 
 	distribution, err := cloudfront.NewDistribution(ctx, name, &cloudfront.DistributionArgs{
+		Comment: pulumi.String(comment),
 		Aliases: pulumi.StringArray{pulumi.String(args.DomainName)}, Enabled: pulumi.Bool(true), IsIpv6Enabled: pulumi.Bool(true), HttpVersion: pulumi.String("http2and3"),
 		Origins: cloudfront.DistributionOriginArray{&cloudfront.DistributionOriginArgs{
 			DomainName: args.Origin.DNSName, OriginId: pulumi.String("alb"),
@@ -114,6 +121,17 @@ func New(ctx *pulumi.Context, name string, args Args, options ...pulumi.Resource
 		return nil, err
 	}
 	return component, nil
+}
+
+func ownershipComment(marker string) (string, error) {
+	if strings.TrimSpace(marker) == "" || strings.IndexFunc(marker, unicode.IsControl) >= 0 {
+		return "", errors.New("CloudFront requires an edge ownership marker without control characters")
+	}
+	comment := cloudFrontCommentPrefix + strings.TrimSpace(marker)
+	if len(comment) > 128 {
+		return "", errors.New("CloudFront ownership comment exceeds the 128-byte service limit")
+	}
+	return comment, nil
 }
 
 func validateArgs(name string, args Args) error {

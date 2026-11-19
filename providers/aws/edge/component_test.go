@@ -44,10 +44,11 @@ func TestEdgeResourceGraphEnforcesSecurityBoundaries(t *testing.T) {
 			return err
 		}
 		_, err = New(ctx, "shop-production", Args{
-			DomainName:  "shop.example.com",
-			FrontName:   "backend",
-			HostedZone:  sdk.ExistingResourceRef{ID: "shop-zone", Provider: "aws", Kind: sdk.ExistingDNSZone, ExternalID: "Z123456789"},
-			Certificate: sdk.ExistingResourceRef{ID: "shop-certificate", Provider: "aws", Kind: sdk.ExistingCertificate, ExternalID: "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"},
+			OwnershipMarker: "magelift/edge/shop-production",
+			DomainName:      "shop.example.com",
+			FrontName:       "backend",
+			HostedZone:      sdk.ExistingResourceRef{ID: "shop-zone", Provider: "aws", Kind: sdk.ExistingDNSZone, ExternalID: "Z123456789"},
+			Certificate:     sdk.ExistingResourceRef{ID: "shop-certificate", Provider: "aws", Kind: sdk.ExistingCertificate, ExternalID: "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"},
 			Origin: ALBOrigin{
 				DNSName: pulumi.String("internal-shop-alb.eu-west-3.elb.amazonaws.com"),
 				ARN:     "arn:aws:elasticloadbalancing:eu-west-3:123456789012:loadbalancer/app/shop/id",
@@ -78,6 +79,10 @@ func TestEdgeResourceGraphEnforcesSecurityBoundaries(t *testing.T) {
 	}
 
 	distribution := encodedInputs(t, byType["aws:cloudfront/distribution:Distribution"])
+	configured := byType["aws:cloudfront/distribution:Distribution"].Inputs["comment"]
+	if !configured.IsString() || configured.StringValue() != "magelift ownership=magelift/edge/shop-production" {
+		t.Fatalf("CloudFront operations cannot identify this stack's distribution: %v", configured)
+	}
 	for _, required := range []string{"redirect-to-https", "https-only", "TLSv1.2", "TLSv1.2_2021", "internal-shop-alb.eu-west-3.elb.amazonaws.com"} {
 		if !strings.Contains(distribution, required) {
 			t.Fatalf("distribution lacks %q: %s", required, distribution)
