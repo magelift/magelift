@@ -15,13 +15,16 @@ import (
 )
 
 type fakeCloudFrontAPI struct {
-	distributions        map[string]*cloudfronttypes.Distribution
-	etags                map[string]string
-	invalidations        map[string]*cloudfronttypes.Invalidation
-	createCalls          int
-	updateCalls          int
-	deleteCalls          int
-	invalidationsCreated int
+	distributions            map[string]*cloudfronttypes.Distribution
+	etags                    map[string]string
+	invalidations            map[string]*cloudfronttypes.Invalidation
+	invalidationStatuses     []string
+	invalidationPolls        int
+	createInvalidationStatus string
+	createCalls              int
+	updateCalls              int
+	deleteCalls              int
+	invalidationsCreated     int
 }
 
 func newFakeCloudFrontAPI() *fakeCloudFrontAPI {
@@ -110,17 +113,76 @@ func (api *fakeCloudFrontAPI) CreateInvalidation(_ context.Context, input *cloud
 		return &cloudfront.CreateInvalidationOutput{Invalidation: existing}, nil
 	}
 	id := "I1"
-	api.invalidations[callerReference] = &cloudfronttypes.Invalidation{Id: aws.String(id), Status: aws.String(cloudFrontStatusCompleted), InvalidationBatch: batch}
+	status := api.createInvalidationStatus
+	if status == "" {
+		status = cloudFrontStatusCompleted
+	}
+	api.invalidations[callerReference] = &cloudfronttypes.Invalidation{Id: aws.String(id), Status: aws.String(status), InvalidationBatch: batch}
 	return &cloudfront.CreateInvalidationOutput{Invalidation: api.invalidations[callerReference]}, nil
 }
 
 func (api *fakeCloudFrontAPI) GetInvalidation(_ context.Context, input *cloudfront.GetInvalidationInput) (*cloudfront.GetInvalidationOutput, error) {
 	for _, invalidation := range api.invalidations {
 		if aws.ToString(invalidation.Id) == aws.ToString(input.Id) {
+			if api.invalidationPolls < len(api.invalidationStatuses) {
+				invalidation.Status = aws.String(api.invalidationStatuses[api.invalidationPolls])
+			}
+			api.invalidationPolls++
 			return &cloudfront.GetInvalidationOutput{Invalidation: invalidation}, nil
 		}
 	}
 	return nil, errors.New("invalidation not found")
+}
+
+func TestCloudFrontManualPurgePollsOneInvalidationToTerminalProof(t *testing.T) {
+	api := newFakeCloudFrontAPI()
+	api.createInvalidationStatus = cloudFrontStatusInProgress
+	api.invalidationStatuses = []string{cloudFrontStatusInProgress, cloudFrontStatusInProgress, cloudFrontStatusCompleted}
+	api.distributions["E1"] = &cloudfronttypes.Distribution{
+		Id: aws.String("E1"), Status: aws.String(cloudFrontStatusDeployed),
+		DistributionConfig: &cloudfronttypes.DistributionConfig{Comment: aws.String(cloudFrontCommentPrefix + "magelift/test/cloudfront"), Enabled: aws.Bool(true)},
+	}
+	native, err := NewNativeAPI(api, AlwaysHealthy{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := cloudFrontTestRequest()
+	request.Configuration = nil
+	plan, err := native.Plan(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operation := sdk.EdgeOperationRequest{Provider: "aws", Action: sdk.EdgePurge, Request: sdk.EdgeExecutionRequest{
+		Plan: plan, Action: sdk.EdgePurge, IdempotencyKey: "purge/staging/one", OwnershipMarker: plan.OwnershipMarker,
+		ResourceReferences: []string{cloudFrontDistribution + "E1"},
+	}}
+	started, err := native.Start(context.Background(), operation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if started.Status != sdk.EdgeOperationPending || !started.OwnershipVerified || started.OwnershipMarker != plan.OwnershipMarker || api.invalidationsCreated != 1 {
+		t.Fatalf("start = %#v, invalidations created = %d", started, api.invalidationsCreated)
+	}
+	for attempt := 1; attempt <= 3; attempt++ {
+		observation, err := native.Poll(context.Background(), started.OperationID)
+		if err != nil {
+			t.Fatalf("poll %d: %v", attempt, err)
+		}
+		if observation.OperationID != started.OperationID || observation.OwnershipMarker != plan.OwnershipMarker || !observation.OwnershipVerified {
+			t.Fatalf("poll %d lost bound identity or ownership: %#v", attempt, observation)
+		}
+		if attempt < 3 && observation.Status != sdk.EdgeOperationPending {
+			t.Fatalf("poll %d status = %q, want pending", attempt, observation.Status)
+		}
+		if attempt == 3 {
+			if observation.Status != sdk.EdgeOperationSucceeded || !reflect.DeepEqual(observation.ProofRefs, []string{"aws.cloudfront.ownership", "aws.cloudfront.purge-complete"}) {
+				t.Fatalf("terminal purge observation = %#v", observation)
+			}
+		}
+	}
+	if api.invalidationsCreated != 1 || api.invalidationPolls != 3 {
+		t.Fatalf("invalidation calls = create:%d poll:%d, want one create and three polls", api.invalidationsCreated, api.invalidationPolls)
+	}
 }
 
 type fakeCloudFrontHealth struct {
@@ -206,9 +268,9 @@ func TestCloudFrontPlanIsProviderTypedAndDoesNotMutate(t *testing.T) {
 
 func TestCloudFrontPurgePlansWithoutOriginConfigurationAndRevalidatesOwnership(t *testing.T) {
 	for _, test := range []struct {
-		name        string
-		comment     string
-		wantPurge   bool
+		name      string
+		comment   string
+		wantPurge bool
 	}{
 		{name: "owned distribution", comment: cloudFrontCommentPrefix + "magelift/test/cloudfront", wantPurge: true},
 		{name: "foreign distribution", comment: "foreign owner"},

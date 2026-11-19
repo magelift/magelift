@@ -374,11 +374,33 @@ func (api *NativeAPI) startPurge(ctx context.Context, operation sdk.EdgeOperatio
 	if distribution == nil || distribution.Distribution == nil || !ownedDistributionConfig(distribution.Distribution.DistributionConfig, operation.Request.OwnershipMarker) {
 		return sdk.EdgeOperationObservation{}, errors.New("refusing to purge an unowned CloudFront distribution")
 	}
+	callerReference := strings.TrimSpace(operation.Request.IdempotencyKey)
+	if callerReference == "" {
+		return sdk.EdgeOperationObservation{}, errors.New("CloudFront purge requires a stable idempotency key")
+	}
 	paths := plan.purgePaths
 	if len(paths) == 0 {
 		paths = []string{"/*"}
 	}
-	return pendingObservation(sdk.EdgePurge, distributionOperationID(sdk.EdgePurge, id, true, operation.Request.IdempotencyKey, paths, operation.Request.OwnershipMarker), operation.Request.OwnershipMarker), nil
+	created, err := api.api.CreateInvalidation(ctx, &cloudfront.CreateInvalidationInput{
+		DistributionId: aws.String(id), InvalidationBatch: invalidationBatch(callerReference, paths),
+	})
+	if err != nil {
+		return sdk.EdgeOperationObservation{}, fmt.Errorf("create CloudFront invalidation: %w", err)
+	}
+	if created == nil || created.Invalidation == nil || strings.TrimSpace(aws.ToString(created.Invalidation.Id)) == "" {
+		return sdk.EdgeOperationObservation{}, errors.New("CloudFront invalidation response did not contain an identity")
+	}
+	operationID := invalidationOperationID(id, aws.ToString(created.Invalidation.Id), operation.Request.OwnershipMarker)
+	resourceRef := "aws.cloudfront.invalidation:" + id + ":" + aws.ToString(created.Invalidation.Id)
+	if aws.ToString(created.Invalidation.Status) == cloudFrontStatusCompleted {
+		return succeededObservation(sdk.EdgePurge, operationID, operation.Request.OwnershipMarker, []string{resourceRef}, []string{"aws.cloudfront.ownership", "aws.cloudfront.purge-complete"}), nil
+	}
+	return sdk.EdgeOperationObservation{
+		Status: sdk.EdgeOperationPending, Action: sdk.EdgePurge, OperationID: operationID,
+		ResourceRefs: []string{resourceRef}, OwnershipMarker: operation.Request.OwnershipMarker,
+		OwnershipVerified: true, IdempotencyVerified: true, ProofRefs: []string{"aws.cloudfront.ownership"},
+	}, nil
 }
 
 func (api *NativeAPI) startOriginTransition(ctx context.Context, operation sdk.EdgeOperationRequest, plan cloudFrontPlan, failover bool) (sdk.EdgeOperationObservation, error) {
@@ -561,6 +583,20 @@ func (api *NativeAPI) Poll(ctx context.Context, operationID string) (sdk.EdgeOpe
 		}
 		if invalidationOutput == nil || invalidationOutput.Invalidation == nil {
 			return sdk.EdgeOperationObservation{}, errors.New("CloudFront invalidation poll response is empty")
+		}
+		if action == sdk.EdgePurge {
+			resourceRef := "aws.cloudfront.invalidation:" + id + ":" + callerReference
+			if aws.ToString(invalidationOutput.Invalidation.Status) == cloudFrontStatusInProgress {
+				return sdk.EdgeOperationObservation{
+					Status: sdk.EdgeOperationPending, Action: action, OperationID: operationID,
+					ResourceRefs: []string{resourceRef}, OwnershipMarker: expectedOwner,
+					OwnershipVerified: true, IdempotencyVerified: true, ProofRefs: []string{"aws.cloudfront.ownership"},
+				}, nil
+			}
+			if aws.ToString(invalidationOutput.Invalidation.Status) != cloudFrontStatusCompleted {
+				return failedObservation(action, operationID, "CloudFront returned an unknown invalidation status"), nil
+			}
+			return succeededObservation(action, operationID, expectedOwner, []string{resourceRef}, []string{"aws.cloudfront.ownership", "aws.cloudfront.purge-complete"}), nil
 		}
 		if aws.ToString(invalidationOutput.Invalidation.Status) != cloudFrontStatusCompleted {
 			return pendingObservation(action, operationID, ""), nil
@@ -959,6 +995,13 @@ func distributionOperationID(action sdk.EdgeAction, id string, purge bool, calle
 	return operation + ":purge:" + base64.RawURLEncoding.EncodeToString([]byte(callerReference)) + ":" + base64.RawURLEncoding.EncodeToString(pathBytes) + ":owner:" + base64.RawURLEncoding.EncodeToString([]byte(ownershipMarker))
 }
 
+func invalidationOperationID(distributionID, invalidationID, ownershipMarker string) string {
+	if strings.TrimSpace(distributionID) == "" || strings.TrimSpace(invalidationID) == "" || strings.TrimSpace(ownershipMarker) == "" {
+		return ""
+	}
+	return cloudFrontOperation + ":invalidation:purge:" + distributionID + ":" + invalidationID + ":owner:" + base64.RawURLEncoding.EncodeToString([]byte(ownershipMarker))
+}
+
 func transitionOperationID(action sdk.EdgeAction, id string, groups *cloudfronttypes.OriginGroups) (string, error) {
 	if action != sdk.EdgeFailover && action != sdk.EdgeRollback {
 		return "", fmt.Errorf("invalid CloudFront transition action %q", action)
@@ -1014,6 +1057,16 @@ func parseDistributionOperationID(value string) (kind string, action sdk.EdgeAct
 		return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront operation ID %q", value)
 	}
 	kind, action, id = parts[1], sdk.EdgeAction(parts[2]), parts[3]
+	if kind == "invalidation" && len(parts) == 7 && action == sdk.EdgePurge && parts[5] == "owner" {
+		if parts[4] == "" {
+			return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront invalidation operation ID %q", value)
+		}
+		ownerBytes, ownerErr := base64.RawURLEncoding.DecodeString(parts[6])
+		if ownerErr != nil || len(ownerBytes) == 0 || strings.ContainsAny(string(ownerBytes), "\r\n\x00") {
+			return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront invalidation operation ID %q", value)
+		}
+		return kind, action, id, false, parts[4], nil, nil, string(ownerBytes), nil
+	}
 	if id == "" || (action != sdk.EdgeApply && action != sdk.EdgeVerify && action != sdk.EdgeFailover && action != sdk.EdgeRollback && action != sdk.EdgeDestroy && action != sdk.EdgePurge) {
 		return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront operation ID %q", value)
 	}
