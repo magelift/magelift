@@ -2,7 +2,7 @@
 
 ADRs record decisions that constrain public contracts, infrastructure, security, or maintenance. Until the first public release tag, this set is the **current** decision list: edit or replace a file when the product changes. After that tag, freeze the body and supersede with a new number.
 
-When a public contract, certification tier, or topology rule changes, update the ADR and the human page in the same change. A knowledge note is not a substitute.
+When a public contract, runtime tier or topology rule changes, update its ADR and the guide that explains it.
 
 Each ADR states context, decision, consequences, alternatives, and provenance.
 

@@ -91,8 +91,6 @@ func (o *options) secretsPort() (platform.Secrets, error) {
 	return port, nil
 }
 
-// notSupportedMessage is the single unsupported day-2 shape: surface, provider/runtime,
-// then the certification tier after the preserved trailing "yet" (plan 01-03 prefix).
 func notSupportedMessage(provider, runtime string, tier platform.CertificationTier, surface string) string {
 	return fmt.Sprintf("%s is not supported for target %s/%s yet (%s)", surface, provider, runtime, tier)
 }

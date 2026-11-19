@@ -88,7 +88,7 @@ func ValidateWebRuntimeDescriptor(descriptor WebRuntimeDescriptor) error {
 		problems = append(problems, errors.New("web-runtime digest must use sha256: prefix"))
 	}
 	if descriptor.Tier != ExtensionTierBuiltIn && descriptor.Tier != ExtensionTierExperimental {
-		problems = append(problems, fmt.Errorf("invalid web-runtime certification tier %q", descriptor.Tier))
+		problems = append(problems, fmt.Errorf("invalid web-runtime tier %q", descriptor.Tier))
 	}
 	if descriptor.Adobe != AdobeSupported && descriptor.Adobe != AdobeUnsupported {
 		problems = append(problems, fmt.Errorf("invalid web-runtime Adobe support %q", descriptor.Adobe))

@@ -594,7 +594,7 @@ The dump is unsanitized Magento data unless --sanitize is set. --sanitize hashes
 		},
 	}
 	command.Flags().StringVar(&dest, "to", "", "local .sql or .sql.gz path to write (required)")
-	command.Flags().BoolVar(&sanitize, "sanitize", false, "hash mailbox addresses in the dump (not certified anonymous)")
+	command.Flags().BoolVar(&sanitize, "sanitize", false, "hash email addresses in the dump (other personal data may remain)")
 	_ = command.MarkFlagRequired("to")
 	return command
 }

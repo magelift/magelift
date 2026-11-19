@@ -14,7 +14,7 @@ import (
 )
 
 // Stable leading portion of the not-supported message. Plan 01-08 appends the
-// certification tier after this prefix; keep assertions on the prefix only.
+// runtime tier after this prefix; keep assertions on the prefix only.
 const costNotSupportedPrefix = "cost estimation is not supported for target aws/ecs-fargate yet"
 
 type recordingCostEstimator struct {

@@ -186,7 +186,7 @@ func (r *ModuleRegistry) registerModule(module StackModule, manifest *sdk.Extens
 		}
 	}
 	if tier := module.CertificationTier(); tier != TierBuiltIn && tier != TierExperimental {
-		return fmt.Errorf("stack module %q has invalid certification tier %q", descriptor.ID, tier)
+		return fmt.Errorf("stack module %q has invalid runtime tier %q", descriptor.ID, tier)
 	}
 	keys := RequiredOutputKeys()
 	provided := make(map[string]struct{}, len(module.OutputKeys()))

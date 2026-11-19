@@ -450,7 +450,7 @@ magelift env dump <environment> [flags]
 Options:
 
 ```text
-      --sanitize[=true|false]   hash mailbox addresses in the dump (not certified anonymous)
+      --sanitize[=true|false]   hash email addresses in the dump (other personal data may remain)
       --to string               local .sql or .sql.gz path to write (required)
 ```
 ### magelift env import-dump

@@ -169,7 +169,7 @@ type DescribeRequest struct {
 	ProtocolVersion string `json:"protocolVersion"`
 }
 
-// RuntimeAdvertisement names one served runtime and its certification tier.
+// RuntimeAdvertisement names one served runtime and its runtime tier.
 type RuntimeAdvertisement struct {
 	Runtime string                     `json:"runtime"`
 	Tier    ExtensionCertificationTier `json:"tier"`

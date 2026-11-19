@@ -71,7 +71,7 @@ func ValidateExtensionDescriptor(descriptor ExtensionDescriptor) error {
 		problems = append(problems, errors.New("extension digest must use sha256: prefix"))
 	}
 	if descriptor.Tier != ExtensionTierBuiltIn && descriptor.Tier != ExtensionTierExperimental {
-		problems = append(problems, fmt.Errorf("invalid extension certification tier %q", descriptor.Tier))
+		problems = append(problems, fmt.Errorf("invalid extension tier %q", descriptor.Tier))
 	}
 	if len(descriptor.Targets) == 0 {
 		problems = append(problems, errors.New("extension must declare at least one target"))

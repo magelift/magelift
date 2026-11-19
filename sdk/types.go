@@ -22,9 +22,8 @@ const (
 	ExternalLifecycleObserveOnly ExternalLifecycle = "observe-only"
 )
 
-// ExternalCertificationStatus is deliberately independent of the target's
-// certification tier. A cloud target can be certified while an external edge
-// or telemetry adapter remains experimental.
+// ExternalCertificationStatus records an edge or telemetry adapter's status independently
+// of the cloud runtime. Older run records use the certified value.
 type ExternalCertificationStatus string
 
 const (
