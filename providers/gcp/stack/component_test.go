@@ -6,6 +6,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/magelift/magelift/providers/gcp/cache"
+	"github.com/magelift/magelift/providers/gcp/database"
+	"github.com/magelift/magelift/providers/gcp/network"
 	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -1308,5 +1311,21 @@ func TestManagedCacheAndSessionUseSeparateInstancesAndPolicies(t *testing.T) {
 	}
 	if instances != 2 || policies != 1 || !foundCache || !foundSession {
 		t.Fatalf("instances=%d connection policies=%d cache=%t session=%t", instances, policies, foundCache, foundSession)
+	}
+}
+
+func TestManagedSessionDependsOnCloudSQLWithNonManagedPrimaryCache(t *testing.T) {
+	net := &network.Component{}
+	db := &database.Component{}
+	primary := &cache.Component{}
+	for _, binding := range []sdk.ServiceBinding{{Family: "valkey", Ownership: "self-hosted"}, {Family: "valkey", Ownership: "external", Endpoint: "redis.example"}} {
+		deps := managedSessionDependencies(net, db, primary, sdk.ServiceBinding{Family: "mysql", Ownership: "managed"}, binding)
+		if len(deps) != 2 || deps[0] != net || deps[1] != db {
+			t.Fatalf("binding=%+v dependencies=%v", binding, deps)
+		}
+	}
+	deps := managedSessionDependencies(net, db, primary, sdk.ServiceBinding{Family: "mysql", Ownership: "managed"}, sdk.ServiceBinding{Family: "valkey", Ownership: "managed"})
+	if len(deps) != 3 || deps[2] != primary {
+		t.Fatalf("managed cache dependencies=%v", deps)
 	}
 }

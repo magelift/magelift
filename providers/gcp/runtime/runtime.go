@@ -719,7 +719,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.ClusterEndpoint = cluster.Endpoint
 	component.SearchEndpoint = searchEndpoint
 	component.QueueHost = queueHost
-	component.Namespace = pulumi.String(args.Namespace).ToStringOutput()
+	component.Namespace = pulumi.String(effectiveNamespace(args.Namespace)).ToStringOutput()
 	component.WorkloadServiceAccount = pulumi.String(workloadServiceAccount).ToStringOutput()
 	component.QueueMode = pulumi.String(args.QueueMode).ToStringOutput()
 	component.QueueUsername = pulumi.String(queueUser).ToStringOutput()
@@ -877,4 +877,11 @@ func asString(value interface{}) string {
 	default:
 		return fmt.Sprintf("%v", value)
 	}
+}
+
+func effectiveNamespace(namespace string) string {
+	if namespace == "" {
+		return "default"
+	}
+	return namespace
 }

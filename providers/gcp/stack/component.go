@@ -224,10 +224,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 			if session.Version == "" {
 				version = spec.Catalog.MemorystoreEngineVersion
 			}
-			sessionDependencies := []pulumi.Resource{component.Network}
-			if !serviceSelfOrAttached(spec.Services["cache"]) {
-				sessionDependencies = append(sessionDependencies, component.Cache)
-			}
+			sessionDependencies := managedSessionDependencies(component.Network, component.Database, component.Cache, externalDatabase, spec.Services["cache"])
 			sessionCache, cacheErr := cache.New(ctx, naming.Resource(spec.Identity.Project, spec.Identity.Environment, "session"), cache.Args{
 				Project: spec.Identity.GCPProject, Region: spec.Identity.Region,
 				UseExistingServiceConnectionPolicy: spec.PreviewPool != nil || !serviceSelfOrAttached(spec.Services["cache"]),
@@ -548,4 +545,16 @@ func (c *Component) Outputs() pulumi.Map {
 		outputs["observabilityUnavailableOperations"] = c.Observability.UnavailableOperations
 	}
 	return outputs
+}
+
+// Managed session Memorystore must be deleted before Cloud SQL tears down PSA.
+func managedSessionDependencies(network *network.Component, db *database.Component, primary *cache.Component, databaseBinding, cacheBinding sdk.ServiceBinding) []pulumi.Resource {
+	dependencies := []pulumi.Resource{network}
+	if !serviceSelfOrAttached(databaseBinding) {
+		dependencies = append(dependencies, db)
+	}
+	if !serviceSelfOrAttached(cacheBinding) {
+		dependencies = append(dependencies, primary)
+	}
+	return dependencies
 }

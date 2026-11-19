@@ -29,3 +29,12 @@ func TestBuildKubeconfigUsesOAuthTokenNotExecPlugin(t *testing.T) {
 		t.Fatal("kubeconfig missing expected context name")
 	}
 }
+
+func TestEffectiveNamespace(t *testing.T) {
+	if got := effectiveNamespace(""); got != "default" {
+		t.Fatalf("stable namespace=%q", got)
+	}
+	if got := effectiveNamespace("preview-42"); got != "preview-42" {
+		t.Fatalf("preview namespace=%q", got)
+	}
+}
