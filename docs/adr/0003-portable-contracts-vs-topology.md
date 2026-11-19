@@ -29,7 +29,9 @@ Provider roots:
 
 Single exception: `internal/cloud/kube` stays where it is (see carve-out below). Nothing else shared lives under `internal/cloud/`.
 
-Carve-out: `internal/cloud/kube` is the single shared Pulumi helper. It holds Magento-shaped Kubernetes wiring (`SkipAwaitAnnotations`, `ToStringArray`, `EnvVars`, `BuildStaticTokenKubeconfig`, shared Observe/Steps/projection) consumed by the GKE, MKS, and Kapsule runtime adapters, pinned to one `pulumi-kubernetes` SDK version. It owns no network, database, cache, search, or queue topology and contains no `if provider ==` switch. Scope is frozen: no new shared Pulumi helpers without an ADR amending this section.
+`internal/cloud/kube` holds shared Magento workload wiring and Kubernetes resources for OpenSearch and RabbitMQ. Adapters choose whether to use them and supply the namespace, storage, replica count, images and credentials. Each provider still owns its network, database and cache topology. Extending the shared Pulumi layer requires an amendment to this decision.
+
+The portable service contract distinguishes cache and session storage. A shop can declare versions, ownership, supported database parameters, eviction policies, OpenSearch plugins and self-hosted storage sizes. Web replicas and data service redundancy are separate choices. The configuration reports single-replica dependencies in a high-availability environment.
 
 ## Consequences
 

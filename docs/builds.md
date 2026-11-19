@@ -69,6 +69,23 @@ The CLI adds the full inspected commit checksum to the provenance URL. It reject
 
 BuildKit publishes the SBOM and SLSA provenance. MageLift signs the pushed digest with Cosign. Give the GitHub build job `id-token: write` so it can sign with its job identity. On a workstation, use your current Google login and the bootstrapped CI service account, or complete Cosign’s browser login. For automation, use `MAGELIFT_COSIGN_IDENTITY_TOKEN_FILE`, `MAGELIFT_COSIGN_IDENTITY_TOKEN_ARGV` or `--identity-token-file` to supply a token explicitly. MageLift passes Cosign a file path and keeps the token out of the process arguments.
 
+### Static assets by theme
+
+Use `build.staticContent.matrix` when the Admin and storefront themes need different locales. In the PHP project, a theme with an empty list produces no static assets. The builder runs Magento for each listed theme and locale. You can also use `locales` and `themes` together to build every combination.
+
+```php
+'staticContent' => [
+    'matrix' => [
+        'Magento/backend' => ['en_US'],
+        'Example/store' => ['en_US', 'fr_FR'],
+        'Magento/blank' => [],
+    ],
+    'threads' => 2,
+],
+```
+
+The PaaS importer reads `SCD_MATRIX` and `QUALITY_PATCHES` from the Magento build stage. It preserves patch IDs for the shop's installed patch tooling. Keep custom `m2-hotfixes` files in version control along with the lockfile. [Adobe build variables](https://experienceleague.adobe.com/en/docs/commerce-on-cloud/user-guide/configure/env/stage/variables-build)
+
 ### Composer
 
 The bundled builder uses Composer 2.11.2. An older shop can usually keep its existing `composer.lock` and use the bundled binary. Check that its plugins accept the builder’s Composer plugin API. Set `build.composer.version` to a minimum (`2.9.8+`), a minor branch (`2.10`), a patch range within one branch (`~2.9.8`), or one release (`2.11.2`). If a plugin requires an older binary, set both its version constraint and `build.composer.image` to match. The image must run `/usr/bin/composer --version` and is selected by digest. When you supply a complete builder with `--builder-image`, MageLift checks the Composer installed in that builder. [Composer platform dependencies](https://getcomposer.org/doc/articles/composer-platform-dependencies.md)

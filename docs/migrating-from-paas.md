@@ -1,30 +1,47 @@
-# Move a Magento shop from Upsun or Adobe Commerce Cloud
+# Move a Magento shop to MageLift
 
-Work in a checkout of the source repository. Keep the original configuration, a usable source backup, and the current environment running through the migration rehearsal.
+Start in the shop's Git checkout with its committed `composer.lock`. Choose the destination independently of the old host. The importer writes `magelift.php` with staging, UAT, production and preview environments. You can inspect the project and compare environments before creating a cloud resource.
 
-| Source | Configuration MageLift reads | Example |
+| Source | Files read | Example |
 | --- | --- | --- |
-| Adobe Commerce Cloud | `.magento.app.yaml`, `.magento/services.yaml`, `.magento/routes.yaml`, `.magento.env.yaml` | `magelift init --from-acc --provider aws` |
-| Upsun Flex | Named applications, services and routes in `.upsun/*.yaml` | `magelift init --from-upsun --app shop --provider azure` |
-| Upsun Fixed / Platform.sh | `.platform.app.yaml` or `.platform/applications.yaml`, services and routes in `.platform/` | `magelift init --from-upsun --provider gcp` |
+| Upsun Fixed or Platform.sh | `.platform.app.yaml` or `.platform/applications.yaml`, services and routes in `.platform/`, and `.platform.env.yaml` | `magelift init --from-upsun --provider aws` |
+| Upsun Flex | Named applications, services and routes in `.upsun/*.yaml` | `magelift init --from-upsun --app shop --provider gcp` |
+| Adobe Commerce Cloud | `.magento.app.yaml`, `.magento/services.yaml`, `.magento/routes.yaml`, and `.magento.env.yaml` | `magelift init --from-acc --provider azure` |
+| Docker Compose | Service image tags in the first standard Compose file in the shop root | `magelift init --from-compose --provider azure` |
 
-On Upsun Fixed, MageLift looks for environment settings in `.platform.env.yaml`. If your deployment also runs ece-tools, review `.magento.env.yaml` separately. The unmapped report covers only files the importer reads. Check static content, patches, consumer schedules, database routing and session settings before accepting the generated project. [Adobe deployment variables](https://experienceleague.adobe.com/en/docs/commerce-on-cloud/user-guide/configure/env/stage/variables-deploy)
+For an Upsun shop that also uses ece-tools, MageLift reads the Magento app's `.magento.env.yaml` after the platform settings. Recognized values there take precedence. Use `--app` to select the Magento backend in a multi-app project. To connect a separately deployed storefront, pass `--storefront-origin https://store.example.com`. Leave it out for a native Magento storefront.
 
-Choose the destination provider independently of the source. When a repository has multiple apps, select the Magento application by name. The importer inspects its Composer metadata to determine the edition and exact release. An Enterprise or Cloud metapackage takes precedence when the lock also contains the Community metapackage.
+## Inspect the proposed project
 
-The generated PHP includes recognized PHP and Composer settings, Magento environment variables, static content, service engine versions and routes. For an unsupported setting the importer writes a review file next to the project file and exits with status 2. The report contains source paths and key names. Review shell hooks, custom services, per-service options, and application mounts before deploying. Store secret values separately, including the original Magento encryption key needed to decrypt imported data.
-
-A Composer tool version from the old platform becomes a minimum. For example, a shop that used Composer `2.9.8` imports as `2.9.8+`. This lets a patched Composer 2 build the existing `composer.lock`. The importer leaves the lock and its package versions alone. The importer also carries common Composer 2 constraints across. For example, `^2.9.8` becomes `2.9.8+`, `2.9.*` stays on the 2.9 branch, and `~2.9.8` keeps its upper limit below 2.10. Check the unmapped report for compound ranges. If a plugin needs a particular release, set that constraint explicitly in the PHP project and test the build with it.
-
-Compare how each service is used as well as its version. A cache and a persistent session store can use the same engine with different eviction policies. OpenSearch plugins, queue consumers and CDN purge rules also affect storefront behavior. Supply a hostname you control when the source routes contain platform placeholders.
+This example writes a separate PHP file so you can try another provider in the same checkout. Supply the actual project, region and domain when you know them.
 
 ```sh
-magelift init --from-upsun --app shop --provider gcp --config-out rehearsal.php
+magelift init --from-upsun --provider gcp --cloud-account example-shop \
+  --region europe-west1 --domain shop.example.com --config-out rehearsal.php
 magelift --config rehearsal.php config validate
+magelift --config rehearsal.php --env staging config effective
 magelift --config rehearsal.php env diff staging production
 ```
 
-1. Edit the project’s real domain, cloud identifiers, registry and secret references. Select a provider-managed engine, a self-hosted implementation or an existing service with an appropriate connection adapter. A source engine/version stays visible even when the destination cloud needs a different implementation.
-2. Create a staging rehearsal. Restore a consistent SQL export and a matching media snapshot into the destination using the provider’s import and media operations. Keep production customer data and credentials out of PR previews. [Data migration and cutover](weekend-migrate.md)
-3. Verify the storefront or GraphQL endpoint, Admin login, checkout, search, cron, consumers and media. Check outbound email, payment and webhook destinations before enabling them.
-4. Rehearse a write freeze, final synchronization and DNS or edge cutover. Record how to return traffic to the source and how writes made after cutover will be reconciled. Keep the source until the team accepts the destination and has tested a restore.
+Exit status 2 after the importer writes the project means that settings need review. Open the matching `rehearsal.unmapped.md`. It names the source file and key, so you can find the original value without copying it into the report. Check placeholders, redirects, custom mounts, shell hooks, Fastly rules, cache tiers and database reader routing. Translate the behavior your shop uses, including jobs started outside Magento cron. Keep vendor credentials and shell hook bodies out of the PHP project.
+
+MageLift gets the Magento edition and release from Composer metadata. A Commerce or Cloud metapackage takes precedence over its Open Source dependency. For a June checkout that specified Composer `2.9.8`, the imported tool constraint is `2.9.8+`. The builder can then use a patched Composer 2 and install the existing lockfile. Test shop-specific Composer plugins and provide credentials for licensed packages to the builder. [Build settings](builds.md#composer) · [Adobe system requirements](https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements)
+
+## Match the services and Magento settings
+
+- Check both `services.cache` and `services.session`. Upsun shops often evict cache entries under pressure and keep sessions on another store with a different policy. The importer recognizes persistent stores and common relationship aliases. Inspect custom aliases in the report.
+- Review database character set, collation and maximum packet size. The importer carries supported settings to RDS or self-hosted MariaDB and reports settings the selected service cannot accept. Self-hosted volumes round the source disk size up to the next whole GiB.
+- Check the static content theme and locale matrix, patch IDs, consumer names and session tuning in the generated PHP. A disabled source cron consumer runner leaves dedicated workers off unless you configure them. Keep the shop's patches and distributable archives in the build context. [Build settings](builds.md) · [Adobe deployment variables](https://experienceleague.adobe.com/en/docs/commerce-on-cloud/user-guide/configure/env/stage/variables-deploy)
+- Compose import recognizes numeric tags of public MySQL, MariaDB, Redis, Valkey, RabbitMQ and OpenSearch images. A private search image, a Dockerfile, credentials or custom startup settings need review. A locked Smile ElasticSuite installation adds its ICU and phonetic analyzer requirements. Check which adapter Magento selects and reindex the catalog on the destination. [Service choices](service-bindings.md)
+
+## Carry over the encryption key before restoring data
+
+A restored database needs the source Magento `crypt/key` to read encrypted configuration. Transfer the full value, including any key history, through your secret management process. Configure the destination reference before the first Magento migration. A newly generated key cannot decrypt old values.
+
+| Target | Reference in the destination environment |
+| --- | --- |
+| AWS | Set `target.aws.encryptionKeySecretArn` to the Secrets Manager ARN. |
+| GCP | Set `target.gcp.encryptionKeySecret` to the secret ID in the selected Google Cloud project. |
+| Azure | Set `target.azure.encryptionKeySecret` to a versioned Key Vault secret URL, or `target.azure.encryptionKeySecretName` to an existing namespace-local Kubernetes Secret with a `key` entry. |
+
+Use separate credentials and sanitized data in PR previews. Keep the source available while you rehearse SQL and media restore, search indexing, checkout and the traffic switch. Record how to recover writes made after cutover before you change DNS. [Rehearse the data migration](weekend-migrate.md)

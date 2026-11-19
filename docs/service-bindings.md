@@ -1,63 +1,51 @@
 # Choose services for a shop
 
-Each role under `services` selects a family, version and optional ownership.
-Declare the common choices at the root of `magelift.php`. An environment can
-override a single role. Magento compatibility advice uses a dated Adobe
-snapshot. The shop owns the version decision, and the cloud API determines
-availability in the selected account and region.
-
-When a Magento release recommends Valkey 8.1, the GCP starter selects Memorystore 8.0. You can set an explicit version in the PHP project. Check availability before deploying. [Memorystore versions](https://docs.cloud.google.com/memorystore/docs/valkey/supported-versions)
-
-Inside a PHP project definition, a staging shop can reuse an existing private
-OpenSearch endpoint while the other stages keep their own search resources.
-
-```php
-'services' => [
-    'database' => new \MageLift\Service(family: 'mysql', version: '8.4'),
-    'queue' => new \MageLift\Service(family: 'database'),
-],
-'environments' => [
-    'staging' => new \MageLift\Environment([
-        'services' => [
-            'search' => new \MageLift\Service(
-                family: 'opensearch',
-                ownership: 'existing',
-                endpoint: 'https://search.staging.example.com',
-            ),
-        ],
-    ], class: 'staging'),
-],
-```
+Declare common service choices under `services` in `magelift.php`. Each environment can override a role. Versions come from the shop or its PHP project. Adobe's requirements guide the choice, and each cloud controls which managed versions it offers in a region. A container tag such as MySQL 8.4.3 can remain exact in Compose or in a self-hosted image. Cloud SQL and Azure Flexible Server use the 8.4 service branch and select the patch. RDS accepts an offered full patch or a family such as MariaDB 11.4. [Adobe system requirements](https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements)
 
 | Role | AWS ECS Fargate | GCP GKE | Azure AKS |
 | --- | --- | --- | --- |
-| Database | RDS MySQL or MariaDB, Aurora through AWS settings, or an attached database | Cloud SQL for MySQL or an attached MySQL-compatible database | MySQL Flexible Server |
-| Cache | ElastiCache Valkey or an attached Redis-compatible cache | Memorystore Valkey or an attached Redis-compatible cache | Self-hosted Valkey or Redis, or an existing unauthenticated endpoint |
-| Search | Managed OpenSearch, with additional modes in AWS settings, or an attached endpoint | Self-hosted OpenSearch or an attached endpoint | Self-hosted OpenSearch |
-| Queue | Database, RabbitMQ on ECS, Amazon MQ or an attached RabbitMQ broker | Database, RabbitMQ on GKE or an attached RabbitMQ broker | Database |
+| Database | RDS MySQL or MariaDB, Aurora through AWS settings, or an existing database | Cloud SQL for MySQL, self-hosted MariaDB, or an existing MySQL-compatible database | MySQL Flexible Server, self-hosted MariaDB, or an existing MySQL-compatible database |
+| Cache and optional separate sessions | ElastiCache Valkey or existing Redis-compatible endpoints | Memorystore Valkey, self-hosted stores, or existing Redis-compatible endpoints | Self-hosted Valkey or Redis, or an existing unauthenticated endpoint |
+| Search | Amazon OpenSearch Service or an existing endpoint | Self-hosted OpenSearch or an existing endpoint | Self-hosted OpenSearch |
+| Queue | Database, RabbitMQ on ECS, Amazon MQ, or an existing RabbitMQ broker | Database, RabbitMQ on GKE, or an existing RabbitMQ broker | Database, RabbitMQ on AKS, or an existing AMQPS broker |
 
-For Azure production, supply an existing highly available cache that AKS can reach. The bundled self-hosted cache runs a single replica. The AKS starter exposes a load balancer address. A custom hostname needs an ingress controller, DNS and TLS configured for that host. [Azure setup](bootstrap.md#azure-aks)
+## Keep sessions when cache entries expire
 
-The external-search example works with AWS ECS and GKE for reachable,
-unauthenticated endpoints. Keep attached services in their owning stack and
-configure connectivity from Magento. Refer to AWS Secrets Manager or a
-version in Google Secret Manager when an attachment needs credentials. The
-built-in database and cache connections on these targets use ports 3306 and
-6379. The planner reports unsupported authentication, connection or provisioning
-modes before creating replacement resources. Local Compose provisions
-development containers from the same family, version or explicit local image.
+The following service settings run two stores on Kubernetes. They also give local Compose distinct cache and session containers. With a managed service, choose its instance size and check its supported engine and eviction settings. For example, the GCP starter selects Memorystore 8.0 when an Adobe recommendation names Valkey 8.1. [Memorystore versions](https://docs.cloud.google.com/memorystore/docs/valkey/supported-versions)
 
-Smile ElasticSuite is a Magento search and merchandising extension that can use the same OpenSearch service as Magento’s native search. Set the service family to `opensearch` in either case. MageLift passes the connection details to both clients and preserves the adapter selected in Magento. For an existing shop, check `bin/magento config:show catalog/search/engine` and reindex a representative catalog before cutover. [Smile’s compatibility table](https://github.com/Smile-SA/elasticsuite#which-version-should-i-use-)
-
-For a fresh local installation with the extension installed, run `magelift dev --search-engine elasticsuite` or use the same flag with `magelift local seed`. You can also select the adapter for local and cloud environments by setting `CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE` under `application.magento.variables`. A fresh local installation defaults to `opensearch` when you leave the adapter unspecified. [Smile’s installation guide](https://github.com/Smile-SA/elasticsuite/wiki/ModuleInstall)
-
-ElasticSuite’s default analyzers need the OpenSearch plugins `analysis-icu` and `analysis-phonetic`. Check the nodes with `GET /_cat/plugins?v`. For self-hosted OpenSearch, build the plugins into the shop’s search image and set `local.search.image` for local Compose. For example, this Dockerfile adds both plugins to OpenSearch 3.1.0. [OpenSearch plugin management](https://docs.opensearch.org/latest/install-and-configure/plugins/) · [Amazon OpenSearch plugins](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)
-
-```dockerfile
-FROM opensearchproject/opensearch:3.1.0
-RUN bin/opensearch-plugin install --batch analysis-icu analysis-phonetic
+```php
+'services' => [
+    'cache' => new \MageLift\Service(
+        family: 'valkey', version: '8.1', ownership: 'self-hosted',
+        evictionPolicy: 'allkeys-lru', memoryMiB: 512,
+    ),
+    'session' => new \MageLift\Service(
+        family: 'valkey', version: '8.1', ownership: 'self-hosted',
+        evictionPolicy: 'noeviction', memoryMiB: 512, storageGiB: 4,
+    ),
+],
 ```
 
-Custom binaries can register an adapter to resolve a service vendor to a
-supported connection. A full provider module can own new infrastructure
-and define its lifecycle. [Extending MageLift](adding-a-provider.md)
+Kubernetes self-hosted MariaDB, cache and session stores have one replica each. A persistent volume keeps data across pod restarts. Each provisioned Kubernetes store has its own password, and dedicated session stores use an append-only log. Rehearse recovery from a lost volume and set memory limits that cover the session workload. AKS RabbitMQ and the ECS RabbitMQ task also have one writer. The ECS broker uses EFS. A high-availability web tier can use these services, and `magelift config validate` names the single-replica dependencies. Choose a redundant database or broker where the shop requires failover.
+
+For a provisioned RDS database or self-hosted MariaDB, `services.database.parameters` accepts `character_set_server`, `collation_server` and `max_allowed_packet` in bytes. Self-hosted database, search, broker and store bindings accept `storageGiB` where the provider provisions their volumes. GCP and AKS can keep MariaDB in the cluster when an existing dump depends on MariaDB behavior. Moving the dump to a MySQL service needs a separate rehearsal.
+
+## Connect to existing services
+
+Set `ownership` to `existing`, supply an endpoint reachable from the workload and grant the destination access to the referenced secret. AWS uses Secrets Manager for credentials. GCP uses Secret Manager version references. On AKS, an attached database uses port 3306 and a trusted TLS certificate. An attached RabbitMQ broker uses AMQPS. Both read the password from the `password` entry of a Secret in the Magento namespace. Give previews their own endpoints and credentials when they use attachments.
+
+```php
+'queue' => new \MageLift\Service(
+    family: 'rabbitmq', ownership: 'existing',
+    endpoint: 'amqps://broker.staging.example.com:5671',
+    username: 'magento', secret: 'kubernetes://broker-login',
+),
+```
+
+An AKS deployment exposes a load balancer address by default. Set up ingress, DNS and TLS for the shop hostname. Custom binaries can register an adapter for another service or a provider module that manages its infrastructure. [Azure setup](bootstrap.md#azure-aks) · [Extending MageLift](adding-a-provider.md)
+
+## Run ElasticSuite on OpenSearch
+
+Smile ElasticSuite is a Magento extension for search and merchandising. Use the `opensearch` service family. MageLift supplies the endpoint to Magento and ElasticSuite and preserves the shop's selected search adapter. Check it with `bin/magento config:show catalog/search/engine`. For a new local installation, `magelift dev --search-engine elasticsuite` selects ElasticSuite at install time. [Smile compatibility table](https://github.com/Smile-SA/elasticsuite#which-version-should-i-use-) · [Installation guide](https://github.com/Smile-SA/elasticsuite/wiki/ModuleInstall)
+
+A locked ElasticSuite package adds `analysis-icu` and `analysis-phonetic` to `services.search.plugins`. Amazon's provisioned OpenSearch domains include these analyzers. Self-hosted OpenSearch on GKE, AKS and local Compose checks the installed plugins at startup. It downloads missing plugins, so allow outbound access or provide an image with the matching versions already installed. When moving a custom search image, check `GET /_cat/plugins?v` and reindex a representative catalog. [OpenSearch plugins](https://docs.opensearch.org/latest/install-and-configure/additional-plugins/index/) · [Amazon OpenSearch plugins](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)

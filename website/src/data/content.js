@@ -50,7 +50,7 @@ export const personas = {
     {
       label: 'Move a shop',
       pain: 'Bring an existing Magento project',
-      body: 'Import service settings from Adobe Commerce Cloud or Upsun. Review the entries that need attention, then rehearse the database and media transfer in staging before you switch traffic.',
+      body: 'Bring service versions, session settings and search plugins from Upsun or Adobe Commerce Cloud. For a Compose shop, import its service images. Rehearse the SQL and media transfer in staging.',
       proof: 'magelift init --from-upsun --provider gcp',
     },
     {
@@ -140,7 +140,7 @@ export const faqs = [
   },
   {
     q: 'Can I migrate from Adobe Commerce Cloud or Upsun?',
-    a: 'Import the project settings with magelift init --from-acc or --from-upsun. Follow the migration guide to move the database and media and switch DNS.',
+    a: 'Yes. Run magelift init --from-acc or --from-upsun and choose AWS, GCP or Azure. Review the generated PHP and the list of settings that need attention. The migration guide covers the encryption key, database, media and traffic switch.',
   },
   {
     q: 'Is MageLift affiliated with Adobe?',

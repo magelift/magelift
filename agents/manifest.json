@@ -3,7 +3,7 @@
     "name": "magelift-configure",
     "description": "Configure a MageLift PHP project and choose Magento services. Use when selecting PHP, database, search, queue, cache, Varnish, edge, or provider options.",
     "version": "1.0.0",
-    "digest": "143e8bf0bb2f11d284ab1114af9edddcebe010cf6046fc59ef267e44714f4958",
+    "digest": "26690d545b68fc244e520b7172b71d8af67e9613ed703e5fa3a90a764e41e34e",
     "sources": [
       "embedded",
       "skills-cli"
@@ -31,9 +31,9 @@
   },
   {
     "name": "magelift-migrate",
-    "description": "Migrate an Adobe Commerce Cloud, Platform.sh, or Upsun project to MageLift. Use when importing configuration, mapping services, or reviewing unmapped fields.",
-    "version": "1.0.0",
-    "digest": "2c8ec54192aedccf3c078b18eb2fc58a0a4c003a361e12136dc76dbb80f577d6",
+    "description": "Import Magento settings from Adobe Commerce Cloud, Upsun, Platform.sh or Compose and rehearse a migration to AWS, GCP or Azure.",
+    "version": "1.1.0",
+    "digest": "a6898107fef72342a8e8c07fd493b5aa29ed076bfa47d5757bd349cfbb7e7e3f",
     "sources": [
       "embedded",
       "skills-cli"

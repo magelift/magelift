@@ -12,6 +12,8 @@ magelift env diff staging production
 
 The same project defines staging, UAT, production and pull-request previews. Cloud adapters cover AWS ECS Fargate, GCP GKE Autopilot and Azure AKS at different levels of implementation. MageLift publishes test results for individual paths. The shop owns its service versions, credentials and production acceptance. [Provider coverage](docs/capability-matrix.md) · [Getting started](docs/getting-started.md) · [Moving from Upsun or Adobe Commerce Cloud](docs/migrating-from-paas.md)
 
+For an existing shop, run `magelift init --from-upsun --provider aws`, `--from-acc` for Adobe Commerce Cloud, or `--from-compose` for a Compose checkout. Each importer accepts AWS, GCP or Azure. Review `magelift.unmapped.md` alongside the generated PHP before moving your data. [SQL and media rehearsal](docs/weekend-migrate.md)
+
 ## Install
 
 With the Go toolchain named in [`go.mod`](go.mod), install from a checkout of

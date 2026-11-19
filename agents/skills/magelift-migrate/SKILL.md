@@ -1,36 +1,20 @@
 ---
 name: magelift-migrate
 description: >-
-  Migrate an Adobe Commerce Cloud, Platform.sh, or Upsun project to MageLift.
-  Use when importing configuration, mapping services, or reviewing unmapped fields.
-version: 1.0.0
+  Import Magento settings from Adobe Commerce Cloud, Upsun, Platform.sh or
+  Compose and rehearse a migration to AWS, GCP or Azure.
+version: 1.1.0
 ---
 
 # Migrate to MageLift
 
-Use the importer to create a reviewable starting point. It is not a promise
-that every source platform feature has a direct equivalent.
+Run `magelift init` in the shop checkout. Choose `--from-upsun`, `--from-acc` or `--from-compose`, and select the destination with `--provider aws`, `gcp` or `azure`. For multi-app Upsun, use `--app` to select the Magento backend. Use `--config-out rehearsal.php` to keep a separate file for review.
 
-## Working rules
+- Read the generated PHP and the adjacent unmapped report. Exit status 2 after the file is written means some settings need review. Check hooks, redirects, mounts, reader routing, cache backends, Fastly configuration and jobs.
+- Compare the lockfile, source PHP branch and Composer plugins. A source tool version such as `2.9.8` imports as `2.9.8+`. Keep licensed dependencies and Composer credentials available to the builder.
+- Check session storage, eviction policy, OpenSearch analyzers, RabbitMQ consumers, patch IDs and theme locales. Review every single-replica data service planned for UAT or production.
+- Transfer the source Magento encryption key through the destination's secret store before restoring a database. Keep PR data and credentials isolated.
+- Rehearse SQL and media recovery with a consistent source snapshot. On GKE or AKS, `magelift migrate restore` shows a plan by default. Check the context, namespace UID, database identity, credentials and TLS before using `--execute --yes`. Use the appropriate media store for the provider.
+- Check Admin, checkout, reindexing, media and cron on the restored site. For a headless shop, test authentication, cookies and the storefront's GraphQL requests from its actual origin.
 
-- Run `magelift init --from-acc` or `magelift init --from-upsun` into a new PHP
-  project. Select the destination with `--provider aws`, `gcp` or `azure`;
-  use `--app` to select a Magento app in a multi-app Upsun project.
-- The importer reads source-platform YAML such as `.magento.app.yaml` and
-  `.upsun/*.yaml`; the MageLift project it creates is PHP.
-- When the import reports unmapped fields, review the adjacent
-  magelift.unmapped.md before changing credentials or DNS. A custom output
-  name receives a corresponding named report.
-- The source platform's Composer tool version becomes a minimum. For example,
-  `2.9.8` imports as `2.9.8+`. The importer leaves the shop's locked packages in place.
-- Keep secrets as provider secret references. Never put API tokens, private keys,
-  or Composer auth in the project file or evidence.
-- Preserve Fastly service identity, domains, TLS intent, purge behavior, and
-  custom VCL as an operator-owned reference when it cannot be translated.
-- Validate the imported file and compare environments before preview. The
-  importer maps configuration; it does not move database or media data.
-
-## Report
-
-List every manual follow-up: DNS, certificates, edge rules, cron changes,
-database import, media sync, search reindex, queue cutover, and rollback plan.
+Record the write freeze, final sync, DNS switch, rollback owner and treatment of orders placed after cutover. [Migration guide](https://magelift.dev/docs/migrating-from-paas/) · [Data rehearsal](https://magelift.dev/docs/weekend-migrate/)

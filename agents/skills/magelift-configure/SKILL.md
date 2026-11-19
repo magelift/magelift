@@ -43,6 +43,8 @@ in version control when those changes are needed by CI.
 Check provider constraints and preview capacity changes before applying them.
 An available service version does not guarantee regional capacity.
 
+For an Upsun or Adobe Commerce Cloud checkout, use the appropriate source importer. Use `--from-compose` to identify services in a Compose checkout. Check separate session and cache endpoints, eviction policies, analyzer plugins and volume sizes in `magelift config effective`. Review single-replica warnings for production and UAT. [Service choices](https://magelift.dev/docs/service-bindings/)
+
 ## Build the shop
 
 For a shop with an older lock, try the bundled Composer with a minimum such as `2.9.8+`. Use a digest-pinned `build.composer.image` only when the shop needs another binary. A critical advisory for the selected Composer stops the build. Review locked package advisories separately.

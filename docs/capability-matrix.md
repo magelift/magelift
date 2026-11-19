@@ -9,6 +9,8 @@ The PHP configuration describes the desired Magento environment. The adapter for
 | Azure AKS | AKS and MySQL resource graphs, dedicated and shared cluster modes, migration and rollout tests, Floci Blob and Key Vault, and local PHP/MySQL TLS tests. Live Azure deployment remains unverified |
 | AWS EKS, GCP GKE Standard, OVH and Scaleway | Additional adapters with operation-specific coverage |
 
+Synthetic shop tests import Upsun and Compose configurations for all three clouds and resolve staging, UAT, production and preview. Pulumi tests cover separate session stores, search plugins and RabbitMQ resources. A disposable local Kubernetes cluster exercised compressed SQL restore, PVC media read and write as Magento’s runtime user, refusal of a second restore into a nonempty database, and helper cleanup. [Repeat the local restore smoke](https://github.com/magelift/magelift/blob/main/tests/acceptance/kind_migration_restore_test.sh) · [Migration procedure](weekend-migrate.md)
+
 Go tests check configuration and lifecycle behavior. Pulumi mocks record resource registrations, inputs and dependencies. Floci exercises individual cloud APIs over the network. Each live record names its cloud, region, release, topology and outcome. MageLift makes no certification claim. [Tests](https://github.com/magelift/magelift/tree/main/tests) · [Historical run evidence](evidence/README.md)
 
 ## Earlier acceptance campaigns

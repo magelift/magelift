@@ -18,7 +18,7 @@ Define the application and service versions once, then change the capacity prese
 
 ## Can I bring an existing project?
 
-Run `magelift init` from the shop checkout. For Adobe Commerce Cloud or Upsun, select the source importer and destination provider. Review the generated configuration and any unmapped keys, then rehearse database, media and traffic cutover. [Migration guide](migrating-from-paas.md)
+Run `magelift init` from the shop checkout. For Adobe Commerce Cloud, Upsun or a project with Compose, select the source importer and choose AWS, GCP or Azure. Review the generated configuration and any unmapped keys, then rehearse database, media and traffic cutover. [Migration guide](migrating-from-paas.md)
 
 ## Can a shop use a headless frontend?
 
