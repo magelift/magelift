@@ -151,22 +151,33 @@ var (
 	v2BinaryErr  error
 )
 
+func TestMain(m *testing.M) {
+	result := m.Run()
+	if v2BinaryPath != "" {
+		_ = os.RemoveAll(filepath.Dir(v2BinaryPath))
+	}
+	os.Exit(result)
+}
+
 func v2ProviderBinary(t *testing.T) string {
 	t.Helper()
 	v2BinaryOnce.Do(func() {
 		_, file, _, _ := runtime.Caller(0)
 		root := filepath.Dir(filepath.Dir(filepath.Dir(file)))
-		out := filepath.Join(os.TempDir(), "magelift-provider-gcp-v2test")
-		cmd := exec.Command("go", "build", "-o", out, "./providers/gcp/cmd/magelift-provider-gcp")
+		dir, err := os.MkdirTemp("", "magelift-providerhost-test-*")
+		if err != nil {
+			v2BinaryErr = err
+			return
+		}
+		v2BinaryPath = filepath.Join(dir, "magelift-provider-gcp")
+		cmd := exec.Command("go", "build", "-o", v2BinaryPath, "./providers/gcp/cmd/magelift-provider-gcp")
 		cmd.Dir = root
 		// The provider is a separate module, even when the host test disables
 		// its surrounding workspace.
 		cmd.Env = append(os.Environ(), "GOWORK="+filepath.Join(root, "go.work"))
 		if output, err := cmd.CombinedOutput(); err != nil {
 			v2BinaryErr = errors.New("build provider: " + err.Error() + "\n" + string(output))
-			return
 		}
-		v2BinaryPath = out
 	})
 	if v2BinaryErr != nil {
 		t.Fatal(v2BinaryErr)
