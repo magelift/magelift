@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,15 +14,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// API is the S3 subset mediasync needs (injectable for unit tests / Floci).
+// API covers the S3 requests used to upload and verify media.
 type API interface {
 	PutObject(context.Context, *s3.PutObjectInput, ...func(*s3.Options)) (*s3.PutObjectOutput, error)
 	ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
 // Options configures a media sync into Bucket via Client.
-// Sync always merges: upload/overwrite source keys; never delete remote keys
-// absent locally (D-05). Listing verification fails when any source key is missing.
+// Sync updates source keys, preserves other objects and verifies the resulting listing.
 type Options struct {
 	Source string
 	Bucket string
@@ -34,6 +32,7 @@ type Options struct {
 // Result summarizes a completed sync.
 type Result struct {
 	Uploaded int
+	Bytes    int64
 	Keys     []string
 	Diff     ListingDiff
 }
@@ -44,12 +43,12 @@ type ListingDiff struct {
 	Extra   []string
 }
 
-// Empty reports whether both sides of the diff are empty (SC4 on a clean bucket).
+// Empty reports whether the listing matches the source.
 func (d ListingDiff) Empty() bool {
 	return len(d.Missing) == 0 && len(d.Extra) == 0
 }
 
-// Sync walks Source, PutObjects each file under mapped keys, then verifies listing.
+// Sync uploads each regular file and compares the remote listing with the source.
 func Sync(ctx context.Context, opts Options) (Result, error) {
 	if opts.Client == nil {
 		return Result{}, errors.New("mediasync: S3 client is required")
@@ -74,6 +73,12 @@ func Sync(ctx context.Context, opts Options) (Result, error) {
 	if prefix != "" && (strings.HasPrefix(prefix, "/") || strings.Contains(prefix, "..") || !strings.HasSuffix(prefix, "/")) {
 		return Result{}, errors.New("mediasync: prefix must be a relative directory ending in /")
 	}
+	root, err := os.OpenRoot(source)
+	if err != nil {
+		return Result{}, err
+	}
+	defer root.Close()
+	var uploadedBytes int64
 	keys := make([]string, 0, len(files))
 	for _, file := range files {
 		key, mapErr := objectKey(source, file)
@@ -81,9 +86,15 @@ func Sync(ctx context.Context, opts Options) (Result, error) {
 			return Result{}, mapErr
 		}
 		key = prefix + key
-		if err := putFile(ctx, opts.Client, bucket, key, file); err != nil {
+		relative, err := filepath.Rel(source, file)
+		if err != nil {
 			return Result{}, err
 		}
+		n, err := putFile(ctx, opts.Client, root, bucket, key, relative)
+		if err != nil {
+			return Result{}, err
+		}
+		uploadedBytes += n
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -94,9 +105,9 @@ func Sync(ctx context.Context, opts Options) (Result, error) {
 	}
 	diff := DiffKeys(keys, listed)
 	if len(diff.Missing) > 0 {
-		return Result{Uploaded: len(keys), Keys: keys, Diff: diff}, fmt.Errorf("mediasync: listing drift after sync: missing keys %v", diff.Missing)
+		return Result{Uploaded: len(keys), Bytes: uploadedBytes, Keys: keys, Diff: diff}, fmt.Errorf("mediasync: listing drift after sync: missing keys %v", diff.Missing)
 	}
-	return Result{Uploaded: len(keys), Keys: keys, Diff: diff}, nil
+	return Result{Uploaded: len(keys), Bytes: uploadedBytes, Keys: keys, Diff: diff}, nil
 }
 
 // DiffKeys returns Missing = expected−listed and Extra = listed−expected.
@@ -203,24 +214,33 @@ func objectKey(sourceRoot, absPath string) (string, error) {
 	return slash, nil
 }
 
-func putFile(ctx context.Context, client API, bucket, key, path string) error {
-	file, err := os.Open(path)
+func putFile(ctx context.Context, client API, root *os.Root, bucket, key, name string) (int64, error) {
+	before, err := root.Lstat(name)
 	if err != nil {
-		return fmt.Errorf("mediasync: open %s: %w", path, err)
+		return 0, err
+	}
+	if !before.Mode().IsRegular() {
+		return 0, fmt.Errorf("media file %q is not a regular file", name)
+	}
+	file, err := root.Open(name)
+	if err != nil {
+		return 0, err
 	}
 	defer file.Close()
-	// Seekable body required for AWS SDK v2 checksum middleware against Floci.
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("mediasync: seek %s: %w", path, err)
+	info, err := file.Stat()
+	if err != nil {
+		return 0, err
 	}
-	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: awssdk.String(bucket),
-		Key:    awssdk.String(key),
-		Body:   file,
-	}); err != nil {
-		return fmt.Errorf("mediasync: put s3://%s/%s: %w", bucket, key, err)
+	if !os.SameFile(before, info) {
+		return 0, fmt.Errorf("media file %q changed during upload", name)
 	}
-	return nil
+	_, err = client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: &bucket, Key: &key, Body: file, ContentLength: awssdk.Int64(info.Size()),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("put s3://%s/%s: %w", bucket, key, err)
+	}
+	return info.Size(), nil
 }
 
 func listAllKeys(ctx context.Context, client API, bucket, prefix string) ([]string, error) {
@@ -246,8 +266,8 @@ func listAllKeys(ctx context.Context, client API, bucket, prefix string) ([]stri
 			break
 		}
 		token = out.NextContinuationToken
-		if token == nil {
-			break
+		if token == nil || *token == "" {
+			return nil, errors.New("S3 returned a truncated media listing without a continuation token")
 		}
 	}
 	sort.Strings(keys)
