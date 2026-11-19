@@ -35,7 +35,7 @@ func withCacheInstallLock(ctx context.Context, lockPath string) (func(), error) 
 		}
 	}
 	return func() {
-		unix.Flock(fd, unix.LOCK_UN)
+		_ = unix.Flock(fd, unix.LOCK_UN)
 		file.Close()
 	}, nil
 }

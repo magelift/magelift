@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="$ROOT/build"
-COMPOSER_IMAGE="${MAGELIFT_COMPOSER_TEST_IMAGE:-docker.io/library/composer:2.10.3@sha256:af98f42dfff7c68ba8d53c2164fd9fde1087b7d449514baa38c418b1f6bc4bac}"
+COMPOSER_IMAGE="${MAGELIFT_COMPOSER_TEST_IMAGE:-docker.io/library/composer:2.11.2@sha256:0c8e663f14c94d07b3c45b175c51f5a14718508f21fe4dd7e54f09488dd0ed71}"
 mode="${1:-tests}"
 case "$mode" in tests | --lifecycle-golden | --artifact-manifest) ;; *) printf 'php-test: unknown mode %s\n' "$mode" >&2; exit 2 ;; esac
 

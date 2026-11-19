@@ -90,7 +90,7 @@ func databaseGrantStatement(databaseName, username string) (string, error) {
 	if hasControlCharacter(databaseName) || hasControlCharacter(username) {
 		return "", errors.New("database name and username must not contain control characters")
 	}
-	return fmt.Sprintf(
+	return fmt.Sprintf( //nolint:gocritic // MySQL identifiers require backticks, not Go string literals.
 		"GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%';",
 		escapeMySQLIdentifier(databaseName), escapeMySQLString(username),
 	), nil

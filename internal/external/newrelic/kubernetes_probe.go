@@ -207,7 +207,7 @@ func (probe *KubernetesCollectorSignalProbe) withPortForward(ctx context.Context
 		timer := time.NewTimer(5 * time.Second)
 		defer timer.Stop()
 		select {
-		case <-forwardErr:
+		case <-forwardErr: //nolint:errcheck // shutdown only waits for the forwarder to exit
 		case <-timer.C:
 		}
 	}()

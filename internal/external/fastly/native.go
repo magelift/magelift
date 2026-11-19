@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	fastlysdk "github.com/fastly/go-fastly/fastly"
+	fastlysdk "github.com/fastly/go-fastly/v19/fastly"
 	provider "github.com/magelift/magelift/internal/provider"
 )
 
@@ -309,7 +309,9 @@ func (c *SDKClient) DeleteDomain(ctx context.Context, serviceID string, version 
 }
 
 func (c *SDKClient) PurgeAll(ctx context.Context, serviceID string) (string, error) {
-	var purge fastlysdk.Purge
+	var purge struct {
+		ID string `json:"id"`
+	}
 	path := "/service/" + url.PathEscape(serviceID) + "/purge_all"
 	if err := c.decode(ctx, http.MethodPost, path, nil, nil, &purge); err != nil {
 		return "", err
@@ -577,7 +579,7 @@ func (c *SDKClient) decode(ctx context.Context, method, path string, body io.Rea
 	if ctx == nil {
 		return errors.New("Fastly API context is required")
 	}
-	request, err := c.client.RawRequest(method, path, &fastlysdk.RequestOptions{Body: body, Headers: headers})
+	request, err := c.client.RawRequest(ctx, method, path, fastlysdk.RequestOptions{Body: body, Headers: headers})
 	if err != nil {
 		return errors.New("build Fastly API request failed")
 	}

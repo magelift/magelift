@@ -6,6 +6,7 @@ namespace MageLift\Build\Lifecycle;
 
 use InvalidArgumentException;
 
+/** @psalm-api */
 final readonly class LifecycleHook
 {
     private const ID_PATTERN = '/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/D';

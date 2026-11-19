@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/memorystore"
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/networkconnectivity"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/memorystore"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/networkconnectivity"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

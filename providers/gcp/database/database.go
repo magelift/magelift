@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/compute"
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/secretmanager"
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/servicenetworking"
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/sql"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/compute"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/secretmanager"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/servicenetworking"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/sql"
 	"github.com/pulumi/pulumi-random/sdk/v4/go/random"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )

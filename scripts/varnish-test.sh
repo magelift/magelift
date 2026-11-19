@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-image="${MAGELIFT_VARNISH_IMAGE:-docker.io/library/varnish:8.0.2@sha256:4b595728592a5b9709c9aac15368ca492e9742fb269ed12466b434a62b2c1b63}"
+image="${MAGELIFT_VARNISH_IMAGE:-docker.io/library/varnish:8.0.2@sha256:d5cb7840d6dcff465031e52276f2113675cc8edbea1cc8d7e6f8e6cfd0f522a3}"
 backend="magelift-varnish-backend-$$"
 name="magelift-varnish-test-$$"
 network="magelift-varnish-net-$$"

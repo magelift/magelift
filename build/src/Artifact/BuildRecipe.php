@@ -6,6 +6,7 @@ namespace MageLift\Build\Artifact;
 
 use InvalidArgumentException;
 
+/** @psalm-api */
 final readonly class BuildRecipe
 {
     private const CHECKSUM_PATTERN = '/^[a-f0-9]{64}$/D';

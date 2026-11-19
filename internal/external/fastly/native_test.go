@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	fastlysdk "github.com/fastly/go-fastly/fastly"
+	fastlysdk "github.com/fastly/go-fastly/v19/fastly"
 	provider "github.com/magelift/magelift/internal/provider"
 )
 

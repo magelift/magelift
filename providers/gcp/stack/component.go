@@ -15,8 +15,8 @@ import (
 	"github.com/magelift/magelift/providers/gcp/observability"
 	"github.com/magelift/magelift/providers/gcp/runtime"
 	"github.com/magelift/magelift/providers/gcp/storage"
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp"
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/secretmanager"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/secretmanager"
 	"github.com/pulumi/pulumi-random/sdk/v4/go/random"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )

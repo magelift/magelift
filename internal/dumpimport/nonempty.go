@@ -39,7 +39,7 @@ func nonEmptyWith(ctx context.Context, runner mysqlRunner, database string) (boo
 // schemaReplace drops and recreates the target database so re-imports converge (D-04).
 func schemaReplace(ctx context.Context, runner mysqlRunner, database string) error {
 	db := escapeSQLIdent(database)
-	script := fmt.Sprintf("DROP DATABASE IF EXISTS `%s`; CREATE DATABASE `%s`;", db, db)
+	script := fmt.Sprintf("DROP DATABASE IF EXISTS `%s`; CREATE DATABASE `%s`;", db, db) //nolint:gocritic // MySQL identifiers require backticks.
 	stderr, err := runner.ExecSQL(ctx, "", strings.NewReader(script))
 	if err != nil {
 		msg := strings.TrimSpace(stderr)

@@ -2,7 +2,7 @@ package edge
 
 import (
 	"github.com/magelift/magelift/internal/edge/waf"
-	"github.com/pulumi/pulumi-gcp/sdk/v9/go/gcp/compute"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/compute"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 

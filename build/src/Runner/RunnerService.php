@@ -15,6 +15,7 @@ use MageLift\Build\Protocol\PrepareResponse;
 use MageLift\Build\Protocol\ProtocolJson;
 use RuntimeException;
 
+/** @psalm-api */
 final readonly class RunnerService
 {
     public function __construct(
