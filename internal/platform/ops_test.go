@@ -6,17 +6,12 @@ import (
 	"io"
 	"testing"
 
-	awsops "github.com/magelift/magelift/internal/cloud/aws/ops"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
 )
 
-func TestModuleOpsAWSAndGCP(t *testing.T) {
+func TestPluginModulePorts(t *testing.T) {
 	t.Parallel()
-	awsOps := platform.ModuleOps(awsops.Module{})
-	if awsOps == nil {
-		t.Fatal("AWS module must expose Ops")
-	}
 	gcp, err := providerhost.NewShimModule("gke-autopilot", providerhost.NewLazyClient(func(context.Context) (*providerhost.Client, error) {
 		return nil, errors.New("must not dial")
 	}))

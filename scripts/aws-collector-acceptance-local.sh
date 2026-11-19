@@ -266,7 +266,7 @@ AWS_PROFILE="$profile" AWS_REGION="$region" \
 MAGELIFT_AWS_COLLECTOR_QUERY_KEY="$query_key" \
 MAGELIFT_AWS_COLLECTOR_CREDENTIAL_REF="aws-secrets-manager://$secret_name" \
 MAGELIFT_AWS_COLLECTOR_SECRET_ARN="$secret_arn" \
-go run ./cmd/aws-collector-acceptance \
+go run ./providers/aws/tests/acceptance/cmd/aws-collector-acceptance \
 	--region "$region" \
 	--cluster "$cluster" \
 	--service "$service" \

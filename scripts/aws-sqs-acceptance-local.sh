@@ -109,7 +109,7 @@ for attempt in $(seq 1 30); do
 	sleep 2
 done
 
-go run ./cmd/aws-sqs-acceptance \
+go run ./providers/aws/tests/acceptance/cmd/aws-sqs-acceptance \
 	--region "$region" \
 	--source-url "$source_url" \
 	--marker "$marker" \

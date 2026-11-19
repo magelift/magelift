@@ -281,7 +281,7 @@ cleanup() {
 		fi
 	fi
 	if [[ -f "$state_path" && -n "$cert_arn" ]]; then
-		if ! go run ./cmd/aws-cloudfront-acceptance \
+		if ! go run ./providers/aws/tests/acceptance/cmd/aws-cloudfront-acceptance \
 			--profile "$profile" \
 			--marker "$marker" \
 			--domain "$domain" \
@@ -393,7 +393,7 @@ else
 fi
 
 go_cloudfront() {
-	go run ./cmd/aws-cloudfront-acceptance \
+	go run ./providers/aws/tests/acceptance/cmd/aws-cloudfront-acceptance \
 		--profile "$profile" \
 		--marker "$marker" \
 		--domain "$domain" \

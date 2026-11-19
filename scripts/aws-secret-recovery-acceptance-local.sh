@@ -104,7 +104,7 @@ fi
 bucket_created=1
 aws s3api put-public-access-block --bucket "$bucket" --region "$region" --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true >/dev/null
 
-(cd "$ROOT" && go run ./cmd/aws-secret-recovery-acceptance \
+(cd "$ROOT" && go run ./providers/aws/tests/acceptance/cmd/aws-secret-recovery-acceptance \
 	--region "$region" \
 	--secret-name "$secret_name" \
 	--marker "$marker" \

@@ -86,9 +86,7 @@ func TestUnsupportedAllowlistMethodsReturnSentinelAndZeroValues(t *testing.T) {
 
 func TestSharedDay2PortsAreNotErrNotSupported(t *testing.T) {
 	m := Module{}
-	if _, ok := m.State().(State); !ok {
-		t.Fatalf("State type = %T, want stack.State", m.State())
-	}
+
 	obs := m.RuntimeObserve()
 	if obs == nil {
 		t.Fatal("RuntimeObserve must return shared kube.Observe, not nil")

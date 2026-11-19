@@ -208,7 +208,7 @@ fi
 LIVE_CONFIG="$LIVE_WORKDIR/acceptance.json"
 source "$ROOT/scripts/acceptance-project.sh"
 MAGELIFT_CONFIG="$(realpath "$MAGELIFT_CONFIG")"
-(cd "$ROOT" && go run ./cmd/acceptance-project "$MAGELIFT_CONFIG") > "$LIVE_CONFIG"
+(cd "$ROOT" && go run ./tests/acceptance/cmd/acceptance-project "$MAGELIFT_CONFIG") > "$LIVE_CONFIG"
 acceptance_project_wrapper "$LIVE_WORKDIR"
 configured_project="$(yq -r ".environments.\"$profile\".project.name // .project.name // \"\"" "$LIVE_CONFIG")"
 if [[ -z "$configured_project" || "$configured_project" != "$project_tag" ]]; then

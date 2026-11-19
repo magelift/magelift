@@ -10,6 +10,7 @@ import (
 	ovhcost "github.com/magelift/magelift/internal/cloud/ovh/cost"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/s3state"
 )
 
 // unsupported covers remaining experimental gaps: Bootstrap and application
@@ -18,7 +19,7 @@ import (
 type unsupported struct{}
 
 func (Module) Bootstrap() platform.Bootstrap { return unsupported{} }
-func (Module) State() platform.State         { return State{} }
+func (Module) State() platform.State         { return s3state.Port(stateTarget) }
 func (m Module) Secrets() platform.Secrets {
 	if m.NewApplicationSecretClient == nil {
 		return unsupported{}
@@ -60,7 +61,7 @@ func (Module) Ops() platform.Ops { return Ops{} }
 func (Ops) AcquireLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
 	host, _ := os.Hostname()
 	owner := fmt.Sprintf("magelift-cli-%s-%d", host, os.Getpid())
-	return (State{}).Lock(ctx, planned, owner)
+	return s3state.Port(stateTarget).Lock(ctx, planned, owner)
 }
 
 func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {

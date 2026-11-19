@@ -762,7 +762,7 @@ if (( ready != 1 )); then
 	exit 1
 fi
 
-(cd "$ROOT" && MAGELIFT_AWS_RDS_ROOT_PASSWORD="$master_password" go run ./cmd/aws-database-recovery-acceptance \
+(cd "$ROOT" && MAGELIFT_AWS_RDS_ROOT_PASSWORD="$master_password" go run ./providers/aws/tests/acceptance/cmd/aws-database-recovery-acceptance \
 	--profile "$profile" \
 	--region "$region" \
 	--source-kind "$source_kind" \

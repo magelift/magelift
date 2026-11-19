@@ -21,7 +21,7 @@ grep -Fq 'cloudfront_owned_distribution_count' "$SCRIPT"
 grep -Fq 'carry magelift ownership comments' "$SCRIPT"
 grep -Fq 'aws acm delete-certificate' "$SCRIPT"
 grep -Fq 'cloudfront_acceptance_dns_cleanup_validation' "$SCRIPT"
-grep -Fq 'go run ./cmd/aws-cloudfront-acceptance' "$SCRIPT"
+grep -Fq 'go run ./providers/aws/tests/acceptance/cmd/aws-cloudfront-acceptance' "$SCRIPT"
 grep -Fq 'go run ./cmd/magento-waf-rules' "$SCRIPT"
 grep -Fq 'cloudfront_verify_magento_waf' "$SCRIPT"
 grep -Fq 'bodyInspection=KB_64' "$SCRIPT"
@@ -31,8 +31,8 @@ grep -Fq 'MAGELIFT_AWS_CLOUDFRONT_FAILOVER' "$SCRIPT"
 grep -Fq -- '--phase failover' "$SCRIPT"
 grep -Fq 'failover-https' "$SCRIPT"
 grep -Fq 'LC_ALL=C' "$SCRIPT"
-grep -Fq 'NativeProvider:  "cloudfront"' "$ROOT/cmd/aws-cloudfront-acceptance/main.go"
-if grep -Fq 'cloudfront-waf' "$ROOT/cmd/aws-cloudfront-acceptance/main.go"; then
+grep -Fq 'NativeProvider:  "cloudfront"' "$ROOT/providers/aws/tests/acceptance/cmd/aws-cloudfront-acceptance/main.go"
+if grep -Fq 'cloudfront-waf' "$ROOT/providers/aws/tests/acceptance/cmd/aws-cloudfront-acceptance/main.go"; then
 	printf 'CloudFront acceptance must not use cloudfront-waf\n' >&2
 	exit 1
 fi

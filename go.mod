@@ -8,25 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.48.0
 	github.com/aws/aws-sdk-go-v2/config v1.33.20
 	github.com/aws/aws-sdk-go-v2/credentials v1.21.2
-	github.com/aws/aws-sdk-go-v2/service/budgets v1.53.9
-	github.com/aws/aws-sdk-go-v2/service/cloudfront v1.75.6
-	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.76.0
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.92.2
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.349.0
-	github.com/aws/aws-sdk-go-v2/service/ecs v1.106.0
-	github.com/aws/aws-sdk-go-v2/service/eks v1.105.6
-	github.com/aws/aws-sdk-go-v2/service/elasticache v1.66.0
-	github.com/aws/aws-sdk-go-v2/service/iam v1.67.0
-	github.com/aws/aws-sdk-go-v2/service/kms v1.63.0
-	github.com/aws/aws-sdk-go-v2/service/mq v1.45.12
-	github.com/aws/aws-sdk-go-v2/service/opensearch v1.88.1
-	github.com/aws/aws-sdk-go-v2/service/pricing v1.51.6
-	github.com/aws/aws-sdk-go-v2/service/rds v1.133.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.116.0
-	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.51.0
-	github.com/aws/aws-sdk-go-v2/service/sqs v1.53.0
-	github.com/aws/aws-sdk-go-v2/service/ssm v1.83.0
-	github.com/aws/aws-sdk-go-v2/service/sts v1.52.0
 	github.com/aws/smithy-go v1.28.9
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/fastly/go-fastly/v19 v19.3.1
@@ -38,7 +20,6 @@ require (
 	github.com/ovh/okms-sdk-go v0.5.5
 	github.com/ovh/pulumi-ovh/sdk/v2 v2.22.0
 	github.com/pandatix/go-cvss v0.6.4
-	github.com/pulumi/pulumi-aws/sdk/v7 v7.55.0
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.34.3
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.6
 	github.com/pulumi/pulumi/sdk/v3 v3.277.0
@@ -77,6 +58,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/signin v1.14.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.39.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.44.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.52.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

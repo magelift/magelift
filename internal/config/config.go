@@ -600,7 +600,7 @@ var arm64NatInstanceType = regexp.MustCompile(`^(?:a1|[a-z0-9]+g[a-z0-9]*)\.[a-z
 var awsClockWindow = regexp.MustCompile(`^(?:[01][0-9]|2[0-3]):[0-5][0-9]-(?:[01][0-9]|2[0-3]):[0-5][0-9]$`)
 var awsMaintenanceWindow = regexp.MustCompile(`(?i)^(?:mon|tue|wed|thu|fri|sat|sun):(?:[01][0-9]|2[0-3]):[0-5][0-9]-(?:mon|tue|wed|thu|fri|sat|sun):(?:[01][0-9]|2[0-3]):[0-5][0-9]$`)
 
-func validateAWSTarget(c Config) []string {
+func ValidateAWSTarget(c Config) []string {
 	if c.Target.AWS == nil {
 		return nil
 	}
@@ -686,7 +686,7 @@ func validate(c Config) (CompatibilityAssessment, error) {
 		default:
 			problems = append(problems, "target.runtime must be ecs-fargate or eks when provider is aws")
 		}
-		problems = append(problems, validateAWSTarget(c)...)
+		problems = append(problems, ValidateAWSTarget(c)...)
 		problems = append(problems, validateAWSRuntimeCatalog(c)...)
 	case "gcp":
 		if c.Target.Runtime != "gke-autopilot" && c.Target.Runtime != "gke-standard" {

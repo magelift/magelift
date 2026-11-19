@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	awsendpoint "github.com/magelift/magelift/internal/awsendpoint"
 	"github.com/magelift/magelift/internal/cleanup"
 	internalcli "github.com/magelift/magelift/internal/cli"
-	awsendpoint "github.com/magelift/magelift/internal/awsendpoint"
 	ovhresilience "github.com/magelift/magelift/internal/cloud/ovh/resilience"
 	"github.com/magelift/magelift/internal/cloud/scaleway/resilience"
 	"github.com/magelift/magelift/internal/platform"
@@ -35,7 +35,7 @@ func registerHooks(gcpDialer, awsDialer *providerhost.CachedDialer) internalcli.
 			awsDialer.Close()
 		},
 		NewComposerSecrets: func(ctx context.Context, region string) (internalcli.ComposerSecretProvider, error) {
-		return awsComposerSecretAdapter{dialer: awsDialer, envelope: sdk.Envelope{Region: region}}, nil
+			return awsComposerSecretAdapter{dialer: awsDialer, envelope: sdk.Envelope{Region: region}}, nil
 		},
 		NewComposerGCPSecrets: func(ctx context.Context) (internalcli.ComposerSecretProvider, error) {
 			client, err := gcpDialer.Do(ctx)
@@ -63,7 +63,7 @@ func registerHooks(gcpDialer, awsDialer *providerhost.CachedDialer) internalcli.
 }
 
 type awsComposerSecretAdapter struct {
-	dialer  *providerhost.CachedDialer
+	dialer   *providerhost.CachedDialer
 	envelope sdk.Envelope
 }
 

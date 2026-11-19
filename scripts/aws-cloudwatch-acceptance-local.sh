@@ -99,5 +99,5 @@ AWS_PROFILE="$profile" AWS_REGION="$region" aws sts get-caller-identity >/dev/nu
 acceptance_prepare_lifecycle
 acceptance_start_ttl_watchdog "$ACCEPTANCE_TTL_SECONDS" "$ttl_marker"
 cleanup_enabled=1
-(cd "$ROOT" && go run ./cmd/aws-cloudwatch-acceptance --profile "$profile" --region "$region" --marker "$marker")
+(cd "$ROOT" && go run ./providers/aws/tests/acceptance/cmd/aws-cloudwatch-acceptance --profile "$profile" --region "$region" --marker "$marker")
 printf 'AWS CloudWatch acceptance resources cleaned through exact owning-service inventory marker=%s\n' "$marker"

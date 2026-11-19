@@ -10,6 +10,7 @@ import (
 	scalewaycost "github.com/magelift/magelift/internal/cloud/scaleway/cost"
 	deployflow "github.com/magelift/magelift/internal/deploy"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/s3state"
 )
 
 // unsupported covers the remaining experimental gap: Bootstrap only.
@@ -17,7 +18,7 @@ import (
 type unsupported struct{}
 
 func (Module) Bootstrap() platform.Bootstrap { return unsupported{} }
-func (Module) State() platform.State         { return State{} }
+func (Module) State() platform.State         { return s3state.Port(stateTarget) }
 func (Module) Secrets() platform.Secrets     { return Secrets{} }
 func (Module) RuntimeObserve() platform.RuntimeObserve {
 	return kube.NewObserveWithFactory(kube.ClientFromOutputs)
@@ -46,7 +47,7 @@ func (Module) Ops() platform.Ops { return Ops{} }
 func (Ops) AcquireLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
 	host, _ := os.Hostname()
 	owner := fmt.Sprintf("magelift-cli-%s-%d", host, os.Getpid())
-	return (State{}).Lock(ctx, planned, owner)
+	return s3state.Port(stateTarget).Lock(ctx, planned, owner)
 }
 
 func (o Ops) NewDeploySteps(ctx context.Context, backend any, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
