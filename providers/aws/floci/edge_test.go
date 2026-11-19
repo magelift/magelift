@@ -20,9 +20,9 @@ import (
 
 func TestAWSPluginPurgesOnlyItsCloudFrontDistribution(t *testing.T) {
 	endpoint := flociEndpoint(t)
+	plugin := awsFlociPlugin(t, endpoint, sdk.OpPlan, sdk.OpEdgePlan, sdk.OpEdgeExecute)
 	ctx, cancel := context.WithTimeout(t.Context(), 75*time.Second)
 	defer cancel()
-	plugin := awsFlociPlugin(t, endpoint, sdk.OpPlan, sdk.OpEdgePlan, sdk.OpEdgeExecute)
 	module, err := providerhost.NewLazyProviderShimModule("aws", "ecs-fargate", platform.TierBuiltIn, nil, plugin.Do)
 	if err != nil {
 		t.Fatal(err)
