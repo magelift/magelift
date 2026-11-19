@@ -591,7 +591,11 @@ jobs:
         with:
           distribution: goreleaser
           version: v2.20.2
-          args: check
+          install-only: true
+      - name: Check both release configurations
+        run: |
+          goreleaser check -f .goreleaser.yaml
+          goreleaser check -f .goreleaser.dialproof.yaml
 
   workflow-lint:
     needs: changes
