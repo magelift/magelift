@@ -312,7 +312,7 @@ func publicPlanRequest(cfg config.Config, environment string, opts PlanOptions) 
 		PurgePolicyRef:    cfg.Edge.PurgePolicyRef,
 		WAFPolicyRef:      cfg.Edge.WAFPolicyRef,
 		FailoverPolicyRef: cfg.Edge.FailoverPolicyRef,
-		OwnershipMarker:   edgeOwnershipMarker(cfg, environment),
+		OwnershipMarker:   EdgeOwnershipMarker(cfg, environment),
 	}
 	if health := cfg.Edge.Health; health != nil {
 		edge.Health = sdk.EdgeHealthIntent{
@@ -510,13 +510,6 @@ func externalObservabilityProvider(cfg config.Config) string {
 
 func architectureOwnershipMarker(cfg config.Config, environment string) string {
 	return "magelift/architecture/" + stableProfileID(cfg.Target.Provider, cfg.Project.Name, environment)
-}
-
-func edgeOwnershipMarker(cfg config.Config, environment string) string {
-	if marker := strings.TrimSpace(cfg.Edge.OwnershipMarker); marker != "" {
-		return marker
-	}
-	return "magelift/edge/" + stableProfileID(cfg.Target.Provider, cfg.Project.Name, environment)
 }
 
 func observabilitySignals(value config.ObservabilityConfig) []string {

@@ -17,7 +17,7 @@ func EdgeIntentFromConfig(cfg config.Config, environment string) (sdk.EdgeIntent
 		Mode: edgeMode(cfg.Edge), NativeProvider: cfg.Edge.NativeProvider, CredentialRefs: stringSlice(cfg.Edge.TokenSecret), ServiceReference: cfg.Edge.ServiceID,
 		Domains: append([]string(nil), cfg.Edge.Domains...), TLS: cfg.Edge.TLS, TLSMode: cfg.Edge.TLSMode, DNSMode: cfg.Edge.DNSMode, PurgeOnDeploy: cfg.Edge.PurgeOnDeploy,
 		PolicyReference: cfg.Edge.VCLRef, OriginHealthRef: cfg.Edge.OriginHealthRef, CachePolicyRef: cfg.Edge.CachePolicyRef, PurgePolicyRef: cfg.Edge.PurgePolicyRef,
-		WAFPolicyRef: cfg.Edge.WAFPolicyRef, FailoverPolicyRef: cfg.Edge.FailoverPolicyRef, OwnershipMarker: edgeOwnershipMarker(cfg, environment),
+		WAFPolicyRef: cfg.Edge.WAFPolicyRef, FailoverPolicyRef: cfg.Edge.FailoverPolicyRef, OwnershipMarker: EdgeOwnershipMarker(cfg, environment),
 	}
 	if health := cfg.Edge.Health; health != nil {
 		intent.Health = sdk.EdgeHealthIntent{
@@ -58,4 +58,12 @@ func nativeEdgeMatchesTarget(provider, target string) bool {
 	default:
 		return false
 	}
+}
+
+// EdgeOwnershipMarker identifies the shop environment in managed edge resources.
+func EdgeOwnershipMarker(cfg config.Config, environment string) string {
+	if marker := strings.TrimSpace(cfg.Edge.OwnershipMarker); marker != "" {
+		return marker
+	}
+	return "magelift/edge/" + stableProfileID(cfg.Target.Provider, cfg.Project.Name, environment)
 }

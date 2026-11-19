@@ -166,3 +166,34 @@ func TestAttachedDatabaseSurvivesTeardownPlanning(t *testing.T) {
 		t.Fatal("edited adoption report accepted")
 	}
 }
+
+func TestECSPlanRetainsExplicitEdgeAndTelemetry(t *testing.T) {
+	req := shopRequest(t, "ecs-fargate")
+	req.UseProviderDefaultEdge = false
+	req.Edge = sdk.EdgeIntent{
+		Mode: "both", NativeProvider: "cloudfront-waf", ExternalProvider: "fastly",
+		OriginHealthRef: "shop/health", OwnershipMarker: "magelift/shop/staging", CredentialRefs: []string{"aws-secrets-manager://edge-api"},
+		Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+	}
+	req.Observability = sdk.ObservabilityIntent{
+		NativeProvider: "cloudwatch", ExternalProvider: "newrelic", OwnershipMarker: "magelift/shop/staging", CredentialRefs: []string{"aws-secrets-manager://collector-key"},
+		Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+	}
+	var result sdk.PlanResult
+	if err := new(Server).Plan(req, &result); err != nil || result.Error != nil {
+		t.Fatalf("explicit AWS edge and telemetry: %v %v", err, result.Error)
+	}
+	body, _, _, err := checked(req.Envelope, result.Plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body.ECS.Edge.OriginHealthRef != req.Edge.OriginHealthRef || body.ECS.Edge.ExternalProvider != "fastly" ||
+		len(body.ECS.Observability.CredentialRefs) != 1 || body.ECS.Observability.CredentialRefs[0] != req.Observability.CredentialRefs[0] {
+		t.Fatal("AWS changed the declared edge or telemetry settings")
+	}
+	req.Edge.OriginHealthRef = ""
+	result = sdk.PlanResult{}
+	if err := new(Server).Plan(req, &result); err != nil || result.Error == nil {
+		t.Fatalf("expected validation of the full edge intent: %v %v", err, result.Error)
+	}
+}

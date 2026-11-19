@@ -58,23 +58,15 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	if err := platform.ValidateFirstPartyObservability(cfg); err != nil {
 		return Spec{}, err
 	}
-	observability, err := platform.ObservabilityIntentFromConfig(cfg, environment)
+	intents, err := resolveDeploymentIntents(cfg, environment, options.Intents)
 	if err != nil {
 		return Spec{}, err
 	}
-	edgeIntent, err := platform.EdgeIntentFromConfig(cfg, environment)
-	if err != nil {
-		return Spec{}, err
+	edgeIntent := intents.Edge
+	if edgeIntent.OwnershipMarker == "" {
+		edgeIntent.OwnershipMarker = platform.EdgeOwnershipMarker(cfg, environment)
 	}
-	useDefaultEdge := strings.TrimSpace(cfg.Edge.Mode) == "" && strings.TrimSpace(cfg.Edge.NativeProvider) == "" && strings.TrimSpace(cfg.Edge.ExternalProvider) == ""
-	if inputs := options.Intents; inputs != nil {
-		ownership := edgeIntent.OwnershipMarker
-		edgeIntent, observability, useDefaultEdge = inputs.Edge, inputs.Observability, inputs.UseDefaultEdge
-		if edgeIntent.OwnershipMarker == "" {
-			edgeIntent.OwnershipMarker = ownership
-		}
-	}
-	if useDefaultEdge {
+	if intents.UseDefaultEdge {
 		edgeIntent = defaultAWSEdgeIntent(edgeIntent, cfg.Domain)
 	}
 	aws := cfg.Target.AWS
@@ -161,7 +153,7 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		Policy:        NetworkPolicy{VPCCIDR: cidr, AvailabilityZones: append([]string(nil), aws.AvailabilityZones...), MediaDomain: aws.MediaDomain, ApplicationDomain: cfg.Domain, NatMode: natMode, NatTopology: natTopology, NatReplacementMode: natReplacementMode, NatInstanceType: aws.NatInstanceType},
 		Catalog:       catalogFromConfig(aws.Catalog, preset),
 		Edge:          edgeIntent,
-		Observability: observability,
+		Observability: intents.Observability,
 		Email:         emailSpecFromConfig(cfg),
 	}
 	if pool := aws.PreviewPool; pool != nil {
@@ -233,6 +225,26 @@ func emailSpecFromConfig(cfg config.Config) EmailSpec {
 		HostedZoneID: cfg.Email.Managed.HostedZoneID,
 		From:         cfg.Email.From,
 	}
+}
+
+func resolveDeploymentIntents(cfg config.Config, environment string, supplied *ResolvedIntents) (ResolvedIntents, error) {
+	if supplied != nil {
+		// The host has already resolved secret references, routing and telemetry.
+		// The complete values are validated with the rest of the stack spec.
+		return *supplied, nil
+	}
+	edge, err := platform.EdgeIntentFromConfig(cfg, environment)
+	if err != nil {
+		return ResolvedIntents{}, err
+	}
+	observability, err := platform.ObservabilityIntentFromConfig(cfg, environment)
+	if err != nil {
+		return ResolvedIntents{}, err
+	}
+	return ResolvedIntents{
+		Edge: edge, Observability: observability,
+		UseDefaultEdge: strings.TrimSpace(cfg.Edge.Mode) == "" && strings.TrimSpace(cfg.Edge.NativeProvider) == "" && strings.TrimSpace(cfg.Edge.ExternalProvider) == "",
+	}, nil
 }
 
 func defaultAWSEdgeIntent(intent sdk.EdgeIntent, domain string) sdk.EdgeIntent {
