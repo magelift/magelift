@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -101,7 +100,7 @@ func TestPortHelpersNameTargetAndTier(t *testing.T) {
 			if err == nil || ExitCode(err) != 2 {
 				t.Fatalf("error/code = %v/%d", err, ExitCode(err))
 			}
-			want := tt.surface + " is not supported for target aws/ecs-fargate yet (certified)"
+			want := tt.surface + " is not supported for target aws/ecs-fargate yet (built-in)"
 			if err.Error() != want {
 				t.Fatalf("message = %q, want %q", err.Error(), want)
 			}
@@ -214,7 +213,7 @@ func TestHealthRuntimeErrNotSupportedNamesTier(t *testing.T) {
 	if err == nil || ExitCode(err) != healthExitUnavailable {
 		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
 	}
-	want := "runtime health is not supported for target aws/ecs-fargate yet (certified)"
+	want := "runtime health is not supported for target aws/ecs-fargate yet (built-in)"
 	if !strings.Contains(out.String(), want) {
 		t.Fatalf("health check message must name surface/target/tier; got: %s", out.String())
 	}
@@ -247,8 +246,8 @@ environments:
     monthlyBudgetCents: 250000
 extensions: {}
 `
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "magelift.php")
+	if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return path

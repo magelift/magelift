@@ -20,7 +20,7 @@ func TestMapACCSupportedFixture(t *testing.T) {
 		t.Fatalf("supported ACC must have zero unmapped, got %#v", result.Unmapped)
 	}
 	if strings.Contains(string(result.YAML), "synthetic-crypt-must-not-leak") {
-		t.Fatal("crypt plaintext leaked into generated magelift.yaml")
+		t.Fatal("generated project contains the plaintext encryption key")
 	}
 	file, err := config.Load(result.YAML)
 	if err != nil {
@@ -76,7 +76,7 @@ func TestMapUpsunSupportedFixture(t *testing.T) {
 		t.Fatalf("supported Upsun fixture must have zero unmapped keys, got %#v", result.Unmapped)
 	}
 	if strings.Contains(string(result.YAML), "upsun-crypt-must-not-leak") {
-		t.Fatal("crypt plaintext leaked into generated magelift.yaml")
+		t.Fatal("generated project contains the plaintext encryption key")
 	}
 	file, err := config.Load(result.YAML)
 	if err != nil {
@@ -100,8 +100,8 @@ func TestMapUpsunSupportedFixture(t *testing.T) {
 		"strategy: standard",
 		"threads: 4",
 		"encryptionKeySecretArn:",
-		"searchMode:",
-		"queueMode:",
+		"family: opensearch",
+		"family: rabbitmq",
 		"domain: preview.example.com",
 		"frontName: admin_upsun",
 	} {
@@ -203,7 +203,7 @@ func TestFastlyServiceEmitsMigrationIntentWithoutSecrets(t *testing.T) {
 	if len(unmapped) != 2 || unmapped[0].Path != "fastly.serviceId" || unmapped[1].Path != "fastly.tokenSecret" {
 		t.Fatalf("unmapped Fastly setup = %#v", unmapped)
 	}
-	if !serviceMapped("fastly", "fastly:1.0") {
+	if !relationshipMapped("fastly", "fastly:1.0") {
 		t.Fatal("Fastly service was not recognized")
 	}
 }
@@ -298,10 +298,10 @@ func TestPaaSDisabledExtensionsRemainExplicitlyUnmapped(t *testing.T) {
 }
 
 func TestSidecarPath(t *testing.T) {
-	if got := SidecarPath("/tmp/magelift.yaml"); got != "/tmp/magelift.unmapped.md" {
-		t.Fatalf("SidecarPath magelift.yaml = %q", got)
+	if got := SidecarPath("/tmp/magelift.php"); got != "/tmp/magelift.unmapped.md" {
+		t.Fatalf("SidecarPath magelift.php = %q", got)
 	}
-	if got := SidecarPath("/tmp/review.magelift.yaml"); got != "/tmp/review.magelift.unmapped.md" {
+	if got := SidecarPath("/tmp/review.magelift.php"); got != "/tmp/review.magelift.unmapped.md" {
 		t.Fatalf("SidecarPath config-out = %q", got)
 	}
 }

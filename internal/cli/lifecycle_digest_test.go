@@ -7,13 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/projectphp"
 	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -79,18 +79,28 @@ func (p *digestProbe) Plan(cfg config.Config, environment string, opts platform.
 
 func writeFreshGCPConfig(t *testing.T, imageDigest string) (string, []byte) {
 	t.Helper()
-	body := fmt.Sprintf(minimalGCPStarterTemplate, strconv.Quote("shop"), "open-source", "2.4.8-p5")
-	body = strings.Replace(body, "php: \"8.5\"", "php: \"8.4\"", 1)
-	if imageDigest != "" {
-		needle := "    project: example-gcp-project\n"
-		body = strings.Replace(body, needle, needle+"    imageDigest: "+imageDigest+"\n", 1)
-	}
-	data := []byte(body)
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	document, err := starterDocument("gcp", inspectedShop{ProjectName: "shop", Edition: "open-source", Version: "2.4.8-p5"})
+	if err != nil {
 		t.Fatal(err)
 	}
-	return path, data
+	document["environments"] = map[string]any{"test": map[string]any{"class": "staging", "preset": "preview", "domain": "test.example.invalid"}}
+	if imageDigest != "" {
+		target := document["target"].(map[string]any)
+		target["gcp"].(map[string]any)["imageDigest"] = imageDigest
+	}
+	data, err := projectphp.Render(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "magelift.php")
+	if err := writeTestProjectFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return path, original
 }
 
 func digestDeployOptions(t *testing.T, path string, probe *digestProbe) *options {
@@ -279,6 +289,7 @@ func TestDeployPlanNeverSetsRuntimeObserve(t *testing.T) {
 func TestConfigWithImageDigestCopiesEveryTarget(t *testing.T) {
 	aws := &config.AWSTarget{ImageDigest: "aws-old", VPCCIDR: "10.0.0.0/16", AvailabilityZones: []string{"eu-west-3a"}}
 	gcp := &config.GCPTarget{Project: "example-gcp-project", ImageDigest: "gcp-old", Labels: map[string]string{"k": "v"}}
+	azure := &config.AzureTarget{ResourceGroup: "shop"}
 	ovh := &config.OVHTarget{ServiceName: "project", ImageDigest: "ovh-old"}
 	scw := &config.ScalewayTarget{ProjectID: "project", ImageDigest: "scw-old"}
 	for _, test := range []struct {
@@ -307,6 +318,16 @@ func TestConfigWithImageDigestCopiesEveryTarget(t *testing.T) {
 				}
 				if after.Target.GCP.ImageDigest != freshDeployDigest || after.Target.GCP.Project != "example-gcp-project" || after.Target.GCP.Labels["k"] != "v" {
 					t.Fatalf("gcp copy = %#v", after.Target.GCP)
+				}
+			},
+		},
+		{
+			name: "azure",
+			cfg:  config.Config{Target: config.Target{Provider: "azure", Azure: azure}},
+			mutate: func(before, after config.Config) {
+				if azure.ImageDigest != "" || before.Target.Azure != azure || after.Target.Azure == azure ||
+					after.Target.Azure.ImageDigest != freshDeployDigest || after.Target.Azure.ResourceGroup != "shop" {
+					t.Fatalf("Azure digest override changed the wrong target: %#v", after.Target.Azure)
 				}
 			},
 		},

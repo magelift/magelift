@@ -205,8 +205,11 @@ LIVE_WORKDIR="$MAGELIFT_AWS_ACCEPTANCE_DIR"
 else
 	LIVE_WORKDIR=$(mktemp -d "${TMPDIR:-/tmp}/magelift-aws-acceptance.XXXXXX")
 fi
-LIVE_CONFIG="$LIVE_WORKDIR/magelift.yaml"
-cp "$MAGELIFT_CONFIG" "$LIVE_CONFIG"
+LIVE_CONFIG="$LIVE_WORKDIR/acceptance.json"
+source "$ROOT/scripts/acceptance-project.sh"
+MAGELIFT_CONFIG="$(realpath "$MAGELIFT_CONFIG")"
+(cd "$ROOT" && go run ./cmd/acceptance-project "$MAGELIFT_CONFIG") > "$LIVE_CONFIG"
+acceptance_project_wrapper "$LIVE_WORKDIR"
 configured_project="$(yq -r ".environments.\"$profile\".project.name // .project.name // \"\"" "$LIVE_CONFIG")"
 if [[ -z "$configured_project" || "$configured_project" != "$project_tag" ]]; then
 	printf 'MAGELIFT_AWS_ACCEPTANCE_PROJECT_TAG must exactly match the configured project.name (%s); got %s\n' "$configured_project" "$project_tag" >&2
@@ -277,7 +280,7 @@ cleanup_workdir() {
 	rm -rf "$LIVE_WORKDIR"
 }
 
-config=("$MAGELIFT_BIN" --config "$LIVE_CONFIG" --env "$profile" --no-interaction --output json)
+config=("$MAGELIFT_BIN" --config "$LIVE_WORKDIR/magelift.php" --env "$profile" --no-interaction --output json)
 run() {
 	printf '+ magelift %s\n' "$*" >&2
 	"${config[@]}" "$@"

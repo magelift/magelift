@@ -1,5 +1,5 @@
 // Package skills_test holds the cross-track drift guard: it resolves every
-// `magelift ...` command span and every dotted YAML key span in the five user
+// `magelift ...` command span and every dotted project key span in the five user
 // skills against the real Cobra tree and the generated JSON schema, checks the
 // AGENTS.md router table against the skill dirs, and asserts the embed
 // boundary that keeps contributor runbooks out of the binary.
@@ -216,7 +216,7 @@ func TestCommandSpansResolveAgainstCobraTree(t *testing.T) {
 
 var dottedKeyPattern = regexp.MustCompile("`([A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)+)`")
 
-func TestYamlKeysResolveAgainstSchema(t *testing.T) {
+func TestProjectKeysResolveAgainstSchema(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "schema", "magelift.schema.json"))
 	if err != nil {
@@ -231,7 +231,7 @@ func TestYamlKeysResolveAgainstSchema(t *testing.T) {
 		text := readSkill(t, root, name)
 		for _, match := range dottedKeyPattern.FindAllStringSubmatch(text, -1) {
 			key := match[1]
-			if key == "magelift.yaml" || strings.Contains(key, "/") {
+			if strings.HasSuffix(key, ".php") || strings.Contains(key, "/") {
 				continue
 			}
 			checked++
@@ -241,9 +241,9 @@ func TestYamlKeysResolveAgainstSchema(t *testing.T) {
 		}
 	}
 	if checked == 0 {
-		t.Fatal("no YAML key spans found; extractor is blind")
+		t.Fatal("no project key spans found; extractor is blind")
 	}
-	t.Logf("resolved %d YAML key span(s)", checked)
+	t.Logf("resolved %d project key span(s)", checked)
 }
 
 func resolveSchemaKey(schema map[string]any, segments []string) bool {

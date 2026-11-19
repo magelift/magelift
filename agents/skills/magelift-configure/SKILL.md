@@ -1,7 +1,7 @@
 ---
 name: magelift-configure
 description: >-
-  Configure MageLift YAML and choose an Adobe-compatible architecture. Use when
+  Configure a MageLift PHP project and choose Magento services. Use when
   selecting PHP, database, search, queue, cache, Varnish, edge, or provider options.
 version: 1.0.0
 ---
@@ -16,43 +16,37 @@ Use this skill before preview or deploy when the service shape is changing.
 - Use the latest patch record for 2.4.7 through 2.4.9. Do not use a version range. Magento 2.4.6 is unavailable because it requires PHP 8.2.
 - Separate three facts: Adobe lists the service, MageLift implements the service,
   and the selected provider exposes the required product.
-- Keep `compatibility.allowUnsupported` off unless the exception is deliberate,
-  documented, and visible in the planned artifact.
-- Prefer database-backed queues, no managed search, and small replicas for
-  disposable previews.
-- AWS Magento env must match MageLift's product contract for the selected
-  YAML: writer host + secret JSON for RDS/Aurora; provisioned OpenSearch is
-  in-VPC HTTPS Magento can query (no SigV4 sidecar); AOSS still needs a SigV4
-  sidecar. Private sibling shops may illustrate one of those shapes. They are
-  not the only target and they do not certify a cell.
+- Treat the catalog as a dated recommendation. Review warnings for choices outside the snapshot; provider and implementation constraints still apply.
+- Review the selected service versions and provider adapter. Existing and
+  external services need an endpoint and any required secret reference.
+- Disposable previews can use smaller capacity than production. Keep their
+  data and credentials separate unless the operator explicitly chooses otherwise.
 
 ## Start from an existing shop
 
 Run `magelift init` from the shop repository root (the parent of `--config`).
 It requires composer.json, composer.lock, and `bin/magento`, reads the
 locked Magento metapackage (or `magento/magento2-base` for source checkouts),
-and writes a minimal single-environment starter on GCP by default. It does not
+and writes staging, UAT, production and preview environments on GCP by default. It does not
 read `app/etc/env.php`, auth.json, or execute shop scripts; existing
-`app/etc/config.php` is optional and unchanged. Use `--provider aws` for the
-experimental AWS starter. If the locked release is outside the compatibility
-catalog or needs a PHP branch other than 8.5, `init` exits before writing;
-author YAML manually with the right `build.php` instead. After a successful
-`init`, review placeholders, commit `magelift.yaml`, then run
-`magelift bootstrap --env test`.
+`app/etc/config.php` is optional and unchanged. Use `--provider aws` for ECS
+Fargate or `--provider azure` for AKS. `init` selects a PHP branch for a known
+release and defaults to PHP 8.5 for an unknown line. The bundled nginx-fpm
+recipe builds PHP 8.3, 8.4 or 8.5 according to `build.php`. Review placeholders,
+commit `magelift.php`, then bootstrap the environment you intend to use.
 
-For GCP MySQL 8.4, the default tier remains Enterprise Plus N2. An explicit
-`target.gcp.cloudSqlTier: db-custom-2-7680` selects Enterprise dedicated core
-with 2 vCPUs and 7680 MB memory. Custom sizes are validated, and regional support
-does not guarantee capacity. Shared-core and N4 custom tiers are outside this
-override. Preview an explicit tier change on an existing Plus database and test
-outside production: an edition downgrade can cause downtime. No automatic tier
-change follows a stockout.
+The project file is executable PHP. Review it before running MageLift, as you
+would any other code from a repository. Environment commands write managed
+changes to the adjacent `magelift.environments.php`; keep it with the project
+in version control when those changes are needed by CI.
+
+Check provider constraints and preview capacity changes before applying them.
+An available service version does not guarantee regional capacity.
 
 ## Build the shop
 
-Run `magelift build` from the shop repository after committing YAML, the Composer
-lock and existing module configuration. The default community recipe is PHP 8.5
-with nginx-fpm on Linux amd64. Recipes and pinned upstream inputs ship with
+Run `magelift build` from the shop repository after committing the PHP project, the Composer
+lock and existing module configuration. The bundled nginx-fpm recipe supports PHP 8.3, 8.4, and 8.5 on Linux amd64. Recipes and pinned upstream inputs ship with
 the CLI. The user's Docker engine/CI builds the builder, runtime and application
 images. Local builds do not publish. `magelift build --push --image <registry>/<repository>:<tag>`
 publishes the application into that user-owned repository and signs it.
@@ -90,8 +84,8 @@ path; stderr announces the scope when `magelift build` runs.
 magelift compatibility catalog 2.4.8-p5
 magelift compatibility validate --release 2.4.8-p5 \
   --component search --option elasticsearch --version 8
-magelift --config magelift.yaml --env staging config validate
-magelift --config magelift.yaml --env staging preview
+magelift --config magelift.php --env staging config validate
+magelift --config magelift.php --env staging preview
 ```
 
 If a choice is Adobe-supported but the target reports unavailable, do not mark
@@ -113,9 +107,20 @@ explicit --magelift-version naming an available signed release. A single test
 environment uses push or manual dispatch without production selection inputs.
 Keep generated build results and credential files outside the checkout when
 customizing CI. The build requires a clean committed Git source.
-An untagged MAGELIFT_RELEASE_IMAGE repository gets the source GITHUB_SHA tag;
+An untagged MAGELIFT_RELEASE_IMAGE repository gets the selected source SHA tag;
 an explicitly tagged destination is preserved, including registries with ports.
 Artifact handoff uses repository@sha256 references: the publication tag is
 removed from the reference passed to deploy, while its digest stays unchanged.
 The generated build job installs a pinned Docker Engine before Buildx; it
 does not depend on the runner image's older bundled Docker version.
+
+The generated workflow validates pull requests without cloud credentials. A
+reviewer applies `magelift-preview` to a same-repository PR targeting `main`
+to build its current head. That build can access configured build credentials,
+including Composer secrets; apply the label only to code you trust. Remove and
+reapply the label after reviewing a new head; removing it also requests preview
+cleanup. Protect the `build`,
+`preview-build`, `preview` and stable deployment environments in GitHub.
+Configure provider credentials per environment. Azure deploy jobs need the
+state-account and tenant variables and Pulumi passphrase secret described in
+`docs/bootstrap.md`.

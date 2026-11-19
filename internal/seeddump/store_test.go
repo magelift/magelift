@@ -89,7 +89,7 @@ func TestInitRecordedIdempotentRecordedOverwrite(t *testing.T) {
 
 func TestInitRecordedDoesNotTouchYAML(t *testing.T) {
 	root := t.TempDir()
-	configPath := filepath.Join(root, "magelift.yaml")
+	configPath := filepath.Join(root, "magelift.php")
 	if err := os.WriteFile(configPath, []byte("schemaVersion: 1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

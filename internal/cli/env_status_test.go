@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -13,12 +12,12 @@ import (
 
 func TestEnvStatusMergesSeedDumpPathAndImportedJournal(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dumpPath := filepath.Join(dir, "seed.sql")
-	if err := os.WriteFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -69,12 +68,12 @@ func TestEnvStatusMergesSeedDumpPathAndImportedJournal(t *testing.T) {
 
 func TestEnvStatusMergesFailedReasonFromJournal(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dumpPath := filepath.Join(dir, "seed.sql")
-	if err := os.WriteFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -120,8 +119,8 @@ func TestEnvStatusMergesFailedReasonFromJournal(t *testing.T) {
 
 func TestEnvStatusOmitsSeedFieldsWithoutSeedDump(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -142,6 +141,10 @@ func TestEnvStatusOmitsSeedFieldsWithoutSeedDump(t *testing.T) {
 	if _, ok := result["seedDump"]; ok {
 		t.Fatalf("seedDump present without config path: %#v", result["seedDump"])
 	}
+	api, ok := result["graphql"].(map[string]any)
+	if !ok || api["path"] != "/graphql" || api["source"] != "project" || api["configuredUrl"] != nil {
+		t.Fatalf("expected configured route without an invented serving URL: %v", api)
+	}
 	if _, ok := result["seedDumpStatus"]; ok {
 		t.Fatalf("seedDumpStatus present without config path: %#v", result["seedDumpStatus"])
 	}
@@ -149,7 +152,7 @@ func TestEnvStatusOmitsSeedFieldsWithoutSeedDump(t *testing.T) {
 
 func TestEnvStatusReportsPathWhenJournalMissing(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
+	path := filepath.Join(dir, "magelift.php")
 	contents := `schemaVersion: 1
 project:
   name: example-shop
@@ -171,7 +174,7 @@ environments:
     seedDump: /tmp/orphan.sql
 extensions: {}
 `
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+	if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

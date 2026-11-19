@@ -1,13 +1,11 @@
-# Leave PaaS in a weekend (packaging guide)
+# Rehearse a PaaS migration
 
-Single checklist that chains features already in-tree. It is not a promise that
-every storefront finishes in 48 hours. Treat it as a rehearsal on a non-prod
-host, then schedule production cutover.
+Allow time for one full restore and application test before booking the production cutover. The schedule below is an example for a staging rehearsal.
 
 ## Friday evening: config onramp
 
 1. Export ACC / Upsun config you are allowed to share internally.
-2. `magelift init --from-acc` or `--from-upsun` → review generated `magelift.yaml`.
+2. `magelift init --from-acc` or `--from-upsun` → review generated `magelift.php`.
 3. Map secrets to Secrets Manager / Secret Manager references (no plaintext).
 4. `magelift config validate --env preview` (or staging).
 
@@ -16,14 +14,13 @@ Details: [migrating-from-paas.md](migrating-from-paas.md).
 ## Saturday: disposable cloud preview
 
 1. Bootstrap once per account/region.
-2. Build/promote a digest; deploy **preview** on a certified target (AWS Fargate
+2. Build/promote a digest; deploy **preview** in your cloud account (AWS Fargate
    recommended for first rehearsal).
 3. Import a **sanitized** dump (`magelift env import-dump` / harness dump cell).
 4. Optional media sync listing-diff locally; live paid media later if needed.
 5. `magelift health` / smoke the storefront or API.
 
-Use the sample-shop YAML under `examples/sample-shop/` in the repository as the
-sketch. Destroy the preview when idle.
+Use `examples/sample-shop/magelift.php` as a starting point for the rehearsal. Destroy the preview when idle.
 
 ## Sunday: DNS rehearsal (not production)
 

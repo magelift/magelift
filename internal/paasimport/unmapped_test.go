@@ -24,9 +24,8 @@ func TestRenderUnmappedReportGuidesEachFamily(t *testing.T) {
 		"### dependencies",
 		"### stage",
 		"### other",
-		"Before (ACC shape)",
-		"After (MageLift shape",
-		"executable: magento",
+		"```php",
+		"'executable' => 'magento'",
 		"docs/migrating-from-paas.md",
 		"magelift config validate",
 	} {

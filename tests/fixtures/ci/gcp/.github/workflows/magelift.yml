@@ -60,9 +60,9 @@ jobs:
       - name: Install MageLift provider
         run: magelift providers install
       - name: Validate configuration
-        run: magelift --config 'magelift.yaml' --no-interaction config validate
+        run: magelift --config 'magelift.php' --no-interaction config validate
       - name: Resolve environment
-        run: magelift --config 'magelift.yaml' --env "${{ matrix.environment }}" --no-interaction --output json config effective > /dev/null
+        run: magelift --config 'magelift.php' --env "${{ matrix.environment }}" --no-interaction --output json config effective > /dev/null
 
   build:
     name: Build and sign immutable image
@@ -217,7 +217,7 @@ jobs:
           build_dir="$RUNNER_TEMP/magelift-build"
           result="$build_dir/build-result.json"
           mkdir -p "$build_dir"
-          magelift --config 'magelift.yaml' --no-interaction --output json build --push \
+          magelift --config 'magelift.php' --no-interaction --output json build --push \
             --image "$image" > "$result"
           digest="$(jq -er '.image | (.imageReference | sub(":[^/:]+$"; "")) + "@" + .digest' "$result")"
           cp -- "$(jq -er '.manifest' "$result")" "$build_dir/manifest.json"
@@ -346,7 +346,7 @@ jobs:
           test -n "$PREVIEW_REPOSITORY"
           test -n "$PREVIEW_NUMBER"
           test -n "$PREVIEW_COMMIT"
-          magelift --config 'magelift.yaml' --env "$PREVIEW_ENV" --preview-repository "$PREVIEW_REPOSITORY" --preview-number "$PREVIEW_NUMBER" --preview-branch "$PREVIEW_BRANCH" --preview-commit "$PREVIEW_COMMIT" --preview-generation "$PREVIEW_GENERATION" --no-interaction preview
+          magelift --config 'magelift.php' --env "$PREVIEW_ENV" --preview-repository "$PREVIEW_REPOSITORY" --preview-number "$PREVIEW_NUMBER" --preview-branch "$PREVIEW_BRANCH" --preview-commit "$PREVIEW_COMMIT" --preview-generation "$PREVIEW_GENERATION" --no-interaction preview
 
   preview-destroy:
     name: Destroy closed preview
@@ -461,7 +461,7 @@ jobs:
           test -n "$PREVIEW_REPOSITORY"
           test -n "$PREVIEW_NUMBER"
           test -n "$PREVIEW_COMMIT"
-          magelift --config 'magelift.yaml' --env "$PREVIEW_ENV" --preview-repository "$PREVIEW_REPOSITORY" --preview-number "$PREVIEW_NUMBER" --preview-branch "$PREVIEW_BRANCH" --preview-commit "$PREVIEW_COMMIT" --preview-generation "$PREVIEW_GENERATION" --no-interaction --yes destroy
+          magelift --config 'magelift.php' --env "$PREVIEW_ENV" --preview-repository "$PREVIEW_REPOSITORY" --preview-number "$PREVIEW_NUMBER" --preview-branch "$PREVIEW_BRANCH" --preview-commit "$PREVIEW_COMMIT" --preview-generation "$PREVIEW_GENERATION" --no-interaction --yes destroy
 
   preview-sweep:
     name: Sweep expired previews
@@ -560,7 +560,7 @@ jobs:
       - name: Destroy expired previews
         run: |
           test -n "${{ vars.MAGELIFT_PREVIEW_ENV }}"
-          magelift --config 'magelift.yaml' --env "${{ vars.MAGELIFT_PREVIEW_ENV }}" --preview-repository "${{ github.repository }}" --no-interaction --yes env sweep
+          magelift --config 'magelift.php' --env "${{ vars.MAGELIFT_PREVIEW_ENV }}" --preview-repository "${{ github.repository }}" --no-interaction --yes env sweep
 
   staging:
     name: Deploy staging
@@ -679,4 +679,4 @@ jobs:
           DIGEST: ${{ needs.build.outputs.digest }}
         run: |
           test "$DEPLOY_ENV" = staging
-          magelift --config 'magelift.yaml' --env "$DEPLOY_ENV" --no-interaction --yes deploy --digest "$DIGEST"
+          magelift --config 'magelift.php' --env "$DEPLOY_ENV" --no-interaction --yes deploy --digest "$DIGEST"

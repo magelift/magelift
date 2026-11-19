@@ -19,7 +19,7 @@ or change the selected environment.
 - A healthy database alone does not prove search. Readiness also checks the
   configured engine and endpoint; bare OpenSearch service names use port 9200.
 - GCP outputs, exec, logs, tunnels and health in outputs/runtime mode read the
-  existing stack without a YAML image digest or local build journal. Deploy and preview still
+  existing stack without a configured image digest or local build journal. Deploy and preview still
   require the immutable artifact. Destroy does not require a build.
 - With `nginx-fpm`, select `--container php-fpm` for PHP/Magento exec commands.
 - First deployment initializes schema/data only when the database has zero tables.
@@ -41,7 +41,7 @@ Laptop Magento path:
 ```sh
 magelift --env staging doctor
 magelift --env staging bootstrap
-magelift --env staging deploy --yes
+magelift --env staging deploy --yes --digest IMAGE@sha256:...
 magelift --env staging health --mode runtime
 magelift --env staging logs --service web
 magelift --env staging exec --service web -- php -v
@@ -52,6 +52,11 @@ magelift --env staging destroy --yes
 
 AWS bootstrap also needs `--access-log-bucket`. `cost --live` errors on GCP targets (live Catalog pricing is not wired there); omit `--live` on GCP. `sign` and `promote` use the
 current cloud or CI login; omit Cosign flags.
+Azure needs the state storage account, tenant and stable Pulumi passphrase
+described in `docs/bootstrap.md`; operator-owned Entra-enabled clusters may
+also need `kubelogin`. Preview label removal requests cleanup, so remove and
+reapply the label only after reviewing a new PR head and understanding that
+the previous preview can be destroyed.
 For GCP Actions bootstrap, pass --github-owner and --github-repo. It reuses
 GH_TOKEN, GITHUB_TOKEN, or gh auth login to resolve immutable repository IDs
 before cloud creation, then creates separate build and deployment identities.

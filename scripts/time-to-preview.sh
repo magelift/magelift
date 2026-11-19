@@ -3,7 +3,7 @@
 # that is destroyed on exit. Record the result in docs/release-readiness.md only
 # after a successful maintainer run; do not invent numbers.
 #
-# Prerequisites: magelift on PATH, AWS credentials, magelift.yaml with preview preset,
+# Prerequisites: magelift on PATH, AWS credentials, magelift.php with preview preset,
 # bootstrap already completed for the account/region.
 #
 # Set MAGELIFT_TIME_TO_PREVIEW_KEEP=true to leave the stack up for further matrix
@@ -12,7 +12,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_NAME="${MAGELIFT_ENV:-preview}"
-CONFIG="${MAGELIFT_CONFIG:-magelift.yaml}"
+CONFIG="${MAGELIFT_CONFIG:-magelift.php}"
 LOG="${MAGELIFT_TIME_TO_PREVIEW_LOG:-${ROOT}/.magelift/time-to-preview.log}"
 
 mkdir -p "$(dirname "$LOG")"

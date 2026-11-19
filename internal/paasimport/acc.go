@@ -1,13 +1,9 @@
 package paasimport
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
-
-	"go.yaml.in/yaml/v4"
 )
 
 type accAppRaw map[string]any
@@ -32,78 +28,6 @@ type accEnvDocument struct {
 type accCron struct {
 	Spec string `yaml:"spec"`
 	Cmd  string `yaml:"cmd"`
-}
-
-// MapACC reads an ACC config root and returns MageLift YAML plus residual keys.
-func MapACC(root string) (Result, error) {
-	if err := DetectACC(root); err != nil {
-		return Result{}, err
-	}
-
-	appData, err := readUnder(root, accAppFile)
-	if err != nil {
-		return Result{}, err
-	}
-	var raw accAppRaw
-	if err := yaml.Unmarshal(appData, &raw); err != nil {
-		return Result{}, fmt.Errorf("parse %s: %w", accAppFile, err)
-	}
-
-	doc, unmapped, err := mapAppTree(accAppFile, raw)
-	if err != nil {
-		return Result{}, err
-	}
-
-	if servicesData, err := readUnder(root, accServicesFile); err == nil {
-		var services map[string]any
-		if err := yaml.Unmarshal(servicesData, &services); err != nil {
-			return Result{}, fmt.Errorf("parse %s: %w", accServicesFile, err)
-		}
-		var fastlyUnmapped []UnmappedKey
-		doc.Edge, fastlyUnmapped = fastlyEdgeIntent(accServicesFile, services)
-		unmapped = append(unmapped, fastlyUnmapped...)
-		if observability := observabilityServiceIntent(services); observability != nil {
-			doc.Observability = observability
-		}
-		unmapped = append(unmapped, mapServices(accServicesFile, services)...)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return Result{}, err
-	}
-
-	if routesData, err := readUnder(root, accRoutesFile); err == nil {
-		var routes map[string]accRoute
-		if err := yaml.Unmarshal(routesData, &routes); err != nil {
-			return Result{}, fmt.Errorf("parse %s: %w", accRoutesFile, err)
-		}
-		staging := doc.Environments["staging"]
-		if staging.Domain == "" {
-			staging.Domain = domainFromRoutes(routes)
-		}
-		doc.Environments["staging"] = staging
-		if doc.Edge != nil && staging.Domain != "" {
-			doc.Edge.Domains = []string{staging.Domain}
-		}
-		// All route patterns are structural / consumed.
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return Result{}, err
-	}
-
-	if envData, err := readUnder(root, accEnvFile); err == nil {
-		var env accEnvDocument
-		if err := yaml.Unmarshal(envData, &env); err != nil {
-			return Result{}, fmt.Errorf("parse %s: %w", accEnvFile, err)
-		}
-		unmapped = append(unmapped, applyAllowlistEnv(&doc, accEnvFile, env)...)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return Result{}, err
-	}
-
-	sortUnmapped(unmapped)
-	yamlBytes, err := emitMagelift(doc)
-	if err != nil {
-		return Result{}, err
-	}
-	return Result{YAML: yamlBytes, Unmapped: unmapped}, nil
 }
 
 func mapAppTree(source string, raw accAppRaw) (mageliftDocument, []UnmappedKey, error) {
@@ -216,18 +140,6 @@ func mapBuildRequirements(source string, raw accAppRaw, doc *mageliftDocument) [
 		}
 	}
 
-	return unmapped
-}
-
-func mapServices(source string, services map[string]any) []UnmappedKey {
-	var unmapped []UnmappedKey
-	for name, raw := range services {
-		svcType := serviceType(raw)
-		if serviceMapped(name, svcType) {
-			continue
-		}
-		unmapped = append(unmapped, UnmappedKey{Source: source, Path: name})
-	}
 	return unmapped
 }
 
@@ -380,8 +292,11 @@ func validComposerVersion(value string) bool {
 }
 
 func isMagentoCron(cmd string) bool {
-	c := strings.ToLower(strings.TrimSpace(cmd))
-	return strings.Contains(c, "bin/magento") && strings.Contains(c, "cron:run")
+	args := strings.Fields(cmd)
+	if len(args) > 0 && args[0] == "php" {
+		args = args[1:]
+	}
+	return len(args) == 2 && (args[0] == "bin/magento" || args[0] == "./bin/magento") && args[1] == "cron:run"
 }
 
 func relationshipMapped(name, value string) bool {
@@ -436,10 +351,6 @@ func observabilityServiceIntent(services map[string]any) *mageliftObservability 
 		}
 	}
 	return nil
-}
-
-func serviceMapped(name, typeValue string) bool {
-	return relationshipMapped(name, typeValue)
 }
 
 func fastlyEdgeIntent(source string, services map[string]any) (*mageliftEdge, []UnmappedKey) {

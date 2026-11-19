@@ -14,8 +14,8 @@ import (
 
 func TestEnvDumpWritesLocalFileAndLabelsUnsanitized(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dest := filepath.Join(dir, "staging.sql")
@@ -37,7 +37,7 @@ func TestEnvDumpWritesLocalFileAndLabelsUnsanitized(t *testing.T) {
 		if opts.OutputPath != dest {
 			t.Fatalf("OutputPath = %q, want %q", opts.OutputPath, dest)
 		}
-		return os.WriteFile(opts.OutputPath, []byte("-- fixture dump\n"), 0o600)
+		return writeTestProjectFile(opts.OutputPath, []byte("-- fixture dump\n"), 0o600)
 	}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "env", "dump", "staging", "--to", dest})
@@ -72,8 +72,8 @@ func TestEnvDumpWritesLocalFileAndLabelsUnsanitized(t *testing.T) {
 
 func TestEnvDumpRequiresTo(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -97,12 +97,12 @@ func TestEnvDumpRequiresTo(t *testing.T) {
 
 func TestEnvDumpRefusesOverwriteWithoutYes(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dest := filepath.Join(dir, "staging.sql")
-	if err := os.WriteFile(dest, []byte("keep"), 0o600); err != nil {
+	if err := writeTestProjectFile(dest, []byte("keep"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -150,8 +150,8 @@ func TestEnvDumpIsOnCommandTree(t *testing.T) {
 
 func TestEnvDumpSanitizePassesOptInToExporter(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dest := filepath.Join(dir, "staging.sql")
@@ -161,7 +161,7 @@ func TestEnvDumpSanitizePassesOptInToExporter(t *testing.T) {
 	var sawOpts dumpimport.Options
 	o.exportDump = func(_ context.Context, opts dumpimport.Options) error {
 		sawOpts = opts
-		return os.WriteFile(opts.OutputPath, []byte("-- hashed\n"), 0o600)
+		return writeTestProjectFile(opts.OutputPath, []byte("-- hashed\n"), 0o600)
 	}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "--output", "json", "env", "dump", "staging", "--to", dest, "--sanitize"})

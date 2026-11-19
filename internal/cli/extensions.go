@@ -7,9 +7,10 @@ import (
 )
 
 type extensionInventory struct {
-	Modules     []sdk.ExtensionDescriptor `json:"modules" yaml:"modules"`
-	WebRuntimes []webruntime.ListedPlugin `json:"webRuntimes" yaml:"webRuntimes"`
-	Providers   []providerProvenance      `json:"providers" yaml:"providers"`
+	ServiceAdapters []sdk.ServiceAdapterDescriptor `json:"serviceAdapters,omitempty" yaml:"serviceAdapters,omitempty"`
+	Modules         []sdk.ExtensionDescriptor      `json:"modules" yaml:"modules"`
+	WebRuntimes     []webruntime.ListedPlugin      `json:"webRuntimes" yaml:"webRuntimes"`
+	Providers       []providerProvenance           `json:"providers" yaml:"providers"`
 }
 
 func extensionsCommand(o *options) *cobra.Command {
@@ -26,6 +27,7 @@ func extensionsCommand(o *options) *cobra.Command {
 			inventory := extensionInventory{WebRuntimes: webruntime.List()}
 			if o.modules != nil {
 				inventory.Modules = o.modules.Extensions()
+				inventory.ServiceAdapters = o.modules.ServiceAdapters()
 			}
 			inventory.Providers = o.subprocessProvenance(cmd.Context())
 			return o.write(inventory)

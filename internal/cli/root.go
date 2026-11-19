@@ -20,8 +20,8 @@ import (
 	"github.com/magelift/magelift/internal/dumpimport"
 	fastlyedge "github.com/magelift/magelift/internal/external/fastly"
 	"github.com/magelift/magelift/internal/mediasync"
-	"github.com/magelift/magelift/internal/paasimport"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/projectphp"
 	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/internal/releasejournal"
 	"github.com/magelift/magelift/internal/toolchain"
@@ -73,6 +73,8 @@ type options struct {
 	previewBranch           string
 	previewCommit           string
 	previewDomain           string
+	previewExpiresAt        string
+	previewUpdatedAt        string
 	previewGeneration       uint64
 	resolvedPreviewIdentity *config.PreviewIdentity
 	previewIdentityOverride *config.PreviewIdentity
@@ -95,6 +97,7 @@ type options struct {
 	mediaSync               func(context.Context, mediasync.Options) (mediasync.Result, error)
 	newLock                 func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
 	loadProvider            func(context.Context, string) (providerhost.Loaded, error)
+	inspectProvider         func(context.Context, string) (providerhost.Loaded, error)
 	dialProvider            func(context.Context, string) (*providerhost.Client, error)
 	providerSessions        []*providerhost.Client
 	runCommand              func(context.Context, string, []string, io.Writer, io.Writer) error
@@ -260,6 +263,7 @@ func newCommandWithHooks(stdout, stderr io.Writer, modules *platform.ModuleRegis
 	}
 	o.newBackend = o.defaultNewBackend
 	o.loadProvider = o.defaultLoadProvider
+	o.inspectProvider = o.loadInstalledProvider
 	o.dialProvider = o.defaultDialProvider
 	o.newDeploySteps = func(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
 		module, found := modules.Module(planned.Provider(), planned.Runtime())
@@ -306,7 +310,7 @@ func newCommandWithHooks(stdout, stderr io.Writer, modules *platform.ModuleRegis
 func newCommandWithOptions(o *options) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "magelift",
-		Short:         "Deploy Magento applications to certified and experimental cloud targets",
+		Short:         "Deploy and operate Magento projects in your cloud",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
@@ -317,7 +321,7 @@ func newCommandWithOptions(o *options) *cobra.Command {
 	root.SetErr(o.stderr)
 	configDefault := o.configPath
 	if configDefault == "" {
-		configDefault = "magelift.yaml"
+		configDefault = "magelift.php"
 	}
 	outputDefault := o.output
 	if outputDefault == "" {
@@ -330,6 +334,8 @@ func newCommandWithOptions(o *options) *cobra.Command {
 	root.PersistentFlags().StringVar(&o.previewBranch, "preview-branch", o.previewBranch, "source branch metadata for a preview identity")
 	root.PersistentFlags().StringVar(&o.previewCommit, "preview-commit", o.previewCommit, "commit digest metadata for a preview identity")
 	root.PersistentFlags().StringVar(&o.previewDomain, "preview-domain", o.previewDomain, "domain metadata for a preview identity")
+	root.PersistentFlags().StringVar(&o.previewUpdatedAt, "preview-updated-at", o.previewUpdatedAt, "pull request event time used with previewTtl")
+	root.PersistentFlags().StringVar(&o.previewExpiresAt, "preview-expires-at", o.previewExpiresAt, "absolute RFC3339 expiration for this pull request preview")
 	root.PersistentFlags().Uint64Var(&o.previewGeneration, "preview-generation", o.previewGeneration, "deployment generation for a preview identity")
 	root.PersistentFlags().StringVarP(&o.output, "output", "o", outputDefault, "output format: table, json, or yaml")
 	root.PersistentFlags().BoolVar(&o.noInteraction, "no-interaction", o.noInteraction, "never prompt for input")
@@ -351,122 +357,8 @@ func versionCommand(o *options) *cobra.Command {
 	}}
 }
 
-func initCommand(o *options) *cobra.Command {
-	var fromACC, fromUpsun bool
-	var configOut, provider string
-	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Create a starter magelift.yaml for Magento's PHP storefront",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			if fromACC && fromUpsun {
-				return invalid(fmt.Errorf("--from-acc and --from-upsun are mutually exclusive"))
-			}
-			if provider == "" {
-				provider = "gcp"
-			}
-			if err := validateStarterProvider(provider); err != nil {
-				return invalid(err)
-			}
-			writePath := o.configPath
-			if configOut != "" {
-				writePath = configOut
-			}
-			writePath = filepath.Clean(writePath)
-			if _, err := os.Stat(writePath); err == nil {
-				if !o.yes {
-					return &exitError{code: 2, err: fmt.Errorf("%s already exists", writePath)}
-				}
-			} else if !errors.Is(err, os.ErrNotExist) {
-				return err
-			}
-			var (
-				data     []byte
-				unmapped []paasimport.UnmappedKey
-				shopInit *initWriteResult
-			)
-			switch {
-			case fromACC:
-				root, err := os.Getwd()
-				if err != nil {
-					return err
-				}
-				result, err := paasimport.MapACC(root)
-				if err != nil {
-					return invalid(err)
-				}
-				data, unmapped = result.YAML, result.Unmapped
-			case fromUpsun:
-				root, err := os.Getwd()
-				if err != nil {
-					return err
-				}
-				result, err := paasimport.MapUpsun(root)
-				if err != nil {
-					return invalid(err)
-				}
-				data, unmapped = result.YAML, result.Unmapped
-			default:
-				shop, err := inspectShopSource(shopSourceRoot(o.configPath))
-				if err != nil {
-					return invalid(err)
-				}
-				if err := validateShopForInitRecipe(shop); err != nil {
-					return invalid(err)
-				}
-				starter, err := starterForProvider(provider, shop)
-				if err != nil {
-					return invalid(err)
-				}
-				data = []byte(starter)
-				if err := validateInitStarter(data); err != nil {
-					return invalid(err)
-				}
-				shopInit = &initWriteResult{
-					Path:        writePath,
-					Provider:    strings.ToLower(strings.TrimSpace(provider)),
-					Environment: "test",
-					Edition:     shop.Edition,
-					Release:     shop.Version,
-					Next:        initNextAction(),
-				}
-			}
-			if err := os.MkdirAll(filepath.Dir(writePath), 0o755); err != nil {
-				return err
-			}
-			if err := os.WriteFile(writePath, data, 0o644); err != nil {
-				return err
-			}
-			if len(unmapped) > 0 {
-				sidecar := paasimport.SidecarPath(writePath)
-				report := paasimport.RenderUnmappedReport(unmapped)
-				if err := os.WriteFile(sidecar, []byte(report), 0o644); err != nil {
-					return err
-				}
-				return invalid(fmt.Errorf("import produced %d unmapped key(s); see %s", len(unmapped), sidecar))
-			}
-			if shopInit != nil {
-				return o.write(shopInit)
-			}
-			return nil
-		},
-	}
-	cmd.Flags().BoolVar(&fromACC, "from-acc", false, "generate magelift.yaml from Adobe Commerce Cloud config")
-	cmd.Flags().BoolVar(&fromUpsun, "from-upsun", false, "generate magelift.yaml from Upsun / Platform.sh config")
-	cmd.Flags().StringVar(&configOut, "config-out", "", "write generated YAML to PATH for review (default: --config path)")
-	cmd.Flags().StringVar(&provider, "provider", "gcp", "starter provider: aws or gcp")
-	return cmd
-}
-
-// starterForProvider renders the minimal single-environment starter for the
-// inspected shop. The provider check runs before the overwrite check so a bad
-// flag never looks like a file problem.
-func starterForProvider(provider string, shop inspectedShop) (string, error) {
-	return renderMinimalStarter(provider, shop)
-}
-
 func configCommand(o *options) *cobra.Command {
-	cmd := &cobra.Command{Use: "config", Short: "Inspect and migrate configuration"}
+	cmd := &cobra.Command{Use: "config", Short: "Inspect configuration"}
 	cmd.AddCommand(&cobra.Command{Use: "validate", Short: "Validate configuration", Args: cobra.NoArgs, RunE: func(*cobra.Command, []string) error {
 		file, err := o.load()
 		if err != nil {
@@ -516,31 +408,12 @@ func configCommand(o *options) *cobra.Command {
 		}
 		return o.write(map[string]any{"path": args[0], "source": p.Source, "removed": p.Removed})
 	}})
-	cmd.AddCommand(&cobra.Command{Use: "migrate", Short: "Migrate configuration to the current schema", Args: cobra.NoArgs, RunE: func(*cobra.Command, []string) error {
-		data, err := os.ReadFile(filepath.Clean(o.configPath))
-		if err != nil {
-			return invalid(err)
-		}
-		migration, err := config.Migrate(data)
-		if err != nil {
-			return invalid(err)
-		}
-		if migration.Changed {
-			info, err := os.Stat(filepath.Clean(o.configPath))
-			if err != nil {
-				return err
-			}
-			if err := replaceFile(filepath.Clean(o.configPath), migration.Data, info.Mode().Perm()); err != nil {
-				return err
-			}
-		}
-		return o.write(migration)
-	}})
+
 	return cmd
 }
 
 func replaceFile(path string, data []byte, mode os.FileMode) (err error) {
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".magelift.yaml-*")
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".magelift-config-*")
 	if err != nil {
 		return err
 	}
@@ -619,7 +492,7 @@ func gitCurrentBranch(directory string) (string, error) {
 }
 
 func (o *options) load() (*config.File, error) {
-	data, err := os.ReadFile(filepath.Clean(o.configPath))
+	data, err := projectphp.Evaluate(o.planContext, o.configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -685,11 +558,11 @@ func completionCommand(root *cobra.Command) *cobra.Command {
 
 func commandGroups(o *options) []*cobra.Command {
 	groups := map[string][]string{
-		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "create", "status", "dump", "import-dump", "media-sync", "media-export", "destroy", "protect", "sweep", "ui"},
+		"state": {"status", "backup", "restore", "unlock"}, "env": {"list", "diff", "create", "status", "dump", "import-dump", "media-sync", "media-export", "destroy", "protect", "sweep", "ui"},
 		"secret": {"set", "list", "remove"},
 	}
 	var commands []*cobra.Command
-	commands = append(commands, upgradeCommand(o), loginCommand(o), execCommand(o), sshCommand(o), tunnelCommand(o), devCommand(o))
+	commands = append(commands, upgradeCommand(o), loginCommand(o), execCommand(o), sshCommand(o), tunnelCommand(o), devCommand(o), devQuickstartCommand(o))
 	for _, name := range []string{"cache-flush", "reindex", "cron-run", "queue-status"} {
 		commands = append(commands, magentoOperationCommand(o, name))
 	}
@@ -698,6 +571,8 @@ func commandGroups(o *options) []*cobra.Command {
 		for _, name := range groups[groupName] {
 			if groupName == "env" && name == "list" {
 				group.AddCommand(envListCommand(o))
+			} else if groupName == "env" && name == "diff" {
+				group.AddCommand(envDiffCommand(o))
 			} else if groupName == "env" && name == "create" {
 				group.AddCommand(envCreateCommand(o))
 			} else if groupName == "env" && name == "status" {
@@ -756,112 +631,3 @@ func unavailable(name string) *cobra.Command {
 
 // starterConfig is the default (AWS) starter, kept as the shared test
 // fixture name.
-const starterConfig = starterAWSConfig
-
-const starterAWSConfig = `schemaVersion: 1
-project:
-  name: example-shop
-application:
-  edition: open-source
-  version: 2.4.9
-  mode: integrated
-  webRuntime: nginx-fpm
-  magento:
-    frontName: admin
-build:
-  php: "8.5"
-target:
-  provider: aws
-  runtime: ecs-fargate
-  aws:
-    catalog:
-      # Certified cell: no managed search on first run. Managed search
-      # proves in Phase 2; until then this avoids surprise AOSS bills.
-      searchMode: disabled
-defaults:
-  region: eu-west-3
-  preset: preview
-environments:
-  preview:
-    account: "123456789012"
-    class: preview
-    preset: preview
-    domain: preview.example.com
-    expiresAt: "2026-12-31T23:59:59Z"
-  staging:
-    inherits: preview
-    account: "123456789012"
-    class: staging
-    preset: standard
-    domain: staging.example.com
-  production:
-    inherits: staging
-    account: "210987654321"
-    class: production
-    preset: high-availability
-    domain: example.com
-    protection: true
-extensions: {}
-`
-
-const starterGCPConfig = `# Alpha recipe starter (GCP GKE Autopilot preview). Fill in your GCP
-# project and domains, then follow docs/onboarding.md (billing, domain,
-# licenses, and SMTP relay prerequisites come first).
-schemaVersion: 1
-project:
-  name: example-shop
-application:
-  edition: open-source
-  version: 2.4.9
-  mode: integrated
-  webRuntime: nginx-fpm
-  magento:
-    frontName: admin
-build:
-  php: "8.5"
-  staticContent:
-    locales: [en_US]
-    themes: [Magento/luma]
-target:
-  provider: gcp
-  runtime: gke-autopilot
-  gcp:
-    project: example-gcp-project
-    region: europe-west1
-    # Search defaults to the recipe OpenSearch; pin openSearchMode: disabled
-    # only to skip search on a first smoke run.
-    # After magelift build, set imageDigest to the pushed shop digest.
-    # The stack generates the Magento encryption key. Set
-    # encryptionKeySecret only to reuse an existing Secret Manager secret.
-# Outbound email: uncomment and point at your SMTP relay once the relay
-# account exists (see docs/onboarding.md prerequisites). Preview
-# environments stay disabled unless you set a mode explicitly.
-#email:
-#  mode: smtp
-#  host: smtp.example.com
-#  port: 587
-#  username: mailer
-#  from: shop@example.com
-#  credential: gcp-secret-manager://projects/example-gcp-project/secrets/smtp-password/versions/latest
-defaults:
-  region: europe-west1
-  preset: preview
-environments:
-  preview:
-    class: preview
-    preset: preview
-    domain: preview.example.com
-    expiresAt: "2026-12-31T23:59:59Z"
-  staging:
-    inherits: preview
-    class: staging
-    preset: standard
-    domain: staging.example.com
-  production:
-    inherits: staging
-    class: production
-    preset: high-availability
-    domain: example.com
-    protection: true
-extensions: {}
-`

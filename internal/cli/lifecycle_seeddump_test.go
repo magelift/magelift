@@ -195,7 +195,7 @@ func TestAutoImportFailureFailsDeploy(t *testing.T) {
 
 func rewriteLifecycleSeedDump(t *testing.T, path, dumpPath string) string {
 	t.Helper()
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func rewriteLifecycleSeedDump(t *testing.T, path, dumpPath string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, updated, 0o600); err != nil {
+	if err := writeTestProjectFile(path, updated, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return path

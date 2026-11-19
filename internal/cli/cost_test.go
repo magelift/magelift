@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -50,8 +49,8 @@ func sampleCostReport() platform.CostReport {
 func writeCostConfig(t *testing.T, contents string) string {
 	t.Helper()
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return path

@@ -3,7 +3,7 @@ package cli
 import (
 	"bytes"
 	"errors"
-	"os"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,8 +11,8 @@ import (
 
 func TestDoctorChecksBuildAndEveryEnvironment(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -39,9 +39,9 @@ func TestDoctorChecksBuildAndEveryEnvironment(t *testing.T) {
 
 func TestDoctorPrintsFailedChecksAndUsesStableExitCode(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
+	path := filepath.Join(dir, "magelift.php")
 	contents := strings.Replace(starterConfig, "    account: \"123456789012\"", "    account: \"123456789012\"\n    inherits: staging", 1)
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+	if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -100,7 +100,7 @@ func TestDoctorCredentialsGCPExplainsLoginGap(t *testing.T) {
 func TestDoctorCredentialsGCPUsesADCFileWithoutGcloud(t *testing.T) {
 	path := writeGCPLifecycleConfig(t, "preview")
 	adc := filepath.Join(t.TempDir(), "adc.json")
-	if err := os.WriteFile(adc, []byte("{}"), 0o600); err != nil {
+	if err := writeTestProjectFile(adc, []byte("{}"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -147,8 +147,8 @@ func TestDoctorCredentialsGCPSkipsOnCI(t *testing.T) {
 
 func TestDoctorOmitsCredentialsForNonGCP(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -167,9 +167,9 @@ func TestDoctorOmitsCredentialsForNonGCP(t *testing.T) {
 
 func TestDoctorNextPointsAtValidateOnBuildFailure(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	contents := strings.Replace(starterConfig, `php: "8.5"`, `php: "7.0"`, 1)
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	contents := strings.Replace(starterConfig, `php: "8.5"`, `php: "invalid"`, 1)
+	if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -186,22 +186,33 @@ func TestDoctorNextPointsAtValidateOnBuildFailure(t *testing.T) {
 	}
 }
 
-func TestDoctorDoesNotRequirePulumiCLI(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	var out bytes.Buffer
-	o := testOptions(&out, &fakeTerminal{interactive: false})
-	o.configPath, o.output = path, "json"
-	o.dependencyRunner = &fakeDependencyRunner{missing: map[string]bool{"pulumi": true}}
-	cmd := newCommandWithOptions(o)
-	cmd.SetArgs([]string{"--config", path, "--output", "json", "doctor"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("doctor required a host pulumi CLI: %v\n%s", err, out.String())
-	}
-	if strings.Contains(out.String(), "dependency.pulumi") {
-		t.Fatalf("doctor still reports pulumi: %s", out.String())
+func TestDoctorPulumiRequirement(t *testing.T) {
+	for _, local := range []bool{false, true} {
+		t.Run(fmt.Sprintf("local=%t", local), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "magelift.php")
+			if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var out bytes.Buffer
+			o := testOptions(&out, &fakeTerminal{interactive: false})
+			o.configPath, o.output = path, "json"
+			o.dependencyRunner = &fakeDependencyRunner{missing: map[string]bool{"pulumi": true}}
+			cmd := newCommandWithOptions(o)
+			args := []string{"--config", path, "--output", "json", "doctor"}
+			if local {
+				args = append(args, "--local")
+			}
+			cmd.SetArgs(args)
+			err := cmd.Execute()
+			if local && err != nil {
+				t.Fatalf("local doctor: %v\n%s", err, out.String())
+			}
+			if !local && err == nil {
+				t.Fatalf("cloud doctor accepted missing Pulumi: %s", out.String())
+			}
+			if !strings.Contains(out.String(), "dependency.pulumi") {
+				t.Fatalf("missing Pulumi check: %s", out.String())
+			}
+		})
 	}
 }

@@ -10,12 +10,14 @@ import (
 	"testing"
 
 	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/projectphp"
 )
 
 func TestInitFromAccWritesLoadValidConfig(t *testing.T) {
 	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "supported")
 	dir := t.TempDir()
 	copyTree(t, fixture, dir)
+	writeInitShopFixture(t, dir, "2.4.8-p5", "community")
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -26,7 +28,7 @@ func TestInitFromAccWritesLoadValidConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	configPath := filepath.Join(dir, "magelift.yaml")
+	configPath := filepath.Join(dir, "magelift.php")
 	var out bytes.Buffer
 	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", configPath, "init", "--from-acc"})
@@ -34,12 +36,12 @@ func TestInitFromAccWritesLoadValidConfig(t *testing.T) {
 		t.Fatalf("init --from-acc: %v\n%s", err, out.String())
 	}
 
-	data, err := os.ReadFile(configPath)
+	data, err := projectphp.Evaluate(t.Context(), configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(data), "synthetic-crypt-must-not-leak") {
-		t.Fatal("crypt plaintext leaked into magelift.yaml")
+		t.Fatal("crypt plaintext leaked into magelift.php")
 	}
 	file, err := config.Load(data)
 	if err != nil {
@@ -67,11 +69,11 @@ func TestInitFromAccWritesLoadValidConfig(t *testing.T) {
 }
 
 func TestInitProviderStartersValidate(t *testing.T) {
-	for _, provider := range []string{"aws", "gcp"} {
+	for _, provider := range []string{"aws", "gcp", "azure"} {
 		t.Run(provider, func(t *testing.T) {
 			dir := t.TempDir()
 			writeInitShopFixture(t, dir, "2.4.9", "community")
-			configPath := filepath.Join(dir, "magelift.yaml")
+			configPath := filepath.Join(dir, "magelift.php")
 			var out bytes.Buffer
 			cmd := newCommand(&out, &out, nil)
 			cmd.SetArgs([]string{"--config", configPath, "init", "--provider", provider})
@@ -84,7 +86,7 @@ func TestInitProviderStartersValidate(t *testing.T) {
 			if err := validate.Execute(); err != nil {
 				t.Fatalf("config validate: %v\n%s", err, validateOut.String())
 			}
-			data, err := os.ReadFile(configPath)
+			data, err := projectphp.Evaluate(t.Context(), configPath)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -92,7 +94,7 @@ func TestInitProviderStartersValidate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := file.Environments(); len(got) != 1 || got[0] != "test" {
+			if got := file.Environments(); strings.Join(got, ",") != "preview,production,staging,uat" {
 				t.Fatalf("environments = %v, want [test]", got)
 			}
 		})
@@ -102,25 +104,25 @@ func TestInitProviderStartersValidate(t *testing.T) {
 func TestInitProviderDefaultsToGCP(t *testing.T) {
 	dir := t.TempDir()
 	writeInitShopFixture(t, dir, "2.4.9", "community")
-	configPath := filepath.Join(dir, "magelift.yaml")
+	configPath := filepath.Join(dir, "magelift.php")
 	var out bytes.Buffer
 	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", configPath, "init"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("init: %v\n%s", err, out.String())
 	}
-	data, err := os.ReadFile(configPath)
+	data, err := projectphp.Evaluate(t.Context(), configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "provider: gcp") {
+	if !strings.Contains(string(data), `"provider":"gcp"`) {
 		t.Fatalf("default starter is not GCP:\n%s", data)
 	}
 }
 
 func TestInitUnknownProviderRefusedBeforeOverwrite(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "magelift.yaml")
+	configPath := filepath.Join(dir, "magelift.php")
 	if err := os.WriteFile(configPath, []byte(starterConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +130,7 @@ func TestInitUnknownProviderRefusedBeforeOverwrite(t *testing.T) {
 	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", configPath, "init", "--provider", "ovh"})
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "MageLift supports starter providers") {
+	if err == nil || !strings.Contains(err.Error(), "unknown starter provider") {
 		t.Fatalf("err = %v, want MageLift authority refusal", err)
 	}
 	if ExitCode(err) != 2 {
@@ -140,7 +142,8 @@ func TestInitFromAccRefusesExistingConfig(t *testing.T) {
 	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "supported")
 	dir := t.TempDir()
 	copyTree(t, fixture, dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
+	writeInitShopFixture(t, dir, "2.4.8-p5", "community")
+	configPath := filepath.Join(dir, "magelift.php")
 	if err := os.WriteFile(configPath, []byte(starterConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +171,7 @@ func TestInitFromAccRefusesExistingConfig(t *testing.T) {
 
 func TestInitFromAccAndFromUpsunMutualExclusion(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "magelift.yaml")
+	configPath := filepath.Join(dir, "magelift.php")
 	var out bytes.Buffer
 	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", configPath, "init", "--from-acc", "--from-upsun"})
@@ -191,7 +194,8 @@ func TestInitFromAccOverwriteWithYes(t *testing.T) {
 	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "supported")
 	dir := t.TempDir()
 	copyTree(t, fixture, dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
+	writeInitShopFixture(t, dir, "2.4.8-p5", "community")
+	configPath := filepath.Join(dir, "magelift.php")
 	if err := os.WriteFile(configPath, []byte(starterConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +215,7 @@ func TestInitFromAccOverwriteWithYes(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("init --from-acc --yes: %v\n%s", err, out.String())
 	}
-	data, err := os.ReadFile(configPath)
+	data, err := projectphp.Evaluate(t.Context(), configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,8 +231,9 @@ func TestInitConfigOutWritesSideFileLeavesDefault(t *testing.T) {
 	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "supported")
 	dir := t.TempDir()
 	copyTree(t, fixture, dir)
-	defaultPath := filepath.Join(dir, "magelift.yaml")
-	sidePath := filepath.Join(dir, "review.magelift.yaml")
+	writeInitShopFixture(t, dir, "2.4.8-p5", "community")
+	defaultPath := filepath.Join(dir, "magelift.php")
+	sidePath := filepath.Join(dir, "review.magelift.php")
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -246,9 +251,9 @@ func TestInitConfigOutWritesSideFileLeavesDefault(t *testing.T) {
 		t.Fatalf("init --config-out: %v\n%s", err, out.String())
 	}
 	if _, err := os.Stat(defaultPath); !os.IsNotExist(err) {
-		t.Fatalf("default magelift.yaml should remain absent: %v", err)
+		t.Fatalf("default magelift.php should remain absent: %v", err)
 	}
-	data, err := os.ReadFile(sidePath)
+	data, err := projectphp.Evaluate(t.Context(), sidePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +266,8 @@ func TestInitConfigOutRefusesExistingWithoutYes(t *testing.T) {
 	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "supported")
 	dir := t.TempDir()
 	copyTree(t, fixture, dir)
-	sidePath := filepath.Join(dir, "review.magelift.yaml")
+	writeInitShopFixture(t, dir, "2.4.8-p5", "community")
+	sidePath := filepath.Join(dir, "review.magelift.php")
 	if err := os.WriteFile(sidePath, []byte("existing: true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +300,8 @@ func TestInitFromUpsunAccepted(t *testing.T) {
 	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "upsun", "supported")
 	dir := t.TempDir()
 	copyTree(t, fixture, dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
+	writeInitShopFixture(t, dir, "2.4.8-p5", "community")
+	configPath := filepath.Join(dir, "magelift.php")
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -311,7 +318,7 @@ func TestInitFromUpsunAccepted(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("init --from-upsun: %v\n%s", err, out.String())
 	}
-	data, err := os.ReadFile(configPath)
+	data, err := projectphp.Evaluate(t.Context(), configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +334,8 @@ func TestInitFromAccUnmappedWritesSidecarAndExitsNonZero(t *testing.T) {
 	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "unmapped")
 	dir := t.TempDir()
 	copyTree(t, fixture, dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
+	writeInitShopFixture(t, dir, "2.4.8-p5", "community")
+	configPath := filepath.Join(dir, "magelift.php")
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -361,7 +369,7 @@ func TestInitFromAccUnmappedWritesSidecarAndExitsNonZero(t *testing.T) {
 			t.Fatalf("sidecar missing %q:\n%s", want, report)
 		}
 	}
-	data, err := os.ReadFile(configPath)
+	data, err := projectphp.Evaluate(t.Context(), configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,7 +382,8 @@ func TestInitConfigOutUnmappedSidecarUsesStem(t *testing.T) {
 	fixture := filepath.Join(cliRepoRoot(t), "testdata", "fixtures", "acc", "unmapped")
 	dir := t.TempDir()
 	copyTree(t, fixture, dir)
-	sidePath := filepath.Join(dir, "review.magelift.yaml")
+	writeInitShopFixture(t, dir, "2.4.8-p5", "community")
+	sidePath := filepath.Join(dir, "review.magelift.php")
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -404,7 +413,7 @@ func TestInitConfigOutUnmappedSidecarUsesStem(t *testing.T) {
 func TestInitBareWithYesOverwritesStarter(t *testing.T) {
 	dir := t.TempDir()
 	writeInitShopFixture(t, dir, "2.4.9", "community")
-	configPath := filepath.Join(dir, "magelift.yaml")
+	configPath := filepath.Join(dir, "magelift.php")
 	old := starterConfig + "# marker\n"
 	if err := os.WriteFile(configPath, []byte(old), 0o644); err != nil {
 		t.Fatal(err)
@@ -416,31 +425,48 @@ func TestInitBareWithYesOverwritesStarter(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("init --yes: %v\n%s", err, out.String())
 	}
-	data, err := os.ReadFile(configPath)
+	data, err := projectphp.Evaluate(t.Context(), configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(data) == old {
 		t.Fatal("expected overwrite of existing config")
 	}
-	if !strings.Contains(string(data), "environments:\n  test:") {
-		t.Fatalf("expected minimal test environment starter:\n%s", data)
+	if !strings.Contains(string(data), `"staging":`) {
+		t.Fatalf("expected staging environment starter:\n%s", data)
 	}
-	if !strings.Contains(string(data), "mode: integrated") || !strings.Contains(string(data), "webRuntime: nginx-fpm") || !strings.Contains(string(data), "frontName: admin") {
+	if !strings.Contains(string(data), `"mode":"integrated"`) || !strings.Contains(string(data), `"webRuntime":"nginx-fpm"`) || !strings.Contains(string(data), `"frontName":"admin"`) {
 		t.Fatalf("starter is not an integrated PHP storefront: %s", data)
 	}
 }
 
-func TestSampleShopExampleValidates(t *testing.T) {
-	path := filepath.Join(cliRepoRoot(t), "examples", "sample-shop", "magelift.yaml")
-	var out bytes.Buffer
-	cmd := newCommand(&out, &out, nil)
-	cmd.SetArgs([]string{"--config", path, "--output", "json", "config", "validate"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("config validate %s: %v\n%s", path, err, out.String())
-	}
-	if !strings.Contains(out.String(), `"valid": true`) {
-		t.Fatalf("validate output = %s", out.String())
+func TestShopExamplesDefineStagingAndBuildInputs(t *testing.T) {
+	for _, relative := range []string{"examples/magelift.php", "examples/sample-shop/magelift.php"} {
+		t.Run(relative, func(t *testing.T) {
+			path := filepath.Join(cliRepoRoot(t), relative)
+			data, err := projectphp.Evaluate(t.Context(), path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			file, err := config.Load(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			spec, err := file.ResolveBuild()
+			if err != nil || len(spec.Build.StaticContent.Locales) == 0 || len(spec.Build.StaticContent.Themes) == 0 {
+				t.Fatalf("example build inputs = %#v, error = %v", spec.Build.StaticContent, err)
+			}
+			stage, err := file.Resolve("staging", config.ResolveOptions{})
+			if err != nil || stage.Config.Class != "staging" {
+				t.Fatalf("staging class = %q, error = %v", stage.Config.Class, err)
+			}
+			var out bytes.Buffer
+			cmd := newCommand(&out, &out, nil)
+			cmd.SetArgs([]string{"--config", path, "--output", "json", "config", "validate"})
+			if err := cmd.Execute(); err != nil || !strings.Contains(out.String(), `"valid": true`) {
+				t.Fatalf("config validate: %v\n%s", err, out.String())
+			}
+		})
 	}
 }
 
@@ -495,7 +521,7 @@ func copyTree(t *testing.T, src, dst string) {
 func TestInitGCPStarterMatchesAlphaRecipe(t *testing.T) {
 	dir := t.TempDir()
 	writeInitShopFixture(t, dir, "2.4.9", "community")
-	configPath := filepath.Join(dir, "magelift.yaml")
+	configPath := filepath.Join(dir, "magelift.php")
 	var out bytes.Buffer
 	cmd := newCommand(&out, &out, nil)
 	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "init", "--provider", "gcp"})
@@ -505,7 +531,7 @@ func TestInitGCPStarterMatchesAlphaRecipe(t *testing.T) {
 	if !strings.Contains(out.String(), `"release": "2.4.9"`) || !strings.Contains(out.String(), `"edition": "open-source"`) {
 		t.Fatalf("json init summary missing detection: %s", out.String())
 	}
-	data, err := os.ReadFile(configPath)
+	data, err := projectphp.Evaluate(t.Context(), configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,7 +539,7 @@ func TestInitGCPStarterMatchesAlphaRecipe(t *testing.T) {
 	if strings.Contains(text, "\n    openSearchMode: disabled") {
 		t.Fatal("starter pins search off; the alpha recipe serves OpenSearch by default")
 	}
-	for _, want := range []string{"staticContent:", "locales: [en_US]", "us-central1", "test.example.invalid", "environments:\n  test:"} {
+	for _, want := range []string{`"staticContent":`, `"locales":["en_US"]`, "us-central1", "staging.example.invalid", `"staging":`} {
 		if !strings.Contains(text, want) {
 			t.Errorf("starter missing %q", want)
 		}
@@ -522,11 +548,55 @@ func TestInitGCPStarterMatchesAlphaRecipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	effective, err := file.Resolve("test", config.ResolveOptions{})
+	effective, err := file.Resolve("staging", config.ResolveOptions{})
 	if err != nil {
 		t.Fatalf("test resolve: %v", err)
 	}
 	if got := effective.Config.Build.StaticContent.Locales; len(got) != 1 || got[0] != "en_US" {
 		t.Fatalf("staticContent locales = %#v", got)
+	}
+}
+
+func TestModernUpsunImportsToEachCloudBesideSelectedApplication(t *testing.T) {
+	for _, cloud := range []string{"aws", "gcp", "azure"} {
+		t.Run(cloud, func(t *testing.T) {
+			root := t.TempDir()
+			app := filepath.Join(root, "commerce")
+			writeInitShopFixture(t, app, "2.4.8-p2", "commerce")
+			dir := filepath.Join(root, ".upsun")
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			input := "applications:\n  api:\n    type: php:8.3\n    source: {root: commerce}\n    relationships: {database: {service: sql}}\n  frontend: {type: 'nodejs:22'}\nservices:\n  sql: {type: 'mariadb:10.11'}\n"
+			if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(input), 0600); err != nil {
+				t.Fatal(err)
+			}
+			t.Chdir(root)
+			var out bytes.Buffer
+			cmd := newCommand(&out, &out, nil)
+			cmd.SetArgs([]string{"init", "--from-upsun", "--app", "api", "--provider", cloud})
+			if err := cmd.Execute(); err != nil {
+				t.Fatal(err, out.String())
+			}
+			data, err := projectphp.Evaluate(t.Context(), filepath.Join(app, "magelift.php"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			f, err := config.Load(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			e, err := f.Resolve("staging", config.ResolveOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			db := e.Config.Services["database"]
+			if db.Family != "mariadb" || db.Version != "10.11" || e.Config.Application.Edition != "commerce" || e.Config.Build.PHP != "8.3" || e.Config.Target.Provider != cloud {
+				t.Fatalf("import lost destination or source metadata: %#v", db)
+			}
+			if _, err := os.Stat(filepath.Join(root, "magelift.php")); !os.IsNotExist(err) {
+				t.Fatal("expected project only in selected app")
+			}
+		})
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,12 +15,12 @@ import (
 
 func TestEnvImportDumpSuccessMovesJournalImported(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dumpPath := filepath.Join(dir, "seed.sql")
-	if err := os.WriteFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -79,12 +78,12 @@ func TestEnvImportDumpSuccessMovesJournalImported(t *testing.T) {
 
 func TestEnvImportDumpPreflightsTransportBeforeJournalMutation(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dumpPath := filepath.Join(dir, "seed.sql")
-	if err := os.WriteFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -126,12 +125,12 @@ func TestEnvImportDumpPreflightsTransportBeforeJournalMutation(t *testing.T) {
 
 func TestEnvImportDumpFailureMarksFailed(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dumpPath := filepath.Join(dir, "seed.sql")
-	if err := os.WriteFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,12 +173,12 @@ func TestEnvImportDumpFailureMarksFailed(t *testing.T) {
 
 func TestEnvImportDumpNonEmptyRetryRequiresYes(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dumpPath := filepath.Join(dir, "seed.sql")
-	if err := os.WriteFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -229,12 +228,12 @@ func TestEnvImportDumpNonEmptyRetryRequiresYes(t *testing.T) {
 
 func TestEnvImportDumpWithYesAllowsFailedRetry(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dumpPath := filepath.Join(dir, "seed.sql")
-	if err := os.WriteFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(dumpPath, []byte("-- fixture\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

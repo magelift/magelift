@@ -7,7 +7,7 @@
 Setup for every task (fixture shop copy, installed skills only):
 
 ```sh
-rm -rf /tmp/shop && mkdir -p /tmp/shop && cp tests/fixtures/skills-acceptance/magelift.yaml /tmp/shop/magelift.yaml
+rm -rf /tmp/shop && mkdir -p /tmp/shop && cp tests/fixtures/skills-acceptance/magelift.php /tmp/shop/magelift.php
 cd /tmp/shop
 magelift skills install --agent generic --scope project   # [SEEN shape; exit 0 + clean:true proven in box 2.3]
 ```
@@ -19,8 +19,8 @@ test reads ONLY `/tmp/shop/.agents/skills/*/SKILL.md` for Magelift procedure.
 ## Task 1 — configure (skill: magelift-configure)
 
 ```sh
-magelift config validate --config magelift.yaml --env staging
-magelift config effective --config magelift.yaml --env staging
+magelift config validate --config magelift.php --env staging
+magelift config effective --config magelift.php --env staging
 ```
 
 Pass: both exit 0. `validate` prints `valid: true`. `effective` prints the
@@ -39,7 +39,7 @@ Pass: exit 0 with `status: ok`. Output is a per-check list (`id`, `status`,
 `message`, plus `capability`, `requirement`, `path`, `version` for tool
 checks) separating required tools from optional capabilities; each tool
 reports reachable (`available`) or explicitly missing. Must run from a dir
-containing `magelift.yaml` (without one, doctor errors `open magelift.yaml:
+containing `magelift.php` (without one, doctor errors `open magelift.php:
 no such file or directory`). Do NOT run `--install-dependencies` (skill:
 read-only gate in acceptance).
 

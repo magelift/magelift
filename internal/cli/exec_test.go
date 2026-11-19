@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -140,14 +139,14 @@ func TestMagentoOperationTargetsPHPContainer(t *testing.T) {
 	}
 }
 
-func TestCacheFlushRejectsFrankenPHPWithoutAdobeHatch(t *testing.T) {
+func TestCacheFlushAcceptsFrankenPHPWithoutAdobeHatch(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	data = bytes.Replace(data, []byte("webRuntime: nginx-fpm"), []byte("webRuntime: frankenphp-classic"), 1)
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	if err := writeTestProjectFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
@@ -155,7 +154,7 @@ func TestCacheFlushRejectsFrankenPHPWithoutAdobeHatch(t *testing.T) {
 	command := newCommandWithOptions(o)
 	command.SetArgs([]string{"--config", path, "--env", "staging", "cache-flush"})
 	err = command.Execute()
-	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "allowUnsupported") {
+	if err == nil || !strings.Contains(err.Error(), "infrastructure backend factory is required") {
 		t.Fatalf("error=%v code=%d", err, ExitCode(err))
 	}
 }

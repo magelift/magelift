@@ -78,7 +78,7 @@ func accountFree(cfg config.Config, environment, plannedRegion string) platform.
 		MonthlyBudgetCents: cfg.MonthlyBudgetCents,
 		Priced:             []platform.CostPricedItem{},
 		MonthlyTotalCents:  nil,
-		Notice:             "Account-free mode does not call Scaleway APIs or claim current prices. Capacity is derived from magelift.yaml; Scaleway live pricing is not wired yet.",
+		Notice:             "Account-free mode does not call Scaleway APIs or claim current prices. Capacity is derived from magelift.php; Scaleway live pricing is not wired yet.",
 		Unsupported: []platform.CostUnsupportedItem{
 			{Resource: "Scaleway unit prices", Reason: "current regional prices require live Scaleway pricing data"},
 			{Resource: "usage-based services", Reason: "data transfer, requests, storage growth, logs, load-balancer traffic, and Cockpit usage depend on workload measurements"},

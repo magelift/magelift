@@ -40,16 +40,14 @@ func doctorCommand(o *options) *cobra.Command {
 	var installDependencies bool
 	var localMode bool
 	var exportPath string
-	command := &cobra.Command{Use: "doctor", Short: "Check this project and print the next Magelift command", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	command := &cobra.Command{Use: "doctor", Short: "Check this project and print the next MageLift command", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		file, loadErr := o.load()
 		if loadErr != nil && !localMode && exportPath == "" {
 			return invalid(loadErr)
 		}
 		report := buildDoctorReport(o.configPath, file, loadErr)
 		if localMode {
-			for _, check := range localModeCredentialSkips(file) {
-				report.Checks = append(report.Checks, check)
-			}
+			report.Checks = append(report.Checks, localModeCredentialSkips(file)...)
 		} else if file != nil {
 			for _, check := range credentialChecks(cmd.Context(), file, dependencyRunner(o), o.getenv) {
 				report.Checks = append(report.Checks, check)
@@ -59,6 +57,13 @@ func doctorCommand(o *options) *cobra.Command {
 			}
 		}
 		specs := dependencySpecsForDoctor(file)
+		if localMode {
+			for i := range specs {
+				if specs[i].ID == "pulumi" {
+					specs[i].Requirement = toolchain.DependencyOptional
+				}
+			}
+		}
 		dependencies := toolchain.CheckDependencies(cmd.Context(), dependencyRunner(o), specs)
 		if installDependencies {
 			if err := installMissingDependencies(cmd.Context(), o, specs, dependencies); err != nil {

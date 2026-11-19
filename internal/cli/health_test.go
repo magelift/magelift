@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -32,8 +31,8 @@ func (f fakeRuntimeObserve) PrepareExec(context.Context, platform.PlannedStack, 
 
 func TestHealthConfigModeProducesJSON(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -50,8 +49,8 @@ func TestHealthConfigModeProducesJSON(t *testing.T) {
 
 func TestHealthRuntimeModeDoesNotFabricateSuccess(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer

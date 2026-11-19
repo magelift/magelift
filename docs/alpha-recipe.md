@@ -1,13 +1,11 @@
 ---
-title: Alpha recipe
-description: The single pinned GCP Autopilot shop shape the alpha proves. Versions, tiers, bounds, and excluded promises.
+title: Archived GCP alpha recipe
+description: Versions, infrastructure and limits of the archived GCP staging run.
 ---
 
-# Alpha recipe
+# Archived GCP alpha recipe
 
-The one shop shape the alpha proves. Everything here is a pin, not a
-range. The acceptance loop runs exactly this; pilots should start here
-before varying anything.
+The alpha campaign exercised the GCP Autopilot configuration below. For a new shop, start with the current project template and choose versions for your Magento release. [Get started](getting-started.md)
 
 ## Pins
 
@@ -15,7 +13,7 @@ before varying anything.
 | --- | --- |
 | Magento | Open Source 2.4.9 |
 | PHP | 8.5 |
-| Runtime | GCP GKE Autopilot, `europe-west1` (the proved region) |
+| Runtime | GCP GKE Autopilot, `europe-west1` |
 | Database | Cloud SQL MySQL 8.4, `db-perf-optimized-N-2` |
 | Cache/session | Memorystore Valkey 9 (`VALKEY_9_0`), `SHARED_CORE_NANO`, 1 shard |
 | Search | OpenSearch 3 on GKE, digest-pinned image, recipe replica count |
@@ -25,8 +23,7 @@ before varying anything.
 | Web | 1 replica (preview preset) |
 | Mail | Operator SMTP relay, password in Secret Manager (or disabled) |
 
-`magelift init --provider gcp` templates this shape; the loop and the
-onboarding guide verify it per surface.
+Use `magelift --env staging config effective` to inspect the current GCP starter. [GCP staging walkthrough](onboarding.md)
 
 ## Bounds
 

@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,12 +13,12 @@ import (
 
 func TestEnvCreateDumpPersistsSeedDumpAndJournalRecorded(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dumpPath := filepath.Join(dir, "seed.sql")
-	if err := os.WriteFile(dumpPath, []byte("-- fixture dump\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(dumpPath, []byte("-- fixture dump\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -46,7 +45,7 @@ func TestEnvCreateDumpPersistsSeedDumpAndJournalRecorded(t *testing.T) {
 		t.Fatalf("create still uses placeholder prose: %q", status)
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -50,13 +50,22 @@ func buildCommand(o *options) *cobra.Command {
 	var imageReference string
 	var builderImage string
 	var runtimeImage string
-	var sourceURL string
+	var sourceURL, sourceDirectory string
 	var exportRecipe string
 	var platforms []string
 	command := &cobra.Command{Use: "build", Short: "Build an immutable Magento application image", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		file, err := o.load()
 		if err != nil {
 			return invalid(err)
+		}
+		if sourceDirectory == "" {
+			sourceDirectory = filepath.Dir(o.configPath)
+		} else {
+			lock, err := os.ReadFile(filepath.Join(sourceDirectory, "composer.lock"))
+			if err != nil {
+				return invalid(fmt.Errorf("read selected source composer.lock: %w", err))
+			}
+			file.AttachComposerLock(lock)
 		}
 		spec, err := file.ResolveBuild()
 		if err != nil {
@@ -74,7 +83,7 @@ func buildCommand(o *options) *cobra.Command {
 			if err != nil {
 				return invalid(err)
 			}
-			result, err := exportBuildRecipe(exportRecipe, platform)
+			result, err := exportBuildRecipeForPHP(exportRecipe, platform, spec.Build.PHP)
 			if err != nil {
 				return invalid(err)
 			}
@@ -87,7 +96,7 @@ func buildCommand(o *options) *cobra.Command {
 		if err := requireDependencies(cmd.Context(), o, toolchain.SpecsForBuild(push), "local build"); err != nil {
 			return err
 		}
-		repository, err := (source.GitInspector{}).Inspect(cmd.Context(), filepath.Dir(o.configPath))
+		repository, err := (source.GitInspector{}).Inspect(cmd.Context(), sourceDirectory)
 		if err != nil {
 			return invalid(err)
 		}
@@ -142,7 +151,7 @@ func buildCommand(o *options) *cobra.Command {
 			if spec.Build.Cache != nil {
 				cacheFrom = spec.Build.Cache.From
 			}
-			images, err = toolchain.BuildImages(cmd.Context(), o.stderr, tempRoot, defaultBuildPlatform, "", cacheFrom...)
+			images, err = toolchain.BuildImagesForPHP(cmd.Context(), o.stderr, tempRoot, defaultBuildPlatform, "", spec.Build.PHP, cacheFrom...)
 			request.UseEmbeddedRecipe = true
 			if err == nil {
 				resolver = toolchain.NewResolver(toolchain.SystemCommandRunner(), images.BuilderID, images.RuntimeReference)
@@ -198,6 +207,7 @@ func buildCommand(o *options) *cobra.Command {
 		}
 		return o.write(result)
 	}}
+	command.Flags().StringVar(&sourceDirectory, "source", "", "shop checkout to build when the PHP project is stored separately")
 	command.Flags().StringVar(&exportRecipe, "export-recipe", "", "export the bundled build recipe without building or publishing")
 	command.Flags().BoolVar(&push, "push", false, "push the image and publish build attestations")
 	command.Flags().StringVar(&imageReference, "image", "", "target image reference for a pushed build")
@@ -233,8 +243,13 @@ func imageResolver(builderImage, runtimeImage string) (*toolchain.Resolver, erro
 }
 
 func validateDefaultImageRecipe(php, webRuntime, builderImage, runtimeImage string) error {
-	if builderImage == "" && runtimeImage == "" && (php != toolchain.DefaultPHPBranch || webRuntime != toolchain.DefaultWebRuntime) {
-		return fmt.Errorf("default community images require PHP %s and %s; other recipes need explicit --builder-image and --runtime-image overrides", toolchain.DefaultPHPBranch, toolchain.DefaultWebRuntime)
+	if builderImage == "" && runtimeImage == "" {
+		if _, _, err := buildcontext.PHPRecipe(php); err != nil {
+			return err
+		}
+		if webRuntime != toolchain.DefaultWebRuntime {
+			return fmt.Errorf("default community images require %s; other runtimes need explicit --builder-image and --runtime-image overrides", toolchain.DefaultWebRuntime)
+		}
 	}
 	return nil
 }
@@ -576,7 +591,11 @@ func buildTempRoot(artifactDirectory string) (string, error) {
 
 // exportBuildRecipe writes only versioned inputs and refuses an occupied target.
 func exportBuildRecipe(destination, platform string) (map[string]string, error) {
-	fingerprint, err := buildcontext.ContentFingerprint(platform)
+	return exportBuildRecipeForPHP(destination, platform, "8.5")
+}
+
+func exportBuildRecipeForPHP(destination, platform, php string) (map[string]string, error) {
+	fingerprint, err := buildcontext.ContentFingerprintForPHP(platform, php)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +609,7 @@ func exportBuildRecipe(destination, platform string) (map[string]string, error) 
 	if err := os.Mkdir(absolute, 0o700); err != nil {
 		return nil, fmt.Errorf("recipe destination must not exist: %w", err)
 	}
-	if err := buildcontext.WriteContext(absolute); err != nil {
+	if err := buildcontext.WriteContextForPHP(absolute, php); err != nil {
 		os.RemoveAll(absolute)
 		return nil, err
 	}

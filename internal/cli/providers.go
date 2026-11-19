@@ -28,7 +28,7 @@ func providersInstallCommand(o *options) *cobra.Command {
 	var lockPath, cacheDir, version string
 	command := &cobra.Command{
 		Use:   "install",
-		Short: "Download and verify the providers named by magelift.yaml",
+		Short: "Download and verify the providers named by magelift.php",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			file, err := o.load()
@@ -38,6 +38,18 @@ func providersInstallCommand(o *options) *cobra.Command {
 			providers, err := configProviders(file)
 			if err != nil {
 				return err
+			}
+			remote := providers[:0]
+			for _, provider := range providers {
+				switch provider {
+				case "aws", "ovh", "scaleway":
+				default:
+					remote = append(remote, provider)
+				}
+			}
+			providers = remote
+			if len(providers) == 0 {
+				return o.write(map[string]any{"providers": []any{}, "bootstrapped": false})
 			}
 			executable := ""
 			if o.executable != nil {
@@ -69,6 +81,16 @@ func providersInstallCommand(o *options) *cobra.Command {
 				fetched, ferr := fetch(cmd.Context(), tag)
 				if ferr != nil {
 					return &exitError{code: 3, err: ferr}
+				}
+				for id := range fetched.Providers {
+					if err := providerhost.ValidateBootstrapIdentity(fetched, id, tag); err != nil {
+						return &exitError{code: 3, err: err}
+					}
+				}
+				for _, id := range providers {
+					if _, err := fetched.Artifact(id); err != nil {
+						return &exitError{code: 3, err: err}
+					}
 				}
 				encoded, ferr := json.MarshalIndent(fetched, "", "  ")
 				if ferr != nil {
@@ -163,7 +185,7 @@ func providersInstallCommand(o *options) *cobra.Command {
 }
 
 // configProviders returns the distinct providers named across every
-// environment in the project file. Downloads are YAML-driven: no flag
+// environment in the project file. Downloads follow the project file: no flag
 // selects providers.
 func configProviders(file *config.File) ([]string, error) {
 	if file == nil {

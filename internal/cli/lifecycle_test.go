@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -169,7 +168,7 @@ func writeLifecycleConfig(t *testing.T, class string, protection bool) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
+	path := filepath.Join(t.TempDir(), "magelift.php")
 	if err := writeFile(path, data); err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +176,7 @@ func writeLifecycleConfig(t *testing.T, class string, protection bool) string {
 }
 
 func writeFile(path string, data []byte) error {
-	return os.WriteFile(path, data, 0o600)
+	return writeTestProjectFile(path, data, 0o600)
 }
 
 func TestDeployRunsPreviewAndUpdateThroughBackendBoundary(t *testing.T) {
@@ -464,7 +463,7 @@ func writeGCPLifecycleConfig(t *testing.T, class string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
+	path := filepath.Join(t.TempDir(), "magelift.php")
 	if err := writeFile(path, data); err != nil {
 		t.Fatal(err)
 	}
@@ -739,8 +738,8 @@ func TestExperimentalTargetWarnsAtPlanStack(t *testing.T) {
 			configPath: func(t *testing.T) string {
 				t.Helper()
 				contents := strings.Replace(starterConfig, "runtime: ecs-fargate", "runtime: eks", 1)
-				path := filepath.Join(t.TempDir(), "magelift.yaml")
-				if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+				path := filepath.Join(t.TempDir(), "magelift.php")
+				if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 					t.Fatal(err)
 				}
 				return path
@@ -1027,7 +1026,7 @@ func writeLifecycleConfigWithExistingNetwork(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
+	path := filepath.Join(t.TempDir(), "magelift.php")
 	if err := writeFile(path, data); err != nil {
 		t.Fatal(err)
 	}
@@ -1094,7 +1093,7 @@ func writeLifecycleConfigWithExistingNetworkAndDatabase(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
+	path := filepath.Join(t.TempDir(), "magelift.php")
 	if err := writeFile(path, data); err != nil {
 		t.Fatal(err)
 	}
@@ -1157,7 +1156,7 @@ func writeLifecycleConfigWithExistingDatabase(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
+	path := filepath.Join(t.TempDir(), "magelift.php")
 	if err := writeFile(path, data); err != nil {
 		t.Fatal(err)
 	}

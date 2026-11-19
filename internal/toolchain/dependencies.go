@@ -263,6 +263,15 @@ func PlanDependencyInstalls(runner DependencyRunner, specs []DependencySpec, rep
 			missing[check.ID] = struct{}{}
 		}
 	}
+	for _, spec := range specs {
+		if _, needed := missing[spec.ID]; needed && !spec.Installable {
+			if spec.Requirement == DependencyOptional {
+				delete(missing, spec.ID)
+			} else {
+				return nil, fmt.Errorf("dependency %q cannot be installed automatically; %s", spec.ID, installHint(runner, spec))
+			}
+		}
+	}
 	if len(missing) == 0 {
 		return nil, nil
 	}
@@ -314,13 +323,14 @@ func InstallDependencies(ctx context.Context, runner DependencyRunner, actions [
 // and day-2 launchers. The Go SDKs remain the provider API boundary; provider
 // CLIs are listed only when a returned ExecTarget launches them.
 func SpecsForTarget(provider, runtimeID string) []DependencySpec {
-	// Pulumi runs in-process through the Automation API
-	// (UpsertStackInlineSource). A host `pulumi` binary is not consulted,
-	// and `apt-get install pulumi` is not a Debian package.
 	specs := dockerDependencySpecs(DependencyOptional)
+	switch provider {
+	case "aws", "gcp", "azure", "ovh", "scaleway":
+		specs = append(specs, DependencySpec{ID: "pulumi", Command: "pulumi", Capability: "cloud infrastructure and stack operations", Requirement: DependencyRequired, VersionArgs: []string{"version"}})
+	}
 
 	switch runtimeID {
-	case "eks", "gke-autopilot", "gke-standard", "kapsule", "mks":
+	case "eks", "gke-autopilot", "gke-standard", "aks", "kapsule", "mks":
 		specs = append(specs, DependencySpec{ID: "kubectl", Command: "kubectl", Capability: "Kubernetes exec and private tunnels", Requirement: DependencyOptional, VersionArgs: []string{"version", "--client=true", "--output=yaml"}, InstallPackage: "kubectl", Installable: true})
 	}
 	if provider == "gcp" {
@@ -372,6 +382,9 @@ func dockerDependencySpecs(requirement DependencyRequirement) []DependencySpec {
 }
 
 func installHint(runner DependencyRunner, spec DependencySpec) string {
+	if spec.ID == "pulumi" && !spec.Installable {
+		return "install the Pulumi CLI from https://www.pulumi.com/docs/iac/download-install/"
+	}
 	packageName := strings.TrimSpace(spec.InstallPackage)
 	if packageName == "" {
 		packageName = spec.Command

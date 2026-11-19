@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,8 +21,8 @@ const releaseTwo = "registry.example.invalid/shop@sha256:bbbbbbbbbbbbbbbbbbbbbbb
 
 func TestPromoteRollbackAndHistoryUseForwardJournalEntries(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	verified := 0
@@ -82,8 +81,8 @@ func TestPromoteRollbackAndHistoryUseForwardJournalEntries(t *testing.T) {
 
 func TestRollbackRefusesOlderSchemaBeforeCutover(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	epoch := 1
@@ -130,8 +129,8 @@ func TestRollbackRefusesOlderSchemaBeforeCutover(t *testing.T) {
 
 func TestRollbackRefusesWhenSchemaEpochIsMissing(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
@@ -159,8 +158,8 @@ func TestRollbackRefusesWhenSchemaEpochIsMissing(t *testing.T) {
 
 func TestRollbackRefusesUnsignedJournalWithoutPromoteMetadata(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
@@ -195,8 +194,8 @@ func TestRollbackRefusesUnsignedJournalWithoutPromoteMetadata(t *testing.T) {
 
 func TestRollbackUsesPromoteSignaturesWhenDeployRowIsUnsigned(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	epoch := 1
@@ -252,8 +251,8 @@ func TestRollbackUsesPromoteSignaturesWhenDeployRowIsUnsigned(t *testing.T) {
 
 func TestRollbackRequiresForwardOnlyAcknowledgement(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
@@ -272,9 +271,9 @@ func TestRollbackRequiresForwardOnlyAcknowledgement(t *testing.T) {
 
 func TestProductionReleaseChangesRequireApproval(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
+	configPath := filepath.Join(directory, "magelift.php")
 	production := strings.Replace(starterConfig, "    class: staging", "    class: production", 1)
-	if err := os.WriteFile(configPath, []byte(production), 0o600); err != nil {
+	if err := writeTestProjectFile(configPath, []byte(production), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
@@ -294,8 +293,8 @@ func TestProductionReleaseChangesRequireApproval(t *testing.T) {
 
 func TestPromoteRejectsUnsignedOrMutableReferences(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
@@ -363,8 +362,8 @@ func TestEvidenceExportsDigestActorProvenanceWithoutSecrets(t *testing.T) {
 
 func TestPromoteDiscoversIdentityFromLoginToken(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	token := signIdentityJWT(t, "release@example.invalid", "https://issuer.example.invalid")
@@ -399,8 +398,8 @@ func TestPromoteDiscoversIdentityFromLoginToken(t *testing.T) {
 
 func TestPromoteRefusesWhenLoginIdentityCannotBeDiscovered(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})

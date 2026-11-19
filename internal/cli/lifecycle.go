@@ -513,7 +513,7 @@ func (o *options) planStack(allowExpiredPreview bool) (string, platform.PlannedS
 }
 
 // planStackForRuntimeObserve plans for output-backed read paths (exec, logs,
-// tunnel, runtime health) without requiring target.imageDigest in YAML.
+// tunnel, runtime health) using the deployment already recorded in state.
 func (o *options) planStackForRuntimeObserve() (string, platform.PlannedStack, error) {
 	return o.planStackWith(platform.PlanOptions{RuntimeObserve: true})
 }
@@ -553,9 +553,7 @@ func (o *options) planStackWithDigest(opts platform.PlanOptions, digestOverride 
 	return environment, planned, nil
 }
 
-// configWithImageDigest copies the provider target substruct before setting
-// ImageDigest. Config is passed by value, but AWS/GCP/OVH/Scaleway targets are
-// pointers; assigning the field in place would mutate the resolved config.
+// Copy the selected target so a command-line digest does not alter the project.
 func configWithImageDigest(cfg config.Config, digest string) (config.Config, error) {
 	switch cfg.Target.Provider {
 	case "aws":
@@ -572,6 +570,13 @@ func configWithImageDigest(cfg config.Config, digest string) (config.Config, err
 		copied := *cfg.Target.GCP
 		copied.ImageDigest = digest
 		cfg.Target.GCP = &copied
+	case "azure":
+		if cfg.Target.Azure == nil {
+			return config.Config{}, errors.New("target.azure is required to apply the deployment digest")
+		}
+		copied := *cfg.Target.Azure
+		copied.ImageDigest = digest
+		cfg.Target.Azure = &copied
 	case "ovh":
 		if cfg.Target.OVH == nil {
 			return config.Config{}, errors.New("target.ovh is required to apply the deployment digest")

@@ -15,8 +15,8 @@ import (
 
 func certificationCommand(o *options) *cobra.Command {
 	command := &cobra.Command{
-		Use:   "certification",
-		Short: "Inspect provider cells and verify acceptance evidence",
+		Use: "certification", Hidden: true,
+		Short: "Inspect historical provider campaigns and evidence",
 	}
 
 	targets := &cobra.Command{

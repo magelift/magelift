@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/config"
@@ -60,6 +61,29 @@ func (o *options) previewIdentity(effective config.Config) (*config.PreviewIdent
 	} else if baseDomain := strings.TrimSuffix(strings.TrimSpace(effective.Domain), "."); baseDomain != "" {
 		domain = "pr-" + strconv.FormatInt(o.previewPullRequest, 10) + "." + baseDomain
 	}
+	expiresAt := effective.ExpiresAt
+	if expiresAt == "" && o.previewExpiresAt == "" && (o.previewUpdatedAt != "" || effective.PreviewTTL != "") {
+		updated := time.Now().UTC()
+		if o.previewUpdatedAt != "" {
+			event, err := time.Parse(time.RFC3339, o.previewUpdatedAt)
+			if err != nil {
+				return nil, errors.New("--preview-updated-at requires an RFC3339 timestamp")
+			}
+			updated = event
+		}
+		lifetime := 7 * 24 * time.Hour
+		if effective.PreviewTTL != "" {
+			duration, err := time.ParseDuration(effective.PreviewTTL)
+			if err != nil || duration <= 0 {
+				return nil, errors.New("invalid previewTtl duration")
+			}
+			lifetime = duration
+		}
+		expiresAt = updated.Add(lifetime).UTC().Format(time.RFC3339)
+	}
+	if o.previewExpiresAt != "" {
+		expiresAt = o.previewExpiresAt
+	}
 	identity, err := config.BuildPreviewIdentity(config.PreviewIdentityInput{
 		Project:     effective.Project.Name,
 		Repository:  repository,
@@ -68,7 +92,7 @@ func (o *options) previewIdentity(effective config.Config) (*config.PreviewIdent
 		Commit:      o.previewCommit,
 		Generation:  o.previewGeneration,
 		Domain:      domain,
-		ExpiresAt:   effective.ExpiresAt,
+		ExpiresAt:   expiresAt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build preview identity: %w", err)
@@ -82,7 +106,7 @@ func (o *options) previewIdentityRequested() bool {
 		strings.TrimSpace(o.previewBranch) != "" ||
 		strings.TrimSpace(o.previewCommit) != "" ||
 		strings.TrimSpace(o.previewDomain) != "" ||
-		o.previewGeneration != 0
+		o.previewUpdatedAt != "" || o.previewExpiresAt != "" || o.previewGeneration != 0
 }
 
 func previewMetadata(identity *config.PreviewIdentity) *automation.PreviewMetadata {

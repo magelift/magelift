@@ -9,40 +9,45 @@ version: 1.0.0
 
 # Run Magento locally
 
-Create the Compose file from the project configuration before starting
-containers:
+After installing the shop's Composer dependencies, start the local environment:
 
 ```sh
-magelift doctor
-magelift local init
-magelift local up --service app
+magelift doctor --local
+magelift dev
 ```
 
-`local init` resolves a source-dated compatibility row. It pins the local service
-images, records the selected PHP and Composer inputs, and creates the ignored
-mode-0600 `.magelift/local.env` file. It never changes the cloud target.
+`dev` prepares Compose, installs Magento if the local database is empty and
+checks GraphQL. A generated admin password is stored in the ignored,
+mode-0600 `.magelift/local.env` file. Repeating `dev` reconciles generated
+Compose and PHP settings. If a generated file was manually edited, review and
+move it aside before retrying. `MAGELIFT_LOCAL_APP_HTTP_PORT` changes the local
+HTTP port; `MAGELIFT_LOCAL_BASE_URL` overrides the URL.
 
-Set local choices in the `local` block when the catalog supports them. Keep
-email credentials as environment-variable names; do not put secret values in
-`magelift.yaml`:
+For separate steps, use `magelift local init`, `magelift local up --service app`
+and `magelift local seed`. `local init` resolves a source-dated compatibility
+row and does not change the cloud target.
 
-```yaml
-local:
-  database:
-    family: mariadb
-    version: "11.8"
-  email:
-    mode: mailpit
+Set local choices in the `local` block. Service selections also come from
+the project's `services` settings. Keep email credentials as environment-variable
+names; do not put secret values in `magelift.php`.
+
+Add this fragment inside the existing project array in `magelift.php`:
+
+```php
+'local' => [
+    'phpSettings' => ['memory_limit' => '1G'],
+    'email' => ['mode' => 'mailpit'],
+],
 ```
 
 `mailpit` starts a digest-pinned SMTP sink on loopback. SMTP and SES
-still take `credentialEnv` names, never secret values in `magelift.yaml`.
+still take `credentialEnv` names, never secret values in `magelift.php`.
 
 Seed a project only after installing its Composer dependencies and supplying a
 local administrator password through the process environment:
 
 ```sh
-export MAGELIFT_LOCAL_ADMIN_PASSWORD='use-a-local-password-with-16-or-more-letters'
+export MAGELIFT_LOCAL_ADMIN_PASSWORD='LocalPassword123456'
 magelift local seed
 ```
 

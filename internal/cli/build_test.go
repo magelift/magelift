@@ -5,9 +5,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
+	buildcontext "github.com/magelift/magelift"
 	buildkit "github.com/magelift/magelift/internal/build/kit"
 	buildpipeline "github.com/magelift/magelift/internal/build/pipeline"
 	"github.com/magelift/magelift/internal/secretref"
@@ -359,13 +361,40 @@ func TestDefaultImageRecipeRejectsWrongPHPOrRuntimeBeforePull(t *testing.T) {
 		allowed                      bool
 	}{
 		{"8.5", "nginx-fpm", "", "", true},
-		{"8.4", "nginx-fpm", "", "", false},
+		{"8.3", "nginx-fpm", "", "", true},
+		{"8.4", "nginx-fpm", "", "", true},
+		{"8.4.1", "nginx-fpm", "", "", true},
+		{"8.2", "nginx-fpm", "", "", false},
 		{"8.5", "frankenphp-classic", "", "", false},
 		{"8.4", "nginx-fpm", "builder-override", "runtime-override", true},
 	} {
 		if err := validateDefaultImageRecipe(tc.php, tc.runtime, tc.builder, tc.image); (err == nil) != tc.allowed {
 			t.Fatalf("%+v: %v", tc, err)
 		}
+	}
+}
+
+func TestExportBuildRecipeSelectsPHPBranch(t *testing.T) {
+	for _, branch := range []string{"8.3", "8.4", "8.5"} {
+		t.Run(branch, func(t *testing.T) {
+			destination := filepath.Join(t.TempDir(), "recipe")
+			result, err := exportBuildRecipeForPHP(destination, "linux/amd64", branch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			content, err := os.ReadFile(filepath.Join(destination, "images/php-nginx/Dockerfile"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			base := regexp.MustCompile(`(?m)^ARG PHP_BASE=docker\.io/library/php:` + regexp.QuoteMeta(branch) + `(?:\.[0-9]+)?-fpm-trixie@sha256:[0-9a-f]{64}$`)
+			if !base.Match(content) {
+				t.Errorf("exported recipe has no pinned PHP %s FPM base", branch)
+			}
+			fingerprint, err := buildcontext.ContentFingerprintForPHP("linux/amd64", branch)
+			if err != nil || result["recipeSha256"] != fingerprint {
+				t.Fatalf("fingerprint = %q, error = %v", result["recipeSha256"], err)
+			}
+		})
 	}
 }
 

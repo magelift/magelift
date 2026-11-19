@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -63,7 +64,7 @@ func TestCheckDependenciesDistinguishesRequiredAndOptionalFailures(t *testing.T)
 	if report.Checks[0].Status != DependencyMissing || report.Checks[0].InstallHint != "brew install --cask docker-desktop" {
 		t.Fatalf("optional check = %#v", report.Checks[0])
 	}
-	if report.Checks[1].Status != DependencyMissing || report.Checks[1].InstallHint != "brew install pulumi" {
+	if report.Checks[1].Status != DependencyMissing || report.Checks[1].InstallHint != "install the Pulumi CLI from https://www.pulumi.com/docs/iac/download-install/" {
 		t.Fatalf("required check = %#v", report.Checks[1])
 	}
 	if len(probe.args) != 0 {
@@ -249,5 +250,31 @@ func TestSpecsForTargetGuidesGcloudForGCP(t *testing.T) {
 		if spec.ID == "gcloud" {
 			t.Fatal("aws specs must not include gcloud")
 		}
+	}
+}
+
+func TestPulumiTargetRequirementAndOptionalInstall(t *testing.T) {
+	for _, provider := range []string{"aws", "gcp", "azure", "ovh", "scaleway"} {
+		t.Run(provider, func(t *testing.T) {
+			var pulumi *DependencySpec
+			for _, spec := range SpecsForTarget(provider, "") {
+				if spec.ID == "pulumi" {
+					copy := spec
+					pulumi = &copy
+				}
+			}
+			if pulumi == nil || pulumi.Requirement != DependencyRequired || pulumi.Installable {
+				t.Fatalf("pulumi spec = %#v", pulumi)
+			}
+			probe := &dependencyProbe{}
+			report := DependencyReport{Checks: []DependencyCheck{{ID: "pulumi", Status: DependencyMissing}}}
+			if _, err := PlanDependencyInstalls(probe, []DependencySpec{*pulumi}, report); err == nil || !strings.Contains(err.Error(), "pulumi.com/docs") {
+				t.Fatalf("missing install guidance: %v", err)
+			}
+			pulumi.Requirement = DependencyOptional
+			if actions, err := PlanDependencyInstalls(probe, []DependencySpec{*pulumi}, report); err != nil || len(actions) != 0 {
+				t.Fatalf("optional actions=%v err=%v", actions, err)
+			}
+		})
 	}
 }

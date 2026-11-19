@@ -2,16 +2,18 @@ package paasimport
 
 import (
 	"fmt"
+	"maps"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v4"
 )
 
-// mageliftDocument is the subset of MageLift YAML emitted by the importer.
-// Fields must already exist on starterConfig / schema (IMPORT-04).
+// mageliftDocument holds fields extracted from the source platform before they
+// are merged into the Magento project and written as PHP.
 type mageliftDocument struct {
 	SchemaVersion int                    `yaml:"schemaVersion"`
 	Project       mageliftProject        `yaml:"project"`
@@ -106,13 +108,13 @@ type mageliftEnv struct {
 }
 
 // defaultEncryptionKeyPlaceholder is a secret-ref-shaped ARN placeholder.
-// Crypt plaintext from PaaS env must never be written into magelift.yaml (T-04-02 / T-04-06).
+// Crypt plaintext from PaaS env must never be written into magelift.php (T-04-02 / T-04-06).
 const defaultEncryptionKeyPlaceholder = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:magelift/encryption-key"
 
 func emitMagelift(doc mageliftDocument) ([]byte, error) {
 	data, err := yaml.Marshal(&doc)
 	if err != nil {
-		return nil, fmt.Errorf("encode magelift.yaml: %w", err)
+		return nil, fmt.Errorf("encode magelift.php: %w", err)
 	}
 	return data, nil
 }
@@ -130,8 +132,9 @@ func parsePHPType(typeValue string) (string, error) {
 }
 
 func domainFromRoutes(routes map[string]accRoute) string {
-	for pattern := range routes {
-		if strings.Contains(pattern, "{default}") {
+	for _, pattern := range slices.Sorted(maps.Keys(routes)) {
+		route := routes[pattern]
+		if (route.Type != "" && route.Type != "upstream") || strings.ContainsAny(pattern, "{}*") {
 			continue
 		}
 		u, err := url.Parse(pattern)
@@ -140,7 +143,7 @@ func domainFromRoutes(routes map[string]accRoute) string {
 		}
 		return u.Hostname()
 	}
-	return "staging.example.com"
+	return ""
 }
 
 func catalogFromRelationships(rels map[string]string) map[string]any {
@@ -383,26 +386,9 @@ func applyObservabilityEnv(doc *mageliftDocument, key, value string) (handled, r
 
 func baseDocument(name, php string) mageliftDocument {
 	return mageliftDocument{
-		SchemaVersion: 1,
-		Project:       mageliftProject{Name: name},
-		Application: mageliftApplication{
-			Edition: "open-source",
-			Version: "2.4.9",
-			Mode:    "integrated",
-		},
-		Build: mageliftBuild{PHP: php},
-		Target: mageliftTarget{
-			Provider: "aws",
-			Runtime:  "ecs-fargate",
-		},
-		Defaults: mageliftDefaults{
-			Region: "eu-west-3",
-			Preset: "preview",
-		},
-		Environments: map[string]mageliftEnv{
-			"staging": {Account: "123456789012"},
-		},
-		Extensions: map[string]any{},
+		Project:      mageliftProject{Name: name},
+		Build:        mageliftBuild{PHP: php},
+		Environments: map[string]mageliftEnv{"staging": {}},
 	}
 }
 

@@ -180,10 +180,14 @@ func TestDefaultNewBackendSkipsPluginForOtherCells(t *testing.T) {
 
 func TestSubprocessProvenance(t *testing.T) {
 	withArtifact := &options{
-		loadProvider: func(context.Context, string) (providerhost.Loaded, error) { return testLoaded(), nil },
+		inspectProvider: func(context.Context, string) (providerhost.Loaded, error) { return testLoaded(), nil },
+		loadProvider: func(context.Context, string) (providerhost.Loaded, error) {
+			t.Fatal("listing installed providers tried to acquire one")
+			return providerhost.Loaded{}, nil
+		},
 	}
 	provenance := withArtifact.subprocessProvenance(context.Background())
-	if len(provenance) != 1 {
+	if len(provenance) != 2 || provenance[1].Name != "magelift-provider-azure" || provenance[1].Mode != "subprocess" {
 		t.Fatalf("provenance = %v", provenance)
 	}
 	got := provenance[0]
@@ -191,12 +195,15 @@ func TestSubprocessProvenance(t *testing.T) {
 		t.Fatalf("provenance = %+v", got)
 	}
 	withoutArtifact := &options{
-		loadProvider: func(context.Context, string) (providerhost.Loaded, error) {
-			return providerhost.Loaded{}, errors.New("no lockfile")
+		inspectProvider: func(_ context.Context, name string) (providerhost.Loaded, error) {
+			if name == "azure" {
+				return providerhost.Loaded{}, providerhost.ErrChecksumMismatch
+			}
+			return providerhost.Loaded{}, providerhost.ErrNoLockfile
 		},
 	}
 	provenance = withoutArtifact.subprocessProvenance(context.Background())
-	if len(provenance) != 1 || provenance[0].Mode != "not-installed" || provenance[0].Version != "" {
+	if len(provenance) != 2 || provenance[0].Mode != "not-installed" || provenance[0].Version != "" || provenance[1].Mode != "unverified" {
 		t.Fatalf("provenance = %v", provenance)
 	}
 }
@@ -204,11 +211,11 @@ func TestSubprocessProvenance(t *testing.T) {
 func TestExtensionsListShowsProviderProvenance(t *testing.T) {
 	var stdout bytes.Buffer
 	o := &options{
-		output:       "json",
-		stdout:       &stdout,
-		stderr:       io.Discard,
-		modules:      platform.NewModuleRegistry(),
-		loadProvider: func(context.Context, string) (providerhost.Loaded, error) { return testLoaded(), nil },
+		output:          "json",
+		stdout:          &stdout,
+		stderr:          io.Discard,
+		modules:         platform.NewModuleRegistry(),
+		inspectProvider: func(context.Context, string) (providerhost.Loaded, error) { return testLoaded(), nil },
 	}
 	root := extensionsCommand(o)
 	root.SetArgs([]string{"list"})
@@ -216,7 +223,7 @@ func TestExtensionsListShowsProviderProvenance(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := stdout.String()
-	for _, want := range []string{`"providers"`, "magelift-provider-gcp", `"mode": "subprocess"`, `"version": "0.1.0"`} {
+	for _, want := range []string{`"providers"`, "magelift-provider-gcp", "magelift-provider-azure", `"mode": "subprocess"`, `"version": "0.1.0"`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing %q:\n%s", want, out)
 		}

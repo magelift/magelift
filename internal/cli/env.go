@@ -20,12 +20,12 @@ import (
 	"github.com/magelift/magelift/internal/localdev"
 	"github.com/magelift/magelift/internal/mediasync"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/projectphp"
 	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/internal/seeddump"
 	"github.com/magelift/magelift/internal/toolchain"
 	"github.com/magelift/magelift/sdk"
 	"github.com/spf13/cobra"
-	"go.yaml.in/yaml/v4"
 )
 
 var environmentName = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
@@ -63,7 +63,7 @@ func envCreateCommand(o *options) *cobra.Command {
 	var branches []string
 	command := &cobra.Command{
 		Use:   "create <environment>",
-		Short: "Add an environment overlay to magelift.yaml",
+		Short: "Add an environment to the project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
@@ -78,7 +78,7 @@ func envCreateCommand(o *options) *cobra.Command {
 					return guidedWrap(err,
 						fmt.Sprintf("database dump %q is not readable", dumpPath),
 						"pass an existing .sql or .sql.gz path; import runs after the environment first deploy (ADR 0010)",
-						"docs/adr/0010-database-dump-seed.md",
+						"docs/adr/0009-dump-seed-and-attach.md",
 					)
 				}
 			}
@@ -90,18 +90,6 @@ func envCreateCommand(o *options) *cobra.Command {
 				if existing == name {
 					return invalid(fmt.Errorf("environment %q already exists", name))
 				}
-			}
-			data, err := os.ReadFile(filepath.Clean(o.configPath))
-			if err != nil {
-				return invalid(err)
-			}
-			var document map[string]any
-			if err := yaml.Unmarshal(data, &document); err != nil {
-				return invalid(fmt.Errorf("decode configuration for environment creation: %w", err))
-			}
-			environments, ok := document["environments"].(map[string]any)
-			if !ok {
-				return invalid(errors.New("environments must be a map"))
 			}
 			overlay := map[string]any{}
 			if cmd.Flags().Changed("account") {
@@ -131,25 +119,15 @@ func envCreateCommand(o *options) *cobra.Command {
 			if dumpPath != "" {
 				overlay["seedDump"] = dumpPath
 			}
-			environments[name] = overlay
-			document["environments"] = environments
-			updated, err := yaml.Marshal(document)
-			if err != nil {
-				return fmt.Errorf("encode environment configuration: %w", err)
-			}
-			prospective, err := config.Load(updated)
-			if err != nil {
+			if err := o.updateEnvironmentOverlay(cmd.Context(), func(managed *projectphp.Overlay) error {
+				if _, exists := managed.Environments[name]; exists {
+					return fmt.Errorf("environment %q already exists", name)
+				}
+				managed.Environments[name] = overlay
+				managed.Removed = removeOverlayName(managed.Removed, name)
+				return nil
+			}, name); err != nil {
 				return invalid(fmt.Errorf("created environment is invalid: %w", err))
-			}
-			if _, err := prospective.Resolve(name, config.ResolveOptions{}); err != nil {
-				return invalid(fmt.Errorf("created environment is invalid: %w", err))
-			}
-			info, err := os.Stat(filepath.Clean(o.configPath))
-			if err != nil {
-				return err
-			}
-			if err := replaceFile(filepath.Clean(o.configPath), updated, info.Mode().Perm()); err != nil {
-				return err
 			}
 			result := map[string]any{"environment": name, "created": true}
 			if dumpPath != "" {
@@ -320,7 +298,7 @@ func (o *options) runPreviewSweep(ctx context.Context, file *config.File, cutoff
 	if o.modules == nil {
 		return nil, errors.New("stack module registry is required")
 	}
-	_, planned, err := o.modules.Plan(baseEffective.Config, baseEnvironment, platform.PlanOptions{AllowExpiredPreview: true, Context: ctx})
+	_, planned, err := o.modules.Plan(baseEffective.Config, baseEnvironment, platform.PlanOptions{AccountOnly: true, Context: ctx})
 	if err != nil {
 		return nil, invalid(err)
 	}
@@ -476,32 +454,70 @@ func (o *options) destroyEnvironment(ctx context.Context, name string) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(filepath.Clean(o.configPath))
-	if err != nil {
-		return nil, err
-	}
-	var document map[string]any
-	if err := yaml.Unmarshal(data, &document); err != nil {
-		return nil, fmt.Errorf("decode configuration after environment destroy: %w", err)
-	}
-	environments, ok := document["environments"].(map[string]any)
-	if !ok {
-		return nil, errors.New("environments must be a map")
-	}
-	delete(environments, name)
-	document["environments"] = environments
-	updated, err := yaml.Marshal(document)
-	if err != nil {
-		return nil, fmt.Errorf("encode configuration after environment destroy: %w", err)
-	}
-	info, err := os.Stat(filepath.Clean(o.configPath))
-	if err != nil {
-		return nil, err
-	}
-	if err := replaceFile(filepath.Clean(o.configPath), updated, info.Mode().Perm()); err != nil {
+	if err := o.updateEnvironmentOverlay(ctx, func(managed *projectphp.Overlay) error {
+		delete(managed.Environments, name)
+		managed.Removed = append(removeOverlayName(managed.Removed, name), name)
+		return nil
+	}, ""); err != nil {
 		return nil, fmt.Errorf("remove destroyed environment from configuration: %w", err)
 	}
 	return map[string]any{"environment": name, "destroyed": result, "removed": true}, nil
+}
+
+// updateEnvironmentOverlay leaves the authored PHP program intact and validates
+// the effective configuration before replacing the managed companion file.
+func (o *options) updateEnvironmentOverlay(ctx context.Context, update func(*projectphp.Overlay) error, validateEnvironment string) error {
+	unlock, err := projectphp.LockOverlay(ctx, o.configPath)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	managed, err := projectphp.ReadOverlay(ctx, o.configPath)
+	if err != nil {
+		return err
+	}
+	if err := update(&managed); err != nil {
+		return err
+	}
+	document, err := projectphp.EvaluateProject(ctx, o.configPath)
+	if err != nil {
+		return err
+	}
+	merged, err := projectphp.ApplyOverlay(document, managed)
+	if err != nil {
+		return err
+	}
+	file, err := config.Load(merged)
+	if err != nil {
+		return err
+	}
+	if validateEnvironment != "" {
+		if _, err := file.Resolve(validateEnvironment, config.ResolveOptions{}); err != nil {
+			return err
+		}
+	}
+	data, err := projectphp.RenderOverlay(managed)
+	if err != nil {
+		return err
+	}
+	path := projectphp.OverlayPath(o.configPath)
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return replaceFile(path, data, mode)
+}
+
+func removeOverlayName(names []string, name string) []string {
+	filtered := make([]string, 0, len(names))
+	for _, candidate := range names {
+		if candidate != name {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered
 }
 
 func envProtectCommand(o *options) *cobra.Command {
@@ -530,35 +546,16 @@ func envProtectCommand(o *options) *cobra.Command {
 			if unprotect && effective.Config.Class == "production" && !o.yes {
 				return invalid(errors.New("disabling protection for production requires --yes"))
 			}
-			data, err := os.ReadFile(filepath.Clean(o.configPath))
-			if err != nil {
-				return invalid(err)
-			}
-			var document map[string]any
-			if err := yaml.Unmarshal(data, &document); err != nil {
-				return invalid(fmt.Errorf("decode config for protection update: %w", err))
-			}
-			environments, ok := document["environments"].(map[string]any)
-			if !ok {
-				return invalid(errors.New("environments must be a map"))
-			}
-			overlay, ok := environments[name].(map[string]any)
-			if !ok {
-				return invalid(fmt.Errorf("environment %q must be a map", name))
-			}
-			overlay["protection"] = protect
-			environments[name] = overlay
-			document["environments"] = environments
-			updated, err := yaml.Marshal(document)
-			if err != nil {
-				return fmt.Errorf("encode protected configuration: %w", err)
-			}
-			info, err := os.Stat(filepath.Clean(o.configPath))
-			if err != nil {
-				return err
-			}
-			if err := replaceFile(filepath.Clean(o.configPath), updated, info.Mode().Perm()); err != nil {
-				return err
+			if err := o.updateEnvironmentOverlay(cmd.Context(), func(managed *projectphp.Overlay) error {
+				overlay := managed.Environments[name]
+				if overlay == nil {
+					overlay = map[string]any{}
+					managed.Environments[name] = overlay
+				}
+				overlay["protection"] = protect
+				return nil
+			}, name); err != nil {
+				return invalid(fmt.Errorf("update environment protection: %w", err))
 			}
 			return o.write(map[string]any{"environment": name, "protection": protect})
 		},
@@ -939,6 +936,24 @@ func envStatusCommand(o *options) *cobra.Command {
 				"class":       effective.Config.Class,
 				"domain":      effective.Config.Domain,
 				"protected":   effective.Config.Protection,
+				"console":     envConsole(effective.Config),
+			}
+			cfg := effective.Config
+			api := map[string]string{"source": "project", "path": "/graphql"}
+			if cfg.Domain != "" {
+				api["domain"] = cfg.Domain
+			}
+			base := cfg.Application.Magento.SecureBaseURL
+			if base == "" {
+				base = cfg.Application.Magento.UnsecureBaseURL
+			}
+			if base != "" {
+				api["configuredUrl"] = strings.TrimRight(base, "/") + "/graphql"
+			}
+			result["graphql"] = api
+			result["storefrontMode"] = cfg.Application.Mode
+			if origin := cfg.Application.Magento.StorefrontOrigin; origin != "" {
+				result["storefrontOrigin"] = origin
 			}
 			seedDump := effective.Config.SeedDump
 			if seedDump == "" {

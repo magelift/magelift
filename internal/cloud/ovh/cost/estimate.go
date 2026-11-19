@@ -79,7 +79,7 @@ func accountFree(planned platform.PlannedStack, cfg config.Config) platform.Cost
 		MonthlyBudgetCents: cfg.MonthlyBudgetCents,
 		Priced:             []platform.CostPricedItem{},
 		MonthlyTotalCents:  nil,
-		Notice:             "Account-free mode does not call OVHcloud or claim current prices. Capacity is derived from magelift.yaml; OVHcloud live pricing is not wired yet.",
+		Notice:             "Account-free mode does not call OVHcloud or claim current prices. Capacity is derived from magelift.php; OVHcloud live pricing is not wired yet.",
 		Unsupported: []platform.CostUnsupportedItem{
 			{Resource: "OVHcloud unit prices", Reason: "current regional prices require live OVHcloud pricing data"},
 			{Resource: "usage-based services", Reason: "egress, load-balancer traffic, object storage, backups, and logs depend on workload measurements"},

@@ -74,14 +74,14 @@ func (r *fakeDependencyRunner) Run(_ context.Context, command string, args ...st
 
 func TestDevUpStopsBeforeComposeWhenDockerIsUnavailable(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(directory, ".magelift"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(directory, ".magelift", "compose.local.yml"), []byte("services: {}\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(filepath.Join(directory, ".magelift", "compose.local.yml"), []byte("services: {}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	runner := &fakeDependencyRunner{missing: map[string]bool{"docker": true}}
@@ -105,20 +105,20 @@ func TestDevUpStopsBeforeComposeWhenDockerIsUnavailable(t *testing.T) {
 
 func TestDevSeedChecksDockerBeforeWritingCredentials(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(directory, ".magelift"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(directory, ".magelift", "compose.local.yml"), []byte("services: {}\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(filepath.Join(directory, ".magelift", "compose.local.yml"), []byte("services: {}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(directory, "bin", "magento"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := writeTestProjectFile(filepath.Join(directory, "bin", "magento"), []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	runner := &fakeDependencyRunner{missing: map[string]bool{"docker": true}}
@@ -143,8 +143,8 @@ func TestDevSeedChecksDockerBeforeWritingCredentials(t *testing.T) {
 
 func TestDoctorDependencyInstallRequiresExplicitConfirmation(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	runner := &fakeDependencyRunner{missing: map[string]bool{"docker": true}}
@@ -166,8 +166,8 @@ func TestDoctorDependencyInstallRequiresExplicitConfirmation(t *testing.T) {
 
 func TestDoctorDependencyInstallRechecksAfterExplicitInstall(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	runner := &fakeDependencyRunner{missing: map[string]bool{"docker": true}}
@@ -195,7 +195,7 @@ func TestDoctorDependencyInstallRechecksAfterExplicitInstall(t *testing.T) {
 
 func TestRunExecTargetPreflightsLauncherBeforeStartingSession(t *testing.T) {
 	temporary := filepath.Join(t.TempDir(), "kubeconfig")
-	if err := os.WriteFile(temporary, []byte("secret"), 0o600); err != nil {
+	if err := writeTestProjectFile(temporary, []byte("secret"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	runner := &fakeDependencyRunner{missing: map[string]bool{"kubectl": true}}
@@ -218,7 +218,7 @@ func TestRunExecTargetPreflightsLauncherBeforeStartingSession(t *testing.T) {
 	}
 }
 
-func TestInfrastructureDoesNotRequirePulumiCLI(t *testing.T) {
+func TestInfrastructureRequiresPulumiCLI(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
 	runner := &fakeDependencyRunner{missing: map[string]bool{"pulumi": true}}
 	backendCalled := false
@@ -231,11 +231,11 @@ func TestInfrastructureDoesNotRequirePulumiCLI(t *testing.T) {
 	command := newCommandWithOptions(o)
 	command.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "deploy"})
 	err := command.Execute()
-	if !backendCalled {
-		t.Fatalf("deploy stopped before the infrastructure backend because pulumi was absent: %v", err)
+	if err == nil || ExitCode(err) != 3 || !strings.Contains(err.Error(), "pulumi") {
+		t.Fatalf("error=%v code=%d", err, ExitCode(err))
 	}
-	if err != nil && strings.Contains(err.Error(), "pulumi") {
-		t.Fatalf("deploy still requires the pulumi CLI: %v", err)
+	if backendCalled {
+		t.Fatal("backend started without the Pulumi CLI")
 	}
 }
 

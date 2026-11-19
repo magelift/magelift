@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -44,12 +43,12 @@ func testOptions(out *bytes.Buffer, terminal environmentTerminal) *options {
 
 func TestConfigEffectiveJSON(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "magelift.yaml"), []byte(starterConfig), 0o600); err != nil {
+	if err := writeTestProjectFile(filepath.Join(dir, "magelift.php"), []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
 	cmd := newCommand(&out, &out, nil)
-	cmd.SetArgs([]string{"--config", filepath.Join(dir, "magelift.yaml"), "--env", "staging", "--output", "json", "config", "effective"})
+	cmd.SetArgs([]string{"--config", filepath.Join(dir, "magelift.php"), "--env", "staging", "--output", "json", "config", "effective"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
@@ -60,13 +59,13 @@ func TestConfigEffectiveJSON(t *testing.T) {
 
 func TestEnvironmentRequiredWithoutPrompt(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "magelift.yaml"), []byte(starterConfig), 0o600); err != nil {
+	if err := writeTestProjectFile(filepath.Join(dir, "magelift.php"), []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	cmd := newCommandWithOptions(o)
-	cmd.SetArgs([]string{"--config", filepath.Join(dir, "magelift.yaml"), "config", "effective"})
+	cmd.SetArgs([]string{"--config", filepath.Join(dir, "magelift.php"), "config", "effective"})
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "environment is required") {
 		t.Fatalf("unexpected error: %v", err)
@@ -78,8 +77,8 @@ func TestEnvironmentRequiredWithoutPrompt(t *testing.T) {
 
 func TestEnvironmentListUsesStructuredOutput(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -95,8 +94,8 @@ func TestEnvironmentListUsesStructuredOutput(t *testing.T) {
 
 func TestStatusReportsSelectedConfiguration(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -112,8 +111,8 @@ func TestStatusReportsSelectedConfiguration(t *testing.T) {
 
 func TestDeployRequiresRegisteredStackModule(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cmd := New()
@@ -136,9 +135,9 @@ func TestTopLevelCommandNamesAreUnique(t *testing.T) {
 
 func TestConfigValidateRejectsEnvironmentBuildOverrides(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
+	path := filepath.Join(dir, "magelift.php")
 	contents := strings.Replace(starterConfig, "    inherits: preview\n    account: \"123456789012\"", "    inherits: preview\n    account: \"123456789012\"\n    build:\n      php: \"8.4\"", 1)
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+	if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -152,9 +151,9 @@ func TestConfigValidateRejectsEnvironmentBuildOverrides(t *testing.T) {
 
 func TestConfigValidateWarnsExperimentalManagedInstancesWithoutHatch(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
+	path := filepath.Join(dir, "magelift.php")
 	contents := strings.Replace(starterConfig, "  aws:\n    catalog:\n", "  aws:\n    catalog:\n      fargate:\n        computeMode: managed-instances\n", 1)
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+	if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
@@ -176,10 +175,10 @@ func TestConfigValidateWarnsExperimentalManagedInstancesWithoutHatch(t *testing.
 
 func TestEnvironmentSelectionPrecedence(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "magelift.yaml")
+	configPath := filepath.Join(dir, "magelift.php")
 	contents := strings.Replace(starterConfig, "  staging:\n", "  staging:\n    branches: [main]\n", 1)
 	// The default starter already carries production on 210987654321.
-	if err := os.WriteFile(configPath, []byte(contents), 0o600); err != nil {
+	if err := writeTestProjectFile(configPath, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	tests := []struct {
@@ -226,8 +225,8 @@ func TestEnvironmentSelectionPrecedence(t *testing.T) {
 
 func TestEnvironmentSelectionPromptsOnlyOnTTY(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -254,69 +253,6 @@ func TestEnvironmentSelectionPromptsOnlyOnTTY(t *testing.T) {
 	}
 }
 
-func TestConfigMigrateNormalizesCurrentSchema(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	input := strings.Replace(starterConfig, "project:\n  name: example-shop", "project: {name: example-shop}", 1)
-	if err := os.WriteFile(path, []byte(input), 0o640); err != nil {
-		t.Fatal(err)
-	}
-
-	var out bytes.Buffer
-	cmd := newCommand(&out, &out, nil)
-	cmd.SetArgs([]string{"--config", path, "--output", "json", "config", "migrate"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out.String(), `"changed": true`) {
-		t.Fatalf("unexpected output: %s", out.String())
-	}
-	first, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out.Reset()
-	cmd = newCommand(&out, &out, nil)
-	cmd.SetArgs([]string{"--config", path, "--output", "json", "config", "migrate"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out.String(), `"changed": false`) {
-		t.Fatalf("unexpected idempotent output: %s", out.String())
-	}
-	second, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(first, second) {
-		t.Fatal("second migration changed the file")
-	}
-}
-
-func TestConfigMigrateRejectsUnknownSchemaWithoutWriting(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	input := strings.Replace(starterConfig, "schemaVersion: 1", "schemaVersion: 2", 1)
-	if err := os.WriteFile(path, []byte(input), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	cmd := New()
-	cmd.SetArgs([]string{"--config", path, "config", "migrate"})
-	err := cmd.Execute()
-	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "cannot migrate schema version 2") {
-		t.Fatalf("unexpected error/code: %v/%d", err, ExitCode(err))
-	}
-	written, readErr := os.ReadFile(path)
-	if readErr != nil {
-		t.Fatal(readErr)
-	}
-	if string(written) != input {
-		t.Fatal("unsupported migration changed the file")
-	}
-}
-
 func TestExtensionsListIncludesWebRuntimes(t *testing.T) {
 	var out bytes.Buffer
 	cmd := newCommandWithOptions(testOptions(&out, &fakeTerminal{interactive: false}))
@@ -337,7 +273,7 @@ func TestExtensionsListIncludesWebRuntimes(t *testing.T) {
 
 func TestConfigExplainStandardQueueDefault(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
+	path := filepath.Join(dir, "magelift.php")
 	input := `schemaVersion: 1
 project:
   name: example-shop
@@ -360,7 +296,7 @@ environments:
     account: "123456789012"
 extensions: {}
 `
-	if err := os.WriteFile(path, []byte(input), 0o600); err != nil {
+	if err := writeTestProjectFile(path, []byte(input), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer

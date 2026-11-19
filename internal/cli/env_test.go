@@ -17,8 +17,8 @@ import (
 
 func TestEnvProtectUpdatesOnlySelectedOverlay(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o640); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o640); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -29,7 +29,7 @@ func TestEnvProtectUpdatesOnlySelectedOverlay(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,9 +46,9 @@ func TestEnvProtectUpdatesOnlySelectedOverlay(t *testing.T) {
 }
 
 func TestEnvProtectRequiresExplicitChoiceAndProductionApproval(t *testing.T) {
-	contents := strings.Replace(starterConfig, "extensions: {}", "  production:\n    account: \"123456789012\"\n    class: production\n    domain: example.com\n    monthlyBudgetCents: 1000\nextensions: {}", 1)
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+	contents := starterConfig
+	path := filepath.Join(t.TempDir(), "magelift.php")
+	if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for _, args := range [][]string{
@@ -65,8 +65,8 @@ func TestEnvProtectRequiresExplicitChoiceAndProductionApproval(t *testing.T) {
 }
 
 func TestEnvCreateAddsValidatedOverlayAtomically(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o640); err != nil {
+	path := filepath.Join(t.TempDir(), "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o640); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -77,7 +77,7 @@ func TestEnvCreateAddsValidatedOverlayAtomically(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestEnvDestroyDestroysInfrastructureBeforeRemovingOverlay(t *testing.T) {
 	if !reflect.DeepEqual(backend.calls, []string{"preview", "destroy"}) {
 		t.Fatalf("backend calls = %v", backend.calls)
 	}
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func TestEnvSweepDryRunReportsOnlyExpiredPreviewOverlays(t *testing.T) {
 	if !strings.Contains(out.String(), `"action": "would-destroy"`) {
 		t.Fatalf("expired preview was not reported: %s", out.String())
 	}
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,7 @@ func TestEnvSweepDestroysExpiredPreviewAndRemovesOverlay(t *testing.T) {
 	if !reflect.DeepEqual(backend.calls, []string{"preview", "destroy"}) {
 		t.Fatalf("backend calls = %v", backend.calls)
 	}
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestEnvSweepSkipsProtectedExpiredPreview(t *testing.T) {
 	if !strings.Contains(out.String(), `"reason": "environment is protected"`) {
 		t.Fatalf("protected preview was not classified: %s", out.String())
 	}
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +292,7 @@ func TestSweepResidualUnknownOnForeignShape(t *testing.T) {
 
 func keepAutomatedBackups(t *testing.T, path string) {
 	t.Helper()
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,14 +312,14 @@ func keepAutomatedBackups(t *testing.T, path string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, updated, 0o600); err != nil {
+	if err := writeTestProjectFile(path, updated, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestPreviewSweepUsesPersistedIdentityAndKeepsBaseOverlay(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, []byte(previewTestConfig()), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "magelift.php")
+	if err := writeTestProjectFile(path, []byte(previewTestConfig()), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	identity, err := config.BuildPreviewIdentity(config.PreviewIdentityInput{
@@ -375,7 +375,7 @@ func TestPreviewSweepUsesPersistedIdentityAndKeepsBaseOverlay(t *testing.T) {
 	if len(backend.requests) != 2 || backend.requests[0].Preview == nil || backend.requests[0].Preview.Generation != 3 || !backend.requests[0].Destroy {
 		t.Fatalf("preview requests = %#v, want persisted identity and destroy intent", backend.requests)
 	}
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +389,7 @@ func TestPreviewSweepUsesPersistedIdentityAndKeepsBaseOverlay(t *testing.T) {
 
 func setEnvironmentExpiration(t *testing.T, path, name, expiresAt string) {
 	t.Helper()
-	data, err := os.ReadFile(path)
+	data, err := readTestProjectYAML(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func setEnvironmentExpiration(t *testing.T, path, name, expiresAt string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, updated, 0o600); err != nil {
+	if err := writeTestProjectFile(path, updated, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -2,38 +2,45 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
+	"github.com/magelift/magelift/sdk"
 )
 
-// gcpProviderID selects the plugin-backed target. GCP has no in-process
-// implementation left: every GCP command dials the verified provider
-// plugin, and dial failure fails the command (no fallback).
-const gcpProviderID = "gcp"
-
-// defaultLoadProvider uses lazy first-party acquisition for GCP and the shared
-// resolver for explicit extensions. Project pins win; verification failures
-// never select another provider or version.
+// defaultLoadProvider acquires the target's signed release when first activated.
 func (o *options) defaultLoadProvider(ctx context.Context, provider string) (providerhost.Loaded, error) {
+	if provider != "gcp" && provider != "azure" {
+		return o.loadInstalledProvider(ctx, provider)
+	}
+	return providerhost.Acquire(ctx, provider, Version, providerhost.AcquireOptions{
+		Resolve:   o.providerLocation(),
+		FetchLock: o.fetchProviderLock, EnsureVerifier: o.ensureProviderVerifier,
+		Verifier: o.providerVerifier, Progress: o.stderr,
+	})
+}
+
+func (o *options) providerLocation() providerhost.ResolveOptions {
 	executable := ""
 	if o.executable != nil {
 		if path, err := o.executable(); err == nil {
 			executable = path
 		}
 	}
-	if provider == gcpProviderID {
-		return providerhost.Acquire(ctx, provider, Version, providerhost.AcquireOptions{
-			Resolve:   providerhost.ResolveOptions{ExecutablePath: executable},
-			FetchLock: o.fetchProviderLock, EnsureVerifier: o.ensureProviderVerifier,
-			Verifier: o.providerVerifier, Progress: o.stderr,
-		})
-	}
-	resolved, err := providerhost.Resolve(provider, providerhost.ResolveOptions{ExecutablePath: executable})
+	return providerhost.ResolveOptions{ExecutablePath: executable}
+}
+
+func (o *options) loadInstalledProvider(ctx context.Context, provider string) (providerhost.Loaded, error) {
+	resolved, err := providerhost.ResolveInstalled(provider, Version, o.providerLocation())
 	if err != nil {
 		return providerhost.Loaded{}, err
+	}
+	verifier := o.providerVerifier
+	if verifier == nil {
+		verifier = providerhost.NewPreferredVerifier("")
 	}
 	return providerhost.Load(ctx, providerhost.Options{
 		Mode:       providerhost.ModeSubprocess,
@@ -41,7 +48,7 @@ func (o *options) defaultLoadProvider(ctx context.Context, provider string) (pro
 		LockPath:   resolved.LockPath,
 		BinaryPath: resolved.Binary,
 		BundlePath: resolved.Bundle,
-		Verifier:   providerhost.NewPreferredVerifier(""),
+		Verifier:   verifier,
 	})
 }
 
@@ -49,7 +56,7 @@ func (o *options) defaultLoadProvider(ctx context.Context, provider string) (pro
 // session for closeProviderSessions. Callers defer closeProviderSessions
 // after newBackend returns.
 func (o *options) defaultDialProvider(ctx context.Context, binary string) (*providerhost.Client, error) {
-	client, err := providerhost.Dial(ctx, binary, providerhost.DialOptions{})
+	client, err := providerhost.Dial(ctx, binary, providerhost.DialOptions{Required: []sdk.Operation{sdk.OpDescribe}})
 	if err != nil {
 		return nil, err
 	}
@@ -66,10 +73,9 @@ func (o *options) closeProviderSessions() {
 	o.providerSessions = nil
 }
 
-// defaultNewBackend serves GCP from the verified provider plugin and every
-// other target from the existing in-process backend.
+// Plugin-backed plans execute in the verified provider process.
 func (o *options) defaultNewBackend(ctx context.Context, planned platform.PlannedStack, backendURL string) (infrastructureBackend, error) {
-	if planned.Provider() == gcpProviderID {
+	if _, ok := providerhost.AsShimPlanned(planned); ok {
 		return o.pluginBackend(ctx, planned)
 	}
 	module, found := o.modules.Module(planned.Provider(), planned.Runtime())
@@ -90,10 +96,10 @@ func (o *options) defaultNewBackend(ctx context.Context, planned platform.Planne
 func (o *options) pluginBackend(ctx context.Context, planned platform.PlannedStack) (infrastructureBackend, error) {
 	shim, ok := providerhost.AsShimPlanned(planned)
 	if !ok {
-		return nil, fmt.Errorf("GCP backend requires a plugin-backed plan, got %T", planned)
+		return nil, fmt.Errorf("provider backend requires a plugin-backed plan, got %T", planned)
 	}
 	if o.loadProvider == nil || o.dialProvider == nil {
-		return nil, fmt.Errorf("GCP provider loading is not configured")
+		return nil, fmt.Errorf("provider loading is not configured")
 	}
 	loaded, err := o.loadProvider(ctx, string(planned.Provider()))
 	if err != nil {
@@ -103,14 +109,14 @@ func (o *options) pluginBackend(ctx context.Context, planned platform.PlannedSta
 	if err != nil {
 		return nil, err
 	}
+	if id := client.ProviderID(); id != "" && id != string(planned.Provider()) {
+		client.Close()
+		return nil, fmt.Errorf("provider advertised %q, expected %q", id, planned.Provider())
+	}
 	return providerhost.NewPluginBackend(client, shim.Envelope(), shim.StoredPlan())
 }
 
-// providerProvenance describes one plugin provider for `extensions list`.
-// Mode is "subprocess" when a verified artifact is installed beside the CLI
-// and "not-installed" otherwise (GCP has no in-process implementation, so
-// there is nothing to fall back to); no subprocess starts to answer the
-// listing.
+// providerProvenance describes the local artifact verified by extensions list.
 type providerProvenance struct {
 	Name    string `json:"name" yaml:"name"`
 	Version string `json:"version,omitempty" yaml:"version,omitempty"`
@@ -119,17 +125,25 @@ type providerProvenance struct {
 }
 
 func (o *options) subprocessProvenance(ctx context.Context) []providerProvenance {
-	name := providerhost.ExtractName(gcpProviderID)
-	provenance := providerProvenance{Name: name, Mode: "not-installed"}
-	if o.loadProvider == nil {
-		return []providerProvenance{provenance}
+	var result []providerProvenance
+	for _, id := range []string{"gcp", "azure"} {
+		entry := providerProvenance{Name: providerhost.ExtractName(id), Mode: "not-installed"}
+		if o.inspectProvider != nil {
+			loaded, err := o.inspectProvider(ctx, id)
+			switch {
+			case err == nil:
+				entry.Version = loaded.Artifact.Version
+				entry.Digest = loaded.Artifact.Digest
+				entry.Mode = "subprocess"
+			case errors.Is(err, providerhost.ErrCacheCorrupt):
+				entry.Mode = "unverified"
+			case errors.Is(err, providerhost.ErrNoLockfile), errors.Is(err, providerhost.ErrUnknownProvider), errors.Is(err, providerhost.ErrCacheMiss):
+				// The provider has no installed artifact for this project.
+			default:
+				entry.Mode = "unverified"
+			}
+		}
+		result = append(result, entry)
 	}
-	loaded, err := o.loadProvider(ctx, gcpProviderID)
-	if err != nil {
-		return []providerProvenance{provenance}
-	}
-	provenance.Version = loaded.Artifact.Version
-	provenance.Digest = loaded.Artifact.Digest
-	provenance.Mode = "subprocess"
-	return []providerProvenance{provenance}
+	return result
 }

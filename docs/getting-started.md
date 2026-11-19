@@ -1,148 +1,38 @@
----
-title: Getting started with MageLift
-description: Install the MageLift CLI from source, configure a shop, build its image, and prepare a GCP community alpha preview.
----
+# Start a Magento project
 
-# Getting started
+Install the CLI from the MageLift checkout with `go install ./cmd/magelift`. The CLI evaluates the shop’s project file with PHP. Local development also needs Docker Engine, Compose and Buildx. Run `magelift doctor --local` to inspect the workstation before connecting a cloud account.
 
-Install the CLI, fill in `magelift.yaml`, then let Magelift prepare the cloud
-account and deploy Magento. You should not need Pulumi, Kubernetes, or image
-signing commands on this path.
-
-The community alpha starts with the GCP GKE Autopilot recipe. Its current
-release gates and untested paths are listed in [release readiness](release-readiness.md).
-Historical certification evidence is linked from the capability matrix.
-
-## How to get Magento running with MageLift
-
-1. **Install the CLI.** Follow [Install](install.md), then run `magelift version`.
-2. **Choose local or cloud.** See [local vs cloud](local-vs-cloud.md). Local Compose needs no cloud credentials.
-3. **Start a config.** Run `magelift init --provider gcp`, fill the placeholders, then `magelift doctor`.
-4. **Build, then preview.** Follow [application builds](builds.md), then preview the GCP recipe; destroy disposable resources when done.
-5. **Optional migrate.** Leave ACC/Upsun via [weekend-migrate](weekend-migrate.md).
-
-## 1. Install
-
-No release is published yet. Install from source, as described in
-[Install](install.md):
+From a Magento repository containing `composer.json`, `composer.lock` and `bin/magento`, run the following commands. Choose `aws`, `gcp` or `azure` as the destination when initializing the project.
 
 ```sh
-git clone https://github.com/magelift/magelift.git
-cd magelift
-go install ./cmd/magelift
-magelift version
+magelift init --provider aws
+magelift config validate
+magelift env diff staging production
+magelift dev
 ```
 
-Work from your shop repository. The CLI carries its build recipes, so the
-shop checkout does not need the MageLift source tree.
+Open the URL printed by `dev`. It starts the Compose services, installs Magento into an empty database, and queries Magento’s store configuration over HTTP. On the first install it saves the generated administrator password in `.magelift/local.env`. Keep this file private. `magelift local down` stops the containers and preserves the shop’s volumes.
 
-## 2. Local vs cloud
+For a new shop, run `magelift init --new --provider gcp` in an empty Git repository. Composer downloads Magento Open Source from Adobe’s repository using your Marketplace credentials. For licensed Adobe Commerce use `magelift init --new --edition commerce` with an entitled Marketplace account. Add `--magento-version 2.4.8-p1` to request an exact release. Existing Commerce projects use the edition and version in their Composer lock. For a shop hosted on Adobe Commerce Cloud, Upsun Flex or Platform.sh, use the importer. [Migration guide](migrating-from-paas.md)
 
-Read [local vs cloud](local-vs-cloud.md). Local Compose is for Magento lifecycle
-without cloud credentials; it is not a production replica.
+To fill the destination during initialization, pass `--cloud-account` (AWS account ID, GCP project ID or Azure subscription ID), `--region`, and optionally `--domain`. For example, `--domain store.example.com` selects that production host, `uat.store.example.com` for UAT, and a separate hostname for every preview. The Azure starter uses a load balancer address. To use your domain, configure an ingress controller and TLS. Production’s HA preset also needs a highly available external cache reachable from AKS. [Azure setup](bootstrap.md#azure-aks)
+
+## Configure the shop
+
+Commit `magelift.php` and any generated `magelift.environments.php`. An environment added by the CLI lives in the companion file so an edit can preserve the PHP you authored. The evaluator provides the SDK classes. `init` also installs the class definitions under `.magelift/` for editor completion. Treat project files and required PHP helpers as executable code from the repository.
+
+The starter defines staging, UAT, production and preview. Staging and previews use the smaller preset. UAT starts at standard capacity and production uses the protected high-availability preset. Define a dependency once at project level and override capacity or an individual choice in an environment. Inspect the result before deployment. [Choosing service versions and ownership](service-bindings.md)
 
 ```sh
-magelift local init
-magelift local up
+magelift --env production config effective
+magelift --env staging config explain target.provider
+magelift env diff staging uat
 ```
 
-## 3. Starter config
+## Connect the cloud
 
-Generate a GCP starter, then fill the project, domains and secret references.
-Each starter includes preview, staging and production environment blocks:
+Replace the starter’s example account, project, subscription, region and domain with yours. Add the provider-specific identity, state, encryption and artifact registry settings. Keep passwords in your cloud secret manager. The release image belongs in a registry controlled by the shop. Use your own image build or the optional MageLift build recipes. [Bootstrap](bootstrap.md) · [Builds](builds.md) · [Provider coverage](capability-matrix.md)
 
-```sh
-magelift init --provider gcp    # GCP GKE Autopilot; community alpha path
-# magelift init --provider aws  # AWS ECS Fargate; secondary path
-```
+Generate the GitHub Actions workflow with `magelift ci generate --magelift-version vX.Y.Z`, replacing the version with an available immutable CLI release. Inspect the workflow and configure per-environment identities and GitHub environment protection. After reviewing the current head of a same-repository pull request to `main`, apply `magelift-preview`. Each new head needs a fresh label event. The build uses the reviewed head and the base revision’s PHP configuration. Use protected GitHub environments for both `preview-build` and `preview`. Removing the label or closing the PR schedules teardown. The hourly sweep cleans up expired previews. Set production approvals in GitHub before enabling production promotion.
 
-What you get: preview runs database-backed queues (`db` on AWS,
-`database` on GCP); GCP serves recipe OpenSearch unless you pin it
-off for a first smoke run. Staging and production inherit with
-larger presets. `magelift config effective --env preview` shows
-every resolved value, so no default stays hidden. New GCP teams
-should follow [GCP onboarding](onboarding.md) instead of assembling
-these steps ad hoc.
-
-Fill the placeholders (accounts or the GCP project, domains, secret
-refs; no plaintext secrets), then:
-
-```sh
-magelift doctor
-```
-
-Doctor validates YAML and prints the next Magelift command. Stay on that
-command. The full worked example lives at
-[`examples/sample-shop/magelift.yaml`](https://github.com/magelift/magelift/tree/main/examples/sample-shop)
-with its "What to replace" table in `examples/sample-shop/README.md`.
-Then continue with [local vs cloud](local-vs-cloud.md) if you are still
-offline, or jump to a certified cloud preview below.
-
-## 4. Cloud preview (certified)
-
-Requires you to be logged in to AWS (`aws`) or GCP (`gcloud`) for the account
-in `magelift.yaml`. Preview stacks are **billable** in your account: destroy when
-you are done. Prefer free-tier-safe shapes (`searchMode: disabled`, database
-queues) unless you intentionally want OpenSearch or a broker. Rough cost:
-
-```sh
-magelift cost --env preview
-```
-
-Laptop path (no GitHub, no extra environment variables):
-
-```sh
-magelift doctor
-magelift bootstrap --env preview
-magelift deploy --env preview --yes
-magelift health --mode runtime
-magelift destroy --env preview --yes
-```
-
-On AWS, `bootstrap` also needs an existing log bucket ([bootstrap prerequisites](bootstrap.md)):
-
-```sh
-magelift bootstrap --env preview --access-log-bucket existing-log-bucket
-```
-
-Magelift prepares the account, signs the image with the current login, and
-stores stack state. GitHub flags on `bootstrap` are only for Actions CI.
-
-For pull-request previews in CI:
-
-```sh
-magelift ci generate --magelift-version v1.2.3
-magelift ci validate --magelift-version v1.2.3
-```
-
-`v1.2.3` is a placeholder. `ci generate` requires an immutable release
-version, and no release is published yet. Until a tag exists, install the
-CLI in CI from a checkout:
-
-```sh
-git clone --depth 1 https://github.com/magelift/magelift.git "$RUNNER_TEMP/magelift"
-go install "$RUNNER_TEMP/magelift/cmd/magelift"
-```
-
-Then follow [bootstrap](bootstrap.md) for the CI variables Magelift prints.
-
-## 5. Leaving PaaS
-
-Config import + dump + DNS cutover:
-[migrating from PaaS](migrating-from-paas.md) and the weekend packaging guide
-[leave PaaS in a weekend](weekend-migrate.md).
-
-## More answers
-
-[FAQ](faq.md) · [Compare to PaaS](compare-paas.md) · [pricing](https://magelift.dev/pricing.md)
-
-## Decision pages
-
-| Question | Doc |
-| --- | --- |
-| What is production-supported? | [Capability matrix](capability-matrix.md) |
-| Can we cut a public tag? | [Release readiness](release-readiness.md) |
-| Why not stay on ACC/Upsun? | [Compare to PaaS](compare-paas.md) |
-| Architecture boundaries | [Architecture](architecture.md), [ADRs](adr/README.md) |
-
-Independent of Adobe Inc. Product names are descriptive only.
+Start a headless shop with `magelift init --storefront-origin https://store.example.com`. For an existing project set `application.mode` to `headless`, configure the storefront origin and allowed CORS origins, then point your independently deployed frontend at the Magento endpoint. Keep `integrated` for Magento’s native storefront. [Storefront recipes](storefront-recipes.md)

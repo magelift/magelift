@@ -59,8 +59,8 @@ func fastlyCLIConfig(t *testing.T) string {
 	if input == starterConfig {
 		t.Fatal("starter config shape changed; update the Fastly test fixture")
 	}
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, []byte(input), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "magelift.php")
+	if err := writeTestProjectFile(path, []byte(input), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return path
@@ -162,7 +162,7 @@ func TestFastlyRequestMapsTypedHealthPolicy(t *testing.T) {
 }
 
 func TestFastlyEdgeStatePathSanitizesEnvironment(t *testing.T) {
-	path := fastlyEdgeStatePath("/tmp/project/magelift.yaml", "../staging branch")
+	path := fastlyEdgeStatePath("/tmp/project/magelift.php", "../staging branch")
 	if path != "/tmp/project/.magelift/edge/..-staging-branch/fastly.json" {
 		t.Fatalf("state path = %q", path)
 	}
@@ -192,8 +192,8 @@ func TestEdgePurgeFastlyIssuesProviderPurge(t *testing.T) {
 
 func TestEdgePurgeReturnsTypedUnsupportedWithoutCache(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer

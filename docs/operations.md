@@ -43,7 +43,7 @@ holds the stack lock, the command exits 5 with a wait-and-retry sentence
 instead of the generic failure, so CI can tell a collision from a graph bug.
 
 After a GCP CI deployment, outputs, exec, logs, tunnels and health in
-outputs/runtime mode use existing stack outputs. They do not require an image digest in the YAML or a
+outputs/runtime mode use existing stack outputs. They do not require an image digest in the project or a
 local build journal. Deploy and preview still require the immutable application
 image. Destroy can remove an owned environment without an application build;
 its protection and ownership checks still apply. See
@@ -101,11 +101,10 @@ Rollback commands keep their forward-only acknowledgement for the same reason.
 Preview environments must have a TTL and budget before infrastructure is created.
 Protected environments reject destroy requests until protection is removed.
 
-The v1 preview promise, per certified origin: database-backed queues and a
-single-AZ failure domain on both; search disabled on AWS (opt in with
-`searchMode` when the feature needs it); the 1-replica OpenSearch workload
-on GCP. Previews stay cheap and short-lived by default; standard and
-high-availability presets scale up from there.
+The PHP starter keeps the application and service families consistent across
+stable and preview environments. Pull requests use a smaller, time-limited
+topology and database-backed messaging by default. Managed databases and
+search services can still incur substantial per-environment charges.
 
 `magelift env list` lists configured environments without contacting AWS. `magelift
 env create <name>` adds a validated overlay using the supplied account, preset,
@@ -156,11 +155,11 @@ runs `setup:upgrade`, cleans and flushes Magento caches, applies the Pulumi upda
 waits for ECS stabilization, and runs runtime health checks. Production
 deployments require `--yes` and a matching release-journal entry with verified
 signature metadata. CI can pass the exact build
-output with `deploy --digest <registry>@sha256:<digest>` without changing project YAML.
+output with `deploy --digest <registry>@sha256:<digest>` without changing project configuration.
 `magelift destroy` previews before removing resources, and
 `magelift outputs` reads the last successful stack outputs. Protected environments
 must be unprotected explicitly before they can be destroyed. Magelift derives
-the state backend from `magelift bootstrap` and `magelift.yaml`. Set
+the state backend from `magelift bootstrap` and `magelift.php`. Set
 `PULUMI_BACKEND_URL` only as a CI override. The AWS
 lock bucket is the deterministic bucket created by `magelift bootstrap`; bootstrap
 must complete before deploy or destroy.
@@ -169,7 +168,7 @@ Compiled extensions may add deployment and post-deployment hooks through the Go 
 Hooks target stable operation IDs such as `deploy.migrations`, `deploy.update`, and
 `post-deploy.health`, declare dependencies, and run with a timeout and bounded retry
 policy. `replace` and `disable` are explicit graph operations; arbitrary numeric
-priorities and shell-command matching are not supported. YAML remains limited to the
+priorities and shell-command matching are not supported. Project configuration is limited to the
 Magento preparation lifecycle, so ordinary projects do not need an extension.
 
 `magelift secret set <name> --value-stdin` reads a value only from stdin and never
@@ -183,7 +182,7 @@ that is `gcloud`; MageLift impersonates the CI service account created by
 Override with `MAGELIFT_SIGNING_SERVICE_ACCOUNT` or
 `CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT`. In GitHub Actions the workflow's
 `id-token` permission is enough. Operators do not pass Cosign flags on the
-YAML-only path.
+PHP project.
 
 `magelift promote --digest <registry>@sha256:<digest>` verifies that signature
 with the current login and records the release. `--certificate-identity` and
@@ -197,7 +196,7 @@ commands do not contact AWS.
 config provenance, and backup policy from that journal and the effective
 configuration without secret values. `magelift audit` is a different report: it
 lists encryption, IAM, logging, backup, WAF, and residency pointers from the
-effective YAML. It does not certify SOC 2, ISO 27001, or GDPR. `magelift edge
+effective configuration. It does not certify SOC 2, ISO 27001, or GDPR. `magelift edge
 purge` invalidates Fastly or the native CDN cache when the selected target
 advertises purge; otherwise it fails with a typed unsupported error.
 
@@ -278,7 +277,7 @@ history and screenshots remain in CloudWatch Synthetics.
 `magelift ci generate --magelift-version vX.Y.Z` writes a deterministic GitHub Actions
 workflow for the configured provider/runtime and environment matrix. The shared
 workflow validates every environment, builds and signs one digest, previews opt-in
-pull requests labeled `magelift-preview`, destroys a labeled preview when its pull
+pull requests labeled `magelift-preview`, destroys the preview when its label is removed or its pull
 request closes, deploys `staging` on main, sweeps expired previews hourly, and gates
 a manual `production` run with the GitHub production environment. Fixed environment
 names are unchanged; preview names derive from the repository and pull-request
@@ -289,7 +288,7 @@ GitHub flags. The GCP generator uses `MAGELIFT_GCP_PROJECT_ID`,
 `MAGELIFT_GCP_REGION`, `MAGELIFT_GCP_WORKLOAD_IDENTITY_PROVIDER`, and
 separate build and environment service-account variables for GitHub federation
 (see [bootstrap](bootstrap.md#generated-ci-and-pull-request-previews)). Magelift
-derives stack state from `magelift.yaml` after bootstrap. `build --push` needs
+derives stack state from `magelift.php` after bootstrap. `build --push` needs
 only the final application image destination. Promotion consumes an existing
 build run and signed digest; its expected producer identity/issuer is independent
 of the deployment login. GCP uses short-lived credentials; long-lived
@@ -331,14 +330,37 @@ health probes, and loopback ports. A release or service family without a verifie
 local contract fails before Compose creates a volume. Use the project-level
 `local` block for deliberate choices, for example:
 
-```yaml
-local:
-  database: {family: mysql, version: "8.4"}
-  queue: {family: rabbitmq, version: "4.2"}
-  webServer: {family: nginx, version: "1.30"}
-  webCache: {family: varnish, version: "8"}
-  phpSettings: {memory_limit: 1G, max_execution_time: "180"}
-  email: {mode: smtp, host: mail.example.test, port: 2525, from: shop@example.test}
+```php
+[
+    'local' => [
+        'database' => [
+            'family' => 'mysql',
+            'version' => '8.4',
+        ],
+        'queue' => [
+            'family' => 'rabbitmq',
+            'version' => '4.3',
+        ],
+        'webServer' => [
+            'family' => 'nginx',
+            'version' => '1.30',
+        ],
+        'webCache' => [
+            'family' => 'varnish',
+            'version' => '8',
+        ],
+        'phpSettings' => [
+            'memory_limit' => '1G',
+            'max_execution_time' => '180',
+        ],
+        'email' => [
+            'mode' => 'smtp',
+            'host' => 'mail.example.test',
+            'port' => 2525,
+            'from' => 'shop@example.test',
+        ],
+    ],
+]
 ```
 
 `local init` also writes `.magelift/local.php.ini` and mounts it as the final PHP
@@ -349,16 +371,13 @@ fails during planning instead of being reported as available metadata.
 Then use `magelift local up --service database` for the database, or
 `magelift local up --service app` for the full Magento stack. The app profile
 runs the selected web-runtime image, which is nginx + PHP-FPM by default, plus OpenSearch and
-RabbitMQ. `frankenphp-classic` and `php-apache` require `compatibility.allowUnsupported`; they have no Adobe row and are not certified. `frankenphp-worker` is unregistered. Selecting `webCache: varnish`
+RabbitMQ. The CLI reports compatibility advice for `frankenphp-classic` and `php-apache`. `frankenphp-worker` is unregistered. Selecting `webCache: varnish`
 adds Varnish in front of nginx and keeps the app's direct HTTP port on 8081 by
 default. `magelift local status`, `magelift local logs`, and
 `magelift local exec --service app -- <command>` complete the workflow.
-`magelift local reset --yes` removes all local capability volumes. Generated service
-images are digest-pinned and can be reviewed or deliberately changed in the
-generated Compose file. Artemis uses Magento's STOMP queue transport and a
+`magelift local reset --yes` removes all local capability volumes. Service containers use upstream tags derived from the selection. A project may supply an explicit image digest. Artemis uses Magento's STOMP queue transport and a
 Jolokia-backed broker image contract. Redis remains outside the current Adobe
-rows and requires `compatibility.allowUnsupported: true`; MageLift reports that
-choice as an explicit warning. SMTP and SES modes write Magento's
+rows; MageLift reports that choice as an explicit warning. SMTP and SES modes write Magento's
 `system.smtp` configuration. Both take explicit host, port, username, and a
 credential environment variable; no vendor endpoints are baked in. Point
 `smtp` at any provider relay: OVH mailbox (`smtp.mail.ovh.net`, port 465
@@ -374,7 +393,7 @@ point `smtp` at SES or another relay.
 Put the credential variable in `.magelift/local.env` when the app needs it. The
 resolver reads it inside the container without writing the secret to the
 generated Compose file. `local.email.mode: mailpit` starts a digest-pinned
-Mailpit sidecar (`axllent/mailpit:v1.30.7`) on loopback SMTP 1025 / UI 8025
+Mailpit sidecar (`axllent/mailpit:v1.33.0`) on loopback SMTP 1025 / UI 8025
 with `/mailpit readyz`, and wires Magento SMTP to that sink. It is not cloud
 delivery. The generated credentials and
 loopback-only ports are for local development only; do not reuse them in a
@@ -394,8 +413,7 @@ the command never prints it or places it in the Docker command arguments.
 
 ## Operator verbs
 
-Five verbs cover run, debug, and spend on certified origins, live-proved
-together on GCP (`mldp8`, 2026-09-15) with AWS creds-only cost reads the
+Five verbs cover operation, debugging and spending on AWS and GCP. A historical run exercised them together on GCP (`mldp8`, 2026-09-15) with AWS creds-only cost reads the
 same day. `health --mode runtime` reports layered checks with observed
 sources and refuses to infer. `logs --service web|cron` streams the
 workload logs. `exec --service web|cron -- <command>` runs inside the
@@ -410,20 +428,25 @@ what a reconcile would delete, and reconcile with `--yes` deletes only
 ledger-owned live resources in rank order. Expired previews refuse
 deploy and always allow destroy, on every provider.
 
-## Magento YAML overlays
+## Magento application settings
 
 `application.magento` writes Magento `env.php` / `CONFIG__*` overlays. It does
 not create Magento websites, stores, or store views. Those stay in Magento.
 
-```yaml
-application:
-  magento:
-    frontName: admin
-    cookieDomain: ".shop.example"
-    corsOrigins: ["https://storefront.example"]
-    consumers:
-      mode: processes
-      names: [product_action_attribute.update]
+```php
+[
+    'application' => [
+        'magento' => [
+            'frontName' => 'admin',
+            'cookieDomain' => '.shop.example',
+            'corsOrigins' => ['https://storefront.example'],
+            'consumers' => [
+                'mode' => 'processes',
+                'names' => ['product_action_attribute.update'],
+            ],
+        ],
+    ],
+]
 ```
 
 `frontName` is also the AWS WAF admin path. Extra Magento consumers are worker
@@ -459,21 +482,12 @@ checklist; Floci does not prove that data-plane. A private Magento-on-AWS shop
 may illustrate the provisioned unsigned path
 ([sources/prior-terraform-opensearch.md](sources/prior-terraform-opensearch.md)); it is not
 certification evidence and not the only supported AWS shape. Aurora Magento
-env uses the writer endpoint plus Secrets Manager JSON, same as RDS. The
-Adobe-gated pin is Aurora 3.11/3.12; unaimed 8.4 fails closed.
+env uses the writer endpoint plus Secrets Manager JSON, same as RDS. The dated Adobe advisory covers selected Aurora 3 releases. Operators choose the engine version and validate it for the shop.
 
-Use `make floci-test-aws` for account-free bootstrap, state, lock, versioned-media
-restore, ECS runtime health, ephemeral candidate registration, Secrets Manager, and
-CloudWatch Logs tests against digest-pinned Floci AWS 2.3.0. Use
-`make floci-gcp-test` for GCS, Secret Manager, Pub/Sub, Logging, and Monitoring contracts against digest-pinned floci-gcp 0.11.0.
-Emulators do not replace a real-cloud pass: GitHub Actions OIDC token exchange,
-Autopilot, Memorystore, Armor, managed TLS, and Magento Cloud SQL PITR still need
-packed live sessions ([certification sessions](certification-sessions.md)).
-Floci AWS 2.3.0 does close IAM Create/Get/Tag OpenID Connect Provider
-(`TestIAMOpenIDConnectProviderAgainstFloci`).
-See [Local AWS acceptance](aws-acceptance.md). The composed Pulumi target is tested
-separately with provider mocks, including preview, standard, and high-availability
-resource graphs.
+Use `make local-gates` for the Pulumi mocks, harness tests and the Floci AWS,
+GCP and Azure suites. The tests exercise the implemented API contracts.
+Real OIDC federation, managed TLS, HA failover, cloud restore times and cost
+need deployment-specific evidence. [Pulumi unit tests](https://www.pulumi.com/docs/iac/concepts/testing/unit/)
 
 ## Store loop runbooks (alpha)
 
@@ -496,3 +510,30 @@ executed, in order; shells marked unproved are filled when the loop runs.
 ### Expire a preview (unproved)
 
 <!-- Filled from the executed loop in reference-store-acceptance 2.3. -->
+
+## Staging, UAT and pull requests
+
+Keep the application image, PHP and dependency selectors at project level. Change replicas, database availability and other capacity settings in each environment. Set a smaller preset on staging and PR previews, and choose standard or high availability for UAT. Compare the full result with `magelift env diff staging production`.
+
+The generated GitHub workflow builds in the shop’s registry. After reviewing the current head of a same-repository PR to `main`, apply `magelift-preview` to deploy that revision. Removing the label schedules teardown. After reviewing a later head, reapply it to authorize that revision. Its stack is keyed by repository and PR number and its domain is derived from the preview domain. The workflow uses the base revision of the PHP project for privileged planning and deployment. Use the `preview-build` GitHub environment for the registry identity and `preview` for deployment. Configure required reviewers for these two environments. Stable builds use the `build` environment. Configure their cloud roles and GitHub environment protections before enabling the workflow.
+
+The starter sets `previewTtl` to `168h`. CI anchors the duration to the pull request event timestamp, so repeated evaluation of the same event produces the same expiration. Closing the PR requests teardown. A scheduled sweep processes expired previews using their recorded ownership. The monthly budget is an estimate input; check provider billing and set account alerts for a spending limit.
+
+An AWS team with an existing Fargate cluster and VPC can place `target.aws.previewPool.clusterArn` under its preview environment and supply `target.aws.existing.network` and the public, private and data subnet IDs. The preview reads the shared cluster and owns its own ECS services. Bootstrap the authored preview environment once. PRs have distinct Pulumi stacks and lock records in its state backend. Keep the compute pool in a separately managed stack. Use separate databases, secrets, storage and service identities for PRs that can change code.
+
+`magelift env status staging` prints the configured Magento GraphQL path and domain and links to the target cloud’s operational consoles. Use the provider’s logs, metrics, dashboards and activity history to inspect the running resources. [CLI command reference](cli-reference.md)
+
+
+GKE previews can reference an existing regional cluster using
+`target.gcp.previewPool`. Supply `cluster`, `network`, `subnet`,
+`networkPolicyEnforced: true` and `ingressCidrs` for traffic reaching web pods,
+including load balancers and health checks. AKS uses `target.azure.previewPool`
+with `clusterName`, `nodeSubnetId`, `mysqlSubnetId` and `mysqlDnsZoneId`.
+The shared AKS cluster must already reach the delegated subnet and linked private DNS
+zone. See the Azure setup in [Bootstrap](bootstrap.md).
+
+Both Kubernetes adapters create a per-preview namespace and ingress policies.
+The cluster must enforce NetworkPolicy. Outbound connectivity to managed
+services and DNS is still available. Use separate cloud credentials and data
+for each preview. Shared compute reduces cluster cost. An AKS preview still
+owns a MySQL server, Key Vault and Azure Files storage. [Kubernetes network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)

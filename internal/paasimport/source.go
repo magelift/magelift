@@ -48,10 +48,14 @@ func DetectUpsun(root string) error {
 	if !info.IsDir() {
 		return fmt.Errorf("Upsun config root must be a directory: %s", root)
 	}
-	if _, err := os.Stat(filepath.Join(root, upsunAppFile)); err != nil {
-		return fmt.Errorf("Upsun config root requires %s: %w", upsunAppFile, err)
+	for _, name := range []string{upsunAppFile, ".platform/applications.yaml", ".upsun"} {
+		if _, err := os.Stat(filepath.Join(root, name)); err == nil {
+			return nil
+		} else if !os.IsNotExist(err) {
+			return err
+		}
 	}
-	return nil
+	return fmt.Errorf("Upsun project requires .upsun/*.yaml, .platform/applications.yaml or %s", upsunAppFile)
 }
 
 // ConfineConfigRoot cleans a maintainer-provided soak path and rejects escapes (T-04-07).
@@ -75,18 +79,13 @@ func ConfineConfigRoot(path string) (string, error) {
 
 // readUnder reads a file relative to root, rejecting path escapes.
 func readUnder(root, rel string) ([]byte, error) {
-	root = filepath.Clean(root)
-	if rel == "" || strings.Contains(rel, "..") {
+	if !filepath.IsLocal(rel) {
 		return nil, fmt.Errorf("invalid config path %q", rel)
 	}
-	path := filepath.Clean(filepath.Join(root, rel))
-	sep := string(os.PathSeparator)
-	if path != root && !strings.HasPrefix(path, root+sep) {
-		return nil, fmt.Errorf("path escapes config root: %s", rel)
-	}
-	data, err := os.ReadFile(path)
+	dir, err := os.OpenRoot(root)
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", rel, err)
+		return nil, err
 	}
-	return data, nil
+	defer dir.Close()
+	return dir.ReadFile(rel)
 }

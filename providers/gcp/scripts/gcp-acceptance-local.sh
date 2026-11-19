@@ -266,7 +266,7 @@ PHP_VERSION="${MAGELIFT_GCP_ACCEPTANCE_PHP:-8.5}"
 COMPOSER_VERSION="${MAGELIFT_GCP_ACCEPTANCE_COMPOSER_VERSION:-2.10}"
 PHP_EXTENSIONS="${MAGELIFT_GCP_ACCEPTANCE_EXTENSIONS:-intl,pdo_mysql}"
 MEMORYSTORE_ENGINE_VERSION="${MAGELIFT_GCP_ACCEPTANCE_MEMORYSTORE_ENGINE_VERSION:-}"
-OPENSEARCH_IMAGE="${MAGELIFT_GCP_OPENSEARCH_IMAGE:-opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c}"
+OPENSEARCH_IMAGE="${MAGELIFT_GCP_OPENSEARCH_IMAGE:-opensearchproject/opensearch:3.9.0@sha256:3b55f6b6249cfdb92b52ee59adc8a266203ba9ef9f5d82544fad6f1af2f3609e}"
 RABBITMQ_IMAGE="${MAGELIFT_GCP_RABBITMQ_IMAGE:-rabbitmq:4.3-management-alpine@sha256:cd624335f752f704e768239ea21501e5771ca13b3b278520da5ad1076eb86e55}"
 ENABLE_CLOUD_ARMOR="${MAGELIFT_GCP_ACCEPTANCE_ENABLE_CLOUD_ARMOR:-false}"
 AUTOPILOT_MEMORY_REQUEST="${MAGELIFT_GCP_ACCEPTANCE_MEMORY_REQUEST:-2Gi}"
@@ -373,7 +373,8 @@ fi
 PULUMI_PROJECT="magelift"
 LOG_DIR="${WORKDIR}/logs"
 BIN="${MAGELIFT_GCP_ACCEPTANCE_BIN:-${WORKDIR}/magelift}"
-CONFIG="${WORKDIR}/magelift.yaml"
+CONFIG="${WORKDIR}/magelift.php"
+source "$ROOT/scripts/acceptance-project.sh"
 COMPOSER_SM_URI="gcp-secret-manager://projects/${PROJECT}/secrets/${COMPOSER_SECRET_ID}/versions/latest"
 WIF_POOL_ID="ml-${NAME}-${PROFILE}"
 WIF_PROVIDER_ID="github"
@@ -722,7 +723,7 @@ ORIGIN_ENV_DOMAIN_YAML=""
 if [[ "$NATIVE_EDGE_ENABLED" == 1 ]]; then
 	ORIGIN_ENV_DOMAIN_YAML="    domain: ${ORIGIN_DOMAIN}"
 fi
-cat >"$CONFIG" <<EOF
+cat >"$WORKDIR/acceptance-input.yaml" <<EOF
 schemaVersion: 1
 project:
   name: ${NAME}
@@ -776,7 +777,7 @@ extensions: {}
 EOF
 
 if [[ "$NATIVE_EDGE_ENABLED" == 1 ]]; then
-	cat >>"$CONFIG" <<EOF
+	cat >>"$WORKDIR/acceptance-input.yaml" <<EOF
 edge:
   mode: native
   nativeProvider: cloud-cdn
@@ -789,6 +790,9 @@ edge:
   ownershipMarker: magelift/acceptance/gcp-native-edge/${NAME}-${PROFILE}
 EOF
 fi
+
+yq -o=json '.' "$WORKDIR/acceptance-input.yaml" > "$WORKDIR/acceptance.json"
+acceptance_project_wrapper "$WORKDIR"
 
 # Reusing a retained stack is safe only when the checkpoint belongs to this
 # exact release, runtime, artifact, and cell catalog. This lets one expensive

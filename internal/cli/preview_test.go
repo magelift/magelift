@@ -2,11 +2,32 @@ package cli
 
 import (
 	"bytes"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/magelift/magelift/internal/config"
 )
+
+func TestPreviewTTLUsesEventOrManualStart(t *testing.T) {
+	cfg := config.Config{Project: config.Project{Name: "demo"}, Class: "preview", PreviewTTL: "24h"}
+	o := options{previewRepository: "org/shop", previewPullRequest: 12, previewCommit: strings.Repeat("a", 40), previewBranch: "feature", previewGeneration: 1}
+	start := time.Now().UTC().Truncate(time.Second)
+	identity, err := o.previewIdentity(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expiry, err := time.Parse(time.RFC3339, identity.ExpiresAt)
+	if err != nil || expiry.Before(start.Add(24*time.Hour)) || expiry.After(time.Now().UTC().Add(24*time.Hour)) {
+		t.Fatalf("manual deadline %s, err=%v", identity.ExpiresAt, err)
+	}
+	o.previewUpdatedAt = "2030-05-01T20:30:00Z"
+	identity, err = o.previewIdentity(cfg)
+	if err != nil || identity.ExpiresAt != "2030-05-02T20:30:00Z" {
+		t.Fatalf("event deadline %#v, err=%v", identity, err)
+	}
+}
 
 func previewTestConfig() string {
 	// The default starter already carries a preview env with a PR-scoped
@@ -15,8 +36,8 @@ func previewTestConfig() string {
 }
 
 func TestResolveWithEnvironmentUsesStablePreviewIdentity(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, []byte(previewTestConfig()), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "magelift.php")
+	if err := writeTestProjectFile(path, []byte(previewTestConfig()), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
@@ -48,8 +69,8 @@ func TestResolveWithEnvironmentUsesStablePreviewIdentity(t *testing.T) {
 }
 
 func TestPreviewIdentityInputsCannotTargetFixedEnvironment(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
@@ -63,8 +84,8 @@ func TestPreviewIdentityInputsCannotTargetFixedEnvironment(t *testing.T) {
 }
 
 func TestConfigEffectiveCLIPrintsPreviewIdentity(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "magelift.yaml")
-	if err := os.WriteFile(path, []byte(previewTestConfig()), 0o600); err != nil {
+	path := filepath.Join(t.TempDir(), "magelift.php")
+	if err := writeTestProjectFile(path, []byte(previewTestConfig()), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer

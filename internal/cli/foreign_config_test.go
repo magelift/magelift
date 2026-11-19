@@ -18,7 +18,7 @@ func TestForeignMagentoAppRejectedAsConfig(t *testing.T) {
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".magento.app.yaml")
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	if err := writeTestProjectFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -57,7 +57,7 @@ func TestForeignPlatformAppRejectedAsConfig(t *testing.T) {
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".platform.app.yaml")
-	if err := os.WriteFile(path, platform, 0o600); err != nil {
+	if err := writeTestProjectFile(path, platform, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -81,8 +81,8 @@ func TestStarterConfigStillLoadsAfterForeignGuard(t *testing.T) {
 		t.Fatal("expected environments")
 	}
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer

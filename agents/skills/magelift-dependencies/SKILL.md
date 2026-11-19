@@ -34,9 +34,14 @@ sharing any, because extension data is not covered by this export contract.
 
 The report separates required tools from optional capabilities. A cloud target
 does not require Docker unless the selected command actually builds or runs a
-local container. Deploy and bootstrap do not need a Pulumi CLI; that engine
-runs inside the MageLift process. Read the capability and install hint beside
+local container. Infrastructure and stack operations require the Pulumi CLI
+on PATH. `doctor --local` reports it as optional. Read the capability and install hint beside
 each failed check before changing the machine.
+
+Evaluating `magelift.php` requires PHP. Docker and Compose are needed for
+`magelift dev`; Azure AKS access may need `kubelogin` when the cluster's
+kubeconfig uses Entra authentication. Generated Azure deployment jobs install
+the helper and use the Azure CLI session established by federation.
 
 Review package-manager commands before accepting an installation. Signed
 release operations and remote session launchers can offer to install missing
@@ -65,5 +70,5 @@ version. `help`, `version`, `doctor` and envelope validation do not acquire it.
 For offline preparation or explicit repair, run `magelift providers install`
 while online. A corrupt cache is an error; do not remove or replace a project
 pin to hide a signature, digest or protocol failure. Community provider names
-in YAML do not enable automatic installation. Release archives need no Go
+in PHP configuration do not enable automatic installation. Release archives need no Go
 toolchain on the user's machine.

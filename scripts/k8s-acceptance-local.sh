@@ -314,8 +314,11 @@ if [[ ${#CELLS[@]} -ne 1 ]]; then
 fi
 
 LIVE_WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/magelift-${PROVIDER}-acceptance.XXXXXX")"
-LIVE_CONFIG="$LIVE_WORKDIR/magelift.yaml"
-cp "$MAGELIFT_CONFIG" "$LIVE_CONFIG"
+LIVE_CONFIG="$LIVE_WORKDIR/acceptance.json"
+source "$ROOT/scripts/acceptance-project.sh"
+MAGELIFT_CONFIG="$(realpath "$MAGELIFT_CONFIG")"
+(cd "$ROOT" && go run ./cmd/acceptance-project "$MAGELIFT_CONFIG") > "$LIVE_CONFIG"
+acceptance_project_wrapper "$LIVE_WORKDIR"
 if [[ -n "${MAGELIFT_K8S_ACCEPTANCE_BACKEND_URL:-}" ]]; then
 	export PULUMI_BACKEND_URL="$MAGELIFT_K8S_ACCEPTANCE_BACKEND_URL"
 else
@@ -482,7 +485,7 @@ wait_for_clean() {
 	done
 }
 
-config=("$MAGELIFT_BIN" --config "$LIVE_CONFIG" --env "$PROFILE" --no-interaction --output json)
+config=("$MAGELIFT_BIN" --config "$LIVE_WORKDIR/magelift.php" --env "$PROFILE" --no-interaction --output json)
 run() {
 	printf '+ magelift %s\n' "$*" >&2
 	"${config[@]}" "$@"

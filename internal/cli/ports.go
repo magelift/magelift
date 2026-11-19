@@ -21,7 +21,7 @@ func (o *options) resolveModule() (platform.StackModule, error) {
 	if !found {
 		return nil, guided(
 			fmt.Sprintf("no stack module for %s/%s", effective.Config.Target.Provider, effective.Config.Target.Runtime),
-			"check target.provider and target.runtime in magelift.yaml, or build a custom CLI that RegisterModules your provider",
+			"check target.provider and target.runtime in magelift.php, or build a custom CLI that registers your provider",
 			"docs/capability-matrix.md",
 		)
 	}

@@ -26,7 +26,7 @@ func TestSchemaEpochTransportConfigured(t *testing.T) {
 
 func TestObserveLiveSchemaEpochSkipsUnconfiguredTransport(t *testing.T) {
 	o := testOptions(nil, &fakeTerminal{interactive: false})
-	o.configPath = "magelift.yaml"
+	o.configPath = "magelift.php"
 	_, err := o.observeLiveSchemaEpoch(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "transport is not configured") {
 		t.Fatalf("error = %v", err)

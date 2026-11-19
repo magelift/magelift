@@ -8,17 +8,82 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/usererr"
+	"github.com/magelift/magelift/sdk"
 )
+
+type starterLocation struct{ account, region, domain string }
+
+var (
+	starterAccounts = map[string]*regexp.Regexp{
+		"aws":   regexp.MustCompile(`^[0-9]{12}$`),
+		"gcp":   regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`),
+		"azure": regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`),
+	}
+	starterRegion   = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	starterDNSLabel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+)
+
+func (v starterLocation) validate(provider string) error {
+	if v.account != "" && !starterAccounts[provider].MatchString(v.account) {
+		return fmt.Errorf("--cloud-account must be a valid %s account, project or subscription identifier", provider)
+	}
+	if v.region != "" && !starterRegion.MatchString(v.region) {
+		return errors.New("--region requires a cloud region identifier")
+	}
+	if v.domain != "" {
+		if !strings.Contains(v.domain, ".") || len("preview."+v.domain) > 253 {
+			return errors.New("--domain requires a fully qualified DNS hostname")
+		}
+		for label := range strings.SplitSeq(v.domain, ".") {
+			if !starterDNSLabel.MatchString(label) {
+				return errors.New("--domain requires a lowercase DNS hostname")
+			}
+		}
+	}
+	return nil
+}
+
+func (v starterLocation) apply(project map[string]any, provider string) {
+	target := project["target"].(map[string]any)[provider].(map[string]any)
+	if v.region != "" {
+		project["defaults"].(map[string]any)["region"] = v.region
+		if provider == "gcp" {
+			target["region"] = v.region
+		}
+	}
+	if v.account != "" {
+		switch provider {
+		case "gcp":
+			target["project"] = v.account
+		case "azure":
+			target["subscriptionId"] = v.account
+		}
+	}
+	for name, item := range project["environments"].(map[string]any) {
+		env := item.(map[string]any)
+		if v.account != "" && provider == "aws" {
+			env["account"] = v.account
+		}
+		if v.domain != "" {
+			host := v.domain
+			if name != "production" {
+				host = name + "." + host
+			}
+			env["domain"] = host
+		} else if provider == "azure" && strings.HasSuffix(fmt.Sprint(env["domain"]), ".example.invalid") {
+			delete(env, "domain")
+		}
+	}
+}
 
 const defaultInitRecipePHP = "8.5"
 
 var (
-	magentoInitVersion  = regexp.MustCompile(`^(?:v)?(2\.4\.\d+)(?:-p([1-9][0-9]*))?$`)
+	magentoInitVersion  = regexp.MustCompile(`^(?:v)?(2\.\d+\.\d+)(?:-p([1-9][0-9]*))?$`)
 	errNoMagentoPackage = errors.New("no Magento metapackage or magento/magento2-base entry in composer.lock")
 	editionMetapackage  = map[string]string{
 		"magento/product-community-edition":  "open-source",
@@ -28,6 +93,7 @@ var (
 )
 
 type inspectedShop struct {
+	PHP         string
 	ProjectName string
 	Edition     string
 	Version     string
@@ -47,7 +113,11 @@ func shopSourceRoot(configPath string) string {
 }
 
 func inspectShopSource(root string) (inspectedShop, error) {
-	root = filepath.Clean(root)
+	absolute, err := filepath.Abs(root)
+	if err != nil {
+		return inspectedShop{}, err
+	}
+	root = absolute
 	for _, rel := range []string{"composer.json", "composer.lock", "bin/magento"} {
 		path := filepath.Join(root, rel)
 		info, err := os.Lstat(path)
@@ -96,11 +166,18 @@ func inspectShopSource(root string) (inspectedShop, error) {
 		return inspectedShop{}, err
 	}
 
-	return inspectedShop{ProjectName: projectName, Edition: edition, Version: version}, nil
+	var locked composerLock
+	_ = json.Unmarshal(lockBytes, &locked)
+	php := locked.PlatformOverrides["php"]
+	if !regexp.MustCompile(`^[0-9]+\.[0-9]+(\.[0-9]+)?$`).MatchString(php) {
+		php = ""
+	}
+	return inspectedShop{ProjectName: projectName, Edition: edition, Version: version, PHP: php}, nil
 }
 
 type composerLock struct {
-	Packages []composerPackage `json:"packages"`
+	PlatformOverrides map[string]string `json:"platform-overrides"`
+	Packages          []composerPackage `json:"packages"`
 }
 
 type composerPackage struct {
@@ -212,177 +289,96 @@ func projectNameFromComposer(path string) (string, error) {
 }
 
 func validateShopForInitRecipe(shop inspectedShop) error {
-	catalog := config.CurrentCompatibilityCatalog()
-	match := magentoInitVersion.FindStringSubmatch(shop.Version)
-	if match == nil {
-		return usererr.New(
-			fmt.Sprintf("locked Magento release %q is not a supported exact version", shop.Version),
-			"pin an exact 2.4.x or 2.4.x-pN release in composer.lock, then rerun magelift init",
-			"docs/configuration.md",
-		)
-	}
-	var line *config.CompatibilityReleaseLine
-	for i := range catalog.Lines {
-		if catalog.Lines[i].Line == match[1] {
-			line = &catalog.Lines[i]
-			break
-		}
-	}
-	if line == nil {
-		return usererr.New(
-			fmt.Sprintf("Magento release line %s is not in the MageLift compatibility catalog", match[1]),
-			"run magelift compatibility catalog and align the shop to a listed line, or author magelift.yaml manually",
-			"docs/configuration.md",
-		)
-	}
-	if !line.Available {
-		reason := strings.TrimSpace(line.UnavailableReason)
-		if reason == "" {
-			reason = fmt.Sprintf("Magento %s is not available in the current catalog", line.Line)
-		}
-		return usererr.New(
-			reason,
-			"choose a supported Magento line or author magelift.yaml manually with compatibility.allowUnsupported if deliberate",
-			"docs/configuration.md",
-		)
-	}
-	if match[2] != "" {
-		patch, err := strconv.Atoi(match[2])
-		if err != nil {
-			return usererr.New(
-				fmt.Sprintf("Magento patch in %q is invalid", shop.Version),
-				"pin a catalogued patch such as "+line.RecommendedRelease+", then rerun magelift init",
-				"docs/configuration.md",
-			)
-		}
-		if patch > line.MaximumPatch {
-			return usererr.New(
-				fmt.Sprintf("Magento %s is newer than the latest patch in the compatibility catalog (%s)", shop.Version, line.RecommendedRelease),
-				"pin "+line.RecommendedRelease+" or author magelift.yaml manually for this shop",
-				"docs/configuration.md",
-			)
-		}
-	}
-	if !containsString(line.PHPBranches, defaultInitRecipePHP) {
-		branches := append([]string(nil), line.PHPBranches...)
-		return usererr.New(
-			fmt.Sprintf("the community alpha init recipe uses PHP %s; Magento %s supports PHP %s in the compatibility catalog, not PHP %s", defaultInitRecipePHP, line.Line, strings.Join(branches, " or "), defaultInitRecipePHP),
-			"keep the shop version and author magelift.yaml with its supported PHP branch and explicit compatible builder/runtime overrides",
-			"docs/onboarding.md",
-		)
+	if magentoInitVersion.FindStringSubmatch(shop.Version) == nil {
+		return usererr.New(fmt.Sprintf("locked Magento release %q is not an exact version", shop.Version), "pin an exact release in composer.lock, then rerun magelift init", "docs/configuration.md")
 	}
 	return nil
 }
 
-func containsString(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
+func recommendedInitPHP(version string) string {
+	match := magentoInitVersion.FindStringSubmatch(version)
+	if match != nil {
+		for _, line := range config.CurrentCompatibilityCatalog().Lines {
+			if line.Line == match[1] && len(line.PHPBranches) != 0 {
+				return line.PHPBranches[len(line.PHPBranches)-1]
+			}
 		}
 	}
-	return false
-}
-
-func initNextAction() string {
-	return "review project.name, cloud project or account placeholders, and environments.test.domain, then commit magelift.yaml and run magelift bootstrap --env test"
+	return defaultInitRecipePHP
 }
 
 func validateStarterProvider(provider string) error {
-	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "aws", "gcp":
+	switch provider {
+	case "aws", "gcp", "azure":
 		return nil
 	default:
-		return fmt.Errorf("MageLift supports starter providers \"aws\" and \"gcp\" only, got %q", provider)
+		return fmt.Errorf("unknown starter provider %q (choose aws, gcp or azure)", provider)
 	}
 }
 
-func renderMinimalStarter(provider string, shop inspectedShop) (string, error) {
+// starterDocument is shared by new shops, existing shops and PaaS imports.
+// Service choices live at the root; environments vary capacity and protection.
+func starterDocument(provider string, shop inspectedShop) (map[string]any, error) {
 	if err := validateStarterProvider(provider); err != nil {
-		return "", err
+		return nil, err
 	}
-	template := minimalAWSStarterTemplate
-	if strings.EqualFold(strings.TrimSpace(provider), "gcp") {
-		template = minimalGCPStarterTemplate
+	php := shop.PHP
+	if php == "" {
+		php = recommendedInitPHP(shop.Version)
 	}
-	starter := fmt.Sprintf(template, strconv.Quote(shop.ProjectName), shop.Edition, shop.Version)
+	build := map[string]any{"php": php, "staticContent": map[string]any{"locales": []string{"en_US"}, "themes": []string{"Magento/luma"}}}
 	if shop.Edition == "commerce" {
-		starter = strings.Replace(starter, "build:\n", "build:\n  composer:\n    credentials: env://COMPOSER_AUTH\n", 1)
+		build["composer"] = map[string]any{"credentials": "env://COMPOSER_AUTH"}
 	}
-	return starter, nil
-}
-
-const minimalGCPStarterTemplate = `schemaVersion: 1
-project:
-  name: %s
-application:
-  edition: %s
-  version: %s
-  mode: integrated
-  webRuntime: nginx-fpm
-  magento:
-    frontName: admin
-build:
-  php: "8.5"
-  staticContent:
-    locales: [en_US]
-    themes: [Magento/luma]
-target:
-  provider: gcp
-  runtime: gke-autopilot
-  gcp:
-    project: example-gcp-project
-    region: us-central1
-defaults:
-  region: us-central1
-  preset: preview
-environments:
-  test:
-    class: staging
-    preset: preview
-    domain: test.example.invalid
-extensions: {}
-`
-
-const minimalAWSStarterTemplate = `schemaVersion: 1
-project:
-  name: %s
-application:
-  edition: %s
-  version: %s
-  mode: integrated
-  webRuntime: nginx-fpm
-  magento:
-    frontName: admin
-build:
-  php: "8.5"
-target:
-  provider: aws
-  runtime: ecs-fargate
-  aws:
-    catalog:
-      searchMode: disabled
-defaults:
-  region: eu-west-3
-  preset: preview
-environments:
-  test:
-    account: "123456789012"
-    class: staging
-    preset: preview
-    domain: test.example.invalid
-extensions: {}
-`
-
-func validateInitStarter(data []byte) error {
-	file, err := config.Load(data)
-	if err != nil {
-		return fmt.Errorf("validate generated shop configuration: %w", err)
+	target := map[string]any{"provider": provider}
+	region := "us-central1"
+	switch provider {
+	case "gcp":
+		target["runtime"] = "gke-autopilot"
+		target["gcp"] = map[string]any{"project": "example-gcp-project", "region": region, "openSearchMode": "opensearch", "queueMode": "database"}
+	case "aws":
+		region = "eu-west-3"
+		target["runtime"] = "ecs-fargate"
+		target["aws"] = map[string]any{"catalog": map[string]any{"databaseEngine": "rds-mysql", "searchMode": "provisioned", "queueMode": "db"}}
+	case "azure":
+		region = "eastus"
+		target["runtime"] = "aks"
+		target["azure"] = map[string]any{"subscriptionId": "00000000-0000-0000-0000-000000000000", "resourceGroup": shop.ProjectName}
 	}
-	if _, err := file.ResolveBuild(); err != nil {
-		return fmt.Errorf("validate generated build configuration: %w", err)
+	environments := map[string]any{
+		"staging":    map[string]any{"class": "staging", "preset": "preview", "domain": "staging.example.invalid"},
+		"uat":        map[string]any{"class": "staging", "preset": "standard", "domain": "uat.example.invalid"},
+		"production": map[string]any{"class": "production", "preset": "high-availability", "domain": "shop.example.invalid", "protection": true},
+		"preview":    map[string]any{"class": "preview", "preset": "preview", "domain": "preview.example.invalid", "previewTtl": "168h", "monthlyBudgetCents": 2500},
 	}
-	if _, err := file.Resolve("test", config.ResolveOptions{}); err != nil {
-		return fmt.Errorf("validate generated test environment: %w", err)
+	if provider == "aws" {
+		for _, env := range environments {
+			env.(map[string]any)["account"] = "123456789012"
+		}
 	}
-	return nil
+	// Managed database and search APIs accept different version spellings
+	// from upstream container registries. These are editable starting values.
+	v, _ := config.RecommendedServiceVersions(shop.Version)
+	database, search := v.MySQL, strings.TrimPrefix(v.OpenSearch, "OpenSearch_")
+	if provider != "aws" {
+		database = database[:strings.LastIndexByte(database, '.')]
+		search = sdk.OpenSearchContainerTag(search)
+	}
+	cache := v.Valkey
+	if provider == "gcp" && cache == "8.1" {
+		// Memorystore offers 8.0 in the Valkey 8 series.
+		cache = "8.0"
+	}
+	services := map[string]any{
+		"database": map[string]any{"family": "mysql", "version": database},
+		"cache":    map[string]any{"family": "valkey", "version": cache},
+		"search":   map[string]any{"family": "opensearch", "version": search},
+		"queue":    map[string]any{"family": "database"},
+	}
+	return map[string]any{
+		"schemaVersion": 1, "project": map[string]any{"name": shop.ProjectName},
+		"application": map[string]any{"edition": shop.Edition, "version": shop.Version, "mode": "integrated", "webRuntime": "nginx-fpm", "magento": map[string]any{"frontName": "admin"}},
+		"build":       build, "target": target, "defaults": map[string]any{"region": region, "preset": "standard"},
+		"environments": environments, "services": services,
+	}, nil
 }

@@ -1,28 +1,23 @@
-# Storefront recipes (docs only)
+# Connect a storefront
 
-MageLift does **not** ship an in-core Next.js / PWA / OpenNext runtime. Magento
-remains the commerce backend; storefront frameworks stay in your repo.
+Use the native Magento storefront with `application.mode` set to `integrated`. Build the installed themes, modules, static content and locales into the shop image. Set your domain on each environment. Check the storefront, Admin and media URLs after promoting the image.
 
-## Headless mode
+For a separately deployed storefront, start with the frontend origin when initializing the Magento backend.
 
-Set `application.mode: headless` when Magento is API-only. Wire the storefront
-to Magento GraphQL / REST using outputs from `magelift outputs` (base URL,
-secrets via your secret store; never bake Composer auth into the frontend
-image).
+```sh
+magelift init --provider aws --storefront-origin https://store.example.com
+magelift --env staging config effective
+magelift env status staging
+```
 
-## Typical wiring
+MageLift configures Magento’s storefront origin and allowed CORS origins. The status output gives the configured Magento GraphQL endpoint. Add the corresponding Magento origin to the frontend’s configuration and deploy that frontend with its own tooling. Give previews their own frontend origin and Magento endpoint.
 
-1. Deploy Magento with MageLift on a certified target.
-2. Read `applicationURL` (and related) from `magelift outputs --env <env>`.
-3. Configure the storefront's Magento backend URL + auth to Magento integration
-   tokens stored in Secrets Manager / Secret Manager.
-4. Keep CDN / edge for the storefront separate unless you intentionally share
-   the MageLift edge cell (check the capability matrix before claiming it).
+For an existing project, edit its application settings in PHP.
 
-## Out of scope for v1.0
+```php
+$application['mode'] = 'headless';
+$application['magento']['storefrontOrigin'] = 'https://store.example.com';
+$application['magento']['corsOrigins'] = ['https://store.example.com'];
+```
 
-- Generating Next/PWA apps inside the CLI
-- Signed remote storefront plugins
-- Claiming Adobe PWA Studio compatibility beyond "bring your own frontend"
-
-See [getting-started.md](getting-started.md) and [post-beta-roadmap.md](post-beta-roadmap.md).
+Check a real GraphQL query, a product media URL and a credentialed request from the authorized frontend origin. Cookies, TLS certificates, DNS, cache invalidation and customer session settings should match the domains used by the shop.

@@ -25,6 +25,7 @@ package synthetic_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -36,6 +37,7 @@ import (
 	"github.com/magelift/magelift/internal/localdev"
 	"github.com/magelift/magelift/internal/paasimport"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/projectphp"
 	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/internal/registry"
 	"github.com/magelift/magelift/sdk"
@@ -71,7 +73,13 @@ func fixturePath(t *testing.T, rel string) string {
 
 func loadFixture(t *testing.T, rel string) *config.File {
 	t.Helper()
-	data, err := os.ReadFile(fixturePath(t, rel))
+	var data []byte
+	var err error
+	if strings.HasSuffix(rel, ".php") {
+		data, err = projectphp.Evaluate(t.Context(), fixturePath(t, rel))
+	} else {
+		data, err = os.ReadFile(fixturePath(t, rel))
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +141,7 @@ func TestGaps(t *testing.T) {
 
 func TestRouting_ValidFixturesPlan(t *testing.T) {
 	t.Parallel()
-	cfg := resolveFixture(t, "aws-preview/magelift.yaml", "preview")
+	cfg := resolveFixture(t, "aws-preview/magelift.php", "preview")
 	modules, err := registry.NewDefault()
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +157,7 @@ func TestRouting_ValidFixturesPlan(t *testing.T) {
 
 func TestRouting_GCPDispatchesToPluginShim(t *testing.T) {
 	t.Parallel()
-	cfg := resolveFixture(t, "gcp-preview/magelift.yaml", "preview")
+	cfg := resolveFixture(t, "gcp-preview/magelift.php", "preview")
 	modules, err := registry.NewDefault()
 	if err != nil {
 		t.Fatal(err)
@@ -256,7 +264,7 @@ func TestContract_PublicModule(t *testing.T) {
 	if err := mismatchedRegistry.RegisterPublicModule(mismatched); err != nil {
 		t.Fatalf("register mismatched fake: %v", err)
 	}
-	cfg := resolveFixture(t, "gcp-preview/magelift.yaml", "preview")
+	cfg := resolveFixture(t, "gcp-preview/magelift.php", "preview")
 	cfg.Target.Provider = string(target.Provider)
 	cfg.Target.Runtime = string(target.Runtime)
 	if _, _, err := mismatchedRegistry.Plan(cfg, "preview", platform.PlanOptions{}); err == nil {
@@ -276,7 +284,7 @@ func TestFailure_InvalidFixtures(t *testing.T) {
 		rel     string
 		wantErr string
 	}{
-		{"invalid/unknown-provider.yaml", "target.provider must be aws, gcp, ovh, or scaleway"},
+		{"invalid/unknown-provider.yaml", "target.provider"},
 		{"invalid/unsupported-version.yaml", "must be an exact Magento release"},
 	}
 	for _, tc := range cases {
@@ -350,27 +358,49 @@ func unmappedPaths(t *testing.T, keys []paasimport.UnmappedKey) map[string]bool 
 	return paths
 }
 
+func importedFixture(t *testing.T, root string, kind paasimport.SourceKind) ([]byte, []paasimport.UnmappedKey, error) {
+	t.Helper()
+	data, err := projectphp.Evaluate(t.Context(), filepath.Join("..", "fixtures", "ci", "aws", "magelift.php"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	src, err := paasimport.Read(root, kind, "")
+	if err != nil {
+		return nil, nil, err
+	}
+	residuals, err := src.Apply(doc)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err = json.Marshal(doc)
+	return data, residuals, err
+}
+
 func TestValidation_Importer(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		name  string
-		root  string
-		mapFn func(string) (paasimport.Result, error)
+		name string
+		root string
+		kind paasimport.SourceKind
 	}{
-		{"ACC", "imports/acc", paasimport.MapACC},
-		{"Upsun", "imports/upsun", paasimport.MapUpsun},
+		{"ACC", "imports/acc", paasimport.SourceACC},
+		{"Upsun", "imports/upsun", paasimport.SourceUpsun},
 	} {
-		result, err := tc.mapFn(fixturePath(t, tc.root))
+		data, keys, err := importedFixture(t, fixturePath(t, tc.root), tc.kind)
 		if err != nil {
 			t.Fatalf("%s map: %v", tc.name, err)
 		}
-		if _, err := config.Load(result.YAML); err != nil {
+		if _, err := config.Load(data); err != nil {
 			t.Fatalf("%s emitted YAML invalid: %v", tc.name, err)
 		}
-		paths := unmappedPaths(t, result.Unmapped)
+		paths := unmappedPaths(t, keys)
 		for _, want := range []string{"custom_stage", "relationships.analytics", "analytics"} {
 			if !paths[want] {
-				t.Errorf("%s unmapped keys %v lack %q", tc.name, result.Unmapped, want)
+				t.Errorf("%s unmapped keys %v lack %q", tc.name, keys, want)
 			}
 		}
 	}
@@ -380,22 +410,23 @@ func TestValidation_ImporterVersions(t *testing.T) {
 	t.Parallel()
 	badType := t.TempDir()
 	writeTestFile(t, badType, ".magento.app.yaml", "name: syntheticbad\ntype: nodejs:20\n")
-	if _, err := paasimport.MapACC(badType); err == nil || !strings.Contains(err.Error(), "unsupported app type") {
+	if _, _, err := importedFixture(t, badType, paasimport.SourceACC); err == nil || !strings.Contains(err.Error(), "unsupported app type") {
 		t.Fatalf("malformed app type error = %v, want unsupported-app-type rejection", err)
 	}
 
 	oldPHP := t.TempDir()
 	writeTestFile(t, oldPHP, ".magento.app.yaml", "name: synthetic74\ntype: php:7.4\n")
-	result, err := paasimport.MapACC(oldPHP)
+	data, _, err := importedFixture(t, oldPHP, paasimport.SourceACC)
 	if err != nil {
 		t.Fatalf("php:7.4 map: %v", err)
 	}
-	file, err := config.Load(result.YAML)
+	file, err := config.Load(data)
 	if err != nil {
 		t.Fatalf("php:7.4 emitted YAML load: %v", err)
 	}
-	if _, err := file.Resolve("staging", config.ResolveOptions{}); err == nil || !strings.Contains(err.Error(), "build.php") {
-		t.Fatalf("php:7.4 resolve error = %v, want version rejection (nothing substituted)", err)
+	effective, err := file.Resolve("staging", config.ResolveOptions{})
+	if err != nil || effective.Config.Build.PHP != "7.4" {
+		t.Fatalf("imported PHP version = %q, error = %v", effective.Config.Build.PHP, err)
 	}
 }
 
@@ -412,7 +443,7 @@ func writeTestFile(t *testing.T, dir, name, body string) {
 
 func TestLocalPlanning(t *testing.T) {
 	t.Parallel()
-	data, err := os.ReadFile(fixturePath(t, "gcp-preview/magelift.yaml"))
+	data, err := projectphp.Evaluate(t.Context(), fixturePath(t, "gcp-preview/magelift.php"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -64,7 +64,7 @@ func assertDoctorExportAllowlistShape(t *testing.T, exported []byte) {
 
 func TestDoctorLocalRunsWithMissingConfig(t *testing.T) {
 	dir := t.TempDir()
-	missing := filepath.Join(dir, "magelift.yaml")
+	missing := filepath.Join(dir, "magelift.php")
 	var out bytes.Buffer
 	runner := &fakeDependencyRunner{}
 	o := testOptions(&out, &fakeTerminal{interactive: false})
@@ -88,8 +88,8 @@ func TestDoctorLocalRunsWithMissingConfig(t *testing.T) {
 
 func TestDoctorLocalRunsWithInvalidConfig(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte("not: valid: yaml: [[["), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte("<?php return new ;"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -132,7 +132,7 @@ func TestDoctorLocalSkipsCredentialProbeOnGCP(t *testing.T) {
 
 func TestDoctorMissingConfigStillInvalidWithoutLocal(t *testing.T) {
 	dir := t.TempDir()
-	missing := filepath.Join(dir, "magelift.yaml")
+	missing := filepath.Join(dir, "magelift.php")
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.configPath, o.output = missing, "json"
@@ -146,9 +146,9 @@ func TestDoctorMissingConfigStillInvalidWithoutLocal(t *testing.T) {
 
 func TestDoctorExportWrittenOnFailedReport(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
+	path := filepath.Join(dir, "magelift.php")
 	contents := strings.Replace(starterConfig, "    account: \"123456789012\"", "    account: \"123456789012\"\n    inherits: staging", 1)
-	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+	if err := writeTestProjectFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	exportPath := filepath.Join(dir, "doctor-export.json")
@@ -186,7 +186,7 @@ func TestDoctorExportOmitsSensitiveReportFields(t *testing.T) {
 	path := writeGCPLifecycleConfig(t, "preview")
 	exportPath := filepath.Join(t.TempDir(), "export.json")
 	adc := filepath.Join(t.TempDir(), "adc-"+doctorExportCanaryToken+".json")
-	if err := os.WriteFile(adc, []byte("{}"), 0o600); err != nil {
+	if err := writeTestProjectFile(adc, []byte("{}"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
@@ -228,8 +228,8 @@ func TestDoctorExportOmitsSensitiveReportFields(t *testing.T) {
 
 func TestDoctorExportFileModeAndRefuseOverwrite(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	exportPath := filepath.Join(dir, "doctor-safe.json")
@@ -262,8 +262,8 @@ func TestDoctorExportRefusesSymlinkTarget(t *testing.T) {
 		t.Skip("symlink refusal is exercised on Unix-like systems")
 	}
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(path, []byte(starterConfig), 0o600); err != nil {
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	real := filepath.Join(dir, "real-export.json")
@@ -285,9 +285,9 @@ func TestDoctorExportRefusesSymlinkTarget(t *testing.T) {
 
 func TestDoctorExportWithLocalBadConfig(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "magelift.yaml")
+	path := filepath.Join(dir, "magelift.php")
 	bad := "project:\n  name: " + doctorExportCanaryToken + "\naccount: " + doctorExportCanaryURL + "\n"
-	if err := os.WriteFile(path, []byte(bad), 0o600); err != nil {
+	if err := writeTestProjectFile(path, []byte(bad), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	exportPath := filepath.Join(dir, "local-export.json")

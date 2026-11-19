@@ -19,7 +19,7 @@ type stateStatusResult struct {
 
 func stateStatusCommand(o *options) *cobra.Command {
 	return &cobra.Command{Use: "status", Short: "Show the deployment lock status", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		_, planned, err := o.planStack(false)
+		_, planned, err := o.planStackWith(platform.PlanOptions{AccountOnly: true, AllowExpiredPreview: true, Context: cmd.Context()})
 		if err != nil {
 			return invalid(err)
 		}
@@ -43,7 +43,7 @@ func stateUnlockCommand(o *options) *cobra.Command {
 		if !o.yes {
 			return invalid(errors.New("unlocking deployment state requires --yes"))
 		}
-		_, planned, err := o.planStack(false)
+		_, planned, err := o.planStackWith(platform.PlanOptions{AccountOnly: true, AllowExpiredPreview: true, Context: cmd.Context()})
 		if err != nil {
 			return invalid(err)
 		}
@@ -64,7 +64,7 @@ func stateUnlockCommand(o *options) *cobra.Command {
 
 func stateBackupCommand(o *options) *cobra.Command {
 	return &cobra.Command{Use: "backup", Short: "Create a versioned stack-state backup", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
-		_, planned, err := o.planStack(false)
+		_, planned, err := o.planStackWith(platform.PlanOptions{AccountOnly: true, AllowExpiredPreview: true, Context: cmd.Context()})
 		if err != nil {
 			return invalid(err)
 		}
@@ -100,7 +100,7 @@ func stateRestoreCommand(o *options) *cobra.Command {
 		if !o.yes {
 			return invalid(errors.New("restoring deployment state requires --yes"))
 		}
-		_, planned, err := o.planStack(false)
+		_, planned, err := o.planStackWith(platform.PlanOptions{AccountOnly: true, AllowExpiredPreview: true, Context: cmd.Context()})
 		if err != nil {
 			return invalid(err)
 		}

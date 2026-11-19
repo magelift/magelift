@@ -18,7 +18,7 @@ const signJWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.signature"
 
 func TestSignUsesIdentityTokenFileWithoutPuttingJWTOnOptionsPath(t *testing.T) {
 	tokenPath := filepath.Join(t.TempDir(), "token.jwt")
-	if err := os.WriteFile(tokenPath, []byte(signJWT+"\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(tokenPath, []byte(signJWT+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var signed cosign.SignOptions
@@ -111,8 +111,8 @@ func TestSignRejectsNonDigest(t *testing.T) {
 
 func TestGCPSigningServiceAccountMatchesBootstrapCIAccount(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(gcpStarterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(gcpStarterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
@@ -127,8 +127,8 @@ func TestGCPSigningServiceAccountMatchesBootstrapCIAccount(t *testing.T) {
 
 func TestSignUsesAmbientGitHubOIDCDespiteDiscoverableGcloud(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(gcpStarterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(gcpStarterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var signed cosign.SignOptions
@@ -169,7 +169,7 @@ func TestSignUsesAmbientGitHubOIDCDespiteDiscoverableGcloud(t *testing.T) {
 
 func TestSignExplicitTokenOverridesGitHubActionsAmbient(t *testing.T) {
 	tokenPath := filepath.Join(t.TempDir(), "token.jwt")
-	if err := os.WriteFile(tokenPath, []byte(signJWT+"\n"), 0o600); err != nil {
+	if err := writeTestProjectFile(tokenPath, []byte(signJWT+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var signed cosign.SignOptions
@@ -252,8 +252,8 @@ func TestSignGitHubActionsRejectsMissingOIDCPermission(t *testing.T) {
 
 func TestSignUsesGcloudImpersonationFromYAMLWithoutExecuting(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(gcpStarterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(gcpStarterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})

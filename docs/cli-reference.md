@@ -5,18 +5,20 @@ This page is generated from the Cobra command tree. Do not edit it by hand.
 ## Global options
 
 ```text
-      --config string               configuration file (default "magelift.yaml")
-      --env string                  environment name
-      --no-interaction              never prompt for input
-  -o, --output string               output format: table, json, or yaml (default "table")
-      --preview-branch string       source branch metadata for a preview identity
-      --preview-commit string       commit digest metadata for a preview identity
-      --preview-domain string       domain metadata for a preview identity
-      --preview-generation uint     deployment generation for a preview identity
-      --preview-number int          pull-request number for a preview identity
-      --preview-repository string   canonical repository slug for a pull-request preview
-  -v, --verbose count               increase diagnostic verbosity
-  -y, --yes                         confirm destructive actions
+      --config string                 configuration file (default "magelift.php")
+      --env string                    environment name
+      --no-interaction[=true|false]   never prompt for input
+  -o, --output string                 output format: table, json, or yaml (default "table")
+      --preview-branch string         source branch metadata for a preview identity
+      --preview-commit string         commit digest metadata for a preview identity
+      --preview-domain string         domain metadata for a preview identity
+      --preview-expires-at string     absolute RFC3339 expiration for this pull request preview
+      --preview-generation uint       deployment generation for a preview identity
+      --preview-number int            pull-request number for a preview identity
+      --preview-repository string     canonical repository slug for a pull-request preview
+      --preview-updated-at string     pull request event time used with previewTtl
+  -v, --verbose count                 increase diagnostic verbosity
+  -y, --yes[=true|false]              confirm destructive actions
 ```
 ## magelift audit
 
@@ -66,11 +68,11 @@ magelift bootstrap [flags]
 Options:
 
 ```text
-      --access-log-bucket string   existing AWS log bucket (AWS only)
-      --apply-ci-permissions       apply reviewed GCP CI IAM grants (GCP only)
-      --configure-github           write allowlisted GitHub repository variables after CI permissions are applied (GCP only)
-      --github-owner string        optional GitHub owner for Actions deploys
-      --github-repo string         optional GitHub repository for Actions deploys
+      --access-log-bucket string            existing AWS log bucket (AWS only)
+      --apply-ci-permissions[=true|false]   apply reviewed GCP CI IAM grants (GCP only)
+      --configure-github[=true|false]       write allowlisted GitHub repository variables after CI permissions are applied (GCP only)
+      --github-owner string                 optional GitHub owner for Actions deploys
+      --github-repo string                  optional GitHub repository for Actions deploys
 ```
 ## magelift build
 
@@ -87,8 +89,9 @@ Options:
       --export-recipe string   export the bundled build recipe without building or publishing
       --image string           target image reference for a pushed build
       --platform strings       target platform, repeatable or comma-separated
-      --push                   push the image and publish build attestations
+      --push[=true|false]      push the image and publish build attestations
       --runtime-image string   advanced runtime image override (pair with --builder-image; registry digest required with --push)
+      --source string          shop checkout to build when the PHP project is stored separately
       --source-url string      HTTPS Git source URL used for provenance
 ```
 ## magelift cache-flush
@@ -97,96 +100,6 @@ Run the Magento cache-flush operation on the web workload
 
 ```text
 magelift cache-flush
-```
-## magelift certification
-
-Inspect provider cells and verify acceptance evidence
-
-```text
-magelift certification
-```
-### magelift certification cells
-
-Expand one provider target into architecture cells
-
-```text
-magelift certification cells [flags]
-```
-
-Options:
-
-```text
-      --edition string   Magento edition: open-source or commerce (default "open-source")
-      --preset string    environment preset (default "preview")
-      --release string   exact Adobe Commerce release (default "2.4.9")
-      --target string    target ID, such as aws/ecs-fargate
-```
-### magelift certification docs
-
-Generate source-dated release documents from the catalog and sealed evidence
-
-```text
-magelift certification docs [flags]
-```
-
-Options:
-
-```text
-      --evidence-file string   sealed JSONL evidence file to include
-      --output-dir string      directory for generated Markdown documents
-      --run-id string          run ID when the evidence file contains more than one run
-```
-### magelift certification plan
-
-Print a side-effect-free certification execution plan
-
-```text
-magelift certification plan [flags]
-```
-
-Options:
-
-```text
-      --edition string   Magento edition: open-source or commerce (default "open-source")
-      --preset string    environment preset (default "preview")
-      --release string   exact Adobe Commerce release (default "2.4.9")
-      --target string    target ID, such as gcp/gke-standard
-```
-### magelift certification seal
-
-Seal unsealed acceptance candidates with the core evidence contract
-
-```text
-magelift certification seal [flags]
-```
-
-Options:
-
-```text
-      --file string          unsealed JSONL evidence candidates
-      --output-file string   sealed JSONL output file (default: input with .sealed.jsonl suffix)
-```
-### magelift certification targets
-
-List provider architecture descriptors
-
-```text
-magelift certification targets
-```
-### magelift certification verify
-
-Verify sealed JSONL acceptance evidence
-
-```text
-magelift certification verify [flags]
-```
-
-Options:
-
-```text
-      --file string                 JSONL evidence file
-      --required-cell stringArray   required stable cell ID; repeat for multiple cells
-      --run-id string               run ID when the file contains more than one run
 ```
 ## magelift ci
 
@@ -208,7 +121,7 @@ Options:
 ```text
       --magelift-version string   MageLift release version installed by CI (default "dev")
       --path string               workflow output path
-      --replace                   replace an existing workflow that differs from the MageLift template
+      --replace[=true|false]      replace an existing workflow that differs from the MageLift template
 ```
 ### magelift ci validate
 
@@ -221,9 +134,9 @@ magelift ci validate [flags]
 Options:
 
 ```text
-      --check-template            require the workflow to match the current MageLift template exactly
-      --magelift-version string   MageLift release version installed by CI (default "dev")
-      --path string               workflow output path
+      --check-template[=true|false]   require the workflow to match the current MageLift template exactly
+      --magelift-version string       MageLift release version installed by CI (default "dev")
+      --path string                   workflow output path
 ```
 ## magelift cleanup
 
@@ -339,7 +252,7 @@ magelift completion [bash|zsh|fish|powershell]
 ```
 ## magelift config
 
-Inspect and migrate configuration
+Inspect configuration
 
 ```text
 magelift config
@@ -357,13 +270,6 @@ Explain where an effective value came from
 
 ```text
 magelift config explain [path]
-```
-### magelift config migrate
-
-Migrate configuration to the current schema
-
-```text
-magelift config migrate
 ```
 ### magelift config validate
 
@@ -383,8 +289,8 @@ magelift cost [flags]
 Options:
 
 ```text
-      --budget   read the provider budget definition and alert thresholds when supported
-      --live     query current provider on-demand prices when the adapter supports it
+      --budget[=true|false]   read the provider budget definition and alert thresholds when supported
+      --live[=true|false]     query current provider on-demand prices when the adapter supports it
 ```
 ## magelift cron-run
 
@@ -404,9 +310,9 @@ magelift deploy [flags]
 Options:
 
 ```text
-      --ack-maintenance-drain   attest backup, maintenance mode, and drained writers for production schema risk (see docs/operations.md)
-      --digest string           override the configured immutable image digest
-      --infra-only              update the infrastructure graph only (skip Magento migrate/health)
+      --ack-maintenance-drain[=true|false]   attest backup, maintenance mode, and drained writers for production schema risk (see docs/operations.md)
+      --digest string                        override the configured immutable image digest
+      --infra-only[=true|false]              update the infrastructure graph only (skip Magento migrate/health)
 ```
 ## magelift destroy
 
@@ -419,12 +325,19 @@ magelift destroy [flags]
 Options:
 
 ```text
-      --destroy-backups   also destroy leftover provider backups after the environment is gone; GCP Cloud SQL leftovers are deleted even when the backup policy is disposable, AWS snapshots are still refused
-      --skip-lock         skip the provider distributed state lock (acceptance cleanup only)
+      --destroy-backups[=true|false]   also destroy leftover provider backups after the environment is gone; GCP Cloud SQL leftovers are deleted even when the backup policy is disposable, AWS snapshots are still refused
+      --skip-lock[=true|false]         skip the provider distributed state lock (acceptance cleanup only)
+```
+## magelift dev
+
+Start Magento locally, install an empty shop and check the storefront
+
+```text
+magelift dev
 ```
 ## magelift doctor
 
-Check this project and print the next Magelift command
+Check this project and print the next MageLift command
 
 ```text
 magelift doctor [flags]
@@ -433,9 +346,9 @@ magelift doctor [flags]
 Options:
 
 ```text
-      --export string          write an allowlisted local diagnostic JSON report to a new file (mode 0600)
-      --install-dependencies   install missing allowlisted dependencies after confirmation
-      --local                  skip cloud credential probes; still run local toolchain checks
+      --export string                       write an allowlisted local diagnostic JSON report to a new file (mode 0600)
+      --install-dependencies[=true|false]   install missing allowlisted dependencies after confirmation
+      --local[=true|false]                  skip cloud credential probes; still run local toolchain checks
 ```
 ## magelift edge
 
@@ -481,7 +394,7 @@ magelift env
 ```
 ### magelift env create
 
-Add an environment overlay to magelift.yaml
+Add an environment to the project
 
 ```text
 magelift env create <environment> [flags]
@@ -498,7 +411,7 @@ Options:
       --expires-at string          preview expiration as RFC3339
       --monthly-budget-cents int   maximum monthly AWS budget in cents
       --preset string              infrastructure preset
-      --protection                 protect destructive operations
+      --protection[=true|false]    protect destructive operations
 ```
 ### magelift env destroy
 
@@ -511,7 +424,14 @@ magelift env destroy <environment> [flags]
 Options:
 
 ```text
-      --destroy-backups   also destroy leftover provider backups after the environment is gone; GCP Cloud SQL leftovers are deleted even when the backup policy is disposable, AWS snapshots are still refused
+      --destroy-backups[=true|false]   also destroy leftover provider backups after the environment is gone; GCP Cloud SQL leftovers are deleted even when the backup policy is disposable, AWS snapshots are still refused
+```
+### magelift env diff
+
+Compare two resolved environments and show where each difference came from
+
+```text
+magelift env diff FROM TO
 ```
 ### magelift env dump
 
@@ -524,8 +444,8 @@ magelift env dump <environment> [flags]
 Options:
 
 ```text
-      --sanitize    hash mailbox addresses in the dump (not certified anonymous)
-      --to string   local .sql or .sql.gz path to write (required)
+      --sanitize[=true|false]   hash mailbox addresses in the dump (not certified anonymous)
+      --to string               local .sql or .sql.gz path to write (required)
 ```
 ### magelift env import-dump
 
@@ -578,8 +498,8 @@ magelift env protect <environment> [flags]
 Options:
 
 ```text
-      --off   allow destructive operations
-      --on    protect destructive operations
+      --off[=true|false]   allow destructive operations
+      --on[=true|false]    protect destructive operations
 ```
 ### magelift env status
 
@@ -599,8 +519,8 @@ magelift env sweep [flags]
 Options:
 
 ```text
-      --before string   treat environments expiring at or before this RFC3339 time as expired
-      --dry-run         report expired environments without changing infrastructure or configuration
+      --before string          treat environments expiring at or before this RFC3339 time as expired
+      --dry-run[=true|false]   report expired environments without changing infrastructure or configuration
 ```
 ### magelift env ui
 
@@ -633,9 +553,9 @@ magelift exec --service web --container web -- <command> [flags]
 Options:
 
 ```text
-      --container string   container name (default "web")
-      --service string     logical service: web or cron (default "web")
-      --session-only       print the resolved session command without starting it
+      --container string            container name (default "web")
+      --service string              logical service: web or cron (default "web")
+      --session-only[=true|false]   print the resolved session command without starting it
 ```
 ## magelift extensions
 
@@ -673,7 +593,7 @@ magelift history
 ```
 ## magelift init
 
-Create a starter magelift.yaml for Magento's PHP storefront
+Configure a Magento shop with PHP
 
 ```text
 magelift init [flags]
@@ -682,10 +602,18 @@ magelift init [flags]
 Options:
 
 ```text
-      --config-out string   write generated YAML to PATH for review (default: --config path)
-      --from-acc            generate magelift.yaml from Adobe Commerce Cloud config
-      --from-upsun          generate magelift.yaml from Upsun / Platform.sh config
-      --provider string     starter provider: aws or gcp (default "gcp")
+      --app string                 Magento application to import from a multi-app Upsun project
+      --cloud-account string       AWS account ID, Google Cloud project ID, or Azure subscription ID
+      --config-out string          output PHP project file for review
+      --domain string              production host, also used as the parent of staging, UAT and preview hosts
+      --edition string             edition to create with --new (open-source or commerce) (default "open-source")
+      --from-acc[=true|false]      import Adobe Commerce Cloud configuration
+      --from-upsun[=true|false]    import Upsun or Platform.sh configuration
+      --magento-version string     exact Magento 2 release to create with --new (defaults to Composer's selection)
+      --new[=true|false]           create a Magento project in an empty directory with Composer
+      --provider string            destination cloud (aws, gcp or azure) (default "gcp")
+      --region string              default cloud region for the shop
+      --storefront-origin string   connect an externally deployed headless storefront at this origin
 ```
 ## magelift local
 
@@ -842,7 +770,7 @@ magelift providers
 ```
 ### magelift providers install
 
-Download and verify the providers named by magelift.yaml
+Download and verify the providers named by magelift.php
 
 ```text
 magelift providers install [flags]
@@ -880,8 +808,8 @@ magelift rollback [flags]
 Options:
 
 ```text
-      --ack-forward-only   acknowledge that rollback never reverses database migrations
-      --to-sequence int    previous release sequence
+      --ack-forward-only[=true|false]   acknowledge that rollback never reverses database migrations
+      --to-sequence int                 previous release sequence
 ```
 ## magelift secret
 
@@ -915,7 +843,7 @@ magelift secret set <name> [flags]
 Options:
 
 ```text
-      --value-stdin   read the secret value from stdin
+      --value-stdin[=true|false]   read the secret value from stdin
 ```
 ## magelift sign
 
@@ -949,12 +877,12 @@ magelift skills install [flags]
 Options:
 
 ```text
-      --agent string     agent path: codex, claude, cursor, or generic (default "generic")
-      --backend string   installer backend: direct or skills-cli (default "direct")
-      --mode string      installation mode: auto, copy, or symlink (default "auto")
-      --replace          replace an unrelated skill already at the destination
-      --scope string     installation scope: project or global (default "project")
-  -s, --skill strings    install only the named skill; repeat the flag for more than one
+      --agent string           agent path: codex, claude, cursor, or generic (default "generic")
+      --backend string         installer backend: direct or skills-cli (default "direct")
+      --mode string            installation mode: auto, copy, or symlink (default "auto")
+      --replace[=true|false]   replace an unrelated skill already at the destination
+      --scope string           installation scope: project or global (default "project")
+  -s, --skill strings          install only the named skill; repeat the flag for more than one
 ```
 ### magelift skills list
 
@@ -989,10 +917,10 @@ magelift ssh [flags]
 Options:
 
 ```text
-      --command string     shell command to run (default "/bin/sh")
-      --container string   container name (default "web")
-      --service string     logical service: web or cron (default "web")
-      --session-only       print the resolved session command without starting it
+      --command string              shell command to run (default "/bin/sh")
+      --container string            container name (default "web")
+      --service string              logical service: web or cron (default "web")
+      --session-only[=true|false]   print the resolved session command without starting it
 ```
 ## magelift state
 
@@ -1047,10 +975,10 @@ magelift tunnel [flags]
 Options:
 
 ```text
-      --local-port int    local loopback port (defaults to the target port, or 8080 for app)
-      --remote-port int   provider-side port (defaults to the target's verified service port)
-      --session-only      print the resolved tunnel command without starting it
-      --target string     private target: app, db, db-ui, queue, queue-ui, search, or search-ui (default "app")
+      --local-port int              local loopback port (defaults to the target port, or 8080 for app)
+      --remote-port int             provider-side port (defaults to the target's verified service port)
+      --session-only[=true|false]   print the resolved tunnel command without starting it
+      --target string               private target: app, db, db-ui, queue, queue-ui, search, or search-ui (default "app")
 ```
 ## magelift upgrade
 
@@ -1063,8 +991,8 @@ magelift upgrade [flags]
 Options:
 
 ```text
-      --check            check for an update without replacing the executable
-      --version string   install a specific release tag
+      --check[=true|false]   check for an update without replacing the executable
+      --version string       install a specific release tag
 ```
 ## magelift version
 

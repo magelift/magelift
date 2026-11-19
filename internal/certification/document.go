@@ -25,7 +25,10 @@ func GenerateDocumentation(catalog CapabilityCatalog, records []Record, now time
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
-	if err := catalog.Validate(now); err != nil {
+	// The catalog is a historical snapshot. Rendering it must stay reproducible
+	// after its freshness window for new evidence has elapsed.
+	asOf := catalogTime(catalog)
+	if err := catalog.Validate(asOf); err != nil {
 		return DocumentationBundle{}, fmt.Errorf("validate documentation catalog: %w", err)
 	}
 	for index, record := range records {
@@ -33,7 +36,7 @@ func GenerateDocumentation(catalog CapabilityCatalog, records []Record, now time
 			return DocumentationBundle{}, fmt.Errorf("validate documentation evidence %d: %w", index, err)
 		}
 	}
-	coverage, err := ArchitectureCoverage(catalog, now)
+	coverage, err := ArchitectureCoverage(catalog, asOf)
 	if err != nil {
 		return DocumentationBundle{}, fmt.Errorf("build documentation architecture coverage: %w", err)
 	}
@@ -41,7 +44,7 @@ func GenerateDocumentation(catalog CapabilityCatalog, records []Record, now time
 	return DocumentationBundle{
 		GeneratedAt: generatedAt,
 		Files: map[string]string{
-			"capability-matrix.md":   renderCapabilityMatrix(catalog, now),
+			"capability-matrix.md":   renderCapabilityMatrix(catalog, asOf),
 			"architecture-matrix.md": renderArchitectureMatrix(coverage),
 			"resilience.md":          renderResilience(records, generatedAt),
 			"observability.md":       renderObservability(records, generatedAt),

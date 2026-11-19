@@ -25,9 +25,11 @@ application:
 build:
   php: "8.5"
 target:
-  provider: aws
-  runtime: ecs-fargate
-  aws: {}
+  provider: gcp
+  runtime: gke-autopilot
+  gcp:
+    project: example-gcp-project
+    region: europe-west1
 defaults:
   region: eu-west-3
   preset: standard
@@ -37,17 +39,17 @@ environments:
 extensions: {}
 `
 
-const providersTestLock = `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"aws":{"name":"magelift-provider-aws","version":"v0.0.0-test","protocol":"magelift-v1","digest":"sha256:b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78","cosign":{"identity":"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v0.0.0-test","issuer":"https://token.actions.githubusercontent.com","bundle":"bundle.json"}}}}`
+const providersTestLock = `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"v0.0.0-test","protocol":"magelift-v1","digest":"sha256:b5d54c39e66671c9731b9f471e585d8262cd4f54963f0c93082d8dcf334d4c78","cosign":{"identity":"https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/v0.0.0-test","issuer":"https://token.actions.githubusercontent.com","bundle":"bundle.json"}}}}`
 
 func writeProvidersFixture(t *testing.T) (configPath, lockPath string) {
 	t.Helper()
 	dir := t.TempDir()
-	configPath = filepath.Join(dir, "magelift.yaml")
+	configPath = filepath.Join(dir, "magelift.php")
 	lockPath = filepath.Join(dir, "magelift.providers.lock")
-	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+	if err := writeTestProjectFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(lockPath, []byte(providersTestLock), 0o600); err != nil {
+	if err := writeTestProjectFile(lockPath, []byte(providersTestLock), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return configPath, lockPath
@@ -56,11 +58,11 @@ func writeProvidersFixture(t *testing.T) (configPath, lockPath string) {
 func TestProvidersInstallReportsBundledBinary(t *testing.T) {
 	configPath, lockPath := writeProvidersFixture(t)
 	binDir := t.TempDir()
-	binary := filepath.Join(binDir, "magelift-provider-aws")
-	if err := os.WriteFile(binary, []byte("fake"), 0o755); err != nil {
+	binary := filepath.Join(binDir, "magelift-provider-gcp")
+	if err := writeTestProjectFile(binary, []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
+	if err := writeTestProjectFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -74,20 +76,20 @@ func TestProvidersInstallReportsBundledBinary(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), `"bundled": true`) || !strings.Contains(out.String(), `"provider": "aws"`) {
+	if !strings.Contains(out.String(), `"bundled": true`) || !strings.Contains(out.String(), `"provider": "gcp"`) {
 		t.Fatalf("unexpected output: %s", out.String())
 	}
 }
 
 func TestProvidersInstallRefusesUnknownProvider(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "magelift.yaml")
-	gcpConfig := strings.Replace(providersTestConfig, "provider: aws\n  runtime: ecs-fargate\n  aws: {}", "provider: gcp\n  runtime: gke-autopilot\n  gcp:\n    project: example-gcp-project\n    region: europe-west1", 1)
-	if err := os.WriteFile(configPath, []byte(gcpConfig), 0o600); err != nil {
+	configPath := filepath.Join(dir, "magelift.php")
+	gcpConfig := providersTestConfig
+	if err := writeTestProjectFile(configPath, []byte(gcpConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	lockPath := filepath.Join(dir, "magelift.providers.lock")
-	if err := os.WriteFile(lockPath, []byte(providersTestLock), 0o600); err != nil {
+	if err := writeTestProjectFile(lockPath, []byte(strings.ReplaceAll(providersTestLock, "gcp", "azure")), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -108,8 +110,8 @@ func TestProvidersInstallRefusesUnknownProvider(t *testing.T) {
 
 func TestProvidersInstallRequiresLockfile(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+	configPath := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,16 +129,16 @@ func TestProvidersInstallRequiresLockfile(t *testing.T) {
 func TestProvidersInstallBootstrapsMissingLockfile(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+	configPath := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	binDir := t.TempDir()
-	binary := filepath.Join(binDir, "magelift-provider-aws")
-	if err := os.WriteFile(binary, []byte("fake"), 0o755); err != nil {
+	binary := filepath.Join(binDir, "magelift-provider-gcp")
+	if err := writeTestProjectFile(binary, []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
+	if err := writeTestProjectFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -149,7 +151,7 @@ func TestProvidersInstallBootstrapsMissingLockfile(t *testing.T) {
 		if version != "v9.9.9" {
 			t.Fatalf("version = %q", version)
 		}
-		return providerhost.ParseLock(strings.NewReader(providersTestLock))
+		return providerhost.ParseLock(strings.NewReader(strings.ReplaceAll(providersTestLock, "v0.0.0-test", "v9.9.9")))
 	}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install", "--version", "v9.9.9"})
@@ -180,8 +182,8 @@ func TestProvidersInstallRefusesRebootstrapOverExistingLock(t *testing.T) {
 func TestProvidersInstallNeedsVersionWithoutLock(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+	configPath := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -216,16 +218,16 @@ func TestProvidersInstallRegistersFlags(t *testing.T) {
 func TestProvidersInstallBootstrapsFromReleaseShapedVersion(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+	configPath := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	binDir := t.TempDir()
-	binary := filepath.Join(binDir, "magelift-provider-aws")
-	if err := os.WriteFile(binary, []byte("fake"), 0o755); err != nil {
+	binary := filepath.Join(binDir, "magelift-provider-gcp")
+	if err := writeTestProjectFile(binary, []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
+	if err := writeTestProjectFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	previous := Version
@@ -241,7 +243,7 @@ func TestProvidersInstallBootstrapsFromReleaseShapedVersion(t *testing.T) {
 		if version != "v0.1.0-alpha.1-rc.2" {
 			t.Fatalf("version = %q", version)
 		}
-		return providerhost.ParseLock(strings.NewReader(providersTestLock))
+		return providerhost.ParseLock(strings.NewReader(strings.ReplaceAll(providersTestLock, "v0.0.0-test", "v0.1.0-alpha.1-rc.2")))
 	}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install"})
@@ -256,12 +258,12 @@ func TestProvidersInstallBootstrapsFromReleaseShapedVersion(t *testing.T) {
 func TestProvidersInstallRefusesToReplaceInvalidLock(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+	configPath := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	lockPath := filepath.Join(dir, "magelift.providers.lock")
-	if err := os.WriteFile(lockPath, []byte("{bogus"), 0o600); err != nil {
+	if err := writeTestProjectFile(lockPath, []byte("{bogus"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -294,14 +296,14 @@ func (v providersStubVerifier) VerifyBlob(context.Context, string, string, cosig
 func TestProvidersBootstrapFailureDoesNotPublishProjectLock(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+	configPath := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.executable = func() (string, error) { return filepath.Join(t.TempDir(), "magelift"), nil }
 	o.fetchProviderLock = func(context.Context, string) (providerhost.Lockfile, error) {
-		return providerhost.ParseLock(strings.NewReader(providersTestLock))
+		return providerhost.ParseLock(strings.NewReader(strings.ReplaceAll(providersTestLock, "v0.0.0-test", "v9.9.9")))
 	}
 	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "", fmt.Errorf("fixture verifier unavailable") }
 	cmd := newCommandWithOptions(o)
@@ -321,7 +323,7 @@ func TestProvidersBootstrapFailureDoesNotPublishProjectLock(t *testing.T) {
 func TestProvidersInstallRefusesTamperedBundledBinary(t *testing.T) {
 	configPath, lockPath := writeProvidersFixture(t)
 	binDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(binDir, "magelift-provider-aws"), []byte("tampered"), 0o755); err != nil {
+	if err := writeTestProjectFile(filepath.Join(binDir, "magelift-provider-gcp"), []byte("tampered"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
@@ -338,10 +340,10 @@ func TestProvidersInstallRefusesTamperedBundledBinary(t *testing.T) {
 func TestProvidersInstallRefusesInvalidBundledSignature(t *testing.T) {
 	configPath, lockPath := writeProvidersFixture(t)
 	binDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(binDir, "magelift-provider-aws"), []byte("fake"), 0o755); err != nil {
+	if err := writeTestProjectFile(filepath.Join(binDir, "magelift-provider-gcp"), []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
+	if err := writeTestProjectFile(filepath.Join(filepath.Dir(configPath), "bundle.json"), []byte("signature fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
@@ -358,24 +360,24 @@ func TestProvidersInstallRefusesInvalidBundledSignature(t *testing.T) {
 func TestProvidersBootstrapPreservesConcurrentProjectPin(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	configPath := filepath.Join(dir, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
+	configPath := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(providersTestConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("bundle.json", []byte("signature fixture"), 0o600); err != nil {
+	if err := writeTestProjectFile("bundle.json", []byte("signature fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	binDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(binDir, "magelift-provider-aws"), []byte("fake"), 0o755); err != nil {
+	if err := writeTestProjectFile(filepath.Join(binDir, "magelift-provider-gcp"), []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.executable = func() (string, error) { return filepath.Join(binDir, "magelift"), nil }
 	o.fetchProviderLock = func(context.Context, string) (providerhost.Lockfile, error) {
-		return providerhost.ParseLock(strings.NewReader(providersTestLock))
+		return providerhost.ParseLock(strings.NewReader(strings.ReplaceAll(providersTestLock, "v0.0.0-test", "v9.9.9")))
 	}
 	o.ensureProviderVerifier = func(context.Context, string) (string, error) {
-		return "/fixture/cosign", os.WriteFile("magelift.providers.lock", []byte("concurrent project pin"), 0o600)
+		return "/fixture/cosign", writeTestProjectFile("magelift.providers.lock", []byte("concurrent project pin"), 0o600)
 	}
 	o.providerVerifier = providersStubVerifier{}
 	cmd := newCommandWithOptions(o)
@@ -394,8 +396,8 @@ func TestDefaultLoadProviderAcquiresPinnedGCPFromOfflineCache(t *testing.T) {
 	t.Chdir(dir)
 	cache := t.TempDir()
 	t.Setenv("MAGELIFT_PROVIDER_CACHE_DIR", cache)
-	lock := strings.ReplaceAll(providersTestLock, "aws", "gcp")
-	if err := os.WriteFile("magelift.providers.lock", []byte(lock), 0o600); err != nil {
+	lock := strings.ReplaceAll(providersTestLock, "gcp", "gcp")
+	if err := writeTestProjectFile("magelift.providers.lock", []byte(lock), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	paths, err := providerhost.CachedArtifactPaths(cache, "gcp", "v0.0.0-test")
@@ -405,10 +407,10 @@ func TestDefaultLoadProviderAcquiresPinnedGCPFromOfflineCache(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(paths.Binary), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(paths.Binary, []byte("fake"), 0o755); err != nil {
+	if err := writeTestProjectFile(paths.Binary, []byte("fake"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(providerhost.CachedBundlePath(paths.Binary), []byte("signature fixture"), 0o600); err != nil {
+	if err := writeTestProjectFile(providerhost.CachedBundlePath(paths.Binary), []byte("signature fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
@@ -420,5 +422,125 @@ func TestDefaultLoadProviderAcquiresPinnedGCPFromOfflineCache(t *testing.T) {
 	loaded, err := o.defaultLoadProvider(context.Background(), "gcp")
 	if err != nil || loaded.Binary != paths.Binary || loaded.Artifact.Version != "v0.0.0-test" {
 		t.Fatalf("loaded=%+v, error=%v", loaded, err)
+	}
+}
+
+func TestProvidersInstallBuiltinOnlyHasNoSideEffects(t *testing.T) {
+	for _, provider := range []struct{ name, runtime, settings string }{
+		{"aws", "ecs-fargate", "aws: {}"}, {"ovh", "mks", "ovh:\n    serviceName: example-service"}, {"scaleway", "kapsule", "scaleway:\n    projectId: example-project"},
+	} {
+		t.Run(provider.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			configPath := filepath.Join(dir, "magelift.php")
+			target := "provider: " + provider.name + "\n  runtime: " + provider.runtime + "\n  " + provider.settings
+			text := strings.Replace(providersTestConfig, "provider: gcp\n  runtime: gke-autopilot\n  gcp:\n    project: example-gcp-project\n    region: europe-west1", target, 1)
+			if err := writeTestProjectFile(configPath, []byte(text), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var out bytes.Buffer
+			o := testOptions(&out, &fakeTerminal{interactive: false})
+			o.executable = func() (string, error) { t.Fatal("builtin target looked up executable"); return "", nil }
+			o.fetchProviderLock = func(context.Context, string) (providerhost.Lockfile, error) {
+				t.Fatal("builtin target fetched lock")
+				return providerhost.Lockfile{}, nil
+			}
+			o.ensureProviderVerifier = func(context.Context, string) (string, error) {
+				t.Fatal("builtin target installed verifier")
+				return "", nil
+			}
+			cmd := newCommandWithOptions(o)
+			cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install"})
+			if err := cmd.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat("magelift.providers.lock"); !os.IsNotExist(err) {
+				t.Fatalf("unexpected lock: %v", err)
+			}
+			if !strings.Contains(out.String(), `"providers": []`) {
+				t.Fatalf("output: %s", out.String())
+			}
+		})
+	}
+}
+
+func TestProvidersBootstrapRejectsMismatchedReleaseBeforeSideEffects(t *testing.T) {
+	for _, field := range []string{"version", "identity", "extra-provider"} {
+		t.Run(field, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			if err := writeTestProjectFile("magelift.php", []byte(providersTestConfig), 0600); err != nil {
+				t.Fatal(err)
+			}
+			o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+			o.executable = func() (string, error) { return filepath.Join(dir, "no-binary", "magelift"), nil }
+			o.fetchProviderLock = func(context.Context, string) (providerhost.Lockfile, error) {
+				lock, err := providerhost.ParseLock(strings.NewReader(strings.ReplaceAll(providersTestLock, "v0.0.0-test", "v9.9.9")))
+				if err != nil {
+					return lock, err
+				}
+				artifact := lock.Providers["gcp"]
+				switch field {
+				case "version":
+					artifact.Version = "v1.0.0"
+				case "identity":
+					artifact.Cosign.Identity = providerhost.FirstPartyIdentityPrefix + "v1.0.0"
+				case "extra-provider":
+					artifact.Version = "v1.0.0"
+					lock.Providers["azure"] = artifact
+					return lock, nil
+				}
+				lock.Providers["gcp"] = artifact
+				return lock, nil
+			}
+			o.ensureProviderVerifier = func(context.Context, string) (string, error) {
+				t.Fatal("verifier invoked on mismatched lock")
+				return "", nil
+			}
+			cmd := newCommandWithOptions(o)
+			cmd.SetArgs([]string{"--config", "magelift.php", "providers", "install", "--version", "v9.9.9"})
+			if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "does not match release tag") {
+				t.Fatalf("error: %v", err)
+			}
+			if _, err := os.Stat("magelift.providers.lock"); !os.IsNotExist(err) {
+				t.Fatalf("lock published: %v", err)
+			}
+			matches, _ := filepath.Glob(".magelift-providers-lock-*")
+			if len(matches) > 0 {
+				t.Fatalf("staged locks: %v", matches)
+			}
+		})
+	}
+}
+
+func TestProvidersInstallMixedBuiltinAndPlugin(t *testing.T) {
+	dir := t.TempDir()
+	text := strings.Replace(providersTestConfig, "  staging:\n    account:", "  aws-preview:\n    target:\n      provider: aws\n      runtime: ecs-fargate\n      aws: {}\n      gcp: null\n  staging:\n    account:", 1)
+	configPath := filepath.Join(dir, "magelift.php")
+	lockPath := filepath.Join(dir, "magelift.providers.lock")
+	if err := writeTestProjectFile(configPath, []byte(text), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeTestProjectFile(lockPath, []byte(providersTestLock), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeTestProjectFile(filepath.Join(dir, "bundle.json"), []byte("signature fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeTestProjectFile(filepath.Join(dir, "magelift-provider-gcp"), []byte("fake"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	o := testOptions(&out, &fakeTerminal{interactive: false})
+	o.executable = func() (string, error) { return filepath.Join(dir, "magelift"), nil }
+	o.ensureProviderVerifier = func(context.Context, string) (string, error) { return "/fixture/cosign", nil }
+	o.providerVerifier = providersStubVerifier{}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install", "--lockfile", lockPath})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"provider": "gcp"`) || strings.Contains(out.String(), `"provider": "aws"`) {
+		t.Fatalf("output: %s", out.String())
 	}
 }

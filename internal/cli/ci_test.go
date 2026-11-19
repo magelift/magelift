@@ -22,12 +22,12 @@ func TestCIWorkflowFixturesMatchTheRenderer(t *testing.T) {
 	}{
 		{
 			name:   "aws",
-			config: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "aws", "magelift.yaml"),
+			config: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "aws", "magelift.php"),
 			output: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "aws", ".github", "workflows", "magelift.yml"),
 		},
 		{
 			name:   "gcp",
-			config: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "gcp", "magelift.yaml"),
+			config: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "gcp", "magelift.php"),
 			output: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "gcp", ".github", "workflows", "magelift.yml"),
 		},
 	}
@@ -62,8 +62,8 @@ func TestCIWorkflowFixturesMatchTheRenderer(t *testing.T) {
 
 func TestCIGenerateIsDeterministicAndKeepsWorkflowOffStdout(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	workflowPath := filepath.Join(directory, ".github", "workflows", "magelift.yml")
@@ -104,8 +104,8 @@ func TestCIGenerateIsDeterministicAndKeepsWorkflowOffStdout(t *testing.T) {
 
 func TestCIValidateDetectsWorkflowAndConfigDrift(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	executeCI(t, configPath, "generate")
@@ -164,7 +164,7 @@ func TestCIValidateDetectsWorkflowAndConfigDrift(t *testing.T) {
 	}
 
 	updated := strings.Replace(starterConfig, "  production:\n    inherits: staging\n    account: \"210987654321\"\n    class: production\n    preset: high-availability\n    domain: example.com\n    protection: true\n", "", 1)
-	if err := os.WriteFile(configPath, []byte(updated), 0o600); err != nil {
+	if err := writeTestProjectFile(configPath, []byte(updated), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	executeCIWithArgs(t, configPath, "validate", "--output", "json")
@@ -176,8 +176,8 @@ func TestCIValidateDetectsWorkflowAndConfigDrift(t *testing.T) {
 
 func TestCIGenerateRejectsMutableToolVersion(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
@@ -191,10 +191,10 @@ func TestCIGenerateRejectsMutableToolVersion(t *testing.T) {
 
 func TestCIGenerateIncludesProductionApprovalAndPromotion(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
+	configPath := filepath.Join(directory, "magelift.php")
 	// The default starter already carries staging plus production.
 	config := starterConfig
-	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+	if err := writeTestProjectFile(configPath, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	executeCI(t, configPath, "generate")
@@ -223,10 +223,10 @@ func TestCIGenerateIncludesProductionApprovalAndPromotion(t *testing.T) {
 
 func TestCIGenerateIncludesClosedPreviewCleanup(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
+	configPath := filepath.Join(directory, "magelift.php")
 	// The default starter already carries a preview env.
 	config := starterConfig
-	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+	if err := writeTestProjectFile(configPath, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	executeCI(t, configPath, "generate")
@@ -244,10 +244,10 @@ func TestCIGenerateIncludesClosedPreviewCleanup(t *testing.T) {
 
 func TestCIGenerateGCPUsesFederationAndPRScopedIdentity(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
+	configPath := filepath.Join(directory, "magelift.php")
 	// The GCP starter already carries preview, staging, and production.
 	config := strings.Replace(starterGCPConfig, "example-gcp-project", "example-gcp", 1)
-	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+	if err := writeTestProjectFile(configPath, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	executeCI(t, configPath, "generate")
@@ -285,9 +285,9 @@ func TestCIGenerateGCPUsesFederationAndPRScopedIdentity(t *testing.T) {
 
 func TestCIGenerateRejectsUnsupportedProviderGenerator(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
+	configPath := filepath.Join(directory, "magelift.php")
 	config := strings.Replace(starterConfig, "  provider: aws\n  runtime: ecs-fargate\n  aws:\n    catalog:\n      # Certified cell: no managed search on first run. Managed search\n      # proves in Phase 2; until then this avoids surprise AOSS bills.\n      searchMode: disabled", "  provider: ovh\n  runtime: mks\n  ovh:\n    serviceName: example-service", 1)
-	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+	if err := writeTestProjectFile(configPath, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	err := executeCIError(configPath, "generate")
@@ -326,8 +326,8 @@ func executeCIErrorWithArgs(configPath, action string, extra ...string) error {
 
 func TestCIWorkflowNormalizesInstalledReleaseVersion(t *testing.T) {
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "magelift.yaml")
-	if err := os.WriteFile(configPath, []byte(starterConfig), 0o600); err != nil {
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for _, version := range []string{"1.2.3", "1.2.3-rc.1", "0.0.0-canary.2e75d313b03d53dd7cfe694297032bf8d69cc2ed"} {
