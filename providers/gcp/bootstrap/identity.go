@@ -114,8 +114,8 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 	if err != nil {
 		return IdentityPlan{}, err
 	}
-	if spec.Environment == githubEnvironmentBuild {
-		return IdentityPlan{}, errors.New("environment build is reserved for the CI build identity; choose a shop environment such as test")
+	if spec.Environment == githubEnvironmentBuild || spec.Environment == "preview-build" {
+		return IdentityPlan{}, errors.New("environment build and preview-build are reserved for CI build identities")
 	}
 	repository := spec.GitHubOwner + "/" + spec.GitHubRepo
 	poolID := compactIdentityID(
@@ -201,6 +201,12 @@ func (b *IdentityBootstrapper) Ensure(ctx context.Context, plan IdentityPlan) (I
 	member := workloadIdentityPrincipal(plan.PoolID, projectNumber, plan.GitHubEnvironment)
 	if err := b.ensureWorkloadIdentityBinding(ctx, sa.Name, member); err != nil {
 		return IdentityResult{}, err
+	}
+	if plan.Environment == "preview" && plan.Role == identityRoleBuild {
+		previewBuildMember := workloadIdentityPrincipal(plan.PoolID, projectNumber, "preview-build")
+		if err := b.ensureWorkloadIdentityBinding(ctx, sa.Name, previewBuildMember); err != nil {
+			return IdentityResult{}, err
+		}
 	}
 	providerResource := rewriteProjectNumber(provider.Name, plan.GCPProject, projectNumber)
 	poolResource := rewriteProjectNumber(pool.Name, plan.GCPProject, projectNumber)
@@ -383,12 +389,16 @@ func githubAttributeCondition(repository, magentoEnvironment string) string {
 		celQuote(githubEnvironmentBuild),
 		celQuote(magentoEnvironment),
 	)
+	events := fmt.Sprintf("(assertion.event_name == 'push' || assertion.event_name == 'workflow_dispatch') && %s", envCheck)
+	if magentoEnvironment == "preview" {
+		events = "((" + events + ") || (assertion.event_name == 'pull_request_target' && (assertion.environment == 'preview' || assertion.environment == 'preview-build')) || (assertion.event_name == 'schedule' && assertion.environment == 'preview'))"
+	}
 	return fmt.Sprintf(
-		"assertion.repository == '%s' && assertion.ref == '%s' && assertion.workflow_ref == '%s' && (assertion.event_name == 'push' || assertion.event_name == 'workflow_dispatch') && %s",
+		"assertion.repository == '%s' && assertion.ref == '%s' && assertion.workflow_ref == '%s' && %s",
 		celQuote(repository),
 		celQuote(githubTrustedRef),
 		celQuote(workflowRef),
-		envCheck,
+		events,
 	)
 }
 

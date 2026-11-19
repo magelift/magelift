@@ -5,7 +5,7 @@ import "strings"
 const uploadArtifactAction = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2"
 const downloadArtifactAction = "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2"
 
-func writeRegistryBuildAuth(w *strings.Builder, gcp bool) {
+func writeRegistryBuildAuth(w *strings.Builder, provider string) {
 	w.WriteString(`      - name: Validate registry destination
         env:
           IMAGE: ${{ vars.MAGELIFT_RELEASE_IMAGE }}
@@ -16,7 +16,7 @@ func writeRegistryBuildAuth(w *strings.Builder, gcp bool) {
           test -n "$REGISTRY"
           test "${IMAGE%%/*}" = "$REGISTRY"
 `)
-	if gcp {
+	if provider == "gcp" {
 		w.WriteString(`      - name: Authenticate Artifact Registry
         if: endsWith(vars.MAGELIFT_REGISTRY, '-docker.pkg.dev')
         env:
@@ -26,8 +26,11 @@ func writeRegistryBuildAuth(w *strings.Builder, gcp bool) {
 	}
 	w.WriteString("      - name: Authenticate user GHCR repository\n        if: vars.MAGELIFT_REGISTRY == 'ghcr.io'\n        uses: " + dockerLoginAction + "\n        with:\n          registry: ghcr.io\n          username: ${{ github.actor }}\n          password: ${{ secrets.GITHUB_TOKEN }}\n")
 	genericCondition := "vars.MAGELIFT_REGISTRY != 'ghcr.io'"
-	if gcp {
+	if provider == "gcp" {
 		genericCondition += " && !endsWith(vars.MAGELIFT_REGISTRY, '-docker.pkg.dev')"
+	}
+	if provider == "azure" {
+		genericCondition += " && !endsWith(vars.MAGELIFT_REGISTRY, '.azurecr.io')"
 	}
 	w.WriteString("      - name: Validate generic registry credentials\n        if: " + genericCondition + "\n" + `        env:
           USERNAME: ${{ vars.MAGELIFT_REGISTRY_USERNAME }}
@@ -48,6 +51,7 @@ func writeBuildAndArchive(w *strings.Builder, configFile string) {
         id: build
         env:
           MAGELIFT_RELEASE_IMAGE: ${{ vars.MAGELIFT_RELEASE_IMAGE }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           COMPOSER_AUTH: ${{ secrets.MAGELIFT_COMPOSER_AUTH }}
         run: |
           set -eu
@@ -56,14 +60,14 @@ func writeBuildAndArchive(w *strings.Builder, configFile string) {
           case "${image##*/}" in
             *:*) ;;
             *)
-              printf '%s' "$GITHUB_SHA" | grep -Eq '^[a-f0-9]{40}$'
-              image="$image:$GITHUB_SHA"
+              printf '%s' "$SOURCE_SHA" | grep -Eq '^[a-f0-9]{40}$'
+              image="$image:$SOURCE_SHA"
               ;;
           esac
           build_dir="$RUNNER_TEMP/magelift-build"
           result="$build_dir/build-result.json"
           mkdir -p "$build_dir"
-          magelift --config ` + shellQuote(configFile) + ` --no-interaction --output json build --push \
+          magelift --config ` + shellQuote("project/"+configFile) + ` --no-interaction --output json build --push --source shop \
             --image "$image" > "$result"
           digest="$(jq -er '.image | (.imageReference | sub(":[^/:]+$"; "")) + "@" + .digest' "$result")"
           cp -- "$(jq -er '.manifest' "$result")" "$build_dir/manifest.json"
@@ -96,7 +100,7 @@ func writeBuildArtifactDownload(w *strings.Builder, promotion bool) {
           workflow_path="${WORKFLOW_REF#"$REPOSITORY"/}"
           workflow_path="${workflow_path%@*}"
           gh api "repos/$REPOSITORY/actions/runs/$ARTIFACT_RUN_ID" > "$RUNNER_TEMP/magelift-source-run.json"
-          jq -e --arg repo "$REPOSITORY" --arg path "$workflow_path" '.conclusion == "success" and .head_repository.full_name == $repo and .path == $path and (.event == "push" or .event == "workflow_dispatch")' "$RUNNER_TEMP/magelift-source-run.json" > /dev/null
+          jq -e --arg repo "$REPOSITORY" --arg path "$workflow_path" '.conclusion == "success" and .head_branch == "main" and .head_repository.full_name == $repo and .path == $path and (.event == "push" or .event == "workflow_dispatch")' "$RUNNER_TEMP/magelift-source-run.json" > /dev/null
 `)
 	}
 	w.WriteString("      - name: Download existing artifact manifest\n        uses: " + downloadArtifactAction + "\n        with:\n")

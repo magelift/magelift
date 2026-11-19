@@ -18,7 +18,7 @@ func TestSingleTestWorkflowBuildsAndDeploysWithoutProductionInputs(t *testing.T)
 				generator = gcpCIWorkflowGenerator{}
 				cfg.Target.GCP = &config.GCPTarget{Project: "example-gcp-project", Region: "us-central1"}
 			}
-			rendered := renderWorkflow("magelift.yaml", "v1.2.3", []string{"test"}, generator, cfg, provider)
+			rendered := renderWorkflow("magelift.php", "v1.2.3", []string{"test"}, generator, cfg, provider)
 			var workflow struct {
 				On   map[string]any `yaml:"on"`
 				Jobs map[string]struct {

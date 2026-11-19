@@ -237,6 +237,94 @@ func TestIdentityPlanIsRepoScopedAndLeastPrivilege(t *testing.T) {
 	}
 }
 
+func TestBuildAndDeployTrustUseSeparateEnvironmentsAndMain(t *testing.T) {
+	base := IdentitySpec{Project: "shop", Environment: "preview", AccountID: "123456789012", Region: "eu-west-3", GitHubOwner: "magelift", GitHubRepo: "magelift", StateBucket: "magelift-shop-state", KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/1234"}
+	for _, environment := range []string{"preview", "staging", "production"} {
+		base.Environment = environment
+		plan, err := BuildIdentityPlan(base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, policy := range []string{plan.CITrustPolicy, plan.BuildTrustPolicy} {
+			if !strings.Contains(policy, `"token.actions.githubusercontent.com:ref":"refs/heads/main"`) {
+				t.Fatalf("%s missing main restriction: %s", environment, policy)
+			}
+		}
+		if !strings.Contains(plan.CITrustPolicy, ":environment:"+environment) || strings.Contains(plan.CITrustPolicy, ":environment:build") || strings.Contains(plan.CITrustPolicy, ":environment:preview-build") {
+			t.Fatalf("deploy trust %s", plan.CITrustPolicy)
+		}
+		if !strings.Contains(plan.BuildTrustPolicy, ":environment:build") || strings.Contains(plan.BuildTrustPolicy, ":environment:"+environment+`"`) {
+			t.Fatalf("build trust %s", plan.BuildTrustPolicy)
+		}
+		if strings.Contains(plan.BuildTrustPolicy, ":environment:preview-build") != (environment == "preview") {
+			t.Fatalf("preview build trust %s", plan.BuildTrustPolicy)
+		}
+	}
+}
+
+func TestPreviewRoleTrustDeniesWrongRepositoryRefAndRole(t *testing.T) {
+	plan, err := BuildIdentityPlan(IdentitySpec{Project: "shop", Environment: "preview", AccountID: "123456789012", Region: "eu-west-3", GitHubOwner: "magelift", GitHubRepo: "magelift", StateBucket: "magelift-shop-state", KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/1234"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	allowed := func(policy, subject, ref string) bool {
+		var document struct {
+			Statement []struct {
+				Condition struct {
+					StringEquals map[string]json.RawMessage `json:"StringEquals"`
+				} `json:"Condition"`
+			} `json:"Statement"`
+		}
+		if err := json.Unmarshal([]byte(policy), &document); err != nil {
+			t.Fatal(err)
+		}
+		if len(document.Statement) != 1 {
+			t.Fatal("unexpected trust statement count")
+		}
+		claims := document.Statement[0].Condition.StringEquals
+		for key, value := range map[string]string{"token.actions.githubusercontent.com:aud": "sts.amazonaws.com", "token.actions.githubusercontent.com:ref": ref, "token.actions.githubusercontent.com:sub": subject} {
+			var values []string
+			if err := json.Unmarshal(claims[key], &values); err != nil {
+				var one string
+				if err := json.Unmarshal(claims[key], &one); err != nil {
+					t.Fatal(err)
+				}
+				values = []string{one}
+			}
+			found := false
+			for _, expected := range values {
+				if value == expected {
+					found = true
+				}
+			}
+			if !found {
+				return false
+			}
+		}
+		return true
+	}
+	tests := []struct {
+		role, subject, ref string
+		want               bool
+	}{
+		{"build", "repo:magelift/magelift:environment:preview-build", "refs/heads/main", true},
+		{"deploy", "repo:magelift/magelift:environment:preview", "refs/heads/main", true},
+		{"build", "repo:fork/magelift:environment:preview-build", "refs/heads/main", false},
+		{"build", "repo:magelift/magelift:environment:preview-build", "refs/heads/feature", false},
+		{"deploy", "repo:magelift/magelift:environment:preview-build", "refs/heads/main", false},
+		{"build", "repo:magelift/magelift:environment:preview", "refs/heads/main", false},
+	}
+	for _, test := range tests {
+		policy := plan.BuildTrustPolicy
+		if test.role == "deploy" {
+			policy = plan.CITrustPolicy
+		}
+		if got := allowed(policy, test.subject, test.ref); got != test.want {
+			t.Errorf("%+v: got %v", test, got)
+		}
+	}
+}
+
 // TestIdentityPolicyDocumentsStayUnderIAMQuotas asserts every rendered IAM
 // document against the character quota of the API that submits it.
 //

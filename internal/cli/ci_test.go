@@ -30,6 +30,11 @@ func TestCIWorkflowFixturesMatchTheRenderer(t *testing.T) {
 			config: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "gcp", "magelift.php"),
 			output: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "gcp", ".github", "workflows", "magelift.yml"),
 		},
+		{
+			name:   "azure",
+			config: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "azure", "magelift.php"),
+			output: filepath.Join(repositoryRoot, "tests", "fixtures", "ci", "azure", ".github", "workflows", "magelift.yml"),
+		},
 	}
 	for _, fixture := range fixtures {
 		t.Run(fixture.name, func(t *testing.T) {
@@ -52,6 +57,31 @@ func TestCIWorkflowFixturesMatchTheRenderer(t *testing.T) {
 			}
 			if !bytes.Equal(got, want) {
 				t.Fatalf("generated workflow differs from checked-in fixture %q", fixture.output)
+			}
+			text := string(got)
+			start, end := strings.Index(text, "\n  validate:"), strings.Index(text, "\n  preview:")
+			if start < 0 || end < start || strings.Contains(text[start:end], "Install Pulumi CLI") {
+				t.Fatal("Pulumi must not be installed in validation or build jobs")
+			}
+			jobs := []string{"preview", "preview-destroy", "preview-sweep", "staging"}
+			for i, job := range jobs {
+				begin := strings.Index(text, "\n  "+job+":")
+				if begin < 0 {
+					t.Fatalf("missing job %s", job)
+				}
+				rest := text[begin+1:]
+				if i+1 < len(jobs) {
+					next := strings.Index(rest, "\n  "+jobs[i+1]+":")
+					if next < 0 {
+						t.Fatalf("missing next job %s", jobs[i+1])
+					}
+					rest = rest[:next]
+				}
+				for _, required := range []string{"Install Pulumi CLI", "version=v3.277.0", "sha256sum --check -", "x86_64)", "aarch64|arm64)", "pulumi/pulumi"} {
+					if !strings.Contains(rest, required) {
+						t.Fatalf("job %s missing %s", job, required)
+					}
+				}
 			}
 			if bytes.Contains(got, []byte(`test -n "$PULUMI_BACKEND_URL"`)) || bytes.Contains(got, []byte("MAGELIFT_PULUMI_BACKEND_URL")) {
 				t.Fatal("generated workflow still requires a Pulumi backend URL")
@@ -90,7 +120,7 @@ func TestCIGenerateIsDeterministicAndKeepsWorkflowOffStdout(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(workflow)
-	for _, required := range []string{checkoutAction, setupBuildxAction, cosignInstallerAction, "MAGELIFT_VERSION: v1.2.3", "cosign verify-blob", "checksums.txt.sigstore.json", "sha256sum -c -", "Install MageLift provider", "magelift providers install", "Build and sign immutable image", "environment: staging", "MAGELIFT_BUILD_ROLE_ARN", `- "staging"`, "--env \"${{ matrix.environment }}\"", "deploy --digest"} {
+	for _, required := range []string{checkoutAction, setupBuildxAction, cosignInstallerAction, "MAGELIFT_VERSION: v1.2.3", "cosign verify-blob", "checksums.txt.sigstore.json", "sha256sum -c -", "Install MageLift provider", "providers install", "Build and sign immutable image", "environment: staging", "MAGELIFT_BUILD_ROLE_ARN", `- "staging"`, "--env \"${{ matrix.environment }}\"", "deploy --digest"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("workflow lacks %q:\n%s", required, text)
 		}
@@ -235,7 +265,7 @@ func TestCIGenerateIncludesClosedPreviewCleanup(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(workflow)
-	for _, required := range []string{"name: Destroy closed preview", "environment: preview", "types: [opened, synchronize, reopened, labeled, closed]", "schedule:", "name: Sweep expired previews", "github.event.action == 'closed'", "--yes destroy", "env sweep"} {
+	for _, required := range []string{"name: Remove preview", "environment: preview", "types: [opened, synchronize, reopened]", "pull_request_target:", "types: [labeled, unlabeled, closed]", "github.event.action == 'unlabeled'", "schedule:", "name: Sweep expired previews", "github.event.action == 'closed'", "--yes destroy", "env sweep"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("preview cleanup workflow lacks %q:\n%s", required, text)
 		}
@@ -347,5 +377,25 @@ func TestCIWorkflowNormalizesInstalledReleaseVersion(t *testing.T) {
 				t.Fatal("workflow does not install the immutable release tag")
 			}
 		})
+	}
+}
+
+func TestWorkflowProviderInstallUsesSelectedConfig(t *testing.T) {
+	dir := t.TempDir()
+	defaultPath := filepath.Join(dir, "magelift.php")
+	configPath := filepath.Join(dir, "custom-config.php")
+	if err := writeTestProjectFile(defaultPath, []byte(starterConfig), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(defaultPath, configPath); err != nil {
+		t.Fatal(err)
+	}
+	workflow, _, err := expectedWorkflow(&options{configPath: configPath}, &ciFlags{version: "v1.0.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "run: magelift --config " + shellQuote("custom-config.php") + " providers install"
+	if got, total := strings.Count(string(workflow), want), strings.Count(string(workflow), "providers install"); got == 0 || got != total {
+		t.Fatalf("correct install commands %d of %d", got, total)
 	}
 }

@@ -3,14 +3,22 @@ package bootstrap
 import "encoding/json"
 
 func githubTrustPolicy(providerARN, owner, repository, environment string) (string, error) {
-	subject := "repo:" + owner + "/" + repository + ":environment:" + environment
+	return githubTrustPolicyForEnvironments(providerARN, owner, repository, []string{environment})
+}
+
+func githubTrustPolicyForEnvironments(providerARN, owner, repository string, environments []string) (string, error) {
+	subjects := make([]string, 0, len(environments))
+	for _, environment := range environments {
+		subjects = append(subjects, "repo:"+owner+"/"+repository+":environment:"+environment)
+	}
 	return policyDocument([]map[string]any{{
 		"Effect": "Allow", "Action": "sts:AssumeRoleWithWebIdentity",
 		"Principal": map[string]string{"Federated": providerARN},
 		"Condition": map[string]any{
-			"StringEquals": map[string]string{
+			"StringEquals": map[string]any{
 				"token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-				"token.actions.githubusercontent.com:sub": subject,
+				"token.actions.githubusercontent.com:sub": subjects,
+				"token.actions.githubusercontent.com:ref": "refs/heads/main",
 			},
 		},
 	}})

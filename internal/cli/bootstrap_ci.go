@@ -251,7 +251,7 @@ func bootstrapConfigArgs(o *options) string {
 		return ""
 	}
 	path := strings.TrimSpace(o.configPath)
-	if path == "" || path == "magelift.yaml" {
+	if path == "" || path == "magelift.php" {
 		return ""
 	}
 	return "--config " + shellQuote(path)

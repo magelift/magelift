@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -176,6 +177,47 @@ func TestBuildIdentityPlanBuildAndDeployDistinct(t *testing.T) {
 	buildMember := workloadIdentityPrincipal(build.PoolID, "1", build.GitHubEnvironment)
 	if deployMember == buildMember {
 		t.Fatalf("members should differ deploy=%q build=%q", deployMember, buildMember)
+	}
+}
+
+func TestPreviewWIFAllowsOnlyMainPreviewEventsAndSeparatesBindings(t *testing.T) {
+	base := IdentitySpec{Project: "shop", Environment: "preview", GCPProject: "example-gcp-project", GitHubOwner: "magelift", GitHubRepo: "magelift", GitHubRepositoryID: 42, GitHubOwnerID: 7, Role: identityRoleBuild}
+	plan, err := BuildIdentityPlan(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{"assertion.ref == 'refs/heads/main'", "assertion.workflow_ref == 'magelift/magelift/.github/workflows/magelift.yml@refs/heads/main'", "assertion.event_name == 'pull_request_target'", "assertion.environment == 'preview-build'", "assertion.environment == 'preview'", "assertion.event_name == 'schedule'"} {
+		if !strings.Contains(plan.AttributeCondition, part) {
+			t.Fatalf("missing %q in %s", part, plan.AttributeCondition)
+		}
+	}
+	fake := newFakeWIF("123456789012")
+	boot, err := NewIdentityFromClient(fake)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := boot.Ensure(context.Background(), plan); err != nil {
+		t.Fatal(err)
+	}
+	policy := fake.policies[plan.ServiceAccountName]
+	if policy == nil {
+		t.Fatal("build account policy missing")
+	}
+	encoded, err := json.Marshal(policy.Bindings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(encoded)
+	if !strings.Contains(text, "/attribute.environment/build") || !strings.Contains(text, "/attribute.environment/preview-build") || strings.Contains(text, "/attribute.environment/preview ") {
+		t.Fatalf("build members: %s", text)
+	}
+	base.Environment = "staging"
+	staging, err := BuildIdentityPlan(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(staging.AttributeCondition, "pull_request_target") || strings.Contains(staging.AttributeCondition, "preview-build") {
+		t.Fatalf("staging permits PR target: %s", staging.AttributeCondition)
 	}
 }
 

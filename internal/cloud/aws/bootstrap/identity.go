@@ -92,6 +92,9 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 	if !componentPattern.MatchString(spec.Project) || !componentPattern.MatchString(spec.Environment) {
 		return IdentityPlan{}, errors.New("identity bootstrap project and environment must be stable names")
 	}
+	if spec.Environment == "build" || spec.Environment == "preview-build" {
+		return IdentityPlan{}, errors.New("environment build and preview-build are reserved for CI build identities")
+	}
 	if !accountPattern.MatchString(spec.AccountID) || !regionPattern.MatchString(spec.Region) {
 		return IdentityPlan{}, errors.New("identity bootstrap account or region is invalid")
 	}
@@ -137,7 +140,11 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 	if err != nil {
 		return IdentityPlan{}, err
 	}
-	buildTrust, err := githubTrustPolicy(providerARN, spec.GitHubOwner, spec.GitHubRepo, spec.Environment)
+	buildEnvironments := []string{"build"}
+	if spec.Environment == "preview" {
+		buildEnvironments = append(buildEnvironments, "preview-build")
+	}
+	buildTrust, err := githubTrustPolicyForEnvironments(providerARN, spec.GitHubOwner, spec.GitHubRepo, buildEnvironments)
 	if err != nil {
 		return IdentityPlan{}, err
 	}

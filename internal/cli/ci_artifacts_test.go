@@ -85,7 +85,7 @@ func TestGeneratedBuildStepKeepsCheckoutCleanUntilMageliftFinishes(t *testing.T)
 	}
 	var w strings.Builder
 	w.WriteString("jobs:\n  build:\n    steps:\n")
-	writeBuildAndArchive(&w, "magelift.yaml")
+	writeBuildAndArchive(&w, "magelift.php")
 	var workflow struct {
 		Jobs map[string]struct {
 			Steps []struct {
@@ -198,7 +198,7 @@ jq -n \
 				"PATH="+bin+":"+os.Getenv("PATH"),
 				"RUNNER_TEMP="+runnerTemp,
 				"MAGELIFT_RELEASE_IMAGE="+tc.image,
-				"GITHUB_SHA="+tc.sha,
+				"SOURCE_SHA="+tc.sha,
 				"GITHUB_OUTPUT="+githubOutput,
 			)
 			output, err := cmd.CombinedOutput()
@@ -259,7 +259,7 @@ func TestGeneratedPromotionDoesNotInvokeOrDependOnBuild(t *testing.T) {
 			}
 		}
 	}
-	rendered := renderWorkflow("magelift.yaml", "v1.2.3", []string{"staging", "production"}, awsCIWorkflowGenerator{}, config.Config{}, "aws/ecs-fargate")
+	rendered := renderWorkflow("magelift.php", "v1.2.3", []string{"staging", "production"}, awsCIWorkflowGenerator{}, config.Config{}, "aws/ecs-fargate")
 	if err := yaml.Unmarshal(rendered, &workflow); err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestProductionArtifactRunMustBeSuccessfulSameWorkflowAndRepository(t *testi
 			script = step.Run
 		}
 	}
-	for _, scenario := range []string{"valid", "fork", "PR", "other workflow", "failed run"} {
+	for _, scenario := range []string{"valid", "fork", "PR", "other workflow", "other branch", "failed run"} {
 		t.Run(scenario, func(t *testing.T) {
 			dir := t.TempDir()
 			bin := filepath.Join(dir, "bin")
@@ -314,7 +314,7 @@ func TestProductionArtifactRunMustBeSuccessfulSameWorkflowAndRepository(t *testi
 			if err := os.WriteFile(gh, []byte("#!/bin/sh\ncat \"$ML_SOURCE_RUN_FIXTURE\"\n"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			repo, event, path, conclusion := "fixture/shop", "push", ".github/workflows/magelift.yml", "success"
+			repo, event, path, conclusion, branch := "fixture/shop", "push", ".github/workflows/magelift.yml", "success", "main"
 			switch scenario {
 			case "fork":
 				repo = "fork/shop"
@@ -322,10 +322,12 @@ func TestProductionArtifactRunMustBeSuccessfulSameWorkflowAndRepository(t *testi
 				event = "pull_request"
 			case "other workflow":
 				path = ".github/workflows/untrusted.yml"
+			case "other branch":
+				branch = "feature"
 			case "failed run":
 				conclusion = "failure"
 			}
-			raw := fmt.Sprintf(`{"conclusion":%q,"event":%q,"path":%q,"head_repository":{"full_name":%q}}`, conclusion, event, path, repo)
+			raw := fmt.Sprintf(`{"conclusion":%q,"event":%q,"path":%q,"head_branch":%q,"head_repository":{"full_name":%q}}`, conclusion, event, path, branch, repo)
 			fixture := filepath.Join(dir, "run.json")
 			if err := os.WriteFile(fixture, []byte(raw), 0o600); err != nil {
 				t.Fatal(err)

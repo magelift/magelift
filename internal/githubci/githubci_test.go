@@ -159,10 +159,10 @@ func TestEnsureVariableCreatesWhenAbsent(t *testing.T) {
 func TestEnsureVariableNoopWhenSameValue(t *testing.T) {
 	posts := 0
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet:
+		switch r.Method {
+		case http.MethodGet:
 			_, _ = io.WriteString(w, `{"name":"MAGELIFT_GCP_REGION","value":"europe-west1"}`)
-		case r.Method == http.MethodPost:
+		case http.MethodPost:
 			posts++
 			t.Fatal("unexpected POST")
 		}

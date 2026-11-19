@@ -1,10 +1,10 @@
 # Bootstrap
 
 `magelift bootstrap` prepares the selected cloud account so Magento can deploy.
-Laptop users omit GitHub flags. GitHub Actions needs `--github-owner` and
-`--github-repo` so Magelift can create the CI identity.
+Laptop users omit GitHub flags. AWS and GCP support preparing a CI identity with
+`--github-owner` and `--github-repo`. For Azure, configure federation in Entra ID.
 
-You do not set a state-backend URL. Magelift derives it from `magelift.yaml`
+You do not set a state-backend URL. Magelift derives it from `magelift.php`
 after bootstrap.
 
 For an existing GCP state bucket, bootstrap checks its four MageLift ownership
@@ -16,7 +16,7 @@ number.
 
 ## Laptop
 
-Log in with `aws` or `gcloud`, then:
+Log in with the AWS, Google Cloud or Azure CLI for your target, then run
 
 ```sh
 magelift bootstrap --env preview
@@ -57,9 +57,7 @@ are never included. Use `identity.buildRoleArn` for `MAGELIFT_BUILD_ROLE_ARN` an
 `identity.ciRoleArn` for the environment role variables consumed by generated
 deployment workflows. Keep `identity.stateRoleArn` for audited state recovery only.
 
-Configure the GitHub `preview`, `staging`, and `production` environments with the
-required approvals and use their environment variables for the corresponding CI role
-ARNs. The role trust policy accepts environment subjects, not arbitrary pull-request
+Create GitHub environments called `build` and `preview-build` for stable and PR builds. Configure the separate `preview`, `staging`, `uat` and `production` deployment environments you use. Set their respective role ARNs and required reviewers in GitHub. The build identity needs registry access. Only the deployment identity should have infrastructure permissions. The role trust policy accepts environment subjects, not arbitrary pull-request
 branches. Re-running bootstrap reconciles the managed policy versions before it
 updates role policies.
 
@@ -107,7 +105,7 @@ identities alone does not grant those permissions.
 The runtime's GKE image-pull identity is another role and needs repository read
 permissions independently of the Pod's application identity.
 
-Magelift derives stack state from `magelift.yaml` after bootstrap; do not set a
+Magelift derives stack state from `magelift.php` after bootstrap; do not set a
 state-backend URL. Set `MAGELIFT_RELEASE_IMAGE` to your application destination
 and `MAGELIFT_REGISTRY` to its exact registry host. Artifact Registry uses the
 GCP federation credential helper. User GHCR uses GITHUB_TOKEN; other registries
@@ -254,20 +252,20 @@ automatically after a stockout.
 Prepare the account and inspect the returned ciPermissionPlan first:
 
 ```sh
-magelift bootstrap --env test --github-owner YOUR_OWNER --github-repo YOUR_REPO
+magelift bootstrap --env staging --github-owner YOUR_OWNER --github-repo YOUR_REPO
 ```
 
 The build identity gets Artifact Registry writer on the owned repository. The
 node identity gets repository reader. Deployment receives access to the state
 bucket and key, node impersonation, and the service roles needed to provision
-the test stack. The listed project roles apply across the selected GCP project;
+the staging stack. The listed project roles apply across the selected GCP project;
 they are not restricted to resources with a MageLift name. Review that scope
 with the project administrator and prefer a dedicated test project.
 
 Apply the reviewed grants and configure the nonsecret repository variables:
 
 ```sh
-magelift bootstrap --env test --github-owner YOUR_OWNER --github-repo YOUR_REPO \
+magelift bootstrap --env staging --github-owner YOUR_OWNER --github-repo YOUR_REPO \
   --apply-ci-permissions --configure-github
 magelift ci generate
 ```
@@ -292,3 +290,40 @@ the stack outputs and point the configured shop hostname to that address.
 address exists. Verify DNS, certificate activation and storefront health before
 using the endpoint; an allocated address alone does not establish readiness.
 See [ADR 0020](adr/0020-gcp-native-edge-address.md).
+
+
+## Azure AKS
+
+Set `target.azure.subscriptionId` and `resourceGroup` to an existing Azure
+subscription and group. Set `AZURE_TENANT_ID`, `AZURE_STORAGE_ACCOUNT` and
+a stable `PULUMI_CONFIG_PASSPHRASE` or `PULUMI_CONFIG_PASSPHRASE_FILE`.
+Create the storage account and grant the invoking Azure identity Blob data
+access and the necessary resource-group permissions. Keep the passphrase
+available to the same project's future deployments and cleanup jobs.
+`magelift bootstrap` prepares the state container. In CI configure Azure
+workload identity federation and the client, tenant and subscription IDs
+referenced by the generated workflow. Set the `MAGELIFT_AZURE_STORAGE_ACCOUNT`
+and `MAGELIFT_AZURE_TENANT_ID` variables and the
+`MAGELIFT_PULUMI_CONFIG_PASSPHRASE` secret in each deployment environment.
+Use the state account and passphrase created for that environment. The Azure
+login provides the CLI session used by Pulumi and the Blob client; the identity
+needs Blob data access. The generated deployment jobs install `kubelogin`.
+
+The dedicated AKS graph provisions a VNet, cluster, MySQL Flexible Server,
+Key Vault and Azure Files. Set `target.azure.acrResourceId` for pull access to
+Azure Container Registry or provide an existing Kubernetes `imagePullSecret`.
+For a shared cluster, arrange pull access before creating previews. The
+dedicated cluster does not enable Microsoft Entra integration: Microsoft says
+its cluster-user credential has the same access as cluster-admin. Limit who can
+retrieve that credential with Azure RBAC. For an operator-owned Entra-integrated
+cluster, install the helper required by its kubeconfig, such as `kubelogin`,
+and grant the identity the required cluster permissions. See Microsoft's
+[AKS kubeconfig access guidance](https://learn.microsoft.com/en-us/azure/aks/control-kubeconfig-access).
+
+For a first deployment with a public HTTP load balancer, omit the custom
+domain and ingress settings. To serve a shop domain, configure DNS and an
+installed ingress controller, set `target.azure.ingressClass`, and reference
+the shop's certificate with `target.azure.tlsSecret` in the environment's
+namespace. Set `target.azure.monitorWorkspaceId` to an existing Log Analytics
+workspace to enable AKS Container Insights on a dedicated cluster. Configure
+monitoring on a shared cluster in the cluster's owning stack. [Kubernetes ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
