@@ -1,60 +1,15 @@
 ---
 name: magelift-provider
-description: >-
-  Add or change a MageLift cloud provider adapter. Use when creating
-  internal/cloud/<provider>/ packages, wiring StackModule registration, or
-  updating capability matrix / experimental docs for a new cloud.
+description: Add a cloud adapter, register its runtimes and test the provider boundary.
 version: 1.0.0
 ---
 
-# Adding a MageLift provider
+# Adding a provider
 
-Read `docs/adding-a-provider.md` and ADRs 0002, 0004, 0007, 0008 before coding.
+Start in the [provider guide](../../../docs/adding-a-provider.md). GCP and Azure are examples of separately built plugins. AWS, OVH and Scaleway are linked into the CLI. Each provider owns its Pulumi resources.
 
-## Boundary
-
-- Magento-facing code stays in `sdk`, `internal/platform`, `internal/deploy`,
-  `internal/config`
-- GCP already ships as the reference autonomous plugin under `providers/gcp/` (own module, versioned typed net/rpc protocol, core talks through a plugin-backed shim); AWS, OVH, and Scaleway stay under `internal/cloud/<provider>/` for now, with AWS drafted as the second autonomous provider post-alpha
-- New providers are specified as out-of-module `providers/<name>/` plugins speaking versioned typed operations with explicit negotiation ([ADR 0013](../../../docs/adr/0013-provider-plugin-contract.md)); the in-process checklist below describes the remaining in-process tree, not new work
-- SaaS adapters go under `internal/external/<vendor>/`; provider-neutral ports go under `internal/shared/<port>/`; `internal/cloud/kube` is the single ADR-blessed shared K8s helper; SES and Cloudflare are adapter-less by decision
-- Do not share Pulumi Network/Database components behind a provider switch
-
-## Registration seams
-
-| Seam | Role |
-| --- | --- |
-| `platform.ModuleRegistry` | What the CLI uses for preview/deploy/destroy/outputs |
-| `internal/infra.Registry` | Target/capability index for tests; alone does not wire CLI |
-
-A PR that only calls `infra.RegisterTarget` will not appear in `magelift deploy`.
-
-## Checklist (copy GCP)
-
-1. `internal/cloud/<p>/target/`: IDs, Validate, optional infra register
-2. `internal/cloud/<p>/stack/`: Spec, PlanFromConfig, Pulumi Program, StackModule
-3. Capability packages as needed; keep them typed and small
-4. Optional day-2 ports (`HasOps`, `HasBootstrap`, …) returning `ErrNotSupported`
-   until ready ([ADR 0004](../../../docs/adr/0004-ports-and-adapters.md))
-5. `internal/config`: provider block + `make generate` for schema
-6. First-party: register the `StackModule` in `internal/registry`. Community:
-   implement `sdk.Module` and call `cli.NewWithExtensions(...)` from a custom
-   binary.
-7. Mock Pulumi graph tests; docs for experimental vs acceptance
-8. Capability matrix row; never claim certified without acceptance evidence
-
-## Honesty
-
-Experimental providers are fine. Selling them as production-supported is not.
-
-## Use this skill when
-
-- You are adding a cloud provider, a runtime, or a managed service adapter.
-- You are changing the intersection between Adobe compatibility and provider products.
-- You are reviewing a community extension boundary.
-
-## Leave behind
-
-- Provider-specific Pulumi code under internal/cloud/<provider>/; SaaS code under internal/external/<vendor>/; shared ports under internal/shared/<port>/.
-- Mock coverage and a capability-matrix row.
-- A real acceptance row before changing a cell to certified.
+1. Define the provider and runtime IDs, supported operations and config. Use the public SDK types for the plugin protocol. Keep vendor resource types inside the adapter.
+2. Implement planning and infrastructure in `providers/<name>/`. A new plugin has its own Go module. Add it to the workspace, build, distribution and tests. See the [plugin contract](../../../docs/adr/0013-provider-plugin-contract.md).
+3. Register each first-party runtime with `platform.ModuleRegistry` in `internal/registry`. The CLI resolves bootstrap, preview, deploy and day-two operations there. The discovery index in `internal/infra` serves a different purpose.
+4. Use Pulumi mocks for resource relationships and Go tests for validation and operations. Exercise SDK calls against Floci where it implements the API. Record which cases ran in the [capability matrix](../../../docs/capability-matrix.md).
+5. Run `make generate` for config changes. Update the shop guide and the example for the affected runtime.

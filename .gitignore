@@ -32,14 +32,9 @@ auth.json
 .vscode/
 .DS_Store
 
-# AI agent local caches and user-installed third-party skills (not audited for
-# this repository's Apache-2.0 license surface). First-party user skills live
-# in agents/skills/. The OKF bundle and its maintainer skill are committed.
+# Local agent caches and installed skills. MageLift ships skills from agents/.
 .claude/
-.agents/*
-!.agents/knowledge/
-!.agents/skills/
-.agents/knowledge/tools/.ruff_cache/
+.agents/
 .cursor/
 .serena/
 skills-lock.json

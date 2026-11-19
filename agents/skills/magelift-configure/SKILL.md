@@ -79,8 +79,7 @@ locked `magento/magento-cloud-patches` executable (one `ece-patches apply` after
 `composer install`). List Quality Patch IDs under `build.qualityPatches`; when
 cloud patches are enabled they ride the same upstream pass as Cloud-required
 patches and `m2-hotfixes`, not a separate MageLift stage. Lock
-`magento/quality-patches` when IDs are declared. MageLift does not certify this
-path; stderr announces the scope when `magelift build` runs.
+`magento/quality-patches` when IDs are declared. The build log records which patch tool ran.
 
 ## Check the result
 
@@ -92,8 +91,7 @@ magelift --config magelift.php --env staging config validate
 magelift --config magelift.php --env staging preview
 ```
 
-If a choice is Adobe-supported but the target reports unavailable, do not mark
-the cell certified. Choose another target or add a provider extension.
+If the target cannot provision the service you selected, attach an existing service where the adapter allows it, choose another target or add a provider extension.
 
 ## Generate user CI safely
 

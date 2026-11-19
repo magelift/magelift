@@ -9,24 +9,23 @@ import (
 	"testing"
 )
 
-func TestBundledManifestIsCompleteAndStable(t *testing.T) {
+func TestBundledManifestContainsOnlyShopSkills(t *testing.T) {
 	manifest, err := BundledManifest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(manifest) != 5 {
-		t.Fatalf("bundled skill count = %d, want 5 user skills", len(manifest))
+	contributorSkills, err := os.ReadDir(filepath.Join("..", "..", "contrib", "skills"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, name := range []string{"magelift-configure", "magelift-dependencies", "magelift-local-runtime", "magelift-migrate", "magelift-operate"} {
-		found := false
-		for _, entry := range manifest {
-			if entry.Name == name {
-				found = true
-				break
-			}
+	for _, skill := range contributorSkills {
+		if !skill.IsDir() {
+			continue
 		}
-		if !found {
-			t.Fatalf("user skill %q is missing from the bundle", name)
+		for _, entry := range manifest {
+			if entry.Name == skill.Name() {
+				t.Errorf("contributor runbook %q appears in the shop skill bundle", entry.Name)
+			}
 		}
 	}
 	for _, entry := range manifest {

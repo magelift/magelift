@@ -73,9 +73,7 @@ Do not commit `.claude/` or `.cursor/`; they stay local. The source of truth is
 
 ### Codex / other AGENTS.md consumers
 
-Root [`AGENTS.md`](../AGENTS.md) is the always-on router (hard constraints plus
-the skill table). Load the matching `SKILL.md` for the task; do not paste skill
-bodies into the session.
+[AGENTS.md](../AGENTS.md) lists the repository checks and points to the contributor runbooks.
 
 ### Manual
 

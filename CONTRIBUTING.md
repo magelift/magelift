@@ -62,7 +62,6 @@ Layout:
 - `images/`: optional nginx/PHP-FPM, Apache and FrankenPHP classic build recipes
 - `schema/`: generated JSON Schema for `magelift.php`
 - `docs/`: MkDocs; ADRs in `docs/adr/`; short evidence pack in `docs/evidence/`
-- `.agents/knowledge/`: agent OKF bundle (tracked). `.agents/skills/okf-maintain` is the maintainer procedure for that bundle. Other `.agents/` caches are not tracked.
 - `tests/`: Floci and fixtures ([tests/README.md](tests/README.md))
 
 ## Principles

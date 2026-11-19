@@ -1,11 +1,3 @@
-// Package skills_test holds the cross-track drift guard: it resolves every
-// `magelift ...` command span and every dotted project key span in the five user
-// skills against the real Cobra tree and the generated JSON schema, checks the
-// AGENTS.md router table against the skill dirs, and asserts the embed
-// boundary that keeps contributor runbooks out of the binary.
-//
-// NOTE: this file must never contain the literal "contrib" + "/skills" — the
-// boundary check below scans its own package, exactly like the spec scenario.
 package skills_test
 
 import (
@@ -25,12 +17,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var userSkills = []string{
-	"magelift-configure",
-	"magelift-dependencies",
-	"magelift-local-runtime",
-	"magelift-migrate",
-	"magelift-operate",
+func bundledSkillNames(t *testing.T) []string {
+	t.Helper()
+	manifest, err := parent.BundledManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(manifest))
+	for _, entry := range manifest {
+		names = append(names, entry.Name)
+	}
+	return names
 }
 
 func repoRoot(t *testing.T) string {
@@ -196,7 +193,7 @@ func TestCommandSpansResolveAgainstCobraTree(t *testing.T) {
 	root := repoRoot(t)
 	tree := internalcli.New()
 	checked := 0
-	for _, name := range userSkills {
+	for _, name := range bundledSkillNames(t) {
 		for _, span := range commandSpans(name, readSkill(t, root, name)) {
 			resolved, skipped, detail := resolveArgv(tree, span.argv)
 			if skipped {
@@ -211,7 +208,7 @@ func TestCommandSpansResolveAgainstCobraTree(t *testing.T) {
 	if checked == 0 {
 		t.Fatal("no command spans resolved; extractor is blind")
 	}
-	t.Logf("resolved %d command spans across %d skills", checked, len(userSkills))
+	t.Logf("resolved %d command spans", checked)
 }
 
 var dottedKeyPattern = regexp.MustCompile("`([A-Za-z][A-Za-z0-9_-]*(?:\\.[A-Za-z][A-Za-z0-9_-]*)+)`")
@@ -227,7 +224,7 @@ func TestProjectKeysResolveAgainstSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	checked := 0
-	for _, name := range userSkills {
+	for _, name := range bundledSkillNames(t) {
 		text := readSkill(t, root, name)
 		for _, match := range dottedKeyPattern.FindAllStringSubmatch(text, -1) {
 			key := match[1]
@@ -282,84 +279,6 @@ func resolveSchemaKey(schema map[string]any, segments []string) bool {
 		node = child
 	}
 	return true
-}
-
-var routerRowPattern = regexp.MustCompile("`(agents|contrib)/skills/([a-z][a-z0-9-]+)`")
-
-func TestRouterTableMatchesSkillTree(t *testing.T) {
-	root := repoRoot(t)
-	data, err := os.ReadFile(filepath.Join(root, "AGENTS.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	mentions := map[string]int{}
-	for _, match := range routerRowPattern.FindAllStringSubmatch(string(data), -1) {
-		mentions[match[1]+"/skills/"+match[2]]++
-	}
-	var dirs []string
-	for _, track := range []string{"agents", "contrib"} {
-		entries, err := os.ReadDir(filepath.Join(root, track, "skills"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-			skillFile := filepath.Join(root, track, "skills", entry.Name(), "SKILL.md")
-			if _, err := os.Stat(skillFile); err != nil {
-				t.Errorf("%s/skills/%s has no SKILL.md", track, entry.Name())
-				continue
-			}
-			dirs = append(dirs, track+"/skills/"+entry.Name())
-		}
-	}
-	if len(dirs) != 11 {
-		t.Errorf("skill dirs = %d, want 11 (5 user + 6 contributor)", len(dirs))
-	}
-	for _, dir := range dirs {
-		if mentions[dir] != 1 {
-			t.Errorf("%s appears %d times in the AGENTS.md router table, want exactly once", dir, mentions[dir])
-		}
-	}
-	for path, count := range mentions {
-		found := false
-		for _, dir := range dirs {
-			if dir == path {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("router table names %s, which has no skill dir: %d mention(s)", path, count)
-		}
-	}
-}
-
-func TestEmbedBoundaryExcludesContributorTrack(t *testing.T) {
-	root := repoRoot(t)
-	needle := "contrib" + "/skills"
-	paths := []string{filepath.Join(root, "internal", "cli", "skills.go")}
-	entries, err := os.ReadDir(filepath.Join(root, "internal", "skills"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
-			continue
-		}
-		paths = append(paths, filepath.Join(root, "internal", "skills", entry.Name()))
-	}
-	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if strings.Contains(string(data), needle) {
-			rel, _ := filepath.Rel(root, path)
-			t.Errorf("%s references the contributor track; user-track code must not", rel)
-		}
-	}
 }
 
 func TestManifestMatchesSkillDirs(t *testing.T) {

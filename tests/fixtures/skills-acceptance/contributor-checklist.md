@@ -7,7 +7,7 @@ Conventions: `[FILE]` = verified by reading the tree. `[RUN date]` = verified
 by execution on that date. Live-cloud and release-tag procedures are
 dry-run-only with last-executed dates recorded per spec.
 
-## 1. magelift-certify — Run and document a certification cell
+## 1. Retired acceptance runbook (reviewed September 2026)
 
 - [x] Procedure review: skill names no executable commands (judgment checklist
       only: prefix, digest, preview-first, day-two ops, destroy-on-exit,

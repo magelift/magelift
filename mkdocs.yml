@@ -85,7 +85,7 @@ nav:
       - AWS bootstrap: bootstrap.md
       - AWS acceptance: aws-acceptance.md
       - GCP acceptance: gcp-acceptance.md
-      - Packed RC1 sessions: certification-sessions.md
+      - Historical acceptance sessions: certification-sessions.md
       - Experimental:
           - AWS EKS: aws-eks-experimental.md
           - GCP notes: gcp-experimental.md

@@ -18,9 +18,7 @@ Canonical URL: `https://magelift.dev/` (docs at `/docs/`).
 - Deploy: GitHub Pages, custom domain `magelift.dev`
 - CI: `.github/workflows/site.yml` builds and deploys `website/dist`
 
-Copy must go through humanizer, then remove-ai-marks. Do not invent certified
-claims; mirror `docs/capability-matrix.md`. Schema `$id` and public links use
-`magelift.dev`.
+Review public copy with the current [Humanizer skill](https://github.com/blader/humanizer). Use `magelift.dev` for the schema ID and public links.
 
 ## Local build
 
@@ -45,7 +43,7 @@ separate docs host, redirect file, or header file.
 
 ## Copy rules
 
-- Do not invent certified claims; mirror `docs/capability-matrix.md`
+- Use the test method and results recorded in `docs/capability-matrix.md`.
 - Keep landing and README free of AI-tell clusters (em dashes, “seamless”,
   fake significance)
 - Schema `$id` and public links use `magelift.dev`
@@ -53,7 +51,7 @@ separate docs host, redirect file, or header file.
 ## Use this skill when
 
 - You are changing website/, docs/, mkdocs.yml, or site workflows.
-- A public claim about a provider, compatibility row, or certification changes.
+- Test coverage or provider compatibility changes.
 
 ## Leave behind
 

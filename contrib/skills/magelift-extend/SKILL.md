@@ -17,10 +17,10 @@ core or when a community provider needs a stable integration point.
 - Register extensions explicitly in a custom binary. The default binary does not
   search the working directory or execute nearby programs.
 - Keep Pulumi and provider-specific resource code in the extension adapter.
-- Validate IDs, API version, outputs, certification tier, and provenance before
+- Validate IDs, API version, outputs, status, and provenance before
   registration.
 - Do not download or execute an unsigned remote extension.
-- Add mock tests first, then a disposable real-account cell before claiming support.
+- Test the extension through the public SDK and Pulumi mocks. Record the method and configuration for any additional tests.
 
 ## Report
 
