@@ -226,3 +226,85 @@ func (m *mocks) resourcesOf(token string) []pulumi.MockResourceArgs {
 	}
 	return result
 }
+
+func TestECSRabbitMQUsesEncryptedPersistentStorageAndResolvableDNS(t *testing.T) {
+	m := &mocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		provider, err := awsprovider.NewProvider(ctx, "regional", &awsprovider.ProviderArgs{Region: pulumi.String("eu-west-3")})
+		if err != nil {
+			return err
+		}
+		_, err = New(ctx, "shop", Args{Mode: ModeECSRabbitMQ, Topology: TopologyStandard, Region: "eu-west-3", SubnetIDInputs: pulumi.StringArray{pulumi.String("subnet-a"), pulumi.String("subnet-b")}, SubnetCount: 2, PrivateSubnetCount: 2, SecurityGroupIDInputs: pulumi.StringArray{pulumi.String("sg-broker")}, SecurityGroupCount: 1, Credentials: Credentials{SecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop/rabbit-auth-AbCd", Username: "magelift"}, Provider: provider, VpcID: pulumi.String("vpc-123"), ExecutionRoleARN: pulumi.String("arn:aws:iam::123456789012:role/exec"), TaskRoleARN: pulumi.String("arn:aws:iam::123456789012:role/task"), LogGroupPrefix: "/magelift/shop/staging"})
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for token, count := range map[string]int{"aws:efs/fileSystem:FileSystem": 1, "aws:efs/mountTarget:MountTarget": 2, "aws:ec2/securityGroup:SecurityGroup": 1, "aws:ec2/securityGroupRule:SecurityGroupRule": 2} {
+		if got := m.count(token); got != count {
+			t.Errorf("%s count=%d want %d", token, got, count)
+		}
+	}
+	for token, required := range map[string][]string{
+		"aws:efs/fileSystem:FileSystem":         {`"encrypted":true`},
+		"aws:ecs/taskDefinition:TaskDefinition": {`"transitEncryption":"ENABLED"`, `broker-data`, `/var/lib/rabbitmq`, `RABBITMQ_NODENAME`, `rabbit@localhost`},
+		"aws:ecs/service:Service":               {`"deploymentMinimumHealthyPercent":0`, `"deploymentMaximumPercent":100`, `"desiredCount":1`},
+		"aws:servicediscovery/service:Service":  {`"type":"A"`},
+	} {
+		list := m.resourcesOf(token)
+		if len(list) != 1 {
+			t.Errorf("%s has %d resources", token, len(list))
+			continue
+		}
+		data, err := json.Marshal(list[0].Inputs.Mappable())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range required {
+			if !strings.Contains(string(data), want) {
+				t.Errorf("%s lacks %q: %s", token, want, data)
+			}
+		}
+	}
+	for _, rule := range m.resourcesOf("aws:ec2/securityGroupRule:SecurityGroupRule") {
+		data, _ := json.Marshal(rule.Inputs.Mappable())
+		for _, want := range []string{`"fromPort":2049`, `"toPort":2049`, `"sourceSecurityGroupId"`} {
+			if !strings.Contains(string(data), want) {
+				t.Errorf("NFS rule missing %s: %s", want, data)
+			}
+		}
+		if strings.Contains(string(data), "0.0.0.0/0") {
+			t.Errorf("NFS rule open to world: %s", data)
+		}
+	}
+	services := m.resourcesOf("aws:ecs/service:Service")
+	if len(services) == 1 {
+		data, _ := json.Marshal(services[0].Inputs.Mappable())
+		if strings.Contains(string(data), "containerPort") {
+			t.Errorf("A record registry must not have container port: %s", data)
+		}
+	}
+}
+
+func TestECSArtemisDoesNotProvisionRabbitStorage(t *testing.T) {
+	m := &mocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		provider, err := awsprovider.NewProvider(ctx, "regional", &awsprovider.ProviderArgs{Region: pulumi.String("eu-west-3")})
+		if err != nil {
+			return err
+		}
+		_, err = New(ctx, "shop", Args{Mode: ModeECSArtemis, Topology: TopologyStandard, Region: "eu-west-3", SubnetIDs: []string{"subnet-a"}, SecurityGroupIDs: []string{"sg-broker"}, Credentials: Credentials{SecretARN: "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop/rabbit-auth-AbCd", Username: "magelift"}, Provider: provider, VpcID: pulumi.String("vpc-123"), ExecutionRoleARN: pulumi.String("arn:aws:iam::123456789012:role/exec"), TaskRoleARN: pulumi.String("arn:aws:iam::123456789012:role/task"), LogGroupPrefix: "/magelift/shop/staging"})
+		return err
+	}, pulumi.WithMocks("magelift", "test", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.count("aws:efs/fileSystem:FileSystem") != 0 {
+		t.Fatal("Artemis unexpectedly acquired RabbitMQ storage")
+	}
+	tasks := m.resourcesOf("aws:ecs/taskDefinition:TaskDefinition")
+	data, _ := json.Marshal(tasks[0].Inputs.Mappable())
+	if !strings.Contains(string(data), "apache/activemq-artemis") || strings.Contains(string(data), "RABBITMQ_NODENAME") {
+		t.Fatalf("task: %s", data)
+	}
+}

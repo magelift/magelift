@@ -176,8 +176,6 @@ func provisionECSBroker(ctx *pulumi.Context, name, mode string, args Args, compo
 	if err != nil {
 		return fmt.Errorf("create broker discovery namespace: %w", err)
 	}
-	// SRV records require containerName+containerPort on the ECS service registry.
-	// A records reject containerPort (AWS InvalidParameterException).
 	discovery, err := servicediscovery.NewService(ctx, name+"-discovery", &servicediscovery.ServiceArgs{
 		Name:        pulumi.String("amqp"),
 		NamespaceId: namespace.ID(),
@@ -186,7 +184,7 @@ func provisionECSBroker(ctx *pulumi.Context, name, mode string, args Args, compo
 			NamespaceId:   namespace.ID(),
 			RoutingPolicy: pulumi.String("MULTIVALUE"),
 			DnsRecords: servicediscovery.ServiceDnsConfigDnsRecordArray{
-				&servicediscovery.ServiceDnsConfigDnsRecordArgs{Ttl: pulumi.Int(10), Type: pulumi.String("SRV")},
+				&servicediscovery.ServiceDnsConfigDnsRecordArgs{Ttl: pulumi.Int(10), Type: pulumi.String("A")},
 			},
 		},
 		Tags: pulumi.ToStringMap(tags(args.Tags, name)),
@@ -255,6 +253,19 @@ func provisionECSBroker(ctx *pulumi.Context, name, mode string, args Args, compo
 			},
 		},
 	}
+	var volumes ecs.TaskDefinitionVolumeArray
+	var storageDeps []pulumi.Resource
+	if mode == ModeECSRabbitMQ {
+		filesystem, deps, err := brokerStorage(ctx, name, args, child)
+		if err != nil {
+			return err
+		}
+		storageDeps = deps
+		env = append(env, map[string]any{"name": "RABBITMQ_NODENAME", "value": "rabbit@localhost"})
+		container["environment"] = env
+		container["mountPoints"] = []map[string]any{{"sourceVolume": "broker-data", "containerPath": "/var/lib/rabbitmq", "readOnly": false}}
+		volumes = ecs.TaskDefinitionVolumeArray{&ecs.TaskDefinitionVolumeArgs{Name: pulumi.String("broker-data"), EfsVolumeConfiguration: &ecs.TaskDefinitionVolumeEfsVolumeConfigurationArgs{FileSystemId: filesystem.ID(), TransitEncryption: pulumi.String("ENABLED")}}}
+	}
 	encoded, err := json.Marshal([]map[string]any{container})
 	if err != nil {
 		return fmt.Errorf("encode broker container definitions: %w", err)
@@ -269,14 +280,15 @@ func provisionECSBroker(ctx *pulumi.Context, name, mode string, args Args, compo
 		ExecutionRoleArn:        args.ExecutionRoleARN,
 		TaskRoleArn:             args.TaskRoleARN,
 		ContainerDefinitions:    pulumi.String(string(encoded)),
+		Volumes:                 volumes,
 		Region:                  pulumi.String(args.Region),
 		Tags:                    pulumi.ToStringMap(tags(args.Tags, name)),
-	}, append(child, pulumi.DependsOn([]pulumi.Resource{logGroup}))...)
+	}, append(child, pulumi.DependsOn(append([]pulumi.Resource{logGroup}, storageDeps...)))...)
 	if err != nil {
 		return fmt.Errorf("create broker task definition: %w", err)
 	}
 
-	_, err = ecs.NewService(ctx, name+"-broker-service", &ecs.ServiceArgs{
+	serviceArgs := &ecs.ServiceArgs{
 		Name:           pulumi.String(name + "-broker"),
 		Cluster:        cluster.Arn,
 		TaskDefinition: task.Arn,
@@ -287,14 +299,15 @@ func provisionECSBroker(ctx *pulumi.Context, name, mode string, args Args, compo
 			SecurityGroups: securityGroupInputs(args),
 			AssignPublicIp: pulumi.Bool(false),
 		},
-		ServiceRegistries: &ecs.ServiceServiceRegistriesArgs{
-			RegistryArn:   discovery.Arn,
-			ContainerName: pulumi.String("broker"),
-			ContainerPort: pulumi.Int(amqpPort),
-		},
-		Region: pulumi.String(args.Region),
-		Tags:   pulumi.ToStringMap(tags(args.Tags, name)),
-	}, child...)
+		ServiceRegistries: &ecs.ServiceServiceRegistriesArgs{RegistryArn: discovery.Arn},
+		Region:            pulumi.String(args.Region),
+		Tags:              pulumi.ToStringMap(tags(args.Tags, name)),
+	}
+	if mode == ModeECSRabbitMQ {
+		serviceArgs.DeploymentMinimumHealthyPercent = pulumi.Int(0)
+		serviceArgs.DeploymentMaximumPercent = pulumi.Int(100)
+	}
+	_, err = ecs.NewService(ctx, name+"-broker-service", serviceArgs, child...)
 	if err != nil {
 		return fmt.Errorf("create broker ECS service: %w", err)
 	}
