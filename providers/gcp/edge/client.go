@@ -343,6 +343,9 @@ func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequ
 			request.PurgePaths = []string{"/*"}
 		}
 		state, stateErr = api.api.Purge(ctx, request)
+		if stateErr == nil && strings.TrimSpace(state.Invalidation) == "" {
+			return sdk.EdgeOperationObservation{}, errors.New("Google Cloud did not return a cache invalidation operation")
+		}
 	default:
 		return sdk.EdgeOperationObservation{}, fmt.Errorf("unsupported GCP edge action %q", operation.Action)
 	}
@@ -452,6 +455,9 @@ func googleEdgeObservation(action sdk.EdgeAction, operationID string, request Go
 	}
 	if action == sdk.EdgeDestroy {
 		proofs = []string{"gcp.edge.ownership", "gcp.edge.owning-service-inventory-empty"}
+	}
+	if action == sdk.EdgePurge {
+		proofs = []string{"gcp.edge.ownership", "gcp.edge.purge-complete"}
 	}
 	sort.Strings(proofs)
 	return sdk.EdgeOperationObservation{Status: sdk.EdgeOperationSucceeded, Action: action, OperationID: operationID,

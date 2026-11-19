@@ -116,6 +116,9 @@ func TestGKENativePurgeUsesOnlyVerifiedControllerOutputs(t *testing.T) {
 	if started.Action != sdk.EdgePurge || providerAPI.purgeCalls != 1 || providerAPI.purgeRequest.URLMapName != "k8s2-um-serving-shop" || providerAPI.purgeRequest.Hostname != "shop.example.com" || providerAPI.purgeRequest.GKEIngressOwner != request.Intent.OwnershipMarker {
 		t.Fatalf("GKE purge request = %#v result=%#v", providerAPI.purgeRequest, started)
 	}
+	if !reflect.DeepEqual(started.ProofRefs, []string{"gcp.edge.ownership", "gcp.edge.purge-complete"}) {
+		t.Fatalf("purge checks = %v", started.ProofRefs)
+	}
 }
 
 func TestGKENativePurgeRejectsStaleOrUnboundControllerOutputs(t *testing.T) {
