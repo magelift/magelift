@@ -216,7 +216,8 @@ jobs:
           git diff --exit-code
       - run: go build -o /tmp/genconfig ./cmd/genconfig && /tmp/genconfig --check
       - run: go build -o /tmp/gendocs ./cmd/gendocs && /tmp/gendocs --check
-      - run: go test ./... -count=1
+      - name: Test the core and SDK consumer
+        run: go test ./... -skip '^TestProviderBuildsOutsideWorkspace$' -count=1
       - name: Provider process and CLI lifecycle race checks
         run: go test -race ./internal/providerhost/ ./internal/cli/ -count=1
       - run: env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN go test -tags synthetic ./tests/synthetic/ -count=1
@@ -309,6 +310,10 @@ jobs:
       - run: go test -race ./... -count=1
         working-directory: providers/${{ matrix.provider }}
       - run: bash scripts/check-provider-tidy.sh "${{ matrix.provider }}"
+      - name: Build the provider outside the workspace
+        env:
+          PROVIDER_ID: ${{ matrix.provider }}
+        run: go test ./tests/distribution -run "^TestProviderBuildsOutsideWorkspace$/^${PROVIDER_ID}$" -count=1
       - name: golangci-lint (provider module)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:

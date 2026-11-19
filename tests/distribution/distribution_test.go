@@ -292,6 +292,9 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(providerManifests) == 0 {
+		t.Fatal("no provider modules found")
+	}
 	for _, manifest := range providerManifests {
 		relative, err := filepath.Rel(root, filepath.Dir(manifest))
 		if err != nil {
@@ -310,13 +313,6 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 		if strings.HasPrefix(entry, "GOFLAGS=") {
 			tidyEnv[i] = "GOFLAGS=-mod=mod"
 		}
-	}
-	providerManifests, err = filepath.Glob(filepath.Join(root, "providers", "*", "go.mod"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(providerManifests) == 0 {
-		t.Fatal("no provider modules found")
 	}
 	for _, manifest := range providerManifests {
 		name := filepath.Base(filepath.Dir(manifest))
