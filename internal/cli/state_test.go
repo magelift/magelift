@@ -151,3 +151,63 @@ func TestStateBackupAndRestoreUseADeploymentLock(t *testing.T) {
 		t.Fatalf("restore calls: %+v output=%s", manager.restores, out.String())
 	}
 }
+
+type cancelledStateArchive struct {
+	fakePlatformState
+	cancel  context.CancelFunc
+	release func(context.Context) error
+}
+
+func (s *cancelledStateArchive) Lock(context.Context, platform.PlannedStack, string) (func(context.Context) error, error) {
+	return s.release, nil
+}
+
+func (s *cancelledStateArchive) Backup(ctx context.Context, _ platform.PlannedStack) (platform.BackupResult, error) {
+	s.cancel()
+	return platform.BackupResult{}, ctx.Err()
+}
+
+func (s *cancelledStateArchive) Restore(ctx context.Context, _ platform.PlannedStack, _ string) (platform.RestoreResult, error) {
+	s.cancel()
+	return platform.RestoreResult{}, ctx.Err()
+}
+
+func TestCancelledCloudOperationReleasesItsLock(t *testing.T) {
+	for _, verb := range []string{"backup", "restore", "destroy"} {
+		t.Run(verb, func(t *testing.T) {
+			path := writeLifecycleConfig(t, "staging", false)
+			o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			released := false
+			release := func(cleanup context.Context) error {
+				_, bounded := cleanup.Deadline()
+				released = ctx.Err() != nil && cleanup.Err() == nil && bounded
+				return cleanup.Err()
+			}
+			o.testState = &cancelledStateArchive{cancel: cancel, release: release}
+			args := []string{"--config", path, "--env", "staging", "--yes"}
+			if verb == "destroy" {
+				o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+					cancel()
+					return release, nil
+				}
+				o.newBackend = func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error) {
+					return &fakeInfrastructureBackend{destroyErr: context.Canceled}, nil
+				}
+				args = append(args, verb)
+			} else {
+				args = append(args, "state", verb)
+				if verb == "restore" {
+					args = append(args, "backup-id")
+				}
+			}
+			cmd := newCommandWithOptions(o)
+			cmd.SetArgs(args)
+			err := cmd.ExecuteContext(ctx)
+			if !errors.Is(err, context.Canceled) || !released {
+				t.Fatalf("release after %s cancellation: released=%v, err=%v", verb, released, err)
+			}
+		})
+	}
+}

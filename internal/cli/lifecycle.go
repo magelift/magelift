@@ -287,7 +287,7 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 		err = o.destroyFastlyEdge(ctx, environment)
 	}
 	if release != nil {
-		err = joinReleaseError(err, release(ctx))
+		err = joinReleaseError(err, releaseDeploymentLock(ctx, release))
 	}
 	if err != nil {
 		return infrastructureResult{}, err

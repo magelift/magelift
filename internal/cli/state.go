@@ -77,19 +77,11 @@ func stateBackupCommand(o *options) *cobra.Command {
 			return fmt.Errorf("acquire state backup lock: %w", err)
 		}
 		result, err := state.Backup(cmd.Context(), planned)
-		releaseErr := release(cmd.Context())
 		if err != nil {
-			if mapped := notSupported(err, planned, "state backup"); mapped != err {
-				_ = releaseErr
-				return mapped
-			}
-			if releaseErr != nil {
-				return fmt.Errorf("backup state: %w; release lock: %v", err, releaseErr)
-			}
-			return fmt.Errorf("backup state: %w", err)
+			err = notSupported(fmt.Errorf("backup state: %w", err), planned, "state backup")
 		}
-		if releaseErr != nil {
-			return fmt.Errorf("release state backup lock: %w", releaseErr)
+		if err := joinReleaseError(err, releaseDeploymentLock(cmd.Context(), release)); err != nil {
+			return err
 		}
 		return o.write(map[string]any{"environment": planned.Environment(), "backup": result})
 	}}
@@ -113,19 +105,11 @@ func stateRestoreCommand(o *options) *cobra.Command {
 			return fmt.Errorf("acquire state restore lock: %w", err)
 		}
 		result, err := state.Restore(cmd.Context(), planned, args[0])
-		releaseErr := release(cmd.Context())
 		if err != nil {
-			if mapped := notSupported(err, planned, "state restore"); mapped != err {
-				_ = releaseErr
-				return mapped
-			}
-			if releaseErr != nil {
-				return fmt.Errorf("restore state: %w; release lock: %v", err, releaseErr)
-			}
-			return fmt.Errorf("restore state: %w", err)
+			err = notSupported(fmt.Errorf("restore state: %w", err), planned, "state restore")
 		}
-		if releaseErr != nil {
-			return fmt.Errorf("release state restore lock: %w", releaseErr)
+		if err := joinReleaseError(err, releaseDeploymentLock(cmd.Context(), release)); err != nil {
+			return err
 		}
 		return o.write(map[string]any{"environment": planned.Environment(), "restore": result})
 	}}
