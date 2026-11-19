@@ -318,7 +318,41 @@ func (s Spec) validate(options validateOptions) error {
 	if err := selection.CheckServiceCapabilities(); err != nil {
 		problems = append(problems, err)
 	}
-	if !s.Services["database"].Attached() {
+	for _, role := range []string{"database", "cache", "session"} {
+		binding := s.Services[role]
+		if len(binding.Parameters) > 0 {
+			if role != "database" || binding.Family != "mariadb" || binding.Ownership != "self-hosted" {
+				problems = append(problems, fmt.Errorf("services.%s parameters require self-hosted MariaDB", role))
+			} else if err := sdk.ValidateDatabaseParameters(binding.Parameters); err != nil {
+				problems = append(problems, err)
+			}
+		}
+		if binding.Ownership == "self-hosted" {
+			if binding.Image == "" && binding.Version == "" {
+				problems = append(problems, fmt.Errorf("services.%s requires an explicit version or image for a self-hosted GCP service", role))
+			}
+			if role == "database" && binding.Family != "mariadb" {
+				problems = append(problems, errors.New("GCP self-hosted database requires the mariadb family"))
+			}
+			if role != "database" && binding.Family != "valkey" && binding.Family != "redis" {
+				problems = append(problems, fmt.Errorf("GCP self-hosted %s requires the valkey or redis family", role))
+			}
+		}
+		if role != "database" && (binding.MemoryMiB < 0 || binding.MemoryMiB > 1048576) {
+			problems = append(problems, fmt.Errorf("services.%s.memoryMiB must be between 0 and 1048576", role))
+		}
+		if role != "database" && binding.EvictionPolicy != "" {
+			switch binding.EvictionPolicy {
+			case "noeviction", "allkeys-lru", "allkeys-lfu", "allkeys-random", "volatile-lru", "volatile-lfu", "volatile-random", "volatile-ttl":
+			default:
+				problems = append(problems, fmt.Errorf("services.%s has invalid eviction policy %q", role, binding.EvictionPolicy))
+			}
+			if binding.Attached() {
+				problems = append(problems, fmt.Errorf("services.%s.evictionPolicy cannot be enforced on an attached service", role))
+			}
+		}
+	}
+	if !serviceSelfOrAttached(s.Services["database"]) {
 		databaseVersion, err := s.CloudSQLDatabaseVersion()
 		if err != nil {
 			problems = append(problems, fmt.Errorf("Cloud SQL database version: %w", err))
@@ -326,7 +360,19 @@ func (s Spec) validate(options validateOptions) error {
 			problems = append(problems, err)
 		}
 	}
-	if !s.Services["cache"].Attached() {
+	session := s.Services["session"]
+	if session.Family != "" && !serviceSelfOrAttached(session) && session.Version != "" {
+		version := "VALKEY_" + strings.ReplaceAll(session.ManagedBranch(), ".", "_")
+		if !valkeyVersionPattern.MatchString(version) {
+			problems = append(problems, fmt.Errorf("invalid session Memorystore engine version %q", version))
+		}
+	}
+	managedCache := !serviceSelfOrAttached(s.Services["cache"])
+	managedSession := session.Family != "" && !serviceSelfOrAttached(session)
+	if managedCache && managedSession && s.Catalog.MemorystorePSCConnectionLimit < 4 {
+		problems = append(problems, errors.New("separate managed cache and sessions require at least four Memorystore PSC connections"))
+	}
+	if managedCache || (managedSession && session.Version == "") {
 		if _, err := s.MemorystoreEngineVersion(); err != nil {
 			problems = append(problems, err)
 		}

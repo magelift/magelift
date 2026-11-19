@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	gcpprovider "github.com/magelift/magelift/providers/gcp/provider"
 	gcptarget "github.com/magelift/magelift/providers/gcp/target"
@@ -45,6 +46,16 @@ func (a RegionAdmission) AdmitSpec(ctx context.Context, spec Spec) (Spec, error)
 	if err := gcpprovider.ValidateSelection(ctx, client, selection); err != nil {
 		return Spec{}, err
 	}
+	session := spec.Services["session"]
+	if session.Family != "" && !serviceSelfOrAttached(session) && session.Version != "" {
+		version := "VALKEY_" + strings.ReplaceAll(session.ManagedBranch(), ".", "_")
+		if version != selection.MemorystoreVersion {
+			selection.MemorystoreVersion = version
+			if err := gcpprovider.ValidateSelection(ctx, client, selection); err != nil {
+				return Spec{}, fmt.Errorf("session store: %w", err)
+			}
+		}
+	}
 	return spec, nil
 }
 
@@ -55,8 +66,8 @@ func selectionFromSpec(spec Spec) gcpprovider.AdmissionSelection {
 	}
 	selection := gcpprovider.AdmissionSelection{
 		ProjectID:          spec.Identity.GCPProject,
-		SkipCloudSQL:       spec.Services["database"].Attached(),
-		SkipMemorystore:    spec.Services["cache"].Attached(),
+		SkipCloudSQL:       serviceSelfOrAttached(spec.Services["database"]),
+		SkipMemorystore:    serviceSelfOrAttached(spec.Services["cache"]) && (spec.Services["session"].Family == "" || serviceSelfOrAttached(spec.Services["session"])),
 		ExistingCluster:    spec.PreviewPool != nil,
 		Region:             spec.Identity.Region,
 		Zones:              append([]string(nil), spec.Policy.Zones...),
@@ -72,6 +83,10 @@ func selectionFromSpec(spec Spec) gcpprovider.AdmissionSelection {
 		StandardNodeCount:  spec.Catalog.StandardNodeCount,
 		StandardNodeMax:    spec.Catalog.StandardNodeMaxCount,
 		Runtime:            string(runtimeID),
+	}
+	session := spec.Services["session"]
+	if serviceSelfOrAttached(spec.Services["cache"]) && session.Family != "" && !serviceSelfOrAttached(session) && session.Version != "" {
+		selection.MemorystoreVersion = "VALKEY_" + strings.ReplaceAll(session.ManagedBranch(), ".", "_")
 	}
 	if version, err := spec.CloudSQLDatabaseVersion(); err == nil {
 		selection.CloudSQLVersion = version
@@ -89,10 +104,10 @@ func requiredServices(spec Spec) []string {
 		"serviceusage.googleapis.com",
 		"storage.googleapis.com",
 	}
-	if !spec.Services["database"].Attached() {
+	if !serviceSelfOrAttached(spec.Services["database"]) {
 		services = append(services, "sqladmin.googleapis.com")
 	}
-	if !spec.Services["cache"].Attached() {
+	if !serviceSelfOrAttached(spec.Services["cache"]) || (spec.Services["session"].Family != "" && !serviceSelfOrAttached(spec.Services["session"])) {
 		services = append(services, "memorystore.googleapis.com")
 	}
 	if spec.Observability.NativeProvider == "google-cloud-operations" {

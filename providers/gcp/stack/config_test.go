@@ -500,3 +500,20 @@ func TestPlanAcceptsExplicitUncataloguedProviderVersions(t *testing.T) {
 		t.Fatalf("versions changed in plan: %#v", spec.Catalog)
 	}
 }
+
+func TestSplitManagedStoresReserveFourPSCConnections(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Services = map[string]sdk.ServiceBinding{
+		"cache":   {Family: "valkey", Ownership: "managed", Version: "8.0.1"},
+		"session": {Family: "valkey", Ownership: "managed", Version: "9.0.1"},
+	}
+	spec, err := PlanFromInputs(in)
+	if err != nil || spec.Catalog.MemorystorePSCConnectionLimit != 4 || spec.Catalog.MemorystoreEngineVersion != "VALKEY_8_0" {
+		t.Fatalf("separate managed stores: limit %d, version %s, err %v", spec.Catalog.MemorystorePSCConnectionLimit, spec.Catalog.MemorystoreEngineVersion, err)
+	}
+	limit := 2
+	in.Target.MemorystorePSCConnectionLimit = &limit
+	if _, err := PlanFromInputs(in); err == nil || !strings.Contains(err.Error(), "four Memorystore PSC connections") {
+		t.Fatalf("undersized explicit connection limit: %v", err)
+	}
+}

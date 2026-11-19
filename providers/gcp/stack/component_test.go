@@ -1163,3 +1163,150 @@ func TestHeadlessOriginReachesGKEFPM(t *testing.T) {
 	}
 	t.Fatal("web workload missing")
 }
+
+func TestSelfHostedShopServicesAreDistinctAndPersistent(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Services = map[string]sdk.ServiceBinding{
+		"database": {Family: "mariadb", Version: "11.4", Ownership: "self-hosted", StorageGiB: 35, Parameters: map[string]string{"character_set_server": "utf8mb4"}},
+		"cache":    {Family: "valkey", Version: "8.1", Ownership: "self-hosted", EvictionPolicy: "allkeys-lru", MemoryMiB: 256, StorageGiB: 7},
+		"session":  {Family: "valkey", Version: "8.0", Ownership: "self-hosted", EvictionPolicy: "noeviction"},
+		"queue":    {Family: "rabbitmq", Version: "4.3", Ownership: "self-hosted"},
+		"search":   {Family: "opensearch", Version: "3.0", Ownership: "self-hosted", Plugins: []string{"analysis-icu", "analysis-phonetic"}},
+	}
+	in.Target.QueueMode = "rabbitmq"
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-staging", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	var db, cache, session, queue, search bool
+	workloads := 0
+	for _, r := range mocks.resources {
+		if r.TypeToken == "gcp:sql/databaseInstance:DatabaseInstance" || r.TypeToken == "gcp:memorystore/instance:Instance" {
+			t.Fatalf("unexpected managed service %s", r.TypeToken)
+		}
+		if r.TypeToken == "kubernetes:apps/v1:Deployment" && (strings.HasSuffix(r.Name, "-web") || strings.HasSuffix(r.Name, "-cron") || strings.HasSuffix(r.Name, "-queue")) {
+			workloads++
+			raw, _ := json.Marshal(r.Inputs.Mappable())
+			text := string(raw)
+			for _, required := range []string{"MAGENTO_DC_SESSION__REDIS_PASSWORD", "MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__PASSWORD", "MAGENTO_DC_QUEUE__AMQP__PASSWORD", "-session-cache-password", "-cache-password", "-queue-password"} {
+				if !strings.Contains(text, required) {
+					t.Errorf("workload %s missing %s", r.Name, required)
+				}
+			}
+		}
+		if r.TypeToken != "kubernetes:apps/v1:StatefulSet" {
+			continue
+		}
+		raw, _ := json.Marshal(r.Inputs.Mappable())
+		text := string(raw)
+		switch {
+		case strings.HasSuffix(r.Name, "-db"):
+			db = true
+			for _, v := range []string{"mariadb:11.4", "35Gi", "MARIADB_ROOT_PASSWORD", "--character_set_server=utf8mb4"} {
+				if !strings.Contains(text, v) {
+					t.Errorf("database missing %s", v)
+				}
+			}
+		case strings.HasSuffix(r.Name, "-cache"):
+			cache = true
+			if !strings.Contains(text, "allkeys-lru") || !strings.Contains(text, "valkey/valkey:8.1") || !strings.Contains(text, "256mb") || !strings.Contains(text, "768Mi") || !strings.Contains(text, "7Gi") {
+				t.Errorf("cache config %s", text)
+			}
+		case strings.HasSuffix(r.Name, "-session"):
+			session = true
+			if !strings.Contains(text, "noeviction") || !strings.Contains(text, "valkey/valkey:8.0") {
+				t.Errorf("session config %s", text)
+			}
+		case strings.HasSuffix(r.Name, "-rabbitmq"):
+			queue = true
+		case strings.HasSuffix(r.Name, "-search"):
+			search = true
+			if !strings.Contains(text, "analysis-icu") || !strings.Contains(text, "analysis-phonetic") {
+				t.Errorf("search plugins missing")
+			}
+		}
+	}
+	if workloads != 3 {
+		t.Errorf("got %d web/cron/consumer deployments", workloads)
+	}
+	if !db || !cache || !session || !queue || !search {
+		t.Fatalf("db=%t cache=%t session=%t queue=%t search=%t", db, cache, session, queue, search)
+	}
+}
+
+func TestPooledSelfHostedServicesUseIsolatedNamespaceAndExplicitCryptKey(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Envelope.Environment = "pr-123"
+	in.Envelope.EnvironmentClass = "preview"
+	in.Envelope.Preset = "preview"
+	in.Target.PreviewPool = &sdk.GCPPreviewPool{Cluster: "shared-cluster", Network: "projects/example-gcp-project/global/networks/shared", Subnet: "projects/example-gcp-project/regions/europe-west1/subnetworks/shared", NetworkPolicyEnforced: true, IngressCIDRs: []string{"192.0.2.0/24"}}
+	in.Services = map[string]sdk.ServiceBinding{"database": {Family: "mariadb", Version: "11.4", Ownership: "self-hosted"}, "cache": {Family: "valkey", Version: "8.1", Ownership: "self-hosted"}, "session": {Family: "valkey", Version: "8.1", Ownership: "self-hosted"}}
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-pr-123", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	var secretRead, createdKey bool
+	found := 0
+	for _, r := range mocks.resources {
+		if r.TypeToken == "gcp:secretmanager/secretVersion:SecretVersion" && strings.Contains(r.Name, "encryption-key-version") && r.ID != "" {
+			secretRead = true
+		}
+		if r.TypeToken == "random:index/randomPassword:RandomPassword" && strings.Contains(r.Name, "encryption-key") {
+			createdKey = true
+		}
+		if r.TypeToken == "kubernetes:apps/v1:StatefulSet" && (strings.HasSuffix(r.Name, "-db") || strings.HasSuffix(r.Name, "-cache") || strings.HasSuffix(r.Name, "-session")) {
+			found++
+			raw, _ := json.Marshal(r.Inputs.Mappable())
+			if !strings.Contains(string(raw), "\"whenDeleted\":\"Delete\"") {
+				t.Errorf("preview PVC retention not Delete: %s", raw)
+			}
+		}
+	}
+	if !secretRead || createdKey || found != 3 {
+		t.Fatalf("explicit secret read=%t generated=%t stores=%d", secretRead, createdKey, found)
+	}
+}
+
+func TestManagedCacheAndSessionUseSeparateInstancesAndPolicies(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Services = map[string]sdk.ServiceBinding{
+		"cache":   {Family: "valkey", Version: "8.1", Ownership: "managed", EvictionPolicy: "allkeys-lru"},
+		"session": {Family: "valkey", Version: "8.1", Ownership: "managed", EvictionPolicy: "noeviction"},
+	}
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-staging", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	instances, policies := 0, 0
+	foundCache, foundSession := false, false
+	for _, r := range mocks.resources {
+		if r.TypeToken == "gcp:networkconnectivity/serviceConnectionPolicy:ServiceConnectionPolicy" {
+			policies++
+		}
+		if r.TypeToken == "gcp:memorystore/instance:Instance" {
+			instances++
+			data, _ := json.Marshal(r.Inputs.Mappable())
+			if strings.Contains(string(data), "allkeys-lru") {
+				foundCache = true
+			}
+			if strings.Contains(string(data), "noeviction") {
+				foundSession = true
+			}
+		}
+	}
+	if instances != 2 || policies != 1 || !foundCache || !foundSession {
+		t.Fatalf("instances=%d connection policies=%d cache=%t session=%t", instances, policies, foundCache, foundSession)
+	}
+}

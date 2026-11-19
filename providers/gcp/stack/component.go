@@ -46,13 +46,13 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 	}
 	var databaseVersion, memorystoreEngineVersion string
 	var err error
-	if !spec.Services["database"].Attached() {
+	if !serviceSelfOrAttached(spec.Services["database"]) {
 		databaseVersion, err = spec.CloudSQLDatabaseVersion()
 		if err != nil {
 			return nil, fmt.Errorf("resolve GCP Cloud SQL database version: %w", err)
 		}
 	}
-	if !spec.Services["cache"].Attached() {
+	if !serviceSelfOrAttached(spec.Services["cache"]) {
 		memorystoreEngineVersion, err = spec.MemorystoreEngineVersion()
 		if err != nil {
 			return nil, fmt.Errorf("resolve GCP Memorystore engine version: %w", err)
@@ -74,10 +74,6 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 		childOpts = append(childOpts, pulumi.Provider(provider))
 	}
 	encryptionKeyID := spec.Dependencies.EncryptionKeySecret
-	if spec.PreviewPool != nil {
-		// Preview stores have isolated data and must not inherit a shared crypt key.
-		encryptionKeyID = ""
-	}
 	encryptionKey, err := magentoEncryptionKey(ctx, name, spec.Identity.GCPProject, encryptionKeyID, provider, component)
 	if err != nil {
 		return nil, fmt.Errorf("resolve Magento encryption key: %w", err)
@@ -118,6 +114,16 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 			ConnectionName: pulumi.String("").ToStringOutput(),
 			Password:       password.ToStringOutput(),
 		}
+	} else if externalDatabase.Ownership == "self-hosted" {
+		password, passwordErr := random.NewRandomPassword(ctx, name+"-mariadb-password", &random.RandomPasswordArgs{Length: pulumi.Int(32), Special: pulumi.Bool(false)}, childOpts...)
+		if passwordErr != nil {
+			return nil, fmt.Errorf("generate MariaDB password: %w", passwordErr)
+		}
+		adminPassword, adminErr := random.NewRandomPassword(ctx, name+"-mariadb-admin-password", &random.RandomPasswordArgs{Length: pulumi.Int(32), Special: pulumi.Bool(false)}, childOpts...)
+		if adminErr != nil {
+			return nil, adminErr
+		}
+		component.Database = &database.Component{WriterEndpoint: pulumi.String(naming.Resource(spec.Identity.Project, spec.Identity.Environment, "db")).ToStringOutput(), Password: password.Result, AdminPassword: adminPassword.Result}
 	} else {
 		component.Database, err = database.New(ctx, naming.CloudSQLInstance(spec.Identity.Project, spec.Identity.Environment), database.Args{
 			Project: spec.Identity.GCPProject, Region: spec.Identity.Region,
@@ -149,9 +155,16 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 			}
 		}
 		component.Cache = &cache.Component{PrimaryEndpoint: pulumi.String(externalServiceHost(external.Endpoint)).ToStringOutput()}
+	} else if spec.Services["cache"].Ownership == "self-hosted" {
+		password, passwordErr := random.NewRandomPassword(ctx, name+"-cache-password", &random.RandomPasswordArgs{Length: pulumi.Int(32), Special: pulumi.Bool(false)}, childOpts...)
+		if passwordErr != nil {
+			return nil, fmt.Errorf("generate cache password: %w", passwordErr)
+		}
+		cachePassword = password.Result
+		component.Cache = &cache.Component{PrimaryEndpoint: pulumi.String(naming.Resource(spec.Identity.Project, spec.Identity.Environment, "cache")).ToStringOutput()}
 	} else {
 		cacheDependencies := []pulumi.Resource{component.Network}
-		if !externalDatabase.Attached() {
+		if !serviceSelfOrAttached(externalDatabase) {
 			cacheDependencies = append(cacheDependencies, component.Database)
 		}
 		component.Cache, err = cache.New(ctx, naming.Resource(spec.Identity.Project, spec.Identity.Environment, "valkey"), cache.Args{
@@ -159,7 +172,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 			UseExistingServiceConnectionPolicy: spec.PreviewPool != nil,
 			NetworkID:                          component.Network.NetworkID.ToStringOutput(), PrivateSubnetIDs: component.Network.PrivateSubnetIDs,
 			NodeType: spec.Catalog.MemorystoreNodeType, ShardCount: spec.Catalog.MemorystoreShardCount,
-			EngineVersion: memorystoreEngineVersion, ReplicaCount: spec.Catalog.MemorystoreReplicas,
+			EngineVersion: memorystoreEngineVersion, EvictionPolicy: spec.Services["cache"].EvictionPolicy, ReplicaCount: spec.Catalog.MemorystoreReplicas,
 			Mode: spec.Catalog.MemorystoreMode, ZoneDistributionMode: spec.Catalog.MemorystoreZoneDistributionMode,
 			Zone: spec.Catalog.MemorystoreZone, DeletionProtection: spec.Catalog.MemorystoreDeletionProtection,
 			PSCConnectionLimit: spec.Catalog.MemorystorePSCConnectionLimit,
@@ -186,6 +199,50 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 	if err != nil {
 		return nil, fmt.Errorf("create GCP edge: %w", err)
 	}
+	sessionEndpoint := pulumi.StringInput(component.Cache.PrimaryEndpoint)
+	sessionPassword := cachePassword
+	session := spec.Services["session"]
+	if session.Family != "" {
+		sessionPassword = nil
+		if session.Attached() {
+			sessionEndpoint = pulumi.String(externalServiceHost(session.Endpoint))
+			if session.Secret != "" {
+				sessionPassword, err = resolveExternalServiceSecret(ctx, name+"-external-session", session.Secret, provider)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else if session.Ownership == "self-hosted" {
+			pass, passErr := random.NewRandomPassword(ctx, name+"-session-password", &random.RandomPasswordArgs{Length: pulumi.Int(32), Special: pulumi.Bool(false)}, childOpts...)
+			if passErr != nil {
+				return nil, passErr
+			}
+			sessionPassword = pass.Result
+			sessionEndpoint = pulumi.String(naming.Resource(spec.Identity.Project, spec.Identity.Environment, "session"))
+		} else {
+			version := "VALKEY_" + strings.ReplaceAll(session.ManagedBranch(), ".", "_")
+			if session.Version == "" {
+				version = spec.Catalog.MemorystoreEngineVersion
+			}
+			sessionDependencies := []pulumi.Resource{component.Network}
+			if !serviceSelfOrAttached(spec.Services["cache"]) {
+				sessionDependencies = append(sessionDependencies, component.Cache)
+			}
+			sessionCache, cacheErr := cache.New(ctx, naming.Resource(spec.Identity.Project, spec.Identity.Environment, "session"), cache.Args{
+				Project: spec.Identity.GCPProject, Region: spec.Identity.Region,
+				UseExistingServiceConnectionPolicy: spec.PreviewPool != nil || !serviceSelfOrAttached(spec.Services["cache"]),
+				NetworkID:                          component.Network.NetworkID.ToStringOutput(), PrivateSubnetIDs: component.Network.PrivateSubnetIDs,
+				NodeType: spec.Catalog.MemorystoreNodeType, ShardCount: spec.Catalog.MemorystoreShardCount, EngineVersion: version,
+				EvictionPolicy: session.EvictionPolicy, ReplicaCount: spec.Catalog.MemorystoreReplicas, Mode: spec.Catalog.MemorystoreMode,
+				ZoneDistributionMode: spec.Catalog.MemorystoreZoneDistributionMode, Zone: spec.Catalog.MemorystoreZone,
+				DeletionProtection: spec.Catalog.MemorystoreDeletionProtection, PSCConnectionLimit: spec.Catalog.MemorystorePSCConnectionLimit, Labels: spec.Identity.Labels,
+			}, append(childOpts, pulumi.DependsOn(sessionDependencies))...)
+			if cacheErr != nil {
+				return nil, fmt.Errorf("create GCP session store: %w", cacheErr)
+			}
+			sessionEndpoint = sessionCache.PrimaryEndpoint
+		}
+	}
 	var queuePassword pulumi.StringInput
 	queueHost, queuePort, queueSSL, queueUsername := "", "", "", ""
 	if external := spec.Services["queue"]; external.Attached() {
@@ -197,7 +254,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 		queueUsername = external.Username
 	}
 	runtimeDependencies := []pulumi.Resource{component.Network, component.Storage}
-	if !externalDatabase.Attached() {
+	if !serviceSelfOrAttached(externalDatabase) {
 		runtimeDependencies = append(runtimeDependencies, component.Database)
 	}
 	poolCluster := ""
@@ -222,13 +279,16 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *gcp.Provider, op
 		DatabaseWriter: component.Database.WriterEndpoint, DatabaseName: spec.Dependencies.DatabaseName,
 		DatabaseUsername: databaseUsername, DatabasePassword: component.Database.Password,
 		DatabaseAdminUsername: database.AdminUsername, DatabaseAdminPassword: component.Database.AdminPassword,
-		DatabaseUsersReady: databaseUsersReady, ExternalDatabase: externalDatabase.Attached(),
-		CacheEndpoint: component.Cache.PrimaryEndpoint, SessionEndpoint: component.Cache.PrimaryEndpoint,
-		ExternalCachePassword:  cachePassword,
-		ExternalSearchEndpoint: externalServiceAddress(spec.Services["search"]),
-		SearchMode:             spec.Catalog.SearchMode, SearchReplicas: spec.Catalog.SearchReplicas,
-		SearchImage: spec.Catalog.OpenSearchImage,
-		QueueMode:   spec.Catalog.QueueMode, QueueReplicas: spec.Catalog.QueueReplicas,
+		DatabaseUsersReady: databaseUsersReady, ExternalDatabase: serviceSelfOrAttached(externalDatabase),
+		DatabaseService: externalDatabase, CacheService: spec.Services["cache"], SessionService: session,
+		RetainServiceVolumes: spec.Identity.EnvironmentClass != "preview",
+		CacheEndpoint:        component.Cache.PrimaryEndpoint, SessionEndpoint: sessionEndpoint,
+		ExternalSessionPassword: sessionPassword,
+		ExternalCachePassword:   cachePassword,
+		ExternalSearchEndpoint:  externalServiceAddress(spec.Services["search"]),
+		SearchMode:              spec.Catalog.SearchMode, SearchReplicas: spec.Catalog.SearchReplicas,
+		SearchImage: spec.Catalog.OpenSearchImage, SearchPlugins: spec.Services["search"].Plugins, SearchStorageGiB: spec.Services["search"].StorageGiB, QueueStorageGiB: spec.Services["queue"].StorageGiB,
+		QueueMode: spec.Catalog.QueueMode, QueueReplicas: spec.Catalog.QueueReplicas,
 		ExternalQueueHost: queueHost, ExternalQueuePort: queuePort, ExternalQueueSSL: queueSSL,
 		ExternalQueueUsername: queueUsername, ExternalQueuePassword: queuePassword,
 		QueueImage:        spec.Catalog.RabbitMQImage,
@@ -449,34 +509,36 @@ func (c *Component) Outputs() pulumi.Map {
 		applicationURL = c.Edge.ApplicationURL
 	}
 	outputs := pulumi.Map{
-		platform.OutputApplicationURL:          applicationURL,
-		platform.OutputDatabaseWriter:          c.Database.WriterEndpoint,
-		platform.OutputCacheEndpoint:           c.Cache.PrimaryEndpoint,
-		platform.OutputCachePasswordSecretName: c.Runtime.CachePasswordSecretName,
-		platform.OutputNetworkVpcID:            c.Network.NetworkID,
-		platform.OutputClusterName:             c.Runtime.ClusterName,
-		platform.OutputNamespace:               c.Runtime.Namespace,
-		platform.OutputWorkloadServiceAccount:  c.Runtime.WorkloadServiceAccount,
-		platform.OutputServiceName:             c.Runtime.ServiceName,
-		platform.OutputPrivateSubnetIDs:        c.Network.PrivateSubnetIDs,
-		platform.OutputKubeconfig:              c.Runtime.Kubeconfig,
-		platform.OutputDatabaseConnectionName:  c.Database.ConnectionName,
-		platform.OutputDatabaseSecretName:      c.Runtime.DatabaseSecretName,
-		platform.OutputEncryptionKeySecretName: c.Runtime.EncryptionKeySecretName,
-		platform.OutputQueuePasswordSecretName: c.Runtime.QueuePasswordSecretName,
-		platform.OutputMediaURL:                mediaAppURL(c.Edge.DomainName),
-		"mediaBucket":                          c.Storage.BucketName,
-		"searchEndpoint":                       c.Runtime.SearchEndpoint,
-		"queueMode":                            c.Runtime.QueueMode,
-		"queueHost":                            c.Runtime.QueueHost,
-		"queueUsername":                        c.Runtime.QueueUsername,
-		"queuePort":                            c.Runtime.QueuePort,
-		"queueSSL":                             c.Runtime.QueueSSL,
-		platform.OutputQueueReplicas:           pulumi.Int(c.queueReplicas),
-		"securityPolicyName":                   c.Edge.SecurityPolicyName,
-		"nativeEdgeBackendConfigName":          c.Edge.BackendConfigName,
-		"nativeEdgeIngressName":                c.Edge.IngressName,
-		"nativeEdgeIngressAddress":             c.Edge.IngressAddress,
+		platform.OutputApplicationURL:            applicationURL,
+		platform.OutputDatabaseWriter:            c.Database.WriterEndpoint,
+		platform.OutputCacheEndpoint:             c.Cache.PrimaryEndpoint,
+		platform.OutputCachePasswordSecretName:   c.Runtime.CachePasswordSecretName,
+		platform.OutputSessionEndpoint:           c.Runtime.SessionEndpoint,
+		platform.OutputSessionPasswordSecretName: c.Runtime.SessionPasswordSecretName,
+		platform.OutputNetworkVpcID:              c.Network.NetworkID,
+		platform.OutputClusterName:               c.Runtime.ClusterName,
+		platform.OutputNamespace:                 c.Runtime.Namespace,
+		platform.OutputWorkloadServiceAccount:    c.Runtime.WorkloadServiceAccount,
+		platform.OutputServiceName:               c.Runtime.ServiceName,
+		platform.OutputPrivateSubnetIDs:          c.Network.PrivateSubnetIDs,
+		platform.OutputKubeconfig:                c.Runtime.Kubeconfig,
+		platform.OutputDatabaseConnectionName:    c.Database.ConnectionName,
+		platform.OutputDatabaseSecretName:        c.Runtime.DatabaseSecretName,
+		platform.OutputEncryptionKeySecretName:   c.Runtime.EncryptionKeySecretName,
+		platform.OutputQueuePasswordSecretName:   c.Runtime.QueuePasswordSecretName,
+		platform.OutputMediaURL:                  mediaAppURL(c.Edge.DomainName),
+		"mediaBucket":                            c.Storage.BucketName,
+		"searchEndpoint":                         c.Runtime.SearchEndpoint,
+		"queueMode":                              c.Runtime.QueueMode,
+		"queueHost":                              c.Runtime.QueueHost,
+		"queueUsername":                          c.Runtime.QueueUsername,
+		"queuePort":                              c.Runtime.QueuePort,
+		"queueSSL":                               c.Runtime.QueueSSL,
+		platform.OutputQueueReplicas:             pulumi.Int(c.queueReplicas),
+		"securityPolicyName":                     c.Edge.SecurityPolicyName,
+		"nativeEdgeBackendConfigName":            c.Edge.BackendConfigName,
+		"nativeEdgeIngressName":                  c.Edge.IngressName,
+		"nativeEdgeIngressAddress":               c.Edge.IngressAddress,
 	}
 	if c.Observability != nil {
 		outputs["observabilityDashboardId"] = c.Observability.DashboardID

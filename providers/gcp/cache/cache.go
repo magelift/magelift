@@ -24,6 +24,7 @@ type Args struct {
 	NodeType                           string
 	ShardCount                         int
 	EngineVersion                      string
+	EvictionPolicy                     string
 	ReplicaCount                       int
 	Mode                               string
 	ZoneDistributionMode               string
@@ -119,6 +120,10 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		connectionDependencies = append(connectionDependencies, scp)
 	}
 
+	engineConfigs := pulumi.StringMap{}
+	if args.EvictionPolicy != "" {
+		engineConfigs["maxmemory-policy"] = pulumi.String(args.EvictionPolicy)
+	}
 	instance, err := memorystore.NewInstance(ctx, name, &memorystore.InstanceArgs{
 		Project:                   pulumi.String(args.Project),
 		InstanceId:                pulumi.String(instanceID),
@@ -128,6 +133,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		NodeType:                  pulumi.String(args.NodeType),
 		Mode:                      pulumi.String(args.Mode),
 		EngineVersion:             pulumi.String(args.EngineVersion),
+		EngineConfigs:             engineConfigs,
 		AuthorizationMode:         pulumi.String("AUTH_DISABLED"),
 		TransitEncryptionMode:     pulumi.String("TRANSIT_ENCRYPTION_DISABLED"),
 		DeletionProtectionEnabled: pulumi.Bool(args.DeletionProtection),

@@ -81,8 +81,8 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 		return Spec{}, fmt.Errorf("GCP target validation failed: %w", err)
 	}
 	cloudSQLDatabaseVersion := gcp.CloudSQLDatabaseVersion
-	if cloudSQLDatabaseVersion == "" && !in.Services["database"].Attached() && in.Services["database"].Version != "" {
-		cloudSQLDatabaseVersion = "MYSQL_" + strings.ReplaceAll(in.Services["database"].VersionWithMinor(), ".", "_")
+	if cloudSQLDatabaseVersion == "" && !serviceSelfOrAttached(in.Services["database"]) && in.Services["database"].Version != "" {
+		cloudSQLDatabaseVersion = "MYSQL_" + strings.ReplaceAll(in.Services["database"].ManagedBranch(), ".", "_")
 	}
 	if cloudSQLDatabaseVersion == "" {
 		cloudSQLDatabaseVersion, err = gcpdatabase.DatabaseVersionForMagento(in.Application.Version)
@@ -90,7 +90,7 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 			cloudSQLDatabaseVersion, err = gcpdatabase.DatabaseVersionMySQL84, nil
 		}
 	}
-	if err != nil && !in.Services["database"].Attached() {
+	if err != nil && !serviceSelfOrAttached(in.Services["database"]) {
 		return Spec{}, fmt.Errorf("resolve GCP Cloud SQL database version: %w", err)
 	}
 	cidr := gcp.NetworkCIDR
@@ -198,12 +198,15 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 		memorystoreDeletionProtection = *gcp.MemorystoreDeletionProtection
 	}
 	memorystorePSCConnectionLimit := 2
+	if session := in.Services["session"]; session.Family != "" && !serviceSelfOrAttached(session) && !serviceSelfOrAttached(in.Services["cache"]) {
+		memorystorePSCConnectionLimit = 4
+	}
 	if gcp.MemorystorePSCConnectionLimit != nil {
 		memorystorePSCConnectionLimit = *gcp.MemorystorePSCConnectionLimit
 	}
 	configuredMemorystoreEngineVersion := strings.TrimSpace(gcp.MemorystoreEngineVersion)
-	if configuredMemorystoreEngineVersion == "" && !in.Services["cache"].Attached() && in.Services["cache"].Version != "" {
-		configuredMemorystoreEngineVersion = "VALKEY_" + strings.ReplaceAll(in.Services["cache"].VersionWithMinor(), ".", "_")
+	if configuredMemorystoreEngineVersion == "" && !serviceSelfOrAttached(in.Services["cache"]) && in.Services["cache"].Version != "" {
+		configuredMemorystoreEngineVersion = "VALKEY_" + strings.ReplaceAll(in.Services["cache"].ManagedBranch(), ".", "_")
 	}
 	memorystoreRequirement := strings.TrimSpace(in.ValkeyRequirement)
 	if memorystoreRequirement == "" {
@@ -213,7 +216,7 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 		}
 	}
 	memorystoreEngineVersion, err := memorystoreAPIEngineVersionForMagento(in.Application.Version, configuredMemorystoreEngineVersion, memorystoreRequirement)
-	if err != nil && !in.Services["cache"].Attached() {
+	if err != nil && !serviceSelfOrAttached(in.Services["cache"]) {
 		return Spec{}, fmt.Errorf("resolve GCP Memorystore engine version: %w", err)
 	}
 	openSearchImage := strings.TrimSpace(gcp.OpenSearchImage)
@@ -369,4 +372,8 @@ func valueOrZero(value *int) int {
 		return 0
 	}
 	return *value
+}
+
+func serviceSelfOrAttached(binding sdk.ServiceBinding) bool {
+	return binding.Attached() || binding.Ownership == "self-hosted"
 }

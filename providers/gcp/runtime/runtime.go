@@ -11,6 +11,7 @@ import (
 	"github.com/magelift/magelift/internal/cloud/kube/search"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/providers/gcp/naming"
+	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/container"
 	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/organizations"
 	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/serviceaccount"
@@ -36,97 +37,104 @@ const (
 )
 
 type Args struct {
-	ExistingCluster             string
-	Namespace                   string
-	IngressCIDRs                []string
-	Project                     string
-	MagentoProject              string
-	Environment                 string
-	Region                      string
-	Runtime                     string
-	Zones                       []string
-	KubernetesVersion           string
-	ReleaseChannel              string
-	ClusterIPv4CIDR             string
-	ServicesIPv4CIDR            string
-	StandardNodeType            string
-	StandardNodeCount           int
-	StandardNodeMinCount        int
-	StandardNodeMaxCount        int
-	StandardNodeDiskType        string
-	StandardNodeDiskSizeGiB     int
-	StandardNodeImageType       string
-	StandardNodeSpot            bool
-	NetworkSelfLink             pulumi.StringInput
-	PrivateSubnetNames          pulumi.StringArrayInput
-	Image                       string
-	ApplicationMode             string
-	ApplicationVersion          string
-	WebRuntime                  string
-	DatabaseWriter              pulumi.StringInput
-	DatabaseName                string
-	DatabaseUsername            string
-	DatabasePassword            pulumi.StringInput
-	DatabaseAdminUsername       string
-	DatabaseAdminPassword       pulumi.StringInput
-	DatabaseUsersReady          []pulumi.Resource
-	ExternalDatabase            bool
-	EncryptionKey               pulumi.StringInput
-	ExternalCachePassword       pulumi.StringInput
-	CacheEndpoint               pulumi.StringInput
-	SessionEndpoint             pulumi.StringInput
-	ExternalSearchEndpoint      string
-	SearchMode                  string
-	SearchReplicas              int
-	SearchImage                 string
-	ExternalQueueHost           string
-	ExternalQueuePort           string
-	ExternalQueueSSL            string
-	ExternalQueueUsername       string
-	ExternalQueuePassword       pulumi.StringInput
-	QueueMode                   string
-	QueueReplicas               int
-	QueueImage                  string
-	MediaBucket                 pulumi.StringInput
-	MediaHmacAccessID           pulumi.StringInput
-	MediaHmacSecret             pulumi.StringInput
-	MediaS3Prefix               string
-	CPURequest                  string
-	MemoryRequest               string
-	DesiredWebReplicas          int
-	QueueConsumerCount          int
-	NativeObservability         bool
-	NativeEdge                  bool
-	NativeEdgeBackendConfigName pulumi.StringInput
-	Labels                      map[string]string
-	Magento                     platform.MagentoOverlays
-	SmtpHost                    string
-	SmtpPort                    int
-	SmtpUsername                string
-	SmtpFrom                    string
-	SmtpPassword                pulumi.StringInput
+	ExistingCluster                               string
+	Namespace                                     string
+	IngressCIDRs                                  []string
+	Project                                       string
+	MagentoProject                                string
+	Environment                                   string
+	Region                                        string
+	Runtime                                       string
+	Zones                                         []string
+	KubernetesVersion                             string
+	ReleaseChannel                                string
+	ClusterIPv4CIDR                               string
+	ServicesIPv4CIDR                              string
+	StandardNodeType                              string
+	StandardNodeCount                             int
+	StandardNodeMinCount                          int
+	StandardNodeMaxCount                          int
+	StandardNodeDiskType                          string
+	StandardNodeDiskSizeGiB                       int
+	StandardNodeImageType                         string
+	StandardNodeSpot                              bool
+	NetworkSelfLink                               pulumi.StringInput
+	PrivateSubnetNames                            pulumi.StringArrayInput
+	Image                                         string
+	ApplicationMode                               string
+	ApplicationVersion                            string
+	WebRuntime                                    string
+	DatabaseWriter                                pulumi.StringInput
+	DatabaseName                                  string
+	DatabaseUsername                              string
+	DatabasePassword                              pulumi.StringInput
+	DatabaseAdminUsername                         string
+	DatabaseAdminPassword                         pulumi.StringInput
+	DatabaseUsersReady                            []pulumi.Resource
+	ExternalDatabase                              bool
+	EncryptionKey                                 pulumi.StringInput
+	ExternalCachePassword                         pulumi.StringInput
+	ExternalSessionPassword                       pulumi.StringInput
+	DatabaseService, CacheService, SessionService sdk.ServiceBinding
+	SearchPlugins                                 []string
+	SearchStorageGiB, QueueStorageGiB             int
+	RetainServiceVolumes                          bool
+	CacheEndpoint                                 pulumi.StringInput
+	SessionEndpoint                               pulumi.StringInput
+	ExternalSearchEndpoint                        string
+	SearchMode                                    string
+	SearchReplicas                                int
+	SearchImage                                   string
+	ExternalQueueHost                             string
+	ExternalQueuePort                             string
+	ExternalQueueSSL                              string
+	ExternalQueueUsername                         string
+	ExternalQueuePassword                         pulumi.StringInput
+	QueueMode                                     string
+	QueueReplicas                                 int
+	QueueImage                                    string
+	MediaBucket                                   pulumi.StringInput
+	MediaHmacAccessID                             pulumi.StringInput
+	MediaHmacSecret                               pulumi.StringInput
+	MediaS3Prefix                                 string
+	CPURequest                                    string
+	MemoryRequest                                 string
+	DesiredWebReplicas                            int
+	QueueConsumerCount                            int
+	NativeObservability                           bool
+	NativeEdge                                    bool
+	NativeEdgeBackendConfigName                   pulumi.StringInput
+	Labels                                        map[string]string
+	Magento                                       platform.MagentoOverlays
+	SmtpHost                                      string
+	SmtpPort                                      int
+	SmtpUsername                                  string
+	SmtpFrom                                      string
+	SmtpPassword                                  pulumi.StringInput
 }
 
 type Component struct {
 	pulumi.ResourceState
-	ClusterName             pulumi.StringOutput
-	ServiceName             pulumi.StringOutput
-	ApplicationURL          pulumi.StringOutput
-	ClusterEndpoint         pulumi.StringOutput
-	SearchEndpoint          pulumi.StringOutput
-	QueueHost               pulumi.StringOutput
-	Namespace               pulumi.StringOutput
-	WorkloadServiceAccount  pulumi.StringOutput
-	QueueMode               pulumi.StringOutput
-	QueueUsername           pulumi.StringOutput
-	QueuePort               pulumi.StringOutput
-	QueueSSL                pulumi.StringOutput
-	QueuePasswordSecretName pulumi.StringOutput
-	CachePasswordSecretName pulumi.StringOutput
-	DatabaseSecretName      pulumi.StringOutput
-	EncryptionKeySecretName pulumi.StringOutput
-	Kubeconfig              pulumi.StringOutput
-	KubernetesProvider      *kubernetes.Provider
+	ClusterName               pulumi.StringOutput
+	ServiceName               pulumi.StringOutput
+	ApplicationURL            pulumi.StringOutput
+	ClusterEndpoint           pulumi.StringOutput
+	SearchEndpoint            pulumi.StringOutput
+	QueueHost                 pulumi.StringOutput
+	Namespace                 pulumi.StringOutput
+	WorkloadServiceAccount    pulumi.StringOutput
+	QueueMode                 pulumi.StringOutput
+	QueueUsername             pulumi.StringOutput
+	QueuePort                 pulumi.StringOutput
+	QueueSSL                  pulumi.StringOutput
+	QueuePasswordSecretName   pulumi.StringOutput
+	CachePasswordSecretName   pulumi.StringOutput
+	SessionEndpoint           pulumi.StringOutput
+	SessionPasswordSecretName pulumi.StringOutput
+	DatabaseSecretName        pulumi.StringOutput
+	EncryptionKeySecretName   pulumi.StringOutput
+	Kubeconfig                pulumi.StringOutput
+	KubernetesProvider        *kubernetes.Provider
 }
 
 func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOption) (*Component, error) {
@@ -413,7 +421,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		searchEndpoint = pulumi.String(args.ExternalSearchEndpoint).ToStringOutput()
 	} else if args.SearchMode == "opensearch" {
 		searchComp, err := search.New(ctx, naming.Resource(args.MagentoProject, args.Environment, "search"), search.Args{
-			Replicas: args.SearchReplicas, Image: args.SearchImage, K8sProvider: k8sProvider,
+			Replicas: args.SearchReplicas, Image: args.SearchImage, Plugins: args.SearchPlugins, Namespace: args.Namespace, StorageGiB: args.SearchStorageGiB, K8sProvider: k8sProvider,
 		}, k8sOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("create OpenSearch: %w", err)
@@ -433,7 +441,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		queuePassword = args.ExternalQueuePassword
 	} else if args.QueueMode == "rabbitmq" {
 		queueComp, err := queue.New(ctx, naming.Resource(args.MagentoProject, args.Environment, "rabbitmq"), queue.Args{
-			Replicas: args.QueueReplicas, Image: args.QueueImage, K8sProvider: k8sProvider, Username: "magento", Namespace: args.Namespace,
+			Replicas: args.QueueReplicas, Image: args.QueueImage, K8sProvider: k8sProvider, Username: "magento", Namespace: args.Namespace, StorageGiB: args.QueueStorageGiB,
 		}, k8sOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("create RabbitMQ: %w", err)
@@ -458,7 +466,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	env = kube.AppendDatabaseCredentialEnv(env, databaseSecretName)
 	var databaseAdminSecret pulumi.Resource
 	databaseAdminSecretName := ""
-	if !args.ExternalDatabase {
+	if !args.ExternalDatabase || args.DatabaseService.Ownership == "self-hosted" {
 		databaseAdminSecret, err = kube.NewDatabaseAdminCredentialsSecret(ctx, name, args.DatabaseAdminUsername, args.DatabaseAdminPassword, k8sOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("create database admin credentials Secret: %w", err)
@@ -485,8 +493,19 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 			return nil, fmt.Errorf("create cache password Secret: %w", err)
 		}
 		cachePasswordSecretName = name + "-cache-password"
-		env = kube.AppendCachePasswordEnv(env, cachePasswordSecretName)
 	}
+	sessionPasswordSecretName := ""
+	var sessionPasswordSecret pulumi.Resource
+	if args.SessionService.Family == "" {
+		sessionPasswordSecretName = cachePasswordSecretName
+	} else if args.ExternalSessionPassword != nil {
+		sessionPasswordSecret, err = kube.NewCachePasswordSecret(ctx, name+"-session", args.ExternalSessionPassword, k8sOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("create session password Secret: %w", err)
+		}
+		sessionPasswordSecretName = name + "-session-cache-password"
+	}
+	env = kube.AppendStorePasswordEnv(env, cachePasswordSecretName, sessionPasswordSecretName)
 	mediaHmacSecretName := ""
 	var mediaHmacSecret pulumi.Resource
 	if args.MediaHmacSecret != nil {
@@ -510,6 +529,55 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		env = kube.AppendQueuePasswordEnv(env, queuePasswordSecretName)
 	}
 	workloadDependencies := []pulumi.Resource{databaseSecret, encryptionKeySecret}
+	if args.DatabaseService.Ownership == "self-hosted" {
+		dbname := naming.Resource(args.MagentoProject, args.Environment, "db")
+		dbEnv := corev1.EnvVarArray{
+			&corev1.EnvVarArgs{Name: pulumi.String("MARIADB_DATABASE"), Value: pulumi.String(args.DatabaseName)},
+			&corev1.EnvVarArgs{Name: pulumi.String("MARIADB_USER"), Value: pulumi.String(args.DatabaseUsername)},
+			secretEnv("MARIADB_PASSWORD", databaseSecretName, "password"),
+			secretEnv("MARIADB_ROOT_PASSWORD", databaseAdminSecretName, "password"),
+		}
+		db, dbErr := newStatefulService(ctx, dbname, serviceImage(args.DatabaseService), 3306, args.DatabaseService.StorageGiB, 0, args.RetainServiceVolumes, sdk.DatabaseArguments(args.DatabaseService.Parameters), dbEnv, append(k8sOpts, pulumi.DependsOn([]pulumi.Resource{databaseSecret, databaseAdminSecret}))...)
+		if dbErr != nil {
+			return nil, fmt.Errorf("create MariaDB: %w", dbErr)
+		}
+		workloadDependencies = append(workloadDependencies, db)
+	}
+	for _, item := range []struct {
+		role       string
+		binding    sdk.ServiceBinding
+		secret     string
+		dependency pulumi.Resource
+	}{
+		{"cache", args.CacheService, cachePasswordSecretName, cachePasswordSecret},
+		{"session", args.SessionService, sessionPasswordSecretName, sessionPasswordSecret},
+	} {
+		if item.binding.Ownership != "self-hosted" {
+			continue
+		}
+		policy := item.binding.EvictionPolicy
+		if policy == "" {
+			policy = "noeviction"
+		}
+		cacheName := naming.Resource(args.MagentoProject, args.Environment, item.role)
+		memoryMiB := item.binding.MemoryMiB
+		if memoryMiB == 0 {
+			memoryMiB = 512
+		}
+		executable := "valkey-server"
+		if item.binding.Family == "redis" {
+			executable = "redis-server"
+		}
+		command := []string{executable, "--requirepass", "$(VALKEY_PASSWORD)", "--maxmemory-policy", policy, "--maxmemory", fmt.Sprintf("%dmb", memoryMiB)}
+		if item.role == "session" {
+			command = append(command, "--appendonly", "yes")
+		}
+		store, storeErr := newStatefulService(ctx, cacheName, serviceImage(item.binding), 6379, item.binding.StorageGiB, memoryMiB, args.RetainServiceVolumes, command, corev1.EnvVarArray{secretEnv("VALKEY_PASSWORD", item.secret, "password")}, append(k8sOpts, pulumi.DependsOn([]pulumi.Resource{item.dependency}))...)
+		if storeErr != nil {
+			return nil, fmt.Errorf("create %s store: %w", item.role, storeErr)
+		}
+		workloadDependencies = append(workloadDependencies, store)
+	}
 	if !args.ExternalDatabase {
 		grantStatement, err := databaseGrantStatement(args.DatabaseName, args.DatabaseUsername)
 		if err != nil {
@@ -528,6 +596,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	workloadOpts := append(k8sOpts, pulumi.DependsOn(workloadDependencies))
 	if cachePasswordSecret != nil {
 		workloadOpts = append(workloadOpts, pulumi.DependsOn([]pulumi.Resource{cachePasswordSecret}))
+	}
+	if sessionPasswordSecret != nil {
+		workloadOpts = append(workloadOpts, pulumi.DependsOn([]pulumi.Resource{sessionPasswordSecret}))
 	}
 	if queuePasswordSecret != nil {
 		workloadOpts = append(workloadOpts, pulumi.DependsOn([]pulumi.Resource{queuePasswordSecret}))
@@ -656,6 +727,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.QueueSSL = pulumi.String(args.ExternalQueueSSL).ToStringOutput()
 	component.QueuePasswordSecretName = pulumi.String(queuePasswordSecretName).ToStringOutput()
 	component.CachePasswordSecretName = pulumi.String(cachePasswordSecretName).ToStringOutput()
+	component.SessionPasswordSecretName = pulumi.String(sessionPasswordSecretName).ToStringOutput()
+	if args.SessionEndpoint != nil {
+		component.SessionEndpoint = args.SessionEndpoint.ToStringOutput()
+	} else {
+		component.SessionEndpoint = args.CacheEndpoint.ToStringOutput()
+	}
 	component.DatabaseSecretName = pulumi.String(databaseSecretName).ToStringOutput()
 	component.EncryptionKeySecretName = pulumi.String(encryptionKeySecretName).ToStringOutput()
 	component.Kubeconfig = kubeconfig

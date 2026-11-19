@@ -58,3 +58,14 @@ func TestTeardownDoesNotDependOnCurrentCloudServiceCatalog(t *testing.T) {
 		t.Fatalf("teardown admission: %v", err)
 	}
 }
+
+func TestAdmissionSelectsManagedSessionWhenCacheIsSelfHosted(t *testing.T) {
+	spec := Spec{Services: map[string]sdk.ServiceBinding{
+		"cache":   {Family: "valkey", Ownership: "self-hosted", Version: "7.2"},
+		"session": {Family: "valkey", Ownership: "managed", Version: "8.1"},
+	}}
+	got := selectionFromSpec(spec)
+	if got.SkipMemorystore || got.MemorystoreVersion != "VALKEY_8_1" {
+		t.Fatalf("selection = %#v", got)
+	}
+}
