@@ -8,10 +8,9 @@ For a local build, run:
 magelift build
 ```
 
-Run from the shop repository, with `magelift.yaml` and `composer.lock` committed.
+Run from the shop repository, with `magelift.php` and `composer.lock` committed.
 Existing `app/etc/config.php` is an immutable input; disabled modules stay disabled.
-The default community recipe uses Magento Open Source 2.4.9, PHP 8.5 and
-nginx-fpm on `linux/amd64`, including on an ARM workstation. The CLI ships the
+The bundled nginx-fpm recipe supports PHP 8.3, 8.4, and 8.5 on `linux/amd64`, including on an ARM workstation. MageLift selects the branch from `build.php` for both builder and runtime images. The CLI ships the
 existing Docker and PHP build recipes with pinned upstream image digests.
 It builds the builder and runtime images on your Docker engine, then builds
 the application. BuildKit can reuse its cache. No MageLift source checkout or
@@ -68,7 +67,7 @@ magelift build --push \
 
 The CLI adds the full inspected commit checksum to the provenance URL. It rejects URL credentials and unrelated query parameters so they cannot enter image labels or attestations.
 
-BuildKit publishes an SBOM and SLSA provenance with the image. MageLift then signs the pushed digest. `magelift build --push` and `magelift sign` use ambient GitHub Actions OIDC when available. A GitHub job requires `id-token: write`; missing permission fails with guidance. Explicit token overrides retain priority. Workstation signing can use the current `gcloud` login and the bootstrapped Magento CI service account. Identity tokens are passed to Cosign only as a file path (never a JWT on argv). CR/LF is stripped first. Advanced automation may still set `MAGELIFT_COSIGN_IDENTITY_TOKEN_FILE`, `MAGELIFT_COSIGN_IDENTITY_TOKEN_ARGV`, or `--identity-token-file`. With no Magelift or `gcloud` token source, Cosign uses ambient OIDC (GitHub Actions or a one-time browser confirmation). Artifact Registry, ECR, and Binary Authorization signatures are not substitutes. The release workflow pins Cosign 3.1.3 through the verified installer action.
+BuildKit publishes the SBOM and SLSA provenance. MageLift signs the pushed digest with Cosign. Give the GitHub build job `id-token: write` so it can sign with its job identity. On a workstation, use your current Google login and the bootstrapped CI service account, or complete Cosign’s browser login. For automation, use `MAGELIFT_COSIGN_IDENTITY_TOKEN_FILE`, `MAGELIFT_COSIGN_IDENTITY_TOKEN_ARGV` or `--identity-token-file` to supply a token explicitly. MageLift passes Cosign a file path and keeps the token out of the process arguments.
 
 Composer credentials are mounted as a private file during preparation. They are not passed to BuildKit, copied into the image, or written to the artifact manifest.
 
@@ -97,20 +96,26 @@ retaining equivalent declared inputs and application content.
 Hooks extend the validated preparation DAG with an argument vector. The executable
 is limited to Composer or `bin/magento`; shell strings are not accepted.
 
-```yaml
-build:
-  hooks:
-    build.prepare:
-      phase: build
-      relationship: before
-      target: build
-      command:
-        executable: composer
-        arguments: [run-script, prepare]
+```php
+[
+    'build' => [
+        'hooks' => [
+            'build.prepare' => [
+                'phase' => 'build',
+                'relationship' => 'before',
+                'target' => 'build',
+                'command' => [
+                    'executable' => 'composer',
+                    'arguments' => ['run-script', 'prepare'],
+                ],
+            ],
+        ],
+    ],
+]
 ```
 
 Hooks are ordered by their target and dependency edges. Retries require
-`idempotent: true`, and each hook has a bounded timeout. YAML hooks are limited to
+`idempotent: true`, and each hook has a bounded timeout. Project hooks are limited to
 the validate, build, and package phases; deployment-time hooks are provider
 extension concerns until the deployment protocol exposes the same typed contract.
 
@@ -122,20 +127,24 @@ magelift build --export-recipe .magelift/recipe-inspection
 
 The destination must not exist. This exports the versioned files and reports
 the recipe SHA256 without invoking Docker, Composer credentials or deployment.
-Generated files are diagnostic output; keep configuration in YAML. Source-built
+Generated files are diagnostic output; keep configuration in the PHP project. Source-built
 images carry `io.magelift.recipe.sha256`; their runtime label uses
 `recipe:sha256:<hash>` rather than claiming a separately published runtime digest.
 Explicit base-image overrides retain their digest labels.
 
 ## Optional private registry cache
 
-```yaml
-build:
-  cache:
-    from: [us-central1-docker.pkg.dev/example/build-cache/shop:amd64-recipe-release]
-    to: us-central1-docker.pkg.dev/example/build-cache/shop:amd64-recipe-release
-    mode: max
-    ignoreExportErrors: false
+```php
+[
+    'build' => [
+        'cache' => [
+            'from' => ['us-central1-docker.pkg.dev/example/build-cache/shop:amd64-recipe-release'],
+            'to' => 'us-central1-docker.pkg.dev/example/build-cache/shop:amd64-recipe-release',
+            'mode' => 'max',
+            'ignoreExportErrors' => false,
+        ],
+    ],
+]
 ```
 
 Cache references are separate from the final image. Scope them by project,
@@ -149,17 +158,21 @@ contents of `RUN --mount=type=cache` directories on an ephemeral runner.
 
 ## Composer credentials supplied by CI
 
-```yaml
-build:
-  composer:
-    credentials: env://COMPOSER_AUTH
+```php
+[
+    'build' => [
+        'composer' => [
+            'credentials' => 'env://COMPOSER_AUTH',
+        ],
+    ],
+]
 ```
 
 The CI supplies `COMPOSER_AUTH` as a secret containing a non-empty JSON object.
 An absent or invalid value fails without printing its contents. This reference
 is available only for build-time Composer credentials; runtime secrets retain
 the provider reference contract. The existing cloud secret references remain
-available. Never put the credential JSON in YAML or pass it as a build argument.
+available. Never put the credential JSON in the PHP project or pass it as a build argument.
 
 ## Patch application
 
@@ -170,7 +183,7 @@ Quality Patches executable from the production Composer lock, then sorted
 Optional `build.cloudPatches: true` opts into one upstream `ece-patches apply`
 after `composer install`. The shop must lock `magento/magento-cloud-patches`;
 declared Quality Patch IDs also require `magento/quality-patches` in the
-production lock. Only YAML-declared Quality Patch IDs control selection;
+production lock. Only project-declared Quality Patch IDs control selection;
 leftover `.magento.env.yaml` or ambient environment values are ignored. Cloud-required patches, those IDs,
 and existing `m2-hotfixes` are applied in the single upstream pass; MageLift
 does not run a second Quality Patch or host hotfix stage afterward. Upstream

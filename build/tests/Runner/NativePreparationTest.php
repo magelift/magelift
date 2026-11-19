@@ -31,7 +31,7 @@ final class NativePreparationTest extends TestCase
         mkdir($source.'/.magelift', 0o700);
         file_put_contents($source.'/.git/config', 'repository state');
         file_put_contents($source.'/.magelift/state.json', 'platform state');
-        file_put_contents($source.'/magelift.yaml', 'project: config');
+        file_put_contents($source.'/magelift.php', 'project: config');
         $request = PrepareRequest::fromJson(self::request($source));
         $runner = new SuccessfulRunner();
         $preparation = new NativePreparation(
@@ -53,7 +53,7 @@ final class NativePreparationTest extends TestCase
         self::assertSame(getenv('HOME'), $runner->requests[0]->environment['HOME'] ?? null);
         self::assertFileDoesNotExist($workspace.'/rootfs/.git/config');
         self::assertFileDoesNotExist($workspace.'/rootfs/.magelift/state.json');
-        self::assertFileDoesNotExist($workspace.'/rootfs/magelift.yaml');
+        self::assertFileDoesNotExist($workspace.'/rootfs/magelift.php');
         self::assertFileExists($workspace.'/rootfs/vendor/autoload.php');
         self::assertFileDoesNotExist($source.'/generated');
         self::assertSame('unchanged', file_get_contents($source.'/source-only.txt'));

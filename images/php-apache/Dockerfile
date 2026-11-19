@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.27
 
-ARG PHP_BASE=docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc
+ARG PHP_BASE=docker.io/library/php:8.5.13-fpm-trixie@sha256:52ba6f178d0a08f348578b03595661b7ff13defafacf4c823d045f2ecba8db8f
 ARG APCU_VERSION=5.1.28
 ARG REDIS_VERSION=6.3.0
 

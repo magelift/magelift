@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.27
 
-ARG FRANKENPHP_BASE=docker.io/dunglas/frankenphp:1.12.7-php8.5-trixie@sha256:f92d81eb3fe4fd18b35d3d58192b7cc3acc8943817bbf39f2fcf0be02a3916dc
+ARG FRANKENPHP_BASE=docker.io/dunglas/frankenphp:1.13.5-php8.5-trixie@sha256:667c5fffd348d9c3c260803d75956f1d9aace7e4b7331d8893de6f101d7e0e57
 FROM ${FRANKENPHP_BASE}
 
 ARG FRANKENPHP_BASE

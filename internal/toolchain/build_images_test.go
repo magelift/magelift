@@ -68,6 +68,65 @@ func TestBuildImagesLoadsLocalTagsAndInspectsIDs(t *testing.T) {
 	}
 }
 
+func TestBuildImagesUsesSelectedPHPForBothStages(t *testing.T) {
+	for _, version := range []string{"8.3", "8.4", "8.5"} {
+		t.Run(version, func(t *testing.T) {
+			branch, base, err := buildcontext.PHPRecipe(version)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ids := map[string]string{}
+			stages := map[string]bool{}
+			defer stubDockerBuildFunc(t, func(_ context.Context, _ io.Writer, args []string) error {
+				dockerfile := args[slices.Index(args, "--file")+1]
+				contents, err := os.ReadFile(dockerfile)
+				if err != nil || !strings.Contains(string(contents), "ARG PHP_BASE="+base) || strings.Count(string(contents), "ARG PHP_BRANCH="+branch) != 2 {
+					t.Fatalf("wrong PHP recipe: %v", err)
+				}
+				stage := args[slices.Index(args, "--target")+1]
+				stages[stage] = true
+				ids[args[slices.Index(args, "--tag")+1]] = "sha256:" + strings.Repeat("a", 64)
+				return nil
+			})()
+			defer stubImageInspect(t, ids)()
+			if _, err := BuildImagesForPHP(context.Background(), io.Discard, t.TempDir(), alphaPlatform, "", version); err != nil {
+				t.Fatal(err)
+			}
+			if !stages["builder"] || !stages["runtime"] {
+				t.Fatalf("missing image stages: %#v", stages)
+			}
+		})
+	}
+}
+
+func TestDockerBuildImagesForPHP(t *testing.T) {
+	if os.Getenv("MAGELIFT_TEST_DOCKER_PHP_BRANCHES") != "1" {
+		t.Skip("set MAGELIFT_TEST_DOCKER_PHP_BRANCHES=1 to build the PHP image matrix")
+	}
+	for _, version := range []string{"8.3", "8.4", "8.5"} {
+		t.Run(version, func(t *testing.T) {
+			images, err := BuildImagesForPHP(context.Background(), os.Stderr, t.TempDir(), alphaPlatform, "", version)
+			if err != nil {
+				t.Fatal(err)
+			}
+			builderTag := strings.Replace(images.RuntimeReference, "magelift/php-nginx:", "magelift/php-builder:", 1)
+			t.Cleanup(func() {
+				_ = exec.Command("docker", "image", "rm", images.RuntimeReference, builderTag).Run()
+			})
+			for _, image := range []string{images.BuilderID, images.RuntimeID} {
+				output, err := exec.Command("docker", "run", "--rm", "--entrypoint", "php", image, "-r", `echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;`).CombinedOutput()
+				if err != nil || string(output) != version {
+					t.Fatalf("image %s PHP = %q: %v", image, output, err)
+				}
+				label, err := exec.Command("docker", "image", "inspect", "--format", `{{ index .Config.Labels "io.magelift.php.branch" }}`, image).Output()
+				if err != nil || strings.TrimSpace(string(label)) != version {
+					t.Fatalf("image %s branch label = %q: %v", image, label, err)
+				}
+			}
+		})
+	}
+}
+
 func TestBuildImagesPushesRegistryQualifiedPrefix(t *testing.T) {
 	fingerprint, err := buildcontext.ContentFingerprint(alphaPlatform)
 	if err != nil {

@@ -1,10 +1,8 @@
 # Container images
 
-`php-nginx` is the common PHP-FPM and nginx base for Magento application images. The
-certified matrix covers PHP 8.3 through 8.5 on Debian Trixie. PHP 8.3
-receives security fixes from PHP upstream, while PHP 8.4 and 8.5 receive active
-support. Magento lines whose Adobe row stops below PHP 8.3, including 2.4.6,
-are not available.
+`php-nginx` builds Magento application images with PHP-FPM and nginx on Debian Trixie. MageLift ships the recipes. Build images in your own Docker environment and push the application to a registry your shop controls.
+
+The bundled recipes cover PHP 8.3 through 8.5. Shops that need an older branch can supply their own builder and runtime images.
 
 | Magento line | MageLift PHP branches |
 | --- | --- |
@@ -16,17 +14,13 @@ The images use Debian for glibc and third-party extension compatibility. Base
 images are pinned by multi-platform digest and updated through reviewed dependency
 changes.
 
-`frankenphp-classic` and `php-apache` are experimental Adobe-hatch adapters,
-not Adobe-certified runtimes. They are published for the same PHP 8.3 through
-8.5 branches with the `frankenphp-classic-supported` and
-`php-apache-supported` Bake targets.
+The experimental `frankenphp-classic` and `php-apache` recipes cover the same PHP branches. Build them with the `frankenphp-classic-supported` and `php-apache-supported` Bake targets.
 
 The image runs as UID 10001, writes logs to standard streams, and keeps application
-code under `/app`. It embeds nginx 1.30.4 so the image matches the current Adobe
-Commerce 2.4.9 requirement. An `nginx-fpm` ECS task runs two containers from the
+code under `/app`. The recipe pins nginx by version and digest in `images/php-nginx/Dockerfile`. An `nginx-fpm` ECS task runs two containers from the
 same image: the `php-fpm` process and an nginx HTTP sidecar. They share the task
 network namespace, so nginx proxies to PHP-FPM on localhost without exposing port
-9000. Integrated ECS tasks add the pinned Varnish 8.0.2 sidecar on port 6081 and
+9000. Integrated ECS tasks add the pinned Varnish sidecar on port 6081 and
 send the load balancer there; headless tasks send traffic directly to nginx on
 port 8080. Both nginx and FrankenPHP short-circuit `GET /health` with `200 OK`
 (no Magento bootstrap). Integrated ALB health checks hit Varnish, which must

@@ -57,6 +57,11 @@ var imageInspectCommand Command = SystemCommandRunner()
 // or digest and is used to derive <prefix>:<fingerprint>-builder and
 // <prefix>:<fingerprint>-runtime pushed references.
 func BuildImages(ctx context.Context, diagnostics io.Writer, tempRoot, platform, imagePrefix string, cacheFrom ...string) (Images, error) {
+	return BuildImagesForPHP(ctx, diagnostics, tempRoot, platform, imagePrefix, "8.5", cacheFrom...)
+}
+
+// BuildImagesForPHP builds the bundled builder and runtime for a PHP branch.
+func BuildImagesForPHP(ctx context.Context, diagnostics io.Writer, tempRoot, platform, imagePrefix, php string, cacheFrom ...string) (Images, error) {
 	if diagnostics == nil {
 		return Images{}, errors.New("image build diagnostics writer is required")
 	}
@@ -75,7 +80,7 @@ func BuildImages(ctx context.Context, diagnostics io.Writer, tempRoot, platform,
 		}
 	}
 
-	contextDir, fingerprint, cleanup, err := buildcontext.MaterializePrivateContext(tempRoot, platform)
+	contextDir, fingerprint, cleanup, err := buildcontext.MaterializePrivateContextForPHP(tempRoot, platform, php)
 	if err != nil {
 		return Images{}, err
 	}

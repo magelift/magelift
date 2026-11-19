@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -21,13 +21,64 @@ import (
 //go:embed build/bin
 var embedded embed.FS
 
+//go:embed docker-bake.hcl
+var bakeDefinition string
+
 const alphaPlatform = "linux/amd64"
 
 var forbiddenEmbedPath = []string{"/vendor/", "/tests/", "/auth/", "/.git/"}
+var phpVersionPattern = regexp.MustCompile(`^(8\.[345])(?:\.[0-9]+)?$`)
+var bakePHPBasePattern = regexp.MustCompile(`\{\s*branch\s*=\s*"(8\.[345])",\s*base\s*=\s*"(docker\.io/library/php:[^"\s]+@sha256:[a-f0-9]{64})"\s*\}`)
+var recipePHPBaseLine = regexp.MustCompile(`(?m)^ARG PHP_BASE=docker\.io/library/php:[^\n]+$`)
+var recipePHPBranchLine = regexp.MustCompile(`(?m)^ARG PHP_BRANCH=8\.5$`)
+
+// PHPRecipe resolves a bundled PHP branch and its digest-pinned Bake base.
+func PHPRecipe(version string) (string, string, error) {
+	match := phpVersionPattern.FindStringSubmatch(strings.TrimSpace(version))
+	if match == nil {
+		return "", "", fmt.Errorf("no bundled PHP image for %q; supported branches are 8.3, 8.4, and 8.5", version)
+	}
+	branch, base := match[1], ""
+	for _, entry := range bakePHPBasePattern.FindAllStringSubmatch(bakeDefinition, -1) {
+		if entry[1] != branch {
+			continue
+		}
+		if base != "" && base != entry[2] {
+			return "", "", fmt.Errorf("conflicting bundled PHP %s base images", branch)
+		}
+		base = entry[2]
+	}
+	if base == "" {
+		return "", "", fmt.Errorf("bundled PHP %s base image is missing", branch)
+	}
+	return branch, base, nil
+}
+
+func recipeContents(name string, contents []byte, branch, base string) ([]byte, error) {
+	if name != "images/php-nginx/Dockerfile" {
+		return contents, nil
+	}
+	text := string(contents)
+	if len(recipePHPBaseLine.FindAllStringIndex(text, -1)) != 1 || len(recipePHPBranchLine.FindAllStringIndex(text, -1)) != 2 {
+		return nil, errors.New("bundled PHP recipe has unexpected base or branch declarations")
+	}
+	text = recipePHPBaseLine.ReplaceAllString(text, "ARG PHP_BASE="+base)
+	text = recipePHPBranchLine.ReplaceAllString(text, "ARG PHP_BRANCH="+branch)
+	return []byte(text), nil
+}
 
 // WriteContext copies the bundled recipe alongside a private prepared rootfs.
 // Existing recipe paths are refused so the fingerprint always names our bytes.
 func WriteContext(destination string) error {
+	return WriteContextForPHP(destination, "8.5")
+}
+
+// WriteContextForPHP writes the recipe with the selected digest-pinned PHP base.
+func WriteContextForPHP(destination, version string) error {
+	branch, base, err := PHPRecipe(version)
+	if err != nil {
+		return err
+	}
 	paths, err := listEmbeddedFiles()
 	if err != nil {
 		return err
@@ -45,16 +96,32 @@ func WriteContext(destination string) error {
 			return err
 		}
 	}
-	return os.CopyFS(destination, embedded)
+	if err := os.CopyFS(destination, embedded); err != nil {
+		return err
+	}
+	path := filepath.Join(destination, "images", "php-nginx", "Dockerfile")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	contents, err = recipeContents("images/php-nginx/Dockerfile", contents, branch, base)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, contents, 0o644)
 }
 
 // MaterializePrivateContext writes the embedded Magento image build context to a
 // private directory under tempRoot and returns a content fingerprint.
 func MaterializePrivateContext(tempRoot, platform string) (contextDir string, fingerprint string, cleanup func(), err error) {
+	return MaterializePrivateContextForPHP(tempRoot, platform, "8.5")
+}
+
+func MaterializePrivateContextForPHP(tempRoot, platform, version string) (contextDir string, fingerprint string, cleanup func(), err error) {
 	if err := validatePlatform(platform); err != nil {
 		return "", "", nil, err
 	}
-	fingerprint, err = ContentFingerprint(platform)
+	fingerprint, err = ContentFingerprintForPHP(platform, version)
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -67,7 +134,7 @@ func MaterializePrivateContext(tempRoot, platform string) (contextDir string, fi
 		return "", "", nil, fmt.Errorf("create private build context directory: %w", err)
 	}
 	cleanup = func() { os.RemoveAll(contextDir) }
-	if err := writeEmbeddedTree(contextDir); err != nil {
+	if err := WriteContextForPHP(contextDir, version); err != nil {
 		cleanup()
 		return "", "", nil, err
 	}
@@ -77,7 +144,16 @@ func MaterializePrivateContext(tempRoot, platform string) (contextDir string, fi
 // ContentFingerprint returns a deterministic Docker-tag-safe fingerprint for the
 // embedded build context and target platform.
 func ContentFingerprint(platform string) (string, error) {
+	return ContentFingerprintForPHP(platform, "8.5")
+}
+
+// ContentFingerprintForPHP hashes the exact selected recipe and target platform.
+func ContentFingerprintForPHP(platform, version string) (string, error) {
 	if err := validatePlatform(platform); err != nil {
+		return "", err
+	}
+	branch, base, err := PHPRecipe(version)
+	if err != nil {
 		return "", err
 	}
 	paths, err := listEmbeddedFiles()
@@ -91,6 +167,10 @@ func ContentFingerprint(platform string) (string, error) {
 		contents, err := fs.ReadFile(embedded, name)
 		if err != nil {
 			return "", fmt.Errorf("read embedded file %q: %w", name, err)
+		}
+		contents, err = recipeContents(name, contents, branch, base)
+		if err != nil {
+			return "", err
 		}
 		hasher.Write([]byte(name))
 		hasher.Write([]byte{0})
@@ -171,33 +251,4 @@ func walkEmbedded(dir string, visit func(path string, info fs.DirEntry) error) e
 		}
 	}
 	return nil
-}
-
-func writeEmbeddedTree(contextDir string) error {
-	return walkEmbedded("", func(path string, info fs.DirEntry) error {
-		target := filepath.Join(contextDir, filepath.FromSlash(path))
-		if info.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		if err := rejectForbiddenEmbedPath(path); err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		source, err := embedded.Open(path)
-		if err != nil {
-			return fmt.Errorf("open embedded file %q: %w", path, err)
-		}
-		defer source.Close()
-		destination, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-		if err != nil {
-			return fmt.Errorf("create %q: %w", target, err)
-		}
-		if _, err := io.Copy(destination, source); err != nil {
-			destination.Close()
-			return fmt.Errorf("write %q: %w", target, err)
-		}
-		return destination.Close()
-	})
 }

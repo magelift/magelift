@@ -360,7 +360,8 @@ final readonly class NativePreparation implements Preparation
                 $relativePath = $iterator->getSubPathName();
                 return $relativePath !== '.git'
                     && $relativePath !== '.magelift'
-                    && $relativePath !== 'magelift.yaml'
+                    && $relativePath !== 'magelift.php'
+                    && $relativePath !== 'magelift.environments.php'
                     // Composer dependencies are rebuilt in the isolated workspace.
                     && $relativePath !== 'vendor';
             },

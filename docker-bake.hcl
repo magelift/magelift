@@ -24,9 +24,9 @@ target "php-nginx-supported" {
   ]
   matrix = {
     php = [
-      { branch = "8.3", base = "docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328" },
-      { branch = "8.4", base = "docker.io/library/php:8.4-fpm-trixie@sha256:59fa733c9af643a122f8a9976119460e35ce76dd0a3f2b9c8f75af8e361a54e2" },
-      { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc" },
+      { branch = "8.3", base = "docker.io/library/php:8.3.37-fpm-trixie@sha256:a216054d3de38bc1e45704ef75402a6c43b659ef84f6adc0fa494b2233c195e0" },
+      { branch = "8.4", base = "docker.io/library/php:8.4.28-fpm-trixie@sha256:9185c66c60705ef5775fc2f9f92bcda1a3645b3d195abaccecc37485c28eded8" },
+      { branch = "8.5", base = "docker.io/library/php:8.5.13-fpm-trixie@sha256:52ba6f178d0a08f348578b03595661b7ff13defafacf4c823d045f2ecba8db8f" },
     ]
   }
   name = "php-nginx-${replace(php.branch, ".", "-")}"
@@ -46,9 +46,9 @@ target "php-builder-supported" {
   ]
   matrix = {
     php = [
-      { branch = "8.3", base = "docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328" },
-      { branch = "8.4", base = "docker.io/library/php:8.4-fpm-trixie@sha256:59fa733c9af643a122f8a9976119460e35ce76dd0a3f2b9c8f75af8e361a54e2" },
-      { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc" },
+      { branch = "8.3", base = "docker.io/library/php:8.3.37-fpm-trixie@sha256:a216054d3de38bc1e45704ef75402a6c43b659ef84f6adc0fa494b2233c195e0" },
+      { branch = "8.4", base = "docker.io/library/php:8.4.28-fpm-trixie@sha256:9185c66c60705ef5775fc2f9f92bcda1a3645b3d195abaccecc37485c28eded8" },
+      { branch = "8.5", base = "docker.io/library/php:8.5.13-fpm-trixie@sha256:52ba6f178d0a08f348578b03595661b7ff13defafacf4c823d045f2ecba8db8f" },
     ]
   }
   target   = "builder"
@@ -75,9 +75,9 @@ target "frankenphp-classic-supported" {
   ]
   matrix = {
     php = [
-      { branch = "8.3", base = "docker.io/dunglas/frankenphp:1.12.7-php8.3-trixie@sha256:b0029775078a8434f74f7c694e0634e4a8e1a81b758132b22baaf42110a176b4" },
-      { branch = "8.4", base = "docker.io/dunglas/frankenphp:1.12.7-php8.4-trixie@sha256:77bc2d40a58ace3a9425e4cbb0c40d044188dfd850e44a943ed043d743625df3" },
-      { branch = "8.5", base = "docker.io/dunglas/frankenphp:1.12.7-php8.5-trixie@sha256:f92d81eb3fe4fd18b35d3d58192b7cc3acc8943817bbf39f2fcf0be02a3916dc" },
+      { branch = "8.3", base = "docker.io/dunglas/frankenphp:1.13.5-php8.3-trixie@sha256:5e17d7af9314b54213588803f117a2d482b6ba270b7d41381400ec78db45b36e" },
+      { branch = "8.4", base = "docker.io/dunglas/frankenphp:1.13.5-php8.4-trixie@sha256:8f0d509ad824fa86da88b55c5ea9f1605380f423ab55ec3a72864cc223491bfd" },
+      { branch = "8.5", base = "docker.io/dunglas/frankenphp:1.13.5-php8.5-trixie@sha256:667c5fffd348d9c3c260803d75956f1d9aace7e4b7331d8893de6f101d7e0e57" },
     ]
   }
   name = "frankenphp-classic-${replace(php.branch, ".", "-")}"
@@ -103,9 +103,9 @@ target "php-apache-supported" {
   ]
   matrix = {
     php = [
-      { branch = "8.3", base = "docker.io/library/php:8.3-fpm-trixie@sha256:5ad27201cf5cdf1704e147218e64fa0db2155ecda26edbe2b3eeb7b90cbf9328" },
-      { branch = "8.4", base = "docker.io/library/php:8.4-fpm-trixie@sha256:59fa733c9af643a122f8a9976119460e35ce76dd0a3f2b9c8f75af8e361a54e2" },
-      { branch = "8.5", base = "docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc" },
+      { branch = "8.3", base = "docker.io/library/php:8.3.37-fpm-trixie@sha256:a216054d3de38bc1e45704ef75402a6c43b659ef84f6adc0fa494b2233c195e0" },
+      { branch = "8.4", base = "docker.io/library/php:8.4.28-fpm-trixie@sha256:9185c66c60705ef5775fc2f9f92bcda1a3645b3d195abaccecc37485c28eded8" },
+      { branch = "8.5", base = "docker.io/library/php:8.5.13-fpm-trixie@sha256:52ba6f178d0a08f348578b03595661b7ff13defafacf4c823d045f2ecba8db8f" },
     ]
   }
   name = "php-apache-${replace(php.branch, ".", "-")}"

@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
+	buildcontext "github.com/magelift/magelift"
 	buildkit "github.com/magelift/magelift/internal/build/kit"
 	buildrunner "github.com/magelift/magelift/internal/build/runner"
 	"github.com/magelift/magelift/internal/config"
@@ -206,7 +208,7 @@ func TestPipelineCoordinatesReleaseBuild(t *testing.T) {
 	if !strings.Contains(string(applicationDockerfile), "io.magelift.builder.image") || !strings.Contains(string(applicationDockerfile), "io.magelift.runtime.image") {
 		t.Fatal("embedded Dockerfile does not declare MageLift image trace labels")
 	}
-	if !strings.Contains(string(applicationDockerfile), "docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b") {
+	if !strings.Contains(string(applicationDockerfile), "docker/dockerfile:1.29.0@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183") {
 		t.Fatal("embedded Dockerfile does not pin the Dockerfile frontend")
 	}
 	if !strings.Contains(string(applicationDockerfile), "cp /app/app/etc/env.php /tmp/magelift-runtime-env.php") || !strings.Contains(string(applicationDockerfile), "cp /tmp/magelift-runtime-env.php /app/app/etc/env.php") {
@@ -328,6 +330,40 @@ func TestPipelineEmbeddedRecipeComposesPinnedMultiStageDockerfile(t *testing.T) 
 	}
 }
 
+func TestPipelineEmbeddedRecipeTracksSelectedPHP(t *testing.T) {
+	for _, tc := range []struct{ release, php string }{{"2.4.7-p10", "8.3"}, {"2.4.8-p5", "8.4"}, {"2.4.9", "8.5"}} {
+		t.Run(tc.release, func(t *testing.T) {
+			request := pipelineRequest(t)
+			file, err := config.Load([]byte(`schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: ` + tc.release + `, mode: integrated}
+build: {php: "` + tc.php + `", extensions: [intl, opcache], composer: {version: "2.10+"}, staticContent: {locales: [en_US], themes: [Magento/luma]}}
+target: {provider: aws, runtime: ecs-fargate}
+defaults: {region: eu-west-3, preset: preview}
+environments:
+  staging: {account: "123456789012"}
+`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Config, request.UseEmbeddedRecipe = file, true
+			_, base, err := buildcontext.PHPRecipe(tc.php)
+			if err != nil {
+				t.Fatal(err)
+			}
+			containers := &fakeContainers{t: t, preparePHPVersion: tc.php + ".1"}
+			builder := &fakeBuilder{t: t, expectedPHPBase: base}
+			if _, err := New(containers, builder).Run(context.Background(), request); err != nil {
+				t.Fatal(err)
+			}
+			fingerprint, err := buildcontext.ContentFingerprintForPHP("linux/amd64", tc.php)
+			if err != nil || containers.finalizeRecipe == nil || containers.finalizeRecipe.SHA256 != fingerprint || containers.finalizeRecipe.BaseImages["PHP_BASE"] != base {
+				t.Fatalf("recipe trace = %#v, fingerprint error = %v", containers.finalizeRecipe, err)
+			}
+		})
+	}
+}
+
 func TestPipelineEmbeddedRecipeRejectsUnsupportedPlatformBeforePrepare(t *testing.T) {
 	request := pipelineRequest(t)
 	request.UseEmbeddedRecipe = true
@@ -436,6 +472,7 @@ type fakeContainers struct {
 	preparePHPVersion      string
 	prepareComposerVersion string
 	prepareExtensions      []string
+	finalizeRecipe         *buildrunner.BuildRecipe
 }
 
 func (fake *fakeContainers) Run(_ context.Context, image, _ string, payload []byte, secrets ...containerrunner.Secret) (containerrunner.Result, error) {
@@ -513,6 +550,7 @@ func (fake *fakeContainers) RunInOutput(_ context.Context, image, _ string, outp
 	if err != nil {
 		fake.t.Fatal(err)
 	}
+	fake.finalizeRecipe = request.Finalize.BuildRecipe
 	fake.manifest = `{"imageDigest":"` + request.Finalize.ImageDigest + `"}`
 	manifestDirectory := filepath.Join(output, "manifests")
 	if err := os.Mkdir(manifestDirectory, 0o700); err != nil {
@@ -558,6 +596,7 @@ type fakeBuilder struct {
 	expectedRuntime        string
 	expectedRuntimeTrace   string
 	expectedOutput         buildkit.OutputMode
+	expectedPHPBase        string
 	request                buildkit.Request
 	embeddedRecipeVerified bool
 }
@@ -613,7 +652,12 @@ func (fake *fakeBuilder) Build(_ context.Context, request buildkit.Request) (bui
 		if !strings.Contains(string(contents), "FROM runtime") || strings.Contains(string(contents), "RUNTIME_BASE") {
 			fake.t.Fatal("BuildKit did not receive the composed embedded recipe Dockerfile")
 		}
-		if !strings.Contains(string(contents), "docker.io/library/php:8.5-fpm-trixie@sha256:") {
+		phpBase := fake.expectedPHPBase
+		if phpBase == "" {
+			if !regexp.MustCompile(`docker\.io/library/php:8\.5(?:\.[0-9]+)?-fpm-trixie@sha256:[a-f0-9]{64}`).Match(contents) {
+				fake.t.Fatal("composed Dockerfile must keep pinned upstream PHP 8.5 base")
+			}
+		} else if !strings.Contains(string(contents), phpBase) {
 			fake.t.Fatal("composed Dockerfile must keep pinned upstream PHP base")
 		}
 		if strings.Count(string(contents), "# syntax=docker/dockerfile:") != 1 {

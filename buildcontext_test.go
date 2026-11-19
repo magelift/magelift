@@ -1,11 +1,63 @@
 package buildcontext
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestPHPRecipesHashMaterializedContent(t *testing.T) {
+	fingerprints := map[string]bool{}
+	for _, version := range []string{"8.3", "8.4", "8.5"} {
+		t.Run(version, func(t *testing.T) {
+			branch, base, err := PHPRecipe(version)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir, fingerprint, cleanup, err := MaterializePrivateContextForPHP(t.TempDir(), alphaPlatform, version)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer cleanup()
+			if fingerprints[fingerprint] {
+				t.Fatalf("recipe fingerprint reused for PHP %s", version)
+			}
+			fingerprints[fingerprint] = true
+			dockerfile, err := os.ReadFile(filepath.Join(dir, "images/php-nginx/Dockerfile"))
+			if err != nil || !strings.Contains(string(dockerfile), "ARG PHP_BASE="+base) || strings.Count(string(dockerfile), "ARG PHP_BRANCH="+branch) != 2 {
+				t.Fatalf("wrong recipe for PHP %s: %v", version, err)
+			}
+			paths, err := EmbeddedPaths()
+			if err != nil {
+				t.Fatal(err)
+			}
+			hash := sha256.New()
+			hash.Write([]byte(alphaPlatform))
+			hash.Write([]byte{0})
+			for _, name := range paths {
+				data, err := os.ReadFile(filepath.Join(dir, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				hash.Write([]byte(name))
+				hash.Write([]byte{0})
+				hash.Write(data)
+			}
+			if got := hex.EncodeToString(hash.Sum(nil)); got != fingerprint {
+				t.Fatalf("materialized recipe hash = %s, want %s", got, fingerprint)
+			}
+			if patch, err := ContentFingerprintForPHP(alphaPlatform, version+".1"); err != nil || patch != fingerprint {
+				t.Fatalf("patch branch fingerprint = %s, %v", patch, err)
+			}
+		})
+	}
+	if _, _, err := PHPRecipe("8.2"); err == nil {
+		t.Fatal("unsupported PHP branch was accepted")
+	}
+}
 
 func TestContentFingerprintIsStableAndPlatformBound(t *testing.T) {
 	first, err := ContentFingerprint(alphaPlatform)

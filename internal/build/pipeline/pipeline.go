@@ -178,11 +178,11 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 	var recipeTrace *buildrunner.BuildRecipe
 	var dockerfilePath string
 	if request.UseEmbeddedRecipe {
-		recipeFingerprint, err = buildcontext.ContentFingerprint(platform)
+		recipeFingerprint, err = buildcontext.ContentFingerprintForPHP(platform, prepareRequest.Prepare.PHPVersion)
 		if err != nil {
 			return Result{}, fmt.Errorf("embedded recipe fingerprint: %w", err)
 		}
-		if err := buildcontext.WriteContext(prepared.OutputDir); err != nil {
+		if err := buildcontext.WriteContextForPHP(prepared.OutputDir, prepareRequest.Prepare.PHPVersion); err != nil {
 			return Result{}, fmt.Errorf("materialize embedded recipe context: %w", err)
 		}
 		bases, traceErr := recipeBaseImages(prepared.OutputDir)

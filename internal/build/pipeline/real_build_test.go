@@ -19,6 +19,7 @@ import (
 	buildkit "github.com/magelift/magelift/internal/build/kit"
 	buildrunner "github.com/magelift/magelift/internal/build/runner"
 	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/projectphp"
 	"github.com/magelift/magelift/internal/source"
 	"github.com/magelift/magelift/internal/toolchain"
 )
@@ -41,7 +42,7 @@ func TestRealBuildKeepsSecretsOutOfImageAndPreservesDisabledModule(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	configBytes, err := os.ReadFile(filepath.Join(root, "magelift.yaml"))
+	configBytes, err := projectphp.Evaluate(t.Context(), filepath.Join(root, "magelift.php"))
 	if err != nil {
 		t.Fatal(err)
 	}

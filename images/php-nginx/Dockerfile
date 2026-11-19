@@ -1,8 +1,8 @@
-# syntax=docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
+# syntax=docker/dockerfile:1.29.0@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 
-ARG PHP_BASE=docker.io/library/php:8.5-fpm-trixie@sha256:adde18b67ea7a8cddc580f657e0d3f16e800758c6fa690b969c2925a303e8afc
-ARG COMPOSER_BASE=docker.io/library/composer:2.10.3@sha256:af98f42dfff7c68ba8d53c2164fd9fde1087b7d449514baa38c418b1f6bc4bac
-ARG NGINX_BASE=docker.io/library/nginx:1.30.4-trixie@sha256:d5792f71a9496b833bc08ea834a758c46e2b6a6306c10f4be926f38a656cdc1c
+ARG PHP_BASE=docker.io/library/php:8.5.13-fpm-trixie@sha256:52ba6f178d0a08f348578b03595661b7ff13defafacf4c823d045f2ecba8db8f
+ARG COMPOSER_BASE=docker.io/library/composer:2.10.3@sha256:2cf275428757e5435a667bfc0d038b14520ca02be2b1b70d44a05c8c19e2de48
+ARG NGINX_BASE=docker.io/library/nginx:1.30.7-trixie@sha256:7fad6c0dff97965adbddf28027d934b111fc0221a554315dc274712f3fba24d3
 ARG APCU_VERSION=5.1.28
 ARG REDIS_VERSION=6.3.0
 FROM ${COMPOSER_BASE} AS composer
@@ -60,7 +60,7 @@ ARG NGINX_BASE
 
 LABEL io.magelift.php.branch="${PHP_BRANCH}" \
       io.magelift.php.base="${PHP_BASE}" \
-      io.magelift.nginx.version="1.30.4" \
+      io.magelift.nginx.version="1.30.7" \
       io.magelift.web-runtime="php-nginx" \
       io.magelift.base.family="debian-trixie"
 

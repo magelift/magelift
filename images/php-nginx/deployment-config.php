@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+// The same runtime file is used by nginx/FPM, Apache/FPM and FrankenPHP.
+// Handle CORS before Magento bootstrap, including on preflight requests.
+mageliftHandleCors();
+
 // Magento resolves #env(...) placeholders only when a scalar path is read.
 // Build a complete runtime override before Magento bootstraps so consumers of
 // a parent section, such as db/connection/default, receive resolved values too.
@@ -31,6 +35,20 @@ if ($override !== false && trim($override) !== '') {
         $decoded = mageliftResolveDeploymentConfig($decoded);
         $configuration = mageliftMergeDeploymentConfig($configuration, $decoded);
     }
+}
+
+// Azure MySQL requires TLS. Passing a CA also enables mysqlnd's certificate
+// and hostname verification; never permit an override to disable it.
+$databaseTLSCA = getenv('MAGELIFT_DATABASE_TLS_CA');
+if ($databaseTLSCA !== false && $databaseTLSCA !== '') {
+    if (!is_file($databaseTLSCA) || !is_readable($databaseTLSCA)
+        || !defined('PDO::MYSQL_ATTR_SSL_CA') || !defined('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT')) {
+        throw new RuntimeException('Database TLS CA is unavailable.');
+    }
+    $caOption = defined('Pdo\\Mysql::ATTR_SSL_CA') ? constant('Pdo\\Mysql::ATTR_SSL_CA') : constant('PDO::MYSQL_ATTR_SSL_CA');
+    $verifyOption = defined('Pdo\\Mysql::ATTR_SSL_VERIFY_SERVER_CERT') ? constant('Pdo\\Mysql::ATTR_SSL_VERIFY_SERVER_CERT') : constant('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT');
+    $configuration['db']['connection']['default']['driver_options'][$caOption] = $databaseTLSCA;
+    $configuration['db']['connection']['default']['driver_options'][$verifyOption] = true;
 }
 
 $encoded = json_encode($configuration, JSON_UNESCAPED_SLASHES);
@@ -75,4 +93,73 @@ function mageliftMergeDeploymentConfig(array $base, array $overlay): array
     }
 
     return $base;
+}
+
+function mageliftHandleCors(): void
+{
+    if (PHP_SAPI === 'cli') {
+        return;
+    }
+    $configured = getenv('CONFIG__DEFAULT__WEB__GRAPHQL__CORS_ALLOWED_ORIGINS');
+    if ($configured === false || trim($configured) === '') {
+        return;
+    }
+    header('Vary: Origin', false);
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $allowed = false;
+    foreach (explode(',', $configured) as $candidate) {
+        $candidate = rtrim(trim($candidate), '/');
+        // Treat malformed configuration, wildcard entries and "null" as denied.
+        $parts = parse_url($candidate);
+        if (!is_array($parts) || !in_array($parts['scheme'] ?? '', ['http', 'https'], true)
+            || empty($parts['host']) || str_contains($candidate, '*')
+            || isset($parts['user']) || isset($parts['pass'])
+            || isset($parts['query']) || isset($parts['fragment']) || isset($parts['path'])
+            || preg_match('/[\x00-\x20\x7f]/', $candidate) === 1) {
+            continue;
+        }
+        if ($origin === $candidate) {
+            $allowed = true;
+            break;
+        }
+    }
+    $preflight = ($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS'
+        && isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD']);
+    if (!$allowed) {
+        if ($preflight) {
+            http_response_code(403);
+            exit;
+        }
+        return;
+    }
+    header('Access-Control-Allow-Origin: ' . $origin);
+    header('Access-Control-Allow-Credentials: true');
+    if (!$preflight) {
+        return;
+    }
+    header('Vary: Access-Control-Request-Method', false);
+    header('Vary: Access-Control-Request-Headers', false);
+    $methods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'];
+    $method = $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD'];
+    if (!in_array($method, $methods, true)) {
+        http_response_code(403);
+        exit;
+    }
+    $requestedHeaders = $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'] ?? '';
+    if (strlen($requestedHeaders) > 8192) {
+        http_response_code(403);
+        exit;
+    }
+    if ($requestedHeaders !== '') {
+        foreach (explode(',', $requestedHeaders) as $requestedHeader) {
+            if (preg_match('/\A[!#$%&\x27*+.^_`|~0-9A-Za-z-]+\z/D', trim($requestedHeader)) !== 1) {
+                http_response_code(403);
+                exit;
+            }
+        }
+        header('Access-Control-Allow-Headers: ' . $requestedHeaders);
+    }
+    header('Access-Control-Allow-Methods: ' . implode(', ', $methods));
+    http_response_code(204);
+    exit;
 }

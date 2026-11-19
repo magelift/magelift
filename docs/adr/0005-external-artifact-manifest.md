@@ -22,7 +22,7 @@ JSON protocol unchanged.
 
 Neither step records secret values. Promotion, sign, and rollback use the digest in the external manifest.
 
-`magelift build --push`, `sign`, and `promote` use the operator's current cloud or CI login. Cosign keyless identity is Sigstore OIDC (Actions, Google SA), not Artifact Registry or ECR native signatures. The YAML-only path does not require Cosign flags.
+`magelift build --push`, `sign`, and `promote` use the operator's current cloud or CI login. Cosign keyless identity is Sigstore OIDC (Actions, Google SA), not Artifact Registry or ECR native signatures. The PHP project uses the default Cosign settings.
 
 Cloud-native image signatures are not a substitute for MageLift's signed release journal.
 
@@ -60,3 +60,7 @@ The optional `buildRecipe` member of that same manifest records `sha256`,
 finalization and omitted for older/explicit-base requests. Existing requests
 without the member retain their canonical JSON; provider RPC is unchanged.
 Recipe metadata cannot replace the image's final digest or the source checksums.
+
+## Amendment: PHP branch selection
+
+The bundled nginx-fpm recipe selects the digest-pinned PHP 8.3, 8.4, or 8.5 base from `build.php`. The builder, application runtime, exported recipe, fingerprint, and artifact manifest use the same selected base. This extends the build recipe; it does not certify additional live cells.

@@ -12,6 +12,7 @@ import (
 	buildkit "github.com/magelift/magelift/internal/build/kit"
 	buildpipeline "github.com/magelift/magelift/internal/build/pipeline"
 	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/projectphp"
 	"github.com/magelift/magelift/internal/source"
 	"github.com/magelift/magelift/internal/toolchain"
 )
@@ -38,7 +39,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	sourceRoot := filepath.Clean(args[0])
-	configBytes, err := os.ReadFile(filepath.Clean(args[1]))
+	configBytes, err := projectphp.Evaluate(ctx, args[1])
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package pipeline
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -40,7 +41,7 @@ func TestMaterializeEmbeddedRecipeDockerfileKeepsPinnedBases(t *testing.T) {
 		t.Fatal(err)
 	}
 	dockerfile := string(contents)
-	if !strings.Contains(dockerfile, filepath.Join("images", "php-nginx", "Dockerfile")) && !strings.Contains(dockerfile, "docker.io/library/php:8.5-fpm-trixie@sha256:") {
+	if !strings.Contains(dockerfile, filepath.Join("images", "php-nginx", "Dockerfile")) && !regexp.MustCompile(`docker\.io/library/php:8\.5(?:\.[0-9]+)?-fpm-trixie@sha256:[a-f0-9]{64}`).MatchString(dockerfile) {
 		t.Fatal("composed Dockerfile must include pinned upstream bases")
 	}
 	if strings.Count(dockerfile, "# syntax=docker/dockerfile:") != 1 {

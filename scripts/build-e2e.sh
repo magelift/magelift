@@ -21,7 +21,7 @@ git -C "$fixture" commit --quiet -m "test: create build fixture"
 export XDG_CACHE_HOME="$work/cache"
 result="$work/result.json"
 go run "$repository_root/cmd/magelift" \
-    --config "$fixture/magelift.yaml" \
+    --config "$fixture/magelift.php" \
     --output json \
     build >"$result"
 
@@ -43,7 +43,7 @@ docker run --rm --entrypoint sh "$image" -c '
 test "$(id -u)" = 10001
 test ! -e /app/.git
 test ! -e /app/.magelift
-test ! -e /app/magelift.yaml
+test ! -e /app/magelift.php
 test ! -e /app/auth.json
 test -f /app/app/etc/env.php
 ! grep -Eiq "MAGELIFT" /app/app/etc/env.php

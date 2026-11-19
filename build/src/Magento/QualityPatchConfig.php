@@ -7,7 +7,7 @@ namespace MageLift\Build\Magento;
 use RuntimeException;
 
 /**
- * Validates Quality Patch IDs from magelift.yaml / the prepare protocol.
+ * Validates Quality Patch IDs from magelift.php / the prepare protocol.
  * Build never reads leftover .magento.env.yaml as a live control plane.
  */
 final class QualityPatchConfig
