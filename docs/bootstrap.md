@@ -135,21 +135,15 @@ repository's preview.
 
 ## Account-free contract tests
 
-Run `make floci-aws-test` when Docker is available. The pinned [Floci](https://github.com/floci-io/floci)
-2.3.0 image exercises
-KMS key reconciliation, S3 state setup and versioned-media restore, conditional lock
-acquisition, ownership diagnostics, lock release, ECS candidate registration, Secrets
-Manager version updates, and CloudWatch Logs ingestion without an AWS account.
-Run `make floci-gcp-test` for GCS, Secret Manager, Pub/Sub, Logging, and Monitoring contracts against pinned floci-gcp 0.11.0.
+Each emulator runs in Docker from the image pinned in its provider module.
 
-Floci is an emulator, not a cloud certification environment. Packed live sessions
-are documented in [certification sessions](certification-sessions.md). Floci AWS
-2.3.0 implements IAM Create/Get/Tag OpenID Connect Provider (`make floci-aws-test`
-`TestIAMOpenIDConnectProviderAgainstFloci`). That is an API contract, not GitHub
-Actions token exchange. Do not weaken the production identity contract. Managed-service
-behavior is not proof of AWS behavior. Identity bootstrap against a real account
-and GitHub OIDC from CI still need a sparse local real-AWS acceptance pass when
-credits allow; see [Local AWS acceptance](aws-acceptance.md).
+| Make target | Operations exercised |
+| --- | --- |
+| `make floci-aws-test` | KMS, S3 state and versioned media, deployment locks, ECS candidate registration, Secrets Manager, CloudWatch Logs and IAM OIDC provider setup |
+| `make floci-gcp-test` | Cloud Storage, Secret Manager, Pub/Sub, Logging and Monitoring |
+| `make floci-azure-test` | Blob Storage state, deployment locks and Key Vault secrets |
+
+Floci can create and read an IAM OIDC provider. A shop can check the GitHub token exchange and cloud permissions in its own staging workflow. [Floci](https://github.com/floci-io/floci) · [Test commands](https://github.com/magelift/magelift/blob/main/tests/README.md)
 
 For local AWS-compatible testing, set `MAGELIFT_AWS_ENDPOINT_URL` to the emulator
 endpoint, for example `http://127.0.0.1:4566`. The endpoint must use HTTP or HTTPS

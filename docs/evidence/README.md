@@ -1,6 +1,6 @@
 # Historical run evidence
 
-These files record the result of individual acceptance runs. The labels and dates below belong to the campaigns that produced them. Keep a failed run, partial run or emulator result distinct from a successful live deployment. Current implementation coverage is listed in the [capability matrix](../capability-matrix.md).
+These files record the result of individual acceptance runs. The labels and dates below belong to the campaigns that produced them. Keep a failed run, partial run or emulator result distinct from a successful live deployment. For current support and the original tables, see the [provider capability guide](../capability-matrix.md) and the [archived campaign matrix](provider-campaign-matrix.md).
 
 ## Recorded Magento runs
 
