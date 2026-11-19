@@ -39,7 +39,7 @@ func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
 	if output, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../cmd/magelift-provider-aws").CombinedOutput(); err != nil {
 		t.Fatalf("build plugin: %v\n%s", err, output)
 	}
-	client, err := providerhost.Dial(ctx, binary, providerhost.DialOptions{ExpectedProvider: "aws", Required: []sdk.Operation{sdk.OpPlan, sdk.OpMediaImport, sdk.OpMediaExport, sdk.OpStateLock, sdk.OpStateUnlock}})
+	client, err := providerhost.Dial(ctx, binary, providerhost.DialOptions{ExpectedProvider: "aws", Required: []sdk.Operation{sdk.OpPlan, sdk.OpMediaImport, sdk.OpMediaExport, sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpSecretSet, sdk.OpSecretRead, sdk.OpSecretRemove}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,10 +62,14 @@ func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
 				t.Fatalf("bad backend %s", plan.Plan.StateBackendURL)
 			}
 			bucket := u.Host
+			lockCall := &sdk.StateLockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: env, Plan: plan.Plan, Owner: "first"}
+			missing, err := providerhost.Call[sdk.StateLockCall, sdk.StateLockResult](ctx, client, sdk.OpStateLock, lockCall)
+			if err != nil || missing.Error == nil || missing.Error.Code != sdk.ErrCodeNotFound || !strings.Contains(missing.Error.Message, "magelift bootstrap --env staging") {
+				t.Fatalf("missing state bucket hint: %v %v", missing, err)
+			}
 			if _, err = buckets.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); err != nil {
 				t.Fatal(err)
 			}
-			lockCall := &sdk.StateLockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: env, Plan: plan.Plan, Owner: "first"}
 			locked, err := providerhost.Call[sdk.StateLockCall, sdk.StateLockResult](ctx, client, sdk.OpStateLock, lockCall)
 			if err != nil || locked.Error != nil || locked.ReleaseToken == "" {
 				t.Fatalf("lock: %v %v", locked, err)
@@ -92,6 +96,21 @@ func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
 			}
 			if err := release(next.ReleaseToken); err != nil {
 				t.Fatal(err)
+			}
+
+			name := "magelift/plugintest/staging/" + runtime
+			write, err := providerhost.Call[sdk.SecretSetCall, sdk.SecretSetResult](ctx, client, sdk.OpSecretSet, &sdk.SecretSetCall{
+				ProtocolVersion: sdk.ProtocolV1, Envelope: env, Plan: plan.Plan, Name: name, Value: []byte("local-fixture")})
+			if err != nil || write.Error != nil || !write.Written {
+				t.Fatalf("write secret: %v %v", write, err)
+			}
+			value, err := providerhost.Call[sdk.SecretReadRequest, sdk.SecretReadResult](ctx, client, sdk.OpSecretRead, &sdk.SecretReadRequest{ProtocolVersion: sdk.ProtocolV1, Envelope: env, Name: name})
+			if err != nil || value.Error != nil || string(value.Value) != "local-fixture" {
+				t.Fatal("AWS secret reference did not return the stored fixture", err)
+			}
+			removed, err := providerhost.Call[sdk.SecretRemoveCall, sdk.SecretRemoveResult](ctx, client, sdk.OpSecretRemove, &sdk.SecretRemoveCall{ProtocolVersion: sdk.ProtocolV1, Envelope: env, Plan: plan.Plan, Name: name})
+			if err != nil || removed.Error != nil || !removed.Removed {
+				t.Fatalf("remove secret: %v %v", removed, err)
 			}
 
 			source, output := t.TempDir(), t.TempDir()

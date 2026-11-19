@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/s3state"
 	"github.com/magelift/magelift/providers/aws/secrets"
 	"github.com/magelift/magelift/sdk"
 )
@@ -71,6 +73,9 @@ func (s *Server) StateLock(req *sdk.StateLockCall, resp *sdk.StateLockResult) er
 			return err
 		}
 		release, err := platform.ModuleState(m).Lock(ctx, p, req.Owner)
+		if s3state.IsNotFound(err) {
+			return &sdk.OperationError{Code: sdk.ErrCodeNotFound, Message: fmt.Sprintf("state bucket is missing; run magelift bootstrap --env %s --access-log-bucket <existing-bucket>", p.Environment())}
+		}
 		if err != nil {
 			return err
 		}
