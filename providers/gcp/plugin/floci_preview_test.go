@@ -15,6 +15,7 @@ import (
 	gcpops "github.com/magelift/magelift/providers/gcp/ops"
 	gcpstack "github.com/magelift/magelift/providers/gcp/stack"
 	gcpstate "github.com/magelift/magelift/providers/gcp/state"
+	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -119,5 +120,94 @@ func TestGCPFlociPreviewSweepUsesSharedBucket(t *testing.T) {
 		if _, err := state.Unlock(ctx, spec); err != nil {
 			t.Fatalf("preview unlock: %v", err)
 		}
+	}
+}
+
+func TestGCPFlociStateReleaseReceiptSurvivesRestart(t *testing.T) {
+	if os.Getenv("MAGELIFT_FLOCI_GCP") != "1" {
+		t.Skip("GCP emulator is required")
+	}
+	if os.Getenv("STORAGE_EMULATOR_HOST") == "" {
+		t.Fatal("set STORAGE_EMULATOR_HOST to the Floci storage endpoint")
+	}
+	ctx := context.Background()
+	t.Setenv("GOOGLE_CREDENTIALS", "")
+	t.Setenv("GOOGLE_OAUTH_ACCESS_TOKEN", "floci-test-only")
+	client, err := storage.NewClient(ctx, option.WithoutAuthentication())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	state := gcpops.State{NewManager: func(_ context.Context, bucket, project, environment string) (*gcpstate.Manager, error) {
+		return gcpstate.NewGCSFromClient(client, bucket, project, environment)
+	}}
+	newServer := func() *Server {
+		return &Server{Admission: stubAdmission{}, State: state}
+	}
+	server := newServer()
+	request := testPlanRequest()
+	planned, opErr := server.Plan(ctx, request)
+	if opErr != nil {
+		t.Fatal(opErr)
+	}
+	bucketName := strings.TrimPrefix(planned.Plan.StateBackendURL, "gs://")
+	bucket := client.Bucket(bucketName)
+	if err := bucket.Create(ctx, "floci-local", nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		it := bucket.Objects(context.Background(), nil)
+		for {
+			attrs, err := it.Next()
+			if err == iterator.Done || err != nil {
+				break
+			}
+			_ = bucket.Object(attrs.Name).Delete(context.Background())
+		}
+		_ = bucket.Delete(context.Background())
+	})
+
+	lockCall := &sdk.StateLockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: planned.Plan, Owner: "first"}
+	first, opErr := server.StateLock(ctx, lockCall)
+	if opErr != nil {
+		t.Fatal(opErr)
+	}
+	if first == nil || !first.Locked || first.ReleaseToken == "" {
+		t.Fatalf("first lock returned no receipt: %#v", first)
+	}
+	forceResult, opErr := server.StateUnlock(ctx, &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: planned.Plan})
+	if opErr != nil || forceResult == nil {
+		t.Fatalf("explicit force unlock: result=%#v error=%v", forceResult, opErr)
+	}
+
+	successorServer := newServer()
+	lockCall.Owner = "successor"
+	successor, opErr := successorServer.StateLock(ctx, lockCall)
+	if opErr != nil || successor == nil || successor.ReleaseToken == "" {
+		t.Fatalf("successor lock: result=%#v error=%v", successor, opErr)
+	}
+
+	staleServer := newServer()
+	staleResult, staleErr := staleServer.StateUnlock(ctx, &sdk.StateUnlockCall{
+		ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: planned.Plan, ReleaseToken: first.ReleaseToken,
+	})
+	if staleErr == nil || staleErr.Code != sdk.ErrCodeConflict {
+		t.Fatalf("stale receipt error = %#v (result %#v), want conflict", staleErr, staleResult)
+	}
+	status, opErr := staleServer.StateStatus(ctx, &sdk.StateStatusCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: planned.Plan})
+	if opErr != nil || status == nil || !status.Locked || !strings.Contains(string(status.InfoJSON), "successor") {
+		t.Fatalf("stale receipt changed successor: status=%#v err=%v", status, opErr)
+	}
+
+	restartedServer := newServer()
+	released, opErr := restartedServer.StateUnlock(ctx, &sdk.StateUnlockCall{
+		ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: planned.Plan, ReleaseToken: successor.ReleaseToken,
+	})
+	if opErr != nil || released == nil {
+		t.Fatalf("successor receipt release after restart: result=%#v error=%v", released, opErr)
+	}
+	status, opErr = restartedServer.StateStatus(ctx, &sdk.StateStatusCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: planned.Plan})
+	if opErr != nil || status == nil || status.Locked {
+		t.Fatalf("lock remains after restart release: status=%#v err=%v", status, opErr)
 	}
 }

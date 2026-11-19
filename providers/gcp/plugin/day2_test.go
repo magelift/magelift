@@ -116,6 +116,9 @@ func TestStateLockCycle(t *testing.T) {
 	if !locked.Locked {
 		t.Fatal("lock acquisition not reported")
 	}
+	if locked.ReleaseToken == "" {
+		t.Fatal("lock acquisition returned no release receipt")
+	}
 	status, operr = server.StateStatus(context.Background(), &sdk.StateStatusCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan})
 	if operr != nil {
 		t.Fatal(operr)
@@ -130,12 +133,9 @@ func TestStateLockCycle(t *testing.T) {
 	if info.Owner != "tester" {
 		t.Fatalf("lock owner = %q", info.Owner)
 	}
-	unlocked, operr := server.StateUnlock(context.Background(), &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan})
+	_, operr = server.StateUnlock(context.Background(), &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan, ReleaseToken: locked.ReleaseToken})
 	if operr != nil {
 		t.Fatal(operr)
-	}
-	if len(unlocked.InfoJSON) == 0 {
-		t.Fatal("unlock did not return the released lock")
 	}
 	status, operr = server.StateStatus(context.Background(), &sdk.StateStatusCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan})
 	if operr != nil {
@@ -160,7 +160,10 @@ func TestStateLockAllowsTeardownWithoutImageDigest(t *testing.T) {
 	if !locked.Locked {
 		t.Fatal("teardown lock acquisition not reported")
 	}
-	if _, operr := server.StateUnlock(context.Background(), &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan}); operr != nil {
+	if locked.ReleaseToken == "" {
+		t.Fatal("teardown lock acquisition returned no release receipt")
+	}
+	if _, operr := server.StateUnlock(context.Background(), &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: envelope, Plan: plan, ReleaseToken: locked.ReleaseToken}); operr != nil {
 		t.Fatal(operr)
 	}
 
@@ -175,7 +178,7 @@ func TestStateLockAllowsTeardownWithoutImageDigest(t *testing.T) {
 func TestStateBackupRestore(t *testing.T) {
 	t.Parallel()
 	objects := newMemObjects()
-	if _, err := objects.Put(context.Background(), "shop-staging-state", "stacks/shop-staging.json", []byte(`{"ok":true}`)); err != nil {
+	if _, err := objects.Put(context.Background(), "magelift-example-gcp-project-europe-west1-shop-staging-state", "stacks/shop-staging.json", []byte(`{"ok":true}`)); err != nil {
 		t.Fatal(err)
 	}
 	server := stateServer(t, objects)

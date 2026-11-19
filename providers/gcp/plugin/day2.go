@@ -3,6 +3,7 @@ package plugin
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -136,10 +137,19 @@ func (s *Server) StateLock(ctx context.Context, req *sdk.StateLockCall) (*sdk.St
 	if operr != nil {
 		return nil, operr
 	}
-	if err := s.state().Lock(ctx, spec, req.Owner); err != nil {
+	bucket, info, err := s.state().LockWithReceipt(ctx, spec, req.Owner)
+	if err != nil {
 		return nil, stateLockConflict(err)
 	}
-	return &sdk.StateLockResult{Locked: true}, nil
+	receipt := gcpStateLockReceipt{
+		Version: 1, BackendURL: "gs://" + bucket, StackName: req.Envelope.StackName,
+		Project: spec.Identity.Project, Environment: spec.Identity.Environment, Lock: info,
+	}
+	token, err := encodeGCPStateLockReceipt(receipt)
+	if err != nil {
+		return nil, stateLockConflict(errors.Join(err, s.state().ReleaseReceipt(ctx, spec, bucket, info)))
+	}
+	return &sdk.StateLockResult{Locked: true, ReleaseToken: token}, nil
 }
 
 // StateUnlock mirrors State.Unlock.
@@ -151,6 +161,21 @@ func (s *Server) StateUnlock(ctx context.Context, req *sdk.StateUnlockCall) (*sd
 	if operr != nil {
 		return nil, operr
 	}
+	if req.ReleaseToken != "" {
+		receipt, err := decodeGCPStateLockReceipt(req.ReleaseToken)
+		if err != nil || receipt.BackendURL != backendURLFor(req.Plan, req.Envelope) || receipt.StackName != req.Envelope.StackName || receipt.Project != spec.Identity.Project || receipt.Environment != spec.Identity.Environment {
+			return nil, stateLockConflict(gcpstate.ErrLockReplaced)
+		}
+		bucket := strings.TrimPrefix(receipt.BackendURL, "gs://")
+		if bucket == receipt.BackendURL || bucket == "" {
+			return nil, stateLockConflict(gcpstate.ErrLockReplaced)
+		}
+		if err := s.state().ReleaseReceipt(ctx, spec, bucket, receipt.Lock); err != nil {
+			return nil, stateLockConflict(err)
+		}
+		return &sdk.StateUnlockResult{}, nil
+	}
+	// An empty receipt is reserved for an explicit operator force-unlock.
 	info, err := s.state().Unlock(ctx, spec)
 	if err != nil {
 		return nil, stateLockConflict(err)
@@ -164,6 +189,38 @@ func (s *Server) StateUnlock(ctx context.Context, req *sdk.StateUnlockCall) (*sd
 		result.InfoJSON = encoded
 	}
 	return result, nil
+}
+
+type gcpStateLockReceipt struct {
+	Version     int           `json:"version"`
+	BackendURL  string        `json:"backendUrl"`
+	StackName   string        `json:"stackName"`
+	Project     string        `json:"project"`
+	Environment string        `json:"environment"`
+	Lock        gcpstate.Info `json:"lock"`
+}
+
+func encodeGCPStateLockReceipt(receipt gcpStateLockReceipt) (string, error) {
+	body, err := json.Marshal(receipt)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(body), nil
+}
+
+func decodeGCPStateLockReceipt(token string) (gcpStateLockReceipt, error) {
+	if len(token) > 8192 {
+		return gcpStateLockReceipt{}, gcpstate.ErrLockReplaced
+	}
+	body, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return gcpStateLockReceipt{}, gcpstate.ErrLockReplaced
+	}
+	var receipt gcpStateLockReceipt
+	if err := json.Unmarshal(body, &receipt); err != nil || receipt.Version != 1 || receipt.BackendURL == "" || receipt.StackName == "" || receipt.Lock.Generation == "" {
+		return gcpStateLockReceipt{}, gcpstate.ErrLockReplaced
+	}
+	return receipt, nil
 }
 
 // StateBackup mirrors State.Backup (Pulumi state snapshot).
@@ -514,6 +571,9 @@ func decodeOutputs(data []byte) (map[string]any, *sdk.OperationError) {
 func stateLockConflict(err error) *sdk.OperationError {
 	if errors.Is(err, gcpstate.ErrNotLocked) {
 		return &sdk.OperationError{Code: sdk.ErrCodeNotFound, Message: err.Error()}
+	}
+	if errors.Is(err, gcpstate.ErrLockReplaced) {
+		return &sdk.OperationError{Code: sdk.ErrCodeConflict, Message: err.Error()}
 	}
 	if errors.Is(err, gcpops.ErrStateBucketMissing) {
 		return &sdk.OperationError{Code: sdk.ErrCodeConflict, Message: err.Error()}

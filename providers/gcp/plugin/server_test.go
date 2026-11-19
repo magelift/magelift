@@ -41,7 +41,7 @@ func testEnvelope() sdk.Envelope {
 	return sdk.Envelope{
 		Project: "shop", Environment: "staging", Region: "europe-west1",
 		EnvironmentClass: "staging", StackName: "shop-staging-gcp-gke-autopilot",
-		StateBackendURL: "gs://shop-staging-gcp-state",
+		StateBackendURL: "gs://magelift-example-gcp-project-europe-west1-shop-staging-state",
 		Preset:          "standard", AppVersion: "2.4.9",
 	}
 }
@@ -55,7 +55,7 @@ func storedTestPlan(t *testing.T, spec gcpstack.Spec) sdk.StoredPlan {
 	planned := gcpstack.SpecPlanned{Spec: spec}
 	return sdk.StoredPlan{
 		StackName: planned.StackName(), Provider: "gcp", Runtime: string(planned.Runtime()),
-		ImageDigest: spec.Artifact.ImageDigest, StateBackendURL: "gs://shop-staging-gcp-state",
+		ImageDigest: spec.Artifact.ImageDigest, StateBackendURL: "gs://magelift-example-gcp-project-europe-west1-shop-staging-state",
 		Opaque: opaque,
 	}
 }

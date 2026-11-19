@@ -20,10 +20,11 @@ import (
 )
 
 var (
-	ErrLocked    = errors.New("deployment lock is held")
-	ErrNotLocked = errors.New("deployment lock is not held")
-	stableName   = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,30}$`)
-	bucketName   = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
+	ErrLocked       = errors.New("deployment lock is held")
+	ErrNotLocked    = errors.New("deployment lock is not held")
+	ErrLockReplaced = errors.New("deployment lock was replaced")
+	stableName      = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,30}$`)
+	bucketName      = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
 )
 
 type ObjectAPI interface {
@@ -139,17 +140,40 @@ func (h *Handle) Release(ctx context.Context) error {
 	if h == nil || h.manager == nil {
 		return errors.New("deployment lock handle is required")
 	}
-	current, err := h.manager.inspect(ctx)
+	if err := h.manager.ReleaseReceipt(ctx, h.info); err != nil {
+		return err
+	}
+	h.manager = nil
+	return nil
+}
+
+// ReleaseReceipt deletes only the GCS object generation captured at acquire.
+// A copied Info value remains sufficient after the process that acquired the
+// lock exits, while a later lock generation remains untouched.
+func (m *Manager) ReleaseReceipt(ctx context.Context, receipt Info) error {
+	if m == nil || m.client == nil {
+		return errors.New("state lock manager is required")
+	}
+	if receipt.Project != m.project || receipt.Environment != m.environment || receipt.Generation == "" || strings.TrimSpace(receipt.Owner) == "" || receipt.AcquiredAt.IsZero() {
+		return ErrLockReplaced
+	}
+	current, err := m.inspect(ctx)
 	if err != nil {
 		return err
 	}
-	if current.Owner != h.info.Owner || !current.AcquiredAt.Equal(h.info.AcquiredAt) {
-		return errors.New("deployment lock ownership changed")
+	if current.Generation != receipt.Generation || current.Owner != receipt.Owner || !current.AcquiredAt.Equal(receipt.AcquiredAt) {
+		return ErrLockReplaced
 	}
-	if err := h.manager.client.DeleteGeneration(ctx, h.manager.bucket, h.manager.key, current.Generation); err != nil {
+	if err := m.client.DeleteGeneration(ctx, m.bucket, m.key, receipt.Generation); err != nil {
+		latest, inspectErr := m.inspect(ctx)
+		if errors.Is(inspectErr, ErrNotLocked) || inspectErr == nil && latest.Generation != receipt.Generation {
+			return ErrLockReplaced
+		}
+		if inspectErr != nil {
+			return inspectErr
+		}
 		return fmt.Errorf("release deployment lock: %w", err)
 	}
-	h.manager = nil
 	return nil
 }
 

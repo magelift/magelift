@@ -127,7 +127,7 @@ func TestReleaseDoesNotDeleteSuccessorLock(t *testing.T) {
 	if _, err := objects.Put(context.Background(), manager.bucket, manager.key, []byte(`{"project":"shop","environment":"preview","owner":"owner-2","acquiredAt":"2026-07-21T00:00:00Z"}`)); err != nil {
 		t.Fatal(err)
 	}
-	if err := handle.Release(context.Background()); err == nil || !strings.Contains(err.Error(), "ownership changed") {
+	if err := handle.Release(context.Background()); !errors.Is(err, ErrLockReplaced) {
 		t.Fatalf("release error = %v", err)
 	}
 	if _, ok := objects.data[manager.key]; !ok {

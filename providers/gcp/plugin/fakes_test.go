@@ -341,11 +341,11 @@ func fakeKubeFactory(client kubernetes.Interface) kube.ClientFactory {
 // stateServer builds a Server with in-memory state backends.
 func stateServer(t *testing.T, objects *memObjects) *Server {
 	t.Helper()
-	manager, err := gcpstate.NewManager(objects, "shop-staging-state", "shop", "staging")
+	manager, err := gcpstate.NewManager(objects, "magelift-example-gcp-project-europe-west1-shop-staging-state", "shop", "staging")
 	if err != nil {
 		t.Fatal(err)
 	}
-	archive, err := gcpstate.NewArchive(objects, "shop-staging-state", "shop", "staging")
+	archive, err := gcpstate.NewArchive(objects, "magelift-example-gcp-project-europe-west1-shop-staging-state", "shop", "staging")
 	if err != nil {
 		t.Fatal(err)
 	}

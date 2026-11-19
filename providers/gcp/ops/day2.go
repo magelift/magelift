@@ -212,6 +212,39 @@ func (s State) Lock(ctx context.Context, spec gcpstack.Spec, owner string) error
 	return nil
 }
 
+// LockWithReceipt returns the bucket and object generation captured by the
+// conditional acquire. Callers can carry the receipt across process restarts.
+func (s State) LockWithReceipt(ctx context.Context, spec gcpstack.Spec, owner string) (string, gcpstate.Info, error) {
+	if strings.TrimSpace(owner) == "" {
+		return "", gcpstate.Info{}, errors.New("lock owner is required")
+	}
+	manager, bucket, err := s.stateManager(ctx, spec)
+	if err != nil {
+		return "", gcpstate.Info{}, err
+	}
+	handle, err := manager.Acquire(ctx, spec.Identity.Project, spec.Identity.Environment, owner)
+	if err != nil {
+		if isGCSNotFound(err) {
+			return "", gcpstate.Info{}, fmt.Errorf("%w: run magelift bootstrap --env %s: %w", ErrStateBucketMissing, spec.Identity.StateScope(), err)
+		}
+		return "", gcpstate.Info{}, err
+	}
+	return bucket, handle.Info(), nil
+}
+
+// ReleaseReceipt checks the planned bucket and then deletes only the object
+// generation captured by LockWithReceipt. Unlock remains the force path.
+func (s State) ReleaseReceipt(ctx context.Context, spec gcpstack.Spec, bucket string, receipt gcpstate.Info) error {
+	manager, currentBucket, err := s.stateManager(ctx, spec)
+	if err != nil {
+		return err
+	}
+	if bucket == "" || currentBucket != bucket {
+		return gcpstate.ErrLockReplaced
+	}
+	return manager.ReleaseReceipt(ctx, receipt)
+}
+
 func (s State) Unlock(ctx context.Context, spec gcpstack.Spec) (*platform.LockInfo, error) {
 	manager, _, err := s.stateManager(ctx, spec)
 	if err != nil {
