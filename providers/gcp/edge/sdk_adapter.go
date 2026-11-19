@@ -25,7 +25,8 @@ func NewLifecycleAdapter(client sdk.EdgeAdapter) (sdk.EdgeAdapter, error) {
 func NativeDescriptor() sdk.EdgeAdapterDescriptor {
 	return sdk.EdgeAdapterDescriptor{
 		APIVersion: sdk.ExtensionAPIVersion, ID: "gcp.edge.native", Provider: sdk.ProviderID("gcp"), Version: "1.0.0",
-		Capabilities: []sdk.EdgeAction{sdk.EdgeApply, sdk.EdgeVerify, sdk.EdgeFailover, sdk.EdgeRollback, sdk.EdgeDestroy, sdk.EdgePurge},
+		Capabilities:    []sdk.EdgeAction{sdk.EdgeApply, sdk.EdgeVerify, sdk.EdgeFailover, sdk.EdgeRollback, sdk.EdgeDestroy, sdk.EdgePurge},
+		PurgeOutputKeys: []string{"nativeEdgeURLMapName", "nativeEdgeIngressName", "nativeEdgeIngressNamespace", "nativeEdgeIngressOwner"},
 	}
 }
 

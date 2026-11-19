@@ -24,7 +24,8 @@ func NewLifecycleAdapter(client sdk.EdgeAdapter) (sdk.EdgeAdapter, error) {
 func Descriptor() sdk.EdgeAdapterDescriptor {
 	return sdk.EdgeAdapterDescriptor{
 		APIVersion: sdk.ExtensionAPIVersion, ID: "aws.edge.native", Provider: sdk.ProviderID("aws"), Version: "1.0.0",
-		Capabilities: []sdk.EdgeAction{sdk.EdgeApply, sdk.EdgeVerify, sdk.EdgeFailover, sdk.EdgeRollback, sdk.EdgeDestroy, sdk.EdgePurge},
+		Capabilities:    []sdk.EdgeAction{sdk.EdgeApply, sdk.EdgeVerify, sdk.EdgeFailover, sdk.EdgeRollback, sdk.EdgeDestroy, sdk.EdgePurge},
+		PurgeOutputKeys: []string{"edgeDistributionId"},
 	}
 }
 

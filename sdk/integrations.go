@@ -34,6 +34,9 @@ type EdgeAdapterDescriptor struct {
 	Provider     ProviderID   `json:"provider" yaml:"provider"`
 	Version      string       `json:"version" yaml:"version"`
 	Capabilities []EdgeAction `json:"capabilities" yaml:"capabilities"`
+	// PurgeOutputKeys lists the public stack outputs needed to identify the
+	// deployed storefront cache. The host passes only these string values.
+	PurgeOutputKeys []string `json:"purgeOutputKeys,omitempty" yaml:"purgeOutputKeys,omitempty"`
 }
 
 type AdapterOutput struct {
@@ -42,10 +45,11 @@ type AdapterOutput struct {
 }
 
 type EdgePlanRequest struct {
-	TargetProvider ProviderID     `json:"targetProvider" yaml:"targetProvider"`
-	TargetRuntime  RuntimeID      `json:"targetRuntime" yaml:"targetRuntime"`
-	Intent         EdgeIntent     `json:"intent" yaml:"intent"`
-	Configuration  map[string]any `json:"configuration,omitempty" yaml:"configuration,omitempty"`
+	TargetProvider  ProviderID        `json:"targetProvider" yaml:"targetProvider"`
+	TargetRuntime   RuntimeID         `json:"targetRuntime" yaml:"targetRuntime"`
+	Intent          EdgeIntent        `json:"intent" yaml:"intent"`
+	Configuration   map[string]any    `json:"configuration,omitempty" yaml:"configuration,omitempty"`
+	DeployedOutputs map[string]string `json:"deployedOutputs,omitempty" yaml:"deployedOutputs,omitempty"`
 }
 
 type EdgePlan struct {
