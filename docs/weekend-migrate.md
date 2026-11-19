@@ -4,7 +4,7 @@ Run a complete rehearsal before scheduling a cutover. Use a separate cloud accou
 
 ## Prepare the shop and the data
 
-1. Import the source configuration with `magelift init --from-upsun` or `magelift init --from-acc`, then review the generated PHP and unmapped report. Select the Magento application in a multi-app source. Check service versions, Composer credentials, extension modules, cron and consumers. See [Move a Magento shop to MageLift](migrating-from-paas.md).
+1. Import the source configuration with `magelift init --from-upsun` or `magelift init --from-acc`. Pass `--provider`, `--cloud-account` and `--region` for your destination. The examples below use `--config-out rehearsal.php`. Pass your production hostname with `--domain` to generate the staging and UAT hostnames, or set each hostname in the PHP file. In a multi-app source, select the Magento application with `--app`. Review service versions, Composer credentials, extension modules, cron and consumers in the generated PHP and unmapped report. [Move a Magento shop to MageLift](migrating-from-paas.md)
 2. Obtain a consistent SQL dump and the matching media tree. Record the source Magento version, enabled modules, time of the snapshot and original Magento encryption key. The key is needed to decrypt existing encrypted values. Put it in the destination's supported secret store. Keep the key, database password and dump outside Git.
 3. Verify that the destination can accept the dump. Check the SQL version and collation, `DEFINER` clauses, database names, privileges and incompatible extensions. Take a backup of every destination you might touch and test that backup separately. Back up SQL and media separately from Pulumi state.
 4. Select a dedicated staging or preview environment. Check its account, region, database, media store and estimated running cost.
@@ -53,13 +53,13 @@ On ECS Fargate, MageLift configures Magento's native S3 driver with the task rol
 magelift --config rehearsal.php env media-sync staging --source /secure/rehearsal-media
 ```
 
-Media sync overwrites matching keys and leaves other objects in place. Finish the sync before switching to fresh ECS tasks. Tasks that cached an old file can keep serving it until replaced. Verify both a storefront image and an Admin upload. A CloudFront distribution that reads an SSE-KMS bucket directly also needs permission to decrypt with the bucket's KMS key.
+Media sync overwrites matching keys and leaves other objects in place. Finish the sync before switching to fresh ECS tasks. Tasks that cached an old file can keep serving it until replaced. To serve images through the media CDN, the KMS key policy must allow the CloudFront service to decrypt objects for that distribution. Use the `mediaDistributionId` stack output in the distribution ARN. Verify a storefront image through the CDN and a fresh upload through Admin. [CloudFront KMS key policy](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html#private-content-s3-origin-configure-s3-bucket)
 
 ## GCP GKE and Azure AKS: Kubernetes restore
 
 `magelift migrate restore` creates temporary helper pods in the selected namespace. It can stream a local `.sql` or `.sql.gz` file to a reachable MySQL-compatible database, and it can merge a local directory into an existing PVC. It does not create the database, its credentials, or the PVC. The operator needs Kubernetes permissions to inspect the namespace and create, exec into and delete helper pods, plus network access from those pods to the database. Private clusters also need a way for the helpers to pull their pinned images.
 
-Use the cluster and namespace from the selected stack outputs, obtain an operator kubeconfig for that cluster, and verify the context before proceeding. Use your GKE or AKS cluster credentials to confirm the namespace and read its UID.
+Set `KUBE_CONTEXT` to your operator context for the cluster in the stack outputs. Set `NAMESPACE` to the `namespace` output. Stable GKE and AKS environments use `default` unless the stack assigns another namespace. Check both values against the cluster before reading the namespace UID.
 
 ```sh
 kubectl --context "$KUBE_CONTEXT" get namespace "$NAMESPACE"

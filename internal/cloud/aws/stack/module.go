@@ -115,7 +115,7 @@ func (Module) Program(planned platform.PlannedStack) (pulumi.RunFunc, error) {
 func (Module) OutputKeys() []string {
 	keys := append([]string(nil), platform.RequiredOutputKeys()...)
 	keys = append(keys,
-		"edgeDistributionId", "mediaURL", "mediaBucket", "searchEndpoint", "queueMode",
+		"edgeDistributionId", "mediaURL", "mediaBucket", "mediaDistributionId", "searchEndpoint", "queueMode",
 		"clusterArn", "taskDefinitionArn", "deployTaskDefinitionArn",
 		"cronServiceName", "cronTaskDefinitionArn", "queueServiceName", "queueTaskDefinitionArn",
 		"taskRoleArn", "deploymentRoleArn", "securityGroupId",

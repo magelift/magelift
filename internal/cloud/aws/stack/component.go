@@ -380,7 +380,7 @@ func (c *Component) Outputs() pulumi.Map {
 	}
 	outputs := pulumi.Map{
 		"networkVpcId": c.Network.VpcID, "edgeDistributionId": edgeDistributionID,
-		"applicationURL": applicationURL, "mediaURL": pulumi.Sprintf("%s/media/", c.Storage.DistributionURL), "mediaBucket": c.Storage.BucketName,
+		"applicationURL": applicationURL, "mediaURL": pulumi.Sprintf("%s/media/", c.Storage.DistributionURL), "mediaBucket": c.Storage.BucketName, "mediaDistributionId": c.Storage.DistributionID,
 		"databaseWriter": c.Database.WriterEndpoint, "cacheEndpoint": c.Cache.CachePrimaryEndpoint, "searchEndpoint": searchEndpoint, "queueMode": c.Queue.QueueMode,
 		"clusterName": c.Runtime.ClusterName, "clusterArn": c.Runtime.ClusterARN, "serviceName": c.Runtime.ServiceName,
 		"taskDefinitionArn": c.Runtime.TaskDefinitionARN, "deployTaskDefinitionArn": c.Runtime.DeployTaskDefinitionARN,
