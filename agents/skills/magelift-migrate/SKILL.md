@@ -21,6 +21,8 @@ that every source platform feature has a direct equivalent.
 - When the import reports unmapped fields, review the adjacent
   magelift.unmapped.md before changing credentials or DNS. A custom output
   name receives a corresponding named report.
+- The source platform's Composer tool version becomes a minimum. For example,
+  `2.9.8` imports as `2.9.8+`. The importer leaves the shop's locked packages in place.
 - Keep secrets as provider secret references. Never put API tokens, private keys,
   or Composer auth in the project file or evidence.
 - Preserve Fastly service identity, domains, TLS intent, purge behavior, and

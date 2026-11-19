@@ -14,6 +14,8 @@ Choose the destination provider independently of the source. When a repository h
 
 The generated PHP includes recognized PHP and Composer settings, Magento environment variables, static content, service engine versions and routes. For an unsupported setting the importer writes a review file next to the project file and exits with status 2. The report contains source paths and key names. Review shell hooks, custom services, per-service options, and application mounts before deploying. Store secret values separately, including the original Magento encryption key needed to decrypt imported data.
 
+A Composer tool version from the old platform becomes a minimum. For example, a shop that used Composer `2.9.8` imports as `2.9.8+`. This lets a patched Composer 2 build the existing `composer.lock`. The importer leaves the lock and its package versions alone. The importer also carries common Composer 2 constraints across. For example, `^2.9.8` becomes `2.9.8+`, `2.9.*` stays on the 2.9 branch, and `~2.9.8` keeps its upper limit below 2.10. Check the unmapped report for compound ranges. If a plugin needs a particular release, set that constraint explicitly in the PHP project and test the build with it.
+
 Compare how each service is used as well as its version. A cache and a persistent session store can use the same engine with different eviction policies. OpenSearch plugins, queue consumers and CDN purge rules also affect storefront behavior. Supply a hostname you control when the source routes contain platform placeholders.
 
 ```sh

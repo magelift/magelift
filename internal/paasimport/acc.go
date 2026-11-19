@@ -2,11 +2,40 @@ package paasimport
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
+
+	"go.yaml.in/yaml/v4"
 )
 
 type accAppRaw map[string]any
+
+// Decode an unquoted tool version as written. YAML otherwise turns 2.10 into 2.1.
+func (a *accAppRaw) UnmarshalYAML(node *yaml.Node) error {
+	var fields map[string]any
+	if err := node.Decode(&fields); err != nil {
+		return err
+	}
+	*a = fields
+	dependencies, _ := fields["dependencies"].(map[string]any)
+	php, _ := dependencies["php"].(map[string]any)
+	switch php["composer/composer"].(type) {
+	case float64, int, uint64:
+		var source struct {
+			Dependencies struct {
+				PHP struct {
+					Composer string `yaml:"composer/composer"`
+				}
+			}
+		}
+		if err := node.Decode(&source); err != nil {
+			return err
+		}
+		php["composer/composer"] = source.Dependencies.PHP.Composer
+	}
+	return nil
+}
 
 type accRoute struct {
 	Type     string `yaml:"type"`
@@ -130,12 +159,13 @@ func mapBuildRequirements(source string, raw accAppRaw, doc *mageliftDocument) [
 					unmapped = append(unmapped, UnmappedKey{Source: source, Path: "dependencies.php." + packageName})
 					continue
 				}
-				version, ok := packageVersion.(string)
-				if !ok || !validComposerVersion(version) {
+				rawVersion, _ := packageVersion.(string)
+				version, ok := importedComposerVersion(rawVersion)
+				if !ok {
 					unmapped = append(unmapped, UnmappedKey{Source: source, Path: "dependencies.php.composer/composer"})
 					continue
 				}
-				doc.Build.Composer = &mageliftComposer{Version: strings.TrimSpace(version)}
+				doc.Build.Composer = &mageliftComposer{Version: version}
 			}
 		}
 	}
@@ -272,23 +302,30 @@ func validPHPExtensionName(value string) bool {
 	return true
 }
 
-func validComposerVersion(value string) bool {
-	value = strings.TrimSuffix(strings.TrimSpace(value), "+")
-	parts := strings.Split(value, ".")
-	if len(parts) < 2 || len(parts) > 3 || parts[0] != "2" {
-		return false
+var sourceComposerVersion = regexp.MustCompile(`^(\^|~|>=|=)?\s*v?(2(?:\.[0-9]+){0,2})(\+|\.\*)?$`)
+
+func importedComposerVersion(value string) (string, bool) {
+	parts := sourceComposerVersion.FindStringSubmatch(strings.TrimSpace(value))
+	if len(parts) != 4 || (parts[1] != "" && parts[3] != "") {
+		return "", false
 	}
-	for _, part := range parts[1:] {
-		if part == "" {
-			return false
-		}
-		for _, character := range part {
-			if character < '0' || character > '9' {
-				return false
-			}
-		}
+	operator, version, suffix := parts[1], parts[2], parts[3]
+	dots := strings.Count(version, ".")
+	if suffix == ".*" && dots > 0 {
+		return version, dots == 1
 	}
-	return true
+	if operator == "=" {
+		return version + strings.Repeat(".0", 2-dots), true
+	}
+	if operator == "~" && dots == 2 {
+		return "~" + version, true
+	}
+	if dots == 0 {
+		version += ".0"
+	}
+	// A bare source version records the old build tool. Keep it as a minimum
+	// so a patched Composer 2 release can install the same package lock.
+	return version + "+", true
 }
 
 func isMagentoCron(cmd string) bool {

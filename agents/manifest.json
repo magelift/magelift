@@ -33,7 +33,7 @@
     "name": "magelift-migrate",
     "description": "Migrate an Adobe Commerce Cloud, Platform.sh, or Upsun project to MageLift. Use when importing configuration, mapping services, or reviewing unmapped fields.",
     "version": "1.0.0",
-    "digest": "e8f5cb58dbd3e42d6fba4ea7466d8329f0dcbc52ae260c81ffb8c3a0b74f8038",
+    "digest": "2c8ec54192aedccf3c078b18eb2fc58a0a4c003a361e12136dc76dbb80f577d6",
     "sources": [
       "embedded",
       "skills-cli"

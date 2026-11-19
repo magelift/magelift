@@ -108,6 +108,62 @@ func importProjectWithoutDomain() map[string]any {
 	}
 }
 
+func TestImportedComposerConstraintsPreserveLocksAndBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name, input, want string
+	}{
+		{"unquoted minor", "2.10", "2.10+"},
+		{"bare patch", "2.9.8", "2.9.8+"},
+		{"caret", "'^2.9.8'", "2.9.8+"},
+		{"minimum", "'>= 2.9.8'", "2.9.8+"},
+		{"tilde minor", "'~2.9'", "2.9+"},
+		{"tilde patch", "'~2.9.8'", "~2.9.8"},
+		{"wildcard", "'2.9.*'", "2.9"},
+		{"explicit exact", "'=2.9.8'", "2.9.8"},
+		{"compound range", "'>=2.9.8 <2.10 || ^2.11'", ""},
+	} {
+		for _, kind := range []SourceKind{SourceACC, SourceUpsun} {
+			t.Run(string(kind)+"/"+tc.name, func(t *testing.T) {
+				dir := t.TempDir()
+				app := "name: shop\ntype: php:8.3\ndependencies:\n  php:\n    composer/composer: " + tc.input + "\n"
+				path := filepath.Join(dir, accAppFile)
+				if kind == SourceUpsun {
+					if err := os.Mkdir(filepath.Join(dir, ".upsun"), 0755); err != nil {
+						t.Fatal(err)
+					}
+					path = filepath.Join(dir, ".upsun", "config.yaml")
+					app = "applications:\n  shop:\n    " + strings.ReplaceAll(strings.TrimSpace(app), "\n", "\n    ") + "\n"
+				}
+				if err := os.WriteFile(path, []byte(app), 0600); err != nil {
+					t.Fatal(err)
+				}
+				source, err := Read(dir, kind, "shop")
+				if err != nil {
+					t.Fatal(err)
+				}
+				project := importProjectWithoutDomain()
+				build := project["build"].(map[string]any)
+				build["composer"] = map[string]any{"credentials": "env://COMPOSER_AUTH"}
+				unmapped, err := source.Apply(project)
+				if err != nil {
+					t.Fatal(err)
+				}
+				settings := build["composer"].(map[string]any)
+				if settings["credentials"] != "env://COMPOSER_AUTH" {
+					t.Fatalf("lost Composer credentials reference: %v", settings)
+				}
+				if tc.want == "" {
+					if len(unmapped) != 1 || unmapped[0].Path != "dependencies.php.composer/composer" || settings["version"] != nil {
+						t.Fatalf("unrepresentable constraint: settings=%v, unmapped=%v", settings, unmapped)
+					}
+				} else if len(unmapped) != 0 || settings["version"] != tc.want {
+					t.Fatalf("settings=%v, unmapped=%v; want version %q", settings, unmapped, tc.want)
+				}
+			})
+		}
+	}
+}
+
 func TestFastlyWithoutSourceDomainLeavesAManualFollowUp(t *testing.T) {
 	source := Source{
 		app:      accAppRaw{"name": "shop", "type": "php:8.4"},

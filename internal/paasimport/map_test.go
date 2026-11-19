@@ -278,8 +278,20 @@ func TestMapsPaaSBuildRequirements(t *testing.T) {
 	if len(unmapped) != 0 {
 		t.Fatalf("build requirements were reported as unmapped: %#v", unmapped)
 	}
-	if strings.Join(doc.Build.Extensions, ",") != "apcu,redis" || doc.Build.Composer == nil || doc.Build.Composer.Version != "2.10" {
+	if strings.Join(doc.Build.Extensions, ",") != "apcu,redis" || doc.Build.Composer == nil || doc.Build.Composer.Version != "2.10+" {
 		t.Fatalf("build requirements = %#v", doc.Build)
+	}
+}
+
+func TestImportedComposerKeepsPatchFloor(t *testing.T) {
+	for _, pin := range []string{"2.9.8", "2.9.8+"} {
+		doc, unmapped, err := mapAppTree(".platform.app.yaml", accAppRaw{
+			"name": "shop", "type": "php:8.3",
+			"dependencies": map[string]any{"php": map[string]any{"composer/composer": pin}},
+		})
+		if err != nil || len(unmapped) != 0 || doc.Build.Composer == nil || doc.Build.Composer.Version != "2.9.8+" {
+			t.Fatalf("import %q: composer=%#v, unmapped=%v, err=%v", pin, doc.Build.Composer, unmapped, err)
+		}
 	}
 }
 
