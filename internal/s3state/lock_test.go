@@ -219,3 +219,34 @@ func TestEncryptionKMSPutObjectSetsAwsKms(t *testing.T) {
 		t.Fatalf("SSEKMSKeyId = %q", got)
 	}
 }
+
+func TestReleasePreservesReacquisitionWithTheSameOwnerAndTimestamp(t *testing.T) {
+	fake := &fakeS3{}
+	manager, err := NewManager(fake, "state-bucket", "shop", "staging", ObjectEncryption{Mode: EncryptionAES256})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.now = func() time.Time { return time.Unix(100, 0).UTC() }
+	first, err := manager.Acquire(t.Context(), "shop", "staging", "same-worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Unlock(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	successor, err := manager.Acquire(t.Context(), "shop", "staging", "same-worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Release(t.Context()); !errors.Is(err, ErrLockReplaced) {
+		t.Fatalf("stale release = %v", err)
+	}
+	fake.etag = ""
+	if _, err := manager.Unlock(t.Context()); err == nil || len(fake.body) == 0 {
+		t.Fatal("a lock without a storage ETag was deleted")
+	}
+	fake.etag = successor.Info().ETag
+	if err := successor.Release(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -3,6 +3,7 @@ package s3state
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,11 +41,12 @@ type Manager struct {
 }
 
 type Info struct {
-	Project     string    `json:"project" yaml:"project"`
-	Environment string    `json:"environment" yaml:"environment"`
-	Owner       string    `json:"owner" yaml:"owner"`
-	AcquiredAt  time.Time `json:"acquiredAt" yaml:"acquiredAt"`
-	ETag        string    `json:"etag" yaml:"etag"`
+	AcquisitionID string    `json:"acquisitionId,omitempty" yaml:"acquisitionId,omitempty"`
+	Project       string    `json:"project" yaml:"project"`
+	Environment   string    `json:"environment" yaml:"environment"`
+	Owner         string    `json:"owner" yaml:"owner"`
+	AcquiredAt    time.Time `json:"acquiredAt" yaml:"acquiredAt"`
+	ETag          string    `json:"etag" yaml:"etag"`
 }
 
 type Handle struct {
@@ -76,7 +78,7 @@ func (m *Manager) Acquire(ctx context.Context, project, environment, owner strin
 		return nil, errors.New("state lock scope does not match the manager")
 	}
 	now := m.now()
-	info := Info{Project: project, Environment: environment, Owner: owner, AcquiredAt: now}
+	info := Info{AcquisitionID: rand.Text(), Project: project, Environment: environment, Owner: owner, AcquiredAt: now}
 	data, err := json.Marshal(info)
 	if err != nil {
 		return nil, fmt.Errorf("encode deployment lock: %w", err)
@@ -131,11 +133,7 @@ func (m *Manager) Unlock(ctx context.Context) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
-	input := &s3.DeleteObjectInput{Bucket: awssdk.String(m.bucket), Key: awssdk.String(m.key)}
-	if current.ETag != "" {
-		input.IfMatch = awssdk.String(current.ETag)
-	}
-	if _, err := m.client.DeleteObject(ctx, input); err != nil {
+	if err := m.deleteObserved(ctx, current); err != nil {
 		return Info{}, fmt.Errorf("unlock deployment state: %w", err)
 	}
 	return current, nil
@@ -167,18 +165,23 @@ func (m *Manager) release(ctx context.Context, acquired Info) error {
 	if err != nil {
 		return err
 	}
-	if current.Owner != acquired.Owner || !current.AcquiredAt.Equal(acquired.AcquiredAt) ||
+	if acquired.AcquisitionID == "" || current.AcquisitionID != acquired.AcquisitionID ||
+		current.Owner != acquired.Owner || !current.AcquiredAt.Equal(acquired.AcquiredAt) ||
 		(acquired.ETag != "" && current.ETag != acquired.ETag) {
 		return ErrLockReplaced
 	}
-	input := &s3.DeleteObjectInput{Bucket: &m.bucket, Key: &m.key}
-	if current.ETag != "" {
-		input.IfMatch = &current.ETag
+	return m.deleteObserved(ctx, current)
+}
+
+func (m *Manager) deleteObserved(ctx context.Context, current Info) error {
+	if current.ETag == "" || current.ETag == "*" {
+		return errors.New("object store returned no usable ETag for the deployment lock")
 	}
-	if _, err = m.client.DeleteObject(ctx, input); err != nil {
-		return fmt.Errorf("release deployment lock: %w", err)
+	_, err := m.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &m.bucket, Key: &m.key, IfMatch: &current.ETag})
+	if isPreconditionFailed(err) {
+		return ErrLockReplaced
 	}
-	return nil
+	return err
 }
 
 func (m *Manager) inspect(ctx context.Context) (Info, error) {
@@ -200,9 +203,7 @@ func (m *Manager) inspect(ctx context.Context) (Info, error) {
 	if info.Project == "" || info.Environment == "" || info.Owner == "" || info.AcquiredAt.IsZero() {
 		return Info{}, errors.New("deployment lock metadata is incomplete")
 	}
-	if object.ETag != nil {
-		info.ETag = strings.Trim(awssdk.ToString(object.ETag), "\"")
-	}
+	info.ETag = strings.Trim(awssdk.ToString(object.ETag), "\"")
 	return info, nil
 }
 
