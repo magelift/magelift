@@ -380,3 +380,16 @@ func assertBool(t *testing.T, values resource.PropertyMap, key string, want bool
 		t.Fatalf("%s = %t, want %t", key, got, want)
 	}
 }
+
+func TestDurableRDSMariaDBUsesMultiAZ(t *testing.T) {
+	args := previewArgs()
+	args.Preset = sdk.PresetStandard
+	args.Engine = EngineRDSMariaDB
+	args.EngineVersion = "11.4"
+	args.ServerlessV2 = nil
+	args.ProvisionedInstanceClass = "db.m7g.large"
+	instance := deploy(t, args).one(t, "aws:rds/instance:Instance").inputs
+	if !instance["multiAz"].BoolValue() || instance["engine"].StringValue() != "mariadb" || instance["backupRetentionPeriod"].NumberValue() < 1 {
+		t.Fatal(instance)
+	}
+}

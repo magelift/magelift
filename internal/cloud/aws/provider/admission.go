@@ -250,7 +250,7 @@ func validateDatabase(ctx context.Context, client CapabilityAPI, selection Datab
 	if err != nil {
 		return fmt.Errorf("check AWS database engine %q version %q: %w", engineInput, version, err)
 	}
-	if strings.TrimSpace(candidate.EngineVersion) == "" || !strings.EqualFold(candidate.EngineVersion, version) || !strings.EqualFold(strings.TrimSpace(candidate.Status), "available") {
+	if strings.TrimSpace(candidate.EngineVersion) == "" || !databaseVersionMatches(engine, version, strings.TrimSpace(candidate.EngineVersion)) || !strings.EqualFold(strings.TrimSpace(candidate.Status), "available") {
 		return fmt.Errorf("AWS database engine %q version %q is not available", engineInput, version)
 	}
 	if selection.ServerlessV2 {
@@ -264,7 +264,7 @@ func validateDatabase(ctx context.Context, client CapabilityAPI, selection Datab
 			return fmt.Errorf("AWS Aurora Serverless v2 capacity %.1f-%.1f is outside provider limits %.1f-%.1f", selection.MinimumACU, selection.MaximumACU, *candidate.ServerlessV2MinCapacity, *candidate.ServerlessV2MaxCapacity)
 		}
 	}
-	orderable, err := client.DatabaseInstanceClass(ctx, engine, version, class)
+	orderable, err := client.DatabaseInstanceClass(ctx, engine, strings.TrimSpace(candidate.EngineVersion), class)
 	if err != nil {
 		return fmt.Errorf("check AWS database instance class %q: %w", class, err)
 	}

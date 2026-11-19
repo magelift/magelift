@@ -21,6 +21,7 @@ import (
 	"github.com/magelift/magelift/internal/cloud/aws/search"
 	"github.com/magelift/magelift/internal/cloud/aws/security"
 	"github.com/magelift/magelift/internal/cloud/aws/storage"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/secretref"
 	"github.com/magelift/magelift/sdk"
@@ -154,7 +155,8 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		provisionedCount = 0
 	}
 	databaseArgs := database.Args{
-		Preset: spec.Identity.Preset, EnvironmentClass: spec.Identity.EnvironmentClass, Region: spec.Identity.Region, AvailabilityZones: databaseZones, DataSubnetIDs: databaseSubnets,
+		Parameters: spec.ExternalServices["database"].Parameters,
+		Preset:     spec.Identity.Preset, EnvironmentClass: spec.Identity.EnvironmentClass, Region: spec.Identity.Region, AvailabilityZones: databaseZones, DataSubnetIDs: databaseSubnets,
 		VpcSecurityGroupIDs: pulumi.StringArray{component.Security.DataSecurityGroupID}, Engine: spec.Catalog.DatabaseEngine, EngineVersion: engineVersion, DatabaseName: spec.Dependencies.DatabaseName, MasterUsername: spec.Dependencies.MasterUsername,
 		KMSKeyARN: spec.Dependencies.KMSKeyARN, BackupRetentionDays: spec.Catalog.Retention.BackupDays, BackupWindow: spec.Catalog.DatabaseBackupWindow, MaintenanceWindow: spec.Catalog.DatabaseMaintenanceWindow, DeletionProtection: spec.Catalog.DatabaseDeletionProtection, DeleteAutomatedBackups: spec.Catalog.DatabaseDeleteAutomatedBackups, FinalSnapshotIdentifier: name + "-final", ProvisionedInstanceClass: provisionedClass, InstanceCount: provisionedCount,
 		ServerlessV2: serverless, Tags: tags,
@@ -190,17 +192,26 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		return nil, fmt.Errorf("grant ECS execution access to managed database secret: %w", err)
 	}
 
-	if external := spec.ExternalServices["cache"]; external.Attached() {
-		host := external.Endpoint
-		if parsed, _, err := net.SplitHostPort(host); err == nil {
-			host = parsed
+	cacheBinding := spec.ExternalServices["cache"]
+	session, split := spec.ExternalServices["session"]
+	host := func(b config.ServiceBinding) string {
+		if !b.Attached() {
+			return ""
 		}
-		component.Cache = &cache.Component{
-			CachePrimaryEndpoint:   pulumi.String(host).ToStringOutput(),
-			SessionPrimaryEndpoint: pulumi.String(host).ToStringOutput(),
+		if name, _, err := net.SplitHostPort(b.Endpoint); err == nil {
+			return name
 		}
+		return b.Endpoint
+	}
+	if cacheBinding.Attached() && (!split || session.Attached()) {
+		sessions := host(cacheBinding)
+		if split {
+			sessions = host(session)
+		}
+		component.Cache = &cache.Component{CachePrimaryEndpoint: pulumi.String(host(cacheBinding)).ToStringOutput(), SessionPrimaryEndpoint: pulumi.String(sessions).ToStringOutput()}
 	} else {
 		component.Cache, err = cache.New(ctx, name+"-cache", cache.Args{
+			SeparateSession: split, CacheEvictionPolicy: cacheBinding.EvictionPolicy, SessionEvictionPolicy: session.EvictionPolicy, SessionEngineVersion: session.VersionWithMinor(), ExternalCacheHost: host(cacheBinding), ExternalSessionHost: host(session),
 			Topology: cache.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: spec.Catalog.Versions.Valkey, NodeType: spec.Catalog.Valkey.NodeType, ReplicaCount: spec.Catalog.Valkey.ReplicaCount,
 			SnapshotRetentionLimit: spec.Catalog.CacheSnapshotRetentionLimit, SnapshotWindow: spec.Catalog.CacheSnapshotWindow, SubnetIDInputs: dataSubnets, SubnetCount: len(dataSubnets), SecurityGroupInput: component.Security.CacheSecurityGroupID, KMSKeyARN: spec.Dependencies.KMSKeyARN,
 			AuthTokens: cache.AuthTokens{CacheSecretARN: spec.Dependencies.CacheSecretARN, SessionSecretARN: spec.Dependencies.SessionSecretARN}, Provider: providers.Regional, Tags: tags,
@@ -242,7 +253,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	} else {
 		component.Queue, err = queue.New(ctx, name+"-queue", queue.Args{
 			Mode: spec.Catalog.QueueMode, Topology: queue.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: spec.Catalog.Versions.RabbitMQ, InstanceType: spec.Catalog.RabbitMQ.InstanceType,
-			AvailabilityZones: spec.Policy.AvailabilityZones, SubnetIDInputs: privateSubnets, SubnetCount: len(privateSubnets), SecurityGroupIDInputs: pulumi.StringArray{component.Security.QueueSecurityGroupID}, SecurityGroupCount: 1,
+			AvailabilityZones: spec.Policy.AvailabilityZones, SubnetIDInputs: privateSubnets, SubnetCount: len(privateSubnets), PrivateSubnetCount: len(privateSubnets), SecurityGroupIDInputs: pulumi.StringArray{component.Security.QueueSecurityGroupID}, SecurityGroupCount: 1,
 			KMSKeyARN: spec.Dependencies.KMSKeyARN, Credentials: queue.Credentials{SecretARN: spec.Dependencies.QueueSecretARN, Username: spec.Dependencies.MasterUsername}, Provider: providers.Regional, Tags: tags,
 			VpcID: component.Network.VpcID.ToStringOutput(), ExecutionRoleARN: component.RuntimeIdentity.ExecutionRoleARN, TaskRoleARN: component.RuntimeIdentity.TaskRoleARN, LogGroupPrefix: logGroupPrefix, LogRetentionDays: spec.Catalog.Retention.LogDays,
 		})
@@ -282,6 +293,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	}
 	capabilityConfig := &runtime.CapabilityConfig{
 		DatabaseWriterEndpoint: component.Database.WriterEndpoint, DatabaseName: spec.Dependencies.DatabaseName, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN),
+		CacheTLS: !cacheBinding.Attached(), SessionTLS: (!split && !cacheBinding.Attached()) || (split && !session.Attached()),
 		CacheEndpoint: component.Cache.CachePrimaryEndpoint, SessionEndpoint: component.Cache.SessionPrimaryEndpoint,
 		SearchEndpoint: searchEndpoint, QueueMode: component.Queue.QueueMode, QueueEndpoint: component.Queue.AMQPEndpoint,
 		QueueUsername: pulumi.String(queueUsername),
@@ -405,7 +417,7 @@ func taskPolicy(spec Spec, component *Component, searchARN pulumi.StringOutput) 
 			databaseSecretARN = value
 		}
 		secrets := []string{spec.Dependencies.CacheSecretARN, spec.Dependencies.EncryptionKeyARN}
-		if spec.Identity.Preset != sdk.PresetPreview {
+		if spec.Identity.Preset != sdk.PresetPreview || spec.ExternalServices["session"].Family != "" {
 			secrets = append(secrets, spec.Dependencies.SessionSecretARN)
 		}
 		if queue.NeedsBrokerSecret(effectiveQueueMode(spec)) {
@@ -536,7 +548,7 @@ func runtimeSecrets(spec Spec) []runtime.SecretReference {
 		{Name: "MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__PASSWORD", ARN: spec.Dependencies.CacheSecretARN},
 	}
 	sessionSecret := spec.Dependencies.CacheSecretARN
-	if spec.Identity.Preset != sdk.PresetPreview {
+	if spec.Identity.Preset != sdk.PresetPreview || spec.ExternalServices["session"].Family != "" {
 		sessionSecret = spec.Dependencies.SessionSecretARN
 		secrets = append(secrets,
 			runtime.SecretReference{Name: "MAGELIFT_SESSION_TOKEN", ARN: spec.Dependencies.SessionSecretARN},

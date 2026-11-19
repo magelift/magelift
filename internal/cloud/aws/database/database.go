@@ -3,7 +3,9 @@ package database
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -50,6 +52,7 @@ type ExistingDatabase struct {
 }
 
 type Args struct {
+	Parameters               map[string]string
 	Preset                   sdk.PresetID
 	EnvironmentClass         string
 	Region                   string
@@ -272,16 +275,18 @@ func newRDSInstance(ctx *pulumi.Context, name string, args Args, opts ...pulumi.
 	if err != nil {
 		return nil, err
 	}
+	parameters := rds.ParameterGroupParameterArray{&rds.ParameterGroupParameterArgs{Name: pulumi.String("log_bin_trust_function_creators"), Value: pulumi.String("1")}}
+	if err := sdk.ValidateDatabaseParameters(args.Parameters); err != nil {
+		return nil, err
+	}
+	for _, key := range slices.Sorted(maps.Keys(args.Parameters)) {
+		parameters = append(parameters, &rds.ParameterGroupParameterArgs{Name: pulumi.String(key), Value: pulumi.String(args.Parameters[key])})
+	}
 	parameterGroup, err := rds.NewParameterGroup(ctx, name+"-parameters", &rds.ParameterGroupArgs{
 		Description: pulumi.String("MageLift Magento database import parameters"),
 		Family:      pulumi.String(parameterFamily),
-		Parameters: rds.ParameterGroupParameterArray{
-			&rds.ParameterGroupParameterArgs{
-				Name:  pulumi.String("log_bin_trust_function_creators"),
-				Value: pulumi.String("1"),
-			},
-		},
-		Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "parameters"),
+		Parameters:  parameters,
+		Region:      pulumi.String(args.Region), Tags: tags(args.Tags, name, "parameters"),
 	}, child)
 	if err != nil {
 		return nil, err
@@ -291,7 +296,7 @@ func newRDSInstance(ctx *pulumi.Context, name string, args Args, opts ...pulumi.
 		AllocatedStorage: pulumi.Int(storage), StorageType: pulumi.String("gp3"), StorageEncrypted: pulumi.Bool(true), KmsKeyId: pulumi.String(args.KMSKeyARN),
 		DbSubnetGroupName: subnets.Name, ParameterGroupName: parameterGroup.Name, VpcSecurityGroupIds: args.VpcSecurityGroupIDs, DbName: pulumi.String(args.DatabaseName),
 		Username: pulumi.String(args.MasterUsername), ManageMasterUserPassword: pulumi.Bool(true), MasterUserSecretKmsKeyId: pulumi.String(args.KMSKeyARN),
-		BackupRetentionPeriod: pulumi.Int(args.BackupRetentionDays), MultiAz: pulumi.Bool(false), PubliclyAccessible: pulumi.Bool(false),
+		BackupRetentionPeriod: pulumi.Int(args.BackupRetentionDays), MultiAz: pulumi.Bool(args.Preset != sdk.PresetPreview), PubliclyAccessible: pulumi.Bool(false),
 		DeletionProtection: pulumi.Bool(deletionProtection), SkipFinalSnapshot: pulumi.Bool(!production), DeleteAutomatedBackups: pulumi.Bool(deleteAutomatedBackups),
 		CopyTagsToSnapshot: pulumi.Bool(true), AutoMinorVersionUpgrade: pulumi.Bool(true),
 		EnabledCloudwatchLogsExports: pulumi.StringArray{pulumi.String("error"), pulumi.String("slowquery")},
@@ -368,9 +373,6 @@ func validate(name string, args Args) error {
 		return errors.New("production databases require a final snapshot identifier")
 	}
 	if args.Engine == EngineRDSMySQL || args.Engine == EngineRDSMariaDB {
-		if args.Preset != sdk.PresetPreview {
-			return errors.New("RDS database engines are only supported for the preview preset")
-		}
 		if strings.TrimSpace(args.ProvisionedInstanceClass) == "" || args.ServerlessV2 != nil {
 			return errors.New("rds-mysql requires an explicit instance class and no Aurora Serverless settings")
 		}

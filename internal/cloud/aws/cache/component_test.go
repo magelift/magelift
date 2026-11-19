@@ -238,3 +238,26 @@ func assertSecretReferencesOnly(t *testing.T, mocks *cacheMocks, want int) {
 		}
 	}
 }
+
+func TestSeparatePreviewStoresApplyTheirOwnEvictionPolicies(t *testing.T) {
+	args := baseArgs(TopologyPreview, 0)
+	args.SeparateSession = true
+	args.AuthTokens.SessionSecretARN = args.AuthTokens.CacheSecretARN
+	args.CacheEvictionPolicy = "allkeys-lru"
+	args.SessionEvictionPolicy = "noeviction"
+	args.SessionEngineVersion = "8.1"
+	mocks := runComponentWithArgs(t, args)
+	groups := resourcesOfType(mocks, "aws:elasticache/replicationGroup:ReplicationGroup")
+	policies := resourcesOfType(mocks, "aws:elasticache/parameterGroup:ParameterGroup")
+	if len(groups) != 2 || len(policies) != 2 {
+		t.Fatalf("groups %d policies %d", len(groups), len(policies))
+	}
+	seen := map[string]bool{}
+	for _, group := range policies {
+		policy := group.Inputs["parameters"].ArrayValue()[0].ObjectValue()
+		seen[policy["value"].StringValue()] = true
+	}
+	if !seen["allkeys-lru"] || !seen["noeviction"] {
+		t.Fatal(seen)
+	}
+}

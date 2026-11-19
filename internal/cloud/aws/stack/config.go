@@ -187,7 +187,18 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	if external, ok := cfg.Services["cache"]; ok && external.Attached() {
 		ref, _ := secretref.Parse(external.Secret)
 		spec.Dependencies.CacheSecretARN = ref.ID
-		spec.Dependencies.SessionSecretARN = ref.ID
+		if _, split := cfg.Services["session"]; !split {
+			spec.Dependencies.SessionSecretARN = ref.ID
+		}
+	}
+	if session, ok := cfg.Services["session"]; ok {
+		if session.Attached() {
+			ref, _ := secretref.Parse(session.Secret)
+			spec.Dependencies.SessionSecretARN = ref.ID
+		}
+		if spec.Dependencies.SessionSecretARN == "" && preset == sdk.PresetPreview {
+			spec.Dependencies.SessionSecretARN = spec.Dependencies.CacheSecretARN
+		}
 	}
 	if external, ok := cfg.Services["queue"]; ok && external.Attached() {
 		ref, _ := secretref.Parse(external.Secret)

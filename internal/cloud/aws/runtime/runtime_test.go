@@ -1067,3 +1067,49 @@ func TestPreviewReadsSharedClusterAndOwnsItsServices(t *testing.T) {
 		t.Fatal("no per-preview ECS services created")
 	}
 }
+
+func TestRuntimeManagedCacheTLSAndExternalTransport(t *testing.T) {
+	for _, tc := range []struct {
+		name                            string
+		cacheTLS, sessionTLS            bool
+		cacheHost, sessionHost, backend string
+	}{
+		{"managed", true, true, "tls://shop.cache", "tls://shop.sessions", platform.RedisCacheBackend},
+		{"external", false, false, "shop.cache", "shop.sessions", platform.ValkeyCacheBackend},
+		{"mixed", true, false, "tls://shop.cache", "shop.sessions", platform.RedisCacheBackend},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := validArgs()
+			args.ApplicationVersion = "2.4.9"
+			args.Capabilities = testCapabilities()
+			args.Capabilities.CacheTLS = tc.cacheTLS
+			args.Capabilities.SessionTLS = tc.sessionTLS
+			m := deploy(t, args)
+			task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+			containers := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
+			env := environmentByName(definitionsByName(containers)["php-fpm"])
+			for name, want := range map[string]string{"MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__SERVER": tc.cacheHost, "MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__SERVER": tc.cacheHost, "MAGENTO_DC_SESSION__REDIS_HOST": tc.sessionHost, "MAGENTO_DC_SESSION__SAVE": "redis", "MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND": tc.backend} {
+				if env[name] != want {
+					t.Errorf("%s=%q want %q", name, env[name], want)
+				}
+			}
+		})
+	}
+}
+
+func TestECSAndManagedRabbitMQSelectAMQPWithoutDuplicateEnvironment(t *testing.T) {
+	for _, mode := range []string{"ecs-rabbitmq", "amazon-mq", "rabbitmq"} {
+		t.Run(mode, func(t *testing.T) {
+			args := validArgs()
+			args.Capabilities = testCapabilities()
+			args.Capabilities.QueueMode = pulumi.String(mode)
+			resources := deploy(t, args)
+			task := resources.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+			app := definitionsByName(decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue()))["php-fpm"]
+			env := environmentByName(app)
+			if len(env) != len(app["environment"].([]any)) || env["MAGENTO_DC_QUEUE__DEFAULT_CONNECTION"] != "amqp" || env["MAGENTO_DC_QUEUE__AMQP__HOST"] != "shop.queue" {
+				t.Fatalf("inconsistent RabbitMQ environment for %s: %#v", mode, env)
+			}
+		})
+	}
+}

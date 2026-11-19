@@ -127,3 +127,16 @@ func TestSpecValidateAllowsThreeZonePreviewAmazonMQLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestECSRabbitMQAcceptsOperatorMajorVersion(t *testing.T) {
+	catalog := validSpec().Catalog
+	catalog.QueueMode = QueueModeECSRabbitMQ
+	catalog.Versions.RabbitMQ = "4"
+	if err := catalog.validate(sdk.PresetPreview, false); err != nil {
+		t.Fatalf("ECS RabbitMQ major selection: %v", err)
+	}
+	catalog.QueueMode = QueueModeAmazonMQ
+	if err := catalog.validate(sdk.PresetPreview, false); err == nil {
+		t.Fatal("Amazon MQ must use major.minor")
+	}
+}

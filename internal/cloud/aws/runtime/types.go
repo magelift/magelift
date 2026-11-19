@@ -43,6 +43,8 @@ func (s SecretReference) ValueFrom() string {
 }
 
 type CapabilityConfig struct {
+	CacheTLS               bool
+	SessionTLS             bool
 	DatabaseWriterEndpoint pulumi.StringInput
 	DatabaseName           string
 	DatabaseSecretARN      pulumi.StringInput

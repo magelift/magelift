@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -328,20 +329,32 @@ func (c *SDKCapabilityClient) FckNatAMI(ctx context.Context, ownerID, namePatter
 	return false, nil
 }
 
+var rdsFamilyVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
+
+func databaseVersionMatches(engine, requested, actual string) bool {
+	if (engine == "mysql" || engine == "mariadb") && rdsFamilyVersion.MatchString(requested) {
+		return strings.HasPrefix(actual, requested+".") && len(actual) > len(requested)+1
+	}
+	return strings.EqualFold(actual, requested)
+}
+
 func (c *SDKCapabilityClient) DatabaseEngineVersion(ctx context.Context, engine, version string) (DatabaseEngineVersion, error) {
 	if c == nil || c.rds == nil {
 		return DatabaseEngineVersion{}, errors.New("AWS RDS capability client is required")
 	}
 	marker := (*string)(nil)
+	family := (engine == "mysql" || engine == "mariadb") && rdsFamilyVersion.MatchString(version)
 	for {
-		response, err := c.rds.DescribeDBEngineVersions(ctx, &rds.DescribeDBEngineVersionsInput{
-			Engine: awssdk.String(engine), EngineVersion: awssdk.String(version), Marker: marker, MaxRecords: awssdk.Int32(100),
-		})
+		input := &rds.DescribeDBEngineVersionsInput{Engine: awssdk.String(engine), EngineVersion: awssdk.String(version), Marker: marker, MaxRecords: awssdk.Int32(100)}
+		if family {
+			input.DefaultOnly = awssdk.Bool(true)
+		}
+		response, err := c.rds.DescribeDBEngineVersions(ctx, input)
 		if err != nil {
 			return DatabaseEngineVersion{}, fmt.Errorf("describe AWS RDS engine version: %w", err)
 		}
 		for _, candidate := range response.DBEngineVersions {
-			if awssdk.ToString(candidate.EngineVersion) != version {
+			if !databaseVersionMatches(engine, version, awssdk.ToString(candidate.EngineVersion)) {
 				continue
 			}
 			capability := DatabaseEngineVersion{EngineVersion: awssdk.ToString(candidate.EngineVersion), Status: awssdk.ToString(candidate.Status)}

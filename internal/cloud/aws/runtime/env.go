@@ -68,9 +68,10 @@ func capabilityEnvironment(args Args) pulumi.Output {
 		queueMode := values[5].(string)
 		queueEndpoint := values[6].(string)
 		searchEndpoint := values[4].(string)
-		queueConnection := "db"
-		if queueMode == "rabbitmq" {
-			queueConnection = "amqp"
+		magentoQueueMode := "database"
+		switch queueMode {
+		case "rabbitmq", "ecs-rabbitmq", "amazon-mq":
+			magentoQueueMode = "rabbitmq"
 		}
 		queueHost, queuePort, queueSSL := amqpSettings(queueEndpoint)
 		session := values[3].(string)
@@ -85,23 +86,20 @@ func capabilityEnvironment(args Args) pulumi.Output {
 			DatabaseName:       capabilities.DatabaseName,
 			CacheEndpoint:      values[2].(string),
 			SessionEndpoint:    session,
+			CacheTLS:           capabilities.CacheTLS,
+			SessionTLS:         capabilities.SessionTLS,
 			SearchEndpoint:     magentoSearchEndpoint(args, searchEndpoint),
-			Magento:            args.Magento,
+			QueueMode:          magentoQueueMode, QueueHost: queueHost, QueuePort: queuePort, QueueSSL: queueSSL, QueueUsername: values[7].(string),
+			Magento: args.Magento,
 		}))
 		// MAGELIFT_SEARCH_ENDPOINT stays the AWS endpoint. Magento may talk to
 		// a local SigV4 proxy when the target is AOSS.
 		environment = upsertContainerEnv(environment, platform.EnvSearchEndpoint, searchEndpoint)
-		// AWS adapter-local: secret ARNs, queue AMQP, media until those ports land.
+		environment = upsertContainerEnv(environment, platform.EnvQueueMode, queueMode)
 		environment = append(environment,
 			containerEnvironment{Name: "MAGELIFT_DATABASE_SECRET_ARN", Value: values[1].(string)},
-			containerEnvironment{Name: "MAGELIFT_QUEUE_MODE", Value: queueMode},
 			containerEnvironment{Name: "MAGELIFT_QUEUE_ENDPOINT", Value: queueEndpoint},
 			containerEnvironment{Name: "MAGELIFT_MEDIA_BUCKET", Value: values[8].(string)},
-			containerEnvironment{Name: "MAGENTO_DC_QUEUE__DEFAULT_CONNECTION", Value: queueConnection},
-			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__HOST", Value: queueHost},
-			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__PORT", Value: queuePort},
-			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__SSL", Value: queueSSL},
-			containerEnvironment{Name: "MAGENTO_DC_QUEUE__AMQP__USERNAME", Value: values[7].(string)},
 		)
 		environment = appendSmtpEnvironment(environment, values[9].(string), values[10].(string), capabilities.EmailFrom)
 		return environment

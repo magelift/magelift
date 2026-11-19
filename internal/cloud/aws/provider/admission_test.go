@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/mq"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 )
 
 type fakeCapabilityAPI struct {
@@ -496,6 +497,59 @@ func TestValidateSelectionFailsClosedForProviderCatalogGaps(t *testing.T) {
 			test.mutate(client, &selection)
 			if err := ValidateSelection(context.Background(), client, selection); err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Fatalf("ValidateSelection() error = %v, want substring %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestRDSFamilyAdmissionChecksResolvedPatchAndExactPatch(t *testing.T) {
+	for _, tc := range []struct {
+		engine, request, returned string
+		valid                     bool
+	}{
+		{"mysql", "8.4", "8.4.13", true}, {"mariadb", "11.4", "11.4.13", true},
+		{"mysql", "8.4", "8.40.1", false}, {"mysql", "8.4.10", "8.4.13", false},
+		{"mysql", "8.4.10", "8.4.10", true},
+	} {
+		t.Run(tc.engine+"-"+tc.request+"-"+tc.returned, func(t *testing.T) {
+			client := validFakeCapabilityAPI()
+			client.databaseVersions[tc.engine+":"+tc.request] = DatabaseEngineVersion{EngineVersion: tc.returned, Status: "available"}
+			client.databaseClasses[tc.engine+":"+tc.returned+":db.t4g.micro"] = DatabaseInstanceClass{Available: true, AvailabilityZone: []string{"eu-west-3a"}}
+			err := validateDatabase(context.Background(), client, DatabaseSelection{Engine: tc.engine, Version: tc.request, InstanceClass: "db.t4g.micro", AvailabilityZones: []string{"eu-west-3a"}})
+			if (err == nil) != tc.valid {
+				t.Fatalf("error=%v", err)
+			}
+			if tc.valid && client.calls["DatabaseInstanceClass:"+tc.engine+":"+tc.returned+":db.t4g.micro"] != 1 {
+				t.Fatalf("class lookup did not use resolved patch: %#v", client.calls)
+			}
+		})
+	}
+}
+
+func TestSDKRDSFamilyLookupRequestsRegionalDefault(t *testing.T) {
+	for _, tc := range []struct {
+		engine, request, returned string
+		family                    bool
+	}{
+		{"mysql", "8.4", "8.4.13", true}, {"mariadb", "11.4", "11.4.13", true}, {"mysql", "8.4.10", "8.4.10", false},
+	} {
+		t.Run(tc.engine+"-"+tc.request, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if err := r.ParseForm(); err != nil {
+					t.Error(err)
+				}
+				if r.Form.Get("Engine") != tc.engine || r.Form.Get("EngineVersion") != tc.request || (r.Form.Get("DefaultOnly") == "true") != tc.family {
+					t.Errorf("request = %#v", r.Form)
+				}
+				w.Header().Set("Content-Type", "text/xml")
+				_, _ = fmt.Fprintf(w, `<DescribeDBEngineVersionsResponse xmlns="http://rds.amazonaws.com/doc/2014-10-31/"><DescribeDBEngineVersionsResult><DBEngineVersions><DBEngineVersion><EngineVersion>%s</EngineVersion><Status>available</Status></DBEngineVersion></DBEngineVersions></DescribeDBEngineVersionsResult></DescribeDBEngineVersionsResponse>`, tc.returned)
+			}))
+			defer server.Close()
+			cfg := testAWSConfig(server.Client())
+			client := &SDKCapabilityClient{rds: rds.NewFromConfig(cfg, func(o *rds.Options) { o.BaseEndpoint = awssdk.String(server.URL) })}
+			result, err := client.DatabaseEngineVersion(context.Background(), tc.engine, tc.request)
+			if err != nil || result.EngineVersion != tc.returned {
+				t.Fatalf("result=%#v err=%v", result, err)
 			}
 		})
 	}

@@ -82,3 +82,17 @@ func TestModuleExposesReadOnlyPlanAdmission(t *testing.T) {
 		t.Fatalf("PlanAdmission() = %T, want stack.RegionAdmission", admission)
 	}
 }
+
+func TestSelectionKeepsRDSFamilyAndSkipsAmazonMQForECS(t *testing.T) {
+	for _, tc := range []struct{ engine, version string }{
+		{DatabaseEngineRDSMySQL, "8.4"}, {DatabaseEngineRDSMariaDB, "11.4"},
+	} {
+		t.Run(tc.engine, func(t *testing.T) {
+			spec := Spec{Catalog: CatalogSelection{DatabaseEngine: tc.engine, QueueMode: QueueModeECSRabbitMQ, Versions: ServiceVersions{MySQL: "8.4", MariaDB: "11.4", RabbitMQ: "4"}, AuroraProvisioned: AuroraProvisionedProfile{InstanceClass: "db.t4g.micro"}}}
+			selection := selectionFromSpec(spec)
+			if selection.Database == nil || selection.Database.Engine != tc.engine || selection.Database.Version != tc.version || selection.MQ != nil {
+				t.Fatalf("selection = %#v", selection)
+			}
+		})
+	}
+}

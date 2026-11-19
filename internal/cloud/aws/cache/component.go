@@ -33,6 +33,12 @@ type AuthTokens struct {
 }
 
 type Args struct {
+	SeparateSession        bool
+	CacheEvictionPolicy    string
+	SessionEvictionPolicy  string
+	SessionEngineVersion   string
+	ExternalCacheHost      string
+	ExternalSessionHost    string
 	Topology               Topology
 	Region                 string
 	EngineVersion          string
@@ -77,29 +83,38 @@ func New(ctx *pulumi.Context, name string, args Args, options ...pulumi.Resource
 		return nil, fmt.Errorf("create Valkey subnet group: %w", err)
 	}
 
-	var cacheToken pulumi.StringInput
-	if !args.DisableTransitEncryption {
-		cacheToken = lookupToken(ctx, args.Region, args.AuthTokens.CacheSecretARN, args.Provider)
+	endpoint := func(suffix, description, attached, version, eviction, tokenARN string) (pulumi.StringOutput, error) {
+		if attached != "" {
+			return pulumi.String(attached).ToStringOutput(), nil
+		}
+		var token pulumi.StringInput
+		if !args.DisableTransitEncryption {
+			token = lookupToken(ctx, args.Region, tokenARN, args.Provider)
+		}
+		groupArgs := args
+		groupArgs.EngineVersion = version
+		group, err := newReplicationGroup(ctx, name+suffix, description, groupArgs, subnetGroup.Name, token, eviction, childOptions)
+		if err != nil {
+			return pulumi.StringOutput{}, err
+		}
+		return group.PrimaryEndpointAddress, nil
 	}
-	cacheGroup, err := newReplicationGroup(ctx, name+"-cache", "Magento cache", args, subnetGroup.Name, cacheToken, childOptions)
+	cacheVersion := args.EngineVersion
+	component.CachePrimaryEndpoint, err = endpoint("-cache", "Magento cache", args.ExternalCacheHost, cacheVersion, args.CacheEvictionPolicy, args.AuthTokens.CacheSecretARN)
 	if err != nil {
 		return nil, err
 	}
-	sessionEndpoint := cacheGroup.PrimaryEndpointAddress
-	if args.Topology != TopologyPreview {
-		var sessionToken pulumi.StringInput
-		if !args.DisableTransitEncryption {
-			sessionToken = lookupToken(ctx, args.Region, args.AuthTokens.SessionSecretARN, args.Provider)
+	component.SessionPrimaryEndpoint = component.CachePrimaryEndpoint
+	if args.SeparateSession || args.Topology != TopologyPreview {
+		version := args.SessionEngineVersion
+		if version == "" {
+			version = cacheVersion
 		}
-		sessionGroup, err := newReplicationGroup(ctx, name+"-sessions", "Magento sessions", args, subnetGroup.Name, sessionToken, childOptions)
+		component.SessionPrimaryEndpoint, err = endpoint("-sessions", "Magento sessions", args.ExternalSessionHost, version, args.SessionEvictionPolicy, args.AuthTokens.SessionSecretARN)
 		if err != nil {
 			return nil, err
 		}
-		sessionEndpoint = sessionGroup.PrimaryEndpointAddress
 	}
-
-	component.CachePrimaryEndpoint = cacheGroup.PrimaryEndpointAddress
-	component.SessionPrimaryEndpoint = sessionEndpoint
 	if err := ctx.RegisterResourceOutputs(component, pulumi.Map{"cachePrimaryEndpoint": component.CachePrimaryEndpoint, "sessionPrimaryEndpoint": component.SessionPrimaryEndpoint}); err != nil {
 		return nil, err
 	}
@@ -113,7 +128,7 @@ func lookupToken(ctx *pulumi.Context, region, arn string, provider *awsprovider.
 	return secret.SecretString()
 }
 
-func newReplicationGroup(ctx *pulumi.Context, name, description string, args Args, subnetGroup pulumi.StringInput, token pulumi.StringInput, options []pulumi.ResourceOption) (*elasticache.ReplicationGroup, error) {
+func newReplicationGroup(ctx *pulumi.Context, name, description string, args Args, subnetGroup pulumi.StringInput, token pulumi.StringInput, eviction string, options []pulumi.ResourceOption) (*elasticache.ReplicationGroup, error) {
 	highAvailability := args.Topology != TopologyPreview
 	groupArgs := &elasticache.ReplicationGroupArgs{
 		ReplicationGroupId: pulumi.String(replicationGroupID(name, args)), Description: pulumi.String(description), Region: pulumi.String(args.Region),
@@ -121,6 +136,18 @@ func newReplicationGroup(ctx *pulumi.Context, name, description string, args Arg
 		AutomaticFailoverEnabled: pulumi.Bool(highAvailability), MultiAzEnabled: pulumi.Bool(highAvailability), AutoMinorVersionUpgrade: pulumi.Bool(true),
 		SubnetGroupName: subnetGroup, SecurityGroupIds: pulumi.StringArray{securityGroupInput(args)}, Port: pulumi.Int(6379),
 		AtRestEncryptionEnabled: pulumi.Bool(true), KmsKeyId: pulumi.String(args.KMSKeyARN), Tags: pulumi.ToStringMap(args.Tags),
+	}
+	if eviction != "" {
+		major, _, _ := strings.Cut(args.EngineVersion, ".")
+		parameters, err := elasticache.NewParameterGroup(ctx, name+"-parameters", &elasticache.ParameterGroupArgs{
+			Family: pulumi.String("valkey" + major), Description: pulumi.String(description + " eviction policy"),
+			Parameters: elasticache.ParameterGroupParameterArray{&elasticache.ParameterGroupParameterArgs{Name: pulumi.String("maxmemory-policy"), Value: pulumi.String(eviction)}},
+			Region:     pulumi.String(args.Region), Tags: pulumi.ToStringMap(args.Tags),
+		}, options...)
+		if err != nil {
+			return nil, fmt.Errorf("configure %s eviction: %w", description, err)
+		}
+		groupArgs.ParameterGroupName = parameters.Name
 	}
 	if args.SnapshotRetentionLimit != nil {
 		groupArgs.SnapshotRetentionLimit = pulumi.IntPtrFromPtr(args.SnapshotRetentionLimit)
@@ -172,9 +199,12 @@ func validateArgs(name string, args Args) error {
 	if !args.DisableTransitEncryption && !secretARNPattern.MatchString(args.AuthTokens.CacheSecretARN) {
 		return errors.New("Valkey cache auth token must be a Secrets Manager ARN")
 	}
+	if args.SeparateSession && !args.DisableTransitEncryption && !secretARNPattern.MatchString(args.AuthTokens.SessionSecretARN) {
+		return errors.New("separate sessions require a session credential")
+	}
 	switch args.Topology {
 	case TopologyPreview:
-		if args.ReplicaCount < 0 || args.ReplicaCount > 1 || args.AuthTokens.SessionSecretARN != "" {
+		if args.ReplicaCount < 0 || args.ReplicaCount > 1 || (!args.SeparateSession && args.AuthTokens.SessionSecretARN != "") {
 			return errors.New("preview Valkey must use one bounded group with at most one replica")
 		}
 	case TopologyStandard:

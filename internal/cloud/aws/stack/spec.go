@@ -20,6 +20,7 @@ var (
 	accountID           = regexp.MustCompile(`^[0-9]{12}$`)
 	regionName          = regexp.MustCompile(`^[a-z]{2}(?:-gov)?-[a-z]+-[0-9]+$`)
 	digest              = regexp.MustCompile(`^[^@\s]+@sha256:[a-f0-9]{64}$`)
+	ecsRabbitVersion    = regexp.MustCompile(`^[0-9]+(?:\.[0-9]+){0,2}$`)
 	version             = regexp.MustCompile(`^[0-9]+\.[0-9]+(?:\.[0-9]+)?$`)
 	certificate         = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):acm:us-east-1:[0-9]{12}:certificate/[A-Za-z0-9-]+$`)
 	domain              = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
@@ -254,7 +255,7 @@ func (s Spec) ValidateAllowExpiredPreview() error {
 
 func (s Spec) validate(allowExpiredPreview bool) error {
 	var problems []error
-	problems = append(problems, s.Identity.validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Lifecycle.validate(s.Identity.EnvironmentClass == "preview", allowExpiredPreview), s.Existing.validate(s.Edge), s.Dependencies.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset, s.ExternalSearchEndpoint != "", s.ExternalServices["database"].Attached()), sdk.ValidateEdgeIntent(s.Edge), sdk.ValidateObservabilityIntent(s.Observability))
+	problems = append(problems, s.Identity.validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Lifecycle.validate(s.Identity.EnvironmentClass == "preview", allowExpiredPreview), s.Existing.validate(s.Edge), s.Dependencies.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset, s.ExternalSearchEndpoint != ""), sdk.ValidateEdgeIntent(s.Edge), sdk.ValidateObservabilityIntent(s.Observability))
 	if s.Existing.Network != nil {
 		if s.Policy.NatMode == NatModeFckNat || strings.TrimSpace(s.Policy.NatTopology) != "" || strings.TrimSpace(s.Policy.NatReplacementMode) != "" || strings.TrimSpace(s.Policy.NatInstanceType) != "" {
 			problems = append(problems, errors.New("existing network owns egress; fck-nat and NAT topology/replacement settings cannot be selected"))
@@ -526,7 +527,7 @@ func (p NetworkPolicy) validate(preset sdk.PresetID) error {
 	return errors.Join(problems...)
 }
 
-func (c CatalogSelection) validate(preset sdk.PresetID, externalSearch, externalDatabase bool) error {
+func (c CatalogSelection) validate(preset sdk.PresetID, externalSearch bool) error {
 	var problems []error
 	if strings.TrimSpace(c.Version) == "" {
 		problems = append(problems, errors.New("benchmark catalog version is required"))
@@ -539,9 +540,6 @@ func (c CatalogSelection) validate(preset sdk.PresetID, externalSearch, external
 	}
 	if c.QueueMode != "" && c.QueueMode != QueueModeDB && c.QueueMode != QueueModeAmazonMQ && c.QueueMode != QueueModeECSRabbitMQ && c.QueueMode != QueueModeECSArtemis {
 		problems = append(problems, errors.New("queueMode must be db, amazon-mq, ecs-rabbitmq, or ecs-artemis"))
-	}
-	if !externalDatabase && (c.DatabaseEngine == DatabaseEngineRDSMySQL || c.DatabaseEngine == DatabaseEngineRDSMariaDB) && preset != sdk.PresetPreview {
-		problems = append(problems, errors.New("RDS database engines are only supported for the preview preset"))
 	}
 	if !externalSearch && c.SearchMode == SearchModeDisabled && preset != sdk.PresetPreview {
 		problems = append(problems, errors.New("searchMode disabled is only supported for the preview preset"))
@@ -565,8 +563,19 @@ func (c CatalogSelection) validate(preset sdk.PresetID, externalSearch, external
 	if !retentionSet[c.Retention.LogDays] || c.Retention.BackupDays < 1 || c.Retention.ArtifactDays < 1 {
 		problems = append(problems, errors.New("retention profile is invalid"))
 	}
-	if !version.MatchString(c.Versions.Valkey) || !version.MatchString(c.Versions.RabbitMQ) {
-		problems = append(problems, errors.New("Valkey and RabbitMQ versions must use their explicit AWS version format"))
+	if !version.MatchString(c.Versions.Valkey) {
+		problems = append(problems, errors.New("Valkey version must use major.minor or major.minor.patch"))
+	}
+	rabbitVersion := version
+	mode := c.QueueMode
+	if mode == "" {
+		mode = defaultQueueMode(preset)
+	}
+	if mode == QueueModeECSRabbitMQ {
+		rabbitVersion = ecsRabbitVersion
+	}
+	if !rabbitVersion.MatchString(c.Versions.RabbitMQ) {
+		problems = append(problems, errors.New("RabbitMQ version must use a valid version for the selected queue mode"))
 	}
 	if c.DatabaseEngine == DatabaseEngineRDSMySQL {
 		if !version.MatchString(c.Versions.MySQL) {
@@ -607,7 +616,7 @@ func (c CatalogSelection) validate(preset sdk.PresetID, externalSearch, external
 		if preset == sdk.PresetHighAvailability {
 			minimumInstances = 3
 		}
-		if strings.TrimSpace(c.AuroraProvisioned.InstanceClass) == "" || c.AuroraProvisioned.InstanceCount < minimumInstances {
+		if c.DatabaseEngine == DatabaseEngineAuroraMySQL && (strings.TrimSpace(c.AuroraProvisioned.InstanceClass) == "" || c.AuroraProvisioned.InstanceCount < minimumInstances) {
 			problems = append(problems, fmt.Errorf("preset %q requires at least %d Aurora instances", preset, minimumInstances))
 		}
 		queueMode := c.QueueMode
