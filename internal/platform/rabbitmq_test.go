@@ -48,7 +48,7 @@ func TestQueueReplicasFromOutputs(t *testing.T) {
 }
 
 func TestBindLiveQueueReplicasPreservesCallerContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), struct{}{}, "caller"))
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	planned := &contextReplicaBinder{fakePlannedStack: fakePlannedStack{provider: "aws", runtime: "eks"}}
 	bound, err := BindLiveQueueReplicasContext(ctx, planned, map[string]any{OutputQueueReplicas: 3})

@@ -44,7 +44,8 @@ func (p *contextReplicaPlanned) WithLiveQueueReplicasContext(ctx context.Context
 }
 
 func TestRebindLiveQueuePlanPropagatesContextAndRebuildsBackend(t *testing.T) {
-	ctx := context.WithValue(context.Background(), struct{}{}, "request")
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	planned := &contextReplicaPlanned{stubPlanned: stubPlanned{stackName: "shop-staging", provider: "aws", runtime: "eks"}}
 	oldBackend := &fakeInfrastructureBackend{outputs: map[string]any{platform.OutputQueueReplicas: 3}}
 	var backendPlan platform.PlannedStack
