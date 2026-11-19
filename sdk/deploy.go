@@ -95,6 +95,11 @@ type DeployAppPhaseCall struct {
 // DeployAppPhaseResult carries the phase outcome. Message is a human
 // diagnostic line the core prints; StateJSON feeds the next phase.
 type DeployAppPhaseResult struct {
+	// StateJSON is an opaque provider-owned candidate handle. A provider may
+	// return an updated handle after migration so the host can pass it to
+	// stabilization and health phases. An empty value means no continuation
+	// handle is needed. The host clears any retained handle after successful
+	// health; on phase failure it retains the handle for candidate cleanup.
 	StateJSON []byte          `json:"stateJson,omitempty"`
 	Message   string          `json:"message,omitempty"`
 	Error     *OperationError `json:"error,omitempty"`
@@ -114,8 +119,16 @@ type MediaTransferCall struct {
 
 // MediaTransferResult reports a completed transfer.
 type MediaTransferResult struct {
+	Listing   *MediaListing   `json:"listing,omitempty"`
 	FileCount int64           `json:"fileCount"`
 	ByteCount int64           `json:"byteCount"`
 	LocalDir  string          `json:"localDir"`
 	Error     *OperationError `json:"error,omitempty"`
+}
+
+// MediaListing reports the objects compared after uploading a Magento media tree.
+type MediaListing struct {
+	Keys    []string `json:"keys"`
+	Missing []string `json:"missing"`
+	Extra   []string `json:"extra"`
 }

@@ -48,12 +48,14 @@ type Application struct {
 // reference, never a value. Managed provisioning inputs stay core-side:
 // providers receive only modes they can serve.
 type EmailSettings struct {
-	Mode       string
-	Host       string
-	Port       int
-	Username   string
-	From       string
-	Credential string
+	ManagedDomain       string
+	ManagedHostedZoneID string
+	Mode                string
+	Host                string
+	Port                int
+	Username            string
+	From                string
+	Credential          string
 }
 
 // MagentoSettings mirrors the portable Magento runtime overlays so provider

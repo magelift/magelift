@@ -194,6 +194,7 @@ type DescribeResponse struct {
 // Envelope carries core-resolved deployment coordinates. Every plan-scoped
 // operation takes it so the server never imports core config.
 type Envelope struct {
+	Account            string `json:"account,omitempty"`
 	Project            string `json:"project"`
 	Environment        string `json:"environment"`
 	Region             string `json:"region"`
@@ -227,19 +228,22 @@ type StoredPlan struct {
 // PlanRequest asks the provider to plan from core intents plus raw target
 // bytes. The target block stays provider-owned: the core never parses it.
 type PlanRequest struct {
-	StateEnvironment    string                    `json:"stateEnvironment,omitempty"`
-	ProtocolVersion     string                    `json:"protocolVersion"`
-	Envelope            Envelope                  `json:"envelope"`
-	Application         Application               `json:"application"`
-	Edge                EdgeIntent                `json:"edge"`
-	Observability       ObservabilityIntent       `json:"observability"`
-	TargetBlock         []byte                    `json:"targetBlock"`
-	Services            map[string]ServiceBinding `json:"services,omitempty"`
-	Runtime             string                    `json:"runtime,omitempty"`
-	LiveQueueReplicas   int                       `json:"liveQueueReplicas,omitempty"`
-	ValkeyRequirement   string                    `json:"valkeyRequirement,omitempty"`
-	AllowUnsupported    bool                      `json:"allowUnsupported,omitempty"`
-	AllowExpiredPreview bool                      `json:"allowExpiredPreview,omitempty"`
+	// Admit requests the read-only account and regional checks before mutation.
+	Admit                  bool                      `json:"admit,omitempty"`
+	UseProviderDefaultEdge bool                      `json:"useProviderDefaultEdge,omitempty"`
+	StateEnvironment       string                    `json:"stateEnvironment,omitempty"`
+	ProtocolVersion        string                    `json:"protocolVersion"`
+	Envelope               Envelope                  `json:"envelope"`
+	Application            Application               `json:"application"`
+	Edge                   EdgeIntent                `json:"edge"`
+	Observability          ObservabilityIntent       `json:"observability"`
+	TargetBlock            []byte                    `json:"targetBlock"`
+	Services               map[string]ServiceBinding `json:"services,omitempty"`
+	Runtime                string                    `json:"runtime,omitempty"`
+	LiveQueueReplicas      int                       `json:"liveQueueReplicas,omitempty"`
+	ValkeyRequirement      string                    `json:"valkeyRequirement,omitempty"`
+	AllowUnsupported       bool                      `json:"allowUnsupported,omitempty"`
+	AllowExpiredPreview    bool                      `json:"allowExpiredPreview,omitempty"`
 	// AccountOnly asks for the account-prep plan bootstrap uses. Deploy
 	// planning leaves it false and still requires the image digest and
 	// encryption-key secret.
@@ -364,12 +368,14 @@ type StateLockCall struct {
 
 // StateLockResult reports the lock acquisition.
 type StateLockResult struct {
-	Locked bool            `json:"locked"`
-	Error  *OperationError `json:"error,omitempty"`
+	ReleaseToken string          `json:"releaseToken,omitempty"`
+	Locked       bool            `json:"locked"`
+	Error        *OperationError `json:"error,omitempty"`
 }
 
 // StateUnlockCall mirrors State.Unlock.
 type StateUnlockCall struct {
+	ReleaseToken    string     `json:"releaseToken,omitempty"`
 	ProtocolVersion string     `json:"protocolVersion"`
 	Envelope        Envelope   `json:"envelope"`
 	Plan            StoredPlan `json:"plan"`
@@ -453,6 +459,7 @@ type SecretRemoveResult struct {
 // SecretReadRequest serves secretref value resolution. Name is a full
 // version resource name; JSON-field extraction stays core-side.
 type SecretReadRequest struct {
+	Parameter       bool     `json:"parameter,omitempty"`
 	ProtocolVersion string   `json:"protocolVersion"`
 	Envelope        Envelope `json:"envelope"`
 	Name            string   `json:"name"`
@@ -535,12 +542,13 @@ type PrepareTunnelResult struct {
 // CostInputsRequest mirrors CostEstimator.Estimate without requiring a
 // stored plan: cost works from resolved inputs plus the raw target block.
 type CostInputsRequest struct {
-	ProtocolVersion string   `json:"protocolVersion"`
-	Envelope        Envelope `json:"envelope"`
-	TargetBlock     []byte   `json:"targetBlock"`
-	Runtime         string   `json:"runtime,omitempty"`
-	Live            bool     `json:"live,omitempty"`
-	Budget          bool     `json:"budget,omitempty"`
+	Plan            *StoredPlan `json:"plan,omitempty"`
+	ProtocolVersion string      `json:"protocolVersion"`
+	Envelope        Envelope    `json:"envelope"`
+	TargetBlock     []byte      `json:"targetBlock"`
+	Runtime         string      `json:"runtime,omitempty"`
+	Live            bool        `json:"live,omitempty"`
+	Budget          bool        `json:"budget,omitempty"`
 }
 
 // CostInputsResult carries the JSON-encoded platform.CostReport.
