@@ -178,48 +178,44 @@ func runGo(t *testing.T, dir string, env []string, args ...string) string {
 	return stdout.String()
 }
 
-func copyDir(t *testing.T, src, dst string) {
+// stageTrackedFiles copies the current contents of files that can ship in a Git release.
+func stageTrackedFiles(t *testing.T, source string) string {
 	t.Helper()
-	copyDirSkipping(t, src, dst, map[string]bool{})
-}
-
-func copyDirSkipping(t *testing.T, src, dst string, skip map[string]bool) {
-	t.Helper()
-	copyDirSkippingPath(t, src, dst, "", skip)
-}
-
-func copyDirSkippingPath(t *testing.T, src, dst, relative string, skip map[string]bool) {
-	t.Helper()
-	entries, err := os.ReadDir(src)
+	cmd := exec.Command("git", "ls-files", "-z", "--", ".")
+	cmd.Dir = source
+	paths, err := cmd.Output()
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("list tracked files in %s: %v", source, err)
 	}
-	if err := os.MkdirAll(dst, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		childRelative := filepath.Join(relative, entry.Name())
-		if skip[childRelative] {
+	staged := t.TempDir()
+	for name := range strings.SplitSeq(string(paths), "\x00") {
+		if name == "" {
 			continue
 		}
-		from := filepath.Join(src, entry.Name())
-		to := filepath.Join(dst, entry.Name())
-		if entry.IsDir() {
-			copyDirSkippingPath(t, from, to, childRelative, skip)
+		from := filepath.Join(source, name)
+		info, err := os.Lstat(from)
+		if os.IsNotExist(err) {
 			continue
 		}
-		info, err := entry.Info()
-		if err != nil || !info.Mode().IsRegular() {
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !info.Mode().IsRegular() {
 			continue
+		}
+		to := filepath.Join(staged, name)
+		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+			t.Fatal(err)
 		}
 		body, err := os.ReadFile(from)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(to, body, 0o644); err != nil {
+		if err := os.WriteFile(to, body, info.Mode().Perm()); err != nil {
 			t.Fatal(err)
 		}
 	}
+	return staged
 }
 
 func TestSDKConsumerBuildsOutsideWorkspace(t *testing.T) {
@@ -227,7 +223,7 @@ func TestSDKConsumerBuildsOutsideWorkspace(t *testing.T) {
 	work := t.TempDir()
 	proxy, env := proxyEnv(t, work, false)
 	version := proofVersion(t)
-	publishModule(t, proxy, sdkModule, version, filepath.Join(root, "sdk"))
+	publishModule(t, proxy, sdkModule, version, stageTrackedFiles(t, filepath.Join(root, "sdk")))
 	assertProxyCoherent(t, proxy, sdkModule, version)
 
 	consumer := filepath.Join(work, "consumer")
@@ -269,7 +265,7 @@ func TestSDKConsumerBuildsOutsideWorkspace(t *testing.T) {
 }
 
 func TestProviderBuildsOutsideWorkspace(t *testing.T) {
-	root := repositoryRoot(t)
+	root := stageTrackedFiles(t, repositoryRoot(t))
 	work := t.TempDir()
 	// Magelift modules resolve from the file proxy; third-party modules
 	// resolve upstream (documented network use: the claim under test is
@@ -283,11 +279,6 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	// (the tree keeps its pre-tag workspace form until the
 	// require-bump commit). The provider under test is the main module
 	// on disk; SDK and root resolve from the proxy.
-	rootCopy := filepath.Join(work, "root")
-	skip := map[string]bool{
-		"sdk": true, ".git": true, ".magelift": true, "dist": true,
-		".venv": true, "node_modules": true, "website": true,
-	}
 	providerManifests, err := filepath.Glob(filepath.Join(root, "providers", "*", "go.mod"))
 	if err != nil {
 		t.Fatal(err)
@@ -295,16 +286,8 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	if len(providerManifests) == 0 {
 		t.Fatal("no provider modules found")
 	}
-	for _, manifest := range providerManifests {
-		relative, err := filepath.Rel(root, filepath.Dir(manifest))
-		if err != nil {
-			t.Fatal(err)
-		}
-		skip[relative] = true
-	}
-	copyDirSkipping(t, root, rootCopy, skip)
-	setRequire(t, filepath.Join(rootCopy, "go.mod"), sdkModule, version)
-	publishModule(t, proxy, rootModule, version, rootCopy)
+	setRequire(t, filepath.Join(root, "go.mod"), sdkModule, version)
+	publishModule(t, proxy, rootModule, version, root)
 	assertProxyCoherent(t, proxy, rootModule, version)
 	assertZipContains(t, filepath.Join(proxy, "github.com", "magelift", "magelift", "@v", version+".zip"), "providers/README.md")
 
@@ -317,8 +300,7 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	for _, manifest := range providerManifests {
 		name := filepath.Base(filepath.Dir(manifest))
 		t.Run(name, func(t *testing.T) {
-			copied := filepath.Join(work, "providers", name)
-			copyDir(t, filepath.Join(root, "providers", name), copied)
+			copied := filepath.Dir(manifest)
 			setRequire(t, filepath.Join(copied, "go.mod"), sdkModule, version)
 			setRequire(t, filepath.Join(copied, "go.mod"), rootModule, version)
 			runGo(t, copied, tidyEnv, "mod", "tidy")
