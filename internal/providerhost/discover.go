@@ -88,6 +88,9 @@ func (d *CachedDialer) Do(ctx context.Context) (*Client, error) {
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.cached != nil && d.cached.exited() {
+		d.cached = nil
+	}
 	if d.cached != nil || d.cachedErr != nil {
 		return d.cached, d.cachedErr
 	}

@@ -2,6 +2,8 @@ package s3state
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -74,6 +76,46 @@ func (port Port) Lock(ctx context.Context, p platform.PlannedStack, owner string
 	}
 	return handle.Release, nil
 }
+
+// A receipt binds conditional release to one S3 object generation, even when a
+// cancelled deployment has to start a fresh provider process for cleanup.
+type lockReceipt struct {
+	Bucket string `json:"bucket"`
+	Info   Info   `json:"lock"`
+}
+
+func (port Port) LockWithReceipt(ctx context.Context, p platform.PlannedStack, owner string) (string, error) {
+	manager, bucket, err := port.manager(ctx, p)
+	if err != nil {
+		return "", err
+	}
+	handle, err := manager.Acquire(ctx, p.Project(), p.Environment(), owner)
+	if err != nil {
+		return "", err
+	}
+	body, err := json.Marshal(lockReceipt{Bucket: bucket, Info: handle.Info()})
+	if err != nil {
+		return "", errors.Join(err, handle.Release(ctx))
+	}
+	return base64.RawURLEncoding.EncodeToString(body), nil
+}
+
+func (port Port) ReleaseReceipt(ctx context.Context, p platform.PlannedStack, token string) error {
+	body, err := base64.RawURLEncoding.DecodeString(token)
+	var receipt lockReceipt
+	if err != nil || json.Unmarshal(body, &receipt) != nil {
+		return ErrLockReplaced
+	}
+	manager, bucket, err := port.manager(ctx, p)
+	if err != nil {
+		return err
+	}
+	if receipt.Bucket != bucket {
+		return ErrLockReplaced
+	}
+	return manager.release(ctx, receipt.Info)
+}
+
 func (port Port) Unlock(ctx context.Context, p platform.PlannedStack) (*platform.LockInfo, error) {
 	manager, _, err := port.manager(ctx, p)
 	if err != nil {

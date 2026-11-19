@@ -139,7 +139,15 @@ func (s ShimState) unlock(ctx context.Context, planned platform.PlannedStack, re
 	if err != nil {
 		return nil, err
 	}
-	resp, err := Call[sdk.StateUnlockCall, sdk.StateUnlockResult](ctx, shimClientOf(shim), sdk.OpStateUnlock, &sdk.StateUnlockCall{
+	client := shimClientOf(shim)
+	if releaseToken != "" {
+		// Only a receipt-bound release can resume after its original process exits.
+		client, err = client.forConditionalRelease(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	resp, err := Call[sdk.StateUnlockCall, sdk.StateUnlockResult](ctx, client, sdk.OpStateUnlock, &sdk.StateUnlockCall{
 		ReleaseToken: releaseToken, ProtocolVersion: sdk.ProtocolV1, Envelope: shim.inputs.envelope, Plan: shim.stored,
 	})
 	if err != nil {

@@ -580,16 +580,8 @@ func (o ShimOps) AcquireLock(ctx context.Context, planned platform.PlannedStack)
 		return nil, AsPluginError(sdk.OpStateLock, resp.Error)
 	}
 	return func(releaseCtx context.Context) error {
-		unlock, err := Call[sdk.StateUnlockCall, sdk.StateUnlockResult](releaseCtx, o.client, sdk.OpStateUnlock, &sdk.StateUnlockCall{
-			ProtocolVersion: sdk.ProtocolV1, Envelope: shim.inputs.envelope, Plan: shim.stored,
-		})
-		if err != nil {
-			return err
-		}
-		if unlock.Error != nil {
-			return AsPluginError(sdk.OpStateUnlock, unlock.Error)
-		}
-		return nil
+		_, err := (ShimState{client: o.client}).unlock(releaseCtx, shim, resp.ReleaseToken)
+		return err
 	}, nil
 }
 

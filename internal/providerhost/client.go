@@ -117,6 +117,22 @@ func (c *Client) ensure(ctx context.Context) (*Client, error) {
 	return delegate, nil
 }
 
+func (c *Client) exited() bool {
+	return c != nil && c.process != nil && c.process.Exited()
+}
+
+func (c *Client) forConditionalRelease(ctx context.Context) (*Client, error) {
+	if c == nil {
+		return nil, errors.New("provider client is required")
+	}
+	c.mu.Lock()
+	if c.delegate != nil && c.delegate.exited() {
+		c.delegate = nil
+	}
+	c.mu.Unlock()
+	return c.ensure(ctx)
+}
+
 // DialOptions configures v2 dialing.
 type DialOptions struct {
 	// Logger receives the selection line plus plugin stderr. Nil silences.
@@ -226,6 +242,8 @@ func (c *Client) Describe() *sdk.DescribeResponse {
 	if c == nil {
 		return nil
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.describe == nil && c.delegate != nil {
 		return c.delegate.describe
 	}
@@ -290,6 +308,8 @@ func (c *Client) ProviderID() string {
 	if c == nil {
 		return ""
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.provider == "" && c.delegate != nil {
 		return c.delegate.provider
 	}
@@ -301,6 +321,8 @@ func (c *Client) ProviderVersion() string {
 	if c == nil {
 		return ""
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.providerVersion == "" && c.delegate != nil {
 		return c.delegate.providerVersion
 	}
@@ -321,8 +343,11 @@ func (c *Client) Kill() {
 		c.process.Kill()
 		return
 	}
-	if c.delegate != nil {
-		c.delegate.Kill()
+	c.mu.Lock()
+	delegate := c.delegate
+	c.mu.Unlock()
+	if delegate != nil {
+		delegate.Kill()
 	}
 }
 

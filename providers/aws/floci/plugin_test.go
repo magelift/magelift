@@ -3,6 +3,7 @@
 package floci_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/magelift/magelift/internal/awsendpoint"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/sdk"
@@ -39,11 +41,10 @@ func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
 	if output, err := exec.CommandContext(ctx, "go", "build", "-o", binary, "../cmd/magelift-provider-aws").CombinedOutput(); err != nil {
 		t.Fatalf("build plugin: %v\n%s", err, output)
 	}
-	client, err := providerhost.Dial(ctx, binary, providerhost.DialOptions{ExpectedProvider: "aws", Required: []sdk.Operation{sdk.OpPlan, sdk.OpMediaImport, sdk.OpMediaExport, sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpSecretSet, sdk.OpSecretRead, sdk.OpSecretRemove}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(client.Close)
+	shared := &providerhost.CachedDialer{Dial: func(ctx context.Context) (*providerhost.Client, error) {
+		return providerhost.Dial(ctx, binary, providerhost.DialOptions{ExpectedProvider: "aws", Required: []sdk.Operation{sdk.OpPlan, sdk.OpMediaImport, sdk.OpMediaExport, sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpSecretSet, sdk.OpSecretRead, sdk.OpSecretRemove}})
+	}}
+	t.Cleanup(shared.Close)
 	const region = "us-east-1"
 	buckets, err := awsendpoint.S3Client(ctx, region, endpoint)
 	if err != nil {
@@ -52,6 +53,10 @@ func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
 	for _, runtime := range []string{"ecs-fargate", "eks"} {
 		t.Run(runtime, func(t *testing.T) {
 			ctx := t.Context()
+			client, err := shared.Do(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
 			env := sdk.Envelope{Project: "plugintest", Environment: "staging", Account: "000000000000", Region: region, EnvironmentClass: "staging", Preset: "standard", StackName: platform.FormatStackName("plugintest", "staging", "aws", sdk.RuntimeID(runtime))}
 			plan, err := providerhost.Call[sdk.PlanRequest, sdk.PlanResult](ctx, client, sdk.OpPlan, &sdk.PlanRequest{ProtocolVersion: sdk.ProtocolV1, Runtime: runtime, Envelope: env, AccountOnly: true, TargetBlock: []byte("kmsKeyArn: arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000")})
 			if err != nil || plan.Error != nil {
@@ -139,6 +144,36 @@ func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
 			key := "media/banner.jpg"
 			if _, err := buckets.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucket, Key: &key}); err != nil {
 				t.Fatal(err)
+			}
+			shim, err := providerhost.NewLazyProviderShimModule("aws", sdk.RuntimeID(runtime), platform.TierExperimental, nil, shared.Do)
+			if err != nil {
+				t.Fatal(err)
+			}
+			conf := config.Config{Project: config.Project{Name: env.Project}, Account: env.Account, Class: env.EnvironmentClass, Defaults: config.Defaults{Preset: env.Preset, Region: region}, Target: config.Target{Provider: "aws", Runtime: runtime, AWS: &config.AWSTarget{KMSKeyARN: "arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000"}}}
+			planned, err := shim.Plan(conf, env.Environment, platform.PlanOptions{AccountOnly: true, Context: ctx})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ops := platform.ModuleOps(shim)
+			stale, err := ops.AcquireLock(ctx, planned)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := platform.ModuleState(shim).Unlock(ctx, planned); err != nil {
+				t.Fatal(err)
+			}
+			winner, err := ops.AcquireLock(ctx, planned)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := stale(ctx); err == nil {
+				t.Fatal("deployment release callback removed its successor")
+			}
+			// net/rpc cancellation kills the subprocess. Conditional cleanup must
+			// still release exactly the winner's lock using a fresh verified session.
+			client.Kill()
+			if err := winner(ctx); err != nil {
+				t.Fatalf("release after provider exit: %v", err)
 			}
 			if _, err := buckets.DeleteBucket(ctx, &s3.DeleteBucketInput{Bucket: &bucket}); err != nil {
 				t.Fatal(err)

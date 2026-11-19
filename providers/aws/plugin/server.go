@@ -37,7 +37,6 @@ func PluginMap(server *Server) map[string]plugin.Plugin {
 type Server struct {
 	Version    string
 	mu         sync.Mutex
-	locks      map[string]*heldLock
 	candidates map[string]*deploymentCandidate
 	admit      func(context.Context, platform.StackModule, platform.PlannedStack) (platform.PlannedStack, error)
 }

@@ -4,9 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/magelift/magelift/internal/platform"
@@ -14,13 +12,6 @@ import (
 	"github.com/magelift/magelift/providers/aws/secrets"
 	"github.com/magelift/magelift/sdk"
 )
-
-type heldLock struct {
-	mu      sync.Mutex
-	target  sdk.Envelope
-	backend string
-	release func(context.Context) error
-}
 
 func newToken() (string, error) {
 	var id [24]byte
@@ -68,23 +59,14 @@ func (s *Server) StateStatus(req *sdk.StateStatusCall, resp *sdk.StateStatusResu
 
 func (s *Server) StateLock(req *sdk.StateLockCall, resp *sdk.StateLockResult) error {
 	return withPlan(req.ProtocolVersion, &resp.Error, req.Envelope, req.Plan, func(ctx context.Context, m platform.StackModule, p platform.PlannedStack) error {
-		token, err := newToken()
-		if err != nil {
-			return err
-		}
-		release, err := platform.ModuleState(m).Lock(ctx, p, req.Owner)
+		state := platform.ModuleState(m).(s3state.Port)
+		token, err := state.LockWithReceipt(ctx, p, req.Owner)
 		if s3state.IsNotFound(err) {
 			return &sdk.OperationError{Code: sdk.ErrCodeNotFound, Message: fmt.Sprintf("state bucket is missing; run magelift bootstrap --env %s --access-log-bucket <existing-bucket>", p.Environment())}
 		}
 		if err != nil {
 			return err
 		}
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		if s.locks == nil {
-			s.locks = make(map[string]*heldLock)
-		}
-		s.locks[token] = &heldLock{target: req.Envelope, backend: req.Plan.StateBackendURL, release: release}
 		resp.Locked, resp.ReleaseToken = true, token
 		return nil
 	})
@@ -93,21 +75,7 @@ func (s *Server) StateLock(req *sdk.StateLockCall, resp *sdk.StateLockResult) er
 func (s *Server) StateUnlock(req *sdk.StateUnlockCall, resp *sdk.StateUnlockResult) error {
 	return withPlan(req.ProtocolVersion, &resp.Error, req.Envelope, req.Plan, func(ctx context.Context, m platform.StackModule, p platform.PlannedStack) error {
 		if req.ReleaseToken != "" {
-			s.mu.Lock()
-			lock, ok := s.locks[req.ReleaseToken]
-			s.mu.Unlock()
-			if !ok || lock.target != req.Envelope || lock.backend != req.Plan.StateBackendURL {
-				return invalid(errors.New("AWS lock does not belong to this invocation and stack"))
-			}
-			lock.mu.Lock()
-			defer lock.mu.Unlock()
-			if err := lock.release(ctx); err != nil {
-				return err
-			}
-			s.mu.Lock()
-			delete(s.locks, req.ReleaseToken)
-			s.mu.Unlock()
-			return nil
+			return platform.ModuleState(m).(s3state.Port).ReleaseReceipt(ctx, p, req.ReleaseToken)
 		}
 		info, err := platform.ModuleState(m).Unlock(ctx, p)
 		if err != nil {

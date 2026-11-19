@@ -16,6 +16,7 @@ import (
 )
 
 var ErrLocked = errors.New("deployment lock is held")
+var ErrLockReplaced = errors.New("deployment lock ownership changed")
 var ErrNotLocked = errors.New("deployment lock is not held")
 var stableName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,30}$`)
 var bucketName = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
@@ -151,21 +152,32 @@ func (h *Handle) Release(ctx context.Context) error {
 	if h == nil || h.manager == nil {
 		return errors.New("deployment lock handle is required")
 	}
-	current, err := h.manager.inspect(ctx)
+	if err := h.manager.release(ctx, h.info); err != nil {
+		return err
+	}
+	h.manager = nil
+	return nil
+}
+
+func (m *Manager) release(ctx context.Context, acquired Info) error {
+	if acquired.Project != m.project || acquired.Environment != m.environment || acquired.Owner == "" || acquired.AcquiredAt.IsZero() {
+		return ErrLockReplaced
+	}
+	current, err := m.inspect(ctx)
 	if err != nil {
 		return err
 	}
-	if current.Owner != h.info.Owner || !current.AcquiredAt.Equal(h.info.AcquiredAt) {
-		return errors.New("deployment lock ownership changed")
+	if current.Owner != acquired.Owner || !current.AcquiredAt.Equal(acquired.AcquiredAt) ||
+		(acquired.ETag != "" && current.ETag != acquired.ETag) {
+		return ErrLockReplaced
 	}
-	input := &s3.DeleteObjectInput{Bucket: awssdk.String(h.manager.bucket), Key: awssdk.String(h.manager.key)}
+	input := &s3.DeleteObjectInput{Bucket: &m.bucket, Key: &m.key}
 	if current.ETag != "" {
-		input.IfMatch = awssdk.String(current.ETag)
+		input.IfMatch = &current.ETag
 	}
-	if _, err := h.manager.client.DeleteObject(ctx, input); err != nil {
+	if _, err = m.client.DeleteObject(ctx, input); err != nil {
 		return fmt.Errorf("release deployment lock: %w", err)
 	}
-	h.manager = nil
 	return nil
 }
 
