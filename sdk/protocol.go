@@ -366,14 +366,16 @@ type StateLockCall struct {
 	Owner           string     `json:"owner"`
 }
 
-// StateLockResult reports the lock acquisition.
+// StateLockResult returns a receipt for this acquisition. A deployment must
+// return it to release its own lock, including after a provider restart.
 type StateLockResult struct {
 	ReleaseToken string          `json:"releaseToken,omitempty"`
 	Locked       bool            `json:"locked"`
 	Error        *OperationError `json:"error,omitempty"`
 }
 
-// StateUnlockCall mirrors State.Unlock.
+// StateUnlockCall uses the receipt for a conditional release. Only an explicit
+// operator unlock may omit it and release the current owner.
 type StateUnlockCall struct {
 	ReleaseToken    string     `json:"releaseToken,omitempty"`
 	ProtocolVersion string     `json:"protocolVersion"`

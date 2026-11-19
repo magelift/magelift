@@ -110,6 +110,21 @@ func TestShimState(t *testing.T) {
 	}
 }
 
+func TestShimStateRequiresProofOfAcquisition(t *testing.T) {
+	for _, result := range []sdk.StateLockResult{{Locked: true}, {ReleaseToken: "unacquired"}} {
+		module, planned := scriptedModule(t, func(method string, reply any) error {
+			if method != "Plugin.StateLock" {
+				t.Fatalf("unexpected operation %s", method)
+			}
+			*reply.(*sdk.StateLockResult) = result
+			return nil
+		})
+		if release, err := module.State().Lock(t.Context(), planned, "tester"); err == nil || release != nil {
+			t.Fatalf("lock without an ownership receipt returned a release callback or succeeded: %v", err)
+		}
+	}
+}
+
 func TestShimSecrets(t *testing.T) {
 	t.Parallel()
 	module, planned := scriptedModule(t, func(method string, reply any) error {

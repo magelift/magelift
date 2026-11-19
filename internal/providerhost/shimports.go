@@ -15,7 +15,7 @@ import (
 func shimPlanOf(planned platform.PlannedStack) (*ShimPlanned, error) {
 	shim, ok := AsShimPlanned(planned)
 	if !ok {
-		return nil, fmt.Errorf("GCP shim received unexpected planned type %T", planned)
+		return nil, fmt.Errorf("provider received unexpected planned type %T", planned)
 	}
 	if shim.module == nil || shim.module.client == nil {
 		return nil, errors.New("provider client is required")
@@ -123,6 +123,9 @@ func (s ShimState) Lock(ctx context.Context, planned platform.PlannedStack, owne
 	}
 	if resp.Error != nil {
 		return nil, AsPluginError(sdk.OpStateLock, resp.Error)
+	}
+	if !resp.Locked || resp.ReleaseToken == "" {
+		return nil, errors.New("provider did not confirm lock ownership; check magelift state status before retrying")
 	}
 	return func(releaseCtx context.Context) error {
 		_, err := s.unlock(releaseCtx, planned, resp.ReleaseToken)
