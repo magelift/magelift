@@ -387,3 +387,62 @@ func withVersions(input, magento, php string) string {
 	input = strings.Replace(input, "2.4.8-p5", magento, 1)
 	return strings.Replace(input, `php: "8.3"`, `php: "`+php+`"`, 1)
 }
+
+func TestUnlistedAuroraVersionProducesAnAdvisory(t *testing.T) {
+	t.Parallel()
+	input := strings.Replace(base,
+		"target: {provider: aws, runtime: ecs-fargate}",
+		"target: {provider: aws, runtime: ecs-fargate, aws: {catalog: {databaseEngine: aurora-mysql, versions: {auroraMysql: 8.4.mysql_aurora.8.4.7}}}}",
+		1)
+	file, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective, err := file.Resolve("staging", ResolveOptions{})
+	if err != nil || !strings.Contains(strings.Join(effective.Compatibility.Warnings, " "), "Aurora MySQL 3.11 or 3.12") {
+		t.Fatalf("expected Aurora advisory, got %#v, %v", effective.Compatibility, err)
+	}
+}
+
+func TestAutopilotRegionalRabbitMQDoesNotRequireStandardPreset(t *testing.T) {
+	t.Parallel()
+	input := `schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: 2.4.9, mode: integrated}
+build:
+  php: "8.5"
+  composer: {credentials: gcp-secret-manager://composer/auth}
+target:
+  provider: gcp
+  runtime: gke-autopilot
+  gcp:
+    project: example-gcp-project
+    cloudSqlAvailability: REGIONAL
+    cloudSqlBackupEnabled: true
+    cloudSqlBinaryLogEnabled: true
+    queueMode: rabbitmq
+defaults: {region: europe-west1, preset: preview}
+environments: {staging: {}}
+`
+	file, err := Load([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective, err := file.Resolve("staging", ResolveOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcp := effective.Config.Target.GCP
+	if gcp == nil {
+		t.Fatal("resolved GCP target is nil")
+	}
+	if gcp.CloudSQLAvailability != "REGIONAL" {
+		t.Fatalf("cloudSqlAvailability = %q, want REGIONAL", gcp.CloudSQLAvailability)
+	}
+	if gcp.QueueMode != "rabbitmq" {
+		t.Fatalf("queueMode = %q, want rabbitmq", gcp.QueueMode)
+	}
+	if effective.Config.Target.Runtime != "gke-autopilot" {
+		t.Fatalf("runtime = %q, want gke-autopilot", effective.Config.Target.Runtime)
+	}
+}
