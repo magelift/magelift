@@ -66,6 +66,12 @@ func guidanceForFamily(path string) (family, action string) {
 	case "hooks":
 		return "hooks", "Review each shell hook and decide when it belongs in the Magento lifecycle. MageLift runs schema upgrades and static content deployment. For an additional build command, add an entry to `build.hooks` in the PHP project. Replace `STEP_ID` with the step your hook follows.\n\n" +
 			"```php\n'flush-cache' => [\n    'phase' => 'package',\n    'relationship' => 'after',\n    'target' => 'STEP_ID',\n    'command' => ['executable' => 'magento', 'arguments' => ['cache:flush']],\n],\n```"
+	case "routes":
+		return "routes", "Set the destination hostname with `--domain` or in the PHP environment. Recreate redirects and check both the Magento base URL and the response at the old hostname."
+	case "mounts":
+		return "mounts", "Take a snapshot of pub/media with the SQL dump. Check each other writable directory and decide which contents the destination must retain."
+	case "services":
+		return "services", "Check service image tags, volumes, startup options and credentials in the source file. Set the destination ownership and versions under services. Supply credentials through the destination secret store."
 	case "crons":
 		return "crons", "MageLift schedules Magento cron on the selected runtime. Keep custom schedules in Magento configuration and check their logs after deploying."
 	case "relationships":
@@ -76,6 +82,14 @@ func guidanceForFamily(path string) (family, action string) {
 	case "dependencies":
 		return "dependencies", "Keep application package requirements in `composer.json` and commit the lock. The importer copies the Composer tool version into `build.composer.version` when it recognizes the setting."
 	case "stage":
+		switch {
+		case strings.Contains(path, ".DATABASE_CONFIGURATION"):
+			return "database routing", "Check Magento's database connection names and reader routing against the destination. Rehearse an indexer run and a transaction before cutover."
+		case strings.Contains(path, ".CACHE_CONFIGURATION"):
+			return "cache configuration", "Review custom cache backends, layered caches and reader connections in the shop. Check one cache write, read and invalidation on the destination."
+		case strings.Contains(path, ".SESSION_CONFIGURATION"):
+			return "sessions", "Store session credentials at the destination. Match locking and lifetime settings, then test a login and a cart across two requests."
+		}
 		return "stage", "Move unrecognized Magento environment settings into your application configuration or store them in the destination secret manager. Match encryption, URL and consumer settings to the source shop before importing data."
 	default:
 		return "other", "Review the key by hand against `docs/migrating-from-paas.md`. If it names a secret, store it as a secret reference, keep raw values out of the project file."

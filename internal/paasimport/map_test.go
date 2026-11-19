@@ -234,7 +234,7 @@ func TestMapsQualityPatchesFromEnvYaml(t *testing.T) {
 func TestMapsObservabilityIntentWithoutCopyingCredentials(t *testing.T) {
 	doc := baseDocument("sample-shop", "8.5")
 	env := accEnvDocument{}
-	env.Stage.Deploy = map[string]string{
+	env.Stage.Deploy = map[string]any{
 		"NEW_RELIC_LICENSE_KEY": "synthetic-license-must-not-leak",
 		"NEW_RELIC_APP_NAME":    "magento-staging",
 	}
@@ -354,4 +354,12 @@ func repoRoot(t *testing.T) string {
 		t.Fatalf("repo root %s: %v", root, err)
 	}
 	return root
+}
+
+func TestDatadogEnvironmentSelectsDatadog(t *testing.T) {
+	var doc mageliftDocument
+	handled, residual := applyObservabilityEnv(&doc, "DD_ENV", "staging")
+	if !handled || residual || doc.Observability.ExternalProvider != "datadog" || doc.Observability.Environment != "staging" {
+		t.Fatal(doc.Observability)
+	}
 }

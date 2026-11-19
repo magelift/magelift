@@ -179,3 +179,15 @@ func TestFastlyWithoutSourceDomainLeavesAManualFollowUp(t *testing.T) {
 		t.Fatal(edge)
 	}
 }
+
+func TestSharedStoreAliasAndDisabledSourceConsumers(t *testing.T) {
+	app := accAppRaw{"relationships": map[string]any{"sessions": "shared:redis", "cache": "shared:redis"}}
+	if role := storeRole("shared", app, true); role != "cache" {
+		t.Fatalf("shared store role = %s", role)
+	}
+	var doc mageliftDocument
+	ok, left := mapStageValue(&doc, "deploy", "CRON_CONSUMERS_RUNNER", map[string]any{"cron_run": false})
+	if !ok || len(left) != 0 || doc.Application.Magento.Consumers.Mode != "disabled" {
+		t.Fatal("source disabled the cron runner and declared no dedicated workers")
+	}
+}

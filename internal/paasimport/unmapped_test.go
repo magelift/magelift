@@ -14,6 +14,7 @@ func TestRenderUnmappedReportGuidesEachFamily(t *testing.T) {
 		{Source: ".magento.app.yaml", Path: "dependencies.php.foo/bar"},
 		{Source: ".magento.env.yaml", Path: "stage.build.CUSTOM_FLAG"},
 		{Source: ".magento.app.yaml", Path: "mounts.var"},
+		{Source: ".magento.app.yaml", Path: "custom.feature"},
 	}
 	report := RenderUnmappedReport(keys)
 	for _, want := range []string{
@@ -23,6 +24,7 @@ func TestRenderUnmappedReportGuidesEachFamily(t *testing.T) {
 		"### runtime",
 		"### dependencies",
 		"### stage",
+		"### mounts",
 		"### other",
 		"```php",
 		"'executable' => 'magento'",

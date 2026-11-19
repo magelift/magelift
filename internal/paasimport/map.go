@@ -41,6 +41,7 @@ type mageliftApplication struct {
 
 // mageliftMagento mirrors the importable fields of config.MagentoRuntime.
 type mageliftMagento struct {
+	Variables    map[string]string        `yaml:"variables,omitempty"`
 	FrontName    string                   `yaml:"frontName,omitempty"`
 	CookieDomain string                   `yaml:"cookieDomain,omitempty"`
 	CORSOrigins  []string                 `yaml:"corsOrigins,omitempty"`
@@ -175,28 +176,42 @@ func applyAllowlistEnv(doc *mageliftDocument, source string, env accEnvDocument)
 	}
 	var vars []staged
 	var unmapped []UnmappedKey
-	for k, v := range env.Stage.Global {
-		vars = append(vars, staged{path: "stage.global." + k, key: k, val: v})
+	for key := range env.Extra {
+		unmapped = append(unmapped, UnmappedKey{Source: source, Path: key})
 	}
-	for k, v := range env.Stage.Deploy {
-		vars = append(vars, staged{path: "stage.deploy." + k, key: k, val: v})
+	for key := range env.Variables.Extra {
+		unmapped = append(unmapped, UnmappedKey{Source: source, Path: "variables." + key})
 	}
-	for k, v := range env.Stage.Build {
-		if k == "QUALITY_PATCHES" {
-			ids, ok := qualityPatchIDs(v)
-			if !ok {
-				unmapped = append(unmapped, UnmappedKey{Source: source, Path: "stage.build.QUALITY_PATCHES"})
+	for key, value := range env.Stage.Other {
+		unmapped = append(unmapped, stageResiduals(source, "stage."+key, value)...)
+	}
+	for _, stage := range []struct {
+		name   string
+		values map[string]any
+	}{{"global", env.Stage.Global}, {"build", env.Stage.Build}, {"deploy", env.Stage.Deploy}} {
+		for _, k := range slices.Sorted(maps.Keys(stage.values)) {
+			v := stage.values[k]
+			path := "stage." + stage.name + "." + k
+			if handled, remaining := mapStageValue(doc, stage.name, k, v); handled {
+				for _, sub := range remaining {
+					unmapped = append(unmapped, UnmappedKey{Source: source, Path: path + sub})
+				}
 				continue
 			}
-			doc.Build.QualityPatches = ids
-			continue
+			var val string
+			switch v := v.(type) {
+			case string:
+				val = v
+			case int:
+				val = strconv.Itoa(v)
+			case bool:
+				val = strconv.FormatBool(v)
+			default:
+				unmapped = append(unmapped, stageResiduals(source, path, v)...)
+				continue
+			}
+			vars = append(vars, staged{path: path, key: k, val: val})
 		}
-		val, ok := v.(string)
-		if !ok {
-			unmapped = append(unmapped, UnmappedKey{Source: source, Path: "stage.build." + k})
-			continue
-		}
-		vars = append(vars, staged{path: "stage.build." + k, key: k, val: val})
 	}
 	for k, v := range env.Variables.Env {
 		vars = append(vars, staged{path: "variables.env." + k, key: k, val: v})
@@ -280,7 +295,7 @@ func applyMagentoEnv(doc *mageliftDocument, key, value string) (handled, valid b
 		magentoOverlay(doc).CORSOrigins = origins
 		doc.Application.Mode = "headless"
 	case "CONFIG__DEFAULT__CRON__CONSUMERS_RUNNER__MODE":
-		if value != "cron" && value != "processes" && value != "both" {
+		if value != "cron" && value != "processes" && value != "both" && value != "disabled" {
 			return true, false
 		}
 		magentoOverlay(doc).Consumers.Mode = value
@@ -347,8 +362,10 @@ func applyObservabilityEnv(doc *mageliftDocument, key, value string) (handled, r
 		provider = "newrelic"
 	case "DD_SERVICE":
 		provider = "datadog"
-	case "NEW_RELIC_ENVIRONMENT", "DD_ENV":
+	case "NEW_RELIC_ENVIRONMENT":
 		provider = "newrelic"
+	case "DD_ENV":
+		provider = "datadog"
 	case "OTEL_EXPORTER_OTLP_ENDPOINT":
 		provider = "otlp"
 	case "OTEL_SERVICE_NAME":

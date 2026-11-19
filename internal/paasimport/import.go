@@ -21,6 +21,8 @@ type Source struct {
 	serviceFiles, routeFiles                 map[string]string
 	routes                                   map[string]accRoute
 	env                                      accEnvDocument
+	magentoEnv                               accEnvDocument
+	magentoEnvPath                           string
 	unmapped                                 []UnmappedKey
 }
 
@@ -46,6 +48,9 @@ func Read(root string, kind SourceKind, selected string) (*Source, error) {
 		}
 		if _, err := os.Stat(filepath.Join(root, ".upsun")); err == nil {
 			if err := s.readModernUpsun(root, selected); err != nil {
+				return nil, err
+			}
+			if err := s.readMagentoStageFile(root); err != nil {
 				return nil, err
 			}
 			return s, nil
@@ -84,7 +89,23 @@ func Read(root string, kind SourceKind, selected string) (*Source, error) {
 			return nil, err
 		}
 	}
+	if kind == SourceUpsun {
+		if err := s.readMagentoStageFile(root); err != nil {
+			return nil, err
+		}
+		return s, nil
+	}
 	return s, nil
+}
+
+func (s *Source) readMagentoStageFile(root string) error {
+	s.magentoEnvPath = filepath.Join(s.AppRoot, accEnvFile)
+	err := readSourceFile(root, s.magentoEnvPath, &s.magentoEnv)
+	if errors.Is(err, os.ErrNotExist) {
+		s.magentoEnvPath = ""
+		return nil
+	}
+	return err
 }
 
 func fixedApplications(file string, document yaml.Node) (map[string]accAppRaw, error) {
@@ -283,6 +304,9 @@ func (s *Source) Apply(project map[string]any) ([]UnmappedKey, error) {
 		envFile = s.appFile
 	}
 	residuals = append(residuals, applyAllowlistEnv(&doc, envFile, s.env)...)
+	if s.magentoEnvPath != "" {
+		residuals = append(residuals, applyAllowlistEnv(&doc, s.magentoEnvPath, s.magentoEnv)...)
+	}
 	env := project["environments"].(map[string]any)["staging"].(map[string]any)
 	// Keep routes pointing at the selected Magento application in multi-app projects.
 	routes := map[string]accRoute{}
@@ -290,6 +314,16 @@ func (s *Source) Apply(project map[string]any) ([]UnmappedKey, error) {
 		upstream, _, _ := strings.Cut(route.Upstream, ":")
 		if upstream == app["name"] || (!s.multiApp && (upstream == "" || len(s.routeFiles) == 0)) {
 			routes[name] = route
+			file := s.routeFile
+			if s.routeFiles[name] != "" {
+				file = s.routeFiles[name]
+			}
+			if strings.ContainsAny(name, "{}*") {
+				residuals = append(residuals, UnmappedKey{Source: file, Path: "routes.placeholder"})
+			}
+			if route.Type == "redirect" {
+				residuals = append(residuals, UnmappedKey{Source: file, Path: "routes.redirect"})
+			}
 		}
 	}
 	domain := doc.Environments["staging"].Domain
@@ -309,6 +343,10 @@ func (s *Source) Apply(project map[string]any) ([]UnmappedKey, error) {
 	}
 	for _, key := range []string{"magento", "cron"} {
 		if v, ok := imported["application"].(map[string]any)[key]; ok {
+			if key == "magento" {
+				maps.Copy(ensureMap(project["application"].(map[string]any), key), v.(map[string]any))
+				continue
+			}
 			project["application"].(map[string]any)[key] = v
 		}
 	}
@@ -317,7 +355,15 @@ func (s *Source) Apply(project map[string]any) ([]UnmappedKey, error) {
 	}
 	build := project["build"].(map[string]any)
 	for key, v := range imported["build"].(map[string]any) {
-		if key == "composer" && build["composer"] != nil {
+		if key == "staticContent" && build[key] != nil {
+			settings := build[key].(map[string]any)
+			incoming := v.(map[string]any)
+			if incoming["matrix"] != nil {
+				delete(settings, "themes")
+				delete(settings, "locales")
+			}
+			maps.Copy(settings, incoming)
+		} else if key == "composer" && build["composer"] != nil {
 			maps.Copy(build[key].(map[string]any), v.(map[string]any))
 		} else {
 			build[key] = v
@@ -335,6 +381,8 @@ func (s *Source) Apply(project map[string]any) ([]UnmappedKey, error) {
 			block["encryptionKeySecretArn"] = defaultEncryptionKeyPlaceholder
 		case "gcp":
 			block["encryptionKeySecret"] = "magelift-encryption-key"
+		case "azure":
+			block["encryptionKeySecretName"] = "magelift-source-crypt-key"
 		default:
 			residuals = append(residuals, UnmappedKey{Source: envFile, Path: "CRYPT_KEY"})
 		}
@@ -366,31 +414,15 @@ func (s *Source) Apply(project map[string]any) ([]UnmappedKey, error) {
 			}
 			continue
 		}
-		family, version, _ := strings.Cut(serviceType(service), ":")
-		switch family {
-		case "oracle-mysql":
-			family = "mysql"
-		case "redis-persistent":
-			family = "redis"
-		}
-		role := serviceRole(family)
-		if role == "" || version == "" {
-			residuals = append(residuals, UnmappedKey{Source: file, Path: id})
-			continue
-		}
-		services := ensureMap(project, "services")
-		if importedRoles[role] {
+		binding, role, options := importService(id, service, app, provider, project)
+		if role == "" || importedRoles[role] {
 			residuals = append(residuals, UnmappedKey{Source: file, Path: id})
 			continue
 		}
 		importedRoles[role] = true
-		services[role] = map[string]any{"family": family, "version": version}
-		if opts, ok := asStringMap(service); ok {
-			for key := range opts {
-				if key != "type" {
-					residuals = append(residuals, UnmappedKey{Source: file, Path: id + "." + key})
-				}
-			}
+		ensureMap(project, "services")[role] = binding
+		for _, path := range options {
+			residuals = append(residuals, UnmappedKey{Source: file, Path: id + "." + path})
 		}
 	}
 	sortUnmapped(residuals)

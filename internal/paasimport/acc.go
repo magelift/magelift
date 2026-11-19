@@ -45,13 +45,16 @@ type accRoute struct {
 
 type accEnvDocument struct {
 	Stage struct {
-		Global map[string]string `yaml:"global"`
-		Deploy map[string]string `yaml:"deploy"`
-		Build  map[string]any    `yaml:"build"`
+		Global map[string]any `yaml:"global"`
+		Deploy map[string]any `yaml:"deploy"`
+		Build  map[string]any `yaml:"build"`
+		Other  map[string]any `yaml:",inline"`
 	} `yaml:"stage"`
 	Variables struct {
-		Env map[string]string `yaml:"env"`
+		Env   map[string]string `yaml:"env"`
+		Extra map[string]any    `yaml:",inline"`
 	} `yaml:"variables"`
+	Extra map[string]any `yaml:",inline"`
 }
 
 type accCron struct {
@@ -124,7 +127,7 @@ func mapBuildRequirements(source string, raw accAppRaw, doc *mageliftDocument) [
 			for key, value := range runtime {
 				switch key {
 				case "extensions":
-					extensions, ok := stringList(value)
+					extensions, ok := extensionList(value)
 					if !ok {
 						unmapped = append(unmapped, UnmappedKey{Source: source, Path: "runtime.extensions"})
 						continue
@@ -256,6 +259,24 @@ func asStringMap(value any) (map[string]any, bool) {
 	}
 }
 
+func extensionList(value any) ([]string, bool) {
+	values, ok := stringList(value)
+	if !ok {
+		return nil, false
+	}
+	seen := map[string]bool{}
+	for i, v := range values {
+		v = strings.ToLower(v)
+		if !validPHPExtensionName(v) || seen[v] {
+			return nil, false
+		}
+		values[i] = v
+		seen[v] = true
+	}
+	sort.Strings(values)
+	return values, true
+}
+
 func stringList(value any) ([]string, bool) {
 	var values []any
 	switch typed := value.(type) {
@@ -276,8 +297,8 @@ func stringList(value any) ([]string, bool) {
 		if !ok {
 			return nil, false
 		}
-		item = strings.ToLower(strings.TrimSpace(item))
-		if !validPHPExtensionName(item) {
+		item = strings.TrimSpace(item)
+		if item == "" {
 			return nil, false
 		}
 		if _, exists := seen[item]; exists {
@@ -286,7 +307,6 @@ func stringList(value any) ([]string, bool) {
 		seen[item] = struct{}{}
 		result = append(result, item)
 	}
-	sort.Strings(result)
 	return result, true
 }
 
@@ -343,7 +363,7 @@ func relationshipMapped(name, value string) bool {
 	case strings.Contains(service, "mysql") || strings.Contains(service, "mariadb") ||
 		key == "database" || key == "db":
 		return true
-	case strings.Contains(service, "redis") || key == "redis" || key == "cache" || key == "session":
+	case strings.Contains(service, "valkey") || strings.Contains(service, "redis") || key == "redis" || key == "cache" || key == "session":
 		return true
 	case strings.Contains(service, "opensearch") || strings.Contains(service, "elasticsearch") ||
 		key == "opensearch" || key == "elasticsearch" || key == "search":

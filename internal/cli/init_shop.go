@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/magelift/magelift/internal/config"
@@ -93,10 +94,11 @@ var (
 )
 
 type inspectedShop struct {
-	PHP         string
-	ProjectName string
-	Edition     string
-	Version     string
+	ElasticSuite bool
+	PHP          string
+	ProjectName  string
+	Edition      string
+	Version      string
 }
 
 type initWriteResult struct {
@@ -172,7 +174,8 @@ func inspectShopSource(root string) (inspectedShop, error) {
 	if !regexp.MustCompile(`^[0-9]+\.[0-9]+(\.[0-9]+)?$`).MatchString(php) {
 		php = ""
 	}
-	return inspectedShop{ProjectName: projectName, Edition: edition, Version: version, PHP: php}, nil
+	elasticsuite := slices.ContainsFunc(locked.Packages, func(pkg composerPackage) bool { return pkg.Name == "smile/elasticsuite" })
+	return inspectedShop{ProjectName: projectName, Edition: edition, Version: version, PHP: php, ElasticSuite: elasticsuite}, nil
 }
 
 type composerLock struct {
@@ -374,6 +377,9 @@ func starterDocument(provider string, shop inspectedShop) (map[string]any, error
 		"cache":    map[string]any{"family": "valkey", "version": cache},
 		"search":   map[string]any{"family": "opensearch", "version": search},
 		"queue":    map[string]any{"family": "database"},
+	}
+	if shop.ElasticSuite {
+		services["search"].(map[string]any)["plugins"] = []string{"analysis-icu", "analysis-phonetic"}
 	}
 	return map[string]any{
 		"schemaVersion": 1, "project": map[string]any{"name": shop.ProjectName},

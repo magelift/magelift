@@ -17,15 +17,15 @@ import (
 )
 
 func initCommand(o *options) *cobra.Command {
-	var fromACC, fromUpsun, newShop bool
+	var fromACC, fromUpsun, fromCompose, newShop bool
 	var provider, configOut, app, storefrontOrigin string
 	var edition, release string
 	var location starterLocation
 	cmd := &cobra.Command{
 		Use: "init", Short: "Configure a Magento shop with PHP", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if (fromACC && fromUpsun) || (newShop && (fromACC || fromUpsun)) {
-				return invalid(errors.New("--new, --from-acc and --from-upsun are mutually exclusive"))
+			if (fromACC && fromUpsun) || (fromCompose && (fromACC || fromUpsun)) || (newShop && (fromACC || fromUpsun || fromCompose)) {
+				return invalid(errors.New("--new, --from-acc, --from-compose and --from-upsun are mutually exclusive"))
 			}
 			if err := validateStarterProvider(provider); err != nil {
 				return invalid(err)
@@ -124,6 +124,12 @@ func initCommand(o *options) *cobra.Command {
 					return invalid(err)
 				}
 			}
+			if fromCompose {
+				residuals, err = paasimport.ApplyCompose(shopRoot, doc)
+				if err != nil {
+					return invalid(err)
+				}
+			}
 			if storefrontOrigin != "" {
 				application := doc["application"].(map[string]any)
 				application["mode"] = "headless"
@@ -174,6 +180,7 @@ func initCommand(o *options) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&fromACC, "from-acc", false, "import Adobe Commerce Cloud configuration")
+	cmd.Flags().BoolVar(&fromCompose, "from-compose", false, "read database, cache, search and queue versions from the shop’s Compose file")
 	cmd.Flags().BoolVar(&fromUpsun, "from-upsun", false, "import Upsun or Platform.sh configuration")
 	cmd.Flags().BoolVar(&newShop, "new", false, "create a Magento project in an empty directory with Composer")
 	cmd.Flags().StringVar(&edition, "edition", "open-source", "edition to create with --new (open-source or commerce)")
