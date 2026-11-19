@@ -167,7 +167,7 @@ HARNESS_STEP := bash scripts/acceptance/run-harness-step.sh
 # runner. Every other name is a root scripts/ runner.
 HARNESS_STEPS := \
 	fast harness_step_timeout_test.sh \
-	fast development_loop_gate_test.sh \
+	build development_loop_gate_test.sh \
 	fast development_loop_runner_test.sh \
 	fast artifact_gate_test.sh \
 	fast gcp_product_gate_test.sh \
