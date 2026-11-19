@@ -42,16 +42,16 @@ type ServiceBinding struct {
 }
 
 // VersionWithMinor expands a numeric major for APIs that require major.minor.
-func (b ServiceBinding) VersionWithMinor() string {
-	if b.Version != "" && strings.Trim(b.Version, "0123456789") == "" {
-		return b.Version + ".0"
+func (s ServiceBinding) VersionWithMinor() string {
+	if s.Version != "" && strings.Trim(s.Version, "0123456789") == "" {
+		return s.Version + ".0"
 	}
-	return b.Version
+	return s.Version
 }
 
 // ManagedBranch returns the major.minor selector used by cloud APIs that select their own patch.
-func (b ServiceBinding) ManagedBranch() string {
-	version := b.VersionWithMinor()
+func (s ServiceBinding) ManagedBranch() string {
+	version := s.VersionWithMinor()
 	parts := strings.Split(version, ".")
 	if len(parts) == 3 && parts[2] != "" && strings.Trim(parts[2], "0123456789") == "" {
 		return parts[0] + "." + parts[1]
