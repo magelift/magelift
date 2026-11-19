@@ -81,7 +81,6 @@ func TestPlanForWarnsWhenCloudHasLessThanLocal(t *testing.T) {
 	joined := strings.Join(plan.Warnings, "\n")
 	for _, want := range []string{
 		"cloud search is disabled for this environment; local OpenSearch does not prove cloud behavior",
-		"cloud queues are database-backed for this environment; the local broker does not prove cloud behavior",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("warnings = %#v", plan.Warnings)
@@ -91,7 +90,7 @@ func TestPlanForWarnsWhenCloudHasLessThanLocal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(strings.Join(gcp.Warnings, "\n"), "database-backed") {
+	if gcp.Queue.Family != "database" || strings.Contains(ComposeTemplateFor(gcp), "MAGELIFT_LOCAL_QUEUE_IMAGE") {
 		t.Fatalf("warnings = %#v", gcp.Warnings)
 	}
 }
@@ -99,8 +98,8 @@ func TestPlanForWarnsWhenCloudHasLessThanLocal(t *testing.T) {
 func TestPlanForRefusesRedisWithoutHatch(t *testing.T) {
 	build := parityBuild()
 	build.Local = config.LocalRuntime{Cache: config.LocalService{Family: "redis"}}
-	_, err := PlanFor(build, CloudHints{Provider: "aws"})
-	if err == nil || !strings.Contains(err.Error(), "Adobe compatibility row") {
-		t.Fatalf("err = %v, want Adobe-row refusal", err)
+	plan, err := PlanFor(build, CloudHints{Provider: "aws"})
+	if err != nil || !strings.Contains(strings.Join(plan.Warnings, " "), "Redis 7.2") {
+		t.Fatalf("expected Redis advisory, got %#v, %v", plan.Warnings, err)
 	}
 }

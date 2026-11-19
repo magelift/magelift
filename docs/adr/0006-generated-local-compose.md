@@ -11,7 +11,7 @@ Contributors need Magento locally without AWS credentials or Pulumi state. The l
 
 `magelift local init` generates `.magelift/compose.local.yml` and a mode-0600 `.magelift/local.env`. Compose is an execution context, not a second cloud provider.
 
-Default project: MySQL and Valkey. The `app` profile uses nginx + PHP-FPM by default, plus OpenSearch and RabbitMQ, and bind-mounts the repository. `frankenphp-classic` and `php-apache` require `compatibility.allowUnsupported`; they have no Adobe row and are not certified. `frankenphp-worker` is unregistered. `search` and `queue` can start alone. Host ports bind to loopback. `local reset --yes` is the only command that removes named volumes.
+Default project: MySQL and Valkey. The `app` profile uses nginx + PHP-FPM by default, plus OpenSearch and RabbitMQ, and bind-mounts the repository. `frankenphp-classic` and `php-apache` produce a compatibility warning; they have no Adobe row and are not certified. `frankenphp-worker` is unregistered. `search` and `queue` can start alone. Host ports bind to loopback. `local reset --yes` is the only command that removes named volumes.
 
 `magelift local seed` is the local first-install path when Composer dependencies and `bin/magento` exist. It is non-interactive and refuses to overwrite `app/etc/env.php`.
 

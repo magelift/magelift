@@ -97,6 +97,9 @@ func applyCloudHints(local *config.LocalRuntime, hints CloudHints, row localRele
 			return err
 		}
 	}
+	if (hints.QueueMode == "db" || hints.QueueMode == "database") && local.Queue.Family == "" {
+		local.Queue.Family = "database"
+	}
 	if queueUsesRabbitFamily(hints.QueueMode) && strings.TrimSpace(local.Queue.Family) == "" {
 		if err := preferFamily(&local.Queue, "rabbitmq", "", row.Queue); err != nil {
 			return err

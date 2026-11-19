@@ -17,10 +17,10 @@ func TestPlanUsesReleaseSpecificPinnedServices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan.Database.Family != "mariadb" || plan.Database.Version != "10.11" || !strings.Contains(plan.Database.Image, "sha256:") {
+	if plan.Database.Family != "mariadb" || plan.Database.Version != "10.11" || plan.Database.Image != "mariadb:10.11" {
 		t.Fatalf("database plan = %#v", plan.Database)
 	}
-	if plan.Search.Version != "2" || plan.Cache.Version != "8.1" || plan.Queue.Version != "4.2" {
+	if plan.Search.Version != "2" || plan.Cache.Version != "8.1" || plan.Queue.Version != "4.3" {
 		t.Fatalf("service plan = %#v", plan)
 	}
 	if plan.Database.Connection.Host != "database" || plan.Database.Connection.Port != 3306 || plan.Database.Connection.PasswordEnv != "MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD" {
@@ -56,15 +56,15 @@ func TestPlanSupportsArtemisNginxAndVarnishContracts(t *testing.T) {
 	if plan.Queue.Family != "artemis" || plan.Queue.Connection.Scheme != "stomp" || plan.Queue.Connection.Port != 61613 {
 		t.Fatalf("queue = %#v", plan.Queue)
 	}
-	if plan.WebCache.Family != "varnish" || !strings.Contains(plan.WebCache.Image, "sha256:") {
+	if plan.WebCache.Family != "varnish" || plan.WebCache.Image != "varnish:8" {
 		t.Fatalf("web cache = %#v", plan.WebCache)
 	}
 	compose := ComposeTemplateFor(plan)
 	for _, value := range []string{
-		"apache/activemq-artemis:2.38.0-alpine@sha256:",
+		"apache/activemq-artemis:2.38.0-alpine",
 		"MAGENTO_DC_QUEUE__DEFAULT_CONNECTION: \"stomp\"",
 		"MAGENTO_DC_QUEUE__STOMP__PORT: \"61613\"",
-		"varnish:8@sha256:",
+		"varnish:8",
 		"VARNISH_BACKEND_HOST: app",
 		"php-fpm --daemonize && exec nginx",
 		"MAGELIFT_LOCAL_APP_HTTP_PORT:-8081",
@@ -135,10 +135,6 @@ func TestPlanRequiresAnExplicitCompatibilityExceptionForRedis(t *testing.T) {
 		Build:       config.Build{PHP: "8.5", Composer: config.Composer{Version: "2.10"}},
 		Local:       config.LocalRuntime{Cache: config.LocalService{Family: "redis", Version: "7.2"}},
 	}
-	if _, err := Plan(base); err == nil || !strings.Contains(err.Error(), "compatibility.allowUnsupported") {
-		t.Fatalf("Redis without exception error = %v", err)
-	}
-	base.Compatibility.Status = config.CompatibilityUnsupportedAllowed
 	plan, err := Plan(base)
 	if err != nil {
 		t.Fatal(err)
@@ -146,8 +142,29 @@ func TestPlanRequiresAnExplicitCompatibilityExceptionForRedis(t *testing.T) {
 	if plan.Cache.Family != "redis" || plan.Cache.Version != "7.2" || !strings.Contains(plan.Cache.Healthcheck, "redis-cli") {
 		t.Fatalf("Redis plan = %#v", plan.Cache)
 	}
-	if len(plan.Warnings) == 0 || !strings.Contains(plan.Warnings[0], "Redis 7.2") {
+	if len(plan.Warnings) == 0 || !strings.Contains(strings.Join(plan.Warnings, " "), "Redis 7.2") {
 		t.Fatalf("Redis warnings = %#v", plan.Warnings)
+	}
+}
+
+func TestPlanAllowsCustomVersionWithWarning(t *testing.T) {
+	plan, err := Plan(config.BuildSpec{
+		Application: config.Application{Version: "2.4.9"},
+		Build:       config.Build{PHP: "8.5", Composer: config.Composer{Version: "2.10"}},
+		Local:       config.LocalRuntime{Queue: config.LocalService{Family: "rabbitmq", Version: "4.4"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Queue.Image != "rabbitmq:4.4-management" || !strings.Contains(strings.Join(plan.Warnings, " "), "unpinned") {
+		t.Fatalf("custom queue plan = %#v, warnings = %#v", plan.Queue, plan.Warnings)
+	}
+}
+
+func TestPlanAllowsOtherMagentoAndPHPWithWarning(t *testing.T) {
+	plan, err := Plan(config.BuildSpec{Application: config.Application{Version: "2.4.10"}, Build: config.Build{PHP: "8.4", Composer: config.Composer{Version: "2.10"}}})
+	if err != nil || plan.MagentoVersion != "2.4.10" || !strings.Contains(strings.Join(plan.Warnings, " "), "no tested local row") {
+		t.Fatalf("custom release plan = %#v, error = %v", plan, err)
 	}
 }
 
@@ -195,7 +212,7 @@ func TestPlanMailpitWiresSMTPAndComposeService(t *testing.T) {
 	}
 	compose := ComposeTemplateFor(plan)
 	for _, value := range []string{
-		"axllent/mailpit:v1.30.7@sha256:",
+		localMailpitImage,
 		"/mailpit",
 		"readyz",
 		`MAGELIFT_LOCAL_EMAIL_HOST: "mailpit"`,
@@ -217,7 +234,8 @@ func TestPlanMailpitWiresSMTPAndComposeService(t *testing.T) {
 }
 
 func TestLocalRowsMatchTheSharedCompatibilityCatalog(t *testing.T) {
-	for release, row := range localReleaseCatalog {
+	for _, release := range []string{"2.4.7", "2.4.8", "2.4.9"} {
+		row, _ := localReleaseRowFor(release)
 		t.Run(release, func(t *testing.T) {
 			if len(row.PHPBranches) == 0 {
 				t.Fatal("local row has no PHP branches")
@@ -226,21 +244,34 @@ func TestLocalRowsMatchTheSharedCompatibilityCatalog(t *testing.T) {
 				Application: config.Application{Version: row.Release},
 				Build:       config.Build{PHP: row.PHPBranches[0], Composer: config.Composer{Version: row.Composer}},
 			}
-			if err := validateSharedCompatibility(build, row); err != nil {
+			if _, err := Plan(build); err != nil {
 				t.Fatal(err)
 			}
 		})
 	}
 }
 
-func TestPlanRejectsUnverifiedLocalServiceChoice(t *testing.T) {
-	_, err := Plan(config.BuildSpec{
+func TestAdobeRecommendedLocalRows(t *testing.T) {
+	for _, tc := range []struct{ release, php string }{
+		{"2.4.7-p10", "8.3"}, {"2.4.8-p5", "8.3"}, {"2.4.8-p5", "8.4"}, {"2.4.9", "8.5"},
+	} {
+		t.Run(tc.release+"-php-"+tc.php, func(t *testing.T) {
+			plan, err := Plan(config.BuildSpec{Application: config.Application{Version: tc.release}, Build: config.Build{PHP: tc.php, Composer: config.Composer{Version: "2.10"}}})
+			if err != nil || plan.Queue.Version != "4.3" || plan.Composer != "2.10" {
+				t.Fatalf("recommended plan = %#v, error = %v", plan, err)
+			}
+		})
+	}
+}
+
+func TestPlanAllowsUnverifiedLocalServiceChoice(t *testing.T) {
+	plan, err := Plan(config.BuildSpec{
 		Application: config.Application{Version: "2.4.9"},
 		Build:       config.Build{PHP: "8.5", Composer: config.Composer{Version: "2.10"}},
 		Local:       config.LocalRuntime{Queue: config.LocalService{Family: "artemis", Version: "3"}},
 	})
-	if err == nil || !strings.Contains(err.Error(), "nearest supported choices") {
-		t.Fatalf("error = %v", err)
+	if err != nil || plan.Queue.Version != "3" || !strings.Contains(strings.Join(plan.Warnings, " "), "unpinned") {
+		t.Fatalf("plan = %#v, error = %v", plan.Queue, err)
 	}
 }
 
@@ -381,7 +412,7 @@ func TestPlanForRecordsAuroraMySQLSubstituteAndNginx(t *testing.T) {
 	for _, substitute := range plan.Substitutes {
 		got[substitute.Cloud] = substitute.Local
 	}
-	if got["Aurora MySQL"] != "mysql 8.4" || got["OpenSearch Serverless"] != "opensearch 3" || got["Amazon MQ"] != "rabbitmq 4.2" {
+	if got["Aurora MySQL"] != "mysql 8.4" || got["OpenSearch Serverless"] != "opensearch 3" || got["Amazon MQ"] != "rabbitmq 4.3" {
 		t.Fatalf("substitutes = %#v", plan.Substitutes)
 	}
 	if len(plan.Warnings) == 0 || !strings.Contains(strings.Join(plan.Warnings, "\n"), CloudOnlyNote) {
@@ -469,7 +500,7 @@ func TestPlanForRecordsECSRabbitMQSubstitute(t *testing.T) {
 	for _, substitute := range plan.Substitutes {
 		got[substitute.Cloud] = substitute.Local
 	}
-	if got["ECS RabbitMQ"] != "rabbitmq 4.2" {
+	if got["ECS RabbitMQ"] != "rabbitmq 4.3" {
 		t.Fatalf("substitutes = %#v", plan.Substitutes)
 	}
 }

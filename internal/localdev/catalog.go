@@ -8,29 +8,28 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/sdk"
 )
 
 const (
 	localCatalogUpdatedAt = "2026-08-15"
 	localCatalogSource    = "https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements?lang=en"
 
-	localMySQL84Image     = "mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb"
-	localMariaDB1011Image = "mariadb:10.11@sha256:de61fed4a40d3842f3ee09944ba52792156cfd9adf489b2cc670fc6ded28df8d"
-	localMariaDB118Image  = "mariadb:11.8@sha256:d9f7eb2637296652f24b484afd5d246f759f49f5babcadc6a9e344c9acb75fbf"
-	localValkey81Image    = "valkey/valkey:8.1@sha256:495e4fecdc98ee48a20b207726caa5ab6451e0fac3642a9be10d9e70b3068df6"
-	localValkey9Image     = "valkey/valkey:9@sha256:3acc0687f2a2e1091fae6450d7842dd658c941338cf0a873ddd9e14b9e4ea4dd"
-	localOpenSearch2Image = "opensearchproject/opensearch:2@sha256:8690b204fe914c60ca76d451ac73bc0481e034d32d3779944c8caca56a2b003f"
-	localOpenSearch3Image = "opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c"
-	localRabbitMQ42Image  = "rabbitmq:4.2-management@sha256:a2751b3b5eed89e47ebbd5e776de0d6d85d924002773933ab881da49c073b85d"
-	localRedis72Image     = "redis:7.2@sha256:6461ca4ac0c5c9d81d53685c3bf76aa81f464a9de6cf3a97b80a1da8d1bb1de4"
-	localArtemis238Image  = "apache/activemq-artemis:2.38.0-alpine@sha256:1867bc96210790b41ae139713ac63d69920c55a6cd8684c35205dd3fb4973b33"
-	localVarnish8Image    = "varnish:8@sha256:3e71d126023f0def70c0de744358ce3347d50ac401c63c2dec47d1dcd6ca4085"
-	// Mailpit v1.30.7 multi-arch index digest from hub.docker.com (retrieved 2026-08-18).
-	localMailpitImage = "axllent/mailpit:v1.30.7@sha256:d5ecbb067db3705fa953d79e1b7f81ef84038df67aba6c52825d8c02a1ea748a"
+	localMySQL84Image     = "mysql:8.4"
+	localMariaDB1011Image = "mariadb:10.11"
+	localMariaDB118Image  = "mariadb:11.8"
+	localValkey81Image    = "valkey/valkey:8.1"
+	localValkey9Image     = "valkey/valkey:9"
+	localOpenSearch2Image = "opensearchproject/opensearch:2"
+	localOpenSearch3Image = "opensearchproject/opensearch:3.9.0"
+	localRabbitMQ43Image  = "rabbitmq:4.3-management"
+	localRedis72Image     = "redis:7.2"
+	localArtemis238Image  = "apache/activemq-artemis:2.38.0-alpine"
+	localVarnish8Image    = "varnish:8"
+	localMailpitImage     = "axllent/mailpit:v1.34.0@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e"
 )
 
 var localPHPSettingName = regexp.MustCompile(`^[a-z][a-z0-9_.-]*$`)
@@ -120,37 +119,17 @@ type localServiceRow struct {
 	Connection  LocalConnectionShape
 }
 
-var localReleaseCatalog = map[string]localReleaseRow{
-	"2.4.7": {
-		Release: "2.4.7-p10", PHPBranches: []string{"8.3"}, Composer: "2.10",
-		Database: databaseRows(
-			localServiceRow{Family: "mariadb", Version: "10.11", Image: localMariaDB1011Image},
-			localServiceRow{Family: "mariadb", Version: "11.8", Image: localMariaDB118Image},
-		),
-		Cache:     cacheRows(localServiceRow{Family: "valkey", Version: "8.1", Image: localValkey81Image}),
-		Search:    searchRows(localServiceRow{Family: "opensearch", Version: "2", Image: localOpenSearch2Image}, localServiceRow{Family: "opensearch", Version: "3", Image: localOpenSearch3Image}),
-		Queue:     queueRows(localServiceRow{Family: "rabbitmq", Version: "4.2", Image: localRabbitMQ42Image}, localServiceRow{Family: "artemis", Version: "2", Image: localArtemis238Image}),
-		WebServer: webServerRows(localServiceRow{Family: "nginx", Version: "1.30"}),
-		WebCache:  webCacheRows(localServiceRow{Family: "none"}, localServiceRow{Family: "varnish", Version: "8", Image: localVarnish8Image}),
-	},
-	"2.4.8": {
-		Release: "2.4.8-p5", PHPBranches: []string{"8.3", "8.4"}, Composer: "2.10",
-		Database:  databaseRows(localServiceRow{Family: "mysql", Version: "8.4", Image: localMySQL84Image}, localServiceRow{Family: "mariadb", Version: "11.8", Image: localMariaDB118Image}),
-		Cache:     cacheRows(localServiceRow{Family: "valkey", Version: "8.1", Image: localValkey81Image}),
-		Search:    searchRows(localServiceRow{Family: "opensearch", Version: "3", Image: localOpenSearch3Image}),
-		Queue:     queueRows(localServiceRow{Family: "rabbitmq", Version: "4.2", Image: localRabbitMQ42Image}, localServiceRow{Family: "artemis", Version: "2", Image: localArtemis238Image}),
-		WebServer: webServerRows(localServiceRow{Family: "nginx", Version: "1.30"}),
-		WebCache:  webCacheRows(localServiceRow{Family: "none"}, localServiceRow{Family: "varnish", Version: "8", Image: localVarnish8Image}),
-	},
-	"2.4.9": {
+// Default service families are independent of a Magento compatibility matrix.
+func defaultServices() localReleaseRow {
+	return localReleaseRow{
 		Release: "2.4.9", PHPBranches: []string{"8.5"}, Composer: "2.10",
 		Database:  databaseRows(localServiceRow{Family: "mysql", Version: "8.4", Image: localMySQL84Image}, localServiceRow{Family: "mariadb", Version: "11.8", Image: localMariaDB118Image}),
-		Cache:     cacheRows(localServiceRow{Family: "valkey", Version: "9", Image: localValkey9Image}),
+		Cache:     cacheRows(localServiceRow{Family: "valkey", Version: "9", Image: localValkey9Image}, localServiceRow{Family: "redis", Version: "7.2", Image: localRedis72Image}),
 		Search:    searchRows(localServiceRow{Family: "opensearch", Version: "3", Image: localOpenSearch3Image}),
-		Queue:     queueRows(localServiceRow{Family: "rabbitmq", Version: "4.2", Image: localRabbitMQ42Image}, localServiceRow{Family: "artemis", Version: "2", Image: localArtemis238Image}),
+		Queue:     queueRows(localServiceRow{Family: "rabbitmq", Version: "4.3", Image: localRabbitMQ43Image}, localServiceRow{Family: "artemis", Version: "2", Image: localArtemis238Image}),
 		WebServer: webServerRows(localServiceRow{Family: "nginx", Version: "1.30"}),
 		WebCache:  webCacheRows(localServiceRow{Family: "none"}, localServiceRow{Family: "varnish", Version: "8", Image: localVarnish8Image}),
-	},
+	}
 }
 
 func databaseRows(rows ...localServiceRow) []localServiceRow {
@@ -267,19 +246,15 @@ func Plan(build config.BuildSpec) (RuntimePlan, error) {
 func PlanFor(build config.BuildSpec, hints CloudHints) (RuntimePlan, error) {
 	row, ok := localReleaseRowFor(build.Application.Version)
 	if !ok {
-		return RuntimePlan{}, fmt.Errorf("no verified local runtime row exists for Magento %q; supported releases are 2.4.7-p10, 2.4.8-p5, and 2.4.9", build.Application.Version)
+		row = defaultServices()
 	}
-	if err := validateSharedCompatibility(build, row); err != nil {
-		return RuntimePlan{}, err
-	}
+
 	php := strings.TrimSpace(build.Build.PHP)
-	if !containsBranch(row.PHPBranches, php) {
-		return RuntimePlan{}, fmt.Errorf("Magento %s has no verified local PHP %q row; supported PHP branches are %s", row.Release, php, strings.Join(row.PHPBranches, ", "))
+	if php == "" {
+		return RuntimePlan{}, fmt.Errorf("no local app image exists for PHP %q", php)
 	}
 	composer := strings.TrimSpace(build.Build.Composer.Version)
-	if !composerMatches(composer, row.Composer) {
-		return RuntimePlan{}, fmt.Errorf("Magento %s has no verified local Composer %q row; use Composer %s", row.Release, composer, row.Composer)
-	}
+
 	local := build.Local
 	if err := applyCloudHints(&local, hints, row); err != nil {
 		return RuntimePlan{}, err
@@ -288,7 +263,7 @@ func PlanFor(build config.BuildSpec, hints CloudHints) (RuntimePlan, error) {
 	if err != nil {
 		return RuntimePlan{}, err
 	}
-	cache, unsupportedCache, err := chooseCache(local.Cache, row.Cache, build.Compatibility.Status == config.CompatibilityUnsupportedAllowed)
+	cache, unsupportedCache, err := chooseCache(local.Cache, row.Cache)
 	if err != nil {
 		return RuntimePlan{}, err
 	}
@@ -312,23 +287,21 @@ func PlanFor(build config.BuildSpec, hints CloudHints) (RuntimePlan, error) {
 	if err != nil {
 		return RuntimePlan{}, err
 	}
-	if email.Mode == "mailpit" && !strings.Contains(localMailpitImage, "@sha256:") {
-		return RuntimePlan{}, errors.New("local email mode mailpit is missing a digest-pinned Mailpit image contract")
-	}
+
 	settings := make(map[string]string, len(local.PHPSettings))
 	for key, value := range local.PHPSettings {
 		settings[key] = value
 	}
 	extensions := append([]string(nil), build.Build.Extensions...)
 	for _, extension := range extensions {
-		if _, ok := localSupportedExtensions[extension]; !ok {
+		if _, ok := localSupportedExtensions[extension]; !ok && local.WebServer.Image == "" {
 			return RuntimePlan{}, fmt.Errorf("local PHP extension %q has no verified app-image contract; supported local extensions are %s", extension, strings.Join(sortedLocalExtensions(), ", "))
 		}
 	}
 	sort.Strings(extensions)
 	appImage := webServer.Image
 	plan := RuntimePlan{
-		MagentoVersion:   row.Release,
+		MagentoVersion:   build.Application.Version,
 		PHP:              php,
 		Composer:         composer,
 		Extensions:       extensions,
@@ -351,11 +324,22 @@ func PlanFor(build config.BuildSpec, hints CloudHints) (RuntimePlan, error) {
 	}
 	plan.Substitutes = namedSubstitutes(hints, plan)
 	plan.Warnings = append(plan.Warnings, emailWarnings...)
+	if _, listed := localReleaseRowFor(build.Application.Version); !listed {
+		plan.Warnings = append(plan.Warnings, fmt.Sprintf("Magento %s has no tested local row; service defaults come from %s", build.Application.Version, row.Release))
+	}
+	if !containsBranch(row.PHPBranches, php) {
+		plan.Warnings = append(plan.Warnings, fmt.Sprintf("PHP %s is outside the tested local row for Magento %s", php, row.Release))
+	}
+	for _, service := range []LocalServicePlan{database, cache, search, queue, webCache} {
+		if service.Image != "" && !strings.Contains(service.Image, "@sha256:") {
+			plan.Warnings = append(plan.Warnings, fmt.Sprintf("local %s %s %s uses an unpinned upstream image; set local.%s.image to pin a digest", service.Component, service.Family, service.Version, service.Component))
+		}
+	}
 	if hints.Provider != "" {
 		plan.Warnings = append(plan.Warnings, CloudOnlyNote)
 	}
 	if unsupportedCache {
-		plan.Warnings = append(plan.Warnings, "Redis 7.2 is an explicit local compatibility exception; Adobe's current release rows list Valkey instead")
+		plan.Warnings = append(plan.Warnings, fmt.Sprintf("Redis %s is outside the Adobe compatibility snapshot; the current release rows list Valkey instead", cache.Version))
 	}
 	// Drift direction is cloud-has-less: local runs a container the cloud
 	// environment does not have, so local success proves nothing there.
@@ -364,6 +348,9 @@ func PlanFor(build config.BuildSpec, hints CloudHints) (RuntimePlan, error) {
 	}
 	switch strings.ToLower(strings.TrimSpace(hints.QueueMode)) {
 	case "db", "database":
+		if queue.Family == "database" {
+			break
+		}
 		plan.Warnings = append(plan.Warnings, "cloud queues are database-backed for this environment; the local broker does not prove cloud behavior")
 	}
 	return plan, nil
@@ -376,55 +363,11 @@ func sessionPlanFromCache(cache LocalServicePlan) LocalServicePlan {
 	return session
 }
 
-func validateSharedCompatibility(build config.BuildSpec, row localReleaseRow) error {
-	catalog := config.CurrentCompatibilityCatalog()
-	if err := catalog.Validate(time.Now().UTC()); err != nil {
-		return fmt.Errorf("validate compatibility catalog for local runtime: %w", err)
-	}
-	requirements := config.RequirementsForRelease(row.Release)
-	if len(requirements) == 0 {
-		return fmt.Errorf("local runtime row %q is missing from the shared compatibility catalog", row.Release)
-	}
-	if err := validateSharedRequirement(requirements, config.CompatibilityPHP, "php", phpBranch(build.Build.PHP), false); err != nil {
-		return err
-	}
-	if err := validateSharedRequirement(requirements, config.CompatibilityComposer, "composer", build.Build.Composer.Version, true); err != nil {
-		return err
-	}
-	for _, service := range []struct {
-		component config.CompatibilityComponent
-		rows      []localServiceRow
-	}{
-		{component: config.CompatibilityDatabase, rows: row.Database},
-		{component: config.CompatibilityCache, rows: row.Cache},
-		{component: config.CompatibilitySearch, rows: row.Search},
-		{component: config.CompatibilityQueue, rows: row.Queue},
-		{component: config.CompatibilityWebServer, rows: row.WebServer},
-		{component: config.CompatibilityWebCache, rows: row.WebCache},
-	} {
-		if len(service.rows) == 0 {
-			return fmt.Errorf("local %s row %q has no service choices", service.component, row.Release)
-		}
-		for _, choice := range service.rows {
-			if err := validateSharedRequirement(requirements, service.component, choice.Family, choice.Version, false); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func chooseCache(requested config.LocalService, rows []localServiceRow, allowUnsupported bool) (LocalServicePlan, bool, error) {
+func chooseCache(requested config.LocalService, rows []localServiceRow) (LocalServicePlan, bool, error) {
 	if strings.EqualFold(strings.TrimSpace(requested.Family), "redis") {
-		if !allowUnsupported {
-			return LocalServicePlan{}, false, errors.New("local cache redis is outside the current Adobe compatibility row; use Valkey or set compatibility.allowUnsupported: true for the explicit Redis 7.2 gap")
-		}
-		version := strings.TrimSpace(requested.Version)
-		if version != "" && !serviceVersionMatches(version, "7.2") {
-			return LocalServicePlan{}, false, fmt.Errorf("local cache has no verified Redis version %q; nearest supported choice: redis 7.2", version)
-		}
 		row := cacheRows(localServiceRow{Family: "redis", Version: "7.2", Image: localRedis72Image})[0]
-		return localServicePlan("cache", row), true, nil
+		plan, err := chooseService("cache", requested, []localServiceRow{row})
+		return plan, true, err
 	}
 	plan, err := chooseService("cache", requested, rows)
 	return plan, false, err
@@ -440,7 +383,7 @@ func chooseWebServer(requested config.LocalService, webRuntime, php string) (Loc
 	case "nginx-fpm":
 		expectedFamily, version, image = "nginx", "1.30", "magelift/php-nginx:"+phpBranch(php)+"-local"
 	case "frankenphp-classic":
-		expectedFamily, version, image = "frankenphp-classic", "1.12.7", "magelift/frankenphp-classic:"+phpBranch(php)+"-local"
+		expectedFamily, version, image = "frankenphp-classic", "1.13.5", "magelift/frankenphp-classic:"+phpBranch(php)+"-local"
 	case "php-apache":
 		expectedFamily, version, image = "php-apache", "2.4", "magelift/php-apache:"+phpBranch(php)+"-local"
 	default:
@@ -453,8 +396,17 @@ func chooseWebServer(requested config.LocalService, webRuntime, php string) (Loc
 	if family != expectedFamily {
 		return LocalServicePlan{}, fmt.Errorf("local web server family %q contradicts application.webRuntime %q; use family=%q", family, webRuntime, expectedFamily)
 	}
-	if requested.Version != "" && requested.Version != version {
-		return LocalServicePlan{}, fmt.Errorf("local web server family %q has no verified version %q for application.webRuntime %q; use %s", family, requested.Version, webRuntime, version)
+	if requested.Version != "" && requested.Version != version && requested.Image == "" {
+		return LocalServicePlan{}, fmt.Errorf("set local.webServer.image to use the selected web server version %s", requested.Version)
+	}
+	if requested.Version != "" {
+		version = requested.Version
+	}
+	if requested.Image != "" {
+		if !localImageRef.MatchString(requested.Image) {
+			return LocalServicePlan{}, errors.New("local.webServer.image must be an OCI image reference")
+		}
+		image = requested.Image
 	}
 	return LocalServicePlan{
 		Component:   "web-server",
@@ -508,33 +460,6 @@ func normalizeEmailSettings(email config.LocalEmailSettings) (config.LocalEmailS
 	return email, warnings, nil
 }
 
-func validateSharedRequirement(requirements []config.CompatibilityRequirement, component config.CompatibilityComponent, option, version string, composer bool) error {
-	for _, requirement := range requirements {
-		if requirement.Component != component || requirement.Option != option {
-			continue
-		}
-		if requirement.Status != config.CompatibilityAdobeSupported && requirement.Status != config.CompatibilityMageLift {
-			return fmt.Errorf("local %s %s %s is %s in the shared compatibility catalog", component, option, version, requirement.Status)
-		}
-		if len(requirement.Versions) == 0 {
-			return nil
-		}
-		for _, allowed := range requirement.Versions {
-			if composer {
-				if composerMatches(version, allowed) {
-					return nil
-				}
-				continue
-			}
-			if serviceVersionMatches(version, allowed) {
-				return nil
-			}
-		}
-		return fmt.Errorf("local %s %s version %q is not listed in the shared compatibility catalog", component, option, version)
-	}
-	return fmt.Errorf("local %s %s is not listed in the shared compatibility catalog", component, option)
-}
-
 func sortedLocalExtensions() []string {
 	values := make([]string, 0, len(localSupportedExtensions))
 	for extension := range localSupportedExtensions {
@@ -545,31 +470,65 @@ func sortedLocalExtensions() []string {
 }
 
 func localReleaseRowFor(version string) (localReleaseRow, bool) {
-	line := strings.TrimSpace(version)
-	if index := strings.IndexByte(line, '-'); index >= 0 {
-		line = line[:index]
+	row := defaultServices()
+	line, _, _ := strings.Cut(version, "-")
+	for _, recommendation := range config.CurrentCompatibilityCatalog().Lines {
+		if recommendation.Line != line {
+			continue
+		}
+		row.Release, row.PHPBranches = recommendation.RecommendedRelease, recommendation.PHPBranches
+		// These are convenient local defaults. Individual project service
+		// versions override each value independently.
+		if line == "2.4.7" {
+			row.Database = append(databaseRows(localServiceRow{Family: "mariadb", Version: "10.11", Image: localMariaDB1011Image}), row.Database...)
+			row.Search = append(searchRows(localServiceRow{Family: "opensearch", Version: "2", Image: localOpenSearch2Image}), row.Search...)
+		}
+		if line == "2.4.7" || line == "2.4.8" {
+			row.Cache[0].Version, row.Cache[0].Image = "8.1", localValkey81Image
+		}
+		return row, true
 	}
-	row, ok := localReleaseCatalog[line]
-	return row, ok
+	return row, false
 }
+
+var imageVersion = regexp.MustCompile(`^[0-9][a-zA-Z0-9._-]*$`)
+var localImageRef = regexp.MustCompile(`^[a-z0-9][A-Za-z0-9./:@_-]*$`)
 
 func chooseService(component string, requested config.LocalService, rows []localServiceRow) (LocalServicePlan, error) {
 	family := strings.ToLower(strings.TrimSpace(requested.Family))
+	if component == "queue" && (family == "database" || family == "db") {
+		return LocalServicePlan{Component: "queue", Family: "database", Connection: LocalConnectionShape{Host: "database", Database: "magento"}}, nil
+	}
+	if requested.Image != "" && !localImageRef.MatchString(requested.Image) {
+		return LocalServicePlan{}, fmt.Errorf("local %s image must be a single OCI image reference", component)
+	}
 	version := strings.TrimSpace(requested.Version)
+	if version != "" && !imageVersion.MatchString(version) {
+		return LocalServicePlan{}, fmt.Errorf("local %s has invalid image version %q", component, version)
+	}
 	for _, row := range rows {
-		if family != "" && row.Family != family {
+		if family != "" && family != row.Family {
 			continue
 		}
-		if version != "" && !serviceVersionMatches(version, row.Version) {
-			continue
+		if version != "" && version != row.Version {
+			tag, _, _ := strings.Cut(row.Image, "@")
+			end := strings.LastIndex(tag, ":")
+			if end <= 0 {
+				continue
+			}
+			suffix := map[string]string{"rabbitmq": "-management", "artemis": "-alpine"}[row.Family]
+			imageTag := version
+			if row.Family == "opensearch" {
+				imageTag = sdk.OpenSearchContainerTag(version)
+			}
+			row.Image, row.Version = tag[:end+1]+imageTag+suffix, version
+		}
+		if requested.Image != "" {
+			row.Image = requested.Image
 		}
 		return localServicePlan(component, row), nil
 	}
-	choices := make([]string, 0, len(rows))
-	for _, row := range rows {
-		choices = append(choices, row.Family+" "+row.Version)
-	}
-	return LocalServicePlan{}, fmt.Errorf("local %s has no verified contract for family=%q version=%q; nearest supported choices: %s", component, family, version, strings.Join(choices, ", "))
+	return LocalServicePlan{}, fmt.Errorf("local %s family %q has no connection adapter", component, family)
 }
 
 func localServicePlan(component string, row localServiceRow) LocalServicePlan {
@@ -603,36 +562,6 @@ func phpBranch(version string) string {
 	return parts[0] + "." + parts[1]
 }
 
-func composerMatches(requested, requirement string) bool {
-	requirementHasMinimum := strings.HasSuffix(strings.TrimSpace(requirement), "+")
-	requested = strings.TrimSuffix(strings.TrimSpace(requested), "+")
-	requirement = strings.TrimSuffix(strings.TrimSpace(requirement), "+")
-	requestedParts := strings.Split(requested, ".")
-	requirementParts := strings.Split(requirement, ".")
-	if len(requestedParts) < 2 || len(requirementParts) < 2 || requestedParts[0] != requirementParts[0] || requestedParts[1] != requirementParts[1] {
-		return false
-	}
-	if requirementHasMinimum {
-		return versionAtLeast(requestedParts, requirementParts)
-	}
-	return true
-}
-
-func versionAtLeast(got, want []string) bool {
-	for index := 0; index < len(want); index++ {
-		gotPart := "0"
-		if index < len(got) {
-			gotPart = got[index]
-		}
-		gotValue, _ := strconv.Atoi(gotPart)
-		wantValue, _ := strconv.Atoi(want[index])
-		if gotValue != wantValue {
-			return gotValue > wantValue
-		}
-	}
-	return true
-}
-
 func serviceVersionMatches(requested, catalogued string) bool {
 	if requested == catalogued {
 		return true
@@ -642,6 +571,10 @@ func serviceVersionMatches(requested, catalogued string) bool {
 
 func ComposeTemplateFor(plan RuntimePlan) string {
 	template := ComposeTemplate
+	if plan.Queue.Family == "database" {
+		template = strings.Replace(template, "      queue:\n        condition: service_healthy\n", "", 1)
+		template = strings.TrimSuffix(template, "  queue:\n")
+	}
 	template = strings.Replace(template, localMySQL84Image, plan.Database.Image, 1)
 	template = strings.Replace(template, localValkey9Image, plan.Cache.Image, 1)
 	template = strings.Replace(template, localOpenSearch3Image, plan.Search.Image, 1)
@@ -697,7 +630,6 @@ func ComposeTemplateFor(plan RuntimePlan) string {
 		"MAGELIFT_LOCAL_EMAIL_RETURN_PATH_EMAIL":                          emailValues["return_path_email"],
 		"MAGENTO_DC__OVERRIDE":                                            platform.MergeDeploymentOverride(localDeploymentConfigOverride(plan), platform.MagentoOverlayJSON(plan.Magento)),
 		"MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST":                        plan.Database.Connection.Host,
-		"MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT":                        strconv.Itoa(plan.Database.Connection.Port),
 		"MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME":                      plan.Database.Connection.Database,
 		"MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME":                    plan.Database.Connection.User,
 		"MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD":                    "magento",
@@ -752,6 +684,9 @@ func ComposeTemplateFor(plan RuntimePlan) string {
 }
 
 func composeQueueService(queue LocalServicePlan) string {
+	if queue.Family == "database" {
+		return ""
+	}
 	if queue.Family == "artemis" {
 		return fmt.Sprintf(`  queue:
     profiles: ["queue"]
@@ -990,7 +925,6 @@ func localDeploymentConfigOverride(plan RuntimePlan) string {
 			"connection": map[string]any{
 				"default": map[string]any{
 					"host":           plan.Database.Connection.Host,
-					"port":           strconv.Itoa(plan.Database.Connection.Port),
 					"dbname":         plan.Database.Connection.Database,
 					"username":       plan.Database.Connection.User,
 					"password":       "magento",

@@ -1,60 +1,30 @@
-# Local development vs cloud
+# Local development and cloud environments
 
-`magelift local` generates Docker Compose for an account-free Magento loop
-([ADR 0006](adr/0006-generated-local-compose.md)). The goal is the same image
-digests and service major versions as the certified cloud matrix where that is
-practical, not a bit-for-bit copy of AWS.
+Run `magelift dev` in the Magento shop to start Compose. It selects the effective
+environment’s runtime and service versions, installs Magento into an empty database
+and checks the GraphQL store configuration. On subsequent starts it reuses the
+database. Use `magelift local logs` and `magelift local exec --service app -- bin/magento list`
+to inspect the installation.
 
-## What matches
-
-| Piece | Local | Cloud (certified AWS ECS) |
+| Concern | Local development | Cloud environment |
 | --- | --- | --- |
-| App image contract | PHP branch selected by the local compatibility row | signed immutable image digest on promote |
-| OpenSearch / Valkey / RabbitMQ / Artemis majors | digest-pinned images from the local row | managed or ECS broker versions from the provider catalog |
-| Magento CLI verbs | `local exec`, cache/reindex helpers | `exec`, `cache-flush`, `reindex` |
-| HTTP entry | selected web-runtime plugin, with nginx + PHP-FPM by default and optional Varnish | CloudFront → ALB → Varnish/nginx on the evidenced AWS tuple; `frankenphp-classic` and `php-apache` require the Adobe hatch and are not certified |
+| Application | Shop source mounted into a PHP runtime | Release from the shop’s registry, promoted by digest |
+| Services | Upstream container tags or project-selected images for implemented families | Provider-managed, self-hosted or attached dependencies selected in the project |
+| HTTP | nginx and PHP-FPM by default, with an optional web cache | Target load balancer, optionally with edge, TLS and DNS |
+| Mail | Mailpit or configured relay | Configured provider or relay, with separate preview settings |
+| Credentials | Private `.magelift/local.env` | Secret references in the shop’s cloud account |
+| Storage and availability | A single Compose project with persistent volumes | Environment-specific data, storage and availability settings |
+| Application maintenance | Magento CLI in the app container | Candidate task or Kubernetes job and a deployment lock |
 
-## Honest deltas
+Start with a shared project-level service definition and change capacity per
+environment. Use `magelift env diff staging production` to see overrides.
+An upstream image tag can move. Set the full local image reference including
+its digest when a reproducible local fixture is required. A cloud provider can
+expose a major/minor release while its upstream image uses a patch tag. For
+example, the AWS OpenSearch selection `3.1` uses the local image tag `3.1.0`.
+[Service bindings](service-bindings.md)
 
-| Concern | Local | Cloud |
-| --- | --- | --- |
-| Database | MySQL or MariaDB container from the verified row | Certified: RDS MySQL. Aurora is experimental-warn |
-| Queue | RabbitMQ or Artemis container (when enabled) | Certified: `db`, `ecs-rabbitmq` (unset standard/HA default). Explicit `amazon-mq` is experimental-warn. `ecs-artemis` is experimental |
-| Email | Magento SMTP config for SMTP or SES; credentials stay in `.magelift/local.env` | provider or extension-owned integration; credentials stay outside YAML |
-| PHP settings and extensions | `.magelift/local.php.ini` plus the verified runtime extension baseline | builder/runtime contract and provider deployment settings |
-| Edge / WAF / DNS | none | CloudFront, WAF, Route 53, ACM. Local does not emulate them |
-| Secrets | `.magelift/local.env` (mode 0600) | Secrets Manager / SSM / GCP Secret Manager references |
-| Multi-AZ / HA | single Compose project | preset-driven topology |
-| Deploy migrations | local Magento commands | candidate ECS task + lock |
-
-The local catalog is narrower than the cloud catalog. Redis and
-provider-managed email transports stay explicit gaps until their image,
-health, Magento connection, and cleanup contracts are verified. Local Mailpit
-is a verified SMTP sink, not cloud delivery. If something works only on
-Compose, treat it as a bug in the local contract or an undocumented delta.
-Local planning cross-checks its pinned PHP, Composer, and service choices
-against the shared source-dated compatibility catalog before it writes
-Compose. File a genuine mismatch rather than papering over it with
-"works on my machine."
-
-## What local proves
-
-A green local run proves the code and the contracts: the PHP and
-Composer versions from the compatibility row, the extension baseline,
-Magento install plus CLI verbs, queue consumer logic against the
-container broker, search queries against container OpenSearch, web
-runtime behavior, and outbound mail captured by Mailpit.
-
-It does not prove the cloud: managed-service auth and IAM, edge and
-WAF and DNS and TLS, multi-AZ behavior, backup and restore, secret
-reference resolution, deploy migrations under lock, or performance at
-scale. `local init` prints `substitutes` for every managed product
-with a container twin, and `warnings` when the cloud environment has
-less than local (disabled search, database-backed queues). Treat each
-entry as a line that still needs a cloud preview.
-
-## Closer iso (later)
-
-A cheap cloud `preview` stage that reuses the same `magelift.yaml` is the path
-to true environment iso. That is a later track, not a substitute for Compose
-today.
+`magelift local down` keeps volumes. The smoke test runs a clean, dependency-installed
+Magento fixture in its own directory and volumes, checks the storefront and GraphQL,
+then tears it down. Cloud IAM, public DNS, managed services, HA failover, and
+billing need their own checks. [Test guide](https://github.com/magelift/magelift/tree/main/tests)

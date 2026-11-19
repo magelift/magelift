@@ -14,7 +14,8 @@ var projectNamePattern = regexp.MustCompile(`[^a-z0-9-]+`)
 
 const ComposeTemplate = `services:
   database:
-    image: ${MAGELIFT_LOCAL_DATABASE_IMAGE:-mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb}
+    command: ["--log-bin-trust-function-creators=1"]
+    image: ${MAGELIFT_LOCAL_DATABASE_IMAGE:-mysql:8.4}
     environment:
       MYSQL_DATABASE: magento
       MYSQL_USER: magento
@@ -31,7 +32,7 @@ const ComposeTemplate = `services:
       retries: 20
 
   cache:
-    image: ${MAGELIFT_LOCAL_CACHE_IMAGE:-valkey/valkey:9@sha256:3acc0687f2a2e1091fae6450d7842dd658c941338cf0a873ddd9e14b9e4ea4dd}
+    image: ${MAGELIFT_LOCAL_CACHE_IMAGE:-valkey/valkey:9}
     ports:
       - "127.0.0.1:${MAGELIFT_LOCAL_CACHE_PORT:-6379}:6379"
     volumes:
@@ -44,7 +45,7 @@ const ComposeTemplate = `services:
 
   search:
     profiles: ["search"]
-    image: ${MAGELIFT_LOCAL_SEARCH_IMAGE:-opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c}
+    image: ${MAGELIFT_LOCAL_SEARCH_IMAGE:-opensearchproject/opensearch:3.9.0}
     environment:
       discovery.type: single-node
       DISABLE_SECURITY_PLUGIN: "true"
@@ -64,10 +65,12 @@ __MAGELIFT_SESSION_SERVICE__
 __MAGELIFT_MAILPIT_SERVICE__
   app:
     profiles: ["app"]
+    user: "${MAGELIFT_LOCAL_UID:-10001}:${MAGELIFT_LOCAL_GID:-10001}"
     image: ${MAGELIFT_LOCAL_APP_IMAGE:-magelift/php-nginx:8.5-local}
     env_file:
       - local.env
     environment:
+      MAGE_MODE: developer
       MAGELIFT_LOCAL_MAGENTO_VERSION: "2.4.9"
       MAGELIFT_LOCAL_PHP: "8.5"
       MAGELIFT_LOCAL_COMPOSER: "2.10"
@@ -80,7 +83,7 @@ __MAGELIFT_MAILPIT_SERVICE__
       MAGELIFT_LOCAL_SEARCH_FAMILY: "opensearch"
       MAGELIFT_LOCAL_SEARCH_VERSION: "3"
       MAGELIFT_LOCAL_QUEUE_FAMILY: "rabbitmq"
-      MAGELIFT_LOCAL_QUEUE_VERSION: "4.2"
+      MAGELIFT_LOCAL_QUEUE_VERSION: "4.3"
       MAGELIFT_LOCAL_WEB_SERVER_FAMILY: "nginx"
       MAGELIFT_LOCAL_WEB_SERVER_VERSION: "8.5"
       MAGELIFT_LOCAL_WEB_CACHE_FAMILY: "none"
@@ -99,7 +102,6 @@ __MAGELIFT_MAILPIT_SERVICE__
       MAGELIFT_LOCAL_EMAIL_RETURN_PATH_EMAIL: ""
       MAGENTO_DC__OVERRIDE: ""
       MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST: database
-      MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT: "3306"
       MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME: magento
       MAGENTO_DC_DB__CONNECTION__DEFAULT__USERNAME: magento
       MAGENTO_DC_DB__CONNECTION__DEFAULT__PASSWORD: magento
@@ -204,9 +206,9 @@ func ComposeArgs(file, project, action, service string, command []string) ([]str
 		}
 		args = append(args, "up", "-d")
 	case "down":
-		args = append(args, "down", "--remove-orphans")
+		args = append(args, "--profile", "*", "down", "--remove-orphans")
 	case "reset":
-		args = append(args, "down", "--volumes", "--remove-orphans")
+		args = append(args, "--profile", "*", "down", "--volumes", "--remove-orphans")
 	case "status":
 		args = append(args, "ps")
 	case "logs":
