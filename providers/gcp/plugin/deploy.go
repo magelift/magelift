@@ -42,7 +42,7 @@ func (s *Server) DeployAppPhase(ctx context.Context, req *sdk.DeployAppPhaseCall
 	if req.ImageDigest != inputs.ImageDigest {
 		return nil, InvalidError("deployment digest does not match the planned artifact")
 	}
-	spec, operr := loadSpecCall(req.Envelope, req.Plan)
+	_, operr := loadSpecCall(req.Envelope, req.Plan)
 	if operr != nil {
 		return nil, operr
 	}
@@ -67,11 +67,7 @@ func (s *Server) DeployAppPhase(ctx context.Context, req *sdk.DeployAppPhaseCall
 		}
 		return &sdk.DeployAppPhaseResult{Message: "service stabilized"}, nil
 	case sdk.DeployPhaseHealth:
-		engine := ""
-		if spec.Catalog.SearchMode == "opensearch" {
-			engine = spec.Catalog.SearchMode
-		}
-		return s.deployHealth(ctx, candidate, runtime, outputs, inputs, req.ImageDigest, engine)
+		return s.deployHealth(ctx, candidate, runtime, outputs, inputs, req.ImageDigest, "")
 	default:
 		return nil, InvalidError(fmt.Sprintf("unknown deploy phase %q", string(req.Phase)))
 	}

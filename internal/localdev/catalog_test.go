@@ -327,13 +327,15 @@ func TestComposeTemplateForCarriesRuntimeInputs(t *testing.T) {
 		`MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST: "database"`,
 		`MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME: "search"`,
 		`CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME: "search"`,
-		`CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE: "opensearch"`,
 		`MAGENTO_DC_QUEUE__AMQP__PASSWORD: "magento"`,
 		`MAGENTO_DC__OVERRIDE: "{`,
 	} {
 		if !strings.Contains(compose, value) {
 			t.Fatalf("Compose template lacks %q", value)
 		}
+	}
+	if strings.Contains(compose, "CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE:") || strings.Contains(compose, "MAGENTO_DC_CATALOG__SEARCH__ENGINE:") {
+		t.Fatal("Compose must preserve the shop's search adapter")
 	}
 	if strings.Contains(compose, "MAGENTO_DB_HOST") || strings.Contains(compose, "MAGENTO_SEARCH_HOST") {
 		t.Fatal("Compose template still contains the legacy Magento environment names")
@@ -348,6 +350,10 @@ func TestComposeTemplateForCarriesRuntimeInputs(t *testing.T) {
 	}
 	if got := override["db"].(map[string]any)["connection"].(map[string]any)["default"].(map[string]any)["host"]; got != "database" {
 		t.Fatalf("database override host = %#v", got)
+	}
+	search := override["system"].(map[string]any)["default"].(map[string]any)["catalog"].(map[string]any)["search"].(map[string]any)
+	if _, exists := search["engine"]; exists {
+		t.Fatal("local override forces a search adapter")
 	}
 	elasticsuite := override["system"].(map[string]any)["default"].(map[string]any)["smile_elasticsuite_core_base_settings"].(map[string]any)["es_client"].(map[string]any)
 	if elasticsuite["servers"] != "search:9200" || elasticsuite["enable_https_mode"] != "0" || elasticsuite["enable_http_auth"] != "0" {

@@ -59,6 +59,11 @@ func TestMigrationJobBindsRabbitMQCredentials(t *testing.T) {
 		t.Fatalf("migration command = %q, want setup:upgrade before app:config:import", cmd)
 	}
 	for _, env := range job.Spec.Template.Spec.Containers[0].Env {
+		if env.Name == platform.EnvMagentoSearchEngine || env.Name == platform.EnvMagentoSearchConfigEngine {
+			t.Fatalf("migration job overrides shop search adapter: %s", env.Name)
+		}
+	}
+	for _, env := range job.Spec.Template.Spec.Containers[0].Env {
 		if env.Name == platform.EnvMagentoSearchHost && env.Value == "search.internal" {
 			return
 		}

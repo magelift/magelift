@@ -73,11 +73,7 @@ func (s *Server) deployAppPhase(ctx context.Context, req *sdk.DeployAppPhaseCall
 		}
 		return &sdk.DeployAppPhaseResult{Message: "service stabilized"}, nil
 	case sdk.DeployPhaseHealth:
-		engine := ""
-		if plan.Spec.SearchImage != "" {
-			engine = "opensearch"
-		}
-		return s.deployHealth(ctx, candidate, runtime, outputs, inputs, req.ImageDigest, engine)
+		return s.deployHealth(ctx, candidate, runtime, outputs, inputs, req.ImageDigest, "")
 	default:
 		return nil, InvalidError(fmt.Sprintf("unknown deploy phase %q", string(req.Phase)))
 	}

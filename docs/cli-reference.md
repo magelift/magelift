@@ -333,7 +333,13 @@ Options:
 Start Magento locally, install an empty shop and check the storefront
 
 ```text
-magelift dev
+magelift dev [flags]
+```
+
+Options:
+
+```text
+      --search-engine string   Magento search adapter for initial installation, such as opensearch or elasticsuite (default "opensearch")
 ```
 ## magelift doctor
 
@@ -686,6 +692,7 @@ Options:
       --admin-user string          Magento administrator username (default "admin")
       --backend-frontname string   Magento administrator URL segment (default "admin")
       --base-url string            local Magento base URL (default "http://localhost:8080/")
+      --search-engine string       Magento search adapter for initial installation, such as opensearch or elasticsuite (default "opensearch")
 ```
 ### magelift local status
 

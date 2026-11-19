@@ -76,7 +76,6 @@ return [
         'default' => [
             'catalog' => [
                 'search' => [
-                    'engine' => '#env(MAGENTO_DC_CATALOG__SEARCH__ENGINE, "opensearch")',
                     'opensearch_server_hostname' => '#env(MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME, "127.0.0.1")',
                     'opensearch_server_port' => '#env(MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT, "9200")',
                     'opensearch_index_prefix' => '#env(MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_INDEX_PREFIX, "magento2")',

@@ -203,13 +203,11 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 		}
 		bindings = append(bindings,
 			EnvBinding{Name: EnvSearchEndpoint, Value: endpoints.SearchEndpoint},
-			EnvBinding{Name: EnvMagentoSearchEngine, Value: "opensearch"},
 			EnvBinding{Name: EnvMagentoSearchHost, Value: nativeHost},
 			EnvBinding{Name: EnvMagentoSearchPort, Value: port},
 			EnvBinding{Name: EnvMagentoSearchIndexPrefix, Value: "magento2"},
 			EnvBinding{Name: EnvMagentoSearchEnableAuth, Value: "0"},
 			EnvBinding{Name: EnvMagentoSearchTimeout, Value: "15"},
-			EnvBinding{Name: EnvMagentoSearchConfigEngine, Value: "opensearch"},
 			EnvBinding{Name: EnvMagentoSearchConfigHost, Value: nativeHost},
 			EnvBinding{Name: EnvMagentoSearchConfigPort, Value: port},
 			EnvBinding{Name: EnvMagentoSearchConfigIndexPrefix, Value: "magento2"},

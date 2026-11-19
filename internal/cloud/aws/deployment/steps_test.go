@@ -145,6 +145,9 @@ func TestHealthProbeSkipsUnsignedReachabilityOnServerless(t *testing.T) {
 	if !strings.Contains(joined, "config:show catalog/search/engine") {
 		t.Errorf("probe command = %q, want search wiring check", joined)
 	}
+	if !strings.Contains(joined, "127.0.0.1:8081") {
+		t.Errorf("probe command = %q, want the signing proxy endpoint", joined)
+	}
 	if strings.Contains(joined, "curl -fsS") {
 		t.Errorf("probe command = %q, want no unsigned curl against serverless", joined)
 	}

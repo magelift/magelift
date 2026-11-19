@@ -51,6 +51,8 @@ export MAGELIFT_LOCAL_ADMIN_PASSWORD='LocalPassword123456'
 magelift local seed
 ```
 
+For a fresh shop using Smile ElasticSuite, install the extension and use an OpenSearch image with the ICU and phonetic analysis plugins. Run `magelift dev --search-engine elasticsuite` or pass the same flag to `magelift local seed`. An existing installation keeps the search adapter selected in Magento.
+
 Useful day-to-day commands are `magelift local status`, `magelift local logs
 --service app`, and `magelift local exec --service app -- bin/magento cache:flush`.
 Use `magelift local reset --yes` only when removing the local database and other

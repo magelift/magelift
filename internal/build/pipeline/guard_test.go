@@ -169,3 +169,18 @@ func splitChain(chain string) []string {
 	}
 	return append(segments, current.String())
 }
+
+func TestRuntimeTemplateLeavesMagentoSearchAdapterUnset(t *testing.T) {
+	php, err := exec.LookPath("php")
+	if err != nil {
+		t.Skip("PHP unavailable")
+	}
+	template, err := filepath.Abs(filepath.Join("..", "..", "..", "images", "php-nginx", "env.php"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(php, "-r", `$config = require $argv[1]; if (array_key_exists('engine', $config['system']['default']['catalog']['search'])) { fwrite(STDERR, 'runtime template forces search adapter'); exit(1); }`, template)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+}

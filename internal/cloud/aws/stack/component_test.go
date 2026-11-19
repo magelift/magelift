@@ -171,7 +171,7 @@ func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
 	}
 	webTask := resourceInput(m, "aws:ecs/taskDefinition:TaskDefinition", "shop-preview-1-runtime-web-task")
 	definitions := webTask["containerDefinitions"].StringValue()
-	for _, required := range []string{"MAGELIFT_DATABASE_WRITER", "shop.writer", "MAGELIFT_DATABASE_SECRET_ARN", "arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed", "MAGELIFT_CACHE_ENDPOINT", "MAGELIFT_SEARCH_ENDPOINT", "MAGELIFT_MEDIA_BUCKET", "shop-media", "docker.io/library/varnish:8.0.2", "VARNISH_HTTP_PORT", "6081", "MAGENTO_DC_CATALOG__SEARCH__ENGINE", "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT"} {
+	for _, required := range []string{"MAGELIFT_DATABASE_WRITER", "shop.writer", "MAGELIFT_DATABASE_SECRET_ARN", "arn:aws:secretsmanager:eu-west-3:123456789012:secret:managed", "MAGELIFT_CACHE_ENDPOINT", "MAGELIFT_SEARCH_ENDPOINT", "MAGELIFT_MEDIA_BUCKET", "shop-media", "docker.io/library/varnish:8.0.2", "VARNISH_HTTP_PORT", "6081", "MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT"} {
 		if !strings.Contains(definitions, required) {
 			t.Fatalf("runtime capability configuration is missing %q: %s", required, definitions)
 		}

@@ -391,9 +391,13 @@ func TestRuntimeWiresMagentoOpenSearchEnvFromEndpoint(t *testing.T) {
 		t.Fatalf("web dependsOn = %#v", web["dependsOn"])
 	}
 	environment := environmentByName(php)
+	for _, name := range []string{"MAGENTO_DC_CATALOG__SEARCH__ENGINE", "CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE"} {
+		if _, exists := environment[name]; exists {
+			t.Fatalf("shop search adapter overridden by %s", name)
+		}
+	}
 	for name, value := range map[string]string{
 		"MAGELIFT_SEARCH_ENDPOINT":                               "https://vpc-shop.eu-west-3.es.amazonaws.com",
-		"MAGENTO_DC_CATALOG__SEARCH__ENGINE":                     "opensearch",
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME": "https://vpc-shop.eu-west-3.es.amazonaws.com",
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":     "443",
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH":     "0",

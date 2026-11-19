@@ -12,7 +12,10 @@ import (
 
 	"github.com/magelift/magelift/internal/cloud/kube"
 	"github.com/magelift/magelift/sdk"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
@@ -228,5 +231,24 @@ func TestPreviousDigestCanBeReplannedForForwardOnlyRollback(t *testing.T) {
 	phase, opErr := server.deployAppPhase(context.Background(), call)
 	if opErr != nil || len(phase.StateJSON) == 0 {
 		t.Fatalf("register previous digest: %#v, %#v", phase, opErr)
+	}
+}
+
+func TestDeployHealthChecksActiveSearchAdapter(t *testing.T) {
+	replicas := int32(1)
+	ready := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "shop-web", Namespace: "default", Generation: 3}, Spec: appsv1.DeploymentSpec{Replicas: &replicas, Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "web", Image: deployTestDigest}}}}}, Status: appsv1.DeploymentStatus{ReadyReplicas: 1, UpdatedReplicas: 1, ObservedGeneration: 3, Conditions: []appsv1.DeploymentCondition{{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue}}}}
+	jobs := &recordingJobs{}
+	server := deployTestServer(jobs, ready)
+	if _, err := server.deployAppPhase(context.Background(), deployPhaseCall(sdk.DeployPhaseHealth, deployTestPlan(t), deployTestOutputsWithURL(t, "https://shop.example/"), nil)); err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs.created) != 1 {
+		t.Fatalf("probe jobs = %v", jobs.created)
+	}
+	script := strings.Join(jobs.jobs[jobs.created[0]].Spec.Template.Spec.Containers[0].Command, " ")
+	for _, want := range []string{"smile_elasticsuite_core_base_settings/es_client/servers", "CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE", "opensearch_server_hostname"} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("probe missing %s: %s", want, script)
+		}
 	}
 }

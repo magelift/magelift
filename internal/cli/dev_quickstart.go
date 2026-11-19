@@ -20,7 +20,8 @@ import (
 )
 
 func devQuickstartCommand(o *options) *cobra.Command {
-	return &cobra.Command{Use: "dev", Short: "Start Magento locally, install an empty shop and check the storefront", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
+	seed := localSeed(o, true)
+	command := &cobra.Command{Use: "dev", Short: "Start Magento locally, install an empty shop and check the storefront", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
 		root := filepath.Dir(o.configPath)
 		if _, err := os.Stat(filepath.Join(root, "bin", "magento")); err != nil {
@@ -41,7 +42,6 @@ func devQuickstartCommand(o *options) *cobra.Command {
 				return err
 			}
 		} else if errors.Is(err, os.ErrNotExist) {
-			seed := localSeed(o, true)
 			if err := seed.RunE(cmd, nil); err != nil {
 				return err
 			}
@@ -54,6 +54,8 @@ func devQuickstartCommand(o *options) *cobra.Command {
 		}
 		return o.write(map[string]any{"status": "ready", "url": address, "environment": plan.Environment, "adminCredentialsFile": filepath.Join(root, ".magelift", localdev.LocalEnvFile)})
 	}}
+	command.Flags().AddFlag(seed.Flags().Lookup("search-engine"))
+	return command
 }
 
 func ensureDevImage(ctx context.Context, plan localdev.RuntimePlan, o *options) error {

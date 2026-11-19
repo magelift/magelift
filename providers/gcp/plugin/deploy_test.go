@@ -213,7 +213,10 @@ func TestDeployStabilizeAndHealthPassOnReadyRollout(t *testing.T) {
 	}
 	probe := jobs.jobs[jobs.created[0]]
 	script := strings.Join(probe.Spec.Template.Spec.Containers[0].Command, " ")
-	for _, want := range []string{"opensearch_server_hostname", "= 'opensearch'"} {
+	if strings.Contains(script, "= 'opensearch'") {
+		t.Fatalf("probe forces a Magento search adapter: %s", script)
+	}
+	for _, want := range []string{"opensearch_server_hostname", "catalog/search/engine"} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("probe command = %q, want %q", script, want)
 		}

@@ -79,20 +79,19 @@ func MagentoQueueArgs() []string {
 // non-interactive by nature, so no --no-interaction flag is set (an unknown
 // flag would fail the probe spuriously).
 //
-// Search is proved through Magento's effective configuration, not just a
-// reachable server: the configured search host must equal the expected
-// endpoint's host, and the configured engine must equal expectedEngine
-// when provided (empty keeps the legacy nonempty check). A reachable
-// server with wrong Magento configuration fails the probe.
+// Check the effective adapter and its endpoint for supported native and
+// ElasticSuite adapters. Custom adapters retain their own configuration.
 func MagentoProbeShell(searchEndpoint string, checkReachability bool, expectedEngine string) []string {
 	script := "bin/magento setup:db:status"
 	if strings.TrimSpace(searchEndpoint) != "" {
-		script += " && test -n \"$(bin/magento config:show catalog/search/engine)\""
-		host := probeSearchHost(searchEndpoint)
-		script += " && test \"$(bin/magento config:show catalog/search/opensearch_server_hostname)\" = '" + shellQuote(host) + "'"
+		script += ` && engine="$(bin/magento config:show catalog/search/engine)" && test -n "$engine"`
 		if strings.TrimSpace(expectedEngine) != "" {
-			script += " && test \"$(bin/magento config:show catalog/search/engine)\" = '" + shellQuote(strings.TrimSpace(expectedEngine)) + "'"
+			script += " && test \"$engine\" = '" + shellQuote(strings.TrimSpace(expectedEngine)) + "'"
 		}
+		script += ` && { test -z "${CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE:-}" || test "$engine" = "$CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE"; }`
+		_, _, _, servers := magentoSearchTarget(searchEndpoint)
+		script += " && case \"$engine\" in elasticsuite) test \"$(bin/magento config:show smile_elasticsuite_core_base_settings/es_client/servers)\" = '" + shellQuote(servers) + "' ;; opensearch) test \"$(bin/magento config:show catalog/search/opensearch_server_hostname)\" = '" + shellQuote(probeSearchHost(searchEndpoint)) + "' ;; *) : ;; esac"
+
 		if checkReachability {
 			script += " && curl -fsS --max-time 10 '" + shellQuote(probeSearchReachabilityURL(searchEndpoint)) + "' -o /dev/null"
 		}
@@ -101,16 +100,12 @@ func MagentoProbeShell(searchEndpoint string, checkReachability bool, expectedEn
 }
 
 // probeSearchHost extracts the hostname Magento must be configured with.
-// Explicit http(s) URLs use the URL host without port; bare service names and
-// host:port endpoints reuse magentoSearchTarget so the probe matches env.php.
+// It follows the same HTTPS and host handling as the runtime bindings.
 func probeSearchHost(endpoint string) string {
-	trimmed := strings.TrimSpace(endpoint)
-	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
-		if parsed, err := url.Parse(trimmed); err == nil && parsed.Hostname() != "" {
-			return parsed.Hostname()
-		}
+	host, _, httpsMode, _ := magentoSearchTarget(endpoint)
+	if httpsMode == "1" {
+		return "https://" + host
 	}
-	host, _, _, _ := magentoSearchTarget(trimmed)
 	return host
 }
 

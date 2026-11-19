@@ -504,8 +504,7 @@ func TestCoreEnvBindingsConfigureElasticsuite(t *testing.T) {
 	// Magento never resolves #env() under env.php's system section, so the
 	// CONFIG__ bindings carry the same resolved search values through stock
 	// Magento's environment configuration contract (live reindex proof).
-	if found[EnvMagentoSearchConfigEngine] != "opensearch" ||
-		found[EnvMagentoSearchConfigHost] != "search.internal" ||
+	if found[EnvMagentoSearchConfigHost] != "search.internal" ||
 		found[EnvMagentoSearchConfigPort] != "9200" ||
 		found[EnvMagentoSearchConfigIndexPrefix] != "magento2" ||
 		found[EnvMagentoSearchConfigEnableAuth] != "0" ||
@@ -514,6 +513,11 @@ func TestCoreEnvBindingsConfigureElasticsuite(t *testing.T) {
 			found[EnvMagentoSearchConfigEngine], found[EnvMagentoSearchConfigHost],
 			found[EnvMagentoSearchConfigPort], found[EnvMagentoSearchConfigIndexPrefix],
 			found[EnvMagentoSearchConfigEnableAuth], found[EnvMagentoSearchConfigTimeout])
+	}
+	for _, key := range []string{EnvMagentoSearchEngine, EnvMagentoSearchConfigEngine} {
+		if _, ok := found[key]; ok {
+			t.Fatalf("search adapter must remain owned by Magento: %s", key)
+		}
 	}
 	wantOverride := `{"system":{"default":{"smile_elasticsuite_core_base_settings":{"es_client":{"servers":"search.internal:9200","enable_https_mode":0,"enable_http_auth":0}}}}}`
 	if found[EnvMagentoDCOverride] != wantOverride {
@@ -588,5 +592,24 @@ func TestCoreEnvBindingsKeepsLegacyRedisBeforeValkeyCutover(t *testing.T) {
 		if found[EnvMagentoCacheBackend] != RedisCacheBackend || found[EnvMagentoPageCacheBackend] != RedisCacheBackend || found[EnvMagentoSessionSave] != "redis" {
 			t.Fatalf("%s cache bindings = %#v", version, found)
 		}
+	}
+}
+
+func TestCoreEnvBindingsPermitExplicitMagentoSearchAdapter(t *testing.T) {
+	bindings := CoreEnvBindings(CapabilityEndpoints{SearchEndpoint: "search.internal", Magento: MagentoOverlays{Variables: map[string]string{EnvMagentoSearchConfigEngine: "elasticsuite"}}})
+	count := 0
+	for _, binding := range bindings {
+		if binding.Name == EnvMagentoSearchEngine {
+			t.Fatal("deployment config forces the search adapter")
+		}
+		if binding.Name == EnvMagentoSearchConfigEngine {
+			count++
+			if binding.Value != "elasticsuite" {
+				t.Fatalf("adapter = %q", binding.Value)
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("adapter bindings = %d", count)
 	}
 }

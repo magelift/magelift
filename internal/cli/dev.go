@@ -15,9 +15,11 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/localdev"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/spf13/cobra"
 )
 
@@ -194,8 +196,9 @@ func writeLocalGeneratedFile(path string, data []byte, mode os.FileMode) error {
 func devSeedCommand(o *options) *cobra.Command { return localSeed(o, false) }
 
 func localSeed(o *options, generatePassword bool) *cobra.Command {
-	var baseURL, adminUser, adminEmail, firstName, lastName, backendFrontname string
-	command := &cobra.Command{
+	var baseURL, adminUser, adminEmail, firstName, lastName, backendFrontname, searchEngine string
+	var command *cobra.Command
+	command = &cobra.Command{
 		Use:   "seed",
 		Short: "Install Magento into the local Compose services",
 		Args:  cobra.NoArgs,
@@ -226,6 +229,21 @@ func localSeed(o *options, generatePassword bool) *cobra.Command {
 				return o.write(map[string]any{"status": "already-installed", "project": build.Project.Name})
 			} else if !errors.Is(err, os.ErrNotExist) {
 				return err
+			}
+
+			configured, configuredSet := build.Application.Magento.Variables[platform.EnvMagentoSearchConfigEngine]
+			if configuredSet && configured != strings.TrimSpace(configured) {
+				return invalid(errors.New("configured Magento search adapter must not have surrounding whitespace"))
+			}
+			selected := strings.TrimSpace(searchEngine)
+			if configuredSet && !command.Flags().Changed("search-engine") {
+				selected = configured
+			}
+			if selected == "" || strings.ContainsFunc(selected, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+				return invalid(errors.New("search engine must be a nonempty Magento adapter name without whitespace"))
+			}
+			if configuredSet && configured != selected {
+				return invalid(fmt.Errorf("--search-engine %q conflicts with application.magento.variables.%s %q", selected, platform.EnvMagentoSearchConfigEngine, configured))
 			}
 
 			password := strings.TrimSpace(o.getenv("MAGELIFT_LOCAL_ADMIN_PASSWORD"))
@@ -267,7 +285,7 @@ exec bin/magento cache:clean config`,
 				"--db-name=magento",
 				"--db-user=magento",
 				"--db-password=magento",
-				"--search-engine=opensearch", "--opensearch-host=search", "--opensearch-port=9200",
+				"--search-engine=" + selected,
 				"--admin-firstname=" + firstName,
 				"--admin-lastname=" + lastName,
 				"--admin-email=" + adminEmail,
@@ -278,9 +296,16 @@ exec bin/magento cache:clean config`,
 				"--use-rewrites=1",
 				"--backend-frontname=" + backendFrontname,
 			}
+			switch selected {
+			case "opensearch":
+				install = append(install, "--opensearch-host=search", "--opensearch-port=9200")
+			case "elasticsuite":
+				install = append(install, "--es-hosts=search:9200")
+			}
 			return o.runLocalCompose(cmd.Context(), "exec", "app", install)
 		},
 	}
+	command.Flags().StringVar(&searchEngine, "search-engine", "opensearch", "Magento search adapter for initial installation, such as opensearch or elasticsuite")
 	command.Flags().StringVar(&baseURL, "base-url", localURL(o), "local Magento base URL")
 	command.Flags().StringVar(&adminUser, "admin-user", "admin", "Magento administrator username")
 	command.Flags().StringVar(&adminEmail, "admin-email", "admin@example.test", "Magento administrator email")

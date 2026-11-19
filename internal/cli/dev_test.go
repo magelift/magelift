@@ -5,9 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -302,6 +305,18 @@ func TestDevSeedStartsAppAndKeepsPasswordOutOfCommandArguments(t *testing.T) {
 	if len(calls) != 2 || calls[0][len(calls[0])-2] != "-d" || calls[0][len(calls[0])-1] != "app" {
 		t.Fatalf("Compose calls = %#v", calls)
 	}
+	if !containsArgument(calls[1], "--search-engine=opensearch") {
+		t.Fatalf("native install args: %v", calls[1])
+	}
+	calls = nil
+	command = newCommandWithOptions(o)
+	command.SetArgs([]string{"--config", path, "local", "seed", "--search-engine", "elasticsuite"})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 2 || !containsArgument(calls[1], "--search-engine=elasticsuite") || !containsArgument(calls[1], "--es-hosts=search:9200") {
+		t.Fatalf("ElasticSuite install args: %v", calls)
+	}
 	for _, argument := range calls[1] {
 		if strings.Contains(argument, password) {
 			t.Fatalf("password leaked into Compose arguments: %#v", calls[1])
@@ -450,5 +465,150 @@ func TestDevReportsMissingShop(t *testing.T) {
 	message := err.Error() + output.String()
 	if !strings.Contains(message, "bin/magento") {
 		t.Fatalf("error=%v output=%s", err, output.String())
+	}
+}
+
+func containsArgument(args []string, want string) bool {
+	for _, arg := range args {
+		if arg == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestDevQuickstartSearchEngineForFreshAndExistingShops(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"storeConfig":{"code":"default"}}}`))
+	}))
+	defer server.Close()
+	for _, installed := range []bool{false, true} {
+		t.Run(map[bool]string{false: "fresh", true: "existing"}[installed], func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "magelift.php")
+			if err := writeTestProjectFile(path, []byte(starterConfig), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(filepath.Join(dir, "bin"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "bin", "magento"), []byte("fixture"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if installed {
+				if err := os.MkdirAll(filepath.Join(dir, "app", "etc"), 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(dir, "app", "etc", "env.php"), []byte("existing"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var calls [][]string
+			o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+			o.getenv = func(key string) string {
+				switch key {
+				case "MAGELIFT_LOCAL_BASE_URL":
+					return server.URL + "/"
+				case "MAGELIFT_LOCAL_APP_IMAGE":
+					return "fixture"
+				}
+				return ""
+			}
+			o.runCompose = func(_ context.Context, _ string, _ []string, args []string, _, _ io.Writer) error {
+				calls = append(calls, append([]string(nil), args...))
+				return nil
+			}
+			cmd := newCommandWithOptions(o)
+			cmd.SetArgs([]string{"--config", path, "--no-interaction", "dev", "--search-engine", "elasticsuite"})
+			if err := cmd.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			if installed {
+				if len(calls) != 1 {
+					t.Fatalf("existing shop calls = %v", calls)
+				}
+				return
+			}
+			if len(calls) != 2 || !containsArgument(calls[1], "--search-engine=elasticsuite") || !containsArgument(calls[1], "--es-hosts=search:9200") {
+				t.Fatalf("fresh shop calls = %v", calls)
+			}
+		})
+	}
+}
+
+func TestLocalSeedAdapterSelection(t *testing.T) {
+	tests := []struct {
+		name, configured, flag, want, wantError string
+		hasFlag, hasConfig                      bool
+	}{
+		{name: "default", want: "opensearch"},
+		{name: "configured", configured: "elasticsuite", hasConfig: true, want: "elasticsuite"},
+		{name: "trim flag", flag: " elasticsuite ", hasFlag: true, want: "elasticsuite"},
+		{name: "custom", flag: "custom_adapter", hasFlag: true, want: "custom_adapter"},
+		{name: "empty flag", flag: "  ", hasFlag: true, wantError: "nonempty"},
+		{name: "bad whitespace", flag: "my adapter", hasFlag: true, wantError: "whitespace"},
+		{name: "conflict", configured: "elasticsuite", hasConfig: true, flag: "opensearch", hasFlag: true, wantError: "conflicts"},
+		{name: "empty configured", configured: "", hasConfig: true, wantError: "nonempty"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "magelift.php")
+			fixture := starterConfig
+			if tc.hasConfig {
+				fixture = strings.Replace(fixture, "    frontName: admin\n", "    frontName: admin\n    variables:\n      CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE: "+strconv.Quote(tc.configured)+"\n", 1)
+			}
+			if err := writeTestProjectFile(path, []byte(fixture), 0600); err != nil {
+				t.Fatal(err)
+			}
+			for _, relative := range []string{"bin/magento", localdev.ComposeFile} {
+				p := filepath.Join(dir, relative)
+				if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte("fixture"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var calls [][]string
+			o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+			o.getenv = func(k string) string {
+				if k == "MAGELIFT_LOCAL_ADMIN_PASSWORD" {
+					return "ExamplePassword12345"
+				}
+				return ""
+			}
+			o.runCompose = func(_ context.Context, _ string, _ []string, args []string, _, _ io.Writer) error {
+				calls = append(calls, append([]string(nil), args...))
+				return nil
+			}
+			cmd := newCommandWithOptions(o)
+			args := []string{"--config", path, "local", "seed"}
+			if tc.hasFlag {
+				args = append(args, "--search-engine", tc.flag)
+			}
+			cmd.SetArgs(args)
+			err := cmd.Execute()
+			if tc.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+					t.Fatalf("error=%v want %q", err, tc.wantError)
+				}
+				if len(calls) != 0 {
+					t.Fatalf("Compose started: %v", calls)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(calls) != 2 || !containsArgument(calls[1], "--search-engine="+tc.want) {
+				t.Fatalf("calls=%v", calls)
+			}
+			opensearch := containsArgument(calls[1], "--opensearch-host=search")
+			es := containsArgument(calls[1], "--es-hosts=search:9200")
+			if opensearch != (tc.want == "opensearch") || es != (tc.want == "elasticsuite") {
+				t.Fatalf("incorrect adapter options: %v", calls[1])
+			}
+		})
 	}
 }

@@ -95,8 +95,8 @@ func TestMagentoProbeShellSearchLegs(t *testing.T) {
 func TestMagentoProbeShellAssertsEffectiveSearchConfig(t *testing.T) {
 	joined := strings.Join(MagentoProbeShell("https://search.internal:9200", false, "opensearch"), " ")
 	for _, want := range []string{
-		`test "$(bin/magento config:show catalog/search/opensearch_server_hostname)" = 'search.internal'`,
-		`test "$(bin/magento config:show catalog/search/engine)" = 'opensearch'`,
+		`test "$(bin/magento config:show catalog/search/opensearch_server_hostname)" = 'https://search.internal'`,
+		`test "$engine" = 'opensearch'`,
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("probe = %q, want %q", joined, want)
@@ -147,7 +147,7 @@ func TestProbeSearchHostBareEndpointsExcludePort(t *testing.T) {
 	if got := probeSearchHost("search.internal:9300"); got != "search.internal" {
 		t.Fatalf("probeSearchHost() = %q, want hostname without port", got)
 	}
-	if got := probeSearchHost("https://search.internal:9200"); got != "search.internal" {
+	if got := probeSearchHost("https://search.internal:9200"); got != "https://search.internal" {
 		t.Fatalf("probeSearchHost(https) = %q", got)
 	}
 }
@@ -269,4 +269,47 @@ exit 1
 		t.Fatal(err)
 	}
 	return strings.TrimSpace(string(data)), true
+}
+
+func TestMagentoProbeUsesActiveAdapterAndConfiguredSelection(t *testing.T) {
+	tests := []struct {
+		name, engine, host, servers, expected, configured string
+		succeeds                                          bool
+	}{
+		{name: "native", engine: "opensearch", host: "search.internal", succeeds: true},
+		{name: "elastic", engine: "elasticsuite", servers: "search.internal:9200", succeeds: true},
+		{name: "elastic wrong endpoint", engine: "elasticsuite", servers: "wrong:9200"},
+		{name: "configured mismatch", engine: "opensearch", host: "search.internal", configured: "elasticsuite"},
+		{name: "expected mismatch", engine: "opensearch", host: "search.internal", expected: "elasticsuite"},
+		{name: "custom", engine: "my_custom_adapter", configured: "my_custom_adapter", succeeds: true},
+		{name: "missing engine", engine: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.Mkdir(filepath.Join(dir, "bin"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			stub := `#!/bin/sh
+case "$1:$2" in
+ setup:db:status:) exit 0 ;;
+ config:show:catalog/search/engine) printf '%s' "$TEST_ENGINE" ;;
+ config:show:catalog/search/opensearch_server_hostname) printf '%s' "$TEST_HOST" ;;
+ config:show:smile_elasticsuite_core_base_settings/es_client/servers) printf '%s' "$TEST_SERVERS" ;;
+ *) exit 1 ;;
+esac
+`
+			if err := os.WriteFile(filepath.Join(dir, "bin", "magento"), []byte(stub), 0755); err != nil {
+				t.Fatal(err)
+			}
+			shell := MagentoProbeShell("search.internal", false, tc.expected)
+			cmd := exec.Command(shell[0], shell[1], shell[2])
+			cmd.Dir = dir
+			cmd.Env = append(os.Environ(), "TEST_ENGINE="+tc.engine, "TEST_HOST="+tc.host, "TEST_SERVERS="+tc.servers, "CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE="+tc.configured)
+			err := cmd.Run()
+			if (err == nil) != tc.succeeds {
+				t.Fatalf("success=%t err=%v command=%s", tc.succeeds, err, shell[2])
+			}
+		})
+	}
 }

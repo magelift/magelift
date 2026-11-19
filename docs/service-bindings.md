@@ -47,7 +47,16 @@ built-in database and cache connections on these targets use ports 3306 and
 modes before creating replacement resources. Local Compose provisions
 development containers from the same family, version or explicit local image.
 
-The built-in Magento runtime sets `catalog/search/engine` to `opensearch` when it wires a search endpoint. It supplies connection settings for ElasticSuite as well. If the shop selects `elasticsuite` or another Magento search engine, preserving that selection requires a runtime change. Check the effective engine and reindex a representative catalog before moving traffic.
+Smile ElasticSuite is a Magento search and merchandising extension that can use the same OpenSearch service as Magento’s native search. Set the service family to `opensearch` in either case. MageLift passes the connection details to both clients and preserves the adapter selected in Magento. For an existing shop, check `bin/magento config:show catalog/search/engine` and reindex a representative catalog before cutover. [Smile’s compatibility table](https://github.com/Smile-SA/elasticsuite#which-version-should-i-use-)
+
+For a fresh local installation with the extension installed, run `magelift dev --search-engine elasticsuite` or use the same flag with `magelift local seed`. You can also select the adapter for local and cloud environments by setting `CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE` under `application.magento.variables`. A fresh local installation defaults to `opensearch` when you leave the adapter unspecified. [Smile’s installation guide](https://github.com/Smile-SA/elasticsuite/wiki/ModuleInstall)
+
+ElasticSuite’s default analyzers need the OpenSearch plugins `analysis-icu` and `analysis-phonetic`. Check the nodes with `GET /_cat/plugins?v`. For self-hosted OpenSearch, build the plugins into the shop’s search image and set `local.search.image` for local Compose. For example, this Dockerfile adds both plugins to OpenSearch 3.1.0. [OpenSearch plugin management](https://docs.opensearch.org/latest/install-and-configure/plugins/) · [Amazon OpenSearch plugins](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)
+
+```dockerfile
+FROM opensearchproject/opensearch:3.1.0
+RUN bin/opensearch-plugin install --batch analysis-icu analysis-phonetic
+```
 
 Custom binaries can register an adapter to resolve a service vendor to a
 supported connection. A full provider module can own new infrastructure

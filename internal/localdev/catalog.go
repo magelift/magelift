@@ -642,11 +642,9 @@ func ComposeTemplateFor(plan RuntimePlan) string {
 		"MAGENTO_DC_SESSION__SAVE":                                        localSessionSave(plan),
 		"MAGENTO_DC_SESSION__REDIS_HOST":                                  localSessionHost(plan),
 		"MAGENTO_DC_SESSION__REDIS_PORT":                                  localSessionPort(plan),
-		"MAGENTO_DC_CATALOG__SEARCH__ENGINE":                              "opensearch",
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME":          plan.Search.Connection.Host,
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":              strconv.Itoa(plan.Search.Connection.Port),
 		"MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH":              "0",
-		"CONFIG__DEFAULT__CATALOG__SEARCH__ENGINE":                        "opensearch",
 		"CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME":    plan.Search.Connection.Host,
 		"CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_SERVER_PORT":        strconv.Itoa(plan.Search.Connection.Port),
 		"CONFIG__DEFAULT__CATALOG__SEARCH__OPENSEARCH_ENABLE_AUTH":        "0",
@@ -959,7 +957,6 @@ func localDeploymentConfigOverride(plan RuntimePlan) string {
 			"default": map[string]any{
 				"catalog": map[string]any{
 					"search": map[string]any{
-						"engine":                     "opensearch",
 						"opensearch_server_hostname": plan.Search.Connection.Host,
 						"opensearch_server_port":     strconv.Itoa(plan.Search.Connection.Port),
 						"opensearch_index_prefix":    "magento2",
