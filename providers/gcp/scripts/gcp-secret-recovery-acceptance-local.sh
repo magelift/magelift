@@ -123,7 +123,7 @@ if gcloud secrets describe "$secret_id" --project="$project" >/dev/null 2>&1; th
 fi
 secret_created=1
 
-(cd "$ROOT" && GOOGLE_CLOUD_PROJECT="$project" go run ./providers/gcp/cmd/gcp-secret-recovery-acceptance \
+(cd "$ROOT" && GOOGLE_CLOUD_PROJECT="$project" go run ./providers/gcp/tests/acceptance/cmd/gcp-secret-recovery-acceptance \
 	--project "$project" \
 	--archive-bucket "$bucket" \
 	--secret-id "$secret_id" \

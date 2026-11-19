@@ -111,7 +111,7 @@ gcloud storage buckets create "gs://${bucket}" \
 	--public-access-prevention >/dev/null
 bucket_created=1
 
-(cd "$ROOT" && GOOGLE_CLOUD_PROJECT="$project" go run ./providers/gcp/cmd/gcp-recovery-acceptance \
+(cd "$ROOT" && GOOGLE_CLOUD_PROJECT="$project" go run ./providers/gcp/tests/acceptance/cmd/gcp-recovery-acceptance \
 	--project "$project" \
 	--bucket "$bucket" \
 	--marker "$marker" \

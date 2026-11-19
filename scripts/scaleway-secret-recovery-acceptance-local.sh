@@ -112,7 +112,7 @@ fi
 scw --profile "$profile" --output json object bucket create "$bucket" "region=$region" "acl=private" "enable-versioning=true" >/dev/null
 bucket_created=1
 
-(cd "$ROOT" && go run ./cmd/scaleway-secret-recovery-acceptance \
+(cd "$ROOT" && go run ./tests/acceptance/cmd/scaleway-secret-recovery-acceptance \
 	--profile "$profile" \
 	--region "$region" \
 	--bucket "$bucket" \

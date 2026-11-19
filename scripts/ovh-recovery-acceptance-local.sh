@@ -210,7 +210,7 @@ bucket_created=1
 export MAGELIFT_OVH_S3_ACCESS_KEY="$access_key"
 export MAGELIFT_OVH_S3_SECRET_KEY="$secret_key"
 
-(cd "$ROOT" && go run ./cmd/ovh-recovery-acceptance \
+(cd "$ROOT" && go run ./tests/acceptance/cmd/ovh-recovery-acceptance \
 	--region "$region" \
 	--endpoint "$endpoint" \
 	--bucket "$bucket" \

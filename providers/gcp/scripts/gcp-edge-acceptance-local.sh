@@ -470,7 +470,7 @@ armor_data_plane=not-run
 failover_rto=""
 
 go_gcp_edge() {
-	go run ./providers/gcp/cmd/gcp-edge-acceptance \
+	go run ./providers/gcp/tests/acceptance/cmd/gcp-edge-acceptance \
 		--project "$project" \
 		--marker "$marker" \
 		--domain "$domain" \

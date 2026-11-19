@@ -1153,7 +1153,7 @@ run_gcp_magento_known_content_check() {
 			return 1
 		fi
 		observed="$(awk 'NF && $0 !~ /^[+{]/ && $0 !~ /^warning:/ && $0 !~ /^Defaulted / { print; exit }' "${LOG_DIR}/cell-magento-seed-probe.exec.log")"
-		if ! (cd "${ROOT}" && go run ./cmd/magento-seed-probe --observed="${observed}" --expect="${seed_expect}") | tee -a "${log_path}"; then
+		if ! (cd "${ROOT}" && go run ./tests/acceptance/cmd/magento-seed-probe --observed="${observed}" --expect="${seed_expect}") | tee -a "${log_path}"; then
 			return 1
 		fi
 	fi
@@ -1163,12 +1163,12 @@ run_gcp_magento_known_content_check() {
 			return 1
 		fi
 		observed="$(awk 'NF && $0 !~ /^[+{]/ && $0 !~ /^warning:/ && $0 !~ /^Defaulted / { print; exit }' "${LOG_DIR}/cell-magento-catalog-sku.exec.log")"
-		if ! (cd "${ROOT}" && go run ./cmd/magento-catalog-sku-probe --observed="${observed}" --expect="${sku}") | tee -a "${log_path}"; then
+		if ! (cd "${ROOT}" && go run ./tests/acceptance/cmd/magento-catalog-sku-probe --observed="${observed}" --expect="${sku}") | tee -a "${log_path}"; then
 			return 1
 		fi
 	fi
 	if [[ -n "${url}" ]]; then
-		if ! (cd "${ROOT}" && go run ./cmd/magento-known-content-probe --url="${url}" --expect="${expect}") | tee -a "${log_path}"; then
+		if ! (cd "${ROOT}" && go run ./tests/acceptance/cmd/magento-known-content-probe --url="${url}" --expect="${expect}") | tee -a "${log_path}"; then
 			return 1
 		fi
 	fi
@@ -1193,7 +1193,7 @@ run_gcp_failed_deployment_check() {
 		printf 'failed-deployment requires a pullable MAGELIFT_GCP_ACCEPTANCE_DIGEST\n' >&2
 		return 2
 	fi
-	if ! (cd "${ROOT}" && go run ./cmd/failed-deployment-probe --current="${DIGEST}" --fault="${fault}") | tee "${log_path}"; then
+	if ! (cd "${ROOT}" && go run ./tests/acceptance/cmd/failed-deployment-probe --current="${DIGEST}" --fault="${fault}") | tee "${log_path}"; then
 		return 2
 	fi
 	web="${NAME}-${PROFILE}-app-web"

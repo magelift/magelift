@@ -191,7 +191,7 @@ if [[ "${leftover_ready}" != 1 ]]; then
 	exit 1
 fi
 
-(cd "${ROOT}" && go run ./providers/gcp/cmd/gcp-cloudsql-destroy-retention-acceptance \
+(cd "${ROOT}" && go run ./providers/gcp/tests/acceptance/cmd/gcp-cloudsql-destroy-retention-acceptance \
 	--project="${project}" \
 	--instance="${instance}")
 

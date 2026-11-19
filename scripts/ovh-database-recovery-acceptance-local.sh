@@ -337,7 +337,7 @@ reset_stdout_file=""
 reset_stderr_file=""
 
 printf '+ ovh-database: starting application-fixture backup/restore cell\n'
-(cd "$ROOT" && MAGELIFT_OVH_DATABASE_ROOT_PASSWORD="$root_password" MAGELIFT_OVH_DATABASE_RESTORE_IP_RESTRICTION="$caller_ipv4/32" go run ./cmd/ovh-database-recovery-acceptance \
+(cd "$ROOT" && MAGELIFT_OVH_DATABASE_ROOT_PASSWORD="$root_password" MAGELIFT_OVH_DATABASE_RESTORE_IP_RESTRICTION="$caller_ipv4/32" go run ./tests/acceptance/cmd/ovh-database-recovery-acceptance \
 	--profile "$profile" \
 	--project "$project" \
 	--region "$region" \

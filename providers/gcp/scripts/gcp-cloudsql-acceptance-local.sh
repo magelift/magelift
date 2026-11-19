@@ -206,7 +206,7 @@ if [[ "${ready}" != 1 ]]; then
 	exit 1
 fi
 
-(cd "${ROOT}" && MAGELIFT_GCP_CLOUDSQL_ROOT_PASSWORD="${root_password}" MAGELIFT_GCP_CLOUDSQL_MYSQL_IMAGE="${mysql_image}" go run ./providers/gcp/cmd/gcp-cloudsql-acceptance \
+(cd "${ROOT}" && MAGELIFT_GCP_CLOUDSQL_ROOT_PASSWORD="${root_password}" MAGELIFT_GCP_CLOUDSQL_MYSQL_IMAGE="${mysql_image}" go run ./providers/gcp/tests/acceptance/cmd/gcp-cloudsql-acceptance \
 	--project="${project}" \
 	--instance="${instance}" \
 	--marker="${marker}" \

@@ -82,7 +82,7 @@ fi
 
 patch_line="$(grep -n 'patch_response=' "$SCRIPT" | head -1 | cut -d: -f1)"
 wait_line="$(grep -nF 'wait_for_cloud_sql_operation "${patch_operation}"' "$SCRIPT" | head -1 | cut -d: -f1)"
-run_line="$(grep -nE '\(cd "\$\{ROOT\}" && .*go run ./providers/gcp/cmd/gcp-cloudsql-acceptance' "$SCRIPT" | head -1 | cut -d: -f1)"
+run_line="$(grep -nE '\(cd "\$\{ROOT\}" && .*go run ./providers/gcp/tests/acceptance/cmd/gcp-cloudsql-acceptance' "$SCRIPT" | head -1 | cut -d: -f1)"
 if [[ -z "$patch_line" || -z "$wait_line" || -z "$run_line" || "$patch_line" -ge "$wait_line" || "$wait_line" -ge "$run_line" ]]; then
 	printf 'Cloud SQL operation readiness is not ordered before the backup command (patch=%s wait=%s run=%s)\n' "$patch_line" "$wait_line" "$run_line" >&2
 	exit 1

@@ -81,7 +81,7 @@ acceptance_start_ttl_watchdog "$ACCEPTANCE_TTL_SECONDS" "$ttl_marker"
 scw --profile "$profile" --output json object bucket create "$bucket" "region=$region" "acl=private" "enable-versioning=false" >/dev/null
 bucket_created=1
 
-(cd "$ROOT" && SCW_PROFILE="$profile" go run ./cmd/scaleway-recovery-acceptance \
+(cd "$ROOT" && SCW_PROFILE="$profile" go run ./tests/acceptance/cmd/scaleway-recovery-acceptance \
 	--profile "$profile" \
 	--region "$region" \
 	--bucket "$bucket" \

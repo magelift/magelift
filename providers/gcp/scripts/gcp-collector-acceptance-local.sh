@@ -296,7 +296,7 @@ KUBECONFIG="$kubeconfig" gcloud container clusters get-credentials "$cluster" --
 KUBECONFIG="$kubeconfig" \
 MAGELIFT_GCP_COLLECTOR_LICENSE_KEY="$license_key" \
 MAGELIFT_GCP_COLLECTOR_QUERY_KEY="$query_key" \
-go run ./providers/gcp/cmd/gcp-collector-acceptance \
+go run ./providers/gcp/tests/acceptance/cmd/gcp-collector-acceptance \
 	--project "$project" \
 	--region "$region" \
 	--cluster "$cluster" \

@@ -135,4 +135,4 @@ MAGELIFT_NEWRELIC_NERDGRAPH_ENDPOINT="$nerdgraph_endpoint" \
 MAGELIFT_NEWRELIC_OTLP_API_KEY="$api_key" \
 MAGELIFT_NEWRELIC_NERDGRAPH_API_KEY="$query_key" \
 MAGELIFT_NEWRELIC_OTLP_MARKER="$marker" \
-	go run ./cmd/newrelic-otlp-acceptance
+	go run ./tests/acceptance/cmd/newrelic-otlp-acceptance

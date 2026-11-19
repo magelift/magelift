@@ -27,7 +27,7 @@ grep -Fq 'MAGELIFT_GCP_EDGE_ALIAS_WAIT_SECONDS' "$SCRIPT"
 grep -Fq 'custom-request-header' "$SCRIPT"
 grep -Fq 'www.google.com' "$SCRIPT"
 grep -Fq 'destroy from leftover state' "$SCRIPT"
-grep -Fq 'go run ./providers/gcp/cmd/gcp-edge-acceptance' "$SCRIPT"
+grep -Fq 'go run ./providers/gcp/tests/acceptance/cmd/gcp-edge-acceptance' "$SCRIPT"
 grep -Fq -- '--phase apply' "$SCRIPT"
 grep -Fq -- '--phase destroy' "$SCRIPT"
 grep -Fq -- '--phase failover' "$SCRIPT"
@@ -41,7 +41,7 @@ grep -Fq 'secondary Internet FQDN NEG' "$SCRIPT"
 grep -Fq 'go_gcp_edge' "$SCRIPT"
 grep -Fq 'trafficImpact=not-run' "$SCRIPT"
 grep -Fq -- '--security-policy' "$SCRIPT"
-grep -Fq '"security-policy"' "$ROOT/providers/gcp/cmd/gcp-edge-acceptance/main.go"
+grep -Fq '"security-policy"' "$ROOT/providers/gcp/tests/acceptance/cmd/gcp-edge-acceptance/main.go"
 grep -Fq 'MAGELIFT_GCP_EDGE_WAF' "$SCRIPT"
 grep -Fq 'go run ./cmd/magento-waf-rules' "$SCRIPT"
 grep -Fq 'gcp_edge_verify_magento_armor' "$SCRIPT"
@@ -68,8 +68,8 @@ jq -e '
 	and ([.rules[]? | select(.description == "scannerdetection" and .preview != true)] | length > 0)
 	and ([.rules[]? | .preconfiguredWafConfig.exclusions[]? | select(.targetRuleSet == "sqli-v33-stable" and ((.requestBodiesToExclude // []) | length) > 0)] | length > 0)
 ' <<<"$payload" >/dev/null
-grep -Fq 'NativeProvider:  "cloud-cdn"' "$ROOT/providers/gcp/cmd/gcp-edge-acceptance/main.go"
-if grep -Fq 'cloud-armor-allow-all' "$ROOT/providers/gcp/cmd/gcp-edge-acceptance/main.go"; then
+grep -Fq 'NativeProvider:  "cloud-cdn"' "$ROOT/providers/gcp/tests/acceptance/cmd/gcp-edge-acceptance/main.go"
+if grep -Fq 'cloud-armor-allow-all' "$ROOT/providers/gcp/tests/acceptance/cmd/gcp-edge-acceptance/main.go"; then
 	printf 'GCP edge acceptance must not use an allow-all Armor policy\n' >&2
 	exit 1
 fi

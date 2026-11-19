@@ -28,8 +28,8 @@ grep -Fq 'credentials-reset' "$SCRIPT"
 grep -Fq -- '--ip-restrictions' "$SCRIPT"
 grep -Fq 'application-fixture backup/restore cell' "$SCRIPT"
 grep -Fq 'provider-managed PITR point' "$SCRIPT"
-grep -Fq 'protection=provider-optional' "$ROOT/cmd/ovh-database-recovery-acceptance/main.go"
-grep -Fq 'applicationFixture=verified' "$ROOT/cmd/ovh-database-recovery-acceptance/main.go"
+grep -Fq 'protection=provider-optional' "$ROOT/tests/acceptance/cmd/ovh-database-recovery-acceptance/main.go"
+grep -Fq 'applicationFixture=verified' "$ROOT/tests/acceptance/cmd/ovh-database-recovery-acceptance/main.go"
 grep -Fq '+ ovh-database: creating encrypted source' "$SCRIPT"
 
 output="$(

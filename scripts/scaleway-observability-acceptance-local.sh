@@ -79,5 +79,5 @@ fi
 acceptance_prepare_lifecycle
 acceptance_start_ttl_watchdog "$ACCEPTANCE_TTL_SECONDS" "$ttl_marker"
 cleanup_enabled=1
-(export SCW_PROFILE="$profile"; cd "$ROOT"; go run ./cmd/scaleway-observability-acceptance --project "$project" --region "$region" --marker "$marker" --verify-budget "$verify_budget")
+(export SCW_PROFILE="$profile"; cd "$ROOT"; go run ./tests/acceptance/cmd/scaleway-observability-acceptance --project "$project" --region "$region" --marker "$marker" --verify-budget "$verify_budget")
 printf 'Scaleway Cockpit observability acceptance resources cleaned through exact owning-service inventory marker=%s\n' "$marker"

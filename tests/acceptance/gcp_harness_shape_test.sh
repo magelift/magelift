@@ -142,19 +142,19 @@ if ! grep -q 'MAGELIFT_HA_MAGENTO_CONTENT_URL' "$SCRIPT" || ! grep -q 'known-con
 	printf 'GCP harness must keep HTTP Magento known-content optional until URL and expect are set\n' >&2
 	exit 1
 fi
-if ! grep -q 'MAGELIFT_HA_MAGENTO_CONTENT_SKU' "$SCRIPT" || ! grep -q './cmd/magento-catalog-sku-probe' "$SCRIPT"; then
+if ! grep -q 'MAGELIFT_HA_MAGENTO_CONTENT_SKU' "$SCRIPT" || ! grep -q './tests/acceptance/cmd/magento-catalog-sku-probe' "$SCRIPT"; then
 	printf 'GCP harness must support Magento catalog SKU known-content without public HTTP\n' >&2
 	exit 1
 fi
-if ! grep -q 'MAGELIFT_HA_MAGENTO_SEED_PROBE' "$SCRIPT" || ! grep -q './cmd/magento-seed-probe' "$SCRIPT" || ! grep -q 'magelift_seed_probe' "$SCRIPT" || ! grep -q 'tiny-fixture' "$SCRIPT" || ! grep -q 'gcp_magento_fetch_one' "$SCRIPT" || ! grep -q 'gcp_apply_magento_seed_probe' "$SCRIPT" || ! grep -q 'magelift-seed-probe.sql' "$SCRIPT" || ! grep -q '/^warning:/' "$SCRIPT" || ! grep -q '/^Defaulted /' "$SCRIPT"; then
+if ! grep -q 'MAGELIFT_HA_MAGENTO_SEED_PROBE' "$SCRIPT" || ! grep -q './tests/acceptance/cmd/magento-seed-probe' "$SCRIPT" || ! grep -q 'magelift_seed_probe' "$SCRIPT" || ! grep -q 'tiny-fixture' "$SCRIPT" || ! grep -q 'gcp_magento_fetch_one' "$SCRIPT" || ! grep -q 'gcp_apply_magento_seed_probe' "$SCRIPT" || ! grep -q 'magelift-seed-probe.sql' "$SCRIPT" || ! grep -q '/^warning:/' "$SCRIPT" || ! grep -q '/^Defaulted /' "$SCRIPT"; then
 	printf 'GCP harness must plant magelift_seed_probe after dump import, probe it on HA cells, and skip exec warning noise\n' >&2
 	exit 1
 fi
-if ! grep -q './cmd/magento-known-content-probe' "$SCRIPT"; then
+if ! grep -q './tests/acceptance/cmd/magento-known-content-probe' "$SCRIPT"; then
 	printf 'GCP harness must invoke magento-known-content-probe for HA application integrity\n' >&2
 	exit 1
 fi
-for required in 'MAGELIFT_GCP_FAILED_DEPLOY_DIGEST' 'run_gcp_failed_deployment_check' 'failed-deployment=not-run' './cmd/failed-deployment-probe' 'failed-deployment PASS restored='; do
+for required in 'MAGELIFT_GCP_FAILED_DEPLOY_DIGEST' 'run_gcp_failed_deployment_check' 'failed-deployment=not-run' './tests/acceptance/cmd/failed-deployment-probe' 'failed-deployment PASS restored='; do
 	if ! grep -q "$required" "$SCRIPT"; then
 		printf 'GCP failed-deployment drill contract missing: %s\n' "$required" >&2
 		exit 1

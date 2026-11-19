@@ -317,7 +317,7 @@ LIVE_WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/magelift-${PROVIDER}-acceptance.XXXXX
 LIVE_CONFIG="$LIVE_WORKDIR/acceptance.json"
 source "$ROOT/scripts/acceptance-project.sh"
 MAGELIFT_CONFIG="$(realpath "$MAGELIFT_CONFIG")"
-(cd "$ROOT" && go run ./cmd/acceptance-project "$MAGELIFT_CONFIG") > "$LIVE_CONFIG"
+(cd "$ROOT" && go run ./tests/acceptance/cmd/acceptance-project "$MAGELIFT_CONFIG") > "$LIVE_CONFIG"
 acceptance_project_wrapper "$LIVE_WORKDIR"
 if [[ -n "${MAGELIFT_K8S_ACCEPTANCE_BACKEND_URL:-}" ]]; then
 	export PULUMI_BACKEND_URL="$MAGELIFT_K8S_ACCEPTANCE_BACKEND_URL"

@@ -167,5 +167,5 @@ fi
 acceptance_prepare_lifecycle
 acceptance_start_ttl_watchdog "$ACCEPTANCE_TTL_SECONDS" "$ttl_marker"
 cleanup_enabled=1
-(cd "$ROOT" && go run ./providers/gcp/cmd/gcp-observability-acceptance --project "$project" --marker "$marker" --verify-budget "$verify_budget")
+(cd "$ROOT" && go run ./providers/gcp/tests/acceptance/cmd/gcp-observability-acceptance --project "$project" --marker "$marker" --verify-budget "$verify_budget")
 printf 'GCP observability acceptance resources cleaned through exact owning-service inventory marker=%s\n' "$marker"

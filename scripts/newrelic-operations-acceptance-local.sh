@@ -78,4 +78,4 @@ MAGELIFT_NEWRELIC_NERDGRAPH_ENDPOINT="$endpoint" \
 MAGELIFT_NEWRELIC_OPERATIONS_API_KEY="$query_key" \
 MAGELIFT_NEWRELIC_OPERATIONS_MARKER="$marker" \
 MAGELIFT_NEWRELIC_OPERATIONS_SLO_ENTITY_GUID="$slo_entity_guid" \
-	go run ./cmd/newrelic-operations-acceptance
+	go run ./tests/acceptance/cmd/newrelic-operations-acceptance

@@ -81,7 +81,7 @@ gcloud pubsub topics publish "${topic}" \
 	--message="magelift-pubsub:${fixture}:${marker}" \
 	--quiet >/dev/null
 
-go run ./providers/gcp/cmd/gcp-pubsub-acceptance \
+go run ./providers/gcp/tests/acceptance/cmd/gcp-pubsub-acceptance \
 	--project="${project}" \
 	--subscription="${subscription}" \
 	--marker="${marker}" \

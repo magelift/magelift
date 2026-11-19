@@ -21,7 +21,7 @@ grep -Fq 'apiAccessCreateKeys' "$SCRIPT"
 grep -Fq 'apiAccessDeleteKeys' "$SCRIPT"
 grep -Fq 'MAGELIFT_GCP_COLLECTOR_LICENSE_KEY' "$SCRIPT"
 grep -Fq 'MAGELIFT_GCP_COLLECTOR_QUERY_KEY' "$SCRIPT"
-grep -Fq 'go run ./providers/gcp/cmd/gcp-collector-acceptance' "$SCRIPT"
+grep -Fq 'go run ./providers/gcp/tests/acceptance/cmd/gcp-collector-acceptance' "$SCRIPT"
 grep -Fq 'acceptance_start_ttl_watchdog' "$SCRIPT"
 
 trap_line="$(grep -n '^trap cleanup EXIT$' "$SCRIPT" | head -1 | cut -d: -f1)"

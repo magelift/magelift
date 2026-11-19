@@ -254,7 +254,7 @@ fi
 acceptance_cleanup_ledger_record "$ledger_path" rdb-instance "$source_name" "$source_id"
 
 printf '+ scaleway-rdb: source ready id=%s; starting snapshot/restore cell\n' "$source_id"
-(cd "$ROOT" && MAGELIFT_SCALEWAY_DATABASE_ROOT_PASSWORD="$root_password" go run ./cmd/scaleway-database-recovery-acceptance \
+(cd "$ROOT" && MAGELIFT_SCALEWAY_DATABASE_ROOT_PASSWORD="$root_password" go run ./tests/acceptance/cmd/scaleway-database-recovery-acceptance \
 	--profile "$profile" \
 	--project "$project" \
 	--region "$region" \
