@@ -37,6 +37,18 @@ builds:
       - -s
       - -w
       - -X main.Version={{ .Version }}
+  - id: magelift-provider-azure
+    dir: providers/azure
+    main: ./cmd/magelift-provider-azure
+    binary: magelift-provider-azure
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
+      - -X main.Version={{ .Version }}
 
 archives:
   - id: cli
@@ -59,6 +71,9 @@ archives:
   # first tag release; see ADR 0011.
   - id: provider-gcp
     ids: [magelift-provider-gcp]
+    formats: [binary]
+  - id: provider-azure
+    ids: [magelift-provider-azure]
     formats: [binary]
 
 checksum:
@@ -92,6 +107,16 @@ signs:
       - "--yes"
     artifacts: binary
     ids: [provider-gcp]
+  - id: provider-azure
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: binary
+    ids: [provider-azure]
 
 # Homebrew cask with binary stanzas: goreleaser deprecated brews (formula
 # generation) in v2.16 in favor of homebrew_casks; casks install binaries on

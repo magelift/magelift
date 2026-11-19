@@ -135,9 +135,19 @@ function magelift_initial_db_count_tables(array $connection, ?callable $tableCou
     );
 
     try {
-        $pdo = new PDO($dsn, $connection['username'], $connection['password'], [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        ]);
+        $options = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION];
+        $ca = getenv('MAGELIFT_DATABASE_TLS_CA');
+        if ($ca !== false && $ca !== '') {
+            if (!is_file($ca) || !is_readable($ca)
+                || !defined('PDO::MYSQL_ATTR_SSL_CA') || !defined('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT')) {
+                magelift_initial_db_fail('Database TLS CA is unavailable.');
+            }
+            $caOption = defined('Pdo\\Mysql::ATTR_SSL_CA') ? constant('Pdo\\Mysql::ATTR_SSL_CA') : constant('PDO::MYSQL_ATTR_SSL_CA');
+            $verifyOption = defined('Pdo\\Mysql::ATTR_SSL_VERIFY_SERVER_CERT') ? constant('Pdo\\Mysql::ATTR_SSL_VERIFY_SERVER_CERT') : constant('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT');
+            $options[$caOption] = $ca;
+            $options[$verifyOption] = true;
+        }
+        $pdo = new PDO($dsn, $connection['username'], $connection['password'], $options);
     } catch (PDOException) {
         magelift_initial_db_fail('Could not connect to the Magento database.');
     }

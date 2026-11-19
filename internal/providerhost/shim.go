@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"strings"
 
@@ -20,14 +21,13 @@ import (
 	"github.com/magelift/magelift/sdk"
 )
 
-// ShimModule is a plugin-backed platform.StackModule for one GCP runtime.
-// Planashes through the v2 client; deploy steps run core-side from the
-// published deploy inputs; admission runs server-side during Plan (the shim
-// deliberately exposes no PlanAdmission).
+// ShimModule sends plan and deployment requests to the provider that owns the runtime.
+// The provider validates the request when it builds the plan.
 type ShimModule struct {
 	platform.LifecycleFactories
-	runtime sdk.RuntimeID
-	client  *Client
+	provider sdk.ProviderID
+	runtime  sdk.RuntimeID
+	client   *Client
 }
 
 var (
@@ -61,7 +61,7 @@ func NewShimModule(runtime sdk.RuntimeID, client *Client) (*ShimModule, error) {
 	if client == nil {
 		return nil, errors.New("provider client is required")
 	}
-	module := &ShimModule{runtime: runtime, client: client}
+	module := &ShimModule{provider: "gcp", runtime: runtime, client: client}
 	module.Edge = func(ctx context.Context, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
 		return NewShimEdgeAdapter(ctx, client, planned)
 	}
@@ -71,12 +71,25 @@ func NewShimModule(runtime sdk.RuntimeID, client *Client) (*ShimModule, error) {
 	return module, nil
 }
 
+// NewLazyAzureShimModule binds the AKS runtime to an independently negotiated
+// Azure provider. The session is opened only when a command needs the provider.
+func NewLazyAzureShimModule(dial DialFunc) (*ShimModule, error) {
+	if dial == nil {
+		return nil, errors.New("provider dialer is required")
+	}
+	return &ShimModule{provider: "azure", runtime: "aks", client: NewLazyClient(dial)}, nil
+}
+
 func (m *ShimModule) Descriptor() sdk.TargetDescriptor {
 	runtime := sdk.RuntimeID("gke-autopilot")
 	if m != nil && m.runtime != "" {
 		runtime = m.runtime
 	}
-	return sdk.TargetDescriptor{ID: sdk.TargetID("gcp." + string(runtime)), Provider: "gcp", Runtime: runtime}
+	provider := sdk.ProviderID("gcp")
+	if m != nil && m.provider != "" {
+		provider = m.provider
+	}
+	return sdk.TargetDescriptor{ID: sdk.TargetID(string(provider) + "." + string(runtime)), Provider: provider, Runtime: runtime}
 }
 
 func (m *ShimModule) CertificationTier() platform.CertificationTier {
@@ -97,9 +110,11 @@ func platformTier(tier sdk.ExtensionCertificationTier) platform.CertificationTie
 // WithLiveQueueReplicas mutate a copy and re-plan: plans are immutable
 // values, never post-hoc mutations.
 type retainedInputs struct {
+	stateEnvironment    string
 	envelope            sdk.Envelope
 	application         sdk.Application
 	targetBlock         []byte
+	services            map[string]sdk.ServiceBinding
 	edge                sdk.EdgeIntent
 	observability       sdk.ObservabilityIntent
 	runtime             string
@@ -115,52 +130,64 @@ func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.P
 	if m == nil || m.client == nil {
 		return nil, errors.New("provider client is required")
 	}
-	if cfg.Target.Provider != "gcp" {
-		return nil, fmt.Errorf("GCP provider shim cannot plan target %q", cfg.Target.Provider)
+	if sdk.ProviderID(cfg.Target.Provider) != m.provider {
+		return nil, fmt.Errorf("%s provider shim cannot plan target %q", m.provider, cfg.Target.Provider)
 	}
 	if cfg.Target.Runtime != "" && cfg.Target.Runtime != string(m.runtime) {
-		return nil, fmt.Errorf("GCP %s shim cannot plan runtime %q", m.runtime, cfg.Target.Runtime)
+		return nil, fmt.Errorf("%s %s shim cannot plan runtime %q", m.provider, m.runtime, cfg.Target.Runtime)
 	}
-	if err := platform.ValidateFirstPartyEdge(cfg); err != nil {
-		return nil, err
+	var target any
+	switch m.provider {
+	case "azure":
+		if cfg.Target.Azure == nil {
+			return nil, errors.New("target.azure is required for Azure deployment")
+		}
+		target = cfg.Target.Azure
+	case "gcp":
+		if cfg.Target.GCP == nil {
+			return nil, errors.New("target.gcp is required for GCP deployment")
+		}
+		target = cfg.Target.GCP
+	default:
+		return nil, fmt.Errorf("unsupported provider shim %q", m.provider)
 	}
-	if err := platform.ValidateFirstPartyObservability(cfg); err != nil {
-		return nil, err
-	}
-	edge, err := platform.EdgeIntentFromConfig(cfg, environment)
+	block, err := yaml.Marshal(target)
 	if err != nil {
-		return nil, err
-	}
-	observability, err := platform.ObservabilityIntentFromConfig(cfg, environment)
-	if err != nil {
-		return nil, err
-	}
-	if cfg.Target.GCP == nil {
-		return nil, errors.New("target.gcp is required for GCP deployment")
-	}
-	targetBlock, err := yaml.Marshal(cfg.Target.GCP)
-	if err != nil {
-		return nil, fmt.Errorf("marshal GCP target block: %w", err)
-	}
-	requirement, err := config.ServiceRequirementForRelease(cfg.Application.Version, config.CompatibilityCache, "valkey")
-	if err != nil {
-		return nil, fmt.Errorf("resolve GCP Valkey compatibility: %w", err)
-	}
-	if len(requirement.Versions) == 0 || strings.TrimSpace(requirement.Versions[0]) == "" {
-		return nil, fmt.Errorf("Adobe Valkey requirement for Magento %s has no service major", cfg.Application.Version)
+		return nil, fmt.Errorf("marshal %s target block: %w", m.provider, err)
 	}
 	inputs := retainedInputs{
-		envelope:            buildEnvelope(cfg, environment),
-		application:         buildApplication(cfg),
-		targetBlock:         targetBlock,
-		edge:                edge,
-		observability:       observability,
-		runtime:             string(m.runtime),
-		valkeyRequirement:   requirement.Versions[0],
-		allowUnsupported:    cfg.Compatibility.AllowUnsupported,
-		allowExpiredPreview: opts.AllowExpiredPreview,
-		accountOnly:         opts.AccountOnly,
-		runtimeObserve:      opts.RuntimeObserve,
+		stateEnvironment: cfg.StateEnvironment, envelope: buildEnvelope(cfg, environment),
+		application: buildApplication(cfg), targetBlock: block, services: maps.Clone(cfg.Services),
+		runtime: string(m.runtime), allowUnsupported: true, allowExpiredPreview: opts.AllowExpiredPreview,
+		accountOnly: opts.AccountOnly, runtimeObserve: opts.RuntimeObserve,
+	}
+	if opts.AccountOnly || opts.AllowExpiredPreview {
+		return m.replan(planContext(opts), inputs)
+	}
+	if m.provider == "gcp" {
+		if err := platform.ValidateFirstPartyEdge(cfg); err != nil {
+			return nil, err
+		}
+		if err := platform.ValidateFirstPartyObservability(cfg); err != nil {
+			return nil, err
+		}
+		requirement, _ := config.ServiceRequirementForRelease(cfg.Application.Version, config.CompatibilityCache, "valkey")
+		if len(requirement.Versions) > 0 {
+			inputs.valkeyRequirement = requirement.Versions[0]
+		} else {
+			inputs.valkeyRequirement = cfg.Services["cache"].Version
+			if inputs.valkeyRequirement == "" {
+				inputs.valkeyRequirement = strings.ReplaceAll(strings.TrimPrefix(cfg.Target.GCP.MemorystoreEngineVersion, "VALKEY_"), "_", ".")
+			}
+		}
+	}
+	inputs.edge, err = platform.EdgeIntentFromConfig(cfg, environment)
+	if err != nil {
+		return nil, err
+	}
+	inputs.observability, err = platform.ObservabilityIntentFromConfig(cfg, environment)
+	if err != nil {
+		return nil, err
 	}
 	return m.replan(planContext(opts), inputs)
 }
@@ -174,12 +201,14 @@ func planContext(opts platform.PlanOptions) context.Context {
 
 func (m *ShimModule) replan(ctx context.Context, inputs retainedInputs) (*ShimPlanned, error) {
 	resp, err := Call[sdk.PlanRequest, sdk.PlanResult](ctx, m.client, sdk.OpPlan, &sdk.PlanRequest{
+		StateEnvironment:    inputs.stateEnvironment,
 		ProtocolVersion:     sdk.ProtocolV1,
 		Envelope:            inputs.envelope,
 		Application:         inputs.application,
 		Edge:                inputs.edge,
 		Observability:       inputs.observability,
 		TargetBlock:         inputs.targetBlock,
+		Services:            inputs.services,
 		Runtime:             inputs.runtime,
 		LiveQueueReplicas:   inputs.liveQueueReplicas,
 		ValkeyRequirement:   inputs.valkeyRequirement,
@@ -211,7 +240,7 @@ func buildEnvelope(cfg config.Config, environment string) sdk.Envelope {
 		Environment:        environment,
 		Region:             region,
 		EnvironmentClass:   cfg.Class,
-		StackName:          platform.FormatStackName(cfg.Project.Name, environment, "gcp", sdk.RuntimeID(cfg.Target.Runtime)),
+		StackName:          platform.FormatStackName(cfg.Project.Name, environment, sdk.ProviderID(cfg.Target.Provider), sdk.RuntimeID(cfg.Target.Runtime)),
 		Preset:             preset,
 		MonthlyBudgetCents: cfg.MonthlyBudgetCents,
 		AppVersion:         cfg.Application.Version,
@@ -264,15 +293,16 @@ func appendMap(values map[string]string) map[string]string {
 	return out
 }
 
-// Program always fails: GCP programs execute inside the provider plugin.
-// The CLI builds a plugin-backed automation backend instead of a core
-// Pulumi program for GCP targets.
+// Program directs callers to the provider backend that owns the Pulumi program.
 func (m *ShimModule) Program(platform.PlannedStack) (pulumi.RunFunc, error) {
-	return nil, errors.New("GCP programs execute inside the provider plugin; use the plugin automation backend")
+	return nil, errors.New("use the provider automation backend to run its Pulumi program")
 }
 
 func (m *ShimModule) OutputKeys() []string {
 	keys := append([]string(nil), platform.RequiredOutputKeys()...)
+	if m != nil && m.provider == "azure" {
+		return append(keys, "clusterID", "databaseHost", "mediaAccount", "mediaShare", "vaultURI", "logAnalyticsWorkspaceId", "kubeconfig", "namespace", "imagePullSecret", "mediaClaim", "databaseTLSCA", platform.OutputSearchEndpoint, "queueMode", platform.OutputDatabaseSecretName, platform.OutputEncryptionKeySecretName)
+	}
 	return append(keys, "mediaURL", "mediaBucket", platform.OutputSearchEndpoint, platform.OutputQueueHost, platform.OutputQueueReplicas, platform.OutputDatabaseConnectionName, "queueMode", platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, "securityPolicyName")
 }
 
@@ -358,7 +388,7 @@ func AsEnvelopePlan(planned platform.PlannedStack) (EnvelopePlan, bool) {
 }
 
 func (p *ShimPlanned) StackName() string        { return p.stored.StackName }
-func (p *ShimPlanned) Provider() sdk.ProviderID { return "gcp" }
+func (p *ShimPlanned) Provider() sdk.ProviderID { return sdk.ProviderID(p.stored.Provider) }
 func (p *ShimPlanned) Runtime() sdk.RuntimeID   { return sdk.RuntimeID(p.stored.Runtime) }
 func (p *ShimPlanned) Project() string          { return p.inputs.envelope.Project }
 func (p *ShimPlanned) Environment() string      { return p.inputs.envelope.Environment }
@@ -371,7 +401,8 @@ func (p *ShimPlanned) Protected() bool          { return p.inputs.envelope.Prote
 func (p *ShimPlanned) ImageDigest() string      { return p.stored.ImageDigest }
 func (p *ShimPlanned) TargetDescriptor() sdk.TargetDescriptor {
 	runtime := p.Runtime()
-	return sdk.TargetDescriptor{ID: sdk.TargetID("gcp." + string(runtime)), Provider: "gcp", Runtime: runtime}
+	provider := p.Provider()
+	return sdk.TargetDescriptor{ID: sdk.TargetID(string(provider) + "." + string(runtime)), Provider: provider, Runtime: runtime}
 }
 
 // StateBackendURL reports the plan-bound backend URL for CLI backend wiring.
@@ -388,14 +419,14 @@ func (p *ShimPlanned) WithImageDigest(digest string) (platform.PlannedStack, err
 	if p == nil || p.module == nil {
 		return nil, errors.New("shim plan has no module")
 	}
-	var target config.GCPTarget
+	var target map[string]any
 	if err := yaml.Unmarshal(p.inputs.targetBlock, &target); err != nil {
-		return nil, fmt.Errorf("decode retained GCP target block: %w", err)
+		return nil, fmt.Errorf("decode retained target block: %w", err)
 	}
-	target.ImageDigest = digest
-	block, err := yaml.Marshal(&target)
+	target["imageDigest"] = digest
+	block, err := yaml.Marshal(target)
 	if err != nil {
-		return nil, fmt.Errorf("marshal GCP target block: %w", err)
+		return nil, fmt.Errorf("marshal target block: %w", err)
 	}
 	next := p.inputs
 	next.targetBlock = block
@@ -432,7 +463,7 @@ func (o ShimOps) WithRecordRelease(fn func(context.Context, deployflow.Request, 
 func (o ShimOps) AcquireLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
 	shim, ok := AsShimPlanned(planned)
 	if !ok {
-		return nil, fmt.Errorf("GCP ops received unexpected planned type %T", planned)
+		return nil, fmt.Errorf("provider operations received unexpected plan type %T", planned)
 	}
 	if o.client == nil {
 		return nil, errors.New("provider client is required")
@@ -465,11 +496,11 @@ func (o ShimOps) AcquireLock(ctx context.Context, planned platform.PlannedStack)
 func (o ShimOps) NewDeploySteps(_ context.Context, backend any, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
 	shim, ok := AsShimPlanned(planned)
 	if !ok {
-		return nil, fmt.Errorf("GCP ops received unexpected planned type %T", planned)
+		return nil, fmt.Errorf("provider operations received unexpected plan type %T", planned)
 	}
 	typed, ok := backend.(kube.Backend)
 	if !ok {
-		return nil, fmt.Errorf("GCP deploy steps require an infrastructure backend with outputs, got %T", backend)
+		return nil, fmt.Errorf("provider deployment requires an infrastructure backend with outputs, got %T", backend)
 	}
 	if o.client == nil {
 		return nil, errors.New("provider client is required")
@@ -505,7 +536,7 @@ var _ deployflow.Steps = (*shimDeploySteps)(nil)
 
 func (s *shimDeploySteps) Validate(_ context.Context, request deployflow.Request) error {
 	if s == nil || s.backend == nil {
-		return errors.New("GCP deployment steps are required")
+		return errors.New("provider deployment steps are required")
 	}
 	if err := sdk.ValidateTargetDescriptor(request.Target); err != nil {
 		return err

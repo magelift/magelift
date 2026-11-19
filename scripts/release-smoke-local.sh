@@ -12,8 +12,8 @@ source "$ROOT/scripts/go-memlimit.sh"
 magelift_apply_go_memlimit
 
 printf '+ goreleaser check (both configs)\n'
-go run github.com/goreleaser/goreleaser/v2@v2.18.3 check -f .goreleaser.yaml
-go run github.com/goreleaser/goreleaser/v2@v2.18.3 check -f .goreleaser.dialproof.yaml
+go run github.com/goreleaser/goreleaser/v2@v2.20.2 check -f .goreleaser.yaml
+go run github.com/goreleaser/goreleaser/v2@v2.20.2 check -f .goreleaser.dialproof.yaml
 
 # The dialproof config is the slim linux/amd64 shape; the full matrix
 # belongs on CI.
@@ -25,7 +25,7 @@ trap 'rm -rf "$WORK"' EXIT
 export MAGELIFT_RELEASE_SMOKE_DIST="$WORK/dist"
 SMOKE_DIST="$MAGELIFT_RELEASE_SMOKE_DIST"
 { printf "dist: '%s'\n" "${SMOKE_DIST//\'/\'\'}"; cat .goreleaser.dialproof.yaml; } > "$WORK/goreleaser.yaml"
-go run github.com/goreleaser/goreleaser/v2@v2.18.3 release --snapshot --clean \
+go run github.com/goreleaser/goreleaser/v2@v2.20.2 release --snapshot --clean \
 	-f "$WORK/goreleaser.yaml" --skip=publish,sign,sbom
 
 cli_archive="$(find "$SMOKE_DIST" -maxdepth 1 -type f -name 'magelift_*.tar.gz' -o -maxdepth 1 -type f -name 'magelift_*.zip' | head -1 || true)"
@@ -42,10 +42,18 @@ if [[ -z "$provider_bin" ]]; then
 	exit 1
 fi
 
+azure_provider_bin="$(find "$SMOKE_DIST" -type f \( -name 'magelift-provider-azure' -o -name 'magelift-provider-azure.exe' \) | head -1 || true)"
+if [[ -z "$azure_provider_bin" ]]; then
+	printf 'magelift-provider-azure binary missing under dist/\n' >&2
+	exit 1
+fi
+
 # The release matrix must carry the provider into checksums.txt, or the
 # lockfile generator has nothing to pin on a real tag.
 grep -q 'magelift-provider-gcp_' "$SMOKE_DIST/checksums.txt" \
 	|| { printf 'provider missing from "$SMOKE_DIST/checksums.txt"\n' >&2; exit 1; }
+grep -q 'magelift-provider-azure_' "$SMOKE_DIST/checksums.txt" \
+	|| { printf 'Azure provider missing from "$SMOKE_DIST/checksums.txt"\n' >&2; exit 1; }
 
 # Archives.files in .goreleaser.yaml; confirm the real archive packs them.
 tar -tzf "$cli_archive" > "$WORK/archive-files.txt"

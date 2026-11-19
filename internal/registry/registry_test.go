@@ -16,6 +16,7 @@ func TestNewDefaultRegistersAlphaSet(t *testing.T) {
 		{"aws", "ecs-fargate"},
 		{"gcp", "gke-autopilot"},
 		{"gcp", "gke-standard"},
+		{"azure", "aks"},
 	} {
 		if _, found := modules.Module(sdk.ProviderID(want[0]), sdk.RuntimeID(want[1])); !found {
 			t.Errorf("alpha set lacks %s/%s", want[0], want[1])
@@ -45,6 +46,7 @@ func TestNewDefaultWithExperimentalAddsDeferred(t *testing.T) {
 		{"scaleway", "kapsule"},
 		{"gcp", "gke-autopilot"},
 		{"gcp", "gke-standard"},
+		{"azure", "aks"},
 	} {
 		if _, found := modules.Module(sdk.ProviderID(want[0]), sdk.RuntimeID(want[1])); !found {
 			t.Errorf("experimental set lacks %s/%s", want[0], want[1])

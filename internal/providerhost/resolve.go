@@ -88,6 +88,39 @@ func Resolve(provider string, opts ResolveOptions) (Resolved, error) {
 	return Resolved{LockPath: lockPath, Lock: lock, Artifact: artifact, Binary: binary, Bundle: bundle, Cached: true}, nil
 }
 
+// ResolveInstalled also looks for the local release lock saved by lazy acquisition.
+// It never downloads a provider or replaces a project lock.
+func ResolveInstalled(provider, cliVersion string, opts ResolveOptions) (Resolved, error) {
+	resolved, lookupErr := Resolve(provider, opts)
+	if !errors.Is(lookupErr, ErrNoLockfile) || (provider != "gcp" && provider != "azure") {
+		return resolved, lookupErr
+	}
+	tag, err := NormalizeReleaseTag(cliVersion)
+	if err != nil {
+		return Resolved{}, lookupErr
+	}
+	cacheDir, err := EffectiveCacheDir(opts.CacheDir)
+	if err != nil {
+		return Resolved{}, err
+	}
+	path, err := cachedReleaseLockPath(cacheDir, tag)
+	if err != nil {
+		return Resolved{}, err
+	}
+	lock, err := readReleaseLockFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return Resolved{}, lookupErr
+	}
+	if err != nil {
+		return Resolved{}, fmt.Errorf("read cached release lock: %w", err)
+	}
+	if err := ValidateBootstrapIdentity(lock, provider, tag); err != nil {
+		return Resolved{}, err
+	}
+	opts.LockPath = path
+	return Resolve(provider, opts)
+}
+
 // ResolveLock locates and parses the lockfile without resolving a binary.
 // Callers that install (rather than load) use it directly. Absence wraps
 // ErrNoLockfile; any existing lock that cannot be read, parsed, or

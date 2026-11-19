@@ -19,7 +19,7 @@ set -eu
 
 REPO="magelift/magelift"
 BIN="magelift"
-COSIGN_VERSION="${MAGELIFT_COSIGN_VERSION:-v3.1.3}"
+COSIGN_VERSION="${MAGELIFT_COSIGN_VERSION:-v3.1.4}"
 
 fail() {
   printf 'install: %s\n' "$1" >&2
@@ -66,10 +66,10 @@ if [ "${MAGELIFT_COSIGN_PIN:-}" ]; then
   COSIGN_PIN="$MAGELIFT_COSIGN_PIN"
 else
   case "$OS/$ARCH" in
-  linux/amd64) COSIGN_PIN="4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71" ;;
-  linux/arm64) COSIGN_PIN="c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a" ;;
-  darwin/amd64) COSIGN_PIN="2347488e5d5b25336644024dfeca5601b190e91197a71a917bda44744aff106c" ;;
-  darwin/arm64) COSIGN_PIN="5cf948c2f4dfe59687bdd0b8523709067383e03982cc543475c8a7dc70e92a76" ;;
+  linux/amd64) COSIGN_PIN="424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa" ;;
+  linux/arm64) COSIGN_PIN="ade83b7aac62e131cacfe96d958948b2150cc9efec46a570a2649b8e27dedad2" ;;
+  darwin/amd64) COSIGN_PIN="9d1e4abe2b6be279ed0d2ff706fde1ccd738747c834e3e6d44039c238867334f" ;;
+  darwin/arm64) COSIGN_PIN="9f9b8cd557cf2e5b3df3373a00baa005a86b02391e3e06dd0ce37b3a1533d3a4" ;;
   *) fail "unsupported platform '$OS/$ARCH' for the cosign bootstrap" ;;
   esac
 fi

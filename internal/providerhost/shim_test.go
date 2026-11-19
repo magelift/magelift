@@ -167,8 +167,26 @@ func TestShimPlan(t *testing.T) {
 	if !strings.Contains(string(captured.TargetBlock), "example-gcp-project") {
 		t.Fatalf("target block = %s", captured.TargetBlock)
 	}
-	if captured.Runtime != "gke-autopilot" || captured.ValkeyRequirement != "9" || !captured.AllowExpiredPreview || captured.AccountOnly || captured.RuntimeObserve {
+	if captured.Runtime != "gke-autopilot" || captured.ValkeyRequirement != "" || !captured.AllowExpiredPreview || captured.AccountOnly || captured.RuntimeObserve {
 		t.Fatalf("request = %#v", captured)
+	}
+}
+
+func TestShimPreservesBootstrapEnvironmentAndUnlistedServiceVersion(t *testing.T) {
+	caller := &stubCaller{respond: planResponder(cannedStoredPlan())}
+	module := shimTestModule(t, caller)
+	cfg := shimTestConfig()
+	cfg.Class = "preview"
+	cfg.StateEnvironment = "preview"
+	cfg.Application.Version = "2.9.1"
+	cfg.Services = map[string]sdk.ServiceBinding{"cache": {Family: "valkey", Version: "15.1"}}
+	_, err := module.Plan(cfg, "pr-42", platform.PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := caller.args[0].(*sdk.PlanRequest)
+	if request.StateEnvironment != "preview" || request.Envelope.Environment != "pr-42" || request.ValkeyRequirement != "15.1" {
+		t.Fatalf("projected state or service input changed: %#v", request)
 	}
 }
 
@@ -432,5 +450,30 @@ func TestShimOpsAcquireLock(t *testing.T) {
 	}
 	if unlocked != 1 {
 		t.Fatalf("unlocked = %d", unlocked)
+	}
+}
+
+func TestShimCarriesServiceBindingsAcrossReplan(t *testing.T) {
+	caller := &stubCaller{respond: planResponder(cannedStoredPlan())}
+	module := shimTestModule(t, caller)
+	cfg := shimTestConfig()
+	cfg.Services = map[string]config.ServiceBinding{"search": {Family: "opensearch", Ownership: "external", Endpoint: "https://search.example"}}
+	planned, err := module.Plan(cfg, "staging", platform.PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Services["search"] = config.ServiceBinding{Family: "other"}
+	shim, ok := AsShimPlanned(planned)
+	if !ok {
+		t.Fatalf("planned = %T", planned)
+	}
+	if _, err := shim.WithImageDigest("ghcr.io/magelift/magento@sha256:" + strings.Repeat("b", 64)); err != nil {
+		t.Fatal(err)
+	}
+	for _, arg := range caller.args {
+		request := arg.(*sdk.PlanRequest)
+		if request.Services["search"].Endpoint != "https://search.example" {
+			t.Fatalf("request services = %#v", request.Services)
+		}
 	}
 }

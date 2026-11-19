@@ -27,7 +27,10 @@ func NewDefault() (*platform.ModuleRegistry, error) {
 	if err := modules.RegisterModule(awsops.Module{}); err != nil {
 		return nil, err
 	}
-	return registerGCPShims(modules)
+	if _, err := registerGCPShims(modules); err != nil {
+		return nil, err
+	}
+	return registerAzureShim(modules)
 }
 
 // NewDefaultWithExperimental adds the deferred providers (EKS, OVH,
@@ -47,7 +50,47 @@ func NewDefaultWithExperimental() (*platform.ModuleRegistry, error) {
 			return nil, err
 		}
 	}
-	return registerGCPShims(modules)
+	if _, err := registerGCPShims(modules); err != nil {
+		return nil, err
+	}
+	return registerAzureShim(modules)
+}
+
+func registerAzureShim(modules *platform.ModuleRegistry) (*platform.ModuleRegistry, error) {
+	dialer := &providerhost.CachedDialer{Dial: dialAzure}
+	modules.RegisterCloser(dialer.Close)
+	shim, err := providerhost.NewLazyAzureShimModule(dialer.Do)
+	if err != nil {
+		return nil, err
+	}
+	if err := modules.RegisterModule(shim); err != nil {
+		return nil, fmt.Errorf("register Azure AKS shim: %w", err)
+	}
+	return modules, nil
+}
+
+func dialAzure(ctx context.Context) (*providerhost.Client, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("locate CLI executable for provider discovery: %w", err)
+	}
+	loaded, err := providerhost.Acquire(ctx, "azure", internalcli.Version, providerhost.AcquireOptions{
+		Resolve: providerhost.ResolveOptions{ExecutablePath: executable}, Progress: os.Stderr,
+	})
+	if err != nil {
+		return nil, err
+	}
+	client, err := providerhost.Dial(ctx, loaded.Binary, providerhost.DialOptions{
+		Required: []sdk.Operation{sdk.OpDescribe, sdk.OpValidateConfig, sdk.OpPlan},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if client.Describe().ProviderID != "azure" {
+		client.Close()
+		return nil, fmt.Errorf("provider binary advertised %q, expected azure", client.Describe().ProviderID)
+	}
+	return client, nil
 }
 
 func registerGCPShims(modules *platform.ModuleRegistry) (*platform.ModuleRegistry, error) {

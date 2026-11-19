@@ -28,13 +28,12 @@ execution, fail closed on missing or invalid material, no silent skip.
 - Core load: digest plus bundle per lockfile entry, beside the CLI or from
   the user cache (`<user-cache>/magelift/providers/<id>/<version>/<os>_<arch>/`).
 - Provider download: `magelift providers install` resolves providers from
-  `magelift.yaml` (never flags), fetches over HTTPS-only URLs, verifies
+  `magelift.php` (never flags), fetches over HTTPS-only URLs, verifies
   before atomic cache install.
 
 Community alpha acquisition uses this same resolver and trust policy. A valid
 project lock takes priority over the release lock; an invalid project lock is
-an error. Only the first-party GCP provider may be acquired automatically on
-activation. With no installed lock, the CLI release version selects the exact
+an error. The CLI may acquire the first-party GCP and Azure plugins when their target is activated. With no installed lock, the CLI release version selects the exact
 release lock; development builds require an explicit lock or installation.
 No mutable `latest` default or alternative provider is substituted.
 
@@ -45,7 +44,7 @@ legacy cache remains usable offline. Registration, help, version, doctor and
 envelope validation remain free of automatic provider installation.
 
 Provider blob verification passes an explicit public Sigstore trust-root
-snapshot to the pinned Cosign binary. This avoids Cosign 3.1.3 refreshing TUF
+snapshot to the pinned Cosign binary. This prevents Cosign from refreshing TUF
 during offline cache use. The snapshot was authenticated through Sigstore TUF
 on 2026-10-17; its embedded digest is checked before materialization and reuse.
 Corruption fails closed and explicit installation can repair it. Trust-root

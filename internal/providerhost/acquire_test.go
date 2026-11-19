@@ -23,11 +23,11 @@ func acquireTestLock(version, digest, url, bundle string) string {
 	return `{"schemaVersion":1,"sdkAPIVersion":"v1","providers":{"gcp":{"name":"magelift-provider-gcp","version":"` + version + `","protocol":"magelift-v1","digest":"` + digest + `","url":"` + url + `","cosign":{"identity":"` + FirstPartyIdentityPrefix + version + `","issuer":"` + FirstPartyIssuer + `","bundle":"` + bundle + `"}}}}`
 }
 
-func TestAcquireRejectsNonGCPProvider(t *testing.T) {
+func TestAcquireRejectsUnsupportedProvider(t *testing.T) {
 	t.Parallel()
 	_, err := Acquire(context.Background(), "aws", "v1.0.0", AcquireOptions{})
-	if err == nil || !strings.Contains(err.Error(), "only gcp") {
-		t.Fatalf("err = %v, want non-gcp refusal", err)
+	if err == nil || !strings.Contains(err.Error(), "gcp or azure") {
+		t.Fatalf("err = %v, want unsupported-provider refusal", err)
 	}
 }
 
@@ -40,6 +40,39 @@ func TestAcquireMalformedProjectLockFailsClosed(t *testing.T) {
 	_, err := Acquire(context.Background(), "gcp", "v1.0.0", AcquireOptions{})
 	if err == nil || errors.Is(err, ErrNoLockfile) {
 		t.Fatalf("err = %v, want parse failure", err)
+	}
+}
+
+func TestAcquireAzureProjectLock(t *testing.T) {
+	project := t.TempDir()
+	t.Chdir(project)
+	cache := t.TempDir()
+	binary := []byte("azure-provider")
+	sum := sha256.Sum256(binary)
+	digest := "sha256:" + hex.EncodeToString(sum[:])
+	version := "v0.0.0-test.2"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/magelift-provider-azure":
+			_, _ = w.Write(binary)
+		case "/magelift-provider-azure.sigstore.json":
+			_, _ = w.Write([]byte("bundle"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	lock := acquireTestLock(version, digest, server.URL+"/magelift-provider-azure", server.URL+"/magelift-provider-azure.sigstore.json")
+	lock = strings.ReplaceAll(lock, `"gcp"`, `"azure"`)
+	lock = strings.ReplaceAll(lock, "magelift-provider-gcp", "magelift-provider-azure")
+	if err := os.WriteFile("magelift.providers.lock", []byte(lock), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Acquire(context.Background(), "azure", "v9.9.9", AcquireOptions{
+		Resolve: ResolveOptions{CacheDir: cache}, HTTP: server.Client(), Verifier: stubVerifier{},
+	})
+	if err != nil || loaded.Provider != "azure" || loaded.Binary == "" {
+		t.Fatalf("Azure acquisition = %#v, %v", loaded, err)
 	}
 }
 
@@ -111,6 +144,10 @@ func TestAcquireBootstrapsAndCachesReleaseLock(t *testing.T) {
 
 	fetchHits.Store(0)
 	server.Close() // The second acquisition must work with the server unavailable.
+	installed, err := ResolveInstalled("gcp", version, opts.Resolve)
+	if err != nil || !installed.Cached || installed.Binary != loaded.Binary || installed.LockPath != lockPath {
+		t.Fatalf("inspect previously acquired provider: %#v, %v", installed, err)
+	}
 	loaded2, err := Acquire(context.Background(), "gcp", version, opts)
 	if err != nil {
 		t.Fatalf("second Acquire: %v", err)

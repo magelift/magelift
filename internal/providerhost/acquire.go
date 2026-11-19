@@ -28,7 +28,7 @@ type AcquireOptions struct {
 }
 
 // Acquire resolves, downloads when needed, verifies, and loads a first-party
-// provider subprocess. Only GCP is acquired automatically; other providers must
+// provider subprocess. First-party GCP and Azure providers can be acquired automatically; other providers must
 // be installed explicitly. Project locks win, then beside-CLI locks, then the
 // CLI release version's fetched lock (cached under the user cache, never
 // written into the project). There is no latest or dev fallback.
@@ -37,8 +37,8 @@ func Acquire(ctx context.Context, provider, cliVersion string, opts AcquireOptio
 		ctx = context.Background()
 	}
 	id := strings.TrimSpace(provider)
-	if id != "gcp" {
-		return Loaded{}, fmt.Errorf("lazy provider acquisition supports only gcp, got %q", provider)
+	if id != "gcp" && id != "azure" {
+		return Loaded{}, fmt.Errorf("lazy provider acquisition supports gcp or azure, got %q", provider)
 	}
 	cacheDir, err := EffectiveCacheDir(opts.Resolve.CacheDir)
 	if err != nil {
@@ -54,11 +54,11 @@ func Acquire(ctx context.Context, provider, cliVersion string, opts AcquireOptio
 		if err != nil {
 			return Loaded{}, fmt.Errorf("no magelift.providers.lock and CLI version %q is not a release tag: pass an explicit project lock or install providers beside the CLI", cliVersion)
 		}
-		lock, lockPath, err = ensureReleaseLock(ctx, cacheDir, tag, opts)
+		lock, lockPath, err = ensureReleaseLock(ctx, cacheDir, tag, id, opts)
 		if err != nil {
 			return Loaded{}, err
 		}
-		if err := validateBootstrapIdentity(lock, id, tag); err != nil {
+		if err := ValidateBootstrapIdentity(lock, id, tag); err != nil {
 			return Loaded{}, err
 		}
 		resolveOpts.LockPath = lockPath
@@ -77,7 +77,7 @@ func Acquire(ctx context.Context, provider, cliVersion string, opts AcquireOptio
 			return Loaded{}, err
 		}
 		if opts.Progress != nil {
-			fmt.Fprintf(opts.Progress, "MageLift: acquiring GCP provider %s for %s\n", artifact.Version, CachePlatform())
+			fmt.Fprintf(opts.Progress, "MageLift: acquiring %s provider %s for %s\n", strings.ToUpper(id), artifact.Version, CachePlatform())
 		}
 		if _, err := (&Downloader{
 			HTTP:     opts.HTTP,
@@ -123,7 +123,7 @@ func acquireVerifier(ctx context.Context, cacheDir string, opts AcquireOptions) 
 	return NewPreferredVerifier(cacheDir), nil
 }
 
-func ensureReleaseLock(ctx context.Context, cacheDir, tag string, opts AcquireOptions) (Lockfile, string, error) {
+func ensureReleaseLock(ctx context.Context, cacheDir, tag, provider string, opts AcquireOptions) (Lockfile, string, error) {
 	path, err := cachedReleaseLockPath(cacheDir, tag)
 	if err != nil {
 		return Lockfile{}, "", err
@@ -155,7 +155,7 @@ func ensureReleaseLock(ctx context.Context, cacheDir, tag string, opts AcquireOp
 	if err != nil {
 		return Lockfile{}, "", err
 	}
-	if err := validateBootstrapIdentity(lock, "gcp", tag); err != nil {
+	if err := ValidateBootstrapIdentity(lock, provider, tag); err != nil {
 		return Lockfile{}, "", err
 	}
 	if err := publishReleaseLock(path, lock); err != nil {
@@ -224,15 +224,21 @@ func publishReleaseLock(path string, lock Lockfile) error {
 	return nil
 }
 
-func validateBootstrapIdentity(lock Lockfile, provider, tag string) error {
+// ValidateBootstrapIdentity binds a release-fetched artifact to the requested tag.
+func ValidateBootstrapIdentity(lock Lockfile, provider, tag string) error {
 	artifact, err := lock.Artifact(provider)
 	if err != nil {
 		return err
 	}
-	wantSuffix := "@refs/tags/" + strings.TrimSpace(tag)
+	if !ValidReleaseTag(tag) {
+		return fmt.Errorf("invalid bootstrap release tag %q", tag)
+	}
 	identity := strings.TrimSpace(artifact.Cosign.Identity)
-	if !strings.HasSuffix(identity, wantSuffix) {
+	if identity != FirstPartyIdentityPrefix+tag || strings.TrimSpace(artifact.Cosign.Issuer) != FirstPartyIssuer {
 		return fmt.Errorf("%w: bootstrap lock identity %q does not match release tag %s", ErrUnsigned, identity, tag)
+	}
+	if strings.TrimSpace(artifact.Version) != tag {
+		return fmt.Errorf("bootstrap provider %q version %q does not match release tag %s", provider, artifact.Version, tag)
 	}
 	return nil
 }

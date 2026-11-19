@@ -1,0 +1,5 @@
+services:
+  floci-azure:
+    image: floci/floci-az:0.17.0@sha256:40f1bbf1ef13569c6eacb47e565bf4cd28785ca833208dcc074910e13aec64ea
+    ports:
+      - "127.0.0.1:4577:4577"

@@ -445,8 +445,7 @@ func inspectVersionCacheDirs(cacheDir, provider, version string) error {
 	if err != nil {
 		return err
 	}
-	switch legacyCacheState(legacy.Binary) {
-	case platformCacheCorrupt:
+	if legacyCacheState(legacy.Binary) == platformCacheCorrupt {
 		return fmt.Errorf("%w: legacy provider cache is corrupt or incomplete", ErrCacheCorrupt)
 	}
 	return nil

@@ -30,6 +30,18 @@ builds:
       - -s
       - -w
       - -X main.Version={{ .Version }}
+  - id: magelift-provider-azure
+    dir: providers/azure
+    main: ./cmd/magelift-provider-azure
+    binary: magelift-provider-azure
+    goos: [linux]
+    goarch: [amd64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
+      - -X main.Version={{ .Version }}
 
 archives:
   - id: cli
@@ -45,6 +57,9 @@ archives:
       - agents/skills/**/SKILL.md
   - id: provider-gcp
     ids: [magelift-provider-gcp]
+    formats: [binary]
+  - id: provider-azure
+    ids: [magelift-provider-azure]
     formats: [binary]
 
 checksum:
@@ -71,6 +86,16 @@ signs:
       - "--yes"
     artifacts: binary
     ids: [provider-gcp]
+  - id: provider-azure
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: binary
+    ids: [provider-azure]
 
 release:
   preflight:

@@ -75,6 +75,18 @@ func TestCallUsesPluginMethodTable(t *testing.T) {
 	}
 }
 
+func TestCallRejectsUnadvertisedOperationsBeforeRPC(t *testing.T) {
+	caller := &stubCaller{respond: func(string, any) error { return errors.New("must not reach RPC") }}
+	client := NewTestClient(caller, &sdk.DescribeResponse{ProviderID: "azure", Operations: []sdk.OperationVersion{{Name: string(sdk.OpPlan), Version: "1.0"}}})
+	_, err := Call[sdk.StackCall, sdk.LifecycleResult](context.Background(), client, sdk.OpApply, &sdk.StackCall{})
+	if err == nil || !strings.Contains(err.Error(), "does not support apply") {
+		t.Fatalf("unadvertised apply error = %v", err)
+	}
+	if len(caller.calls) != 0 {
+		t.Fatalf("unadvertised operation reached RPC: %v", caller.calls)
+	}
+}
+
 func TestCallFailsClosed(t *testing.T) {
 	t.Parallel()
 	if _, err := Call[sdk.DescribeRequest, sdk.DescribeResponse](context.Background(), nil, sdk.OpDescribe, &sdk.DescribeRequest{}); err == nil {
@@ -147,6 +159,9 @@ func v2ProviderBinary(t *testing.T) string {
 		out := filepath.Join(os.TempDir(), "magelift-provider-gcp-v2test")
 		cmd := exec.Command("go", "build", "-o", out, "./providers/gcp/cmd/magelift-provider-gcp")
 		cmd.Dir = root
+		// The provider is a separate module, even when the host test disables
+		// its surrounding workspace.
+		cmd.Env = append(os.Environ(), "GOWORK="+filepath.Join(root, "go.work"))
 		if output, err := cmd.CombinedOutput(); err != nil {
 			v2BinaryErr = errors.New("build provider: " + err.Error() + "\n" + string(output))
 			return
@@ -276,7 +291,7 @@ func TestStaticPreDialValuesMatchAdvertised(t *testing.T) {
 			}
 		}
 		got := sdk.ExtensionTierExperimental
-		if module.CertificationTier() == "built-in" {
+		if string(module.CertificationTier()) == string(sdk.ExtensionTierBuiltIn) {
 			got = sdk.ExtensionTierBuiltIn
 		}
 		if got != want {

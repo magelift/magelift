@@ -250,6 +250,11 @@ func Call[Req any, Resp any](ctx context.Context, c *Client, operation sdk.Opera
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if client.describe != nil && operation != sdk.OpDescribe {
+		if err := sdk.RequireOperation(client.describe.Operations, operation, "1.0"); err != nil {
+			return nil, fmt.Errorf("provider %s does not support %s: %w", client.describe.ProviderID, operation, err)
+		}
+	}
 	method, err := sdk.PluginMethod(operation)
 	if err != nil {
 		return nil, err

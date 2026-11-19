@@ -91,13 +91,13 @@ minutes. Order matters; never move a tag:
    way CI will: fresh clone at HEAD plus `go mod tidy`
    plus `git diff --exit-code` in each module and the
    linter. Only then tag.
-8. Tag `sdk/<v>`, `<v>`, and `providers/gcp/<v>` at that commit
-   and push all three in one `git push`. The release starts; its
+8. Tag `sdk/<v>`, `<v>`, `providers/gcp/<v>` and `providers/azure/<v>` at that commit
+   and push all four in one `git push`. The release starts; its
    visibility-wait sleeps first, then polls.
 9. Wait five minutes in silence (no proxy, sumdb, or CI requests:
    an early 404 seeds a 30-minute negative). Then one primer per
    module (`go mod download <module>@<v>` with default proxy and
-   sumdb); all three must pass.
+   sumdb); all four must pass.
 10. Only then dispatch full CI on the release tag
    (`gh workflow run ci.yml --ref <v> -f all=true`); the publish
    gate requires actual success on the tag commit, and CI jobs
@@ -120,7 +120,7 @@ documented. Untested capabilities are named, including `NOT_RUN`.
 Local commands for this alpha:
 
 ```sh
-make test-fast            # root, sdk (GOWORK=off), providers/gcp; no race
+make test-fast            # root, standalone SDK, GCP and Azure modules
 make test-race            # targeted race
 make verify-community     # alpha gate; also runs the targeted race
 ```
