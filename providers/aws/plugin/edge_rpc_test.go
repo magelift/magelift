@@ -105,13 +105,13 @@ func TestAWSEdgePurgeOpaquePlanRoundTripsThroughProviderRPC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	intent := sdk.EdgeIntent{
-		Mode: "native", NativeProvider: "cloudfront-waf", Domains: []string{request.Envelope.Domain},
-		TLS: true, TLSMode: "existing", DNSMode: "existing", OriginHealthRef: "aws/alb", OwnershipMarker: marker,
+	intent, err := platform.EdgeIntentFromConfig(cfg, request.Envelope.Environment)
+	if err != nil {
+		t.Fatal(err)
 	}
 	_, result, err := sdk.RunEdgeLifecycle(t.Context(), edgeAdapter,
-		sdk.EdgePlanRequest{TargetProvider: "aws", TargetRuntime: "ecs-fargate", Intent: intent},
-		sdk.EdgePurge, "purge/staging/unique", []string{"aws.cloudfront.distribution:E123"}, "")
+		sdk.EdgePlanRequest{TargetProvider: "aws", TargetRuntime: "ecs-fargate", Intent: intent, DeployedOutputs: map[string]string{"edgeDistributionId": "E123"}},
+		sdk.EdgePurge, "purge/staging/unique", nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}

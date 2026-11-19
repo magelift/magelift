@@ -50,16 +50,21 @@ func TestAWSPluginPurgesOnlyItsCloudFrontDistribution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := adapter.PlanEdge(ctx, sdk.EdgePlanRequest{TargetProvider: stack.Provider(), TargetRuntime: stack.Runtime(), Intent: intent})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	cloud := cloudfront.NewFromConfig(flociConfig(t, ctx, endpoint))
 	other := createFlociDistribution(t, cloud, "other-shop", "magelift/edge/other-shop")
 	ours := createFlociDistribution(t, cloud, "this-shop", intent.OwnershipMarker)
-	request := sdk.EdgeExecutionRequest{Plan: plan, Action: sdk.EdgePurge, IdempotencyKey: "this-purge", OwnershipMarker: intent.OwnershipMarker}
-	request.ResourceReferences = []string{"aws.cloudfront.distribution:" + other}
+	planPurge := func(id string) sdk.EdgeExecutionRequest {
+		t.Helper()
+		plan, err := adapter.PlanEdge(ctx, sdk.EdgePlanRequest{
+			TargetProvider: stack.Provider(), TargetRuntime: stack.Runtime(), Intent: intent,
+			DeployedOutputs: map[string]string{"edgeDistributionId": id},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sdk.EdgeExecutionRequest{Plan: plan, Action: sdk.EdgePurge, IdempotencyKey: "this-purge", OwnershipMarker: intent.OwnershipMarker}
+	}
+	request := planPurge(other)
 	if _, err := adapter.ExecuteEdge(ctx, request); err == nil || !strings.Contains(err.Error(), "unowned") {
 		t.Fatalf("expected to reject the other shop's distribution, got %v", err)
 	}
@@ -71,7 +76,12 @@ func TestAWSPluginPurgesOnlyItsCloudFrontDistribution(t *testing.T) {
 		t.Fatalf("unexpected invalidations on the other distribution: %v", list.InvalidationList)
 	}
 
-	request.ResourceReferences = []string{"aws.cloudfront.distribution:" + ours}
+	request = planPurge(ours)
+	request.ResourceReferences = []string{"aws.cloudfront.distribution:" + other}
+	if _, err := adapter.ExecuteEdge(ctx, request); err == nil || !strings.Contains(err.Error(), "differs from the planned") {
+		t.Fatalf("a different distribution was substituted after planning: %v", err)
+	}
+	request.ResourceReferences = nil
 	result, err := adapter.ExecuteEdge(ctx, request)
 	if err != nil {
 		t.Fatal(err)

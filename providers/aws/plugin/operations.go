@@ -8,6 +8,7 @@ import (
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/providers/aws/cost"
+	"github.com/magelift/magelift/providers/aws/stack"
 	"github.com/magelift/magelift/sdk"
 )
 
@@ -140,6 +141,13 @@ func (s *Server) EdgePlan(req *sdk.EdgePlanCall, resp *sdk.EdgePlanResult) error
 		}
 		if string(request.TargetProvider) != req.Plan.Provider || string(request.TargetRuntime) != req.Plan.Runtime {
 			return integrity("AWS edge request target differs from its stored plan")
+		}
+		if request.DeployedOutputs != nil && request.Intent.Mode == "none" {
+			ecs, ok := stack.AsAWSPlanned(p)
+			if !ok || ecs.Spec.Edge.Mode != "native" {
+				return invalid(errors.New("this environment has no native AWS storefront CDN"))
+			}
+			request.Intent = ecs.Spec.Edge
 		}
 		adapter, err := s.edgeAdapter(ctx, m, p)
 		if err != nil {

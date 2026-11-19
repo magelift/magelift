@@ -166,16 +166,13 @@ func (o *options) runEdgePurge(ctx context.Context) (map[string]any, error) {
 		}
 		return map[string]any{"environment": environment, "provider": "fastly", "purged": result.PurgeRequested, "serviceId": result.ServiceID}, nil
 	}
-	nativeConfigured := strings.TrimSpace(cfg.Edge.NativeProvider) != ""
-	externalConfigured := strings.TrimSpace(cfg.Edge.ExternalProvider) != "" && !strings.EqualFold(strings.TrimSpace(cfg.Edge.ExternalProvider), "none")
-	if !nativeConfigured && !externalConfigured && (strings.EqualFold(strings.TrimSpace(cfg.Edge.Mode), "none") ||
-		cfg.Target.Provider == "gcp" && strings.TrimSpace(cfg.Edge.Mode) == "") {
+	if cfg.Edge.Mode == "none" || cfg.Edge.NativeProvider == "none" {
 		return nil, &exitError{code: 3, err: sdk.EdgeCapabilityError{
 			AdapterID: cfg.Target.Provider + ".edge", Action: sdk.EdgePurge, Status: sdk.EdgeCapabilityUnsupported,
-			Reason: "selected target has no configured native edge to purge",
+			Reason: "native edge is disabled for this environment",
 		}}
 	}
-	_, planned, err := o.planStack(false)
+	_, planned, err := o.planStackWith(platform.PlanOptions{Context: ctx, RuntimeObserve: true})
 	if err != nil {
 		return nil, invalid(err)
 	}
@@ -215,14 +212,7 @@ func (o *options) executeNativeEdgePurge(ctx context.Context, environment string
 	if err != nil {
 		return nil, invalid(err)
 	}
-	if planned.Provider() == "aws" && cfg.Edge.Mode == "" && cfg.Edge.NativeProvider == "" && cfg.Edge.ExternalProvider == "" {
-		intent.Mode = "native"
-		intent.NativeProvider = "cloudfront-waf"
-		intent.Domains = []string{cfg.Domain}
-		intent.TLS, intent.TLSMode, intent.DNSMode = true, "existing", "existing"
-		intent.OriginHealthRef = "aws/alb"
-	}
-	configuration, resourceReferences, err := o.nativeEdgePurgeInputs(ctx, environment, cfg, planned)
+	outputs, err := o.nativeEdgePurgeOutputs(ctx, planned, adapter.EdgeDescriptor())
 	if err != nil {
 		return nil, err
 	}
@@ -231,10 +221,10 @@ func (o *options) executeNativeEdgePurge(ctx context.Context, environment string
 		return nil, fmt.Errorf("create edge purge idempotency key: %w", err)
 	}
 	plan, err := adapter.PlanEdge(ctx, sdk.EdgePlanRequest{
-		TargetProvider: planned.Provider(),
-		TargetRuntime:  planned.Runtime(),
-		Intent:         intent,
-		Configuration:  configuration,
+		TargetProvider:  planned.Provider(),
+		TargetRuntime:   planned.Runtime(),
+		Intent:          intent,
+		DeployedOutputs: outputs,
 	})
 	if err != nil {
 		var capability sdk.EdgeCapabilityError
@@ -244,11 +234,10 @@ func (o *options) executeNativeEdgePurge(ctx context.Context, environment string
 		return nil, err
 	}
 	result, err := adapter.ExecuteEdge(ctx, sdk.EdgeExecutionRequest{
-		Plan:               plan,
-		Action:             sdk.EdgePurge,
-		IdempotencyKey:     "purge/" + environment + "/" + hex.EncodeToString(nonce[:]),
-		OwnershipMarker:    plan.OwnershipMarker,
-		ResourceReferences: resourceReferences,
+		Plan:            plan,
+		Action:          sdk.EdgePurge,
+		IdempotencyKey:  "purge/" + environment + "/" + hex.EncodeToString(nonce[:]),
+		OwnershipMarker: plan.OwnershipMarker,
 	})
 	if err != nil {
 		var capability sdk.EdgeCapabilityError
@@ -260,49 +249,39 @@ func (o *options) executeNativeEdgePurge(ctx context.Context, environment string
 	return map[string]any{"environment": environment, "provider": string(planned.Provider()), "purged": true, "operationId": result.OperationID}, nil
 }
 
-func (o *options) nativeEdgePurgeInputs(ctx context.Context, environment string, cfg config.Config, planned platform.PlannedStack) (map[string]any, []string, error) {
-	if planned.Provider() != "aws" && planned.Provider() != "gcp" {
-		return nil, nil, nil
+func (o *options) nativeEdgePurgeOutputs(ctx context.Context, planned platform.PlannedStack, descriptor sdk.EdgeAdapterDescriptor) (map[string]string, error) {
+	if len(descriptor.PurgeOutputKeys) == 0 {
+		return nil, nil
 	}
 	if o.newBackend == nil {
-		return nil, nil, errors.New("native edge purge requires reading the managed edge outputs")
+		return nil, errors.New("native edge purge requires access to the deployed stack outputs")
 	}
 	backend, err := o.newBackend(ctx, planned, o.infrastructureBackendURL(planned))
 	if err != nil {
-		return nil, nil, fmt.Errorf("create infrastructure backend for native edge purge: %w", err)
+		return nil, fmt.Errorf("open stack for native edge purge: %w", err)
 	}
-	outputs, err := backend.Outputs(ctx)
+	public, ok := backend.(interface {
+		RedactedOutputs(context.Context) (map[string]any, error)
+	})
+	if !ok {
+		return nil, errors.New("native edge purge requires a backend that identifies secret outputs")
+	}
+	values, err := public.RedactedOutputs(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("read infrastructure outputs for native edge purge: %w", err)
+		return nil, fmt.Errorf("read public stack outputs for native edge purge: %w", err)
 	}
-	if planned.Provider() == "aws" {
-		distributionID := edgeOutputString(outputs, "edgeDistributionId")
-		if distributionID == "" || strings.ContainsAny(distributionID, "\r\n\x00:") {
-			return nil, nil, errors.New("AWS native edge purge requires an existing managed edgeDistributionId output")
+	selected := make(map[string]string, len(descriptor.PurgeOutputKeys))
+	for _, key := range descriptor.PurgeOutputKeys {
+		value, ok := values[key].(string)
+		if !ok || strings.TrimSpace(value) == "" {
+			return nil, &exitError{code: 3, err: sdk.EdgeCapabilityError{
+				AdapterID: descriptor.ID, Action: sdk.EdgePurge, Status: sdk.EdgeCapabilityUnavailable,
+				Reason: fmt.Sprintf("the stack has no public value for %q; check that the storefront CDN is ready and refresh the infrastructure outputs", key),
+			}}
 		}
-		return nil, []string{"aws.cloudfront.distribution:" + distributionID}, nil
+		selected[key] = value
 	}
-	if len(cfg.Edge.Domains) != 1 {
-		return nil, nil, errors.New("GKE native edge purge requires exactly one configured domain")
-	}
-	marker := platform.EdgeOwnershipMarker(cfg, environment)
-	urlMap, ingressName := edgeOutputString(outputs, "nativeEdgeURLMapName"), edgeOutputString(outputs, "nativeEdgeIngressName")
-	ingressNamespace, ingressOwner := edgeOutputString(outputs, "nativeEdgeIngressNamespace"), edgeOutputString(outputs, "nativeEdgeIngressOwner")
-	if urlMap == "" || ingressName == "" || ingressNamespace == "" || ingressOwner == "" {
-		return nil, nil, errors.New("GKE native edge outputs are incomplete; refresh the infrastructure outputs and retry")
-	}
-	if ingressOwner != marker {
-		return nil, nil, errors.New("GKE native edge owner output does not match this environment; refresh the infrastructure outputs and retry")
-	}
-	return map[string]any{"gkeIngress": map[string]any{
-		"urlMapName": urlMap, "ingressName": ingressName, "namespace": ingressNamespace,
-		"owner": ingressOwner, "hostname": strings.ToLower(strings.TrimSpace(cfg.Edge.Domains[0])),
-	}}, nil, nil
-}
-
-func edgeOutputString(outputs map[string]any, key string) string {
-	value, _ := outputs[key].(string)
-	return strings.TrimSpace(value)
+	return selected, nil
 }
 
 func (o *options) fastlyRequestForSelectedEnvironment() (string, fastlyedge.Request, fastlyLifecycle, error) {

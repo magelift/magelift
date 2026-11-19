@@ -201,25 +201,21 @@ func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sd
 	if len(request.Intent.Domains) == 0 {
 		return sdk.EdgePlan{}, errors.New("Google Cloud edge requires at least one domain")
 	}
-	if !request.Intent.TLS {
-		return sdk.EdgePlan{}, errors.New("Google Cloud external HTTPS edge requires TLS")
-	}
 	marker := strings.TrimSpace(request.Intent.OwnershipMarker)
-	if value, found := request.Configuration["gkeIngress"]; found {
-		gke, ok := value.(map[string]any)
-		if !ok {
-			return sdk.EdgePlan{}, errors.New("GCP gkeIngress configuration must be an object")
+	if request.DeployedOutputs != nil {
+		if !nativeCDNEnabled(request.Intent.NativeProvider) || len(request.Intent.Domains) != 1 {
+			return sdk.EdgePlan{}, sdk.EdgeCapabilityError{AdapterID: googleEdgeAdapterID, Action: sdk.EdgePurge, Status: sdk.EdgeCapabilityUnsupported, Reason: "GKE cache purge requires Cloud CDN on one storefront hostname"}
 		}
-		urlMapName := stringOption(gke, "urlMapName")
-		ingressName := stringOption(gke, "ingressName")
-		namespace := stringOption(gke, "namespace")
-		owner := stringOption(gke, "owner")
-		hostname := strings.ToLower(stringOption(gke, "hostname"))
-		if urlMapName == "" || ingressName == "" || namespace == "" || owner == "" || hostname == "" {
-			return sdk.EdgePlan{}, errors.New("GCP GKE purge requires the verified Ingress identity, owner, URL map, and hostname")
+		urlMapName := strings.TrimSpace(request.DeployedOutputs["nativeEdgeURLMapName"])
+		ingressName := strings.TrimSpace(request.DeployedOutputs["nativeEdgeIngressName"])
+		namespace := strings.TrimSpace(request.DeployedOutputs["nativeEdgeIngressNamespace"])
+		owner := request.DeployedOutputs["nativeEdgeIngressOwner"]
+		hostname := strings.ToLower(strings.TrimSpace(request.Intent.Domains[0]))
+		if urlMapName == "" || ingressName == "" || namespace == "" || owner == "" {
+			return sdk.EdgePlan{}, errors.New("GKE purge requires the deployed Ingress name, namespace, owner and serving URL map")
 		}
-		if owner != marker || len(request.Intent.Domains) != 1 || hostname != strings.ToLower(strings.TrimSpace(request.Intent.Domains[0])) {
-			return sdk.EdgePlan{}, errors.New("GCP GKE purge references do not match the configured owner and unique hostname")
+		if owner != marker {
+			return sdk.EdgePlan{}, errors.New("the GKE Ingress owner differs from the configured storefront")
 		}
 		purgePaths, err := parseGooglePurgePaths(request.Configuration, request.Intent.PurgeOnDeploy)
 		if err != nil {
@@ -237,6 +233,9 @@ func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sd
 	}
 	if len(request.Configuration) == 0 {
 		return sdk.EdgePlan{}, errors.New("GCP native purge requires verified GKE Ingress outputs; refresh infrastructure outputs and retry")
+	}
+	if !request.Intent.TLS {
+		return sdk.EdgePlan{}, errors.New("Google Cloud external HTTPS edge requires TLS")
 	}
 	backendURL, err := backendServiceURL(api.project, stringOption(request.Configuration, "backendService"))
 	if err != nil {
@@ -296,6 +295,12 @@ func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequ
 	}
 	if operation.Request.Plan.AdapterID != googleEdgeAdapterID || operation.Request.Plan.TargetProvider != plan.targetProvider || operation.Request.Plan.TargetRuntime != plan.targetRuntime {
 		return sdk.EdgeOperationObservation{}, errors.New("Google Cloud edge operation target does not match its provider-owned plan")
+	}
+	if plan.request.Project != api.project {
+		return sdk.EdgeOperationObservation{}, errors.New("the edge plan belongs to a different Google Cloud project")
+	}
+	if plan.request.GKEIngressName != "" && operation.Action != sdk.EdgePurge {
+		return sdk.EdgeOperationObservation{}, errors.New("a GKE cache purge plan can only invalidate the storefront cache")
 	}
 	if plan.request.OwnershipMarker != operation.Request.OwnershipMarker {
 		return sdk.EdgeOperationObservation{}, errors.New("Google Cloud edge ownership marker does not match the plan")
@@ -1029,9 +1034,6 @@ func validateGoogleEdgePurgeRequest(request GoogleEdgeApplyRequest) error {
 		if strings.ContainsAny(value, "\r\n\x00") {
 			return fmt.Errorf("GCP edge purge %s must be single-line", name)
 		}
-	}
-	if len(request.PurgePaths) == 0 {
-		return nil
 	}
 	for _, path := range request.PurgePaths {
 		if !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\r\n\x00") {

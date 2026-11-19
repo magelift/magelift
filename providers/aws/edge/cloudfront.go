@@ -132,6 +132,7 @@ func NewCloudFrontSDKClient(ctx context.Context, health OriginHealthProbe, opts 
 }
 
 type cloudFrontPlan struct {
+	distributionID   string
 	version          int
 	targetProvider   sdk.ProviderID
 	targetRuntime    sdk.RuntimeID
@@ -143,6 +144,7 @@ type cloudFrontPlan struct {
 }
 
 type cloudFrontPlanWire struct {
+	DistributionID   string                              `json:"distributionId,omitempty"`
 	Version          int                                 `json:"version"`
 	TargetProvider   sdk.ProviderID                      `json:"targetProvider"`
 	TargetRuntime    sdk.RuntimeID                       `json:"targetRuntime"`
@@ -155,7 +157,7 @@ type cloudFrontPlanWire struct {
 
 func (p cloudFrontPlan) MarshalJSON() ([]byte, error) {
 	return json.Marshal(cloudFrontPlanWire{
-		Version: p.version, TargetProvider: p.targetProvider, TargetRuntime: p.targetRuntime,
+		DistributionID: p.distributionID, Version: p.version, TargetProvider: p.targetProvider, TargetRuntime: p.targetRuntime,
 		Config: p.config, OriginHealthRefs: p.originHealthRefs, PurgeOnDeploy: p.purgeOnDeploy,
 		PurgePaths: p.purgePaths, OwnershipMarker: p.ownershipMarker,
 	})
@@ -170,7 +172,7 @@ func (p *cloudFrontPlan) UnmarshalJSON(data []byte) error {
 		return errors.New("CloudFront plan state has an unsupported version or target")
 	}
 	*p = cloudFrontPlan{
-		version: wire.Version, targetProvider: wire.TargetProvider, targetRuntime: wire.TargetRuntime,
+		distributionID: wire.DistributionID, version: wire.Version, targetProvider: wire.TargetProvider, targetRuntime: wire.TargetRuntime,
 		config: wire.Config, originHealthRefs: wire.OriginHealthRefs, purgeOnDeploy: wire.PurgeOnDeploy,
 		purgePaths: wire.PurgePaths, ownershipMarker: wire.OwnershipMarker,
 	}
@@ -259,6 +261,13 @@ func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sd
 	if err != nil {
 		return sdk.EdgePlan{}, err
 	}
+	var distributionID string
+	if request.DeployedOutputs != nil {
+		distributionID = strings.TrimSpace(request.DeployedOutputs["edgeDistributionId"])
+		if distributionID == "" || strings.ContainsAny(distributionID, "\r\n\x00:") {
+			return sdk.EdgePlan{}, errors.New("an existing CloudFront distribution ID is required to purge its cache")
+		}
+	}
 	var config *cloudfronttypes.DistributionConfig
 	var originHealthRefs []string
 	if len(request.Configuration) > 0 {
@@ -280,7 +289,7 @@ func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sd
 		AdapterID: cloudFrontEdgeAdapterID, TargetProvider: request.TargetProvider, TargetRuntime: request.TargetRuntime,
 		OwnershipMarker: marker,
 		Outputs:         []sdk.AdapterOutput{{Key: "distributionId"}, {Key: "distributionDomainName"}, {Key: "distributionStatus"}},
-		Opaque:          cloudFrontPlan{version: 1, targetProvider: request.TargetProvider, targetRuntime: request.TargetRuntime, config: config, originHealthRefs: originHealthRefs, purgeOnDeploy: request.Intent.PurgeOnDeploy, purgePaths: purgePaths, ownershipMarker: marker},
+		Opaque:          cloudFrontPlan{distributionID: distributionID, version: 1, targetProvider: request.TargetProvider, targetRuntime: request.TargetRuntime, config: config, originHealthRefs: originHealthRefs, purgeOnDeploy: request.Intent.PurgeOnDeploy, purgePaths: purgePaths, ownershipMarker: marker},
 	}
 	if request.Intent.WAFPolicyRef != "" {
 		plan.Outputs = append(plan.Outputs, sdk.AdapterOutput{Key: "webACLId"})
@@ -307,6 +316,9 @@ func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequ
 	}
 	if operation.Request.Plan.AdapterID != cloudFrontEdgeAdapterID || operation.Request.Plan.TargetProvider != plan.targetProvider || operation.Request.Plan.TargetRuntime != plan.targetRuntime {
 		return sdk.EdgeOperationObservation{}, errors.New("CloudFront operation target does not match its provider-owned plan")
+	}
+	if plan.distributionID != "" && operation.Action != sdk.EdgePurge {
+		return sdk.EdgeOperationObservation{}, errors.New("a CloudFront cache purge plan can only invalidate the storefront cache")
 	}
 	if plan.ownershipMarker != operation.Request.OwnershipMarker {
 		return sdk.EdgeOperationObservation{}, errors.New("CloudFront operation ownership marker does not match plan")
@@ -344,9 +356,16 @@ func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequ
 }
 
 func (api *NativeAPI) startPurge(ctx context.Context, operation sdk.EdgeOperationRequest, plan cloudFrontPlan) (sdk.EdgeOperationObservation, error) {
-	id, err := distributionIDFromReferences(operation.Request.ResourceReferences)
-	if err != nil {
-		return sdk.EdgeOperationObservation{}, err
+	id := plan.distributionID
+	if len(operation.Request.ResourceReferences) != 0 || id == "" {
+		referenced, err := distributionIDFromReferences(operation.Request.ResourceReferences)
+		if err != nil {
+			return sdk.EdgeOperationObservation{}, err
+		}
+		if id != "" && referenced != id {
+			return sdk.EdgeOperationObservation{}, errors.New("purge reference differs from the planned CloudFront distribution")
+		}
+		id = referenced
 	}
 	distribution, err := api.api.GetDistribution(ctx, &cloudfront.GetDistributionInput{Id: aws.String(id)})
 	if err != nil {

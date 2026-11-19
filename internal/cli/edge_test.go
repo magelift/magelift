@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,7 +28,16 @@ type recordingNativeEdge struct {
 	executions []sdk.EdgeExecutionRequest
 }
 
-func (e *recordingNativeEdge) EdgeDescriptor() sdk.EdgeAdapterDescriptor { return sdk.EdgeAdapterDescriptor{ID: "test.edge"} }
+func (e *recordingNativeEdge) EdgeDescriptor() sdk.EdgeAdapterDescriptor {
+	return sdk.EdgeAdapterDescriptor{ID: "example.edge", PurgeOutputKeys: []string{"shopCache"}}
+}
+
+type edgeOutputBackend struct{ fakeInfrastructureBackend }
+
+func (b *edgeOutputBackend) RedactedOutputs(context.Context) (map[string]any, error) {
+	return b.outputs, nil
+}
+
 func (e *recordingNativeEdge) PlanEdge(_ context.Context, request sdk.EdgePlanRequest) (sdk.EdgePlan, error) {
 	e.plans = append(e.plans, request)
 	return sdk.EdgePlan{AdapterID: "test.edge", TargetProvider: request.TargetProvider, TargetRuntime: request.TargetRuntime, OwnershipMarker: request.Intent.OwnershipMarker}, nil
@@ -37,17 +47,18 @@ func (e *recordingNativeEdge) ExecuteEdge(_ context.Context, request sdk.EdgeExe
 	return sdk.EdgeExecutionResult{Action: request.Action, OperationID: "operation-1", OwnershipMarker: request.OwnershipMarker}, nil
 }
 
-func TestNativeEdgePurgeUsesOwnedResourcesAndFreshIdempotencyKeys(t *testing.T) {
-	planned := stubPlanned{stackName: "shop-staging", provider: "aws", runtime: "ecs-fargate"}
-	backend := &fakeInfrastructureBackend{outputs: map[string]any{"edgeDistributionId": "E123"}}
-	o := &options{newBackend: func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error) { return backend, nil }}
+func TestNativeEdgePurgeUsesDeclaredOutputsAndFreshIdempotencyKeys(t *testing.T) {
+	planned := stubPlanned{stackName: "shop-staging", provider: "example", runtime: "test"}
+	backend := &edgeOutputBackend{fakeInfrastructureBackend{outputs: map[string]any{"shopCache": "cache-1", "privateKey": map[string]bool{"secret": true}, "unrelated": "skip"}}}
+	o := &options{newBackend: func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error) {
+		return backend, nil
+	}}
 	adapter := &recordingNativeEdge{}
-	cfg := config.Config{
-		Project: config.Project{Name: "shop"}, Target: config.Target{Provider: "aws", Runtime: "ecs-fargate"}, Domain: "shop.example.com",
-		Edge: config.EdgeConfig{Mode: "native", NativeProvider: "cloudfront-waf", Domains: []string{"shop.example.com"}, TLS: true, TLSMode: "existing", DNSMode: "existing", OriginHealthRef: "aws/alb"},
+	cfg := config.Config{Project: config.Project{Name: "shop"}, Target: config.Target{Provider: "example", Runtime: "test"}, Domain: "shop.example.com",
+		Edge: config.EdgeConfig{Mode: "native", NativeProvider: "storefront-cdn", Domains: []string{"shop.example.com"}, TLS: true, TLSMode: "managed", DNSMode: "external", OriginHealthRef: "health/shop"},
 	}
 	for range 2 {
-		if _, err := o.executeNativeEdgePurge(context.Background(), "staging", cfg, planned, adapter); err != nil {
+		if _, err := o.executeNativeEdgePurge(t.Context(), "staging", cfg, planned, adapter); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -55,49 +66,19 @@ func TestNativeEdgePurgeUsesOwnedResourcesAndFreshIdempotencyKeys(t *testing.T) 
 		t.Fatalf("plans=%d executions=%d", len(adapter.plans), len(adapter.executions))
 	}
 	first, second := adapter.executions[0], adapter.executions[1]
-	if first.IdempotencyKey == second.IdempotencyKey || first.IdempotencyKey == "purge/staging" {
-		t.Fatalf("purge keys must be unique per invocation: %q %q", first.IdempotencyKey, second.IdempotencyKey)
+	if first.IdempotencyKey == second.IdempotencyKey || first.IdempotencyKey == "" {
+		t.Errorf("purge keys = %q and %q", first.IdempotencyKey, second.IdempotencyKey)
 	}
-	if len(first.ResourceReferences) != 1 || first.ResourceReferences[0] != "aws.cloudfront.distribution:E123" {
-		t.Fatalf("AWS purge references = %v", first.ResourceReferences)
+	if !maps.Equal(adapter.plans[0].DeployedOutputs, map[string]string{"shopCache": "cache-1"}) {
+		t.Errorf("forwarded outputs = %v", adapter.plans[0].DeployedOutputs)
 	}
-	if adapter.plans[0].Configuration != nil || adapter.plans[0].Intent.NativeProvider != "cloudfront-waf" {
-		t.Fatalf("AWS purge plan inputs = %#v", adapter.plans[0])
+	backend.outputs["shopCache"] = map[string]bool{"secret": true}
+	if _, err := o.executeNativeEdgePurge(t.Context(), "staging", cfg, planned, adapter); ExitCode(err) != 3 || len(adapter.executions) != 2 {
+		t.Fatalf("secret output was accepted: %v", err)
 	}
-	defaultAdapter := &recordingNativeEdge{}
-	defaultConfig := cfg
-	defaultConfig.Edge = config.EdgeConfig{}
-	if _, err := o.executeNativeEdgePurge(context.Background(), "staging", defaultConfig, planned, defaultAdapter); err != nil {
-		t.Fatal(err)
-	}
-	if len(defaultAdapter.plans) != 1 || defaultAdapter.plans[0].Intent.NativeProvider != "cloudfront-waf" || defaultAdapter.plans[0].Intent.Domains[0] != defaultConfig.Domain {
-		t.Fatalf("default AWS edge intent = %#v", defaultAdapter.plans)
-	}
-}
-
-func TestGKENativeEdgePurgeRequiresCurrentControllerOutputs(t *testing.T) {
-	planned := stubPlanned{stackName: "shop-staging", provider: "gcp", runtime: "gke-autopilot"}
-	marker := "magelift/edge/shop/staging"
-	outputs := map[string]any{
-		"nativeEdgeURLMapName": "k8s2-um-serving-shop", "nativeEdgeIngressName": "magelift-shop",
-		"nativeEdgeIngressNamespace": "default", "nativeEdgeIngressOwner": marker,
-	}
-	o := &options{newBackend: func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error) {
-		return &fakeInfrastructureBackend{outputs: outputs}, nil
-	}}
-	cfg := config.Config{Project: config.Project{Name: "shop"}, Target: config.Target{Provider: "gcp", Runtime: "gke-autopilot"}, Domain: "shop.example.com",
-		Edge: config.EdgeConfig{Mode: "native", NativeProvider: "cloud-cdn", Domains: []string{"shop.example.com"}, TLS: true, TLSMode: "gke-managed", DNSMode: "customer-managed", OriginHealthRef: "health/shop", OwnershipMarker: marker}}
-	configuration, references, err := o.nativeEdgePurgeInputs(context.Background(), "staging", cfg, planned)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gke, ok := configuration["gkeIngress"].(map[string]any)
-	if !ok || gke["urlMapName"] != outputs["nativeEdgeURLMapName"] || gke["hostname"] != "shop.example.com" || len(references) != 0 {
-		t.Fatalf("GKE purge configuration=%#v references=%v", configuration, references)
-	}
-	delete(outputs, "nativeEdgeURLMapName")
-	if _, _, err := o.nativeEdgePurgeInputs(context.Background(), "staging", cfg, planned); err == nil || !strings.Contains(err.Error(), "refresh the infrastructure outputs") {
-		t.Fatalf("missing URL map error = %v", err)
+	delete(backend.outputs, "shopCache")
+	if _, err := o.executeNativeEdgePurge(t.Context(), "staging", cfg, planned, adapter); ExitCode(err) != 3 || len(adapter.executions) != 2 {
+		t.Fatalf("missing output was accepted: %v", err)
 	}
 }
 

@@ -87,10 +87,11 @@ func TestGKENativePurgeUsesOnlyVerifiedControllerOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := googleEdgeTestRequest()
-	request.Configuration = map[string]any{"gkeIngress": map[string]any{
-		"urlMapName": "k8s2-um-serving-shop", "ingressName": "magelift-shop", "namespace": "default",
-		"owner": request.Intent.OwnershipMarker, "hostname": "shop.example.com",
-	}}
+	request.Configuration = nil
+	request.DeployedOutputs = map[string]string{
+		"nativeEdgeURLMapName": "k8s2-um-serving-shop", "nativeEdgeIngressName": "magelift-shop",
+		"nativeEdgeIngressNamespace": "default", "nativeEdgeIngressOwner": request.Intent.OwnershipMarker,
+	}
 	plan, err := native.Plan(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)
@@ -101,6 +102,13 @@ func TestGKENativePurgeUsesOnlyVerifiedControllerOutputs(t *testing.T) {
 	operation := sdk.EdgeOperationRequest{Provider: "gcp", Action: sdk.EdgePurge, Request: sdk.EdgeExecutionRequest{
 		Plan: plan, Action: sdk.EdgePurge, IdempotencyKey: "purge/staging/nonce", OwnershipMarker: plan.OwnershipMarker,
 	}}
+	foreignAPI, err := NewNativeAPI(providerAPI, "project-2", &fakeGoogleHealth{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := foreignAPI.Start(t.Context(), operation); err == nil || providerAPI.purgeCalls != 0 {
+		t.Fatalf("another project accepted this plan: %v", err)
+	}
 	started, err := native.Start(context.Background(), operation)
 	if err != nil {
 		t.Fatal(err)
@@ -111,20 +119,24 @@ func TestGKENativePurgeUsesOnlyVerifiedControllerOutputs(t *testing.T) {
 }
 
 func TestGKENativePurgeRejectsStaleOrUnboundControllerOutputs(t *testing.T) {
-	for name, mutate := range map[string]func(map[string]any){
-		"missing url map": func(gke map[string]any) { delete(gke, "urlMapName") },
-		"foreign owner":   func(gke map[string]any) { gke["owner"] = "another/shop" },
-		"wrong hostname":  func(gke map[string]any) { gke["hostname"] = "other.example.com" },
+	for name, mutate := range map[string]func(*sdk.EdgePlanRequest){
+		"missing url map":    func(r *sdk.EdgePlanRequest) { delete(r.DeployedOutputs, "nativeEdgeURLMapName") },
+		"foreign owner":      func(r *sdk.EdgePlanRequest) { r.DeployedOutputs["nativeEdgeIngressOwner"] = "another/shop" },
+		"multiple hostnames": func(r *sdk.EdgePlanRequest) { r.Intent.Domains = append(r.Intent.Domains, "other.example.com") },
+		"CDN disabled":       func(r *sdk.EdgePlanRequest) { r.Intent.NativeProvider = "cloud-armor" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			native, err := NewNativeAPI(&fakeGoogleEdgeAPI{}, "project-1", &fakeGoogleHealth{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			gke := map[string]any{"urlMapName": "k8s2-um-serving-shop", "ingressName": "magelift-shop", "namespace": "default", "owner": "magelift/test/gcp-edge", "hostname": "shop.example.com"}
-			mutate(gke)
 			request := googleEdgeTestRequest()
-			request.Configuration = map[string]any{"gkeIngress": gke}
+			request.Configuration = nil
+			request.DeployedOutputs = map[string]string{
+				"nativeEdgeURLMapName": "k8s2-um-serving-shop", "nativeEdgeIngressName": "magelift-shop",
+				"nativeEdgeIngressNamespace": "default", "nativeEdgeIngressOwner": request.Intent.OwnershipMarker,
+			}
+			mutate(&request)
 			if _, err := native.Plan(context.Background(), request); err == nil {
 				t.Fatal("stale GKE outputs were accepted")
 			}

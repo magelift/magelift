@@ -13,6 +13,8 @@ AWS, Google Cloud and Azure use the same plugin contract. The CLI evaluates the 
 
 The root CLI and the plugin exchange versioned messages over local net/rpc. Keep cloud SDK types off the wire. The plugin runs under the same operating-system identity as the CLI. A plugin installation therefore requires a verified artifact from a trusted publisher.
 
+For a CDN purge, list the public stack outputs your adapter needs in `EdgeAdapterDescriptor.PurgeOutputKeys`. The CLI reads those outputs from the deployed environment and passes them to the plugin. Before invalidating the cache, the plugin must check that the resource belongs to that shop and environment.
+
 ## What to test
 
 - Plan a synthetic shop through the plugin executable and check that its selected runtime, services, image digest and environment survive the round trip.
