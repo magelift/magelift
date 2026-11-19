@@ -2,12 +2,11 @@
 
 The deployment contract is shared by every target. The provider-neutral orchestrator
 defines validation, locking, preview, candidate registration, Magento migrations,
-service updates, stabilization, health checks, and release recording. The AWS CLI
-connects that workflow to an ECS candidate task, while Pulumi remains responsible for
-durable services and infrastructure. Candidate task definitions are deregistered after
-the migration phase, including when the phase fails. If a later hook or deployment
-phase aborts, the orchestrator retries candidate cleanup with a short,
-cancellation-safe timeout before releasing the deployment lock.
+service updates, stabilization, health checks and release recording. On AWS ECS, the
+provider runs migrations in a candidate task and deregisters its task definition
+afterwards. GKE and AKS run Magento workloads in Kubernetes. Pulumi manages each
+environment's infrastructure. If deployment stops early, MageLift gives cleanup
+time to finish before releasing that deployment's lock.
 
 `magelift doctor` resolves the build configuration and every named environment. It
 prints all readiness checks, including failures, before exiting. Exit code 4 means
@@ -128,8 +127,8 @@ explicit destroy. After teardown, state backups (90-day retention), log and
 metric retention, unattached addresses or volumes outside the stack, and
 provider billing delay can all keep costing money; the ledger plus direct
 provider inventory show what remains.
-`magelift login` verifies that the current AWS credentials can access the selected
-account and region. It does not write credentials or change AWS resources.
+`magelift login --env staging` asks the configured provider to check the current
+credentials against the environment's cloud account.
 `magelift upgrade --check` checks the latest GitHub release without changing the
 local binary. `magelift upgrade` downloads the matching OS/architecture archive,
 verifies the keyless Sigstore bundle for `checksums.txt`, then verifies the
@@ -148,21 +147,16 @@ its completion marker. `magelift state restore
 the saved objects. `magelift state unlock --yes` is reserved for a stale lock and
 reports the lock metadata it removed.
 
-`magelift preview` validates the resolved AWS stack and prints the Pulumi change
-summary. `magelift deploy` validates the immutable artifact, runs a fresh preview,
-acquires the S3 deployment lock, executes a candidate task that imports `config.php`,
-runs `setup:upgrade`, cleans and flushes Magento caches, applies the Pulumi update,
-waits for ECS stabilization, and runs runtime health checks. Production
-deployments require `--yes` and a matching release-journal entry with verified
-signature metadata. CI can pass the exact build
-output with `deploy --digest <registry>@sha256:<digest>` without changing project configuration.
-`magelift destroy` previews before removing resources, and
-`magelift outputs` reads the last successful stack outputs. Protected environments
-must be unprotected explicitly before they can be destroyed. Magelift derives
-the state backend from `magelift bootstrap` and `magelift.php`. Set
-`PULUMI_BACKEND_URL` only as a CI override. The AWS
-lock bucket is the deterministic bucket created by `magelift bootstrap`; bootstrap
-must complete before deploy or destroy.
+`magelift preview --env staging` shows the Pulumi changes for that environment.
+`magelift deploy` checks the image digest, takes the environment lock, runs
+Magento's deployment steps and checks the running application. Production requires
+`--yes` and a verified signature recorded in the release journal. CI can pass
+the digest directly with `deploy --digest <registry>@sha256:<digest>`.
+
+Run `magelift bootstrap` before the first deploy. AWS keeps the state lock in
+S3, GCP in Cloud Storage and Azure in Blob Storage. `magelift outputs` reads the
+last stack outputs. `magelift destroy` previews the removal and checks environment
+protection. [Bootstrap the selected provider](bootstrap.md)
 
 Compiled extensions may add deployment and post-deployment hooks through the Go SDK.
 Hooks target stable operation IDs such as `deploy.migrations`, `deploy.update`, and
@@ -171,9 +165,10 @@ policy. `replace` and `disable` are explicit graph operations; arbitrary numeric
 priorities and shell-command matching are not supported. Project configuration is limited to the
 Magento preparation lifecycle, so ordinary projects do not need an extension.
 
-`magelift secret set <name> --value-stdin` reads a value only from stdin and never
-prints it. `magelift secret list` returns names and ARNs. `magelift secret remove
-<name> --yes` schedules deletion with the normal 30-day recovery window.
+`magelift secret set <name> --value-stdin` reads the value from standard input.
+`magelift secret list` displays the provider's secret references. On AWS,
+`magelift secret remove <name> --yes` schedules deletion with a 30-day recovery
+window. On other clouds, recovery follows the destination secret store's policy.
 
 `magelift build --push` and `magelift sign --digest <registry>@sha256:<digest>`
 sign the published digest using the same login already used for Magento. On GCP
@@ -192,13 +187,17 @@ deploy event to the same journal. MageLift writes the release history to
 `.magelift/releases/<environment>.jsonl` with an atomic file replacement; these
 commands do not contact AWS.
 
-`magelift history` reads that journal. `magelift evidence` exports digest, actor,
-config provenance, and backup policy from that journal and the effective
-configuration without secret values. `magelift audit` is a different report: it
-lists encryption, IAM, logging, backup, WAF, and residency pointers from the
-effective configuration. It does not certify SOC 2, ISO 27001, or GDPR. `magelift edge
-purge` invalidates Fastly or the native CDN cache when the selected target
-advertises purge; otherwise it fails with a typed unsupported error.
+`magelift history` reads the release journal. `magelift evidence` exports the
+image digest, actor, configuration source and backup policy with secret values
+omitted. `magelift audit` lists the encryption, IAM, logging, backup, WAF and
+residency settings that an auditor can inspect.
+
+`magelift edge purge --env staging` clears the storefront cache on a configured
+Fastly service, an ECS CloudFront distribution or GKE Cloud CDN. CloudFront uses
+the distribution ID in the stack outputs and checks its ownership marker. On GKE,
+MageLift reads the serving URL map reported by the shop's Ingress and checks the
+storefront hostname. A load balancer address alone is insufficient to identify
+the cache. [GKE edge outputs](bootstrap.md#gcp-native-edge-dns)
 
 `magelift rollback --to-sequence <number>`
 selects an earlier signed digest, verifies it again, refuses when the selected
@@ -230,12 +229,9 @@ does not provide current or forecast spend through this read path, and a budget
 does not block deployments. Every budget report carries `Enforced: false`:
 MageLift validates the configured budget and reports alert thresholds; it never
 caps or stops spend, and provider billing delay means recently destroyed
-resources can still appear on the next invoice. Spend evidence needs the
-provider's billing report or a configured billing export. The authenticated GCP
-certification project has
-the Budget API enabled, but its current principal lacks `billing.budgets.list`
-on the attached billing account, so live budget proof remains blocked until a
-billing-account reader is granted or another billing evidence source is wired.
+resources can still appear on the next invoice. For actual spend, use the
+provider's billing report or your billing export. The GCP budget reader needs
+`billing.budgets.list` on the associated billing account.
 
 For AWS, `magelift cost --budget` reads account-scoped cost budgets and their
 percentage notifications through the read-only Budgets API. Preview environments
@@ -459,57 +455,42 @@ MageLift does not provision those brokers as catalog cells.
 
 Optional `resilience.dataRegion` fails closed when the selected region or GCP
 backup location sits outside that residency (for example `eu` vs a US Cloud SQL
-backup location). AWS standard and high-availability split Valkey cache and
-session endpoints; preview, GCP, OVH, and Scaleway share one cache endpoint for
-both.
+backup location). AWS standard and high-availability presets split the cache
+and session stores. GKE and AKS can also run separate stores. Give sessions
+their own memory budget and eviction policy when the shop needs customers to
+stay signed in during a cache flush. [Configure cache and sessions](service-bindings.md#keep-sessions-when-cache-entries-expire)
 
-Brownfield attach is AWS VPC + RDS MySQL only. MageLift will not destroy an
-adopted VPC or database. There is no Cloud SQL, OVH, or Scaleway database
-adopt path.
+To keep an existing database or broker on AWS, GCP or Azure, set its service
+ownership to `existing` and supply a reachable endpoint and credential reference.
+The attachment stays under its original owner's control when MageLift removes
+the environment. Each runtime supports different roles. [Supported attachments](service-bindings.md#connect-to-existing-services)
 
-Deployed tasks use a non-secret `env.php` scaffold from the runtime image. ECS
+ECS tasks use a non-secret `env.php` scaffold from the runtime image. ECS
 injects the configured Magento encryption key and managed database JSON fields
 through Secrets Manager references, then exposes Adobe's `MAGENTO_DC_*` environment
 configuration before the application starts. Configure
-`target.aws.encryptionKeySecretArn` with a stable secret and never commit its value.
+`target.aws.encryptionKeySecretArn` with a stable secret and keep its value in the secret store. RDS and Aurora use the writer endpoint and read the database credentials from Secrets Manager.
 
 OpenSearch has two Magento contracts. Provisioned domains use HTTPS to the
 domain on 443 inside the VPC, HTTP auth off, fine-grained access off, no
 signing sidecar. OpenSearch Serverless (AOSS) still requires SigV4, so Magento
-talks to a loopback aws-sigv4-proxy sidecar. Unit mocks cover both graphs.
-Live Magento search (index/query/reconnect) remains a paid acceptance
-checklist; Floci does not prove that data-plane. A private Magento-on-AWS shop
-may illustrate the provisioned unsigned path
-([sources/prior-terraform-opensearch.md](sources/prior-terraform-opensearch.md)); it is not
-certification evidence and not the only supported AWS shape. Aurora Magento
-env uses the writer endpoint plus Secrets Manager JSON, same as RDS. The dated Adobe advisory covers selected Aurora 3 releases. Operators choose the engine version and validate it for the shop.
+talks to a loopback aws-sigv4-proxy sidecar. Pulumi mocks cover both graphs.
+For a staging rehearsal, reindex a representative catalog, run storefront
+queries and check reconnection after a node restart. An ElasticSuite shop also
+needs the ICU and phonetic analyzers. [ElasticSuite on OpenSearch](service-bindings.md#run-elasticsuite-on-opensearch)
 
 Use `make local-gates` for the Pulumi mocks, harness tests and the Floci AWS,
 GCP and Azure suites. The tests exercise the implemented API contracts.
 Real OIDC federation, managed TLS, HA failover, cloud restore times and cost
 need deployment-specific evidence. [Pulumi unit tests](https://www.pulumi.com/docs/iac/concepts/testing/unit/)
 
-## Store loop runbooks (alpha)
+## Rehearse a release
 
-Proved end to end on the [alpha recipe](alpha-recipe.md) during
-reference-store acceptance. Each runbook below lists the exact commands
-executed, in order; shells marked unproved are filled when the loop runs.
-
-### Deploy the recipe (unproved)
-
-<!-- Filled from the executed loop in reference-store-acceptance 2.1. -->
-
-### Recover a failed release (unproved)
-
-<!-- Filled from the executed loop in reference-store-acceptance 2.2. -->
-
-### Back up and restore (unproved)
-
-<!-- Filled from the executed loop in reference-store-acceptance 2.2. -->
-
-### Expire a preview (unproved)
-
-<!-- Filled from the executed loop in reference-store-acceptance 2.3. -->
+Start with a staging deployment, record its image digest and check a shopper journey.
+Restore a recent database and media snapshot to an empty destination, then measure
+how long it takes to return the shop to service. Use the archive to compare the
+specific GCP configuration from the alpha run. [Staging walkthrough](onboarding.md) ·
+[Database and media rehearsal](weekend-migrate.md) · [Archived GCP run](alpha-recipe.md)
 
 ## Staging, UAT and pull requests
 

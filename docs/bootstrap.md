@@ -282,9 +282,10 @@ With native edge and customer-managed DNS, read `nativeEdgeIngressAddress` from
 the stack outputs and point the configured shop hostname to that address.
 `applicationURL` uses the configured hostname and TLS scheme once an Ingress
 address exists. Verify DNS, certificate activation and storefront health before
-using the endpoint; an allocated address alone does not establish readiness.
-See [ADR 0020](adr/0020-gcp-native-edge-address.md).
-
+sending traffic to it. For Cloud CDN, GKE reports the serving URL map in the
+Ingress annotation `ingress.kubernetes.io/url-map`. MageLift exposes it as
+`nativeEdgeURLMapName` alongside the Ingress name, namespace and owner. Until
+the controller reports that map, the output is empty. [GKE Ingress controller annotations](https://github.com/kubernetes/ingress-gce/blob/6914b4659868b21b1e2a23e2b56c315180599c62/pkg/annotations/ingress.go#L90-L93)
 
 ## Azure AKS
 
