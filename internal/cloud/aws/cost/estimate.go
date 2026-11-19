@@ -164,7 +164,7 @@ func newAccountFreeReport(cfg config.Config, environment, region string) platfor
 		Environment: environment, Provider: cfg.Target.Provider, Region: region, Preset: preset,
 		Mode: "account-free", Currency: "USD", MonthlyBudgetCents: cfg.MonthlyBudgetCents,
 		Priced: []platform.CostPricedItem{}, MonthlyTotalCents: nil,
-		Notice: "Account-free mode does not call AWS or claim current prices. Capacity is derived from magelift.yaml; use magelift cost --live when current AWS prices are available.",
+		Notice: "Account-free mode does not call AWS or claim current prices. Capacity is derived from magelift.php; use magelift cost --live when current AWS prices are available.",
 		Unsupported: []platform.CostUnsupportedItem{
 			{Resource: "AWS unit prices", Reason: "current regional prices require live AWS Pricing data"},
 			{Resource: "usage-based services", Reason: "data transfer, requests, storage growth, logs, WAF, CloudFront, and NAT processing depend on workload measurements"},

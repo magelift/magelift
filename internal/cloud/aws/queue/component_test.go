@@ -152,6 +152,15 @@ func TestECSRabbitMQCreatesBrokerService(t *testing.T) {
 	}
 }
 
+func TestRabbitImageHonorsRequestedVersion(t *testing.T) {
+	if got := rabbitImageForVersion("4.3"); got != rabbitImage {
+		t.Fatalf("recommended image = %q", got)
+	}
+	if got := rabbitImageForVersion("4.2"); got != "docker.io/library/rabbitmq:4.2-management-alpine" {
+		t.Fatalf("custom image = %q", got)
+	}
+}
+
 func run(t *testing.T, args Args) *mocks {
 	t.Helper()
 	m := &mocks{}

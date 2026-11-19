@@ -9,9 +9,23 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
+
+func TestHeadlessOriginReachesFPM(t *testing.T) {
+	args := validArgs()
+	args.ApplicationMode = "headless"
+	args.VarnishImage = ""
+	args.Magento = platform.MagentoOverlays{StorefrontOrigin: "https://shop.example"}
+	m := deploy(t, args)
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+	php := definitionsByName(decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue()))["php-fpm"]
+	if got := environmentByName(php)[platform.EnvMagentoCORSOrigins]; got != "https://shop.example" {
+		t.Fatalf("CORS origins = %q", got)
+	}
+}
 
 const testImage = "ghcr.io/magelift/shop@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 const testVarnishImage = "docker.io/library/varnish:8.0.2@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -1005,4 +1019,47 @@ func containsResource(resources []string, want string) bool {
 		}
 	}
 	return false
+}
+
+type poolMocks struct {
+	mocks
+	readID string
+}
+
+func (m *poolMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
+	if args.TypeToken == "aws:ecs/cluster:Cluster" {
+		if args.ReadRPC == nil || args.ID == "" {
+			return "", nil, fmt.Errorf("preview tried to create or own a pooled cluster")
+		}
+		m.readID = args.ID
+		return args.ID, resource.PropertyMap{"arn": resource.NewStringProperty(args.ID), "name": resource.NewStringProperty("shared-previews")}, nil
+	}
+	return m.mocks.NewResource(args)
+}
+func TestPreviewReadsSharedClusterAndOwnsItsServices(t *testing.T) {
+	args := validArgs()
+	args.PreviewClusterARN = "arn:aws:ecs:eu-west-3:123456789012:cluster/shared-previews"
+	m := &poolMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error { _, err := New(ctx, "shop-pr-24", args); return err }, pulumi.WithMocks("shop", "pr-24", m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.readID != args.PreviewClusterARN {
+		t.Fatalf("cluster read = %q", m.readID)
+	}
+	services := 0
+	for _, n := range m.nodes {
+		if n.typeToken == "aws:ecs/clusterCapacityProviders:ClusterCapacityProviders" {
+			t.Fatal("preview attempted to replace pool capacity providers")
+		}
+		if n.typeToken == "aws:ecs/service:Service" {
+			services++
+			if n.inputs["cluster"].StringValue() != args.PreviewClusterARN {
+				t.Fatalf("unexpected service cluster: %v", n.inputs["cluster"])
+			}
+		}
+	}
+	if services == 0 {
+		t.Fatal("no per-preview ECS services created")
+	}
 }

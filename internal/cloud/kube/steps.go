@@ -215,11 +215,30 @@ func CandidateRequestFromOutputs(outputs map[string]any, spec DeploySpec, imageD
 	if !valid || strings.TrimSpace(encryptionKeySecretName) == "" {
 		return CandidateRequest{}, fmt.Errorf("Pulumi output %q must be a non-empty string", platform.OutputEncryptionKeySecretName)
 	}
+	namespace, err := namespaceFromOutputs(outputs)
+	if err != nil {
+		return CandidateRequest{}, err
+	}
+	workloadAccount, _ := outputs[platform.OutputWorkloadServiceAccount].(string)
+	imagePullSecret, _ := outputs["imagePullSecret"].(string)
+	mediaClaim, _ := outputs["mediaClaim"].(string)
+	databaseTLSCA, _ := outputs["databaseTLSCA"].(string)
+	cachePasswordSecretName, _ := outputs[platform.OutputCachePasswordSecretName].(string)
+	queueUsername, _ := outputs["queueUsername"].(string)
+	if queueUsername == "" {
+		queueUsername = "magento"
+	}
+	queuePort, _ := outputs["queuePort"].(string)
+	queueSSL, _ := outputs["queueSSL"].(string)
 	return CandidateRequest{
 		Project:                 spec.CloudProject,
 		Region:                  spec.Region,
 		Cluster:                 cluster,
-		Namespace:               defaultNamespace,
+		Namespace:               namespace,
+		WorkloadServiceAccount:  workloadAccount,
+		ImagePullSecret:         imagePullSecret,
+		MediaClaim:              mediaClaim,
+		DatabaseTLSCA:           databaseTLSCA,
 		ServiceName:             service,
 		ImageDigest:             imageDigest,
 		DatabaseWriter:          databaseWriter,
@@ -227,11 +246,14 @@ func CandidateRequestFromOutputs(outputs map[string]any, spec DeploySpec, imageD
 		DatabaseSecretName:      databaseSecretName,
 		EncryptionKeySecretName: encryptionKeySecretName,
 		QueuePasswordSecretName: queuePasswordSecretName,
+		CachePasswordSecretName: cachePasswordSecretName,
 		CacheEndpoint:           cacheEndpoint,
 		SearchEndpoint:          searchEndpoint,
 		QueueMode:               queueMode,
 		QueueHost:               queueHost,
-		QueueUsername:           "magento",
+		QueueUsername:           queueUsername,
+		QueuePort:               queuePort,
+		QueueSSL:                queueSSL,
 		ApplicationMode:         spec.ApplicationMode,
 		ApplicationVersion:      spec.ApplicationVersion,
 		WebRuntime:              spec.WebRuntime,
@@ -448,9 +470,10 @@ func WaitForHealthyService(ctx context.Context, outputs map[string]any, runtime 
 
 // DeploymentRuntime checks Magento web Deployment readiness via client-go.
 type DeploymentRuntime struct {
-	client  kubernetes.Interface
-	factory ClientFactory
-	backend Backend
+	client    kubernetes.Interface
+	namespace string
+	factory   ClientFactory
+	backend   Backend
 }
 
 // NewRuntimeFromClient injects a clientset (tests / pre-built clients).
@@ -459,6 +482,19 @@ func NewRuntimeFromClient(client kubernetes.Interface) (*DeploymentRuntime, erro
 		return nil, errors.New("kubernetes client is required")
 	}
 	return &DeploymentRuntime{client: client}, nil
+}
+
+// NewRuntimeFromClientWithNamespace scopes deployment health to one namespace.
+func NewRuntimeFromClientWithNamespace(client kubernetes.Interface, namespace string) (*DeploymentRuntime, error) {
+	runtime, err := NewRuntimeFromClient(client)
+	if err != nil {
+		return nil, err
+	}
+	runtime.namespace, err = namespaceFromOutputs(map[string]any{platform.OutputNamespace: namespace})
+	if err != nil {
+		return nil, err
+	}
+	return runtime, nil
 }
 
 // NewRuntimeFromFactory builds a client from stack outputs on each Check.
@@ -483,7 +519,18 @@ func (r *DeploymentRuntime) Check(ctx context.Context, _, serviceName string) (S
 	if err != nil {
 		return ServiceHealth{}, err
 	}
-	return deploymentHealth(ctx, client, defaultNamespace, serviceName)
+	namespace := r.namespace
+	if r.backend != nil {
+		outputs, err := r.backend.Outputs(ctx)
+		if err != nil {
+			return ServiceHealth{}, err
+		}
+		namespace, err = namespaceFromOutputs(outputs)
+		if err != nil {
+			return ServiceHealth{}, err
+		}
+	}
+	return deploymentHealth(ctx, client, namespace, serviceName)
 }
 
 func (r *DeploymentRuntime) clientFor(ctx context.Context) (kubernetes.Interface, error) {

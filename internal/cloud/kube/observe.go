@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -127,6 +128,20 @@ func (o *Observe) ns() string {
 	return defaultNamespace
 }
 
+var namespacePattern = regexp.MustCompile(`^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$`)
+
+func namespaceFromOutputs(outputs map[string]any) (string, error) {
+	value, ok := outputs[platform.OutputNamespace]
+	if !ok || value == "" {
+		return defaultNamespace, nil
+	}
+	namespace, ok := value.(string)
+	if !ok || len(namespace) > 63 || !namespacePattern.MatchString(namespace) {
+		return "", errors.New("stack namespace must be a Kubernetes DNS label")
+	}
+	return namespace, nil
+}
+
 // BindOutputs builds and caches a kubernetes client from stack outputs so
 // TailLogs (which has no outputs argument on platform.RuntimeObserve) can
 // work with factory-backed Observe used by GKE/EKS/OVH/Scaleway adapters.
@@ -140,7 +155,12 @@ func (o *Observe) BindOutputs(outputs map[string]any) error {
 	if err != nil {
 		return err
 	}
+	namespace, err := namespaceFromOutputs(outputs)
+	if err != nil {
+		return err
+	}
 	o.client = client
+	o.namespace = namespace
 	o.serviceName = svc
 	return nil
 }
@@ -294,7 +314,10 @@ func (o *Observe) CheckRuntime(ctx context.Context, _ platform.PlannedStack, out
 	if err != nil {
 		return nil, err
 	}
-	namespace := o.ns()
+	namespace, err := namespaceFromOutputs(outputs)
+	if err != nil {
+		return nil, err
+	}
 	dep, err := client.AppsV1().Deployments(namespace).Get(ctx, service, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("get deployment %s: %w", service, err)
@@ -326,7 +349,12 @@ func (o *Observe) CheckRuntime(ctx context.Context, _ platform.PlannedStack, out
 
 func (o *Observe) checkMagentoHTTP(ctx context.Context, client kubernetes.Interface, outputs map[string]any, service string) (platform.RuntimeHealth, bool) {
 	unhealthy := platform.RuntimeHealth{ID: "runtime.web", Service: service, Status: "unhealthy", Detail: "Magento HTTP probe failed"}
-	storefront, err := ResolveStorefrontURL(ctx, client, o.ns(), outputs, service)
+	namespace, err := namespaceFromOutputs(outputs)
+	if err != nil {
+		unhealthy.Detail = err.Error()
+		return unhealthy, true
+	}
+	storefront, err := ResolveStorefrontURL(ctx, client, namespace, outputs, service)
 	if err != nil {
 		unhealthy.Detail = err.Error()
 		return unhealthy, true
@@ -497,6 +525,10 @@ func isLoopbackHost(host string) bool {
 // Writes kubeconfig to a temp file and passes --kubeconfig (T-06-08 fail-closed
 // on missing output). Omits -t so scripted acceptance exec works without a TTY.
 func (o *Observe) PrepareExec(ctx context.Context, _ platform.PlannedStack, outputs map[string]any, query platform.ExecQuery) (platform.ExecTarget, error) {
+	namespace, err := namespaceFromOutputs(outputs)
+	if err != nil {
+		return platform.ExecTarget{}, err
+	}
 	cluster, err := platform.RequireStringOutput(outputs, platform.OutputClusterName)
 	if err != nil {
 		return platform.ExecTarget{}, err
@@ -519,7 +551,7 @@ func (o *Observe) PrepareExec(ctx context.Context, _ platform.PlannedStack, outp
 		if err != nil {
 			return platform.ExecTarget{}, fmt.Errorf("prepare exec client: %w", err)
 		}
-		if err := waitForDeploymentReady(ctx, client, o.ns(), deploy); err != nil {
+		if err := waitForDeploymentReady(ctx, client, namespace, deploy); err != nil {
 			return platform.ExecTarget{}, err
 		}
 	}
@@ -533,7 +565,7 @@ func (o *Observe) PrepareExec(ctx context.Context, _ platform.PlannedStack, outp
 	}
 	args := []string{
 		"--kubeconfig", kubePath,
-		"exec", "-n", o.ns(), "-i",
+		"exec", "-n", namespace, "-i",
 	}
 	if stdoutIsTerminal() {
 		args = append(args, "-t")
@@ -554,6 +586,10 @@ func (o *Observe) PrepareExec(ctx context.Context, _ platform.PlannedStack, outp
 // provider-owned Kubernetes Services. Managed database access and dashboards
 // need provider-specific adapters and fail closed here.
 func (o *Observe) PrepareTunnel(ctx context.Context, _ platform.PlannedStack, outputs map[string]any, query platform.TunnelQuery) (platform.ExecTarget, error) {
+	namespace, err := namespaceFromOutputs(outputs)
+	if err != nil {
+		return platform.ExecTarget{}, err
+	}
 	target, err := platform.NormalizeTunnelTarget(query.Target)
 	if err != nil {
 		return platform.ExecTarget{}, err
@@ -601,7 +637,7 @@ func (o *Observe) PrepareTunnel(ctx context.Context, _ platform.PlannedStack, ou
 		Launcher: "kubectl",
 		Args: []string{
 			"--kubeconfig", kubePath,
-			"port-forward", "-n", o.ns(), "--address", "127.0.0.1",
+			"port-forward", "-n", namespace, "--address", "127.0.0.1",
 			"service/" + service,
 			fmt.Sprintf("%d:%d", query.LocalPort, query.RemotePort),
 		},

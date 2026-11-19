@@ -419,3 +419,45 @@ func AppendMediaHmacSecretEnv(env pulumicorev1.EnvVarArrayOutput, secretName str
 		return result
 	}).(pulumicorev1.EnvVarArrayOutput)
 }
+
+// NewCachePasswordSecret keeps a connected cache password in Kubernetes.
+func NewCachePasswordSecret(ctx *pulumi.Context, runtimeName string, password pulumi.StringInput, opts ...pulumi.ResourceOption) (*pulumicorev1.Secret, error) {
+	if ctx == nil || strings.TrimSpace(runtimeName) == "" || password == nil {
+		return nil, errors.New("runtime and cache password are required")
+	}
+	return pulumicorev1.NewSecret(ctx, runtimeName+"-cache-password", &pulumicorev1.SecretArgs{
+		Metadata:   &pulumimetav1.ObjectMetaArgs{Name: pulumi.String(runtimeName + "-cache-password"), Annotations: SkipAwaitAnnotations()},
+		StringData: pulumi.StringMap{"password": password},
+		Type:       pulumi.String("Opaque"),
+	}, opts...)
+}
+
+var cachePasswordNames = []string{
+	"MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__PASSWORD",
+	"MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__PASSWORD",
+	"MAGENTO_DC_SESSION__REDIS_PASSWORD",
+}
+
+// AppendCachePasswordEnv adds cache and session password SecretKeyRefs.
+func AppendCachePasswordEnv(env pulumicorev1.EnvVarArrayOutput, secretName string) pulumicorev1.EnvVarArrayOutput {
+	return env.ApplyT(func(values []pulumicorev1.EnvVar) []pulumicorev1.EnvVar {
+		result := append([]pulumicorev1.EnvVar(nil), values...)
+		for _, name := range cachePasswordNames {
+			secret := secretName
+			result = append(result, pulumicorev1.EnvVar{Name: name, ValueFrom: &pulumicorev1.EnvVarSource{SecretKeyRef: &pulumicorev1.SecretKeySelector{Name: &secret, Key: "password"}}})
+		}
+		return result
+	}).(pulumicorev1.EnvVarArrayOutput)
+}
+
+// CachePasswordEnvVars supplies the same secret references to migration Jobs.
+func CachePasswordEnvVars(secretName string) []clientcorev1.EnvVar {
+	if strings.TrimSpace(secretName) == "" {
+		return nil
+	}
+	result := make([]clientcorev1.EnvVar, 0, len(cachePasswordNames))
+	for _, name := range cachePasswordNames {
+		result = append(result, clientcorev1.EnvVar{Name: name, ValueFrom: &clientcorev1.EnvVarSource{SecretKeyRef: &clientcorev1.SecretKeySelector{LocalObjectReference: clientcorev1.LocalObjectReference{Name: secretName}, Key: "password"}}})
+	}
+	return result
+}

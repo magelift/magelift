@@ -49,7 +49,7 @@ func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, req 
 	}
 	spec := awsPlanned.AWSSpec()
 	plan, err := awsbootstrap.BuildPlan(awsbootstrap.Spec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+		Project: spec.Identity.Project, Environment: spec.Identity.BootstrapEnvironment(),
 		AccountID: spec.Identity.AccountID, Region: spec.Identity.Region,
 		AccessLogBucket: req.AccessLogBucket,
 	})
@@ -67,7 +67,7 @@ func (Bootstrap) Ensure(ctx context.Context, planned platform.PlannedStack, req 
 	details := map[string]any{"state": result}
 	if wantGitHub {
 		identityPlan, err := awsbootstrap.BuildIdentityPlan(awsbootstrap.IdentitySpec{
-			Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+			Project: spec.Identity.Project, Environment: spec.Identity.BootstrapEnvironment(),
 			AccountID: spec.Identity.AccountID, Region: spec.Identity.Region,
 			GitHubOwner: owner, GitHubRepo: repo,
 			StateBucket: result.Plan.StateBucket, KMSKeyARN: result.KeyARN,
@@ -357,7 +357,7 @@ func stateManager(ctx context.Context, planned platform.PlannedStack) (*awsstate
 	}
 	spec := awsPlanned.AWSSpec()
 	plan, err := awsbootstrap.BuildPlan(awsbootstrap.Spec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+		Project: spec.Identity.Project, Environment: spec.Identity.BootstrapEnvironment(),
 		AccountID: spec.Identity.AccountID, Region: spec.Identity.Region,
 		AccessLogBucket: "magelift-access-logs",
 	})
@@ -378,7 +378,7 @@ func stateArchive(ctx context.Context, planned platform.PlannedStack) (*awsstate
 	}
 	spec := awsPlanned.AWSSpec()
 	plan, err := awsbootstrap.BuildPlan(awsbootstrap.Spec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+		Project: spec.Identity.Project, Environment: spec.Identity.BootstrapEnvironment(),
 		AccountID: spec.Identity.AccountID, Region: spec.Identity.Region,
 		AccessLogBucket: "magelift-access-logs",
 	})

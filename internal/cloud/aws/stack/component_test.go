@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/magelift/magelift/internal/cloud/aws/queue"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/sdk"
 	awsprovider "github.com/pulumi/pulumi-aws/sdk/v7/go/aws"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
@@ -675,5 +676,50 @@ func assertPreviewAmazonMQRejected(t *testing.T, wantReason string) {
 	}
 	if componentCount(m, "aws:mq/broker:Broker") != 0 {
 		t.Fatal("amazon-mq broker registered before the AZ guard rejected the plan")
+	}
+}
+
+func TestExternalServicesUseConnectionInputsWithoutProvisioningDependencies(t *testing.T) {
+	spec := validSpec()
+	spec.Catalog.SearchMode = SearchModeDisabled
+	spec.Catalog.QueueMode = QueueModeECSRabbitMQ
+	cacheSecret := "arn:aws:secretsmanager:eu-west-3:123456789012:secret:external-cache"
+	queueSecret := "arn:aws:secretsmanager:eu-west-3:123456789012:secret:external-queue"
+	spec.Dependencies.CacheSecretARN = cacheSecret
+	spec.Dependencies.SessionSecretARN = cacheSecret
+	spec.Dependencies.QueueSecretARN = queueSecret
+	spec.ExternalServices = map[string]config.ServiceBinding{
+		"database": {Family: "mysql", Ownership: "external", Endpoint: "db.example.internal", Secret: "aws-secrets-manager://arn:aws:secretsmanager:eu-west-3:123456789012:secret:external-db"},
+		"cache":    {Family: "valkey", Ownership: "external", Endpoint: "cache.example.internal", Secret: "aws-secrets-manager://" + cacheSecret},
+		"search":   {Family: "opensearch", Ownership: "external", Endpoint: "https://search.example.internal:9200"},
+		"queue":    {Family: "rabbitmq", Ownership: "external", Endpoint: "amqps://queue.example.internal:5671", Secret: "aws-secrets-manager://" + queueSecret, Username: "shop"},
+	}
+	spec.ExternalSearchEndpoint = spec.ExternalServices["search"].Address()
+	mocks := &stackMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		providers, err := NewProviders(ctx, "shop", "eu-west-3")
+		if err != nil {
+			return err
+		}
+		_, err = New(ctx, "shop-preview-1", spec, providers)
+		return err
+	}, pulumi.WithMocks("magelift", "test", mocks))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{"magelift:aws:AuroraMysql", "magelift:aws:Valkey", "magelift:aws:OpenSearch", "magelift:aws:RabbitMqQueue"} {
+		if got := componentCount(mocks, token); got != 0 {
+			t.Errorf("external service created %s (%d)", token, got)
+		}
+	}
+	task := resourceInput(mocks, "aws:ecs/taskDefinition:TaskDefinition", "shop-preview-1-runtime-web-task")
+	if task == nil {
+		t.Fatal("web task was not created")
+	}
+	definitions := task["containerDefinitions"].StringValue()
+	for _, value := range []string{"db.example.internal", "cache.example.internal", "search.example.internal", "queue.example.internal", "external-db", "external-cache", "external-queue", "shop"} {
+		if !strings.Contains(definitions, value) {
+			t.Errorf("web task missing %q", value)
+		}
 	}
 }

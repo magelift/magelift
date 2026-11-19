@@ -60,6 +60,9 @@ func selectionFromSpec(spec Spec) awsprovider.AdmissionSelection {
 		},
 	}
 
+	if spec.ExternalServices["cache"].Attached() {
+		selection.Valkey = nil
+	}
 	if spec.Existing.Network == nil && spec.Policy.NatMode == NatModeFckNat {
 		instanceType := strings.TrimSpace(spec.Policy.NatInstanceType)
 		if instanceType == "" {
@@ -98,7 +101,7 @@ func selectionFromSpec(spec Spec) awsprovider.AdmissionSelection {
 		selection.CapacityProviders = append(selection.CapacityProviders, "FARGATE_SPOT")
 	}
 
-	if spec.Existing.Database == nil {
+	if spec.Existing.Database == nil && !spec.ExternalServices["database"].Attached() {
 		version := spec.Catalog.Versions.AuroraMySQL
 		switch spec.Catalog.DatabaseEngine {
 		case DatabaseEngineRDSMySQL:

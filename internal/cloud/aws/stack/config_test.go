@@ -6,8 +6,47 @@ import (
 	"time"
 
 	"github.com/magelift/magelift/internal/config"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/sdk"
 )
+
+func TestPreviewStacksShareBootstrapAndKeepSeparateIdentities(t *testing.T) {
+	cfg := deploymentConfig()
+	cfg.Class, cfg.Preset = "preview", "preview"
+	cfg.Target.AWS.ImageDigest = ""
+	module := Module{}
+	base, err := module.Plan(cfg, "preview", platform.PlanOptions{AccountOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseURL := base.(Planned).StateBackendURL()
+	if baseURL == "" {
+		t.Fatal("missing bootstrap state URL")
+	}
+	cfg.StateEnvironment = "preview"
+	stacks := map[string]bool{}
+	for _, environment := range []string{"pr-11", "pr-22"} {
+		plan, err := module.Plan(cfg, environment, platform.PlanOptions{AllowExpiredPreview: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := plan.(Planned)
+		if p.StateBackendURL() != baseURL || p.Environment() != environment || p.StackName() == base.StackName() || stacks[p.StackName()] {
+			t.Fatalf("preview %s has wrong backend or stack name: %s %s", environment, p.StateBackendURL(), p.StackName())
+		}
+		stacks[p.StackName()] = true
+	}
+}
+
+func TestSmallStableEnvironmentDoesNotExpire(t *testing.T) {
+	lifecycle := Lifecycle{}
+	if err := lifecycle.validate(false, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := lifecycle.validate(true, false); err == nil {
+		t.Fatal("preview was accepted without expiry or budget")
+	}
+}
 
 func TestPlanFromConfigMapsExplicitAWSInputs(t *testing.T) {
 	cfg := deploymentConfig()
@@ -379,8 +418,9 @@ func TestPlanFromConfigRejectsUnsupportedAWSServiceCombination(t *testing.T) {
 	cfg := deploymentConfig()
 	cfg.Application.Version = "2.4.9"
 	cfg.Target.AWS.Catalog.Versions.OpenSearch = "OpenSearch_2.19"
-	if _, err := PlanFromConfig(cfg, "staging"); err == nil || !strings.Contains(err.Error(), "OpenSearch") {
-		t.Fatalf("unexpected compatibility error: %v", err)
+	spec, err := PlanFromConfig(cfg, "staging")
+	if err != nil || spec.Artifact.CompatibilityStatus != "unsupported-allowed" {
+		t.Fatalf("expected advisory status, got %#v, %v", spec.Artifact.CompatibilityStatus, err)
 	}
 	cfg.Compatibility.AllowUnsupported = true
 	if _, err := PlanFromConfig(cfg, "staging"); err != nil {
@@ -497,5 +537,35 @@ func TestPlanFromConfigLeavesBYOEmailUnmanaged(t *testing.T) {
 	}
 	if spec.Email.Managed {
 		t.Fatalf("BYO email must not provision managed sending: %#v", spec.Email)
+	}
+}
+
+func TestPlanFromConfigPreservesExternalServiceBindings(t *testing.T) {
+	cfg := deploymentConfig()
+	databaseSecret := "arn:aws:secretsmanager:eu-west-3:123456789012:secret:database"
+	cacheSecret := "arn:aws:secretsmanager:eu-west-3:123456789012:secret:cache"
+	queueSecret := "arn:aws:secretsmanager:eu-west-3:123456789012:secret:queue"
+	cfg.Services = map[string]config.ServiceBinding{
+		"database": {Family: "mysql", Ownership: "external", Endpoint: "db.example.internal", Secret: "aws-secrets-manager://" + databaseSecret},
+		"cache":    {Family: "valkey", Ownership: "existing", Endpoint: "cache.example.internal", Secret: "aws-secrets-manager://" + cacheSecret},
+		"search":   {Family: "opensearch", Ownership: "external", Endpoint: "https://search.example.internal", Port: 9201},
+		"queue":    {Family: "rabbitmq", Ownership: "external", Endpoint: "amqps://queue.example.internal", Port: 5671, Secret: "aws-secrets-manager://" + queueSecret, Username: "shop"},
+	}
+	spec, err := PlanFromConfig(cfg, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.ExternalSearchEndpoint != "https://search.example.internal:9201" || spec.Catalog.SearchMode != SearchModeDisabled {
+		t.Fatalf("search plan: %#v", spec)
+	}
+	if spec.Dependencies.CacheSecretARN != cacheSecret || spec.Dependencies.SessionSecretARN != cacheSecret || spec.Dependencies.QueueSecretARN != queueSecret {
+		t.Fatalf("service credentials missing from plan: %#v", spec.Dependencies)
+	}
+	if spec.Catalog.QueueMode != QueueModeECSRabbitMQ || spec.ExternalServices["queue"].Address() != "amqps://queue.example.internal:5671" {
+		t.Fatalf("queue plan: %#v", spec)
+	}
+	selection := selectionFromSpec(spec)
+	if selection.Database != nil || selection.Valkey != nil || selection.Search != nil {
+		t.Fatalf("external dependencies admitted as managed: %#v", selection)
 	}
 }

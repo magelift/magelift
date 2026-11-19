@@ -110,7 +110,7 @@ var newAWSState = awsstate.NewAWS
 
 func acquireDeploymentLock(ctx context.Context, spec awsstack.Spec) (func(context.Context) error, error) {
 	plan, err := awsbootstrap.BuildPlan(awsbootstrap.Spec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+		Project: spec.Identity.Project, Environment: spec.Identity.BootstrapEnvironment(),
 		AccountID: spec.Identity.AccountID, Region: spec.Identity.Region,
 		AccessLogBucket: "magelift-access-logs",
 	})
@@ -126,7 +126,7 @@ func acquireDeploymentLock(ctx context.Context, spec awsstack.Spec) (func(contex
 	handle, err := manager.Acquire(ctx, spec.Identity.Project, spec.Identity.Environment, owner)
 	if err != nil {
 		if awsstate.IsNotFound(err) {
-			return nil, fmt.Errorf("%w: run magelift bootstrap --env %s: %w", ErrStateBucketMissing, spec.Identity.Environment, err)
+			return nil, fmt.Errorf("%w: run magelift bootstrap --env %s: %w", ErrStateBucketMissing, spec.Identity.BootstrapEnvironment(), err)
 		}
 		return nil, err
 	}

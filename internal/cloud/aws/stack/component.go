@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,7 +28,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
-const varnishImage = "docker.io/library/varnish:8.0.2@sha256:4b595728592a5b9709c9aac15368ca492e9742fb269ed12466b434a62b2c1b63"
+const varnishImage = "docker.io/library/varnish:8.0.2@sha256:d5cb7840d6dcff465031e52276f2113675cc8edbea1cc8d7e6f8e6cfd0f522a3"
 
 type Component struct {
 	pulumi.ResourceState
@@ -39,6 +40,7 @@ type Component struct {
 	Database        *database.Component
 	Cache           *cache.Component
 	Search          *search.Component
+	SearchEndpoint  pulumi.StringOutput
 	Queue           *queue.Component
 	Storage         *storage.Component
 	Email           *email.Component
@@ -164,9 +166,22 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 			SecretARN:  spec.Existing.DatabaseSecretARN,
 		}
 	}
-	component.Database, err = database.New(ctx, name+"-database", databaseArgs, regional...)
-	if err != nil {
-		return nil, fmt.Errorf("create AWS database: %w", err)
+	if external := spec.ExternalServices["database"]; external.Attached() {
+		ref, _ := secretref.Parse(external.Secret)
+		host := external.Endpoint
+		if parsed, _, err := net.SplitHostPort(host); err == nil {
+			host = parsed
+		}
+		component.Database = &database.Component{
+			WriterEndpoint:  pulumi.String(host).ToStringOutput(),
+			ReaderEndpoint:  pulumi.String(host).ToStringOutput(),
+			MasterSecretARN: pulumi.StringPtr(ref.ID).ToStringPtrOutput(),
+		}
+	} else {
+		component.Database, err = database.New(ctx, name+"-database", databaseArgs, regional...)
+		if err != nil {
+			return nil, fmt.Errorf("create AWS database: %w", err)
+		}
 	}
 	if _, err := iam.NewRolePolicy(ctx, name+"-execution-database-policy", &iam.RolePolicyArgs{
 		Role:   component.RuntimeIdentity.ExecutionRoleName,
@@ -175,18 +190,32 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		return nil, fmt.Errorf("grant ECS execution access to managed database secret: %w", err)
 	}
 
-	component.Cache, err = cache.New(ctx, name+"-cache", cache.Args{
-		Topology: cache.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: spec.Catalog.Versions.Valkey, NodeType: spec.Catalog.Valkey.NodeType, ReplicaCount: spec.Catalog.Valkey.ReplicaCount,
-		SnapshotRetentionLimit: spec.Catalog.CacheSnapshotRetentionLimit, SnapshotWindow: spec.Catalog.CacheSnapshotWindow, SubnetIDInputs: dataSubnets, SubnetCount: len(dataSubnets), SecurityGroupInput: component.Security.CacheSecurityGroupID, KMSKeyARN: spec.Dependencies.KMSKeyARN,
-		AuthTokens: cache.AuthTokens{CacheSecretARN: spec.Dependencies.CacheSecretARN, SessionSecretARN: spec.Dependencies.SessionSecretARN}, Provider: providers.Regional, Tags: tags,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create AWS Valkey cache: %w", err)
+	if external := spec.ExternalServices["cache"]; external.Attached() {
+		host := external.Endpoint
+		if parsed, _, err := net.SplitHostPort(host); err == nil {
+			host = parsed
+		}
+		component.Cache = &cache.Component{
+			CachePrimaryEndpoint:   pulumi.String(host).ToStringOutput(),
+			SessionPrimaryEndpoint: pulumi.String(host).ToStringOutput(),
+		}
+	} else {
+		component.Cache, err = cache.New(ctx, name+"-cache", cache.Args{
+			Topology: cache.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: spec.Catalog.Versions.Valkey, NodeType: spec.Catalog.Valkey.NodeType, ReplicaCount: spec.Catalog.Valkey.ReplicaCount,
+			SnapshotRetentionLimit: spec.Catalog.CacheSnapshotRetentionLimit, SnapshotWindow: spec.Catalog.CacheSnapshotWindow, SubnetIDInputs: dataSubnets, SubnetCount: len(dataSubnets), SecurityGroupInput: component.Security.CacheSecurityGroupID, KMSKeyARN: spec.Dependencies.KMSKeyARN,
+			AuthTokens: cache.AuthTokens{CacheSecretARN: spec.Dependencies.CacheSecretARN, SessionSecretARN: spec.Dependencies.SessionSecretARN}, Provider: providers.Regional, Tags: tags,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create AWS Valkey cache: %w", err)
+		}
+
 	}
 
 	searchEndpoint := pulumi.String("").ToStringOutput()
 	searchARN := pulumi.String("").ToStringOutput()
-	if spec.Catalog.SearchMode != SearchModeDisabled {
+	if spec.ExternalSearchEndpoint != "" {
+		searchEndpoint = pulumi.String(spec.ExternalSearchEndpoint).ToStringOutput()
+	} else if spec.Catalog.SearchMode != SearchModeDisabled {
 		component.Search, err = search.New(ctx, name+"-search", search.Args{
 			Preset: spec.Identity.Preset, Region: spec.Identity.Region, VPCID: component.Network.VpcID.ToStringOutput(), SubnetIDs: searchSubnets,
 			SecurityGroupIDs: pulumi.StringArray{component.Security.SearchSecurityGroupID}, KMSKeyARN: spec.Dependencies.KMSKeyARN, AccessIdentityInput: component.RuntimeIdentity.TaskRoleARN,
@@ -199,15 +228,28 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		searchARN = component.Search.ARN
 	}
 
+	component.SearchEndpoint = searchEndpoint
 	logGroupPrefix := "/magelift/" + spec.Identity.Project + "/" + spec.Identity.Environment
-	component.Queue, err = queue.New(ctx, name+"-queue", queue.Args{
-		Mode: spec.Catalog.QueueMode, Topology: queue.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: spec.Catalog.Versions.RabbitMQ, InstanceType: spec.Catalog.RabbitMQ.InstanceType,
-		AvailabilityZones: spec.Policy.AvailabilityZones, SubnetIDInputs: privateSubnets, SubnetCount: len(privateSubnets), SecurityGroupIDInputs: pulumi.StringArray{component.Security.QueueSecurityGroupID}, SecurityGroupCount: 1,
-		KMSKeyARN: spec.Dependencies.KMSKeyARN, Credentials: queue.Credentials{SecretARN: spec.Dependencies.QueueSecretARN, Username: spec.Dependencies.MasterUsername}, Provider: providers.Regional, Tags: tags,
-		VpcID: component.Network.VpcID.ToStringOutput(), ExecutionRoleARN: component.RuntimeIdentity.ExecutionRoleARN, TaskRoleARN: component.RuntimeIdentity.TaskRoleARN, LogGroupPrefix: logGroupPrefix, LogRetentionDays: spec.Catalog.Retention.LogDays,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create AWS queue: %w", err)
+	if external := spec.ExternalServices["queue"]; external.Attached() {
+		endpoint := external.Address()
+		if !strings.Contains(endpoint, "://") {
+			endpoint = "amqp://" + endpoint
+		}
+		component.Queue = &queue.Component{
+			QueueMode:    pulumi.String("rabbitmq").ToStringOutput(),
+			AMQPEndpoint: pulumi.String(endpoint).ToStringOutput(),
+		}
+	} else {
+		component.Queue, err = queue.New(ctx, name+"-queue", queue.Args{
+			Mode: spec.Catalog.QueueMode, Topology: queue.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: spec.Catalog.Versions.RabbitMQ, InstanceType: spec.Catalog.RabbitMQ.InstanceType,
+			AvailabilityZones: spec.Policy.AvailabilityZones, SubnetIDInputs: privateSubnets, SubnetCount: len(privateSubnets), SecurityGroupIDInputs: pulumi.StringArray{component.Security.QueueSecurityGroupID}, SecurityGroupCount: 1,
+			KMSKeyARN: spec.Dependencies.KMSKeyARN, Credentials: queue.Credentials{SecretARN: spec.Dependencies.QueueSecretARN, Username: spec.Dependencies.MasterUsername}, Provider: providers.Regional, Tags: tags,
+			VpcID: component.Network.VpcID.ToStringOutput(), ExecutionRoleARN: component.RuntimeIdentity.ExecutionRoleARN, TaskRoleARN: component.RuntimeIdentity.TaskRoleARN, LogGroupPrefix: logGroupPrefix, LogRetentionDays: spec.Catalog.Retention.LogDays,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create AWS queue: %w", err)
+		}
+
 	}
 
 	component.Storage, err = storage.New(ctx, name+"-storage", storage.Args{
@@ -234,11 +276,15 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		smtpUsername = emailComponent.SmtpUsername
 		smtpSecretARN = emailComponent.SecretARN
 	}
+	queueUsername := spec.Dependencies.MasterUsername
+	if external := spec.ExternalServices["queue"]; external.Attached() {
+		queueUsername = external.Username
+	}
 	capabilityConfig := &runtime.CapabilityConfig{
 		DatabaseWriterEndpoint: component.Database.WriterEndpoint, DatabaseName: spec.Dependencies.DatabaseName, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN),
 		CacheEndpoint: component.Cache.CachePrimaryEndpoint, SessionEndpoint: component.Cache.SessionPrimaryEndpoint,
 		SearchEndpoint: searchEndpoint, QueueMode: component.Queue.QueueMode, QueueEndpoint: component.Queue.AMQPEndpoint,
-		QueueUsername: pulumi.String(spec.Dependencies.MasterUsername),
+		QueueUsername: pulumi.String(queueUsername),
 		MediaBucket:   component.Storage.BucketName,
 		SmtpHost:      smtpHost, SmtpUsername: smtpUsername, EmailFrom: spec.Email.From,
 	}
@@ -253,7 +299,8 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	runtimeOpts := append([]pulumi.ResourceOption{}, regional...)
 	runtimeOpts = append(runtimeOpts, pulumi.DependsOn([]pulumi.Resource{logGroups}))
 	component.Runtime, err = runtime.New(ctx, name+"-runtime", runtime.Args{
-		ComputeMode: spec.Catalog.Fargate.ComputeMode, InstanceType: spec.Catalog.Fargate.InstanceType, InstanceAMI: spec.Catalog.Fargate.InstanceAMI, MinCapacity: spec.Catalog.Fargate.MinCapacity, MaxCapacity: spec.Catalog.Fargate.MaxCapacity,
+		PreviewClusterARN: spec.Existing.PreviewClusterARN,
+		ComputeMode:       spec.Catalog.Fargate.ComputeMode, InstanceType: spec.Catalog.Fargate.InstanceType, InstanceAMI: spec.Catalog.Fargate.InstanceAMI, MinCapacity: spec.Catalog.Fargate.MinCapacity, MaxCapacity: spec.Catalog.Fargate.MaxCapacity,
 		ApplicationMode: spec.Application.Mode, ApplicationVersion: spec.Application.Version, WebRuntime: spec.Application.WebRuntime, Magento: spec.Application.Magento,
 		Region: spec.Identity.Region, VpcID: component.Network.VpcID.ToStringOutput(), PrivateSubnetIDs: privateSubnets,
 		Image: spec.Artifact.ImageDigest, DatabaseSecretARN: databaseSecretARN(component.Database.MasterSecretARN), ContainerPort: frontendPort, VarnishImage: varnishImageFor(spec.Application.Mode), TaskCPU: strconv.Itoa(spec.Catalog.Fargate.CPU), TaskMemory: strconv.Itoa(spec.Catalog.Fargate.MemoryMiB), DesiredCount: spec.Catalog.Fargate.DesiredCount, QueueConsumerCount: queueConsumerCount(spec), SmtpSecretARN: smtpSecretARN,
@@ -311,10 +358,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 // commands read via Pulumi Automation API. Keep this map and Program exports
 // in sync; RegisterResourceOutputs alone does not surface stack outputs.
 func (c *Component) Outputs() pulumi.Map {
-	searchEndpoint := pulumi.String("").ToStringOutput()
-	if c.Search != nil {
-		searchEndpoint = c.Search.Endpoint
-	}
+	searchEndpoint := c.SearchEndpoint
 	edgeDistributionID := pulumi.ID("").ToIDOutput()
 	applicationURL := pulumi.Sprintf("https://%s", c.Ingress.DNSName)
 	if c.Edge != nil {

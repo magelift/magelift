@@ -41,6 +41,10 @@ type CandidateRequest struct {
 	Region                  string
 	Cluster                 string
 	Namespace               string
+	WorkloadServiceAccount  string
+	ImagePullSecret         string
+	MediaClaim              string
+	DatabaseTLSCA           string
 	ServiceName             string
 	ImageDigest             string
 	DatabaseWriter          string
@@ -48,11 +52,14 @@ type CandidateRequest struct {
 	DatabaseSecretName      string
 	EncryptionKeySecretName string
 	QueuePasswordSecretName string
+	CachePasswordSecretName string
 	CacheEndpoint           string
 	SearchEndpoint          string
 	QueueMode               string
 	QueueHost               string
 	QueueUsername           string
+	QueuePort               string
+	QueueSSL                string
 	ApplicationMode         string
 	ApplicationVersion      string
 	WebRuntime              string
@@ -369,6 +376,8 @@ func migrationJob(name string, request CandidateRequest) *batchv1.Job {
 		QueueMode:          request.QueueMode,
 		QueueHost:          request.QueueHost,
 		QueueUsername:      request.QueueUsername,
+		QueuePort:          request.QueuePort,
+		QueueSSL:           request.QueueSSL,
 	})
 	env := make([]corev1.EnvVar, 0, len(bindings))
 	for _, binding := range bindings {
@@ -377,10 +386,14 @@ func migrationJob(name string, request CandidateRequest) *batchv1.Job {
 	env = append(env, DatabaseCredentialEnvVars(request.DatabaseSecretName)...)
 	env = append(env, EncryptionKeyEnvVars(request.EncryptionKeySecretName)...)
 	env = append(env, QueuePasswordEnvVars(request.QueuePasswordSecretName)...)
+	env = append(env, CachePasswordEnvVars(request.CachePasswordSecretName)...)
+	if request.DatabaseTLSCA != "" {
+		env = append(env, corev1.EnvVar{Name: "MAGELIFT_DATABASE_TLS_CA", Value: request.DatabaseTLSCA})
+	}
 	// A failed migration can leave database changes behind. Another attempt
 	// requires an explicit deployment invocation after inspecting the failure.
 	backoff := int32(0)
-	return &batchv1.Job{
+	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
@@ -391,7 +404,8 @@ func migrationJob(name string, request CandidateRequest) *batchv1.Job {
 			BackoffLimit: &backoff,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy:      corev1.RestartPolicyNever,
+					ServiceAccountName: request.WorkloadServiceAccount,
 					Containers: []corev1.Container{{
 						Name:    "deploy",
 						Image:   request.ImageDigest,
@@ -408,4 +422,12 @@ func migrationJob(name string, request CandidateRequest) *batchv1.Job {
 			},
 		},
 	}
+	if request.ImagePullSecret != "" {
+		job.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: request.ImagePullSecret}}
+	}
+	if request.MediaClaim != "" {
+		job.Spec.Template.Spec.Volumes = []corev1.Volume{{Name: "media", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: request.MediaClaim}}}}
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{{Name: "media", MountPath: "/app/pub/media"}}
+	}
+	return job
 }

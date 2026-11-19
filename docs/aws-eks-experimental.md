@@ -1,29 +1,29 @@
 # Experimental AWS target (EKS Autopilot / Auto Mode)
 
-Status: **experimental** ([ADR 0002](adr/0002-certified-vs-experimental.md)). The infrastructure and shared
-Kubernetes workload graph are wired. Packed KEEP `awsek` ran Magento 2.4.9 on
-Auto Mode with RabbitMQ, then destroy. This target is not Magento-acceptance
-certified. Certified paths remain AWS ECS Fargate and GCP GKE Autopilot. See the product matrix in
-[architecture.md](architecture.md#aws-magento-product-matrix).
+The EKS adapter is experimental. The `awsek` acceptance run deployed Magento 2.4.9 with RabbitMQ on Auto Mode and removed the environment. [AWS resource coverage](architecture.md#aws-magento-product-matrix) · [Evidence terminology](adr/0002-certified-vs-experimental.md)
 
 ## Target
 
-```yaml
-target:
-  provider: aws
-  runtime: eks
-  aws:
-    # Same account inputs as ECS (KMS, secrets, VPC CIDR, AZs, image digest).
-    catalog:
-      eks:
-        kubernetesVersion: "1.36"
-        cpuRequest: 500m
-        memoryRequest: 1Gi
-        desiredWebReplicas: 1
-        searchMode: disabled    # use opensearch for standard/HA search cells
-        queueMode: database     # use rabbitmq for standard/HA broker cells
-      # Do not set catalog.fargate CPU/memory on this runtime.
-      databaseEngine: rds-mysql   # preview-friendly
+Use this array for the `target` entry in `magelift.php`.
+
+```php
+$target = [
+    'provider' => 'aws',
+    'runtime' => 'eks',
+    'aws' => [
+        'catalog' => [
+            'eks' => [
+                'kubernetesVersion' => '1.36',
+                'cpuRequest' => '500m',
+                'memoryRequest' => '1Gi',
+                'desiredWebReplicas' => 1,
+                'searchMode' => 'disabled',
+                'queueMode' => 'database',
+            ],
+            'databaseEngine' => 'rds-mysql',
+        ],
+    ],
+];
 ```
 
 DIY stack name: `project-env-aws-eks`.

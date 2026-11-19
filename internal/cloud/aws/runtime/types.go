@@ -75,6 +75,7 @@ type Identity struct {
 }
 
 type Args struct {
+	PreviewClusterARN  string
 	Region             string
 	ComputeMode        string
 	InstanceType       string

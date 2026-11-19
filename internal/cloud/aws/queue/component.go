@@ -39,7 +39,7 @@ const (
 	ecsBrokerCPU       = "512"
 	ecsBrokerMemoryMiB = "1024"
 	amqpPort           = 5672
-	rabbitImage        = "docker.io/library/rabbitmq:3.13.7-management-alpine"
+	rabbitImage        = "docker.io/library/rabbitmq:4.3-management-alpine@sha256:1528a88eebf2bc4d0ab7e9d5d9bc542e9bdf5e1b105e65848fcf8de5c2186528"
 	artemisImage       = "docker.io/apache/activemq-artemis:2.39.0-alpine"
 )
 
@@ -219,7 +219,7 @@ func provisionECSBroker(ctx *pulumi.Context, name, mode string, args Args, compo
 		return fmt.Errorf("create broker log group: %w", err)
 	}
 
-	image := rabbitImage
+	image := rabbitImageForVersion(args.EngineVersion)
 	env := []map[string]any{
 		{"name": "RABBITMQ_DEFAULT_USER", "value": args.Credentials.Username},
 	}
@@ -305,6 +305,14 @@ func provisionECSBroker(ctx *pulumi.Context, name, mode string, args Args, compo
 		return fmt.Sprintf("amqp://%s.%s:%d", svc, ns, amqpPort)
 	}).(pulumi.StringOutput)
 	return nil
+}
+
+func rabbitImageForVersion(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" || version == "4.3" {
+		return rabbitImage
+	}
+	return "docker.io/library/rabbitmq:" + version + "-management-alpine"
 }
 
 func lookupPassword(ctx *pulumi.Context, region, arn string, provider *awsprovider.Provider) pulumi.StringInput {

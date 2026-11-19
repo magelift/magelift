@@ -23,10 +23,11 @@ const (
 	EPMDPort       = 4369
 	InterNodePort  = 25672
 	ManagementPort = 15672
-	DefaultImage   = "rabbitmq:4.2-management-alpine@sha256:b774118f6eee1edfb133c26f6d9f52b09d2813a6f65a2c9d991a6f6e3db7fa19"
+	DefaultImage   = "rabbitmq:4.3-management-alpine@sha256:1528a88eebf2bc4d0ab7e9d5d9bc542e9bdf5e1b105e65848fcf8de5c2186528"
 )
 
 type Args struct {
+	Namespace        string
 	Replicas         int
 	Username         string
 	Image            string
@@ -64,6 +65,9 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	component := &Component{}
+	if strings.TrimSpace(args.Namespace) == "" {
+		args.Namespace = "default"
+	}
 	resourceType := TypeToken
 	if strings.TrimSpace(args.TypeToken) != "" {
 		resourceType = args.TypeToken
@@ -115,7 +119,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	config, err := corev1.NewConfigMap(ctx, name+"-config", &corev1.ConfigMapArgs{
 		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name + "-config"), Annotations: skipAwait},
 		Data: pulumi.StringMap{
-			"rabbitmq.conf": pulumi.String(rabbitmqConfig(headlessName)),
+			"rabbitmq.conf": pulumi.String(rabbitmqConfig(headlessName, args.Namespace)),
 		},
 	}, k8sOpts...)
 	if err != nil {
@@ -157,7 +161,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 			&rbacv1.SubjectArgs{
 				Kind:      pulumi.String("ServiceAccount"),
 				Name:      pulumi.String(serviceAccountName),
-				Namespace: pulumi.String("default"),
+				Namespace: pulumi.String(args.Namespace),
 			},
 		},
 	}, append(k8sOpts, pulumi.DependsOn([]pulumi.Resource{serviceAccount, role}))...)
@@ -245,7 +249,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 								&corev1.ContainerPortArgs{Name: pulumi.String("inter-node"), ContainerPort: pulumi.Int(InterNodePort)},
 								&corev1.ContainerPortArgs{Name: pulumi.String("management"), ContainerPort: pulumi.Int(ManagementPort)},
 							},
-							Env: rabbitmqEnv(credentialsName, headlessName, args.Username),
+							Env: rabbitmqEnv(credentialsName, headlessName, args.Username, args.Namespace),
 							ReadinessProbe: &corev1.ProbeArgs{
 								Exec:                &corev1.ExecActionArgs{Command: pulumi.StringArray{pulumi.String("rabbitmq-diagnostics"), pulumi.String("-q"), pulumi.String("ping")}},
 								InitialDelaySeconds: pulumi.Int(30), PeriodSeconds: pulumi.Int(10), TimeoutSeconds: pulumi.Int(10), FailureThreshold: pulumi.Int(30),
@@ -303,12 +307,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	return component, nil
 }
 
-func rabbitmqConfig(headlessName string) string {
+func rabbitmqConfig(headlessName, namespace string) string {
 	return strings.Join([]string{
 		"cluster_formation.peer_discovery_backend = k8s",
 		"cluster_formation.k8s.service_name = " + headlessName,
 		"cluster_formation.k8s.address_type = hostname",
-		"cluster_formation.k8s.hostname_suffix = ." + headlessName + ".default.svc.cluster.local",
+		"cluster_formation.k8s.hostname_suffix = ." + headlessName + "." + namespace + ".svc.cluster.local",
 		"cluster_partition_handling = pause_minority",
 	}, "\n") + "\n"
 }
@@ -322,10 +326,10 @@ func rabbitmqServicePorts() corev1.ServicePortArray {
 	}
 }
 
-func rabbitmqEnv(credentialsName, headlessName, username string) corev1.EnvVarArray {
+func rabbitmqEnv(credentialsName, headlessName, username, namespace string) corev1.EnvVarArray {
 	return corev1.EnvVarArray{
 		&corev1.EnvVarArgs{Name: pulumi.String("POD_NAME"), ValueFrom: &corev1.EnvVarSourceArgs{FieldRef: &corev1.ObjectFieldSelectorArgs{FieldPath: pulumi.String("metadata.name")}}},
-		&corev1.EnvVarArgs{Name: pulumi.String("RABBITMQ_NODENAME"), Value: pulumi.String("rabbit@$(POD_NAME)." + headlessName + ".default.svc.cluster.local")},
+		&corev1.EnvVarArgs{Name: pulumi.String("RABBITMQ_NODENAME"), Value: pulumi.String("rabbit@$(POD_NAME)." + headlessName + "." + namespace + ".svc.cluster.local")},
 		&corev1.EnvVarArgs{Name: pulumi.String("RABBITMQ_USE_LONGNAME"), Value: pulumi.String("true")},
 		&corev1.EnvVarArgs{Name: pulumi.String("RABBITMQ_DEFAULT_USER"), Value: pulumi.String(username)},
 		&corev1.EnvVarArgs{Name: pulumi.String("RABBITMQ_DEFAULT_PASS"), ValueFrom: secretKeyRef(credentialsName, "password")},

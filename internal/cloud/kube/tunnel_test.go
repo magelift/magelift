@@ -36,6 +36,22 @@ func TestPrepareTunnelQueueManagementIsLoopbackBound(t *testing.T) {
 	}
 }
 
+func TestPrepareTunnelUsesPreviewNamespace(t *testing.T) {
+	outputs := map[string]any{platform.OutputNamespace: "ml-preview-123", platform.OutputServiceName: "shop-web", platform.OutputKubeconfig: "apiVersion: v1\nkind: Config\n"}
+	target, err := NewObserve(nil).PrepareTunnel(context.Background(), nil, outputs, platform.TunnelQuery{Target: platform.TunnelTargetApp, LocalPort: 8080, RemotePort: 80})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(target.CleanupPaths[0]) }()
+	if !strings.Contains(strings.Join(target.Args, " "), "-n ml-preview-123") {
+		t.Fatalf("wrong namespace: %v", target.Args)
+	}
+	outputs[platform.OutputNamespace] = "INVALID"
+	if _, err := NewObserve(nil).PrepareTunnel(context.Background(), nil, outputs, platform.TunnelQuery{Target: platform.TunnelTargetApp, LocalPort: 8080, RemotePort: 80}); err == nil {
+		t.Fatal("invalid namespace accepted")
+	}
+}
+
 func TestPrepareTunnelSupportsApplicationAndSearchAPI(t *testing.T) {
 	obs := NewObserve(nil)
 	base := map[string]any{

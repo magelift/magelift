@@ -24,7 +24,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	child := pulumi.Parent(component)
 
-	cluster, err := ecs.NewCluster(ctx, name+"-cluster", &ecs.ClusterArgs{Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "cluster")}, child)
+	var cluster *ecs.Cluster
+	if args.PreviewClusterARN != "" {
+		cluster, err = ecs.GetCluster(ctx, name+"-pool", pulumi.ID(args.PreviewClusterARN), nil, child)
+	} else {
+		cluster, err = ecs.NewCluster(ctx, name+"-cluster", &ecs.ClusterArgs{Region: pulumi.String(args.Region), Tags: tags(args.Tags, name, "cluster")}, child)
+	}
 	if err != nil {
 		return nil, err
 	}

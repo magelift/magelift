@@ -17,7 +17,8 @@ type Module struct {
 
 // Planned is the AWS PlannedStack adapter.
 type Planned struct {
-	Spec Spec
+	Spec      Spec
+	stateOnly bool
 }
 
 func (p Planned) StackName() string {
@@ -44,6 +45,9 @@ func (p Planned) TargetDescriptor() sdk.TargetDescriptor {
 }
 
 func (p Planned) WithImageDigest(digest string) (platform.PlannedStack, error) {
+	if p.stateOnly {
+		return nil, fmt.Errorf("a state-only AWS plan cannot deploy an image")
+	}
 	next := p
 	next.Spec.Artifact.ImageDigest = digest
 	if err := next.Spec.Validate(); err != nil {
@@ -56,7 +60,7 @@ func (p Planned) WithImageDigest(digest string) (platform.PlannedStack, error) {
 func (p Planned) AWSSpec() Spec { return p.Spec }
 
 func (p Planned) StateBackendURL() string {
-	url, err := awsbootstrap.StateBackendURL(p.Spec.Identity.Project, p.Spec.Identity.Environment, p.Spec.Identity.AccountID, p.Spec.Identity.Region)
+	url, err := awsbootstrap.StateBackendURL(p.Spec.Identity.Project, p.Spec.Identity.BootstrapEnvironment(), p.Spec.Identity.AccountID, p.Spec.Identity.Region)
 	if err != nil {
 		return ""
 	}
@@ -74,12 +78,23 @@ func (Module) CertificationTier() platform.CertificationTier { return platform.T
 func (Module) PlanAdmission() platform.PlanAdmission { return RegionAdmission{} }
 
 func (Module) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
+	if opts.AccountOnly || opts.AllowExpiredPreview {
+		if cfg.Target.AWS == nil {
+			return nil, fmt.Errorf("target.aws is required to access AWS state")
+		}
+		preset := cfg.Preset
+		if preset == "" {
+			preset = cfg.Defaults.Preset
+		}
+		id := Identity{Project: cfg.Project.Name, Environment: environment, StateEnvironment: cfg.StateEnvironment, AccountID: cfg.Account, Region: cfg.Defaults.Region, EnvironmentClass: cfg.Class, Preset: sdk.PresetID(preset)}
+		if err := id.validate(); err != nil {
+			return nil, err
+		}
+		return Planned{stateOnly: true, Spec: Spec{Identity: id, Lifecycle: Lifecycle{Protection: cfg.Protection}, Dependencies: Dependencies{KMSKeyARN: cfg.Target.AWS.KMSKeyARN}, Artifact: Artifact{ImageDigest: cfg.Target.AWS.ImageDigest}}}, nil
+	}
 	spec, err := PlanFromConfigWithOptions(cfg, environment, PlanOptions{AllowExpiredPreview: opts.AllowExpiredPreview})
 	if err != nil {
 		return nil, err
-	}
-	if err := spec.Validate(); err != nil {
-		return nil, fmt.Errorf("deployment configuration is invalid: %w", err)
 	}
 	return Planned{Spec: spec}, nil
 }
@@ -88,6 +103,11 @@ func (Module) Program(planned platform.PlannedStack) (pulumi.RunFunc, error) {
 	awsPlanned, ok := planned.(Planned)
 	if !ok {
 		return nil, fmt.Errorf("AWS stack module received unexpected planned type %T", planned)
+	}
+	if awsPlanned.stateOnly {
+		// Pulumi destroy and preview-destroy operate from stored state and
+		// run without executing the program. Refuse an accidental update.
+		return func(*pulumi.Context) error { return fmt.Errorf("AWS state-only plans cannot run a resource program") }, nil
 	}
 	return Program(awsPlanned.Spec), nil
 }

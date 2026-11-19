@@ -12,6 +12,7 @@ import (
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/edge/waf"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/secretref"
 	"github.com/magelift/magelift/internal/topology"
 	"github.com/magelift/magelift/sdk"
 )
@@ -40,6 +41,9 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	}
 	if cfg.Target.AWS == nil {
 		return Spec{}, fmt.Errorf("target.aws is required for AWS deployment")
+	}
+	if err := cfg.CheckServiceCapabilities(); err != nil {
+		return Spec{}, err
 	}
 	if err := platform.ValidateFirstPartyEdge(cfg); err != nil {
 		return Spec{}, err
@@ -118,11 +122,14 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		existingDatabaseEndpoint = aws.Existing.Database.Endpoint
 	}
 	status := "compatible"
+	if err := config.ValidateAWSProviderConstraints(cfg); err != nil {
+		return Spec{}, err
+	}
 	if cfg.Compatibility.AllowUnsupported {
 		status = "unsupported-allowed"
 	}
-	if err := validateAWSServiceCompatibility(cfg); err != nil && !cfg.Compatibility.AllowUnsupported {
-		return Spec{}, err
+	if err := validateAWSServiceCompatibility(cfg); err != nil {
+		status = "unsupported-allowed"
 	}
 	tags := map[string]string{"magelift:managed-by": "magelift", "magelift:project": cfg.Project.Name, "magelift:environment": environment}
 	for key, value := range aws.Labels {
@@ -137,7 +144,8 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	}
 	spec := Spec{
 		Identity: Identity{
-			Project: cfg.Project.Name, Environment: environment, AccountID: cfg.Account, Region: cfg.Defaults.Region,
+			StateEnvironment: cfg.StateEnvironment,
+			Project:          cfg.Project.Name, Environment: environment, AccountID: cfg.Account, Region: cfg.Defaults.Region,
 			EnvironmentClass: class, Preset: preset,
 			Tags: tags,
 		},
@@ -155,6 +163,40 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		Edge:          edgeIntent,
 		Observability: observability,
 		Email:         emailSpecFromConfig(cfg),
+	}
+	if pool := aws.PreviewPool; pool != nil {
+		arn := pool.ClusterARN
+		if spec.Existing.Network == nil {
+			return Spec{}, fmt.Errorf("target.aws.previewPool requires target.aws.existing.network and its subnet IDs")
+		}
+		if cfg.Class != "preview" {
+			return Spec{}, fmt.Errorf("target.aws.previewPool.clusterArn requires a preview environment")
+		}
+		// The PR owns its services, task roles and state. Shared compute
+		// capacity and cluster associations belong to the pool owner.
+		if mode := spec.Catalog.Fargate.ComputeMode; mode != "" && mode != "fargate" {
+			return Spec{}, fmt.Errorf("previewPool.clusterArn requires Fargate compute")
+		}
+		parts := strings.SplitN(arn, ":", 6)
+		if len(parts) != 6 || parts[0] != "arn" || parts[2] != "ecs" || parts[3] != spec.Identity.Region || parts[4] != spec.Identity.AccountID || !strings.HasPrefix(parts[5], "cluster/") || strings.TrimPrefix(parts[5], "cluster/") == "" {
+			return Spec{}, fmt.Errorf("target.aws.previewPool.clusterArn must identify an ECS cluster in the target region and account")
+		}
+		spec.Existing.PreviewClusterARN = arn
+	}
+	spec.ExternalServices = cfg.Services
+	if external, ok := cfg.Services["cache"]; ok && external.Attached() {
+		ref, _ := secretref.Parse(external.Secret)
+		spec.Dependencies.CacheSecretARN = ref.ID
+		spec.Dependencies.SessionSecretARN = ref.ID
+	}
+	if external, ok := cfg.Services["queue"]; ok && external.Attached() {
+		ref, _ := secretref.Parse(external.Secret)
+		spec.Dependencies.QueueSecretARN = ref.ID
+		spec.Catalog.QueueMode = QueueModeECSRabbitMQ
+	}
+	if search, ok := cfg.Services["search"]; ok && search.Attached() {
+		spec.ExternalSearchEndpoint = search.Address()
+		spec.Catalog.SearchMode = SearchModeDisabled
 	}
 	validate := spec.Validate
 	if options.AllowExpiredPreview && preset == sdk.PresetPreview && !expiresAt.IsZero() && expiresAt.Before(time.Now().UTC()) {

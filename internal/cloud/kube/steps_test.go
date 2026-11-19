@@ -506,3 +506,34 @@ func TestFourModuleNewDeployStepsTypeIdentity(t *testing.T) {
 	// (package kube_test) to avoid provider→kube import cycles.
 	var _ deployflow.Steps = (*Steps)(nil)
 }
+
+func TestCandidateUsesExternalQueueAndCacheConnectionSettings(t *testing.T) {
+	digest := "ghcr.io/magelift/magento@sha256:" + strings.Repeat("a", 64)
+	outputs := map[string]any{
+		platform.OutputClusterName: "shop-gke", platform.OutputServiceName: "shop-web",
+		platform.OutputDatabaseWriter: "db.example", platform.OutputCacheEndpoint: "cache.example",
+		platform.OutputDatabaseSecretName: "db-secret", platform.OutputEncryptionKeySecretName: "crypt-secret",
+		platform.OutputCachePasswordSecretName: "cache-secret", platform.OutputQueuePasswordSecretName: "queue-secret",
+		"queueMode": "rabbitmq", "queueHost": "queue.example", "queueUsername": "shop_user", "queuePort": "5671", "queueSSL": "1",
+	}
+	request, err := CandidateRequestFromOutputs(outputs, testDeploySpec(digest), digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := migrationJob("migrate", request)
+	values := map[string]corev1.EnvVar{}
+	for _, env := range job.Spec.Template.Spec.Containers[0].Env {
+		values[env.Name] = env
+	}
+	for name, want := range map[string]string{platform.EnvMagentoQueueUsername: "shop_user", platform.EnvMagentoQueuePort: "5671", platform.EnvMagentoQueueSSL: "1"} {
+		if values[name].Value != want {
+			t.Errorf("%s = %q, want %q", name, values[name].Value, want)
+		}
+	}
+	for _, name := range []string{"MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__PASSWORD", "MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__PASSWORD", "MAGENTO_DC_SESSION__REDIS_PASSWORD"} {
+		item := values[name]
+		if item.ValueFrom == nil || item.ValueFrom.SecretKeyRef == nil || item.ValueFrom.SecretKeyRef.Name != "cache-secret" {
+			t.Errorf("%s secret reference = %#v", name, item.ValueFrom)
+		}
+	}
+}

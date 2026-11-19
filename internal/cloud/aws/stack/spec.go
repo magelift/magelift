@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/magelift/magelift/internal/cloud/aws/network"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/sdk"
 )
@@ -44,8 +45,10 @@ type Spec struct {
 	// AllowExpiredPreview records that CLI planning already accepted an
 	// expired preview for teardown. The Pulumi program reads it to skip
 	// only the expiry check; deploy planning never sets it.
-	AllowExpiredPreview bool
-	Email               EmailSpec
+	AllowExpiredPreview    bool
+	ExternalServices       map[string]config.ServiceBinding
+	ExternalSearchEndpoint string
+	Email                  EmailSpec
 }
 
 type EmailSpec struct {
@@ -56,6 +59,7 @@ type EmailSpec struct {
 }
 
 type Identity struct {
+	StateEnvironment string
 	Project          string
 	Environment      string
 	AccountID        string
@@ -63,6 +67,13 @@ type Identity struct {
 	EnvironmentClass string
 	Preset           sdk.PresetID
 	Tags             map[string]string
+}
+
+func (i Identity) BootstrapEnvironment() string {
+	if i.StateEnvironment != "" {
+		return i.StateEnvironment
+	}
+	return i.Environment
 }
 
 type Application struct {
@@ -86,6 +97,7 @@ type Lifecycle struct {
 }
 
 type ExistingResources struct {
+	PreviewClusterARN string
 	Network           *sdk.ExistingResourceRef
 	PublicSubnetIDs   []string
 	PrivateSubnetIDs  []string
@@ -242,7 +254,7 @@ func (s Spec) ValidateAllowExpiredPreview() error {
 
 func (s Spec) validate(allowExpiredPreview bool) error {
 	var problems []error
-	problems = append(problems, s.Identity.validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Lifecycle.validate(s.Identity.Preset, allowExpiredPreview), s.Existing.validate(s.Edge), s.Dependencies.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset), sdk.ValidateEdgeIntent(s.Edge), sdk.ValidateObservabilityIntent(s.Observability))
+	problems = append(problems, s.Identity.validate(), s.Application.validate(), s.Artifact.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Lifecycle.validate(s.Identity.EnvironmentClass == "preview", allowExpiredPreview), s.Existing.validate(s.Edge), s.Dependencies.validate(s.Identity.Preset, s.Catalog.QueueMode), s.Policy.validate(s.Identity.Preset), s.Catalog.validate(s.Identity.Preset, s.ExternalSearchEndpoint != "", s.ExternalServices["database"].Attached()), sdk.ValidateEdgeIntent(s.Edge), sdk.ValidateObservabilityIntent(s.Observability))
 	if s.Existing.Network != nil {
 		if s.Policy.NatMode == NatModeFckNat || strings.TrimSpace(s.Policy.NatTopology) != "" || strings.TrimSpace(s.Policy.NatReplacementMode) != "" || strings.TrimSpace(s.Policy.NatInstanceType) != "" {
 			problems = append(problems, errors.New("existing network owns egress; fck-nat and NAT topology/replacement settings cannot be selected"))
@@ -265,7 +277,7 @@ func (s Spec) validate(allowExpiredPreview bool) error {
 
 func (i Identity) validate() error {
 	var problems []error
-	if !stableName.MatchString(i.Project) || !stableName.MatchString(i.Environment) {
+	if !stableName.MatchString(i.Project) || !stableName.MatchString(i.Environment) || !stableName.MatchString(i.BootstrapEnvironment()) {
 		problems = append(problems, errors.New("stack project and environment must be lowercase stable names"))
 	}
 	if !accountID.MatchString(i.AccountID) {
@@ -331,15 +343,15 @@ func awsCapabilities(preset sdk.PresetID, queueMode string) []sdk.CapabilityID {
 	return append(capabilities, sdk.CapabilityQueueRabbitMQ)
 }
 
-func (l Lifecycle) validate(preset sdk.PresetID, allowExpiredPreview bool) error {
+func (l Lifecycle) validate(preview, allowExpiredPreview bool) error {
 	var problems []error
-	if preset == sdk.PresetPreview && l.ExpiresAt.IsZero() {
+	if preview && l.ExpiresAt.IsZero() {
 		problems = append(problems, errors.New("preview stacks require an expiration time"))
 	}
-	if preset == sdk.PresetPreview && !allowExpiredPreview && l.ExpiresAt.Before(time.Now().UTC()) {
+	if preview && !allowExpiredPreview && l.ExpiresAt.Before(time.Now().UTC()) {
 		problems = append(problems, errors.New("preview stack expiration must be in the future"))
 	}
-	if l.MonthlyBudgetCents <= 0 {
+	if l.MonthlyBudgetCents < 0 || (preview && l.MonthlyBudgetCents == 0) {
 		problems = append(problems, errors.New("stack monthly budget must be positive and expressed in cents"))
 	}
 	return errors.Join(problems...)
@@ -514,7 +526,7 @@ func (p NetworkPolicy) validate(preset sdk.PresetID) error {
 	return errors.Join(problems...)
 }
 
-func (c CatalogSelection) validate(preset sdk.PresetID) error {
+func (c CatalogSelection) validate(preset sdk.PresetID, externalSearch, externalDatabase bool) error {
 	var problems []error
 	if strings.TrimSpace(c.Version) == "" {
 		problems = append(problems, errors.New("benchmark catalog version is required"))
@@ -528,10 +540,10 @@ func (c CatalogSelection) validate(preset sdk.PresetID) error {
 	if c.QueueMode != "" && c.QueueMode != QueueModeDB && c.QueueMode != QueueModeAmazonMQ && c.QueueMode != QueueModeECSRabbitMQ && c.QueueMode != QueueModeECSArtemis {
 		problems = append(problems, errors.New("queueMode must be db, amazon-mq, ecs-rabbitmq, or ecs-artemis"))
 	}
-	if (c.DatabaseEngine == DatabaseEngineRDSMySQL || c.DatabaseEngine == DatabaseEngineRDSMariaDB) && preset != sdk.PresetPreview {
+	if !externalDatabase && (c.DatabaseEngine == DatabaseEngineRDSMySQL || c.DatabaseEngine == DatabaseEngineRDSMariaDB) && preset != sdk.PresetPreview {
 		problems = append(problems, errors.New("RDS database engines are only supported for the preview preset"))
 	}
-	if c.SearchMode == SearchModeDisabled && preset != sdk.PresetPreview {
+	if !externalSearch && c.SearchMode == SearchModeDisabled && preset != sdk.PresetPreview {
 		problems = append(problems, errors.New("searchMode disabled is only supported for the preview preset"))
 	}
 	if strings.TrimSpace(c.Valkey.NodeType) == "" || c.Valkey.ReplicaCount < 0 {
