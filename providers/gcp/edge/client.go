@@ -1055,7 +1055,7 @@ func validateGoogleEdgePurgeRequest(request GoogleEdgeApplyRequest) error {
 		if request.GKEIngressOwner != request.OwnershipMarker {
 			return errors.New("GCP GKE Ingress owner does not match the edge ownership marker")
 		}
-		if len(request.Domains) != 1 || strings.ToLower(strings.TrimSpace(request.Domains[0])) != strings.ToLower(request.Hostname) {
+		if len(request.Domains) != 1 || !strings.EqualFold(strings.TrimSpace(request.Domains[0]), request.Hostname) {
 			return errors.New("GCP GKE purge must match its unique configured hostname")
 		}
 	}
