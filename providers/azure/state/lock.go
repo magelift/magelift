@@ -76,7 +76,7 @@ func (m *Manager) Acquire(ctx context.Context, owner string) (*Handle, error) {
 		}
 		return nil, fmt.Errorf("acquire Azure deployment lock: %w", err)
 	}
-	if response.ETag == nil {
+	if response.ETag == nil || !concreteETag(*response.ETag) {
 		return nil, errors.New("Azure did not return a lock ETag; inspect the lock before retrying")
 	}
 	return &Handle{manager: m, etag: *response.ETag, info: info}, nil
@@ -103,7 +103,7 @@ func (m *Manager) inspect(ctx context.Context) (platform.LockInfo, azcore.ETag, 
 	if err := json.Unmarshal(data, &info); err != nil {
 		return platform.LockInfo{}, "", errors.New("Azure deployment lock contains invalid metadata")
 	}
-	if info.Project != m.project || info.Environment != m.environment || response.ETag == nil {
+	if info.Project != m.project || info.Environment != m.environment || response.ETag == nil || !concreteETag(*response.ETag) {
 		return platform.LockInfo{}, "", errors.New("Azure deployment lock identity or ETag is invalid")
 	}
 	return info, *response.ETag, nil
@@ -133,13 +133,16 @@ func (m *Manager) BackendIdentity() (string, error) {
 // ReleaseReceipt conditionally deletes the Blob version captured by Acquire.
 // It does not depend on the process that created the receipt remaining alive.
 func (m *Manager) ReleaseReceipt(ctx context.Context, etag azcore.ETag) error {
-	if etag == "" {
+	if !concreteETag(etag) {
 		return ErrLockReplaced
 	}
 	return m.delete(ctx, etag)
 }
 
 func (m *Manager) delete(ctx context.Context, etag azcore.ETag) error {
+	if !concreteETag(etag) {
+		return ErrLockReplaced
+	}
 	_, err := m.client.DeleteBlob(ctx, m.container, m.key, &azblob.DeleteBlobOptions{
 		AccessConditions: &blob.AccessConditions{ModifiedAccessConditions: &blob.ModifiedAccessConditions{IfMatch: &etag}},
 	})
@@ -156,6 +159,21 @@ func (m *Manager) delete(ctx context.Context, etag azcore.ETag) error {
 		return fmt.Errorf("release Azure deployment lock: %w", err)
 	}
 	return nil
+}
+
+// concreteETag accepts only a single quoted HTTP entity tag. In particular,
+// wildcard, list, whitespace, and control values cannot weaken If-Match.
+func concreteETag(etag azcore.ETag) bool {
+	value := string(etag)
+	if len(value) < 3 || value[0] != '"' || value[len(value)-1] != '"' || strings.TrimSpace(value) != value {
+		return false
+	}
+	for _, r := range value[1 : len(value)-1] {
+		if r == '"' || r == '*' || r == ',' || r <= 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *Handle) Release(ctx context.Context) error {
