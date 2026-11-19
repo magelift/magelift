@@ -5,6 +5,7 @@ package floci_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/url"
 	"os"
 	"os/exec"
@@ -145,6 +146,7 @@ func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			checkBootstrapIdentity(t, shim, conf, planned)
 			ops := platform.ModuleOps(shim)
 			stale, err := ops.AcquireLock(ctx, planned)
 			if err != nil {
@@ -170,5 +172,30 @@ func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func checkBootstrapIdentity(t *testing.T, module *providerhost.ShimModule, cfg config.Config, planned platform.PlannedStack) {
+	t.Helper()
+	ctx := t.Context()
+	admitted, err := platform.AdmitPlan(ctx, module, planned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bootstrap := platform.ModuleBootstrap(module)
+	if err := bootstrap.VerifyAccount(ctx, admitted); err != nil {
+		t.Fatalf("verify the Floci account before bootstrap: %v", err)
+	}
+	cfg.Account = "111111111111"
+	target := *cfg.Target.AWS
+	target.KMSKeyARN = strings.Replace(target.KMSKeyARN, "000000000000", cfg.Account, 1)
+	cfg.Target.AWS = &target
+	mismatch, err := module.Plan(cfg, planned.Environment(), platform.PlanOptions{AccountOnly: true, Context: ctx})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var failure *providerhost.PluginError
+	if err := bootstrap.VerifyAccount(ctx, mismatch); !errors.As(err, &failure) || failure.Code != sdk.ErrCodeCredential {
+		t.Fatalf("expected a credential error for the other account, got %v", err)
 	}
 }

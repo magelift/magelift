@@ -17,6 +17,7 @@ import (
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/s3state"
 	"github.com/magelift/magelift/internal/secretsafe"
+	"github.com/magelift/magelift/providers/aws/bootstrap"
 	"github.com/magelift/magelift/providers/aws/edge"
 	"github.com/magelift/magelift/providers/aws/eksops"
 	"github.com/magelift/magelift/providers/aws/ops"
@@ -95,6 +96,8 @@ func operationError(err error) *sdk.OperationError {
 		result.Code = typed.Code
 		result.Retryable = typed.Retryable
 		result.Message, _ = secretsafe.RedactSensitiveText(typed.Message)
+	case errors.Is(err, bootstrap.ErrAccountVerification), errors.Is(err, bootstrap.ErrAccountMismatch):
+		result.Code = sdk.ErrCodeCredential
 	case errors.Is(err, context.DeadlineExceeded):
 		result.Code = sdk.ErrCodeTimeout
 	case errors.Is(err, s3state.ErrLocked), errors.Is(err, s3state.ErrLockReplaced), errors.As(err, &ownership), automation.IsConcurrentUpdate(err):
