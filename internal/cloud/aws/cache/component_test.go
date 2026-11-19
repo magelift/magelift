@@ -126,11 +126,17 @@ func TestPrivateTransportOmitsAuthAndTLS(t *testing.T) {
 
 func TestRejectsCapacityDefaultsAndUnsafeSecrets(t *testing.T) {
 	valid := baseArgs(TopologyStandard, 1)
+	valid.Provider = &awsprovider.Provider{}
+	if err := validateArgs("shop", valid); err != nil {
+		t.Fatalf("invalid test fixture: %v", err)
+	}
 	tests := []struct {
 		name   string
 		mutate func(*Args)
 	}{
 		{name: "missing engine version", mutate: func(args *Args) { args.EngineVersion = "" }},
+		{name: "unresolved cache patch", mutate: func(args *Args) { args.EngineVersion = "8.1.3" }},
+		{name: "unresolved session patch", mutate: func(args *Args) { args.SessionEngineVersion = "8.1.3" }},
 		{name: "missing node type", mutate: func(args *Args) { args.NodeType = "" }},
 		{name: "plaintext token", mutate: func(args *Args) { args.AuthTokens.CacheSecretARN = "plaintext-password" }},
 		{name: "shared tokens", mutate: func(args *Args) { args.AuthTokens.SessionSecretARN = args.AuthTokens.CacheSecretARN }},
@@ -147,6 +153,16 @@ func TestRejectsCapacityDefaultsAndUnsafeSecrets(t *testing.T) {
 				t.Fatal("unsafe Valkey arguments were accepted")
 			}
 		})
+	}
+}
+
+func TestAttachedSessionsDoNotRequireAnElastiCacheVersion(t *testing.T) {
+	args := baseArgs(TopologyStandard, 1)
+	args.Provider = &awsprovider.Provider{}
+	args.ExternalSessionHost = "sessions.example.internal"
+	args.SessionEngineVersion = "8.1.3"
+	if err := validateArgs("shop", args); err != nil {
+		t.Fatal(err)
 	}
 }
 

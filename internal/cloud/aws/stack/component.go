@@ -210,9 +210,10 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 		}
 		component.Cache = &cache.Component{CachePrimaryEndpoint: pulumi.String(host(cacheBinding)).ToStringOutput(), SessionPrimaryEndpoint: pulumi.String(sessions).ToStringOutput()}
 	} else {
+		cacheVersion, sessionVersion := spec.managedValkeyVersions()
 		component.Cache, err = cache.New(ctx, name+"-cache", cache.Args{
-			SeparateSession: split, CacheEvictionPolicy: cacheBinding.EvictionPolicy, SessionEvictionPolicy: session.EvictionPolicy, SessionEngineVersion: session.VersionWithMinor(), ExternalCacheHost: host(cacheBinding), ExternalSessionHost: host(session),
-			Topology: cache.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: spec.Catalog.Versions.Valkey, NodeType: spec.Catalog.Valkey.NodeType, ReplicaCount: spec.Catalog.Valkey.ReplicaCount,
+			SeparateSession: split, CacheEvictionPolicy: cacheBinding.EvictionPolicy, SessionEvictionPolicy: session.EvictionPolicy, SessionEngineVersion: sessionVersion, ExternalCacheHost: host(cacheBinding), ExternalSessionHost: host(session),
+			Topology: cache.Topology(spec.Identity.Preset), Region: spec.Identity.Region, EngineVersion: cacheVersion, NodeType: spec.Catalog.Valkey.NodeType, ReplicaCount: spec.Catalog.Valkey.ReplicaCount,
 			SnapshotRetentionLimit: spec.Catalog.CacheSnapshotRetentionLimit, SnapshotWindow: spec.Catalog.CacheSnapshotWindow, SubnetIDInputs: dataSubnets, SubnetCount: len(dataSubnets), SecurityGroupInput: component.Security.CacheSecurityGroupID, KMSKeyARN: spec.Dependencies.KMSKeyARN,
 			AuthTokens: cache.AuthTokens{CacheSecretARN: spec.Dependencies.CacheSecretARN, SessionSecretARN: spec.Dependencies.SessionSecretARN}, Provider: providers.Regional, Tags: tags,
 		})

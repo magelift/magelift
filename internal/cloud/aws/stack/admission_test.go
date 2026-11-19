@@ -5,7 +5,9 @@ import (
 
 	"github.com/magelift/magelift/internal/cloud/aws/network"
 	"github.com/magelift/magelift/internal/cloud/aws/runtime"
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/sdk"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
 func TestSelectionFromSpecCoversIndependentAWSInstanceShapes(t *testing.T) {
@@ -94,5 +96,39 @@ func TestSelectionKeepsRDSFamilyAndSkipsAmazonMQForECS(t *testing.T) {
 				t.Fatalf("selection = %#v", selection)
 			}
 		})
+	}
+}
+
+func TestAttachedCacheWithManagedSessionsUsesSameVersionInAdmissionAndPulumi(t *testing.T) {
+	spec := validSpec()
+	spec.Dependencies.SessionSecretARN = "arn:aws:secretsmanager:eu-west-3:123456789012:secret:shop-session-token"
+	spec.ExternalServices = map[string]config.ServiceBinding{
+		"cache":   {Family: "valkey", Ownership: "external", Endpoint: "cache.example.internal"},
+		"session": {Family: "valkey", Ownership: "managed", Version: "8.1.3"},
+	}
+	selection := selectionFromSpec(spec)
+	if selection.Valkey != nil || selection.SessionValkey == nil || selection.SessionValkey.Version != "8.1" {
+		t.Fatalf("admission selected cache %v and sessions %v", selection.Valkey, selection.SessionValkey)
+	}
+	mocks := &stackMocks{}
+	err := pulumi.RunErr(func(ctx *pulumi.Context) error {
+		providers, err := NewProviders(ctx, "shop", spec.Identity.Region)
+		if err != nil {
+			return err
+		}
+		_, err = New(ctx, "shop", spec, providers)
+		return err
+	}, pulumi.WithMocks("magelift", "test", mocks))
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := "aws:elasticache/replicationGroup:ReplicationGroup"
+	group := resourceInput(mocks, token, "shop-cache-sessions")
+	if componentCount(mocks, token) != 1 || group == nil || group["engineVersion"].StringValue() != "8.1" {
+		t.Fatalf("expected one managed session group on branch 8.1, got %v", group)
+	}
+	spec.ExternalServices["session"] = config.ServiceBinding{Family: "valkey", Ownership: "external", Endpoint: "session.example.internal"}
+	if selection := selectionFromSpec(spec); selection.Valkey != nil || selection.SessionValkey != nil {
+		t.Fatalf("both stores are external: cache %v, sessions %v", selection.Valkey, selection.SessionValkey)
 	}
 }

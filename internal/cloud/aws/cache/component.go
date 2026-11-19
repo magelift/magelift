@@ -22,7 +22,7 @@ const (
 	TopologyHighAvailability Topology = "high-availability"
 )
 
-var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+(?:\.[0-9]+)?$`)
+var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
 var secretARNPattern = regexp.MustCompile(`^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$`)
 var kmsARNPattern = regexp.MustCompile(`^arn:aws:kms:[a-z0-9-]+:[0-9]{12}:key/[A-Za-z0-9-]+$`)
 var snapshotWindowPattern = regexp.MustCompile(`^(?:[01][0-9]|2[0-3]):[0-5][0-9]-(?:[01][0-9]|2[0-3]):[0-5][0-9]$`)
@@ -179,8 +179,20 @@ func validateArgs(name string, args Args) error {
 	if strings.TrimSpace(name) == "" || args.Provider == nil || strings.TrimSpace(args.Region) == "" {
 		return errors.New("Valkey name, region, and AWS provider are required")
 	}
-	if !versionPattern.MatchString(args.EngineVersion) || strings.TrimSpace(args.NodeType) == "" {
-		return errors.New("Valkey engine version and node type must be provided explicitly")
+	if strings.TrimSpace(args.NodeType) == "" {
+		return errors.New("Valkey node type is required")
+	}
+	if args.ExternalCacheHost == "" && !versionPattern.MatchString(args.EngineVersion) {
+		return errors.New("managed Valkey cache requires a major.minor engine version")
+	}
+	if args.ExternalSessionHost == "" && (args.SeparateSession || args.Topology != TopologyPreview) {
+		version := args.SessionEngineVersion
+		if version == "" {
+			version = args.EngineVersion
+		}
+		if !versionPattern.MatchString(version) {
+			return errors.New("managed Valkey sessions require a major.minor engine version")
+		}
 	}
 	if args.SnapshotRetentionLimit != nil && (*args.SnapshotRetentionLimit < 0 || *args.SnapshotRetentionLimit > 35) {
 		return errors.New("Valkey snapshot retention must be between 0 and 35 days")

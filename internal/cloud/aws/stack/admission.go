@@ -51,17 +51,16 @@ func (a RegionAdmission) Admit(ctx context.Context, planned platform.PlannedStac
 }
 
 func selectionFromSpec(spec Spec) awsprovider.AdmissionSelection {
+	cacheVersion, sessionVersion := spec.managedValkeyVersions()
 	selection := awsprovider.AdmissionSelection{
 		AccountID:         spec.Identity.AccountID,
 		AvailabilityZones: append([]string(nil), spec.Policy.AvailabilityZones...),
-		Valkey: &awsprovider.ValkeySelection{
-			Version:  spec.Catalog.Versions.Valkey,
-			NodeType: spec.Catalog.Valkey.NodeType,
-		},
 	}
-
-	if spec.ExternalServices["cache"].Attached() {
-		selection.Valkey = nil
+	if !spec.ExternalServices["cache"].Attached() {
+		selection.Valkey = &awsprovider.ValkeySelection{Version: cacheVersion, NodeType: spec.Catalog.Valkey.NodeType}
+	}
+	if session, separate := spec.ExternalServices["session"]; separate && !session.Attached() {
+		selection.SessionValkey = &awsprovider.ValkeySelection{Version: sessionVersion, NodeType: spec.Catalog.Valkey.NodeType}
 	}
 	if spec.Existing.Network == nil && spec.Policy.NatMode == NatModeFckNat {
 		instanceType := strings.TrimSpace(spec.Policy.NatInstanceType)

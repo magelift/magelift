@@ -186,6 +186,28 @@ func TestValidateSelectionUsesExplicitRequiredAvailabilityZones(t *testing.T) {
 	}
 }
 
+func TestValidateSelectionChecksDistinctSessionStore(t *testing.T) {
+	client := validFakeCapabilityAPI()
+	selection := validAdmissionSelection()
+	selection.SessionValkey = &ValkeySelection{Version: "8.1", NodeType: selection.Valkey.NodeType}
+	if err := ValidateSelection(context.Background(), client, selection); err == nil || !strings.Contains(err.Error(), "session store") {
+		t.Fatalf("unavailable session version: %v", err)
+	}
+	if client.calls["ValkeyEngineVersion:8.0"] != 1 || client.calls["ValkeyEngineVersion:8.1"] != 1 {
+		t.Fatalf("expected both branches to be checked: %v", client.calls)
+	}
+	client = validFakeCapabilityAPI()
+	selection.SessionValkey.Version = selection.Valkey.Version
+	if err := ValidateSelection(context.Background(), client, selection); err != nil || client.calls["ValkeyEngineVersion:8.0"] != 1 {
+		t.Fatalf("shared branch checked %d times: %v", client.calls["ValkeyEngineVersion:8.0"], err)
+	}
+	client = validFakeCapabilityAPI()
+	selection.Valkey = nil
+	if err := ValidateSelection(context.Background(), client, selection); err != nil || client.calls["ValkeyEngineVersion:8.0"] != 1 {
+		t.Fatalf("standalone managed session store: %v, calls: %v", err, client.calls)
+	}
+}
+
 func TestValidateSelectionRequiresExplicitAvailabilityZonesForEC2(t *testing.T) {
 	client := validFakeCapabilityAPI()
 	selection := validAdmissionSelection()

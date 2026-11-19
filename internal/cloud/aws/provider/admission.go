@@ -18,6 +18,7 @@ type AdmissionSelection struct {
 	AMIs              []string
 	Database          *DatabaseSelection
 	Valkey            *ValkeySelection
+	SessionValkey     *ValkeySelection
 	Search            *SearchSelection
 	MQ                *MQSelection
 	CapacityProviders []string
@@ -163,6 +164,11 @@ func ValidateSelection(ctx context.Context, client CapabilityAPI, selection Admi
 	if selection.Valkey != nil {
 		if err := validateValkey(ctx, client, *selection.Valkey); err != nil {
 			return err
+		}
+	}
+	if session := selection.SessionValkey; session != nil && (selection.Valkey == nil || *session != *selection.Valkey) {
+		if err := validateValkey(ctx, client, *session); err != nil {
+			return fmt.Errorf("session store: %w", err)
 		}
 	}
 	if selection.Search != nil {

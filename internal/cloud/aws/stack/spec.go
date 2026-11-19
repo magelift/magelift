@@ -52,6 +52,15 @@ type Spec struct {
 	Email                  EmailSpec
 }
 
+func (s Spec) managedValkeyVersions() (cache, session string) {
+	cache = (sdk.ServiceBinding{Version: s.Catalog.Versions.Valkey}).ManagedBranch()
+	session = s.ExternalServices["session"].ManagedBranch()
+	if session == "" {
+		session = cache
+	}
+	return cache, session
+}
+
 type EmailSpec struct {
 	Managed      bool
 	Domain       string
