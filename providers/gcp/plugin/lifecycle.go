@@ -234,16 +234,16 @@ func (s *Server) Preview(ctx context.Context, req *sdk.StackCall) (*sdk.Lifecycl
 		return nil, mapError(err)
 	}
 	planned := gcpstack.SpecPlanned{Spec: spec}
-	var diagnostics cappedBuffer
+	var diagnostics automation.Diagnostics
 	changes, err := backend.Preview(ctx, automation.Request{
 		Target:  planned.TargetDescriptor(),
 		Preview: metadata,
 		Destroy: spec.AllowExpiredPreview,
 	}, &diagnostics)
 	if err != nil {
-		return nil, withDiagnostics(mapError(err), diagnostics.lines())
+		return nil, withDiagnostics(mapError(err), diagnostics.Lines())
 	}
-	return &sdk.LifecycleResult{Summary: summarizeChanges(changes), Diagnostics: diagnostics.lines()}, nil
+	return &sdk.LifecycleResult{Summary: summarizeChanges(changes), Diagnostics: diagnostics.Lines()}, nil
 }
 
 // Apply runs the Pulumi update for a stored plan.
@@ -284,7 +284,7 @@ func (s *Server) runStackMutation(ctx context.Context, req *sdk.StackCall, destr
 	}
 	planned := gcpstack.SpecPlanned{Spec: spec}
 	request := automation.Request{Target: planned.TargetDescriptor(), Preview: metadata, Destroy: destroying}
-	var diagnostics cappedBuffer
+	var diagnostics automation.Diagnostics
 	var changes map[string]int
 	if destroying {
 		changes, err = backend.Destroy(ctx, request, &diagnostics)
@@ -296,10 +296,10 @@ func (s *Server) runStackMutation(ctx context.Context, req *sdk.StackCall, destr
 		if !destroying {
 			failure = withSQLCapacityGuidance(failure, spec)
 		}
-		return nil, withDiagnostics(failure, diagnostics.lines())
+		return nil, withDiagnostics(failure, diagnostics.Lines())
 	}
 	summary := summarizeChanges(changes)
-	result := &sdk.LifecycleResult{Summary: summary, Diagnostics: diagnostics.lines()}
+	result := &sdk.LifecycleResult{Summary: summary, Diagnostics: diagnostics.Lines()}
 	return result, nil
 }
 
@@ -451,28 +451,4 @@ func summarizeChanges(changes map[string]int) sdk.ChangeSummary {
 		}
 	}
 	return summary
-}
-
-// cappedBuffer keeps the tail of verbose progress streams so diagnostics
-// stay bounded on the wire.
-type cappedBuffer struct {
-	kept []string
-}
-
-func (b *cappedBuffer) Write(data []byte) (int, error) {
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		b.kept = append(b.kept, line)
-	}
-	const maxLines = 50
-	if len(b.kept) > maxLines {
-		b.kept = append([]string(nil), b.kept[len(b.kept)-maxLines:]...)
-	}
-	return len(data), nil
-}
-
-func (b *cappedBuffer) lines() []string {
-	return append([]string(nil), b.kept...)
 }

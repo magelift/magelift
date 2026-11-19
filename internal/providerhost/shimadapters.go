@@ -320,10 +320,10 @@ func (b *PluginBackend) runLifecycle(ctx context.Context, operation sdk.Operatio
 	if err != nil {
 		return nil, err
 	}
+	writePluginDiagnostics(diagnostics, resp.Diagnostics)
 	if resp.Error != nil {
 		return nil, AsPluginError(operation, resp.Error)
 	}
-	writePluginDiagnostics(diagnostics, resp.Diagnostics)
 	return map[string]int{
 		"create": resp.Summary.Create, "update": resp.Summary.Update,
 		"delete": resp.Summary.Delete, "replace": resp.Summary.Replace,

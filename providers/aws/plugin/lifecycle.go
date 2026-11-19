@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"os"
 	"slices"
 	"strings"
@@ -75,14 +74,16 @@ func (s *Server) mutate(op sdk.Operation, req *sdk.StackCall, resp *sdk.Lifecycl
 			return err
 		}
 		backend := automation.NewPulumiBackend(st)
+		var progress automation.Diagnostics
+		defer func() { resp.Diagnostics = progress.Lines() }()
 		var counts map[string]int
 		switch op {
 		case sdk.OpPreview:
-			counts, err = backend.Preview(ctx, request, io.Discard)
+			counts, err = backend.Preview(ctx, request, &progress)
 		case sdk.OpApply:
-			counts, err = backend.Update(ctx, request, io.Discard)
+			counts, err = backend.Update(ctx, request, &progress)
 		case sdk.OpDestroy:
-			counts, err = backend.Destroy(ctx, request, io.Discard)
+			counts, err = backend.Destroy(ctx, request, &progress)
 		}
 		if err != nil {
 			return err

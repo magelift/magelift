@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/magelift/magelift/internal/automation"
@@ -34,13 +35,15 @@ type deploymentCandidate struct {
 	plan       [32]byte
 	steps      deploy.Steps
 	outputs    *phaseOutputs
+	progress   *automation.Diagnostics
 	migrated   bool
 	stabilized bool
 	finished   bool
 }
 
 func (s *Server) DeployAppPhase(req *sdk.DeployAppPhaseCall, resp *sdk.DeployAppPhaseResult) error {
-	return withPlan(req.ProtocolVersion, &resp.Error, req.Envelope, req.Plan, func(ctx context.Context, m platform.StackModule, p platform.PlannedStack) error {
+	var lines []string
+	err := withPlan(req.ProtocolVersion, &resp.Error, req.Envelope, req.Plan, func(ctx context.Context, m platform.StackModule, p platform.PlannedStack) error {
 		if !req.Phase.Valid() || req.ImageDigest == "" || req.ImageDigest != p.ImageDigest() {
 			return invalid(errors.New("AWS deploy phase or artifact digest does not match the plan"))
 		}
@@ -60,7 +63,9 @@ func (s *Server) DeployAppPhase(req *sdk.DeployAppPhaseCall, resp *sdk.DeployApp
 				return err
 			}
 			backend := &phaseOutputs{values: outputs}
-			steps, err := platform.ModuleOps(m).NewDeploySteps(ctx, backend, p, io.Discard)
+			progress := &automation.Diagnostics{}
+			defer func() { lines = progress.Drain() }()
+			steps, err := platform.ModuleOps(m).NewDeploySteps(ctx, backend, p, progress)
 			if err != nil {
 				return err
 			}
@@ -74,7 +79,7 @@ func (s *Server) DeployAppPhase(req *sdk.DeployAppPhaseCall, resp *sdk.DeployApp
 			if s.candidates == nil {
 				s.candidates = make(map[string]*deploymentCandidate)
 			}
-			s.candidates[token] = &deploymentCandidate{plan: id, steps: steps, outputs: backend}
+			s.candidates[token] = &deploymentCandidate{plan: id, steps: steps, outputs: backend, progress: progress}
 			s.mu.Unlock()
 			return encode(&resp.StateJSON, token)
 		}
@@ -92,6 +97,9 @@ func (s *Server) DeployAppPhase(req *sdk.DeployAppPhaseCall, resp *sdk.DeployApp
 		defer candidate.mu.Unlock()
 		if candidate.finished {
 			return invalid(errors.New("AWS deployment candidate is already closed"))
+		}
+		if candidate.progress != nil {
+			defer func() { lines = candidate.progress.Drain() }()
 		}
 		candidate.outputs.values = outputs
 		switch req.Phase {
@@ -132,4 +140,15 @@ func (s *Server) DeployAppPhase(req *sdk.DeployAppPhaseCall, resp *sdk.DeployApp
 		s.mu.Unlock()
 		return nil
 	})
+	if len(lines) > 0 {
+		if resp.Error != nil {
+			if len(lines) > 5 {
+				lines = lines[len(lines)-5:]
+			}
+			resp.Error.Message += "\n" + strings.Join(lines, "\n")
+		} else {
+			resp.Message = strings.Join(lines, "\n")
+		}
+	}
+	return err
 }
