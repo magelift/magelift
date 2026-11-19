@@ -42,7 +42,7 @@ func providersInstallCommand(o *options) *cobra.Command {
 			remote := providers[:0]
 			for _, provider := range providers {
 				switch provider {
-				case "aws", "ovh", "scaleway":
+				case "ovh", "scaleway":
 				default:
 					remote = append(remote, provider)
 				}

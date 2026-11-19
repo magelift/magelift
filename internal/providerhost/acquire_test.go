@@ -25,9 +25,42 @@ func acquireTestLock(version, digest, url, bundle string) string {
 
 func TestAcquireRejectsUnsupportedProvider(t *testing.T) {
 	t.Parallel()
-	_, err := Acquire(context.Background(), "aws", "v1.0.0", AcquireOptions{})
-	if err == nil || !strings.Contains(err.Error(), "gcp or azure") {
+	_, err := Acquire(context.Background(), "ovh", "v1.0.0", AcquireOptions{})
+	if err == nil || !strings.Contains(err.Error(), "aws, gcp, or azure") {
 		t.Fatalf("err = %v, want unsupported-provider refusal", err)
+	}
+}
+
+func TestAcquireAWSProjectLock(t *testing.T) {
+	project := t.TempDir()
+	t.Chdir(project)
+	cache := t.TempDir()
+	binary := []byte("aws-provider")
+	sum := sha256.Sum256(binary)
+	digest := "sha256:" + hex.EncodeToString(sum[:])
+	version := "v0.0.0-test.3"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/magelift-provider-aws":
+			_, _ = w.Write(binary)
+		case "/magelift-provider-aws.sigstore.json":
+			_, _ = w.Write([]byte("bundle"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	lock := acquireTestLock(version, digest, server.URL+"/magelift-provider-aws", server.URL+"/magelift-provider-aws.sigstore.json")
+	lock = strings.ReplaceAll(lock, `"gcp"`, `"aws"`)
+	lock = strings.ReplaceAll(lock, "magelift-provider-gcp", "magelift-provider-aws")
+	if err := os.WriteFile("magelift.providers.lock", []byte(lock), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Acquire(context.Background(), "aws", "v9.9.9", AcquireOptions{
+		Resolve: ResolveOptions{CacheDir: cache}, HTTP: server.Client(), Verifier: stubVerifier{},
+	})
+	if err != nil || loaded.Provider != "aws" || loaded.Binary == "" {
+		t.Fatalf("AWS acquisition = %#v, %v", loaded, err)
 	}
 }
 

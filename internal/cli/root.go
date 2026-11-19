@@ -98,8 +98,6 @@ type options struct {
 	newLock                 func(context.Context, platform.PlannedStack) (func(context.Context) error, error)
 	loadProvider            func(context.Context, string) (providerhost.Loaded, error)
 	inspectProvider         func(context.Context, string) (providerhost.Loaded, error)
-	dialProvider            func(context.Context, string) (*providerhost.Client, error)
-	providerSessions        []*providerhost.Client
 	runCommand              func(context.Context, string, []string, io.Writer, io.Writer) error
 	runCompose              func(context.Context, string, []string, []string, io.Writer, io.Writer) error
 	dependencyRunner        toolchain.DependencyRunner
@@ -220,7 +218,6 @@ func newCommandWithHooks(stdout, stderr io.Writer, modules *platform.ModuleRegis
 		modules:            modules,
 		newBackend:         nil, // Assigned post-literal to o.defaultNewBackend below.
 		loadProvider:       nil, // Assigned post-literal to o.defaultLoadProvider below.
-		dialProvider:       nil, // Assigned post-literal to o.defaultDialProvider below.
 		listPreviewRecords: automation.ListPreviewRecords,
 		newDeploySteps:     nil,
 		newLock: func(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
@@ -264,7 +261,6 @@ func newCommandWithHooks(stdout, stderr io.Writer, modules *platform.ModuleRegis
 	o.newBackend = o.defaultNewBackend
 	o.loadProvider = o.defaultLoadProvider
 	o.inspectProvider = o.loadInstalledProvider
-	o.dialProvider = o.defaultDialProvider
 	o.newDeploySteps = func(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {
 		module, found := modules.Module(planned.Provider(), planned.Runtime())
 		if !found {

@@ -240,7 +240,6 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
-	defer o.closeProviderSessions()
 	if name != "destroy" {
 		planned, err = bindLiveQueueReplicas(ctx, backend, planned)
 		if err != nil {
@@ -312,7 +311,6 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
-	defer o.closeProviderSessions()
 	planned, err = bindLiveQueueReplicas(ctx, backend, planned)
 	if err != nil {
 		return infrastructureResult{}, invalid(err)
@@ -483,7 +481,6 @@ func outputsCommand(o *options) *cobra.Command {
 		if err != nil {
 			return fmt.Errorf("create infrastructure backend: %w", err)
 		}
-		defer o.closeProviderSessions()
 		var outputs map[string]any
 		// Prefer redacted secrets for user-facing JSON (kubeconfig, DB passwords).
 		// Fail closed: never fall through to decrypted Outputs on redaction error.

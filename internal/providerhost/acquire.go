@@ -28,8 +28,8 @@ type AcquireOptions struct {
 }
 
 // Acquire resolves, downloads when needed, verifies, and loads a first-party
-// provider subprocess. First-party GCP and Azure providers can be acquired automatically; other providers must
-// be installed explicitly. Project locks win, then beside-CLI locks, then the
+// provider subprocess. First-party AWS, GCP, and Azure providers can be
+// acquired automatically. Project locks win, then beside-CLI locks, then the
 // CLI release version's fetched lock (cached under the user cache, never
 // written into the project). There is no latest or dev fallback.
 func Acquire(ctx context.Context, provider, cliVersion string, opts AcquireOptions) (Loaded, error) {
@@ -37,8 +37,8 @@ func Acquire(ctx context.Context, provider, cliVersion string, opts AcquireOptio
 		ctx = context.Background()
 	}
 	id := strings.TrimSpace(provider)
-	if id != "gcp" && id != "azure" {
-		return Loaded{}, fmt.Errorf("lazy provider acquisition supports gcp or azure, got %q", provider)
+	if id != "aws" && id != "gcp" && id != "azure" {
+		return Loaded{}, fmt.Errorf("lazy provider acquisition supports aws, gcp, or azure, got %q", provider)
 	}
 	cacheDir, err := EffectiveCacheDir(opts.Resolve.CacheDir)
 	if err != nil {

@@ -172,6 +172,20 @@ func TestShimPlan(t *testing.T) {
 	}
 }
 
+func TestShimPlanDefaultsMissingTierToNegotiatedTier(t *testing.T) {
+	t.Parallel()
+	plan := cannedStoredPlan()
+	plan.Tier = ""
+	module := shimTestModule(t, &stubCaller{respond: planResponder(plan)})
+	planned, err := module.Plan(shimTestConfig(), "staging", platform.PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if planned.CertificationTier() != platform.TierBuiltIn {
+		t.Fatalf("plan tier = %q, want negotiated built-in tier", planned.CertificationTier())
+	}
+}
+
 func TestShimPreservesBootstrapEnvironmentAndUnlistedServiceVersion(t *testing.T) {
 	caller := &stubCaller{respond: planResponder(cannedStoredPlan())}
 	module := shimTestModule(t, caller)
@@ -353,6 +367,7 @@ func TestShimDeployStepsDrivePluginPhases(t *testing.T) {
 		t.Fatal(err)
 	}
 	stored := cannedStoredPlan()
+	stored.Provider = "aws"
 	stored.DeployInputsJSON = deployInputs
 	var phases []string
 	caller := &stubCaller{respond: func(method string, reply any) error {
@@ -362,7 +377,11 @@ func TestShimDeployStepsDrivePluginPhases(t *testing.T) {
 			return nil
 		case "Plugin.DeployAppPhase":
 			phases = append(phases, "phase")
-			*(reply.(*sdk.DeployAppPhaseResult)) = sdk.DeployAppPhaseResult{StateJSON: []byte(`{"candidate":true}`), Message: "ok"}
+			state := `{"candidate":true}`
+			if len(phases) >= 2 {
+				state = `{"migrated":true}`
+			}
+			*(reply.(*sdk.DeployAppPhaseResult)) = sdk.DeployAppPhaseResult{StateJSON: []byte(state), Message: "ok"}
 			return nil
 		default:
 			return errors.New("unexpected method " + method)
@@ -394,6 +413,30 @@ func TestShimDeployStepsDrivePluginPhases(t *testing.T) {
 	if len(phases) != 4 {
 		t.Fatalf("phase calls = %d, want 4", len(phases))
 	}
+	var phaseCalls []sdk.DeployAppPhaseCall
+	for _, arg := range caller.args {
+		if call, ok := arg.(*sdk.DeployAppPhaseCall); ok {
+			phaseCalls = append(phaseCalls, *call)
+		}
+	}
+	if len(phaseCalls) != 4 {
+		t.Fatalf("phase requests = %d, want 4", len(phaseCalls))
+	}
+	for i, phase := range []sdk.DeployAppPhase{sdk.DeployPhaseRegister, sdk.DeployPhaseMigrate, sdk.DeployPhaseStabilize, sdk.DeployPhaseHealth} {
+		if phaseCalls[i].Phase != phase {
+			t.Errorf("phase request %d = %q, want %q", i, phaseCalls[i].Phase, phase)
+		}
+		wantState := `{"candidate":true}`
+		if i > 1 {
+			wantState = `{"migrated":true}`
+		}
+		if i > 0 && string(phaseCalls[i].StateJSON) != wantState {
+			t.Errorf("phase %q candidate state = %s", phase, phaseCalls[i].StateJSON)
+		}
+	}
+	if len(steps.(*shimDeploySteps).state) != 0 {
+		t.Fatal("candidate state retained after successful health check")
+	}
 	// Stored inputs pass through undecoded: corrupt bytes still build
 	// steps (the plugin validates at execution).
 	stored.DeployInputsJSON = []byte(`{invalid`)
@@ -407,6 +450,63 @@ func TestShimDeployStepsDrivePluginPhases(t *testing.T) {
 	}
 	if _, err := module.Ops().NewDeploySteps(context.Background(), backend, replanned, io.Discard); err != nil {
 		t.Fatalf("opaque inputs refused: %v", err)
+	}
+}
+
+func TestShimDeployStepsClearStateWhenMigrationReturnsNoContinuation(t *testing.T) {
+	t.Parallel()
+	stored := cannedStoredPlan()
+	var phaseIndex int
+	caller := &stubCaller{respond: func(method string, reply any) error {
+		switch method {
+		case "Plugin.Plan":
+			*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: stored}
+		case "Plugin.DeployAppPhase":
+			phaseIndex++
+			state := []byte(nil)
+			if phaseIndex == 1 {
+				state = []byte(`{"candidate":true}`)
+			}
+			*(reply.(*sdk.DeployAppPhaseResult)) = sdk.DeployAppPhaseResult{StateJSON: state}
+		default:
+			return errors.New("unexpected method " + method)
+		}
+		return nil
+	}}
+	module := shimTestModule(t, caller)
+	planned, err := module.Plan(shimTestConfig(), "staging", platform.PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &stubKubeBackend{outputs: map[string]any{"clusterName": "c"}}
+	steps, err := module.Ops().NewDeploySteps(context.Background(), backend, planned, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := deployRequestForTest(stored.ImageDigest)
+	if err := steps.RegisterCandidate(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if err := steps.RunMigrations(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if err := steps.Stabilize(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if err := steps.Health(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	var phases []sdk.DeployAppPhaseCall
+	for _, arg := range caller.args {
+		if call, ok := arg.(*sdk.DeployAppPhaseCall); ok {
+			phases = append(phases, *call)
+		}
+	}
+	if len(phases) != 4 || string(phases[0].StateJSON) != "" || string(phases[1].StateJSON) != `{"candidate":true}` || len(phases[2].StateJSON) != 0 || len(phases[3].StateJSON) != 0 {
+		t.Fatalf("phase state sequence = %#v", phases)
+	}
+	if len(steps.(*shimDeploySteps).state) != 0 {
+		t.Fatal("candidate state retained after successful health check")
 	}
 }
 

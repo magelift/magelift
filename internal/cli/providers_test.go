@@ -427,7 +427,7 @@ func TestDefaultLoadProviderAcquiresPinnedGCPFromOfflineCache(t *testing.T) {
 
 func TestProvidersInstallBuiltinOnlyHasNoSideEffects(t *testing.T) {
 	for _, provider := range []struct{ name, runtime, settings string }{
-		{"aws", "ecs-fargate", "aws: {}"}, {"ovh", "mks", "ovh:\n    serviceName: example-service"}, {"scaleway", "kapsule", "scaleway:\n    projectId: example-project"},
+		{"ovh", "mks", "ovh:\n    serviceName: example-service"}, {"scaleway", "kapsule", "scaleway:\n    projectId: example-project"},
 	} {
 		t.Run(provider.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -513,7 +513,7 @@ func TestProvidersBootstrapRejectsMismatchedReleaseBeforeSideEffects(t *testing.
 	}
 }
 
-func TestProvidersInstallMixedBuiltinAndPlugin(t *testing.T) {
+func TestProvidersInstallRequiresAWSLockEntry(t *testing.T) {
 	dir := t.TempDir()
 	text := strings.Replace(providersTestConfig, "  staging:\n    account:", "  aws-preview:\n    target:\n      provider: aws\n      runtime: ecs-fargate\n      aws: {}\n      gcp: null\n  staging:\n    account:", 1)
 	configPath := filepath.Join(dir, "magelift.php")
@@ -537,10 +537,7 @@ func TestProvidersInstallMixedBuiltinAndPlugin(t *testing.T) {
 	o.providerVerifier = providersStubVerifier{}
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install", "--lockfile", lockPath})
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out.String(), `"provider": "gcp"`) || strings.Contains(out.String(), `"provider": "aws"`) {
-		t.Fatalf("output: %s", out.String())
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "provider is not in magelift.providers.lock: aws") {
+		t.Fatalf("install error = %v, want missing AWS lock entry", err)
 	}
 }

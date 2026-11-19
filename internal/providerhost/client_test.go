@@ -197,7 +197,7 @@ func TestDialNegotiatesLivePlugin(t *testing.T) {
 	binary := v2ProviderBinary(t)
 	var logs bytes.Buffer
 	logger := hclog.New(&hclog.LoggerOptions{Level: hclog.Info, Output: &logs})
-	client, err := Dial(context.Background(), binary, DialOptions{Logger: logger})
+	client, err := Dial(context.Background(), binary, DialOptions{Logger: logger, ExpectedProvider: "gcp"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,6 +223,14 @@ func TestDialNegotiatesLivePlugin(t *testing.T) {
 	}
 	if !resp.Valid {
 		t.Fatalf("problems = %#v", resp.Problems)
+	}
+}
+
+func TestDialRejectsUnexpectedProviderID(t *testing.T) {
+	binary := v2ProviderBinary(t)
+	_, err := Dial(context.Background(), binary, DialOptions{ExpectedProvider: "azure"})
+	if err == nil || !strings.Contains(err.Error(), `advertised provider "gcp", expected "azure"`) {
+		t.Fatalf("unexpected provider error = %v", err)
 	}
 }
 

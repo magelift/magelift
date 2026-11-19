@@ -146,13 +146,18 @@ func TestRouting_ValidFixturesPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	module, _, err := modules.Plan(cfg, "preview", platform.PlanOptions{})
-	if err != nil {
-		t.Fatalf("plan aws-preview: %v", err)
+	t.Cleanup(modules.Close)
+	module, found := modules.Module("aws", sdk.RuntimeID(cfg.Target.Runtime))
+	if !found {
+		t.Fatalf("AWS runtime %q is not registered", cfg.Target.Runtime)
+	}
+	if _, ok := module.(*providerhost.ShimModule); !ok {
+		t.Fatalf("AWS module = %T, want *providerhost.ShimModule", module)
 	}
 	if got := string(module.Descriptor().Provider); got != cfg.Target.Provider {
 		t.Errorf("plan aws-preview dispatched to provider %q, want %q", got, cfg.Target.Provider)
 	}
+	// Planning dials the provider; this offline suite covers dispatch only.
 }
 
 func TestRouting_GCPDispatchesToPluginShim(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	internalcli "github.com/magelift/magelift/internal/cli"
+	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/registry"
 	"github.com/magelift/magelift/sdk"
 	"github.com/spf13/cobra"
@@ -36,7 +37,7 @@ func Execute(command *cobra.Command) error {
 // NewWithExtensions returns a command with first-party modules plus the
 // explicitly linked community modules. It never loads extensions from disk.
 func NewWithExtensions(extensions ...sdk.Module) (*cobra.Command, error) {
-	return NewWithExtensionsAndHooks(registry.RegisterHooks(), extensions...)
+	return newWithDefaultComponents(nil, extensions)
 }
 
 // NewWithExtensionsAndHooks returns a command with first-party modules plus the
@@ -49,7 +50,7 @@ func NewWithExtensionsAndHooks(hooks internalcli.Hooks, extensions ...sdk.Module
 // NewWithServiceAdapters builds a CLI with explicitly linked per-service
 // connection adapters and optional additional target modules.
 func NewWithServiceAdapters(adapters []sdk.ServiceAdapter, extensions ...sdk.Module) (*cobra.Command, error) {
-	return newWithComponents(registry.RegisterHooks(), adapters, extensions)
+	return newWithDefaultComponents(adapters, extensions)
 }
 
 func newWithComponents(hooks internalcli.Hooks, adapters []sdk.ServiceAdapter, extensions []sdk.Module) (*cobra.Command, error) {
@@ -61,6 +62,26 @@ func newWithComponents(hooks internalcli.Hooks, adapters []sdk.ServiceAdapter, e
 	if err != nil {
 		return nil, fmt.Errorf("register first-party modules: %w", err)
 	}
+	return finishComponents(modules, hooks, adapters, extensions)
+}
+
+func newWithDefaultComponents(adapters []sdk.ServiceAdapter, extensions []sdk.Module) (*cobra.Command, error) {
+	experimental := strings.TrimSpace(os.Getenv(ExperimentalProvidersEnv)) != ""
+	var modules *platform.ModuleRegistry
+	var hooks internalcli.Hooks
+	var err error
+	if experimental {
+		modules, hooks, err = registry.NewDefaultExperimentalSet()
+	} else {
+		modules, hooks, err = registry.NewDefaultSet()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("register first-party modules: %w", err)
+	}
+	return finishComponents(modules, hooks, adapters, extensions)
+}
+
+func finishComponents(modules *platform.ModuleRegistry, hooks internalcli.Hooks, adapters []sdk.ServiceAdapter, extensions []sdk.Module) (*cobra.Command, error) {
 	for _, extension := range extensions {
 		if err := modules.RegisterPublicModule(extension); err != nil {
 			return nil, err

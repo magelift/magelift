@@ -106,9 +106,11 @@ func TestDefaultNewBackendUsesPluginForGCP(t *testing.T) {
 	}}
 	client := providerhost.NewTestClient(caller, testDescribe())
 	o := &options{
-		modules:      platform.NewModuleRegistry(),
-		loadProvider: func(context.Context, string) (providerhost.Loaded, error) { return testLoaded(), nil },
-		dialProvider: func(context.Context, string) (*providerhost.Client, error) { return client, nil },
+		modules: platform.NewModuleRegistry(),
+		loadProvider: func(context.Context, string) (providerhost.Loaded, error) {
+			t.Fatal("planned provider must not be acquired a second time")
+			return providerhost.Loaded{}, nil
+		},
 	}
 	backend, err := o.defaultNewBackend(context.Background(), testShimPlan(t, client), "file:///state")
 	if err != nil {
@@ -126,28 +128,35 @@ func TestDefaultNewBackendUsesPluginForGCP(t *testing.T) {
 	}
 }
 
-func TestDefaultNewBackendFailsClosedWhenProviderMissing(t *testing.T) {
+func TestDefaultNewBackendReusesPlannedProviderSession(t *testing.T) {
 	var stderr bytes.Buffer
 	o := &options{
 		stderr:  &stderr,
 		modules: platform.NewModuleRegistry(),
 		loadProvider: func(context.Context, string) (providerhost.Loaded, error) {
-			return providerhost.Loaded{}, errors.New("no lockfile")
-		},
-		dialProvider: func(context.Context, string) (*providerhost.Client, error) {
-			t.Fatal("dial must not run when loading fails")
-			return nil, nil
+			t.Fatal("planned provider must not be loaded a second time")
+			return providerhost.Loaded{}, nil
 		},
 	}
 	planClient := providerhost.NewTestClient(&scriptedCaller{respond: func(method string, reply any) error {
-		*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: sdk.StoredPlan{
-			StackName: "shop-staging", Provider: "gcp", Runtime: "gke-autopilot", Opaque: []byte(`{}`),
-		}}
+		switch method {
+		case "Plugin.Plan":
+			*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: sdk.StoredPlan{
+				StackName: "shop-staging", Provider: "gcp", Runtime: "gke-autopilot", Opaque: []byte(`{}`),
+			}}
+		case "Plugin.Preview":
+			*(reply.(*sdk.LifecycleResult)) = sdk.LifecycleResult{Summary: sdk.ChangeSummary{Create: 1}}
+		default:
+			return errors.New("unexpected method " + method)
+		}
 		return nil
 	}}, testDescribe())
-	_, err := o.defaultNewBackend(context.Background(), testShimPlan(t, planClient), "file:///state")
-	if err == nil || !strings.Contains(err.Error(), "no lockfile") {
-		t.Fatalf("err = %v, want load failure (no fallback)", err)
+	backend, err := o.defaultNewBackend(context.Background(), testShimPlan(t, planClient), "file:///state")
+	if err != nil {
+		t.Fatalf("defaultNewBackend: %v", err)
+	}
+	if _, err := backend.Preview(context.Background(), automation.Request{Target: sdk.TargetDescriptor{Provider: "gcp", Runtime: "gke-autopilot"}}, io.Discard); err != nil {
+		t.Fatalf("Preview on planned session: %v", err)
 	}
 	if strings.Contains(stderr.String(), "using in-process backend") {
 		t.Fatalf("stderr = %q, want no fallback notice", stderr.String())
@@ -162,10 +171,6 @@ func TestDefaultNewBackendSkipsPluginForOtherCells(t *testing.T) {
 		loadProvider: func(context.Context, string) (providerhost.Loaded, error) {
 			t.Fatal("loader must not run for non-GCP cells")
 			return providerhost.Loaded{}, nil
-		},
-		dialProvider: func(context.Context, string) (*providerhost.Client, error) {
-			t.Fatal("dial must not run for non-GCP cells")
-			return nil, nil
 		},
 	}
 	other := stubPlanned{stackName: "shop-prod", provider: "aws", runtime: "eks", tier: platform.TierBuiltIn}

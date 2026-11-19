@@ -121,6 +121,8 @@ func (c *Client) ensure(ctx context.Context) (*Client, error) {
 type DialOptions struct {
 	// Logger receives the selection line plus plugin stderr. Nil silences.
 	Logger hclog.Logger
+	// ExpectedProvider requires the plugin to advertise this provider ID.
+	ExpectedProvider sdk.ProviderID
 	// Required lists the operations negotiation must find. Nil requires all
 	// known operations: a partial plugin fails closed.
 	Required []sdk.Operation
@@ -183,6 +185,10 @@ func Dial(ctx context.Context, binaryPath string, opts DialOptions) (*Client, er
 	if err := sdk.ValidateProtocolVersion(described.ProtocolVersion); err != nil {
 		process.Kill()
 		return nil, fmt.Errorf("negotiate provider protocol: %w", err)
+	}
+	if opts.ExpectedProvider != "" && described.ProviderID != string(opts.ExpectedProvider) {
+		process.Kill()
+		return nil, fmt.Errorf("negotiate provider protocol: plugin advertised provider %q, expected %q", described.ProviderID, opts.ExpectedProvider)
 	}
 	required := opts.Required
 	if required == nil {

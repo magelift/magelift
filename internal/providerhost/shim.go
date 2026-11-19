@@ -25,9 +25,11 @@ import (
 // The provider validates the request when it builds the plan.
 type ShimModule struct {
 	platform.LifecycleFactories
-	provider sdk.ProviderID
-	runtime  sdk.RuntimeID
-	client   *Client
+	provider   sdk.ProviderID
+	runtime    sdk.RuntimeID
+	tier       platform.CertificationTier
+	outputKeys []string
+	client     *Client
 }
 
 var (
@@ -44,10 +46,7 @@ var (
 // processes and needs no credentials; the first fallible use dials once
 // via the shared lazy client.
 func NewLazyShimModule(runtime sdk.RuntimeID, dial DialFunc) (*ShimModule, error) {
-	if dial == nil {
-		return nil, errors.New("provider dialer is required")
-	}
-	return NewShimModule(runtime, NewLazyClient(dial))
+	return NewLazyProviderShimModule("gcp", runtime, platformTierForRuntime(runtime), gcpOutputKeys(), dial)
 }
 
 // NewShimModule binds a client to one runtime. Tier and output keys are
@@ -58,15 +57,50 @@ func NewShimModule(runtime sdk.RuntimeID, client *Client) (*ShimModule, error) {
 	if runtime != "gke-autopilot" && runtime != "gke-standard" {
 		return nil, fmt.Errorf("GCP provider shim cannot serve runtime %q", runtime)
 	}
+	return newShimModule("gcp", runtime, platformTierForRuntime(runtime), gcpOutputKeys(), client)
+}
+
+// NewLazyProviderShimModule binds one provider runtime to a verified plugin.
+func NewLazyProviderShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform.CertificationTier, outputKeys []string, dial DialFunc) (*ShimModule, error) {
+	if dial == nil {
+		return nil, errors.New("provider dialer is required")
+	}
+	if provider == "" || runtime == "" {
+		return nil, errors.New("provider and runtime are required")
+	}
+	return newShimModule(provider, runtime, tier, outputKeys, NewLazyClient(dial))
+}
+
+func newShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform.CertificationTier, outputKeys []string, client *Client) (*ShimModule, error) {
 	if client == nil {
 		return nil, errors.New("provider client is required")
 	}
-	module := &ShimModule{provider: "gcp", runtime: runtime, client: client}
-	module.Edge = func(ctx context.Context, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
-		return NewShimEdgeAdapter(ctx, client, planned)
+	if len(outputKeys) == 0 {
+		outputKeys = platform.RequiredOutputKeys()
 	}
-	module.Resilience = func(ctx context.Context, planned platform.PlannedStack) (sdk.ResilienceAdapter, error) {
-		return NewShimResilienceAdapter(ctx, client, planned)
+	module := &ShimModule{
+		provider:   provider,
+		runtime:    runtime,
+		tier:       tier,
+		outputKeys: append([]string(nil), outputKeys...),
+		client:     client,
+	}
+	if provider == "gcp" {
+		module.Edge = func(ctx context.Context, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
+			return NewShimEdgeAdapter(ctx, client, planned)
+		}
+		module.Resilience = func(ctx context.Context, planned platform.PlannedStack) (sdk.ResilienceAdapter, error) {
+			return NewShimResilienceAdapter(ctx, client, planned)
+		}
+	}
+	if provider == "aws" {
+		module.Admission = func(_ context.Context, planned platform.PlannedStack) (platform.PlanAdmission, error) {
+			shim, ok := AsShimPlanned(planned)
+			if !ok || shim.module != module {
+				return nil, errors.New("AWS admission requires a plan from this provider shim")
+			}
+			return shimPlanAdmission{module: module}, nil
+		}
 	}
 	return module, nil
 }
@@ -74,10 +108,22 @@ func NewShimModule(runtime sdk.RuntimeID, client *Client) (*ShimModule, error) {
 // NewLazyAzureShimModule binds the AKS runtime to an independently negotiated
 // Azure provider. The session is opened only when a command needs the provider.
 func NewLazyAzureShimModule(dial DialFunc) (*ShimModule, error) {
-	if dial == nil {
-		return nil, errors.New("provider dialer is required")
+	return NewLazyProviderShimModule("azure", "aks", platform.TierExperimental, azureOutputKeys(), dial)
+}
+
+func platformTierForRuntime(runtime sdk.RuntimeID) platform.CertificationTier {
+	if runtime == "gke-autopilot" {
+		return platform.TierBuiltIn
 	}
-	return &ShimModule{provider: "azure", runtime: "aks", client: NewLazyClient(dial)}, nil
+	return platform.TierExperimental
+}
+
+func gcpOutputKeys() []string {
+	return append(append([]string(nil), platform.RequiredOutputKeys()...), "mediaURL", "mediaBucket", platform.OutputSearchEndpoint, platform.OutputQueueHost, platform.OutputQueueReplicas, platform.OutputDatabaseConnectionName, "queueMode", platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, "securityPolicyName")
+}
+
+func azureOutputKeys() []string {
+	return append(append([]string(nil), platform.RequiredOutputKeys()...), "clusterID", "databaseHost", "mediaAccount", "mediaShare", "vaultURI", "logAnalyticsWorkspaceId", "kubeconfig", "namespace", "imagePullSecret", "mediaClaim", "databaseTLSCA", platform.OutputSearchEndpoint, "queueMode", platform.OutputDatabaseSecretName, platform.OutputEncryptionKeySecretName)
 }
 
 func (m *ShimModule) Descriptor() sdk.TargetDescriptor {
@@ -93,10 +139,10 @@ func (m *ShimModule) Descriptor() sdk.TargetDescriptor {
 }
 
 func (m *ShimModule) CertificationTier() platform.CertificationTier {
-	if m != nil && m.runtime == "gke-autopilot" {
-		return platform.TierBuiltIn
+	if m != nil && m.tier != "" {
+		return m.tier
 	}
-	return platform.TierExperimental
+	return platformTierForRuntime(m.runtime)
 }
 
 func platformTier(tier sdk.ExtensionCertificationTier) platform.CertificationTier {
@@ -110,20 +156,22 @@ func platformTier(tier sdk.ExtensionCertificationTier) platform.CertificationTie
 // WithLiveQueueReplicas mutate a copy and re-plan: plans are immutable
 // values, never post-hoc mutations.
 type retainedInputs struct {
-	stateEnvironment    string
-	envelope            sdk.Envelope
-	application         sdk.Application
-	targetBlock         []byte
-	services            map[string]sdk.ServiceBinding
-	edge                sdk.EdgeIntent
-	observability       sdk.ObservabilityIntent
-	runtime             string
-	liveQueueReplicas   int
-	valkeyRequirement   string
-	allowUnsupported    bool
-	allowExpiredPreview bool
-	accountOnly         bool
-	runtimeObserve      bool
+	stateEnvironment       string
+	envelope               sdk.Envelope
+	application            sdk.Application
+	targetBlock            []byte
+	services               map[string]sdk.ServiceBinding
+	edge                   sdk.EdgeIntent
+	observability          sdk.ObservabilityIntent
+	runtime                string
+	liveQueueReplicas      int
+	valkeyRequirement      string
+	allowUnsupported       bool
+	allowExpiredPreview    bool
+	accountOnly            bool
+	runtimeObserve         bool
+	useProviderDefaultEdge bool
+	admitted               bool
 }
 
 func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {
@@ -138,6 +186,11 @@ func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.P
 	}
 	var target any
 	switch m.provider {
+	case "aws":
+		if cfg.Target.AWS == nil {
+			return nil, errors.New("target.aws is required for AWS deployment")
+		}
+		target = cfg.Target.AWS
 	case "azure":
 		if cfg.Target.Azure == nil {
 			return nil, errors.New("target.azure is required for Azure deployment")
@@ -160,6 +213,10 @@ func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.P
 		application: buildApplication(cfg), targetBlock: block, services: maps.Clone(cfg.Services),
 		runtime: string(m.runtime), allowUnsupported: true, allowExpiredPreview: opts.AllowExpiredPreview,
 		accountOnly: opts.AccountOnly, runtimeObserve: opts.RuntimeObserve,
+		useProviderDefaultEdge: cfg.Edge.Mode == "" && cfg.Edge.NativeProvider == "" && cfg.Edge.ExternalProvider == "",
+	}
+	if m.provider == "aws" {
+		inputs.allowUnsupported = cfg.Compatibility.AllowUnsupported
 	}
 	if opts.AccountOnly || opts.AllowExpiredPreview {
 		return m.replan(planContext(opts), inputs)
@@ -201,21 +258,23 @@ func planContext(opts platform.PlanOptions) context.Context {
 
 func (m *ShimModule) replan(ctx context.Context, inputs retainedInputs) (*ShimPlanned, error) {
 	resp, err := Call[sdk.PlanRequest, sdk.PlanResult](ctx, m.client, sdk.OpPlan, &sdk.PlanRequest{
-		StateEnvironment:    inputs.stateEnvironment,
-		ProtocolVersion:     sdk.ProtocolV1,
-		Envelope:            inputs.envelope,
-		Application:         inputs.application,
-		Edge:                inputs.edge,
-		Observability:       inputs.observability,
-		TargetBlock:         inputs.targetBlock,
-		Services:            inputs.services,
-		Runtime:             inputs.runtime,
-		LiveQueueReplicas:   inputs.liveQueueReplicas,
-		ValkeyRequirement:   inputs.valkeyRequirement,
-		AllowUnsupported:    inputs.allowUnsupported,
-		AllowExpiredPreview: inputs.allowExpiredPreview,
-		AccountOnly:         inputs.accountOnly,
-		RuntimeObserve:      inputs.runtimeObserve,
+		Admit:                  inputs.admitted,
+		UseProviderDefaultEdge: inputs.useProviderDefaultEdge,
+		StateEnvironment:       inputs.stateEnvironment,
+		ProtocolVersion:        sdk.ProtocolV1,
+		Envelope:               inputs.envelope,
+		Application:            inputs.application,
+		Edge:                   inputs.edge,
+		Observability:          inputs.observability,
+		TargetBlock:            inputs.targetBlock,
+		Services:               inputs.services,
+		Runtime:                inputs.runtime,
+		LiveQueueReplicas:      inputs.liveQueueReplicas,
+		ValkeyRequirement:      inputs.valkeyRequirement,
+		AllowUnsupported:       inputs.allowUnsupported,
+		AllowExpiredPreview:    inputs.allowExpiredPreview,
+		AccountOnly:            inputs.accountOnly,
+		RuntimeObserve:         inputs.runtimeObserve,
 	})
 	if err != nil {
 		return nil, err
@@ -223,7 +282,20 @@ func (m *ShimModule) replan(ctx context.Context, inputs retainedInputs) (*ShimPl
 	if resp.Error != nil {
 		return nil, AsPluginError(sdk.OpPlan, resp.Error)
 	}
-	return &ShimPlanned{module: m, stored: resp.Plan, inputs: inputs}, nil
+	if resp.Plan.Tier == "" {
+		if m.tier == platform.TierBuiltIn {
+			resp.Plan.Tier = sdk.ExtensionTierBuiltIn
+		} else {
+			resp.Plan.Tier = sdk.ExtensionTierExperimental
+		}
+	} else if resp.Plan.Tier != sdk.ExtensionTierBuiltIn && resp.Plan.Tier != sdk.ExtensionTierExperimental {
+		return nil, fmt.Errorf("provider returned invalid plan tier %q", resp.Plan.Tier)
+	}
+	var outputKeys []string
+	if described := m.client.Describe(); described != nil {
+		outputKeys = append(outputKeys, described.OutputKeys...)
+	}
+	return &ShimPlanned{module: m, stored: resp.Plan, inputs: inputs, outputKeys: outputKeys}, nil
 }
 
 func buildEnvelope(cfg config.Config, environment string) sdk.Envelope {
@@ -236,6 +308,7 @@ func buildEnvelope(cfg config.Config, environment string) sdk.Envelope {
 		preset = cfg.Preset
 	}
 	return sdk.Envelope{
+		Account:            cfg.Account,
 		Project:            cfg.Project.Name,
 		Environment:        environment,
 		Region:             region,
@@ -253,18 +326,25 @@ func buildEnvelope(cfg config.Config, environment string) sdk.Envelope {
 func buildApplication(cfg config.Config) sdk.Application {
 	magento := cfg.Application.Magento
 	email := cfg.Email
+	var managedDomain, managedHostedZoneID string
+	if email.Managed != nil {
+		managedDomain = email.Managed.Domain
+		managedHostedZoneID = email.Managed.HostedZoneID
+	}
 	return sdk.Application{
 		Edition:    cfg.Application.Edition,
 		Version:    cfg.Application.Version,
 		Mode:       cfg.Application.Mode,
 		WebRuntime: cfg.Application.WebRuntime,
 		Email: sdk.EmailSettings{
-			Mode:       email.Mode,
-			Host:       email.Host,
-			Port:       email.Port,
-			Username:   email.Username,
-			From:       email.From,
-			Credential: email.Credential,
+			ManagedDomain:       managedDomain,
+			ManagedHostedZoneID: managedHostedZoneID,
+			Mode:                email.Mode,
+			Host:                email.Host,
+			Port:                email.Port,
+			Username:            email.Username,
+			From:                email.From,
+			Credential:          email.Credential,
 		},
 		Magento: sdk.MagentoSettings{
 			FrontName:        magento.FrontName,
@@ -299,11 +379,10 @@ func (m *ShimModule) Program(platform.PlannedStack) (pulumi.RunFunc, error) {
 }
 
 func (m *ShimModule) OutputKeys() []string {
-	keys := append([]string(nil), platform.RequiredOutputKeys()...)
-	if m != nil && m.provider == "azure" {
-		return append(keys, "clusterID", "databaseHost", "mediaAccount", "mediaShare", "vaultURI", "logAnalyticsWorkspaceId", "kubeconfig", "namespace", "imagePullSecret", "mediaClaim", "databaseTLSCA", platform.OutputSearchEndpoint, "queueMode", platform.OutputDatabaseSecretName, platform.OutputEncryptionKeySecretName)
+	if m != nil && len(m.outputKeys) > 0 {
+		return append([]string(nil), m.outputKeys...)
 	}
-	return append(keys, "mediaURL", "mediaBucket", platform.OutputSearchEndpoint, platform.OutputQueueHost, platform.OutputQueueReplicas, platform.OutputDatabaseConnectionName, "queueMode", platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, "securityPolicyName")
+	return platform.RequiredOutputKeys()
 }
 
 func (m *ShimModule) Ops() platform.Ops {
@@ -358,9 +437,10 @@ func (m *ShimModule) RuntimeTunnel() platform.RuntimeTunnel {
 // ShimPlanned is a plugin-backed planned stack. The stored plan is opaque;
 // plan identity fields come from the retained envelope.
 type ShimPlanned struct {
-	module *ShimModule
-	stored sdk.StoredPlan
-	inputs retainedInputs
+	module     *ShimModule
+	stored     sdk.StoredPlan
+	inputs     retainedInputs
+	outputKeys []string
 }
 
 var (
@@ -372,6 +452,26 @@ var (
 func AsShimPlanned(planned platform.PlannedStack) (*ShimPlanned, bool) {
 	value, ok := planned.(*ShimPlanned)
 	return value, ok
+}
+
+// OutputKeys returns the keys advertised by the connected provider.
+func (p *ShimPlanned) OutputKeys() []string {
+	if p == nil {
+		return nil
+	}
+	return append([]string(nil), p.outputKeys...)
+}
+
+type shimPlanAdmission struct{ module *ShimModule }
+
+func (a shimPlanAdmission) Admit(ctx context.Context, planned platform.PlannedStack) (platform.PlannedStack, error) {
+	shim, ok := AsShimPlanned(planned)
+	if !ok || shim.module != a.module {
+		return nil, errors.New("AWS admission requires a plan from this provider shim")
+	}
+	inputs := shim.inputs
+	inputs.admitted = true
+	return a.module.replan(ctx, inputs)
 }
 
 // EnvelopePlan exposes plan identity for plan-scoped plugin calls without
@@ -593,7 +693,10 @@ func (s *shimDeploySteps) RunMigrations(ctx context.Context, request deployflow.
 	if err != nil {
 		return err
 	}
-	s.state = nil
+	// Providers that need candidate verification may return an updated opaque
+	// handle for stabilization and health. Empty state means their migration
+	// phase completed the candidate lifecycle.
+	s.state = append(s.state[:0], resp.StateJSON...)
 	s.report(resp.Message)
 	return nil
 }
@@ -629,6 +732,7 @@ func (s *shimDeploySteps) Health(ctx context.Context, request deployflow.Request
 	if err != nil {
 		return err
 	}
+	s.state = nil
 	s.report(resp.Message)
 	return nil
 }
@@ -651,7 +755,7 @@ func (s *shimDeploySteps) phase(ctx context.Context, phase sdk.DeployAppPhase, r
 	}
 	resp, err := Call[sdk.DeployAppPhaseCall, sdk.DeployAppPhaseResult](ctx, s.client, sdk.OpDeployAppPhase, &sdk.DeployAppPhaseCall{
 		ProtocolVersion: sdk.ProtocolV1, Envelope: s.envelope, Plan: s.stored,
-		Phase: phase, ImageDigest: request.ImageDigest, OutputsJSON: encoded, StateJSON: s.state,
+		Phase: phase, ImageDigest: request.ImageDigest, OutputsJSON: encoded, StateJSON: append([]byte(nil), s.state...),
 	})
 	if err != nil {
 		return nil, err

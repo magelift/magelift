@@ -10,7 +10,6 @@ import (
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/sdk"
-	"gopkg.in/yaml.v3"
 )
 
 func shimPlanOf(planned platform.PlannedStack) (*ShimPlanned, error) {
@@ -126,18 +125,22 @@ func (s ShimState) Lock(ctx context.Context, planned platform.PlannedStack, owne
 		return nil, AsPluginError(sdk.OpStateLock, resp.Error)
 	}
 	return func(releaseCtx context.Context) error {
-		_, err := s.Unlock(releaseCtx, planned)
+		_, err := s.unlock(releaseCtx, planned, resp.ReleaseToken)
 		return err
 	}, nil
 }
 
 func (s ShimState) Unlock(ctx context.Context, planned platform.PlannedStack) (*platform.LockInfo, error) {
+	return s.unlock(ctx, planned, "")
+}
+
+func (s ShimState) unlock(ctx context.Context, planned platform.PlannedStack, releaseToken string) (*platform.LockInfo, error) {
 	shim, err := shimPlanOf(planned)
 	if err != nil {
 		return nil, err
 	}
 	resp, err := Call[sdk.StateUnlockCall, sdk.StateUnlockResult](ctx, shimClientOf(shim), sdk.OpStateUnlock, &sdk.StateUnlockCall{
-		ProtocolVersion: sdk.ProtocolV1, Envelope: shim.inputs.envelope, Plan: shim.stored,
+		ReleaseToken: releaseToken, ProtocolVersion: sdk.ProtocolV1, Envelope: shim.inputs.envelope, Plan: shim.stored,
 	})
 	if err != nil {
 		return nil, err
@@ -433,20 +436,14 @@ type ShimCostEstimator struct {
 
 var _ platform.CostEstimator = ShimCostEstimator{}
 
-func (e ShimCostEstimator) Estimate(ctx context.Context, planned platform.PlannedStack, cfg config.Config, opts platform.CostOptions) (platform.CostReport, error) {
+func (e ShimCostEstimator) Estimate(ctx context.Context, planned platform.PlannedStack, _ config.Config, opts platform.CostOptions) (platform.CostReport, error) {
 	shim, err := shimPlanOf(planned)
 	if err != nil {
 		return platform.CostReport{}, err
 	}
-	var targetBlock []byte
-	if cfg.Target.GCP != nil {
-		targetBlock, err = yaml.Marshal(cfg.Target.GCP)
-		if err != nil {
-			return platform.CostReport{}, fmt.Errorf("marshal GCP target block: %w", err)
-		}
-	}
 	resp, err := Call[sdk.CostInputsRequest, sdk.CostInputsResult](ctx, shimClientOf(shim), sdk.OpCostInputs, &sdk.CostInputsRequest{
-		ProtocolVersion: sdk.ProtocolV1, Envelope: shim.inputs.envelope, TargetBlock: targetBlock,
+		Plan:            &shim.stored,
+		ProtocolVersion: sdk.ProtocolV1, Envelope: shim.inputs.envelope, TargetBlock: append([]byte(nil), shim.inputs.targetBlock...),
 		Runtime: string(shim.Runtime()), Live: opts.Live, Budget: opts.Budget,
 	})
 	if err != nil {
@@ -460,4 +457,24 @@ func (e ShimCostEstimator) Estimate(ctx context.Context, planned platform.Planne
 		return platform.CostReport{}, fmt.Errorf("decode cost report: %w", err)
 	}
 	return report, nil
+}
+
+// NewPluginBackendForPlan reuses the provider session that created the plan.
+func NewPluginBackendForPlan(planned platform.PlannedStack) (*PluginBackend, error) {
+	shim, err := shimPlanOf(planned)
+	if err != nil {
+		return nil, err
+	}
+	return NewPluginBackend(shim.module.client, shim.inputs.envelope, shim.stored)
+}
+
+// CallForPlan sends a provider operation over the session that produced the
+// plan, preserving negotiated identity and provider-owned invocation state.
+func CallForPlan[Request any, Response any](ctx context.Context, planned platform.PlannedStack, operation sdk.Operation, request *Request) (*Response, error) {
+	shim, err := shimPlanOf(planned)
+	if err != nil {
+		return nil, err
+	}
+	response, err := Call[Request, Response](ctx, shim.module.client, operation, request)
+	return response, err
 }

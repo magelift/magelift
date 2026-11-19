@@ -6,8 +6,6 @@ import (
 	"os"
 
 	internalcli "github.com/magelift/magelift/internal/cli"
-	awseksops "github.com/magelift/magelift/internal/cloud/aws/eksops"
-	awsops "github.com/magelift/magelift/internal/cloud/aws/ops"
 	ovhstack "github.com/magelift/magelift/internal/cloud/ovh/stack"
 	scwstack "github.com/magelift/magelift/internal/cloud/scaleway/stack"
 	"github.com/magelift/magelift/internal/platform"
@@ -15,112 +13,131 @@ import (
 	"github.com/magelift/magelift/sdk"
 )
 
-// NewDefault returns the alpha module set: AWS ECS Fargate (certified,
-// in-process pending parity extraction) plus lazy GCP plugin shims.
-// Registration spawns no processes and needs no credentials. The first
-// fallible GCP use dials exactly once per CLI invocation (one plugin
-// serves both runtimes); dial failure fails the GCP command with a clear
-// error, never other providers' commands. Provider hook constructors
-// live in hooks.go (RegisterHooks).
-func NewDefault() (*platform.ModuleRegistry, error) {
-	modules := platform.NewModuleRegistry()
-	if err := modules.RegisterModule(awsops.Module{}); err != nil {
-		return nil, err
-	}
-	if _, err := registerGCPShims(modules); err != nil {
-		return nil, err
-	}
-	return registerAzureShim(modules)
+var awsOperations = []sdk.Operation{
+	sdk.OpDescribe, sdk.OpValidateConfig, sdk.OpPlan, sdk.OpPreview, sdk.OpApply,
+	sdk.OpOutputs, sdk.OpDestroy, sdk.OpBootstrapVerify, sdk.OpBootstrapEnsure,
+	sdk.OpStateStatus, sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpStateBackup,
+	sdk.OpStateRestore, sdk.OpSecretList, sdk.OpSecretSet, sdk.OpSecretRemove,
+	sdk.OpSecretRead, sdk.OpTailLogs, sdk.OpCheckRuntime, sdk.OpPrepareExec,
+	sdk.OpPrepareTunnel, sdk.OpCostInputs, sdk.OpDeployAppPhase,
+	sdk.OpMediaExport, sdk.OpMediaImport,
 }
 
-// NewDefaultWithExperimental adds the deferred providers (EKS, OVH,
-// Scaleway) to the alpha set. The CLI selects it only when
-// MAGELIFT_EXPERIMENTAL_PROVIDERS is set; harnesses and tests call it
-// explicitly. Cleanup/recovery providers stay available regardless:
-// recovery must read old ledgers.
+// NewDefault returns the default first-party module set.
+func NewDefault() (*platform.ModuleRegistry, error) {
+	modules, _, err := NewDefaultSet()
+	return modules, err
+}
+
+// NewDefaultSet returns the default modules and hooks with shared provider
+// sessions.
+func NewDefaultSet() (*platform.ModuleRegistry, internalcli.Hooks, error) {
+	return newDefaultSet(false)
+}
+
+// NewDefaultWithExperimental returns modules with EKS, OVH, and Scaleway.
 func NewDefaultWithExperimental() (*platform.ModuleRegistry, error) {
+	modules, _, err := NewDefaultExperimentalSet()
+	return modules, err
+}
+
+// NewDefaultExperimentalSet returns experimental modules and hooks with
+// shared provider sessions.
+func NewDefaultExperimentalSet() (*platform.ModuleRegistry, internalcli.Hooks, error) {
+	return newDefaultSet(true)
+}
+
+func newDefaultSet(experimental bool) (*platform.ModuleRegistry, internalcli.Hooks, error) {
 	modules := platform.NewModuleRegistry()
-	for _, module := range []platform.StackModule{
-		awsops.Module{},
-		awseksops.Module{},
-		ovhstack.Module{},
-		scwstack.Module{},
-	} {
-		if err := modules.RegisterModule(module); err != nil {
-			return nil, err
+	awsDialer := newProviderDialer("aws", awsOperations)
+	gcpDialer := newProviderDialer("gcp", nil)
+	azureDialer := newProviderDialer("azure", []sdk.Operation{sdk.OpDescribe, sdk.OpValidateConfig, sdk.OpPlan})
+	modules.RegisterCloser(awsDialer.Close)
+	modules.RegisterCloser(gcpDialer.Close)
+	modules.RegisterCloser(azureDialer.Close)
+
+	if experimental {
+		for _, module := range []platform.StackModule{ovhstack.Module{}, scwstack.Module{}} {
+			if err := modules.RegisterModule(module); err != nil {
+				return nil, internalcli.Hooks{}, err
+			}
 		}
 	}
-	if _, err := registerGCPShims(modules); err != nil {
-		return nil, err
+	if err := registerAWSShims(modules, awsDialer, experimental); err != nil {
+		return nil, internalcli.Hooks{}, err
 	}
-	return registerAzureShim(modules)
+	if err := registerGCPShims(modules, gcpDialer); err != nil {
+		return nil, internalcli.Hooks{}, err
+	}
+	if err := registerAzureShim(modules, azureDialer); err != nil {
+		return nil, internalcli.Hooks{}, err
+	}
+	hooks := registerHooks(gcpDialer, awsDialer)
+	hooks.Close = nil
+	return modules, hooks, nil
 }
 
-func registerAzureShim(modules *platform.ModuleRegistry) (*platform.ModuleRegistry, error) {
-	dialer := &providerhost.CachedDialer{Dial: dialAzure}
-	modules.RegisterCloser(dialer.Close)
+func registerAWSShims(modules *platform.ModuleRegistry, dialer *providerhost.CachedDialer, experimental bool) error {
+	for _, target := range []struct {
+		runtime sdk.RuntimeID
+		tier    platform.CertificationTier
+	}{
+		{runtime: "ecs-fargate", tier: platform.TierBuiltIn},
+		{runtime: "eks", tier: platform.TierExperimental},
+	} {
+		if target.runtime == "eks" && !experimental {
+			continue
+		}
+		shim, err := providerhost.NewLazyProviderShimModule("aws", target.runtime, target.tier, platform.RequiredOutputKeys(), dialer.Do)
+		if err != nil {
+			return err
+		}
+		if err := modules.RegisterModule(shim); err != nil {
+			return fmt.Errorf("register AWS %s shim: %w", target.runtime, err)
+		}
+	}
+	return nil
+}
+
+func registerAzureShim(modules *platform.ModuleRegistry, dialer *providerhost.CachedDialer) error {
 	shim, err := providerhost.NewLazyAzureShimModule(dialer.Do)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if err := modules.RegisterModule(shim); err != nil {
-		return nil, fmt.Errorf("register Azure AKS shim: %w", err)
+		return fmt.Errorf("register Azure AKS shim: %w", err)
 	}
-	return modules, nil
+	return nil
 }
 
-func dialAzure(ctx context.Context) (*providerhost.Client, error) {
-	executable, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("locate CLI executable for provider discovery: %w", err)
-	}
-	loaded, err := providerhost.Acquire(ctx, "azure", internalcli.Version, providerhost.AcquireOptions{
-		Resolve: providerhost.ResolveOptions{ExecutablePath: executable}, Progress: os.Stderr,
-	})
-	if err != nil {
-		return nil, err
-	}
-	client, err := providerhost.Dial(ctx, loaded.Binary, providerhost.DialOptions{
-		Required: []sdk.Operation{sdk.OpDescribe, sdk.OpValidateConfig, sdk.OpPlan},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if client.Describe().ProviderID != "azure" {
-		client.Close()
-		return nil, fmt.Errorf("provider binary advertised %q, expected azure", client.Describe().ProviderID)
-	}
-	return client, nil
-}
-
-func registerGCPShims(modules *platform.ModuleRegistry) (*platform.ModuleRegistry, error) {
-	dialer := &providerhost.CachedDialer{Dial: dialGCP}
-	modules.RegisterCloser(dialer.Close)
+func registerGCPShims(modules *platform.ModuleRegistry, dialer *providerhost.CachedDialer) error {
 	for _, runtime := range []sdk.RuntimeID{"gke-autopilot", "gke-standard"} {
 		shim, err := providerhost.NewLazyShimModule(runtime, dialer.Do)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if err := modules.RegisterModule(shim); err != nil {
-			return nil, fmt.Errorf("register GCP %s shim: %w", runtime, err)
+			return fmt.Errorf("register GCP %s shim: %w", runtime, err)
 		}
 	}
-	return modules, nil
+	return nil
 }
 
-// dialGCP acquires, verifies and dials the first-party GCP plugin lazily.
-// The shared resolver preserves project pins. A failed acquisition or trust
-// check is returned without selecting another implementation.
-func dialGCP(ctx context.Context) (*providerhost.Client, error) {
-	executable, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("locate CLI executable for provider discovery: %w", err)
-	}
-	loaded, err := providerhost.Acquire(ctx, "gcp", internalcli.Version, providerhost.AcquireOptions{
-		Resolve: providerhost.ResolveOptions{ExecutablePath: executable}, Progress: os.Stderr,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return providerhost.Dial(ctx, loaded.Binary, providerhost.DialOptions{})
+func newProviderDialer(provider string, required []sdk.Operation) *providerhost.CachedDialer {
+	return &providerhost.CachedDialer{Dial: func(ctx context.Context) (*providerhost.Client, error) {
+		executable, err := os.Executable()
+		if err != nil {
+			return nil, fmt.Errorf("locate CLI executable for provider discovery: %w", err)
+		}
+		loaded, err := providerhost.Acquire(ctx, provider, internalcli.Version, providerhost.AcquireOptions{
+			Resolve: providerhost.ResolveOptions{ExecutablePath: executable}, Progress: os.Stderr,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return providerhost.Dial(ctx, loaded.Binary, providerhost.DialOptions{
+			ExpectedProvider: sdk.ProviderID(provider),
+			Required:         required,
+		})
+	}}
 }

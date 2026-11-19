@@ -12,10 +12,9 @@ import (
 	"strings"
 	"time"
 
-	awssdk "github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/magelift/magelift/internal/automation"
+	"github.com/magelift/magelift/internal/awsendpoint"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/dumpimport"
 	"github.com/magelift/magelift/internal/localdev"
@@ -751,7 +750,7 @@ func (o *options) runMediaExport(ctx context.Context, environment, dest string) 
 		return nil, err
 	}
 	_ = environmentName
-	if planned.Provider() != "gcp" {
+	if planned.Provider() != "gcp" && planned.Provider() != "aws" {
 		return nil, invalid(fmt.Errorf("%s", notSupportedForPlanned(planned, "media export")))
 	}
 	if err := requireTargetDependencies(ctx, o, planned); err != nil {
@@ -764,7 +763,6 @@ func (o *options) runMediaExport(ctx context.Context, environment, dest string) 
 	if err != nil {
 		return nil, fmt.Errorf("create infrastructure backend: %w", err)
 	}
-	defer o.closeProviderSessions()
 	outputs, err := backend.Outputs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read infrastructure outputs: %w", err)
@@ -772,19 +770,15 @@ func (o *options) runMediaExport(ctx context.Context, environment, dest string) 
 	if _, err := platform.RequireStringOutput(outputs, platform.OutputMediaBucket); err != nil {
 		return nil, invalid(err)
 	}
-	return o.runGCPMediaTransfer(ctx, planned, outputs, sdk.OpMediaExport, environment, dest)
+	return o.runProviderMediaTransfer(ctx, planned, outputs, sdk.OpMediaExport, environment, dest)
 }
 
-// runGCPMediaTransfer moves the media tree through the provider plugin
-// (never a direct cloud client in core). Direction follows the operation:
-// import uploads, export downloads.
-func (o *options) runGCPMediaTransfer(ctx context.Context, planned platform.PlannedStack, outputs map[string]any, operation sdk.Operation, environment, localDir string) (map[string]any, error) {
+// runProviderMediaTransfer moves the media tree through the provider plugin.
+// Direction follows the operation: import uploads, export downloads.
+func (o *options) runProviderMediaTransfer(ctx context.Context, planned platform.PlannedStack, outputs map[string]any, operation sdk.Operation, environment, localDir string) (map[string]any, error) {
 	shim, ok := providerhost.AsEnvelopePlan(planned)
 	if !ok {
-		return nil, fmt.Errorf("GCP media transfer requires a plugin-backed plan, got %T", planned)
-	}
-	if o.loadProvider == nil || o.dialProvider == nil {
-		return nil, errors.New("GCP provider loading is not configured")
+		return nil, fmt.Errorf("provider media transfer requires a plugin-backed plan, got %T", planned)
 	}
 	absolute, err := filepath.Abs(localDir)
 	if err != nil {
@@ -794,15 +788,7 @@ func (o *options) runGCPMediaTransfer(ctx context.Context, planned platform.Plan
 	if err != nil {
 		return nil, fmt.Errorf("encode outputs: %w", err)
 	}
-	loaded, err := o.loadProvider(ctx, string(planned.Provider()))
-	if err != nil {
-		return nil, err
-	}
-	client, err := o.dialProvider(ctx, loaded.Binary)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := providerhost.Call[sdk.MediaTransferCall, sdk.MediaTransferResult](ctx, client, operation, &sdk.MediaTransferCall{
+	resp, err := providerhost.CallForPlan[sdk.MediaTransferCall, sdk.MediaTransferResult](ctx, planned, operation, &sdk.MediaTransferCall{
 		ProtocolVersion: sdk.ProtocolV1, Envelope: shim.Envelope(), Plan: shim.StoredPlan(),
 		OutputsJSON: encoded, LocalDir: absolute,
 	})
@@ -813,6 +799,20 @@ func (o *options) runGCPMediaTransfer(ctx context.Context, planned platform.Plan
 		return nil, providerhost.AsPluginError(operation, resp.Error)
 	}
 	bucket, _ := platform.RequireStringOutput(outputs, platform.OutputMediaBucket)
+	if planned.Provider() == "aws" && operation == sdk.OpMediaImport && resp.Listing != nil {
+		return map[string]any{
+			"environment": environment,
+			"bucket":      bucket,
+			"uploaded":    resp.FileCount,
+			"bytes":       resp.ByteCount,
+			"keys":        resp.Listing.Keys,
+			"listingDiff": map[string]any{
+				"missing": resp.Listing.Missing,
+				"extra":   resp.Listing.Extra,
+				"empty":   len(resp.Listing.Missing) == 0 && len(resp.Listing.Extra) == 0,
+			},
+		}, nil
+	}
 	return map[string]any{
 		"environment": environment,
 		"bucket":      bucket,
@@ -843,7 +843,6 @@ func (o *options) runMediaSync(ctx context.Context, environment, source string) 
 		if err != nil {
 			return nil, fmt.Errorf("create infrastructure backend: %w", err)
 		}
-		defer o.closeProviderSessions()
 		outputs, err := backend.Outputs(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("read infrastructure outputs: %w", err)
@@ -852,8 +851,8 @@ func (o *options) runMediaSync(ctx context.Context, environment, source string) 
 		if err != nil {
 			return nil, invalid(err)
 		}
-		if planned.Provider() == "gcp" {
-			return o.runGCPMediaTransfer(ctx, planned, outputs, sdk.OpMediaImport, environment, source)
+		if planned.Provider() == "gcp" || planned.Provider() == "aws" {
+			return o.runProviderMediaTransfer(ctx, planned, outputs, sdk.OpMediaImport, environment, source)
 		}
 		client, err = o.newMediaS3Client(ctx, planned.Region())
 		if err != nil {
@@ -909,16 +908,11 @@ func (o *options) newMediaS3Client(ctx context.Context, region string) (*s3.Clie
 			return nil, invalid(err)
 		}
 	}
-	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
+	client, err := awsendpoint.S3Client(ctx, region, endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("load AWS config for media sync: %w", err)
+		return nil, fmt.Errorf("create S3 client for media sync: %w", err)
 	}
-	return s3.NewFromConfig(cfg, func(options *s3.Options) {
-		if endpoint != "" {
-			options.BaseEndpoint = awssdk.String(endpoint)
-			options.UsePathStyle = true
-		}
-	}), nil
+	return client, nil
 }
 
 func envStatusCommand(o *options) *cobra.Command {

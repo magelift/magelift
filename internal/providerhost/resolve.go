@@ -92,7 +92,7 @@ func Resolve(provider string, opts ResolveOptions) (Resolved, error) {
 // It never downloads a provider or replaces a project lock.
 func ResolveInstalled(provider, cliVersion string, opts ResolveOptions) (Resolved, error) {
 	resolved, lookupErr := Resolve(provider, opts)
-	if !errors.Is(lookupErr, ErrNoLockfile) || (provider != "gcp" && provider != "azure") {
+	if !errors.Is(lookupErr, ErrNoLockfile) || (provider != "aws" && provider != "gcp" && provider != "azure") {
 		return resolved, lookupErr
 	}
 	tag, err := NormalizeReleaseTag(cliVersion)

@@ -10,8 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/magelift/magelift/internal/cleanup"
 	internalcli "github.com/magelift/magelift/internal/cli"
-	awsendpoint "github.com/magelift/magelift/internal/cloud/aws/endpoint"
-	awssecrets "github.com/magelift/magelift/internal/cloud/aws/secrets"
+	awsendpoint "github.com/magelift/magelift/internal/awsendpoint"
 	ovhresilience "github.com/magelift/magelift/internal/cloud/ovh/resilience"
 	"github.com/magelift/magelift/internal/cloud/scaleway/resilience"
 	"github.com/magelift/magelift/internal/platform"
@@ -26,14 +25,20 @@ import (
 // in-process clients. No constructor runs here; each hook builds its client
 // only when the CLI invokes it, so registration needs no credentials.
 func RegisterHooks() internalcli.Hooks {
-	dialer := &providerhost.CachedDialer{Dial: dialGCP}
+	return registerHooks(newProviderDialer("gcp", nil), newProviderDialer("aws", awsOperations))
+}
+
+func registerHooks(gcpDialer, awsDialer *providerhost.CachedDialer) internalcli.Hooks {
 	return internalcli.Hooks{
-		Close: dialer.Close,
+		Close: func() {
+			gcpDialer.Close()
+			awsDialer.Close()
+		},
 		NewComposerSecrets: func(ctx context.Context, region string) (internalcli.ComposerSecretProvider, error) {
-			return awssecrets.New(ctx, region)
+		return awsComposerSecretAdapter{dialer: awsDialer, envelope: sdk.Envelope{Region: region}}, nil
 		},
 		NewComposerGCPSecrets: func(ctx context.Context) (internalcli.ComposerSecretProvider, error) {
-			client, err := dialer.Do(ctx)
+			client, err := gcpDialer.Do(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -47,14 +52,47 @@ func RegisterHooks() internalcli.Hooks {
 			if _, ok := providerhost.AsShimPlanned(planned); !ok {
 				return nil, fmt.Errorf("leftover Cloud SQL backup destroy requires a GCP planned stack")
 			}
-			return gcpLeftoverBackupDestroyer{dialer: dialer, planned: planned}, nil
+			return gcpLeftoverBackupDestroyer{dialer: gcpDialer, planned: planned}, nil
 		},
-		NewGCPCleanupProvider: newGCPCleanupProvider(dialer),
-		NewCleanupProvider:    newFirstPartyCleanupProvider(dialer),
+		NewGCPCleanupProvider: newGCPCleanupProvider(gcpDialer),
+		NewCleanupProvider:    newFirstPartyCleanupProvider(gcpDialer),
 		MediaEndpoint: func() (string, error) {
 			return awsendpoint.FromEnv()
 		},
 	}
+}
+
+type awsComposerSecretAdapter struct {
+	dialer  *providerhost.CachedDialer
+	envelope sdk.Envelope
+}
+
+func (a awsComposerSecretAdapter) GetSecretValue(ctx context.Context, name string) ([]byte, error) {
+	return a.read(ctx, name, false)
+}
+
+func (a awsComposerSecretAdapter) GetParameter(ctx context.Context, name string) ([]byte, error) {
+	return a.read(ctx, name, true)
+}
+
+func (a awsComposerSecretAdapter) read(ctx context.Context, name string, parameter bool) ([]byte, error) {
+	client, err := a.dialer.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := providerhost.Call[sdk.SecretReadRequest, sdk.SecretReadResult](ctx, client, sdk.OpSecretRead, &sdk.SecretReadRequest{
+		ProtocolVersion: sdk.ProtocolV1,
+		Envelope:        a.envelope,
+		Name:            name,
+		Parameter:       parameter,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp.Error != nil {
+		return nil, providerhost.AsPluginError(sdk.OpSecretRead, resp.Error)
+	}
+	return resp.Value, nil
 }
 
 type gcpComposerSecretAdapter struct {

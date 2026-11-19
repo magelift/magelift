@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,18 @@ import (
 	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/sdk"
 )
+
+func registerMediaTestShim(t *testing.T, o *options, caller *scriptedCaller) {
+	t.Helper()
+	client := providerhost.NewTestClient(caller, testDescribe())
+	module, err := providerhost.NewShimModule("gke-autopilot", client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := o.modules.RegisterModule(module); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestEnvMediaSyncUploadsFixtureListingDiffEmpty(t *testing.T) {
 	dir := t.TempDir()
@@ -64,23 +77,22 @@ func TestEnvMediaSyncGCPRoutesThroughPlugin(t *testing.T) {
 	backend := &fakeInfrastructureBackend{outputs: map[string]any{"mediaBucket": "shop-media"}}
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
-	if err := o.modules.RegisterModule(stubGCPModule{}); err != nil {
-		t.Fatal(err)
-	}
 	o.configPath = path
-	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
-		return backend, nil
-	}
-	o.loadProvider = func(context.Context, string) (providerhost.Loaded, error) {
-		return providerhost.Loaded{Binary: "/tmp/magelift-provider-gcp"}, nil
-	}
 	var sawOp string
-	o.dialProvider = func(context.Context, string) (*providerhost.Client, error) {
-		return providerhost.NewTestClient(&scriptedCaller{respond: func(method string, reply any) error {
+	registerMediaTestShim(t, o, &scriptedCaller{respond: func(method string, reply any) error {
+		switch method {
+		case "Plugin.Plan":
+			*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: sdk.StoredPlan{StackName: "shop-preview", Provider: "gcp", Runtime: "gke-autopilot", Tier: sdk.ExtensionTierBuiltIn, ImageDigest: "digest"}}
+		case "Plugin.MediaImport":
 			sawOp = method
 			*(reply.(*sdk.MediaTransferResult)) = sdk.MediaTransferResult{FileCount: 2, ByteCount: 7, LocalDir: t.TempDir()}
-			return nil
-		}}, testDescribe()), nil
+		default:
+			return errors.New("unexpected method " + method)
+		}
+		return nil
+	}})
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
 	}
 	source := t.TempDir()
 	cmd := newCommandWithOptions(o)
@@ -93,7 +105,7 @@ func TestEnvMediaSyncGCPRoutesThroughPlugin(t *testing.T) {
 	}
 	var result map[string]any
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatal(err)
+		t.Fatalf("decode output: %v: %s", err, out.String())
 	}
 	if result["files"] != float64(2) || result["bucket"] != "shop-media" {
 		t.Fatalf("result = %#v", result)
@@ -105,23 +117,22 @@ func TestEnvMediaExportGCPDownloads(t *testing.T) {
 	backend := &fakeInfrastructureBackend{outputs: map[string]any{"mediaBucket": "shop-media"}}
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
-	if err := o.modules.RegisterModule(stubGCPModule{}); err != nil {
-		t.Fatal(err)
-	}
 	o.configPath = path
-	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
-		return backend, nil
-	}
-	o.loadProvider = func(context.Context, string) (providerhost.Loaded, error) {
-		return providerhost.Loaded{Binary: "/tmp/magelift-provider-gcp"}, nil
-	}
 	var sawOp string
-	o.dialProvider = func(context.Context, string) (*providerhost.Client, error) {
-		return providerhost.NewTestClient(&scriptedCaller{respond: func(method string, reply any) error {
+	registerMediaTestShim(t, o, &scriptedCaller{respond: func(method string, reply any) error {
+		switch method {
+		case "Plugin.Plan":
+			*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: sdk.StoredPlan{StackName: "shop-preview", Provider: "gcp", Runtime: "gke-autopilot", Tier: sdk.ExtensionTierBuiltIn, ImageDigest: "digest"}}
+		case "Plugin.MediaExport":
 			sawOp = method
 			*(reply.(*sdk.MediaTransferResult)) = sdk.MediaTransferResult{FileCount: 1, ByteCount: 3, LocalDir: t.TempDir()}
-			return nil
-		}}, testDescribe()), nil
+		default:
+			return errors.New("unexpected method " + method)
+		}
+		return nil
+	}})
+	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		return backend, nil
 	}
 	dest := t.TempDir()
 	cmd := newCommandWithOptions(o)
@@ -134,7 +145,7 @@ func TestEnvMediaExportGCPDownloads(t *testing.T) {
 	}
 }
 
-func TestEnvMediaExportRefusesNonGCP(t *testing.T) {
+func TestEnvMediaExportRefusesUnsupportedTarget(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "magelift.php")
 	if err := writeTestProjectFile(path, []byte(starterConfig), 0o600); err != nil {
@@ -150,7 +161,7 @@ func TestEnvMediaExportRefusesNonGCP(t *testing.T) {
 	cmd := newCommandWithOptions(o)
 	cmd.SetArgs([]string{"--config", path, "env", "media-export", "staging", "--dest", t.TempDir()})
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "not supported") {
+	if err == nil || !strings.Contains(err.Error(), "unexpected planned type") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

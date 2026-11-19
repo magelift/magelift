@@ -5,11 +5,10 @@ import (
 	"os"
 
 	"github.com/magelift/magelift/cli"
-	"github.com/magelift/magelift/internal/registry"
 )
 
 func main() {
-	command, err := cli.NewWithExtensionsAndHooks(registry.RegisterHooks())
+	command, err := cli.New()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

@@ -8,12 +8,11 @@ import (
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
-	"github.com/magelift/magelift/sdk"
 )
 
 // defaultLoadProvider acquires the target's signed release when first activated.
 func (o *options) defaultLoadProvider(ctx context.Context, provider string) (providerhost.Loaded, error) {
-	if provider != "gcp" && provider != "azure" {
+	if provider != "aws" && provider != "gcp" && provider != "azure" {
 		return o.loadInstalledProvider(ctx, provider)
 	}
 	return providerhost.Acquire(ctx, provider, Version, providerhost.AcquireOptions{
@@ -52,27 +51,6 @@ func (o *options) loadInstalledProvider(ctx context.Context, provider string) (p
 	})
 }
 
-// defaultDialProvider starts the verified provider subprocess and tracks the
-// session for closeProviderSessions. Callers defer closeProviderSessions
-// after newBackend returns.
-func (o *options) defaultDialProvider(ctx context.Context, binary string) (*providerhost.Client, error) {
-	client, err := providerhost.Dial(ctx, binary, providerhost.DialOptions{Required: []sdk.Operation{sdk.OpDescribe}})
-	if err != nil {
-		return nil, err
-	}
-	o.providerSessions = append(o.providerSessions, client)
-	return client, nil
-}
-
-func (o *options) closeProviderSessions() {
-	for _, session := range o.providerSessions {
-		if session != nil {
-			session.Close()
-		}
-	}
-	o.providerSessions = nil
-}
-
 // Plugin-backed plans execute in the verified provider process.
 func (o *options) defaultNewBackend(ctx context.Context, planned platform.PlannedStack, backendURL string) (infrastructureBackend, error) {
 	if _, ok := providerhost.AsShimPlanned(planned); ok {
@@ -94,26 +72,7 @@ func (o *options) defaultNewBackend(ctx context.Context, planned platform.Planne
 }
 
 func (o *options) pluginBackend(ctx context.Context, planned platform.PlannedStack) (infrastructureBackend, error) {
-	shim, ok := providerhost.AsShimPlanned(planned)
-	if !ok {
-		return nil, fmt.Errorf("provider backend requires a plugin-backed plan, got %T", planned)
-	}
-	if o.loadProvider == nil || o.dialProvider == nil {
-		return nil, fmt.Errorf("provider loading is not configured")
-	}
-	loaded, err := o.loadProvider(ctx, string(planned.Provider()))
-	if err != nil {
-		return nil, err
-	}
-	client, err := o.dialProvider(ctx, loaded.Binary)
-	if err != nil {
-		return nil, err
-	}
-	if id := client.ProviderID(); id != "" && id != string(planned.Provider()) {
-		client.Close()
-		return nil, fmt.Errorf("provider advertised %q, expected %q", id, planned.Provider())
-	}
-	return providerhost.NewPluginBackend(client, shim.Envelope(), shim.StoredPlan())
+	return providerhost.NewPluginBackendForPlan(planned)
 }
 
 // providerProvenance describes the local artifact verified by extensions list.

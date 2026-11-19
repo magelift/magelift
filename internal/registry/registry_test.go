@@ -7,11 +7,11 @@ import (
 )
 
 func TestNewDefaultRegistersAlphaSet(t *testing.T) {
-	t.Parallel()
 	modules, err := NewDefault()
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(modules.Close)
 	for _, want := range [][2]string{
 		{"aws", "ecs-fargate"},
 		{"gcp", "gke-autopilot"},
@@ -34,11 +34,11 @@ func TestNewDefaultRegistersAlphaSet(t *testing.T) {
 }
 
 func TestNewDefaultWithExperimentalAddsDeferred(t *testing.T) {
-	t.Parallel()
 	modules, err := NewDefaultWithExperimental()
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(modules.Close)
 	for _, want := range [][2]string{
 		{"aws", "ecs-fargate"},
 		{"aws", "eks"},
@@ -50,6 +50,27 @@ func TestNewDefaultWithExperimentalAddsDeferred(t *testing.T) {
 	} {
 		if _, found := modules.Module(sdk.ProviderID(want[0]), sdk.RuntimeID(want[1])); !found {
 			t.Errorf("experimental set lacks %s/%s", want[0], want[1])
+		}
+	}
+}
+
+func TestDefaultSetSharesHookAndModuleLifecycle(t *testing.T) {
+	modules, hooks, err := NewDefaultSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(modules.Close)
+	if hooks.Close != nil {
+		t.Fatal("default hooks must share module-owned provider sessions")
+	}
+	for _, want := range [][2]string{
+		{"aws", "ecs-fargate"},
+		{"gcp", "gke-autopilot"},
+		{"gcp", "gke-standard"},
+		{"azure", "aks"},
+	} {
+		if _, found := modules.Module(sdk.ProviderID(want[0]), sdk.RuntimeID(want[1])); !found {
+			t.Errorf("default set lacks %s/%s", want[0], want[1])
 		}
 	}
 }

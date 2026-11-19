@@ -10,6 +10,9 @@ import (
 
 func TestRegisterHooksPopulatesAllHooks(t *testing.T) {
 	hooks := RegisterHooks()
+	if hooks.Close != nil {
+		t.Cleanup(hooks.Close)
+	}
 	if hooks.NewComposerSecrets == nil {
 		t.Error("NewComposerSecrets is nil")
 	}
@@ -32,6 +35,9 @@ func TestRegisterHooksPopulatesAllHooks(t *testing.T) {
 
 func TestRegisterHooksNeedsNoCredentials(t *testing.T) {
 	hooks := RegisterHooks()
+	if hooks.Close != nil {
+		t.Cleanup(hooks.Close)
+	}
 	if _, err := hooks.NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "unknown-cloud"}); err == nil || !strings.Contains(err.Error(), `restartable cleanup has no adapter for provider "unknown-cloud"`) {
 		t.Fatalf("unknown provider err = %v", err)
 	}
@@ -44,34 +50,44 @@ func TestRegisterHooksNeedsNoCredentials(t *testing.T) {
 }
 
 func TestRegisterHooksMediaEndpointReadsEnvironment(t *testing.T) {
+	hooks := RegisterHooks()
+	if hooks.Close != nil {
+		t.Cleanup(hooks.Close)
+	}
 	t.Setenv("MAGELIFT_AWS_ENDPOINT_URL", "")
-	endpoint, err := RegisterHooks().MediaEndpoint()
+	endpoint, err := hooks.MediaEndpoint()
 	if err != nil || endpoint != "" {
 		t.Fatalf("unset endpoint = %q, %v", endpoint, err)
 	}
 	t.Setenv("MAGELIFT_AWS_ENDPOINT_URL", "https://example.com")
-	_, err = RegisterHooks().MediaEndpoint()
+	_, err = hooks.MediaEndpoint()
 	if err == nil || !strings.Contains(err.Error(), `host "example.com" is not loopback`) {
 		t.Fatalf("non-loopback err = %v", err)
 	}
 }
 
 func TestRegisterHooksCleanupProviderRejectsIncompleteOVHLedgerBeforeCredentialLookup(t *testing.T) {
-	_, err := RegisterHooks().NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "ovh"})
+	hooks := RegisterHooks()
+	t.Cleanup(hooks.Close)
+	_, err := hooks.NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "ovh"})
 	if err == nil || !strings.Contains(err.Error(), "profile, region, and project") {
 		t.Fatalf("error = %v", err)
 	}
 }
 
 func TestRegisterHooksCleanupProviderRejectsIncompleteGCPLedgerBeforeClientLookup(t *testing.T) {
-	_, err := RegisterHooks().NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "gcp"})
+	hooks := RegisterHooks()
+	t.Cleanup(hooks.Close)
+	_, err := hooks.NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "gcp"})
 	if err == nil || !strings.Contains(err.Error(), "require a project") {
 		t.Fatalf("error = %v", err)
 	}
 }
 
 func TestRegisterHooksCleanupProviderDefersGCPDial(t *testing.T) {
-	provider, err := RegisterHooks().NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "gcp", Project: "example-gcp", Marker: "m"})
+	hooks := RegisterHooks()
+	t.Cleanup(hooks.Close)
+	provider, err := hooks.NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "gcp", Project: "example-gcp", Marker: "m"})
 	if err != nil {
 		t.Fatalf("construction must not dial: %v", err)
 	}
