@@ -38,9 +38,9 @@ Your cloud provider bills the resources to your account. [MageLift pricing](http
 
     ---
 
-    Import settings from Adobe Commerce Cloud or Upsun and rehearse the cutover.
+    Import settings from Upsun, Adobe Commerce Cloud or Docker Compose. Rehearse the database and media transfer on your chosen cloud.
 
-    [Cutover checklist](weekend-migrate.md) · [Full migration](migrating-from-paas.md)
+    [Import the shop](migrating-from-paas.md) · [Rehearse the migration](weekend-migrate.md)
 
 -   **Operate a store**
 

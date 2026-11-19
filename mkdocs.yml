@@ -65,8 +65,8 @@ nav:
       - Compare to PaaS: compare-paas.md
       - FAQ: faq.md
   - Migrate:
-      - Leave PaaS in a weekend: weekend-migrate.md
-      - Migrate from ACC / Platform.sh: migrating-from-paas.md
+      - Import an existing shop: migrating-from-paas.md
+      - Rehearse the data migration: weekend-migrate.md
       - Brownfield attach: brownfield-attach.md
       - ece-tools parity: ece-parity.md
   - Operate:
