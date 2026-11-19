@@ -166,11 +166,8 @@ func (p *AccountPreparer) EnsureRepository(ctx context.Context, plan Preparation
 		if err := validateRepositoryOwnership(plan, resource, meta); err != nil {
 			return RepositoryResult{}, err
 		}
-	} else {
-		meta, err = p.registry.CreateRepository(ctx, project, location, repositoryID, plan.RegistryLabels)
-		if err != nil {
-			return RepositoryResult{}, err
-		}
+	} else if _, err := p.registry.CreateRepository(ctx, project, location, repositoryID, plan.RegistryLabels); err != nil {
+		return RepositoryResult{}, err
 	}
 	host := location + "-docker.pkg.dev"
 	return RepositoryResult{

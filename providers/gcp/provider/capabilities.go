@@ -307,17 +307,14 @@ func validDedicatedCustomTier(tier string) bool {
 	return mb >= 3840 && mb%256 == 0 && mb*10 >= cpu*9*1024 && mb <= cpu*6656
 }
 
-func (c *SDKCapabilityClient) MemorystoreValkey(ctx context.Context, projectID, region, engineVersion, nodeType, mode string) (bool, error) {
+func (c *SDKCapabilityClient) MemorystoreValkey(ctx context.Context, projectID, region, engineVersion, nodeType, _ string) (bool, error) {
 	if c == nil || c.valkey == nil {
 		return false, errors.New("GCP Memorystore capability client is required")
 	}
 	projectID, region = strings.TrimSpace(projectID), strings.TrimSpace(region)
-	engineVersion, nodeType, mode = strings.TrimSpace(engineVersion), strings.TrimSpace(nodeType), strings.TrimSpace(mode)
+	engineVersion, nodeType = strings.TrimSpace(engineVersion), strings.TrimSpace(nodeType)
 	if projectID == "" || region == "" || engineVersion == "" || nodeType == "" {
 		return false, errors.New("GCP Memorystore project, region, engine version, and node type are required")
-	}
-	if mode == "" {
-		mode = "CLUSTER_DISABLED"
 	}
 	if err := c.valkey.ListInstances(ctx, projectID, region); err != nil {
 		return false, fmt.Errorf("read GCP Memorystore Valkey instances in %q: %w", region, err)

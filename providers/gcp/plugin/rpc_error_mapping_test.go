@@ -28,7 +28,7 @@ func TestSetErrorMapsEveryRegisteredRPCResponse(t *testing.T) {
 			t.Fatalf("RPCServer.%s result is %s, want error", method.Name, method.Type.Out(0))
 		}
 		respType := method.Type.In(2)
-		if respType.Kind() != reflect.Ptr || respType.Elem().Kind() != reflect.Struct {
+		if respType.Kind() != reflect.Pointer || respType.Elem().Kind() != reflect.Struct {
 			t.Fatalf("RPCServer.%s response %s is not a struct pointer", method.Name, respType)
 		}
 
@@ -38,7 +38,7 @@ func TestSetErrorMapsEveryRegisteredRPCResponse(t *testing.T) {
 			t.Fatalf("setError did not map RPCServer.%s response %s", method.Name, respType)
 		}
 		errField := instance.Elem().FieldByName("Error")
-		if !errField.IsValid() || errField.Kind() != reflect.Ptr || errField.IsNil() {
+		if !errField.IsValid() || errField.Kind() != reflect.Pointer || errField.IsNil() {
 			t.Fatalf("RPCServer.%s Error field = %#v", method.Name, errField)
 		}
 		got, ok := errField.Interface().(*sdk.OperationError)

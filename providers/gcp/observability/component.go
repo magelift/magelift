@@ -283,7 +283,7 @@ func renderDashboardJSON(displayName string, clusterName pulumi.StringInput, sig
 				widgets = append(widgets, map[string]any{
 					"title": signal + " is unavailable natively",
 					"text": map[string]any{
-						"content": fmt.Sprintf("MageLift requested signal `%s` is not delivered by this native GCP component. Configure an external observability adapter for it.", signal),
+						"content": fmt.Sprintf("Configure an external observability adapter to collect %s.", signal),
 						"format":  "MARKDOWN",
 					},
 				})
