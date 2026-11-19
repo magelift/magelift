@@ -21,16 +21,7 @@ import (
 )
 
 func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
-	if os.Getenv("MAGELIFT_FLOCI") != "1" {
-		t.Skip("requires Floci")
-	}
-	endpoint := os.Getenv("MAGELIFT_FLOCI_ENDPOINT")
-	if endpoint == "" {
-		endpoint = "http://127.0.0.1:4566"
-	}
-	if local, err := awsendpoint.Parse(endpoint); err != nil || local == "" {
-		t.Fatalf("invalid Floci endpoint %q: %v", endpoint, err)
-	}
+	endpoint := flociEndpoint(t)
 	t.Setenv("AWS_ACCESS_KEY_ID", "test")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")

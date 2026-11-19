@@ -14,5 +14,5 @@ cleanup() {
 trap cleanup EXIT
 
 "${compose[@]}" up -d --wait
-MAGELIFT_FLOCI=1 MAGELIFT_FLOCI_ENDPOINT="${MAGELIFT_FLOCI_ENDPOINT:-http://localhost:4566}" \
+MAGELIFT_FLOCI_AWS=1 MAGELIFT_AWS_ENDPOINT_URL="${MAGELIFT_AWS_ENDPOINT_URL:-http://127.0.0.1:4566}" \
 go test -race -tags=floci ./providers/aws/floci -count=1

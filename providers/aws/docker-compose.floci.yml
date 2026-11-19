@@ -1,8 +1,8 @@
 services:
-  floci:
+  floci-aws:
     image: floci/floci:2.5.0@sha256:a0fbf944d7f338cc0856f1ef83831ea749ff2be71956eb7a7fce08fc21458e19
     ports:
-      - "4566:4566"
+      - "127.0.0.1:4566:4566"
     environment:
       FLOCI_DEFAULT_REGION: us-east-1
       FLOCI_DEFAULT_ACCOUNT_ID: "000000000000"

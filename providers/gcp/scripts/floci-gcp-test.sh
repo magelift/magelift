@@ -21,4 +21,4 @@ export SECRET_MANAGER_EMULATOR_HOST="${SECRET_MANAGER_EMULATOR_HOST:-127.0.0.1:4
 export PUBSUB_EMULATOR_HOST="${PUBSUB_EMULATOR_HOST:-127.0.0.1:4588}"
 export GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT:-floci-local}"
 go test -race -tags=floci ./providers/gcp/floci -count=1
-go test -tags=floci ./providers/gcp/plugin -run '^TestGCPFlociPreviewSweepUsesSharedBucket$' -count=1
+go test -race -tags=floci ./providers/gcp/plugin -run '^TestGCPFloci' -count=1

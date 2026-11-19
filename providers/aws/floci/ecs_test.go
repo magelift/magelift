@@ -4,14 +4,12 @@ package floci_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
+
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
@@ -19,23 +17,11 @@ import (
 )
 
 func TestECSRuntimeHealthAgainstFloci(t *testing.T) {
-	if os.Getenv("MAGELIFT_FLOCI") != "1" {
-		t.Skip("set MAGELIFT_FLOCI=1 to run the Floci integration test")
-	}
-	endpoint := os.Getenv("MAGELIFT_FLOCI_ENDPOINT")
-	if endpoint == "" {
-		endpoint = "http://localhost:4566"
-	}
+	endpoint := flociEndpoint(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	configuration, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithRegion("us-east-1"),
-		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := ecs.NewFromConfig(configuration, func(options *ecs.Options) { options.BaseEndpoint = awssdk.String(endpoint) })
+	configuration := flociConfig(t, ctx, endpoint)
+	client := ecs.NewFromConfig(configuration)
 	clusterName := "magelift-floci-ecs"
 	serviceName := "magelift-floci-runtime"
 	cluster, err := client.CreateCluster(ctx, &ecs.CreateClusterInput{ClusterName: awssdk.String(clusterName)})
@@ -77,23 +63,11 @@ func TestECSRuntimeHealthAgainstFloci(t *testing.T) {
 }
 
 func TestECSCandidateRegistrationAgainstFloci(t *testing.T) {
-	if os.Getenv("MAGELIFT_FLOCI") != "1" {
-		t.Skip("set MAGELIFT_FLOCI=1 to run the Floci integration test")
-	}
-	endpoint := os.Getenv("MAGELIFT_FLOCI_ENDPOINT")
-	if endpoint == "" {
-		endpoint = "http://localhost:4566"
-	}
+	endpoint := flociEndpoint(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	configuration, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithRegion("us-east-1"),
-		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := ecs.NewFromConfig(configuration, func(options *ecs.Options) { options.BaseEndpoint = awssdk.String(endpoint) })
+	configuration := flociConfig(t, ctx, endpoint)
+	client := ecs.NewFromConfig(configuration)
 	oldImage := "registry.example.invalid/shop@sha256:" + strings.Repeat("b", 64)
 	newImage := "registry.example.invalid/shop@sha256:" + strings.Repeat("a", 64)
 	definition, err := client.RegisterTaskDefinition(ctx, &ecs.RegisterTaskDefinitionInput{

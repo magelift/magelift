@@ -495,7 +495,7 @@ jobs:
     if: needs.changes.outputs.go == 'true' || needs.changes.outputs.provider == 'true'
     runs-on: ubuntu-latest
     services:
-      floci:
+      floci-aws:
         image: floci/floci:2.5.0@sha256:a0fbf944d7f338cc0856f1ef83831ea749ff2be71956eb7a7fce08fc21458e19
         ports:
           - 4566:4566
@@ -514,8 +514,8 @@ jobs:
       - uses: ./.github/actions/go-memlimit
       - name: Run Floci AWS contract tests
         env:
-          MAGELIFT_FLOCI: '1'
-          MAGELIFT_FLOCI_ENDPOINT: http://127.0.0.1:4566
+          MAGELIFT_FLOCI_AWS: '1'
+          MAGELIFT_AWS_ENDPOINT_URL: http://127.0.0.1:4566
         run: go test -race -tags=floci ./providers/aws/floci -count=1
 
   floci-gcp:
@@ -540,7 +540,7 @@ jobs:
           go-version-file: providers/gcp/go.mod
       - uses: ./.github/actions/go-memlimit
       - uses: ./.github/actions/setup-pulumi
-      - name: Run floci-gcp contract tests
+      - name: Run Floci GCP contract tests
         env:
           MAGELIFT_FLOCI_GCP: '1'
           MAGELIFT_GCP_ENDPOINT_URL: http://127.0.0.1:4588
@@ -550,7 +550,7 @@ jobs:
           GOOGLE_CLOUD_PROJECT: floci-local
         run: |
           go test -race -tags=floci ./providers/gcp/floci -count=1
-          go test -tags=floci ./providers/gcp/plugin -run '^TestGCPFlociPreviewSweepUsesSharedBucket$' -count=1
+          go test -race -tags=floci ./providers/gcp/plugin -run '^TestGCPFloci' -count=1
 
   floci-azure:
     needs: changes

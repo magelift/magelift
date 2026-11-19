@@ -57,7 +57,7 @@ for row in "${MAPPINGS[@]}"; do
 	fi
 	case "$cloud" in
 		gcp)
-			plugin_run="go test -tags=floci ./providers/gcp/plugin -run '^TestGCPFlociPreviewSweepUsesSharedBucket$' -count=1"
+			plugin_run="go test -race -tags=floci ./providers/gcp/plugin -run '^TestGCPFloci' -count=1"
 			if ! grep -Fq -- "$plugin_run" "$script" || ! grep -Fq -- "$plugin_run" <<<"$ci_block"; then
 				printf 'GCP Floci plugin sweep is missing from the local runner or CI job\n' >&2
 				fail=1

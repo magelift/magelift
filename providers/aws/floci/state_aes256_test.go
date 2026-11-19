@@ -5,37 +5,22 @@ package floci_test
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
-	awscfg "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
+
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/magelift/magelift/internal/s3state"
 )
 
 func TestAES256LockAgainstFloci(t *testing.T) {
-	if os.Getenv("MAGELIFT_FLOCI") != "1" {
-		t.Skip("set MAGELIFT_FLOCI=1 to run the Floci AES256 integration test")
-	}
-	endpoint := os.Getenv("MAGELIFT_FLOCI_ENDPOINT")
-	if endpoint == "" {
-		endpoint = "http://localhost:4566"
-	}
+	endpoint := flociEndpoint(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	configuration, err := awscfg.LoadDefaultConfig(ctx,
-		awscfg.WithRegion("us-east-1"),
-		awscfg.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	configuration := flociConfig(t, ctx, endpoint)
 	s3Client := s3.NewFromConfig(configuration, func(options *s3.Options) {
-		options.BaseEndpoint = awssdk.String(endpoint)
 		options.UsePathStyle = true
 	})
 	bucket := "magelift-aes256-state"
