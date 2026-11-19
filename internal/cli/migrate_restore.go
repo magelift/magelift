@@ -277,10 +277,16 @@ func runKubeRestore(ctx context.Context, o restoreOptions, run restoreExec) (res
 		if err := verifyTarget(); err != nil {
 			return nil, err
 		}
+		// Azure Files can reject chown while already exposing a writable UID mapping.
+		// Check the scan separately so a failed find cannot look like an empty result.
+		prepare := `links=$(find /media -type l -print) || exit 1; test -z "$links" || { echo "media destination contains symlinks" >&2; exit 1; }; chown 10001:10001 /media || true`
+		if _, err := call(ctx, nil, "exec", "pod/"+name, "-c", "helper", "--", "sh", "-c", prepare); err != nil {
+			return nil, fmt.Errorf("prepare media destination: %w", err)
+		}
 		reader, writer := io.Pipe()
 		done := make(chan error, 1)
 		go func() { err := writeRestoreTar(writer, o.Media); _ = writer.CloseWithError(err); done <- err }()
-		_, err := call(ctx, reader, "exec", "-i", "pod/"+name, "--", "sh", "-c", "test -z \"$(find /media -type l -print -quit)\" && exec tar -xf - -C /media")
+		_, err := call(ctx, reader, "exec", "-i", "pod/"+name, "-c", "writer", "--", "sh", "-c", "test -w /media && exec tar -xof - -C /media")
 		_ = reader.Close()
 		archiveErr := <-done
 		if err != nil {
@@ -305,6 +311,11 @@ func restorePod(name, image string, o restoreOptions, media bool) map[string]any
 	if media {
 		container["volumeMounts"] = []any{map[string]string{"name": "media", "mountPath": "/media"}}
 		spec["volumes"] = []any{map[string]any{"name": "media", "persistentVolumeClaim": map[string]string{"claimName": o.MediaClaim}}}
+		spec["containers"] = []any{container, map[string]any{
+			"name": "writer", "image": image, "command": []string{"sleep", fmt.Sprint(seconds)},
+			"securityContext": map[string]any{"runAsUser": 10001, "runAsGroup": 10001},
+			"volumeMounts":    []any{map[string]string{"name": "media", "mountPath": "/media"}},
+		}}
 	}
 	if !media {
 		if o.CASecret != "" {

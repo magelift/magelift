@@ -78,7 +78,7 @@ func TestRestoreImportsFromSecretAndMediaPVC(t *testing.T) {
 			if string(data) != "SELECT 1;" {
 				t.Errorf("SQL stream %q", data)
 			}
-		case strings.Contains(joined, "tar -xf"):
+		case strings.Contains(joined, "tar -xof"):
 			archives++
 			reader := tar.NewReader(input)
 			h, err := reader.Next()
@@ -344,5 +344,26 @@ func TestRestoreReportsTruncatedGzipMayHavePartiallyImported(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "destination database may be partially modified") {
 		t.Fatalf("error=%v", err)
+	}
+}
+
+func TestRestoreStopsWhenMediaScanFails(t *testing.T) {
+	opts := restoreOptions{Context: "target", Namespace: "shop", NamespaceUID: "uid", Media: t.TempDir(), MediaClaim: "media"}
+	var extraction bool
+	_, err := runKubeRestore(context.Background(), opts, func(_ context.Context, _ io.Reader, args ...string) (string, error) {
+		joined := strings.Join(args, " ")
+		if strings.Contains(joined, "get namespace") {
+			return "uid", nil
+		}
+		if strings.Contains(joined, "find /media") {
+			return "", errors.New("scan failed")
+		}
+		if strings.Contains(joined, "tar -xof") {
+			extraction = true
+		}
+		return "", nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "prepare media destination") || extraction {
+		t.Fatalf("err=%v extraction=%t", err, extraction)
 	}
 }

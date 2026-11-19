@@ -77,7 +77,7 @@ apiVersion: v1
 kind: Pod
 metadata: {name: media-check, namespace: restore-smoke}
 spec:
-  securityContext: {runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001}
+  securityContext: {runAsUser: 10001, runAsGroup: 10001}
   containers:
     - name: check
       image: busybox:1.37.0
@@ -97,7 +97,7 @@ args=(migrate restore --context "$context" --namespace restore-smoke --namespace
 "$tmp/magelift" "${args[@]}"
 row=$(k -n restore-smoke exec deployment/mariadb -- env MYSQL_PWD=synthetic-password mariadb -uroot -N -B magento -e 'SELECT value FROM synthetic WHERE id=1')
 [[ $row == restored ]] || { echo "unexpected database value: $row" >&2; exit 1; }
-k -n restore-smoke exec media-check -- sh -c 'test "$(cat /media/catalog/nested/example.txt)" = synthetic-media && echo written-by-magento > /media/catalog/nested/write-check && test "$(cat /media/catalog/nested/write-check)" = written-by-magento'
+k -n restore-smoke exec media-check -- sh -c 'test "$(cat /media/catalog/nested/example.txt)" = synthetic-media && echo root-write > /media/write-check && test "$(cat /media/write-check)" = root-write && echo written-by-magento > /media/catalog/nested/write-check && test "$(cat /media/catalog/nested/write-check)" = written-by-magento'
 if "$tmp/magelift" "${args[@]}" > "$tmp/retry.log" 2>&1; then
   echo 'restore unexpectedly accepted a nonempty database' >&2
   exit 1
