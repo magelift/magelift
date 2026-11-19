@@ -8,7 +8,6 @@ import (
 	"net/rpc"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/hashicorp/go-plugin"
@@ -50,8 +49,6 @@ type Server struct {
 	outputs         func(context.Context, storedPlan) (map[string]any, []string, error)
 	stateFactory    func(context.Context, storedPlan) (*azurestate.Manager, error)
 	blobFactory     func(context.Context, storedPlan) (*azblob.Client, error)
-	lockMu          sync.Mutex
-	locks           map[string]*azurestate.Handle
 }
 
 func (s *Server) Describe(req *sdk.DescribeRequest, resp *sdk.DescribeResponse) error {

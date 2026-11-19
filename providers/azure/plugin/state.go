@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,9 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/secretsafe"
 	azurestate "github.com/magelift/magelift/providers/azure/state"
 	"github.com/magelift/magelift/sdk"
@@ -66,6 +67,39 @@ func stateError(err error) *sdk.OperationError {
 	}
 	message, _ := secretsafe.RedactSensitiveText(err.Error())
 	return &sdk.OperationError{Code: code, Message: message}
+}
+
+type azureStateLockReceipt struct {
+	Version         int    `json:"version"`
+	BackendURL      string `json:"backendUrl"`
+	BackendIdentity string `json:"backendIdentity"`
+	StackName       string `json:"stackName"`
+	Project         string `json:"project"`
+	Environment     string `json:"environment"`
+	ETag            string `json:"etag"`
+}
+
+func encodeAzureStateLockReceipt(receipt azureStateLockReceipt) (string, error) {
+	body, err := json.Marshal(receipt)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(body), nil
+}
+
+func decodeAzureStateLockReceipt(token string) (azureStateLockReceipt, error) {
+	if len(token) > 8192 {
+		return azureStateLockReceipt{}, azurestate.ErrLockReplaced
+	}
+	body, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return azureStateLockReceipt{}, azurestate.ErrLockReplaced
+	}
+	var receipt azureStateLockReceipt
+	if err := json.Unmarshal(body, &receipt); err != nil || receipt.Version != 1 || receipt.BackendURL == "" || receipt.BackendIdentity == "" || receipt.StackName == "" || receipt.Project == "" || receipt.Environment == "" || receipt.ETag == "" {
+		return azureStateLockReceipt{}, azurestate.ErrLockReplaced
+	}
+	return receipt, nil
 }
 
 func (s *Server) StateStatus(req *sdk.StateStatusCall, resp *sdk.StateStatusResult) error {
@@ -124,23 +158,27 @@ func (s *Server) StateLock(req *sdk.StateLockCall, resp *sdk.StateLockResult) er
 		resp.Error = stateError(err)
 		return nil
 	}
-	s.lockMu.Lock()
-	defer s.lockMu.Unlock()
-	key := plan.BackendURL + "\x00" + plan.Envelope.StackName
-	if s.locks[key] != nil {
-		resp.Error = stateError(azurestate.ErrLocked)
-		return nil
-	}
 	handle, err := manager.Acquire(ctx, req.Owner)
 	if err != nil {
 		resp.Error = stateError(err)
 		return nil
 	}
-	if s.locks == nil {
-		s.locks = make(map[string]*azurestate.Handle)
+	backendIdentity, err := manager.BackendIdentity()
+	if err != nil {
+		resp.Error = stateError(errors.Join(err, handle.Release(ctx)))
+		return nil
 	}
-	s.locks[key] = handle
-	resp.Locked = true
+	receipt := azureStateLockReceipt{
+		Version: 1, BackendURL: plan.BackendURL, BackendIdentity: backendIdentity,
+		StackName: plan.Envelope.StackName, Project: plan.Spec.Project,
+		Environment: plan.Spec.Environment, ETag: string(handle.ETag()),
+	}
+	token, err := encodeAzureStateLockReceipt(receipt)
+	if err != nil {
+		resp.Error = stateError(errors.Join(err, handle.Release(ctx)))
+		return nil
+	}
+	resp.Locked, resp.ReleaseToken = true, token
 	return nil
 }
 
@@ -163,21 +201,28 @@ func (s *Server) StateUnlock(req *sdk.StateUnlockCall, resp *sdk.StateUnlockResu
 		resp.Error = stateError(err)
 		return nil
 	}
-	s.lockMu.Lock()
-	defer s.lockMu.Unlock()
-	key := plan.BackendURL + "\x00" + plan.Envelope.StackName
-	var info platform.LockInfo
-	if handle := s.locks[key]; handle != nil {
-		info, err = manager.Status(ctx)
-		if err == nil {
-			err = handle.Release(ctx)
+	if req.ReleaseToken != "" {
+		receipt, err := decodeAzureStateLockReceipt(req.ReleaseToken)
+		if err != nil {
+			resp.Error = stateError(err)
+			return nil
 		}
-		if err == nil || errors.Is(err, azurestate.ErrNotLocked) || errors.Is(err, azurestate.ErrLockReplaced) {
-			delete(s.locks, key)
+		backendIdentity, err := manager.BackendIdentity()
+		if err != nil {
+			resp.Error = stateError(err)
+			return nil
 		}
-	} else {
-		info, err = manager.Unlock(ctx)
+		if receipt.BackendURL != plan.BackendURL || receipt.BackendIdentity != backendIdentity || receipt.StackName != plan.Envelope.StackName || receipt.Project != plan.Spec.Project || receipt.Environment != plan.Spec.Environment {
+			resp.Error = stateError(azurestate.ErrLockReplaced)
+			return nil
+		}
+		if err := manager.ReleaseReceipt(ctx, azcore.ETag(receipt.ETag)); err != nil {
+			resp.Error = stateError(err)
+		}
+		return nil
 	}
+	// An empty receipt is reserved for an explicit operator force-unlock.
+	info, err := manager.Unlock(ctx)
 	if errors.Is(err, azurestate.ErrNotLocked) {
 		return nil
 	}

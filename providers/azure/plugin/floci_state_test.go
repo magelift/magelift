@@ -4,6 +4,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -50,6 +51,9 @@ func TestAzureFlociPluginStateOperations(t *testing.T) {
 	if err := server.StateLock(lockCall, &locked); err != nil || locked.Error != nil || !locked.Locked {
 		t.Fatalf("lock = %#v, %v", locked, err)
 	}
+	if locked.ReleaseToken == "" {
+		t.Fatal("lock acquisition returned no release receipt")
+	}
 	var second sdk.StateLockResult
 	if err := server.StateLock(lockCall, &second); err != nil || second.Error == nil || second.Error.Code != sdk.ErrCodeConflict {
 		t.Fatalf("second lock = %#v, %v", second, err)
@@ -59,7 +63,7 @@ func TestAzureFlociPluginStateOperations(t *testing.T) {
 		t.Fatalf("status = %#v, %v", status, err)
 	}
 	var unlocked sdk.StateUnlockResult
-	if err := server.StateUnlock(&sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: planned.Plan}, &unlocked); err != nil || unlocked.Error != nil {
+	if err := server.StateUnlock(&sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: planned.Plan, ReleaseToken: locked.ReleaseToken}, &unlocked); err != nil || unlocked.Error != nil {
 		t.Fatalf("unlock = %#v, %v", unlocked, err)
 	}
 	status = sdk.StateStatusResult{}
@@ -68,7 +72,7 @@ func TestAzureFlociPluginStateOperations(t *testing.T) {
 	}
 }
 
-func TestAzureFlociStaleHandleDoesNotDeleteSuccessor(t *testing.T) {
+func TestAzureFlociReleaseReceiptSurvivesRestart(t *testing.T) {
 	if os.Getenv("MAGELIFT_FLOCI_AZURE") != "1" {
 		t.Skip("Azure emulator is required")
 	}
@@ -88,9 +92,12 @@ func TestAzureFlociStaleHandleDoesNotDeleteSuccessor(t *testing.T) {
 	}
 	t.Cleanup(func() { _, _ = client.DeleteContainer(context.Background(), container, nil) })
 	request := testPlanRequest()
-	server := &Server{stateFactory: func(_ context.Context, plan storedPlan) (*azurestate.Manager, error) {
-		return azurestate.NewManager(client, container, plan.Spec.Project, plan.Spec.Environment)
-	}}
+	newServer := func() *Server {
+		return &Server{stateFactory: func(_ context.Context, plan storedPlan) (*azurestate.Manager, error) {
+			return azurestate.NewManager(client, container, plan.Spec.Project, plan.Spec.Environment)
+		}}
+	}
+	server := newServer()
 	var plan sdk.PlanResult
 	if err := server.Plan(request, &plan); err != nil || plan.Error != nil {
 		t.Fatalf("plan: %v %#v", err, plan.Error)
@@ -100,42 +107,46 @@ func TestAzureFlociStaleHandleDoesNotDeleteSuccessor(t *testing.T) {
 	if err := server.StateLock(call, &locked); err != nil || locked.Error != nil {
 		t.Fatalf("first lock: %v %#v", err, locked)
 	}
+	if locked.ReleaseToken == "" {
+		t.Fatal("first lock returned no receipt")
+	}
+	forceUnlock := &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: plan.Plan}
+	var forceResult sdk.StateUnlockResult
+	if err := server.StateUnlock(forceUnlock, &forceResult); err != nil || forceResult.Error != nil {
+		t.Fatalf("explicit force unlock: %v %#v", err, forceResult)
+	}
+	oldReceipt := locked.ReleaseToken
+
+	successorServer := newServer()
+	call.Owner = "successor"
+	var successorLock sdk.StateLockResult
+	if err := successorServer.StateLock(call, &successorLock); err != nil || successorLock.Error != nil || successorLock.ReleaseToken == "" {
+		t.Fatalf("successor lock: %v %#v", err, successorLock)
+	}
+
+	staleServer := newServer()
+	staleCall := &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: plan.Plan, ReleaseToken: oldReceipt}
+	var staleResult sdk.StateUnlockResult
+	if err := staleServer.StateUnlock(staleCall, &staleResult); err != nil || staleResult.Error == nil || staleResult.Error.Code != sdk.ErrCodeConflict {
+		t.Fatalf("stale receipt release: %v %#v", err, staleResult)
+	}
 	manager, err := azurestate.NewManager(client, container, "shop", "preview")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if _, err := manager.Unlock(ctx); err != nil {
-		t.Fatal(err)
-	}
-	successor, err := manager.Acquire(ctx, "successor")
-	if err != nil {
-		t.Fatal(err)
-	}
-	unlock := &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: plan.Plan}
-	var unlocked sdk.StateUnlockResult
-	if err := server.StateUnlock(unlock, &unlocked); err != nil || unlocked.Error == nil || unlocked.Error.Code != sdk.ErrCodeConflict {
-		t.Fatalf("stale release: %v %#v", err, unlocked)
 	}
 	status, err := manager.Status(ctx)
 	if err != nil || status.Owner != "successor" {
 		t.Fatalf("successor changed: %v %#v", err, status)
 	}
-	if err := successor.Release(ctx); err != nil {
-		t.Fatal(err)
+
+	restartedServer := newServer()
+	unlockSuccessor := &sdk.StateUnlockCall{ProtocolVersion: sdk.ProtocolV1, Envelope: request.Envelope, Plan: plan.Plan, ReleaseToken: successorLock.ReleaseToken}
+	var successorResult sdk.StateUnlockResult
+	if err := restartedServer.StateUnlock(unlockSuccessor, &successorResult); err != nil || successorResult.Error != nil {
+		t.Fatalf("successor receipt release after restart: %v %#v", err, successorResult)
 	}
-	locked = sdk.StateLockResult{}
-	if err := server.StateLock(call, &locked); err != nil || locked.Error != nil {
-		t.Fatalf("reacquire after stale handle: %v %#v", err, locked)
-	}
-	if _, err := manager.Unlock(ctx); err != nil {
-		t.Fatal(err)
-	}
-	unlocked = sdk.StateUnlockResult{}
-	if err := server.StateUnlock(unlock, &unlocked); err != nil || unlocked.Error != nil {
-		t.Fatalf("missing lock cleanup: %v %#v", err, unlocked)
-	}
-	locked = sdk.StateLockResult{}
-	if err := server.StateLock(call, &locked); err != nil || locked.Error != nil {
-		t.Fatalf("reacquire after remote deletion: %v %#v", err, locked)
+	status, err = manager.Status(ctx)
+	if !errors.Is(err, azurestate.ErrNotLocked) {
+		t.Fatalf("lock remains after restart release: status=%#v err=%v", status, err)
 	}
 }

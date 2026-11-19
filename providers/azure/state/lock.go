@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -36,6 +37,15 @@ type Handle struct {
 	manager *Manager
 	etag    azcore.ETag
 	info    platform.LockInfo
+}
+
+// ETag returns the object version captured by Acquire for a stateless release
+// receipt. The value is only useful with the manager that owns the Blob.
+func (h *Handle) ETag() azcore.ETag {
+	if h == nil {
+		return ""
+	}
+	return h.etag
 }
 
 func NewManager(client *azblob.Client, container, project, environment string) (*Manager, error) {
@@ -102,6 +112,31 @@ func (m *Manager) inspect(ctx context.Context) (platform.LockInfo, azcore.ETag, 
 func (m *Manager) Status(ctx context.Context) (platform.LockInfo, error) {
 	info, _, err := m.inspect(ctx)
 	return info, err
+}
+
+// BackendIdentity binds receipts to the account endpoint and container while
+// omitting URL credentials such as SAS query parameters.
+func (m *Manager) BackendIdentity() (string, error) {
+	if m == nil || m.client == nil {
+		return "", errors.New("Azure state lock manager is required")
+	}
+	endpoint, err := url.Parse(m.client.URL())
+	if err != nil || endpoint.Scheme == "" || endpoint.Host == "" {
+		return "", errors.New("Azure Blob service endpoint is invalid")
+	}
+	endpoint.User = nil
+	endpoint.RawQuery = ""
+	endpoint.Fragment = ""
+	return strings.TrimRight(endpoint.String(), "/") + "/" + m.container, nil
+}
+
+// ReleaseReceipt conditionally deletes the Blob version captured by Acquire.
+// It does not depend on the process that created the receipt remaining alive.
+func (m *Manager) ReleaseReceipt(ctx context.Context, etag azcore.ETag) error {
+	if etag == "" {
+		return ErrLockReplaced
+	}
+	return m.delete(ctx, etag)
 }
 
 func (m *Manager) delete(ctx context.Context, etag azcore.ETag) error {
