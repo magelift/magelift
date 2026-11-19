@@ -1,0 +1,7 @@
+name: Install Pulumi for Floci tests
+description: Install the CLI used to read and write local emulator stacks.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: bash "$GITHUB_WORKSPACE/internal/cli/ci_setup_pulumi.bash"

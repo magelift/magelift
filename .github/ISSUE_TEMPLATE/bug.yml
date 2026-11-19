@@ -36,7 +36,7 @@ body:
     id: reproduce
     attributes:
       label: Steps to reproduce
-      description: Minimal steps, commands, and relevant magelift.yaml snippets (redact secrets).
+      description: Minimal steps, commands, and relevant magelift.php snippets (redact secrets).
       render: markdown
     validations:
       required: true

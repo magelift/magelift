@@ -76,6 +76,14 @@ if [[ "$aws_compose" != "$aws_ci" || "$gcp_compose" != "$gcp_ci" ]]; then
 	fail=1
 fi
 
+# The repository tests providers against Floci. Customer workflows under
+# examples/ and tests/fixtures/ deploy to the shop's own cloud accounts.
+live_cloud='uses:[[:space:]]*(aws-actions/[^@[:space:]]+|azure/login|google-github-actions/auth)@|scripts/(aws|gcp|k8s)-acceptance-local\.sh|(magelift|pulumi)[[:space:]]+(deploy|destroy|up)([[:space:]]|$)|secrets\.(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AZURE_CREDENTIALS|GOOGLE_CREDENTIALS)'
+if grep -REin --include='*.yml' --include='*.yaml' "$live_cloud" "$ROOT/.github/workflows" "$ROOT/.github/actions"; then
+	printf 'A MageLift repository workflow references live cloud deployment or login. Use the Floci test target.\n' >&2
+	fail=1
+fi
+
 if [[ "$fail" -ne 0 ]]; then
 	printf 'port_coverage_floci_gate_test FAILED\n' >&2
 	exit 1

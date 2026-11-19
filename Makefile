@@ -15,16 +15,17 @@ help: ## Show available targets
 # CI and make fmt-check must use the go.mod toolchain so composite literals
 # do not flip between indent styles.
 GOFMT := $(shell go env GOROOT)/bin/gofmt
+GO_SOURCES := find . \( -name .magelift -o -name vendor -o -name .git -o -name node_modules \) -prune -o -type f -name '*.go' -print0
 
 fmt: ## Format Go sources
-	$(GOFMT) -w $$(find . -type f -name '*.go' -not -path './vendor/*')
+	$(GO_SOURCES) | xargs -0 $(GOFMT) -w
 
 fmt-check: ## Check Go formatting without changing files
-	test -z "$$($(GOFMT) -l $$(find . -type f -name '*.go' -not -path './vendor/*'))"
+	test -z "$$($(GO_SOURCES) | xargs -0 $(GOFMT) -l)"
 
-test: test-fast ## Run all three Go module suites without race
+test: test-fast ## Run all Go module suites without race
 
-test-fast: ## Fast Go tests for root, sdk, and providers/gcp (no race)
+test-fast: ## Fast Go tests for the CLI, SDK, and nested providers (no race)
 	./scripts/go-test-modules.sh
 
 test-community:
@@ -68,7 +69,7 @@ core-leanness: ## Prove the CLI carries no GCP provider code or GCP cloud SDKs
 # provider-SDK independence is a post-parity gate, not this one.
 
 lint: ## Run static Go checks
-	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
 
 license-check: ## Check Go dependency licenses
 	go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown \
@@ -80,6 +81,9 @@ check-clean-room: ## Fail if vendored ece-tools / cloud-patches / ACC cli trees 
 
 release-smoke: ## Serial single-target goreleaser smoke (safe on low-RAM Macs)
 	./scripts/release-smoke-local.sh
+
+ci-act-project: ## Exercise consumer PHP config, workflow generation and a local OCI registry
+	./scripts/ci-act-project.sh
 
 ci-act-go: ## Run Go CI jobs locally via nektos/act (serial; no Actions minutes)
 	./scripts/ci-act-go.sh
@@ -97,7 +101,7 @@ image-test: ## Build and inspect the local PHP runtime image
 	docker buildx bake php-nginx --load
 	test "$$(docker run --rm magelift/php-nginx:local id -u)" = 10001
 	docker run --rm magelift/php-nginx:local php-fpm --test
-	test "$$(docker run --rm --entrypoint nginx magelift/php-nginx:local -v 2>&1)" = "nginx version: nginx/1.30.4"
+	test "$$(docker run --rm --entrypoint nginx magelift/php-nginx:local -v 2>&1)" = "nginx version: nginx/1.30.7"
 	docker run --rm --entrypoint nginx magelift/php-nginx:local -t -c /etc/nginx/nginx.conf
 	docker run --rm --entrypoint nginx magelift/php-nginx:local -T -c /etc/nginx/nginx.conf | grep -q "location /media/"
 	for prefix in customer downloadable import custom_options; do docker run --rm --entrypoint nginx magelift/php-nginx:local -T -c /etc/nginx/nginx.conf | grep -q "location ^~ /media/$$prefix/" || exit 1; done
@@ -130,6 +134,7 @@ build-e2e-test: builder-image-test ## Build the fixture through the CLI, Docker,
 
 pulumi-mock-test: ## Run Pulumi mock graph tests for cloud adapters (no account)
 	go test -race ./internal/cloud/... -count=1
+	go test ./providers/gcp/stack ./providers/azure/stack -count=1
 
 floci-test-aws: ## Run account-free AWS contract tests through Floci
 	./scripts/floci-test-aws.sh
@@ -137,7 +142,16 @@ floci-test-aws: ## Run account-free AWS contract tests through Floci
 floci-gcp-test: ## Run account-free GCP contract tests through floci-gcp
 	./providers/gcp/scripts/floci-gcp-test.sh
 
-local-gates: pulumi-mock-test acceptance-harness-test floci-test-aws floci-gcp-test ## Account-free stack: Pulumi mocks, harness, Floci AWS/GCP
+magento-dev-smoke: ## Install a real Magento fixture locally and verify HTTP, GraphQL and repeat startup
+	./scripts/magento-dev-smoke.sh
+
+floci-azure-test: ## Run account-free Azure Blob and Key Vault tests through Floci
+	./providers/azure/scripts/floci-azure-test.sh
+
+azure-mysql-tls-test: ## Verify Magento and bootstrap PDO against a local TLS-only MySQL server
+	./providers/azure/scripts/mysql-tls-test.sh
+
+local-gates: pulumi-mock-test acceptance-harness-test floci-test-aws floci-gcp-test floci-azure-test ## Account-free stack: Pulumi mocks, harness, Floci AWS/GCP/Azure
 
 # Offline harness steps print a label and die at a ceiling so a stuck child
 # cannot hang `make acceptance-harness-test` with no output. Shape/dry-run
@@ -365,7 +379,9 @@ workflow-check: ## Validate GitHub Actions workflow syntax and expressions
 		examples/.github/workflows/*.yml \
 		examples/sample-shop/.github/workflows/*.yml \
 		tests/fixtures/ci/aws/.github/workflows/*.yml \
-		tests/fixtures/ci/gcp/.github/workflows/*.yml
+		tests/fixtures/ci/gcp/.github/workflows/*.yml \
+		tests/fixtures/ci/azure/.github/workflows/*.yml \
+		tests/act/*.yml
 
 verify: generate-check cli-docs-check fmt-check lint test-fast test-race-full sdk-test license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
 generate: certification-docs ## Generate configuration, certification, reference, and skill artifacts

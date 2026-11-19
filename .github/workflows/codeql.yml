@@ -1,13 +1,16 @@
 name: CodeQL
 
-# PR (Go-touching only) + weekly. Skip Dependabot — CI go-verify/govulncheck
-# is the dep-bump gate; weekly schedule covers baseline. No main-push re-run.
+# Analyze Go changes and run a weekly scan. Dependency PRs run govulncheck in CI.
 on:
   pull_request:
     paths:
       - '**/*.go'
       - 'go.mod'
       - 'go.sum'
+      - 'providers/*/go.mod'
+      - 'providers/*/go.sum'
+      - 'sdk/go.mod'
+      - 'go.work'
       - '.github/workflows/codeql.yml'
   schedule:
     - cron: '23 3 * * 1'
@@ -38,20 +41,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
         if: matrix.language == 'go'
       - uses: ./.github/actions/go-memlimit
         if: matrix.language == 'go'
-      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:${{ matrix.language }}
-          # Repo does not have Code scanning enabled → SARIF upload fails and
-          # emails weekly. Keep analysis; skip upload until GHAS is turned on.
+          # Enable uploads once the repository has GitHub code scanning.
           upload: never
         continue-on-error: false

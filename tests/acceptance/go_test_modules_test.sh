@@ -16,6 +16,7 @@ list="$(bash "$SCRIPT" --list-modules)"
 printf '%s\n' "$list" | grep -qx root || fail "--list-modules must include root"
 printf '%s\n' "$list" | grep -qx sdk || fail "--list-modules must include sdk"
 printf '%s\n' "$list" | grep -qx gcp || fail "--list-modules must include gcp"
+printf '%s\n' "$list" | grep -qx azure || fail "--list-modules must include azure"
 
 set +e
 bash "$SCRIPT" --only definitely-not-a-module >/dev/null 2>&1

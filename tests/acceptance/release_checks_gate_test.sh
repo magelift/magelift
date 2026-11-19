@@ -28,6 +28,8 @@ runs = [
     {"name": "sdk-verify", "status": "completed", "conclusion": "success", "id": 3, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/3"},
     {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 4, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/4"},
     {"name": "floci-gcp", "status": "completed", "conclusion": "success", "id": 5, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/5"},
+    {"name": "azure-provider", "status": "completed", "conclusion": "success", "id": 15, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/15"},
+    {"name": "floci-aws", "status": "completed", "conclusion": "success", "id": 25, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/25"},
     {"name": "php (8.3)", "status": "completed", "conclusion": "success", "id": 61, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/61"},
     {"name": "php (8.5)", "status": "completed", "conclusion": "success", "id": 62, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/62"},
     {"name": "unrelated", "status": "completed", "conclusion": "failure", "id": 7, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/7"},
@@ -343,6 +345,8 @@ page2 = {"check_runs": [
     {"name": "sdk-verify", "status": "completed", "conclusion": "success", "id": 203, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/203"},
     {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 204, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/204"},
     {"name": "floci-gcp", "status": "completed", "conclusion": "success", "id": 205, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/205"},
+    {"name": "azure-provider", "status": "completed", "conclusion": "success", "id": 215, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/215"},
+    {"name": "floci-aws", "status": "completed", "conclusion": "success", "id": 225, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/225"},
     {"name": "php (8.3)", "status": "completed", "conclusion": "success", "id": 206, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/206"},
     {"name": "php (8.5)", "status": "completed", "conclusion": "success", "id": 207, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/207"},
 ]}
@@ -383,7 +387,7 @@ def job(run, name, status, conclusion, ident):
         "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/{ident}",
     }
 
-names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-verify", "floci-gcp", "php (8.3)", "php (8.5)"]
+names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-verify", "azure-provider", "floci-aws", "floci-gcp", "php (8.3)", "php (8.5)"]
 runs = [job("100", name, "completed", "success", 10 + i) for i, name in enumerate(names)]
 runs.extend([
     job("200", "CI passed", "queued", None, 20),
@@ -424,7 +428,7 @@ def job(run, name, status, conclusion, ident):
         "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/{ident}",
     }
 
-names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-verify", "floci-gcp", "php (8.3)", "php (8.5)"]
+names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-verify", "azure-provider", "floci-aws", "floci-gcp", "php (8.3)", "php (8.5)"]
 runs = [job("100", name, "completed", "success", 10 + i) for i, name in enumerate(names)]
 runs.append(job("200", "lint", "in_progress", None, 30))
 with open(sys.argv[1], "w") as handle:
@@ -445,7 +449,7 @@ fi
 
 # 24. Aggregate success with skipped release-mandatory jobs blocks.
 write_payload
-for name in lint go-verify sdk-verify floci-gcp; do
+for name in lint go-verify sdk-verify azure-provider floci-aws floci-gcp; do
 	mutate "$name" "[{\"name\": \"$name\", \"status\": \"completed\", \"conclusion\": \"skipped\", \"id\": 80, \"html_url\": \"https://github.com/magelift/magelift/actions/runs/100/job/80\"}]"
 done
 if "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/skipped-mand.out" 2>&1; then

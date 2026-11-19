@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run go test for the three Go modules: root, sdk (GOWORK=off), and providers/gcp.
+# Run go test for the CLI, public SDK and provider modules.
 # Optional -race via --race. MAGELIFT_GO_TEST_WRAPPER overrides the go command (tests only).
 set -Eeuo pipefail
 
@@ -10,7 +10,7 @@ magelift_apply_go_memlimit
 
 usage() {
   cat <<'EOF'
-usage: go-test-modules.sh [--community] [--race] [--only root|sdk|gcp] [--list-modules]
+usage: go-test-modules.sh [--community] [--race] [--only root|sdk|gcp|azure] [--list-modules]
 
   --community     omit frozen provider/vendor suites from the root module
   --race          pass -race to go test
@@ -34,7 +34,7 @@ go_cmd() {
 
 valid_module() {
   case "$1" in
-  root | sdk | gcp) return 0 ;;
+  root | sdk | gcp | azure) return 0 ;;
   *) return 1 ;;
   esac
 }
@@ -55,14 +55,14 @@ while [[ $# -gt 0 ]]; do
       exit 2
     }
     if ! valid_module "$2"; then
-      printf 'go-test-modules: unknown module %s (want root, sdk, or gcp)\n' "$2" >&2
+      printf 'go-test-modules: unknown module %s (want root, sdk, gcp, or azure)\n' "$2" >&2
       exit 2
     fi
     only+=("$2")
     shift 2
     ;;
   --list-modules)
-    printf '%s\n' root sdk gcp
+    printf '%s\n' root sdk gcp azure
     exit 0
     ;;
   -h | --help)
@@ -124,9 +124,10 @@ run_sdk() {
   (cd "$ROOT/sdk" && GOWORK=off go_cmd test "${race_args[@]}" ./... -count=1)
 }
 
-run_gcp() {
-  printf '+ go-test-modules: providers/gcp ./...\n'
-  (cd "$ROOT/providers/gcp" && go_cmd test "${race_args[@]}" ./... -count=1)
+run_provider() {
+  local provider="$1"
+  printf '+ go-test-modules: providers/%s ./...\n' "$provider"
+  (cd "$ROOT/providers/$provider" && go_cmd test "${race_args[@]}" ./... -count=1)
 }
 
 status=0
@@ -140,10 +141,10 @@ if module_wanted sdk; then
     status=1
   fi
 fi
-if module_wanted gcp; then
-  if ! run_gcp; then
+for provider in gcp azure; do
+  if module_wanted "$provider" && ! run_provider "$provider"; then
     status=1
   fi
-fi
+done
 
 exit "$status"

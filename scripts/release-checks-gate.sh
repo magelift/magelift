@@ -7,7 +7,7 @@
 # Usage: release-checks-gate.sh --sha <sha> [--repo owner/name]
 #        [--run-id ID] [--checks-json FILE] [--exclude-run ID] [check...]
 # Default checks: CI passed, lint, go-verify, sdk-verify,
-# provider-verify, floci-gcp, php (8.3), php (8.5).
+# provider-verify, azure-provider, floci-aws, floci-gcp, php (8.3), php (8.5).
 # "CI passed" still catches failures in other jobs; skipped
 # path-filtered jobs count as OK there, so this list also
 # requires the release-mandatory jobs to succeed (not skip)
@@ -26,7 +26,7 @@ SHA=""
 CHECKS_JSON=""
 EXCLUDE_RUN=""
 RUN_ID=""
-CHECKS=("CI passed" "lint" "go-verify" "sdk-verify" "provider-verify" "floci-gcp" "php (8.3)" "php (8.5)")
+CHECKS=("CI passed" "lint" "go-verify" "sdk-verify" "provider-verify" "azure-provider" "floci-aws" "floci-gcp" "php (8.3)" "php (8.5)")
 POLL_SECONDS="${GATE_POLL_SECONDS:-60}"
 TIMEOUT_SECONDS="${GATE_TIMEOUT_SECONDS:-1800}"
 

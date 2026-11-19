@@ -19,6 +19,13 @@ concurrency:
 permissions:
   contents: read
 
+# Give repository tests dummy AWS credentials and use Floci for SDK requests.
+env:
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  AWS_EC2_METADATA_DISABLED: 'true'
+  AWS_ENDPOINT_URL: http://127.0.0.1:4566
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -60,8 +67,11 @@ jobs:
               - '.golangci.yml'
               # CI Go jobs live here — workflow-only edits must still exercise them.
               - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+              - 'internal/cli/ci_setup_pulumi.bash'
               - 'docker-compose.floci.yml'
               - 'docker-compose.floci-gcp.yml'
+              - 'docker-compose.floci-azure.yml'
             sdk:
               - 'sdk/**/*.go'
               - 'sdk/go.mod'
@@ -70,8 +80,9 @@ jobs:
               - 'go.work.sum'
             provider:
               - 'providers/**/*.go'
-              - 'providers/gcp/go.mod'
-              - 'providers/gcp/go.sum'
+              - 'providers/*/go.mod'
+              - 'providers/*/go.sum'
+              - 'providers/*/scripts/**'
               - 'sdk/**/*.go'
               - 'sdk/go.mod'
               - 'sdk/go.sum'
@@ -92,6 +103,8 @@ jobs:
               - 'scripts/**'
             workflows:
               - '.github/workflows/**'
+              - '.github/actions/**'
+              - 'internal/cli/ci_setup_pulumi.bash'
               - '.github/dependabot.yml'
             release:
               - '.goreleaser.yml'
@@ -108,7 +121,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
           cache: false
@@ -117,9 +130,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
             go-prime-${{ runner.os }}-
           lookup-only: true
       - uses: ./.github/actions/go-memlimit
@@ -132,7 +145,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
 
   lint:
     name: lint
@@ -150,7 +163,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
           cache: false
@@ -159,16 +172,16 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
-            go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
+            go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          # Pin the binary (not "latest"): v2.13.2 is built with go1.27 for this toolchain.
-          version: v2.13.2
+          # Pin the binary to keep local and CI lint checks consistent.
+          version: v2.15.0
           args: ./...
 
   go-verify:
@@ -182,7 +195,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
           cache: false
@@ -191,9 +204,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - run: |
           gofmt="$(go env GOROOT)/bin/gofmt"
@@ -227,7 +240,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
           cache: false
@@ -236,9 +249,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - run: GOWORK=off go build ./...
         working-directory: sdk
@@ -251,7 +264,7 @@ jobs:
       - name: golangci-lint (SDK module)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.13.2
+          version: v2.15.0
           args: ./...
           working-directory: sdk
       - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
@@ -275,7 +288,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: providers/gcp/go.mod
           cache: false
@@ -284,9 +297,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - run: go build ./...
         working-directory: providers/gcp
@@ -299,7 +312,7 @@ jobs:
       - name: golangci-lint (provider module)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.13.2
+          version: v2.15.0
           args: ./...
           working-directory: providers/gcp
       - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
@@ -307,6 +320,22 @@ jobs:
           go-version-file: providers/gcp/go.mod
           go-package: ./...
           work-dir: providers/gcp
+
+  azure-provider:
+    needs: changes
+    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.provider == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: providers/azure/go.mod
+      - uses: ./.github/actions/go-memlimit
+      - uses: ./.github/actions/setup-pulumi
+      - run: go test -race ./providers/azure/... -count=1
+      - run: make floci-azure-test
 
   docs:
     needs: changes
@@ -317,9 +346,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: '3.12'
+          python-version: '3.15'
       - name: Install MkDocs
         run: pip install --disable-pip-version-check -r docs/requirements.txt
       - name: Build docs
@@ -329,11 +358,12 @@ jobs:
     needs: changes
     if: needs.changes.outputs.php == 'true'
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.php-version == '8.6' }}
     strategy:
       fail-fast: false
       matrix:
         # Full matrix on main; PR samples current + previous minor.
-        php-version: ${{ github.event_name == 'push' && fromJSON('["8.3","8.4","8.5"]') || fromJSON('["8.3","8.5"]') }}
+        php-version: ${{ github.event_name == 'push' && fromJSON('["8.3","8.4","8.5","8.6"]') || fromJSON('["8.3","8.5"]') }}
     defaults:
       run:
         working-directory: build
@@ -386,10 +416,10 @@ jobs:
           test "$(docker run --rm "$image" id -u)" = 10001
           test "$(docker run --rm "$image" php -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" = "$PHP_BRANCH"
           test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.php.branch" }}')" = "$PHP_BRANCH"
-          test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.nginx.version" }}')" = "1.30.4"
+          test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.nginx.version" }}')" = "1.30.7"
           test "$(docker image inspect "$image" --format '{{ index .Config.Labels "io.magelift.web-runtime" }}')" = "php-nginx"
           docker run --rm "$image" php-fpm --test
-          test "$(docker run --rm --entrypoint nginx "$image" -v 2>&1)" = "nginx version: nginx/1.30.4"
+          test "$(docker run --rm --entrypoint nginx "$image" -v 2>&1)" = "nginx version: nginx/1.30.7"
           docker run --rm --entrypoint nginx "$image" -t -c /etc/nginx/nginx.conf
           ./scripts/nginx-media-deny-test.sh
           docker run --rm --read-only --tmpfs /tmp:uid=10001,gid=10001 "$image" php -r 'file_put_contents(sys_get_temp_dir() . "/probe", "ok");'
@@ -407,6 +437,7 @@ jobs:
       - name: Scan runtime image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           image-ref: magelift/php-nginx:${{ matrix.php.branch }}-local
           format: table
           ignore-unfixed: true
@@ -417,6 +448,7 @@ jobs:
       - name: Scan builder image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           image-ref: magelift/php-builder:${{ matrix.php.branch }}-local
           format: table
           ignore-unfixed: true
@@ -454,6 +486,7 @@ jobs:
       - name: Scan frankenphp image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: v0.76.2
           image-ref: magelift/frankenphp-classic:${{ matrix.php.branch }}-local
           format: table
           ignore-unfixed: true
@@ -475,15 +508,11 @@ jobs:
 
   floci-aws:
     needs: changes
-    # Skip Dependabot: AWS contract suite is unrelated to module bumps and costs
-    # a cold Go compile on every deps PR.
-    if: >-
-      needs.changes.outputs.go == 'true'
-      && github.actor != 'dependabot[bot]'
+    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.provider == 'true'
     runs-on: ubuntu-latest
     services:
       floci:
-        image: floci/floci:2.3.0@sha256:e0b292df4dc9559b7b1bf4f51bdda4bb8e269276236438cd03cae661260ea8a9
+        image: floci/floci:2.5.0@sha256:a0fbf944d7f338cc0856f1ef83831ea749ff2be71956eb7a7fce08fc21458e19
         ports:
           - 4566:4566
         env:
@@ -495,7 +524,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
       - uses: ./.github/actions/go-memlimit
@@ -507,13 +536,11 @@ jobs:
 
   floci-gcp:
     needs: changes
-    if: >-
-      needs.changes.outputs.go == 'true'
-      && github.actor != 'dependabot[bot]'
+    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.provider == 'true'
     runs-on: ubuntu-latest
     services:
       floci-gcp:
-        image: floci/floci-gcp:0.11.0@sha256:eae9683d806ceb643bcb36aee97cdb8cad13c3e2959cd053bf40e481994fde12
+        image: floci/floci-gcp:0.13.0@sha256:a59403d43d524b1a08282d67d541a6d37bf7868cbd9d1311caa0d2983adf6f46
         ports:
           - 4588:4588
         env:
@@ -524,10 +551,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
       - uses: ./.github/actions/go-memlimit
+      - uses: ./.github/actions/setup-pulumi
       - name: Run floci-gcp contract tests
         env:
           MAGELIFT_FLOCI_GCP: '1'
@@ -536,7 +564,9 @@ jobs:
           SECRET_MANAGER_EMULATOR_HOST: 127.0.0.1:4588
           PUBSUB_EMULATOR_HOST: 127.0.0.1:4588
           GOOGLE_CLOUD_PROJECT: floci-local
-        run: go test -race -tags=floci_gcp ./providers/gcp/floci/floci-gcp -count=1
+        run: |
+          go test -race -tags=floci_gcp ./providers/gcp/floci/floci-gcp -count=1
+          go test -tags=floci_gcp ./providers/gcp/plugin -run '^TestGCPFlociPreviewSweepUsesSharedBucket$' -count=1
 
   release-config:
     needs: changes
@@ -550,7 +580,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           distribution: goreleaser
-          version: v2.18.3
+          version: v2.20.2
           args: check
 
   workflow-lint:
@@ -561,7 +591,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
       - uses: ./.github/actions/go-memlimit
@@ -593,7 +623,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
           cache: false
@@ -602,14 +632,14 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - name: Install pinned JSON/YAML tools
         env:
-          YQ_VERSION: v4.53.3
-          YQ_SHA256: fa52a4e758c63d38299163fbdd1edfb4c4963247918bf9c1c5d31d84789eded4
+          YQ_VERSION: v4.54.3
+          YQ_SHA256: 129534601871538efe0ba4c5e62a34fb1d5f469bcb975c4fddeb467d82974973
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y jq
@@ -641,6 +671,7 @@ jobs:
       - floci-aws
       - floci-gcp
       - provider-verify
+      - azure-provider
       - release-config
       - workflow-lint
       - shellcheck

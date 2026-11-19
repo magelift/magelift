@@ -6,7 +6,8 @@ root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "$root/scripts/go-memlimit.sh"
 magelift_apply_go_memlimit
 
-compose=(docker compose -f docker-compose.floci.yml)
+cd "$root"
+compose=(docker compose --project-name magelift-floci-aws -f docker-compose.floci.yml)
 cleanup() {
 	"${compose[@]}" down --remove-orphans >/dev/null 2>&1 || true
 }

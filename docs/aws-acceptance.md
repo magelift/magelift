@@ -149,7 +149,7 @@ for the shared `jq`/Mike Farah `yq` v4 preflight and the no-auto-install policy.
 - A signed immutable image digest and matching Cosign identity. **Must** be a
   MageLift runtime image (`php-nginx`, nginx + PHP-FPM) so `GET /health`
   returns 200 without Magento bootstrap (ALB + ECS container health)
-- A `magelift.yaml` environment named for the profile you will run (`preview`
+- A `magelift.php` environment named for the profile you will run (`preview`
   recommended)
 
 Unset `MAGELIFT_AWS_ENDPOINT_URL` so clients talk to real AWS, not Floci.
@@ -201,7 +201,7 @@ YAML. That catalog also warm-patches ECS `searchMode` (`disabled` then
 go build -trimpath -ldflags='-s -w' -o /tmp/magelift ./cmd/magelift
 
 export MAGELIFT_BIN=/tmp/magelift
-export MAGELIFT_CONFIG=/path/to/acceptance.magelift.yaml
+export MAGELIFT_CONFIG=/path/to/acceptance.magelift.php
 export MAGELIFT_AWS_ACCEPTANCE_PROFILE=preview
 export MAGELIFT_AWS_ACCEPTANCE_DIGEST='ghcr.io/example/app@sha256:…'
 export MAGELIFT_CERTIFICATE_IDENTITY='…'

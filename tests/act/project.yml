@@ -1,0 +1,18 @@
+name: Shop project contracts
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate a project, compare environments and generate its workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./magelift --config magelift.php --no-interaction config validate
+          ./magelift --config magelift.php --output json env diff preview staging > differences.json
+          # shellcheck disable=SC2016
+          php -r '$d=json_decode(file_get_contents("differences.json"),true,flags:JSON_THROW_ON_ERROR); if (!$d["changes"]) exit(1);'
+          ./magelift --config magelift.php --no-interaction ci generate --magelift-version v1.0.0-rc.1
+          ./magelift --config magelift.php --no-interaction ci validate --check-template --magelift-version v1.0.0-rc.1

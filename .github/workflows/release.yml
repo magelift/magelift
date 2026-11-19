@@ -32,7 +32,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
           cache: false
@@ -45,16 +45,18 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
             go-prime-${{ runner.os }}-
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
         with:
-          cosign-release: v3.1.3
+          cosign-release: v3.1.4
       # GoReleaser's SBOM cataloging shells out to syft; without it the
       # release fails after the builds (seen on v0.0.0-dialproof.3).
       - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: v1.57.2
       # Module tags need proxy plus sumdb visibility before packaging:
       # workspace builds still verify requirement .mod files over the
       # network on cold caches. The proxy negative-caches unknown
@@ -69,7 +71,7 @@ jobs:
         run: |
           sleep 300
           deadline=$((SECONDS + 7200))
-          for module in "github.com/magelift/magelift" "github.com/magelift/magelift/sdk" "github.com/magelift/magelift/providers/gcp"; do
+          for module in "github.com/magelift/magelift" "github.com/magelift/magelift/sdk" "github.com/magelift/magelift/providers/gcp" "github.com/magelift/magelift/providers/azure"; do
             stable=0
             while [[ "$stable" -lt 2 ]]; do
               # go mod download, not go list: packaging needs the zip plus
@@ -107,19 +109,18 @@ jobs:
         if: "(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         with:
           distribution: goreleaser
-          version: v2.18.3
+          version: v2.20.2
           args: release --clean --timeout 30m -f .goreleaser.dialproof.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CGO_ENABLED: "0"
-          # Provider builds run in providers/gcp. Pin the workspace so they
-          # compile this checkout, not the published module in go.mod.
+          # Build both providers against the SDK and CLI from this checkout.
           GOWORK: ${{ github.workspace }}/go.work
       - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
         with:
           distribution: goreleaser
-          version: v2.18.3
+          version: v2.20.2
           args: release --clean --parallelism 1 --timeout 150m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -211,7 +212,9 @@ jobs:
           GOWORK: "off"
         run: |
           go install "github.com/magelift/magelift/cmd/magelift@${RELEASE_TAG}"
-          go install "github.com/magelift/magelift/providers/gcp/cmd/magelift-provider-gcp@${RELEASE_TAG}"
+          for provider in gcp azure; do
+            go install "github.com/magelift/magelift/providers/${provider}/cmd/magelift-provider-${provider}@${RELEASE_TAG}"
+          done
           work="$(mktemp -d)"
           cd "$work"
           go mod init magelift-sdk-verify >/dev/null
@@ -247,7 +250,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
   # The cask publishes to the tap during release; this job is the tested
   # macOS install path the readiness doc requires. A failure fails the
   # workflow visibly so the tap file gets fixed forward the same day.
