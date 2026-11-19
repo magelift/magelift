@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/magelift/magelift/sdk"
@@ -26,42 +27,62 @@ import (
 // stack. The resource group and any supplied network references remain owned
 // by the caller. An omitted network is created as part of the stack.
 type Spec struct {
-	DestroyOnly        bool
-	ObserveOnly        bool
-	SubscriptionID     string
-	TenantID           string
-	ResourceGroup      string
-	Region             string
-	Project            string
-	Environment        string
-	ClusterName        string
-	PreviewPoolCluster string
-	Namespace          string
-	NodeSubnetID       string
-	MySQLServerName    string
-	MySQLSubnetID      string
-	MySQLDNSZoneID     string
-	MySQLVersion       string
-	MySQLUsername      string
-	MySQLPassword      pulumi.StringInput `json:"-"`
-	StorageAccount     string
-	VaultName          string
-	HighAvailability   bool
-	ApplicationImage   string
-	ApplicationMode    string
-	MagentoVersion     string
-	Magento            sdk.MagentoOverlays
-	WebRuntime         string
-	CacheImage         string
-	CacheEndpoint      string
-	SearchImage        string
-	ImagePullSecret    string
-	ACRResourceID      string
-	IngressClass       string
-	TLSSecret          string
-	Domain             string
-	MonitorWorkspaceID string
-	EncryptionKey      pulumi.StringInput `json:"-"`
+	DestroyOnly                                              bool
+	ObserveOnly                                              bool
+	SubscriptionID                                           string
+	TenantID                                                 string
+	ResourceGroup                                            string
+	Region                                                   string
+	Project                                                  string
+	Environment                                              string
+	ClusterName                                              string
+	PreviewPoolCluster                                       string
+	Namespace                                                string
+	NodeSubnetID                                             string
+	MySQLServerName                                          string
+	MySQLSubnetID                                            string
+	MySQLDNSZoneID                                           string
+	MySQLVersion                                             string
+	MySQLUsername                                            string
+	MySQLPassword                                            pulumi.StringInput `json:"-"`
+	StorageAccount                                           string
+	VaultName                                                string
+	HighAvailability                                         bool
+	ApplicationImage                                         string
+	ApplicationMode                                          string
+	MagentoVersion                                           string
+	Magento                                                  sdk.MagentoOverlays
+	WebRuntime                                               string
+	DatabaseFamily                                           string
+	DatabaseImage                                            string
+	DatabaseParameters                                       map[string]string
+	DatabaseStorageGiB                                       int
+	DatabaseEndpoint, DatabaseSecretName                     string
+	QueueEndpoint, QueueUsername, QueueSecretName, QueuePort string
+	CacheImage                                               string
+	CacheEndpoint                                            string
+	CacheEvictionPolicy                                      string
+	CacheMemoryMiB                                           int
+	CacheStorageGiB                                          int
+	SessionImage                                             string
+	SessionEndpoint                                          string
+	SessionEvictionPolicy                                    string
+	SessionMemoryMiB                                         int
+	SessionStorageGiB                                        int
+	QueueImage                                               string
+	QueueStorageGiB                                          int
+	SearchPlugins                                            []string
+	SearchStorageGiB                                         int
+	EncryptionKeySecret                                      string
+	EncryptionKeySecretName                                  string
+	SearchImage                                              string
+	ImagePullSecret                                          string
+	ACRResourceID                                            string
+	IngressClass                                             string
+	TLSSecret                                                string
+	Domain                                                   string
+	MonitorWorkspaceID                                       string
+	EncryptionKey                                            pulumi.StringInput `json:"-"`
 }
 
 func (s Spec) Validate() error {
@@ -77,8 +98,8 @@ func (s Spec) Validate() error {
 		"resource group": s.ResourceGroup, "region": s.Region,
 		"project": s.Project, "environment": s.Environment,
 		"cluster name":      s.ClusterName,
-		"MySQL server name": s.MySQLServerName, "MySQL version": s.MySQLVersion,
-		"MySQL username": s.MySQLUsername, "storage account": s.StorageAccount,
+		"MySQL server name": s.MySQLServerName,
+		"MySQL username":    s.MySQLUsername, "storage account": s.StorageAccount,
 		"vault name": s.VaultName,
 	} {
 		if strings.TrimSpace(value) == "" {
@@ -119,6 +140,38 @@ func (s Spec) Validate() error {
 	if provided == len(refs) && !strings.Contains(strings.ToLower(s.NodeSubnetID), "/subnets/") {
 		return errors.New("node subnet must be an Azure subnet resource ID")
 	}
+	if len(s.DatabaseParameters) > 0 {
+		if s.DatabaseFamily != "mariadb" || s.DatabaseEndpoint != "" {
+			return errors.New("Azure database parameters require self-hosted MariaDB")
+		}
+		if err := sdk.ValidateDatabaseParameters(s.DatabaseParameters); err != nil {
+			return err
+		}
+	}
+	if s.DatabaseEndpoint == "" && s.DatabaseFamily != "mariadb" && strings.TrimSpace(s.MySQLVersion) == "" {
+		return errors.New("Azure managed MySQL version is required")
+	}
+	if s.DatabaseEndpoint == "" && s.DatabaseFamily == "mariadb" && s.DatabaseImage == "" {
+		return errors.New("Azure self-hosted MariaDB requires an image")
+	}
+	if s.DatabaseEndpoint != "" && (s.DatabaseSecretName == "" || len(validation.IsDNS1123Subdomain(s.DatabaseEndpoint)) != 0 || len(validation.IsDNS1123Subdomain(s.DatabaseSecretName)) != 0) {
+		return errors.New("Azure external database requires a DNS hostname and namespace-local password Secret")
+	}
+	if s.QueueEndpoint != "" && (s.QueueSecretName == "" || s.QueueUsername == "" || s.QueuePort == "" || len(validation.IsDNS1123Subdomain(s.QueueEndpoint)) != 0 || len(validation.IsDNS1123Subdomain(s.QueueSecretName)) != 0) {
+		return errors.New("Azure external RabbitMQ requires a hostname, port, username and namespace-local password Secret")
+	}
+	if s.QueueEndpoint != "" {
+		port, err := strconv.Atoi(s.QueuePort)
+		if err != nil || port < 1 || port > 65535 {
+			return errors.New("Azure external RabbitMQ port is invalid")
+		}
+		if s.QueueImage != "" {
+			return errors.New("Azure external RabbitMQ cannot provision an image")
+		}
+	}
+	if s.DatabaseEndpoint != "" && s.DatabaseImage != "" {
+		return errors.New("Azure external database cannot provision an image")
+	}
 	if s.ApplicationImage != "" {
 		if strings.TrimSpace(s.MagentoVersion) == "" || strings.TrimSpace(s.SearchImage) == "" {
 			return errors.New("Magento version and search image are required for an application workload")
@@ -126,9 +179,7 @@ func (s Spec) Validate() error {
 		if strings.TrimSpace(s.CacheEndpoint) == "" && strings.TrimSpace(s.CacheImage) == "" {
 			return errors.New("a cache image or existing cache endpoint is required for an application workload")
 		}
-		if s.HighAvailability && strings.TrimSpace(s.CacheEndpoint) == "" {
-			return errors.New("Azure high-availability workloads require an operator-provided HA Redis or Valkey endpoint: set services.cache ownership to external and endpoint to its hostname; cache authentication is not yet supported")
-		}
+
 	}
 	if s.ACRResourceID != "" {
 		parts := strings.Split(strings.Trim(s.ACRResourceID, "/"), "/")
@@ -176,7 +227,9 @@ func Program(spec Spec) pulumi.RunFunc {
 			return fmt.Errorf("create Azure Key Vault: %w", err)
 		}
 		var password pulumi.StringOutput
-		if spec.MySQLPassword == nil {
+		if spec.DatabaseEndpoint != "" {
+			password = pulumi.String("").ToStringOutput()
+		} else if spec.MySQLPassword == nil {
 			generated, err := random.NewRandomPassword(ctx, "mysql-password", &random.RandomPasswordArgs{
 				Length: pulumi.Int(32), Special: pulumi.Bool(true), OverrideSpecial: pulumi.String("!#$%_+-"),
 				MinUpper: pulumi.Int(1), MinLower: pulumi.Int(1), MinNumeric: pulumi.Int(1), MinSpecial: pulumi.Int(1),
@@ -188,12 +241,14 @@ func Program(spec Spec) pulumi.RunFunc {
 		} else {
 			password = pulumi.ToSecret(spec.MySQLPassword).(pulumi.StringOutput)
 		}
-		_, err = keyvault.NewSecret(ctx, "mysql-password-secret", &keyvault.SecretArgs{
-			ResourceGroupName: pulumi.String(spec.ResourceGroup), VaultName: vault.Name,
-			SecretName: pulumi.String("mysql-password"), Properties: &keyvault.SecretPropertiesArgs{Value: password.ToStringPtrOutput()}, Tags: tags,
-		}, options...)
-		if err != nil {
-			return fmt.Errorf("store Azure MySQL password: %w", err)
+		if spec.DatabaseEndpoint == "" {
+			_, err = keyvault.NewSecret(ctx, "mysql-password-secret", &keyvault.SecretArgs{
+				ResourceGroupName: pulumi.String(spec.ResourceGroup), VaultName: vault.Name,
+				SecretName: pulumi.String("mysql-password"), Properties: &keyvault.SecretPropertiesArgs{Value: password.ToStringPtrOutput()}, Tags: tags,
+			}, options...)
+			if err != nil {
+				return fmt.Errorf("store Azure MySQL password: %w", err)
+			}
 		}
 		nodeSubnet := pulumi.String(spec.NodeSubnetID).ToStringOutput()
 		dbSubnet := pulumi.String(spec.MySQLSubnetID).ToStringOutput()
@@ -219,33 +274,35 @@ func Program(spec Spec) pulumi.RunFunc {
 			if err != nil {
 				return fmt.Errorf("create Azure node subnet: %w", err)
 			}
-			databaseSubnet, err := network.NewSubnet(ctx, "database-subnet", &network.SubnetArgs{
-				ResourceGroupName: pulumi.String(spec.ResourceGroup), VirtualNetworkName: vnet.Name,
-				SubnetName: pulumi.String("database"), AddressPrefix: pulumi.String("10.42.16.0/24"),
-				Delegations: network.DelegationArray{&network.DelegationArgs{Name: pulumi.String("mysql"), ServiceName: pulumi.String("Microsoft.DBforMySQL/flexibleServers")}},
-			}, append(append([]pulumi.ResourceOption{}, options...), pulumi.DependsOn([]pulumi.Resource{nodes}))...)
-			if err != nil {
-				return fmt.Errorf("create Azure MySQL subnet: %w", err)
-			}
-			zone, err := privatedns.NewPrivateZone(ctx, "database-dns", &privatedns.PrivateZoneArgs{
-				ResourceGroupName: pulumi.String(spec.ResourceGroup), PrivateZoneName: pulumi.String(spec.ClusterName + ".mysql.database.azure.com"),
-				Location: pulumi.String("global"), Tags: tags,
-			}, options...)
-			if err != nil {
-				return fmt.Errorf("create Azure MySQL private DNS zone: %w", err)
-			}
-			dnsLink, err = privatedns.NewVirtualNetworkLink(ctx, "database-dns-link", &privatedns.VirtualNetworkLinkArgs{
-				ResourceGroupName: pulumi.String(spec.ResourceGroup), PrivateZoneName: zone.Name,
-				VirtualNetworkLinkName: pulumi.String("magelift"), Location: pulumi.String("global"),
-				VirtualNetwork:      &privatedns.SubResourceArgs{Id: vnet.ID().ToStringOutput()},
-				RegistrationEnabled: pulumi.Bool(false), Tags: tags,
-			}, options...)
-			if err != nil {
-				return fmt.Errorf("link Azure MySQL private DNS zone: %w", err)
+			if spec.DatabaseEndpoint == "" && spec.DatabaseFamily != "mariadb" {
+				databaseSubnet, err := network.NewSubnet(ctx, "database-subnet", &network.SubnetArgs{
+					ResourceGroupName: pulumi.String(spec.ResourceGroup), VirtualNetworkName: vnet.Name,
+					SubnetName: pulumi.String("database"), AddressPrefix: pulumi.String("10.42.16.0/24"),
+					Delegations: network.DelegationArray{&network.DelegationArgs{Name: pulumi.String("mysql"), ServiceName: pulumi.String("Microsoft.DBforMySQL/flexibleServers")}},
+				}, append(append([]pulumi.ResourceOption{}, options...), pulumi.DependsOn([]pulumi.Resource{nodes}))...)
+				if err != nil {
+					return fmt.Errorf("create Azure MySQL subnet: %w", err)
+				}
+				zone, err := privatedns.NewPrivateZone(ctx, "database-dns", &privatedns.PrivateZoneArgs{
+					ResourceGroupName: pulumi.String(spec.ResourceGroup), PrivateZoneName: pulumi.String(spec.ClusterName + ".mysql.database.azure.com"),
+					Location: pulumi.String("global"), Tags: tags,
+				}, options...)
+				if err != nil {
+					return fmt.Errorf("create Azure MySQL private DNS zone: %w", err)
+				}
+				dnsLink, err = privatedns.NewVirtualNetworkLink(ctx, "database-dns-link", &privatedns.VirtualNetworkLinkArgs{
+					ResourceGroupName: pulumi.String(spec.ResourceGroup), PrivateZoneName: zone.Name,
+					VirtualNetworkLinkName: pulumi.String("magelift"), Location: pulumi.String("global"),
+					VirtualNetwork:      &privatedns.SubResourceArgs{Id: vnet.ID().ToStringOutput()},
+					RegistrationEnabled: pulumi.Bool(false), Tags: tags,
+				}, options...)
+				if err != nil {
+					return fmt.Errorf("link Azure MySQL private DNS zone: %w", err)
+				}
+				dbSubnet = databaseSubnet.ID().ToStringOutput()
+				dbZone = zone.ID().ToStringOutput()
 			}
 			nodeSubnet = nodes.ID().ToStringOutput()
-			dbSubnet = databaseSubnet.ID().ToStringOutput()
-			dbZone = zone.ID().ToStringOutput()
 			networkID = vnet.ID().ToStringOutput()
 		}
 		nodes := 1
@@ -301,28 +358,37 @@ func Program(spec Spec) pulumi.RunFunc {
 				return fmt.Errorf("grant AKS image pull access: %w", err)
 			}
 		}
-		databaseOptions := options
-		if dnsLink != nil {
-			databaseOptions = append(append([]pulumi.ResourceOption{}, options...), pulumi.DependsOn([]pulumi.Resource{dnsLink}))
+		databaseHost := pulumi.String("magelift-database").ToStringOutput()
+		if spec.DatabaseEndpoint != "" {
+			databaseHost = pulumi.String(spec.DatabaseEndpoint).ToStringOutput()
 		}
-		database, err := dbformysql.NewServer(ctx, "mysql", &dbformysql.ServerArgs{
-			ResourceGroupName: pulumi.String(spec.ResourceGroup), ServerName: pulumi.String(spec.MySQLServerName),
-			Location: pulumi.String(spec.Region), Version: pulumi.String(spec.MySQLVersion),
-			AdministratorLogin: pulumi.String(spec.MySQLUsername), AdministratorLoginPassword: password.ToStringPtrOutput(),
-			Sku:              &dbformysql.MySQLServerSkuArgs{Name: pulumi.String("Standard_D2ds_v4"), Tier: pulumi.String("GeneralPurpose")},
-			Network:          &dbformysql.NetworkArgs{DelegatedSubnetResourceId: dbSubnet, PrivateDnsZoneResourceId: dbZone, PublicNetworkAccess: pulumi.String("Disabled")},
-			HighAvailability: &dbformysql.HighAvailabilityArgs{Mode: pulumi.String(haMode)}, Tags: tags,
-		}, databaseOptions...)
-		if err != nil {
-			return fmt.Errorf("create Azure MySQL server: %w", err)
+		if spec.DatabaseEndpoint == "" && spec.DatabaseFamily != "mariadb" {
+			databaseOptions := options
+			if dnsLink != nil {
+				databaseOptions = append(append([]pulumi.ResourceOption{}, options...), pulumi.DependsOn([]pulumi.Resource{dnsLink}))
+			}
+			serverArgs := &dbformysql.ServerArgs{
+				ResourceGroupName: pulumi.String(spec.ResourceGroup), ServerName: pulumi.String(spec.MySQLServerName),
+				Location: pulumi.String(spec.Region), Version: pulumi.String(spec.MySQLVersion),
+				AdministratorLogin: pulumi.String(spec.MySQLUsername), AdministratorLoginPassword: password.ToStringPtrOutput(),
+				Sku:              &dbformysql.MySQLServerSkuArgs{Name: pulumi.String("Standard_D2ds_v4"), Tier: pulumi.String("GeneralPurpose")},
+				Network:          &dbformysql.NetworkArgs{DelegatedSubnetResourceId: dbSubnet, PrivateDnsZoneResourceId: dbZone, PublicNetworkAccess: pulumi.String("Disabled")},
+				HighAvailability: &dbformysql.HighAvailabilityArgs{Mode: pulumi.String(haMode)}, Tags: tags,
+			}
+			database, err := newMySQLServer(ctx, "mysql", serverArgs, spec.MySQLVersion, databaseOptions...)
+			if err != nil {
+				return fmt.Errorf("create Azure MySQL server: %w", err)
+			}
+			_, err = dbformysql.NewDatabase(ctx, "magento", &dbformysql.DatabaseArgs{
+				ResourceGroupName: pulumi.String(spec.ResourceGroup), ServerName: database.Name,
+				DatabaseName: pulumi.String("magento"), Charset: pulumi.String("utf8mb4"), Collation: pulumi.String("utf8mb4_general_ci"),
+			}, options...)
+			if err != nil {
+				return fmt.Errorf("create Magento database: %w", err)
+			}
+			databaseHost = database.FullyQualifiedDomainName
 		}
-		_, err = dbformysql.NewDatabase(ctx, "magento", &dbformysql.DatabaseArgs{
-			ResourceGroupName: pulumi.String(spec.ResourceGroup), ServerName: database.Name,
-			DatabaseName: pulumi.String("magento"), Charset: pulumi.String("utf8mb4"), Collation: pulumi.String("utf8mb4_general_ci"),
-		}, options...)
-		if err != nil {
-			return fmt.Errorf("create Magento database: %w", err)
-		}
+
 		account, err := storage.NewStorageAccount(ctx, "media", &storage.StorageAccountArgs{
 			ResourceGroupName: pulumi.String(spec.ResourceGroup), AccountName: pulumi.String(spec.StorageAccount),
 			Location: pulumi.String(spec.Region), Kind: pulumi.String("StorageV2"),
@@ -340,13 +406,13 @@ func Program(spec Spec) pulumi.RunFunc {
 			return fmt.Errorf("create Azure media share: %w", err)
 		}
 		if spec.ApplicationImage != "" {
-			if err := addMagentoWorkloads(ctx, spec, provider, cluster, database, account, share, vault, password); err != nil {
+			if err := addMagentoWorkloads(ctx, spec, provider, cluster, databaseHost, account, share, vault, password); err != nil {
 				return fmt.Errorf("create AKS Magento workloads: %w", err)
 			}
 		}
 		ctx.Export("clusterID", cluster.ID())
-		ctx.Export("databaseHost", database.FullyQualifiedDomainName)
-		ctx.Export("databaseWriter", database.FullyQualifiedDomainName)
+		ctx.Export("databaseHost", databaseHost)
+		ctx.Export("databaseWriter", databaseHost)
 		ctx.Export("networkVpcId", networkID)
 		ctx.Export("privateSubnetIds", pulumi.StringArray{nodeSubnet, dbSubnet})
 		ctx.Export("mediaAccount", account.Name)

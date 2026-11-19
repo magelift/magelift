@@ -6,13 +6,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/magelift/magelift/internal/searchplugins"
 	"github.com/magelift/magelift/providers/azure/stack"
 	"github.com/magelift/magelift/sdk"
 	"gopkg.in/yaml.v3"
@@ -158,16 +162,76 @@ func buildPlan(req *sdk.PlanRequest, config target) (storedPlan, error) {
 	if req.Application.Magento.QueueTransport != "" || req.Application.Magento.QueueModule != "" {
 		return storedPlan{}, errors.New("Azure custom Magento queue transports are not yet implemented")
 	}
-	for role := range req.Services {
+	for role, binding := range req.Services {
 		switch role {
-		case "database", "cache", "search", "queue":
+		case "database", "cache", "session", "search", "queue":
 		default:
 			return storedPlan{}, fmt.Errorf("Azure provider does not yet support services.%s", role)
 		}
+		if len(binding.Parameters) > 0 {
+			if role != "database" || binding.Family != "mariadb" || binding.Ownership != "self-hosted" {
+				return storedPlan{}, errors.New("Azure database parameters require self-hosted MariaDB")
+			}
+			if err := sdk.ValidateDatabaseParameters(binding.Parameters); err != nil {
+				return storedPlan{}, err
+			}
+		}
+		if len(binding.Plugins) > 0 {
+			if role != "search" || binding.Family != "opensearch" {
+				return storedPlan{}, fmt.Errorf("services.%s.plugins requires OpenSearch", role)
+			}
+			if err := searchplugins.Validate(binding.Plugins); err != nil {
+				return storedPlan{}, err
+			}
+		}
+		if binding.EvictionPolicy != "" && ((role != "cache" && role != "session") || binding.Attached() || !slices.Contains([]string{"noeviction", "allkeys-lru", "allkeys-lfu", "allkeys-random", "volatile-lru", "volatile-lfu", "volatile-random", "volatile-ttl"}, binding.EvictionPolicy)) {
+			return storedPlan{}, fmt.Errorf("services.%s has an invalid or unsupported eviction policy", role)
+		}
+		if binding.MemoryMiB < 0 || (binding.MemoryMiB > 0 && (binding.Ownership != "self-hosted" || (role != "cache" && role != "session"))) {
+			return storedPlan{}, fmt.Errorf("services.%s memoryMiB requires a self-hosted cache or session", role)
+		}
+		if binding.StorageGiB < 0 || (binding.StorageGiB > 0 && (binding.Ownership != "self-hosted" || binding.Family == "database" || binding.Family == "db")) {
+			return storedPlan{}, fmt.Errorf("services.%s storageGiB requires a self-hosted service with storage", role)
+		}
 	}
 	database, ok := req.Services["database"]
-	if !ok || database.Family != "mysql" || (database.Ownership != "" && database.Ownership != "managed") || strings.TrimSpace(database.Version) == "" || database.Attached() || database.Image != "" || database.Endpoint != "" || database.Secret != "" || database.Username != "" || database.Port != 0 {
-		return storedPlan{}, errors.New("Azure requires a managed MySQL database with an explicit version in services.database")
+	if !ok {
+		return storedPlan{}, errors.New("Azure requires a database service")
+	}
+	if database.Attached() {
+		if (database.Family != "mysql" && database.Family != "mariadb") || database.Image != "" || strings.TrimSpace(database.Username) == "" || strings.Contains(database.Endpoint, "://") || (database.Port != 0 && database.Port != 3306) {
+			return storedPlan{}, errors.New("Azure external database requires a MySQL or MariaDB hostname on port 3306 and username")
+		}
+		if _, err := kubernetesSecretName(database.Secret); err != nil {
+			return storedPlan{}, err
+		}
+		host := database.Endpoint
+		if parsedHost, port, err := net.SplitHostPort(host); err == nil {
+			if port != "3306" || database.Port != 0 {
+				return storedPlan{}, errors.New("Azure external database requires port 3306 specified once")
+			}
+			host = parsedHost
+		}
+		if len(validation.IsDNS1123Subdomain(host)) != 0 {
+			return storedPlan{}, errors.New("Azure external database endpoint must be a DNS hostname")
+		}
+		database.Endpoint = host
+	} else {
+		if database.Endpoint != "" || database.Secret != "" || database.Username != "" || database.Port != 0 {
+			return storedPlan{}, errors.New("Azure managed database cannot have external connection settings")
+		}
+		switch database.Family {
+		case "mysql":
+			if (database.Ownership != "" && database.Ownership != "managed") || strings.TrimSpace(database.Version) == "" || database.Image != "" {
+				return storedPlan{}, errors.New("Azure managed MySQL requires a version and cannot use an image")
+			}
+		case "mariadb":
+			if database.Ownership != "self-hosted" || (database.Image == "" && database.Version == "") {
+				return storedPlan{}, errors.New("Azure MariaDB requires self-hosted ownership and an image or version")
+			}
+		default:
+			return storedPlan{}, errors.New("Azure supports managed MySQL or self-hosted MariaDB")
+		}
 	}
 	cache, ok := req.Services["cache"]
 	if !ok || (cache.Family != "redis" && cache.Family != "valkey") {
@@ -204,8 +268,48 @@ func buildPlan(req *sdk.PlanRequest, config target) (storedPlan, error) {
 	if !ok || search.Family != "opensearch" || search.Attached() || (search.Ownership != "" && search.Ownership != "self-hosted") || (strings.TrimSpace(search.Image) == "" && strings.TrimSpace(search.Version) == "") || search.Endpoint != "" || search.Secret != "" || search.Username != "" || search.Port != 0 {
 		return storedPlan{}, errors.New("Azure requires a self-hosted OpenSearch image in services.search")
 	}
-	if queue, ok := req.Services["queue"]; ok && ((queue.Family != "database" && queue.Family != "db") || queue.Attached() || queue.Image != "" || queue.Endpoint != "" || queue.Secret != "" || queue.Username != "" || queue.Port != 0) {
-		return storedPlan{}, errors.New("Azure currently supports the Magento database queue")
+	queue := req.Services["queue"]
+	if queue.Family == "" {
+		queue.Family = "database"
+	}
+	if queue.Attached() {
+		u, err := url.Parse(queue.Endpoint)
+		if err != nil || u.Scheme != "amqps" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || queue.Family != "rabbitmq" || strings.TrimSpace(queue.Username) == "" || queue.Image != "" {
+			return storedPlan{}, errors.New("Azure external RabbitMQ requires an amqps endpoint, username and no image")
+		}
+		if _, err := kubernetesSecretName(queue.Secret); err != nil {
+			return storedPlan{}, err
+		}
+		if queue.Port != 0 && u.Port() != "" {
+			return storedPlan{}, errors.New("specify the RabbitMQ port once")
+		}
+		port := u.Port()
+		if queue.Port != 0 {
+			port = strconv.Itoa(queue.Port)
+		}
+		if port != "" {
+			n, err := strconv.Atoi(port)
+			if err != nil || n < 1 || n > 65535 {
+				return storedPlan{}, errors.New("invalid RabbitMQ port")
+			}
+		}
+
+	} else {
+		if queue.Endpoint != "" || queue.Secret != "" || queue.Username != "" || queue.Port != 0 {
+			return storedPlan{}, errors.New("Azure non-attached queue cannot have external connection settings")
+		}
+		switch queue.Family {
+		case "database", "db":
+			if queue.Image != "" || (queue.Ownership != "" && queue.Ownership != "self-hosted") {
+				return storedPlan{}, errors.New("Azure database queue cannot use an image or managed ownership")
+			}
+		case "rabbitmq":
+			if queue.Ownership != "self-hosted" || (queue.Image == "" && queue.Version == "") {
+				return storedPlan{}, errors.New("Azure RabbitMQ requires self-hosted ownership and an image or version")
+			}
+		default:
+			return storedPlan{}, errors.New("Azure supports database or RabbitMQ queue")
+		}
 	}
 	if strings.TrimSpace(config.ImageDigest) == "" {
 		return storedPlan{}, errors.New("target.azure.imageDigest is required for a Magento application plan")
@@ -214,7 +318,56 @@ func buildPlan(req *sdk.PlanRequest, config target) (storedPlan, error) {
 		return storedPlan{}, err
 	}
 	spec := base.Spec
-	spec.MySQLVersion = database.Version
+	spec.MySQLVersion = database.ManagedBranch()
+	if spec.MySQLVersion == "8.0" {
+		spec.MySQLVersion = "8.0.21"
+	}
+	spec.DatabaseFamily = database.Family
+	if database.Attached() {
+		spec.DatabaseEndpoint = database.Endpoint
+		spec.DatabaseSecretName, _ = kubernetesSecretName(database.Secret)
+		spec.MySQLUsername = database.Username
+	}
+	if queue.Attached() {
+		u, _ := url.Parse(queue.Endpoint)
+		spec.QueueEndpoint = u.Hostname()
+		spec.QueuePort = u.Port()
+		if queue.Port != 0 {
+			spec.QueuePort = fmt.Sprint(queue.Port)
+		}
+		if spec.QueuePort == "" {
+			spec.QueuePort = "5671"
+		}
+		spec.QueueUsername = queue.Username
+		spec.QueueSecretName, _ = kubernetesSecretName(queue.Secret)
+	}
+	spec.DatabaseStorageGiB = database.StorageGiB
+	spec.DatabaseParameters = maps.Clone(database.Parameters)
+	if database.Family == "mariadb" && !database.Attached() {
+		spec.DatabaseImage = database.Image
+		if spec.DatabaseImage == "" {
+			spec.DatabaseImage = "mariadb:" + database.Version
+		}
+	}
+	if queue.Family == "rabbitmq" && !queue.Attached() {
+		spec.QueueImage = queue.Image
+		if spec.QueueImage == "" {
+			spec.QueueImage = "rabbitmq:" + queue.Version + "-management-alpine"
+		}
+	}
+	spec.EncryptionKeySecret = strings.TrimSpace(config.EncryptionKeySecret)
+	if spec.EncryptionKeySecret != "" {
+		if _, _, _, err := parseEncryptionSecretID(spec.EncryptionKeySecret); err != nil {
+			return storedPlan{}, err
+		}
+	}
+	if spec.EncryptionKeySecret != "" && config.EncryptionKeySecretName != "" {
+		return storedPlan{}, errors.New("Azure encryptionKeySecret and encryptionKeySecretName are mutually exclusive")
+	}
+	spec.EncryptionKeySecretName = strings.TrimSpace(config.EncryptionKeySecretName)
+	if spec.EncryptionKeySecretName != "" && len(validation.IsDNS1123Subdomain(spec.EncryptionKeySecretName)) != 0 {
+		return storedPlan{}, errors.New("target.azure.encryptionKeySecretName must be a Kubernetes Secret name")
+	}
 	spec.ApplicationImage = config.ImageDigest
 	spec.ApplicationMode = req.Application.Mode
 	spec.MagentoVersion = req.Application.Version
@@ -233,6 +386,47 @@ func buildPlan(req *sdk.PlanRequest, config target) (storedPlan, error) {
 		}
 	}
 	spec.CacheEndpoint = cacheEndpoint
+	spec.CacheEvictionPolicy = cache.EvictionPolicy
+	spec.CacheMemoryMiB, spec.CacheStorageGiB = cache.MemoryMiB, cache.StorageGiB
+	spec.SearchPlugins = append([]string(nil), search.Plugins...)
+	spec.SearchStorageGiB = search.StorageGiB
+	spec.QueueStorageGiB = queue.StorageGiB
+	session, hasSession := req.Services["session"]
+	if hasSession {
+		if session.Family != "valkey" && session.Family != "redis" {
+			return storedPlan{}, errors.New("Azure session requires Valkey or Redis")
+		}
+		if session.Secret != "" || session.Username != "" {
+			return storedPlan{}, errors.New("Azure session authentication is not yet supported")
+		}
+		if session.Attached() {
+			if session.Image != "" || (session.Port != 0 && session.Port != 6379) || strings.Contains(session.Endpoint, "://") {
+				return storedPlan{}, errors.New("Azure external session requires a hostname on port 6379")
+			}
+			spec.SessionEndpoint = session.Endpoint
+			if host, port, err := net.SplitHostPort(session.Endpoint); err == nil {
+				if port != "6379" {
+					return storedPlan{}, errors.New("Azure external session requires port 6379")
+				}
+				spec.SessionEndpoint = host
+			}
+		} else if session.Endpoint != "" || session.Port != 0 || (session.Ownership != "" && session.Ownership != "self-hosted") {
+			return storedPlan{}, errors.New("Azure session requires self-hosted ownership or an external endpoint")
+		}
+		if !session.Attached() && session.Image == "" && session.Version == "" {
+			return storedPlan{}, errors.New("Azure session requires an image or version")
+		}
+		spec.SessionImage = session.Image
+		if spec.SessionImage == "" && !session.Attached() {
+			if session.Family == "valkey" {
+				spec.SessionImage = "valkey/valkey:" + session.Version
+			} else {
+				spec.SessionImage = "redis:" + session.Version
+			}
+		}
+		spec.SessionEvictionPolicy = session.EvictionPolicy
+		spec.SessionMemoryMiB, spec.SessionStorageGiB = session.MemoryMiB, session.StorageGiB
+	}
 	spec.SearchImage = search.Image
 	if spec.SearchImage == "" {
 		spec.SearchImage = "opensearchproject/opensearch:" + sdk.OpenSearchContainerTag(search.Version)
@@ -294,4 +488,25 @@ func buildAccountPlan(req *sdk.PlanRequest, config target) (storedPlan, error) {
 		ClusterName: "ml-" + name, MySQLServerName: "ml-" + name, MySQLUsername: "magelift",
 		StorageAccount: "ml" + name, VaultName: "ml-" + name, HighAvailability: req.Envelope.Preset == "high-availability"}
 	return storedPlan{Envelope: req.Envelope, Spec: spec, BackendURL: backendURL, DestroyPreview: req.AllowExpiredPreview, AccountOnly: req.AccountOnly}, nil
+}
+
+func parseEncryptionSecretID(raw string) (string, string, string, error) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" || u.RawQuery != "" || u.Fragment != "" || !strings.HasSuffix(strings.ToLower(u.Hostname()), ".vault.azure.net") {
+		return "", "", "", errors.New("Azure encryptionKeySecret must be a versioned HTTPS Key Vault secret ID")
+	}
+	parts := strings.Split(strings.Trim(u.EscapedPath(), "/"), "/")
+	if len(parts) != 3 || parts[0] != "secrets" || !regexp.MustCompile(`^[a-zA-Z0-9-]{1,127}$`).MatchString(parts[1]) || !regexp.MustCompile(`^[a-fA-F0-9]{32}$`).MatchString(parts[2]) {
+		return "", "", "", errors.New("Azure encryptionKeySecret must be a versioned HTTPS Key Vault secret ID")
+	}
+	return "https://" + u.Hostname(), parts[1], parts[2], nil
+}
+
+func kubernetesSecretName(reference string) (string, error) {
+	const prefix = "kubernetes://"
+	name := strings.TrimPrefix(reference, prefix)
+	if !strings.HasPrefix(reference, prefix) || len(validation.IsDNS1123Subdomain(name)) != 0 {
+		return "", errors.New("Azure external services require a kubernetes:// namespace-local Secret reference")
+	}
+	return name, nil
 }

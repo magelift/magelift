@@ -11,11 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 	"github.com/magelift/magelift/internal/automation"
 	"github.com/magelift/magelift/internal/secretsafe"
 	"github.com/magelift/magelift/providers/azure/stack"
 	"github.com/magelift/magelift/sdk"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
 func (s *Server) Apply(req *sdk.StackCall, resp *sdk.LifecycleResult) error {
@@ -84,6 +87,28 @@ func runMutation(ctx context.Context, plan storedPlan, rawMetadata []byte, destr
 func openStack(ctx context.Context, plan storedPlan, selectOnly bool) (*auto.Stack, error) {
 	if strings.TrimSpace(os.Getenv("PULUMI_CONFIG_PASSPHRASE")) == "" && strings.TrimSpace(os.Getenv("PULUMI_CONFIG_PASSPHRASE_FILE")) == "" {
 		return nil, errors.New("set the Azure Pulumi state passphrase before opening the stack")
+	}
+	if !selectOnly && plan.Spec.EncryptionKeySecret != "" {
+		vault, name, version, err := parseEncryptionSecretID(plan.Spec.EncryptionKeySecret)
+		if err != nil {
+			return nil, err
+		}
+		credential, err := azidentity.NewDefaultAzureCredential(nil)
+		if err != nil {
+			return nil, fmt.Errorf("create Azure credential: %w", err)
+		}
+		client, err := azsecrets.NewClient(vault, credential, nil)
+		if err != nil {
+			return nil, fmt.Errorf("create Key Vault client: %w", err)
+		}
+		result, err := client.GetSecret(ctx, name, version, nil)
+		if err != nil {
+			return nil, fmt.Errorf("read configured Magento encryption key from Key Vault: %w", err)
+		}
+		if result.Value == nil || strings.TrimSpace(*result.Value) == "" {
+			return nil, errors.New("configured Magento encryption key is empty")
+		}
+		plan.Spec.EncryptionKey = pulumi.ToSecret(*result.Value).(pulumi.StringOutput)
 	}
 	if !selectOnly {
 		return automation.NewInlineStackWithBackend(ctx, plan.Envelope.StackName, stack.Program(plan.Spec), plan.BackendURL)

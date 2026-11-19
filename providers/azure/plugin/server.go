@@ -88,17 +88,19 @@ func (s *Server) Describe(req *sdk.DescribeRequest, resp *sdk.DescribeResponse) 
 }
 
 type target struct {
-	SubscriptionID     string       `yaml:"subscriptionId"`
-	ResourceGroup      string       `yaml:"resourceGroup"`
-	TenantID           string       `yaml:"tenantId,omitempty"`
-	ImageDigest        string       `yaml:"imageDigest,omitempty"`
-	StateBackendURL    string       `yaml:"stateBackendUrl,omitempty"`
-	ImagePullSecret    string       `yaml:"imagePullSecret,omitempty"`
-	ACRResourceID      string       `yaml:"acrResourceId,omitempty"`
-	IngressClass       string       `yaml:"ingressClass,omitempty"`
-	TLSSecret          string       `yaml:"tlsSecret,omitempty"`
-	MonitorWorkspaceID string       `yaml:"monitorWorkspaceId,omitempty"`
-	PreviewPool        *previewPool `yaml:"previewPool,omitempty"`
+	SubscriptionID          string       `yaml:"subscriptionId"`
+	ResourceGroup           string       `yaml:"resourceGroup"`
+	TenantID                string       `yaml:"tenantId,omitempty"`
+	ImageDigest             string       `yaml:"imageDigest,omitempty"`
+	StateBackendURL         string       `yaml:"stateBackendUrl,omitempty"`
+	ImagePullSecret         string       `yaml:"imagePullSecret,omitempty"`
+	EncryptionKeySecretName string       `yaml:"encryptionKeySecretName,omitempty"`
+	EncryptionKeySecret     string       `yaml:"encryptionKeySecret,omitempty"`
+	ACRResourceID           string       `yaml:"acrResourceId,omitempty"`
+	IngressClass            string       `yaml:"ingressClass,omitempty"`
+	TLSSecret               string       `yaml:"tlsSecret,omitempty"`
+	MonitorWorkspaceID      string       `yaml:"monitorWorkspaceId,omitempty"`
+	PreviewPool             *previewPool `yaml:"previewPool,omitempty"`
 }
 
 type previewPool struct {

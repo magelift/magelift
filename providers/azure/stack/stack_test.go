@@ -49,7 +49,7 @@ func (m *resourceMocks) NewResource(args pulumi.MockResourceArgs) (string, resou
 	m.resources[args.TypeToken+"/"+args.Name] = args
 	outputs := args.Inputs.Copy()
 	outputs["name"] = resource.NewStringProperty(args.Name)
-	if args.TypeToken == "azure-native:dbformysql:Server" {
+	if args.TypeToken == "azure-native:dbformysql:Server" || args.TypeToken == "azure-native_dbformysql_v20250601preview:dbformysql:Server" {
 		outputs["fullyQualifiedDomainName"] = resource.NewStringProperty("mysql.example.invalid")
 	}
 	if args.TypeToken == "azure-native:containerservice:ManagedCluster" {
@@ -64,6 +64,22 @@ func (m *resourceMocks) NewResource(args pulumi.MockResourceArgs) (string, resou
 		outputs["result"] = resource.MakeSecret(resource.NewStringProperty("generated-password"))
 	}
 	return args.Name + "-id", outputs, nil
+}
+
+func TestMySQL84UsesVersionedAPI(t *testing.T) {
+	spec := testSpec()
+	spec.MySQLVersion = "8.4"
+	mocks := &resourceMocks{resources: make(map[string]pulumi.MockResourceArgs)}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-test", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	server, ok := mocks.resources["azure-native_dbformysql_v20250601preview:dbformysql:Server"]
+	if !ok || server.Inputs["version"].StringValue() != "8.4" {
+		t.Fatalf("MySQL 8.4 server not registered with versioned API: %#v", server.Inputs)
+	}
+	if _, ok := mocks.resources["azure-native:dbformysql:Server"]; ok {
+		t.Fatal("MySQL 8.4 must not use the older default server API")
+	}
 }
 
 func (m *resourceMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
@@ -312,5 +328,106 @@ func TestDestroyOnlyProgramUsesExistingStateWithoutReconstructingResources(t *te
 	}
 	if len(mocks.resources) != 0 {
 		t.Fatalf("cleanup graph must read the existing stack state, got resources %v", mocks.resources)
+	}
+}
+
+func TestShopServiceWorkloadsHavePersistentStorageAndCredentials(t *testing.T) {
+	spec := testSpec()
+	spec.ApplicationImage = "registry.example/shop@sha256:" + strings.Repeat("a", 64)
+	spec.MagentoVersion = "2.4.9"
+	spec.DatabaseFamily = "mariadb"
+	spec.DatabaseImage = "mariadb:11.4"
+	spec.DatabaseStorageGiB = 48
+	spec.CacheImage = "valkey/valkey:8.1"
+	spec.CacheEvictionPolicy = "allkeys-lru"
+	spec.CacheMemoryMiB = 512
+	spec.CacheStorageGiB = 12
+	spec.SessionImage = "valkey/valkey:8.1"
+	spec.SessionEvictionPolicy = "noeviction"
+	spec.SessionMemoryMiB = 128
+	spec.SessionStorageGiB = 8
+	spec.QueueImage = "rabbitmq:4.1-management-alpine"
+	spec.QueueStorageGiB = 20
+	spec.SearchImage = "opensearchproject/opensearch:3.1.0"
+	spec.SearchPlugins = []string{"analysis-icu", "analysis-phonetic"}
+	spec.SearchStorageGiB = 32
+	spec.EncryptionKeySecretName = "existing-key"
+	mocks := &resourceMocks{resources: make(map[string]pulumi.MockResourceArgs)}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-test", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := mocks.resources["azure-native:dbformysql:Server/mysql"]; ok {
+		t.Fatal("self-hosted database created managed MySQL")
+	}
+	for key, parts := range map[string][]string{
+		"kubernetes:apps/v1:StatefulSet/mariadb":          {"48Gi", "MARIADB_PASSWORD", "secretKeyRef"},
+		"kubernetes:apps/v1:StatefulSet/magelift-cache":   {"12Gi", "512mb", "768Mi", "allkeys-lru", "--appendonly", "--requirepass", "magelift-cache-cache-password"},
+		"kubernetes:apps/v1:StatefulSet/magelift-session": {"8Gi", "128mb", "384Mi", "noeviction", "--appendonly"},
+		"kubernetes:apps/v1:StatefulSet/magelift-queue":   {"20Gi", "rabbitmq:4.1-management-alpine"},
+		"kubernetes:apps/v1:StatefulSet/magelift-search":  {"32Gi", "analysis-icu", "analysis-phonetic"},
+		"kubernetes:apps/v1:Deployment/magento-web":       {"existing-key", "magento-queue-password", "magelift-cache-cache-password", "magelift-session-cache-password", "magelift-session", "magelift-database"},
+		"kubernetes:apps/v1:Deployment/magento-cron":      {"existing-key", "magento-queue-password", "magelift-cache-cache-password", "magelift-session-cache-password", "magelift-session"},
+		"kubernetes:apps/v1:Deployment/magento-consumer":  {"existing-key", "magento-queue-password", "magelift-cache-cache-password", "magelift-session-cache-password", "magelift-session"},
+	} {
+		resource, ok := mocks.resources[key]
+		if !ok {
+			t.Errorf("missing %s", key)
+			continue
+		}
+		payload, err := json.Marshal(resource.Inputs.Mappable())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, part := range parts {
+			if !strings.Contains(string(payload), part) {
+				t.Errorf("%s missing %q: %s", key, part, payload)
+			}
+		}
+	}
+	if _, ok := mocks.resources["kubernetes:core/v1:Secret/magento-encryption-key"]; ok {
+		t.Fatal("operator-owned encryption key was created")
+	}
+}
+
+func TestProgramConnectsExternalDatabaseAndTLSRabbitMQ(t *testing.T) {
+	spec := testSpec()
+	spec.ApplicationImage = "registry.example.invalid/shop@sha256:" + strings.Repeat("a", 64)
+	spec.MagentoVersion = "2.4.9"
+	spec.ApplicationMode = "integrated"
+	spec.DatabaseFamily = "mariadb"
+	spec.DatabaseEndpoint = "db.example.com"
+	spec.DatabaseSecretName = "external-db"
+	spec.MySQLUsername = "shopuser"
+	spec.QueueEndpoint = "mq.example.com"
+	spec.QueueUsername = "brokeruser"
+	spec.QueuePort = "5671"
+	spec.QueueSecretName = "external-mq"
+	spec.CacheImage = "example.invalid/valkey:9"
+	spec.SearchImage = "example.invalid/opensearch:3"
+	spec.HighAvailability = true
+	mocks := &resourceMocks{resources: make(map[string]pulumi.MockResourceArgs)}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-test", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"azure-native:dbformysql:Server", "azure-native:dbformysql:Database", "random:index/randomPassword:RandomPassword/mysql-password", "azure-native:keyvault:Secret/mysql-password-secret", "kubernetes:apps/v1:StatefulSet/mariadb", "kubernetes:core/v1:Secret/magento-db-credentials", "kubernetes:apps/v1:StatefulSet/magelift-queue"} {
+		if _, ok := mocks.resources[name]; ok {
+			t.Errorf("unexpected owned resource %s", name)
+		}
+	}
+	for _, name := range []string{"magento-web", "magento-cron", "magento-consumer"} {
+		r, ok := mocks.resources["kubernetes:apps/v1:Deployment/"+name]
+		if !ok {
+			t.Errorf("missing %s", name)
+			continue
+		}
+		data, err := json.Marshal(r.Inputs.Mappable())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, term := range []string{"db.example.com", "shopuser", "external-db", "mq.example.com", "brokeruser", "external-mq", "5671", "MAGELIFT_DATABASE_TLS_CA", "MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__VERIFY_PEER", "MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__VERIFY_PEER_NAME"} {
+			if !strings.Contains(string(data), term) {
+				t.Errorf("%s missing %s", name, term)
+			}
+		}
 	}
 }

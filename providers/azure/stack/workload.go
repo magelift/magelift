@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/magelift/magelift/internal/cloud/kube"
+	"github.com/magelift/magelift/internal/cloud/kube/queue"
 	"github.com/magelift/magelift/internal/cloud/kube/search"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/pulumi/pulumi-azure-native-sdk/containerservice/v3"
-	"github.com/pulumi/pulumi-azure-native-sdk/dbformysql/v3"
 	"github.com/pulumi/pulumi-azure-native-sdk/keyvault/v3"
 	"github.com/pulumi/pulumi-azure-native-sdk/storage/v3"
 	azurenative "github.com/pulumi/pulumi-azure-native-sdk/v3"
@@ -26,7 +26,7 @@ import (
 
 // addMagentoWorkloads builds the Magento runtime after its dependencies. The
 // deployment lifecycle still needs to run Magento setup and health checks.
-func addMagentoWorkloads(ctx *pulumi.Context, spec Spec, azure *azurenative.Provider, cluster *containerservice.ManagedCluster, database *dbformysql.Server, account *storage.StorageAccount, share *storage.FileShare, vault *keyvault.Vault, dbPassword pulumi.StringInput) error {
+func addMagentoWorkloads(ctx *pulumi.Context, spec Spec, azure *azurenative.Provider, cluster *containerservice.ManagedCluster, databaseHost pulumi.StringInput, account *storage.StorageAccount, share *storage.FileShare, vault *keyvault.Vault, dbPassword pulumi.StringInput) error {
 	credentials := containerservice.ListManagedClusterUserCredentialsOutput(ctx, containerservice.ListManagedClusterUserCredentialsOutputArgs{
 		ResourceGroupName: pulumi.String(spec.ResourceGroup), ResourceName: cluster.Name,
 	}, pulumi.Provider(azure))
@@ -76,32 +76,43 @@ func addMagentoWorkloads(ctx *pulumi.Context, spec Spec, azure *azurenative.Prov
 		}
 	}
 
-	var encryptionKey pulumi.StringOutput
-	if spec.EncryptionKey == nil {
-		generated, err := random.NewRandomPassword(ctx, "magento-encryption-key", &random.RandomPasswordArgs{Length: pulumi.Int(32), Special: pulumi.Bool(false), MinUpper: pulumi.Int(1), MinLower: pulumi.Int(1), MinNumeric: pulumi.Int(1)})
+	keySecretName := spec.EncryptionKeySecretName
+	var keySecret *corev1.Secret
+	if keySecretName == "" {
+		var encryptionKey pulumi.StringOutput
+		if spec.EncryptionKey == nil {
+			generated, err := random.NewRandomPassword(ctx, "magento-encryption-key", &random.RandomPasswordArgs{Length: pulumi.Int(32), Special: pulumi.Bool(false), MinUpper: pulumi.Int(1), MinLower: pulumi.Int(1), MinNumeric: pulumi.Int(1)})
+			if err != nil {
+				return err
+			}
+			encryptionKey = generated.Result
+		} else {
+			encryptionKey = pulumi.ToSecret(spec.EncryptionKey).(pulumi.StringOutput)
+		}
+		_, err = keyvault.NewSecret(ctx, "magento-encryption-key-secret", &keyvault.SecretArgs{ResourceGroupName: pulumi.String(spec.ResourceGroup), VaultName: vault.Name, SecretName: pulumi.String("magento-encryption-key"), Properties: &keyvault.SecretPropertiesArgs{Value: encryptionKey.ToStringPtrOutput()}}, pulumi.Provider(azure))
 		if err != nil {
 			return err
 		}
-		encryptionKey = generated.Result
-	} else {
-		encryptionKey = pulumi.ToSecret(spec.EncryptionKey).(pulumi.StringOutput)
+		keySecret, err = kube.NewMagentoEncryptionKeySecret(ctx, "magento", encryptionKey, options...)
+		if err != nil {
+			return err
+		}
+		keySecretName = kube.EncryptionKeySecretName("magento")
 	}
-	_, err = keyvault.NewSecret(ctx, "magento-encryption-key-secret", &keyvault.SecretArgs{
-		ResourceGroupName: pulumi.String(spec.ResourceGroup), VaultName: vault.Name, SecretName: pulumi.String("magento-encryption-key"),
-		Properties: &keyvault.SecretPropertiesArgs{Value: encryptionKey.ToStringPtrOutput()},
-	}, pulumi.Provider(azure))
-	if err != nil {
-		return err
+	dbSecretName := spec.DatabaseSecretName
+	var dbSecret *corev1.Secret
+	if spec.DatabaseEndpoint == "" {
+		dbSecret, err = kube.NewDatabaseCredentialsSecret(ctx, "magento", spec.MySQLUsername, dbPassword, options...)
+		if err != nil {
+			return err
+		}
+		dbSecretName = kube.DatabaseCredentialsSecretName("magento")
 	}
-	keySecret, err := kube.NewMagentoEncryptionKeySecret(ctx, "magento", encryptionKey, options...)
-	if err != nil {
-		return err
+	if spec.DatabaseFamily == "mariadb" && spec.DatabaseEndpoint == "" {
+		if err := addMariaDB(ctx, spec, dbSecret, options); err != nil {
+			return err
+		}
 	}
-	dbSecret, err := kube.NewDatabaseCredentialsSecret(ctx, "magento", spec.MySQLUsername, dbPassword, options...)
-	if err != nil {
-		return err
-	}
-
 	keys := storage.ListStorageAccountKeysOutput(ctx, storage.ListStorageAccountKeysOutputArgs{ResourceGroupName: pulumi.String(spec.ResourceGroup), AccountName: account.Name}, pulumi.Provider(azure))
 	storageKey := pulumi.ToSecret(keys.Keys().Index(pulumi.Int(0)).Value()).(pulumi.StringOutput)
 	fileSecret, err := corev1.NewSecret(ctx, "azure-file-key", &corev1.SecretArgs{
@@ -141,28 +152,46 @@ func addMagentoWorkloads(ctx *pulumi.Context, spec Spec, azure *azurenative.Prov
 	if spec.HighAvailability {
 		searchReplicas = 3
 	}
-	searchComponent, err := search.New(ctx, "magelift-search", search.Args{Replicas: searchReplicas, Image: spec.SearchImage, K8sProvider: provider, TypeToken: "magelift:azure:OpenSearch"}, options...)
+	searchComponent, err := search.New(ctx, "magelift-search", search.Args{Replicas: searchReplicas, Namespace: namespace, Plugins: spec.SearchPlugins, StorageGiB: spec.SearchStorageGiB, Image: spec.SearchImage, K8sProvider: provider, TypeToken: "magelift:azure:OpenSearch"}, options...)
 	if err != nil {
 		return err
 	}
 	cacheEndpoint := spec.CacheEndpoint
+	cachePasswordSecret := ""
 	if cacheEndpoint == "" {
 		cacheEndpoint = "magelift-cache"
-		labels := pulumi.StringMap{"app": pulumi.String(cacheEndpoint)}
-		_, err = appsv1.NewDeployment(ctx, "cache", &appsv1.DeploymentArgs{
-			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(cacheEndpoint)},
-			Spec: &appsv1.DeploymentSpecArgs{Replicas: pulumi.Int(1), Selector: &metav1.LabelSelectorArgs{MatchLabels: labels}, Template: &corev1.PodTemplateSpecArgs{
-				Metadata: &metav1.ObjectMetaArgs{Labels: labels}, Spec: &corev1.PodSpecArgs{Containers: corev1.ContainerArray{&corev1.ContainerArgs{Name: pulumi.String("cache"), Image: pulumi.String(spec.CacheImage), Ports: corev1.ContainerPortArray{&corev1.ContainerPortArgs{ContainerPort: pulumi.Int(6379)}}}}},
-			}},
-		}, options...)
-		if err != nil {
-			return err
-		}
-		_, err = corev1.NewService(ctx, "cache-service", &corev1.ServiceArgs{Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(cacheEndpoint)}, Spec: &corev1.ServiceSpecArgs{Selector: labels, Ports: corev1.ServicePortArray{&corev1.ServicePortArgs{Port: pulumi.Int(6379)}}}}, options...)
-		if err != nil {
+		cachePasswordSecret = cacheEndpoint + "-cache-password"
+		if err := addValkey(ctx, cacheEndpoint, spec.CacheImage, spec.CacheEvictionPolicy, spec.CacheMemoryMiB, spec.CacheStorageGiB, options); err != nil {
 			return err
 		}
 	}
+	sessionEndpoint := cacheEndpoint
+	sessionPasswordSecret := cachePasswordSecret
+	if spec.SessionEndpoint != "" {
+		sessionEndpoint = spec.SessionEndpoint
+		sessionPasswordSecret = ""
+	}
+	if spec.SessionImage != "" {
+		sessionEndpoint = "magelift-session"
+		sessionPasswordSecret = sessionEndpoint + "-cache-password"
+		if err := addValkey(ctx, sessionEndpoint, spec.SessionImage, spec.SessionEvictionPolicy, spec.SessionMemoryMiB, spec.SessionStorageGiB, options); err != nil {
+			return err
+		}
+	}
+	queueMode, queueHost, queueSecret, queueUser, queuePort, queueSSL := "database", "", "", "", "", ""
+	if spec.QueueEndpoint != "" {
+		queueMode, queueHost, queueSecret, queueUser, queuePort, queueSSL = "rabbitmq", spec.QueueEndpoint, spec.QueueSecretName, spec.QueueUsername, spec.QueuePort, "1"
+	} else if spec.QueueImage != "" {
+		component, err := queue.New(ctx, "magelift-queue", queue.Args{Namespace: namespace, Replicas: 1, Image: spec.QueueImage, StorageGiB: spec.QueueStorageGiB, K8sProvider: provider, TypeToken: "magelift:azure:RabbitMQ"}, options...)
+		if err != nil {
+			return err
+		}
+		if _, err := kube.NewQueuePasswordSecret(ctx, "magento", component.Password, options...); err != nil {
+			return err
+		}
+		queueMode, queueHost, queueSecret, queueUser, queuePort = "rabbitmq", "magelift-queue", kube.QueuePasswordSecretName("magento"), "magento", "5672"
+	}
+
 	webRuntime := spec.WebRuntime
 	if webRuntime == "" {
 		webRuntime = "nginx-fpm"
@@ -171,18 +200,35 @@ func addMagentoWorkloads(ctx *pulumi.Context, spec Spec, azure *azurenative.Prov
 	if mode == "" {
 		mode = "integrated"
 	}
-	env := pulumi.All(database.FullyQualifiedDomainName, searchComponent.Endpoint).ApplyT(func(values []any) []corev1.EnvVar {
+	env := pulumi.All(databaseHost, searchComponent.Endpoint).ApplyT(func(values []any) []corev1.EnvVar {
 		return kube.EnvVars(platform.CoreEnvBindings(platform.CapabilityEndpoints{
 			ApplicationMode: mode, ApplicationVersion: spec.MagentoVersion, WebRuntime: webRuntime,
 			DatabaseWriter: values[0].(string), DatabaseName: "magento", CacheEndpoint: cacheEndpoint,
-			SessionEndpoint: cacheEndpoint, SearchEndpoint: values[1].(string), QueueMode: "database", Magento: spec.Magento,
+			SessionEndpoint: sessionEndpoint, SearchEndpoint: values[1].(string), QueueMode: queueMode, QueueHost: queueHost, QueueUsername: queueUser, QueuePort: queuePort, QueueSSL: queueSSL, Magento: spec.Magento,
 		}))
 	}).(corev1.EnvVarArrayOutput)
-	env = kube.AppendEncryptionKeyEnv(env, kube.EncryptionKeySecretName("magento"))
-	env = kube.AppendDatabaseCredentialEnv(env, kube.DatabaseCredentialsSecretName("magento"))
-	env = env.ApplyT(func(values []corev1.EnvVar) []corev1.EnvVar {
-		return append(values, corev1.EnvVar{Name: "MAGELIFT_DATABASE_TLS_CA", Value: pulumi.StringRef("/etc/ssl/certs/ca-certificates.crt")})
-	}).(corev1.EnvVarArrayOutput)
+	env = kube.AppendEncryptionKeyEnv(env, keySecretName)
+	env = kube.AppendStorePasswordEnv(env, cachePasswordSecret, sessionPasswordSecret)
+	if queueSecret != "" {
+		env = kube.AppendQueuePasswordEnv(env, queueSecret)
+	}
+	env = kube.AppendDatabaseCredentialEnv(env, dbSecretName)
+	if spec.DatabaseEndpoint != "" {
+		env = env.ApplyT(func(values []corev1.EnvVar) []corev1.EnvVar {
+			for i := range values {
+				if values[i].Name == platform.EnvMagentoDBUser {
+					values[i].Value = pulumi.StringRef(spec.MySQLUsername)
+					values[i].ValueFrom = nil
+				}
+			}
+			return values
+		}).(corev1.EnvVarArrayOutput)
+	}
+	if spec.DatabaseEndpoint != "" || spec.DatabaseFamily != "mariadb" {
+		env = env.ApplyT(func(values []corev1.EnvVar) []corev1.EnvVar {
+			return append(values, corev1.EnvVar{Name: "MAGELIFT_DATABASE_TLS_CA", Value: pulumi.StringRef("/etc/ssl/certs/ca-certificates.crt")})
+		}).(corev1.EnvVarArrayOutput)
+	}
 	containers, err := kube.WebRuntimeContainers(webRuntime, spec.ApplicationImage, env, "500m", "2Gi")
 	if err != nil {
 		return err
@@ -211,7 +257,7 @@ func addMagentoWorkloads(ctx *pulumi.Context, spec Spec, azure *azurenative.Prov
 		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String("magelift-web"), Annotations: kube.SkipAwaitAnnotations()},
 		Spec: &appsv1.DeploymentSpecArgs{Replicas: pulumi.Int(replicas), Selector: &metav1.LabelSelectorArgs{MatchLabels: labels},
 			Template: &corev1.PodTemplateSpecArgs{Metadata: &metav1.ObjectMetaArgs{Labels: labels}, Spec: pod}},
-	}, append(options, pulumi.DependsOn([]pulumi.Resource{dbSecret, keySecret, claim}))...)
+	}, append(options, pulumi.DependsOn(workloadDependencies(dbSecret, keySecret, claim)))...)
 	if err != nil {
 		return err
 	}
@@ -229,9 +275,20 @@ func addMagentoWorkloads(ctx *pulumi.Context, spec Spec, azure *azurenative.Prov
 		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String("magelift-cron"), Annotations: kube.SkipAwaitAnnotations()},
 		Spec: &appsv1.DeploymentSpecArgs{Replicas: pulumi.Int(1), Selector: &metav1.LabelSelectorArgs{MatchLabels: cronLabels},
 			Template: &corev1.PodTemplateSpecArgs{Metadata: &metav1.ObjectMetaArgs{Labels: cronLabels}, Spec: cronPod}},
-	}, append(options, pulumi.DependsOn([]pulumi.Resource{dbSecret, keySecret, claim}))...)
+	}, append(options, pulumi.DependsOn(workloadDependencies(dbSecret, keySecret, claim)))...)
 	if err != nil {
 		return err
+	}
+	queueConsumers := 0
+	if queueMode == "rabbitmq" {
+		queueConsumers = 1
+	}
+	if platform.MagentoConsumerProcessCount(spec.Magento.ConsumersMode, queueConsumers) > 0 {
+		queueLabels := pulumi.StringMap{"app": pulumi.String("magelift-consumer")}
+		_, err = appsv1.NewDeployment(ctx, "magento-consumer", &appsv1.DeploymentArgs{Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String("magelift-consumer"), Annotations: kube.SkipAwaitAnnotations()}, Spec: &appsv1.DeploymentSpecArgs{Replicas: pulumi.Int(1), Selector: &metav1.LabelSelectorArgs{MatchLabels: queueLabels}, Template: &corev1.PodTemplateSpecArgs{Metadata: &metav1.ObjectMetaArgs{Labels: queueLabels}, Spec: &corev1.PodSpecArgs{Containers: corev1.ContainerArray{&corev1.ContainerArgs{Name: pulumi.String("consumer"), Image: pulumi.String(spec.ApplicationImage), Command: kube.ToStringArray(platform.MagentoQueueArgsFor(spec.Magento.ConsumerNames)), Env: env, VolumeMounts: corev1.VolumeMountArray{&corev1.VolumeMountArgs{Name: pulumi.String("media"), MountPath: pulumi.String("/app/pub/media")}}}}, Volumes: cronPod.Volumes, ImagePullSecrets: pod.ImagePullSecrets}}}}, append(options, pulumi.DependsOn(workloadDependencies(dbSecret, keySecret, claim)))...)
+		if err != nil {
+			return err
+		}
 	}
 	serviceType := "LoadBalancer"
 	if spec.IngressClass != "" {
@@ -251,7 +308,17 @@ func addMagentoWorkloads(ctx *pulumi.Context, spec Spec, azure *azurenative.Prov
 	ctx.Export("imagePullSecret", pulumi.String(spec.ImagePullSecret))
 	ctx.Export("mediaClaim", pulumi.String("magelift-media"))
 	ctx.Export("cacheEndpoint", pulumi.String(cacheEndpoint))
-	ctx.Export("queueMode", pulumi.String("database"))
+	ctx.Export("sessionEndpoint", pulumi.String(sessionEndpoint))
+	ctx.Export(platform.OutputCachePasswordSecretName, pulumi.String(cachePasswordSecret))
+	ctx.Export(platform.OutputSessionPasswordSecretName, pulumi.String(sessionPasswordSecret))
+	ctx.Export("queueMode", pulumi.String(queueMode))
+	if queueSecret != "" {
+		ctx.Export("queueHost", pulumi.String(queueHost))
+		ctx.Export("queueUsername", pulumi.String(queueUser))
+		ctx.Export("queuePort", pulumi.String(queuePort))
+		ctx.Export("queueSSL", pulumi.String(queueSSL))
+		ctx.Export("queuePasswordSecretName", pulumi.String(queueSecret))
+	}
 	applicationURL := service.Status.ApplyT(func(status *corev1.ServiceStatus) string {
 		if status == nil || status.LoadBalancer == nil {
 			return ""
@@ -317,9 +384,25 @@ func addMagentoWorkloads(ctx *pulumi.Context, spec Spec, azure *azurenative.Prov
 		}
 	}
 	ctx.Export("applicationURL", applicationURL)
-	ctx.Export("databaseSecretName", pulumi.String(kube.DatabaseCredentialsSecretName("magento")))
-	ctx.Export("databaseTLSCA", pulumi.String("/etc/ssl/certs/ca-certificates.crt"))
-	ctx.Export("encryptionKeySecretName", pulumi.String(kube.EncryptionKeySecretName("magento")))
+	ctx.Export("databaseSecretName", pulumi.String(dbSecretName))
+	if spec.DatabaseEndpoint != "" {
+		ctx.Export("databaseUsername", pulumi.String(spec.MySQLUsername))
+	}
+	if spec.DatabaseEndpoint != "" || spec.DatabaseFamily != "mariadb" {
+		ctx.Export("databaseTLSCA", pulumi.String("/etc/ssl/certs/ca-certificates.crt"))
+	}
+	ctx.Export("encryptionKeySecretName", pulumi.String(keySecretName))
 	ctx.Export("searchEndpoint", searchComponent.Endpoint)
 	return nil
+}
+
+func workloadDependencies(dbSecret, keySecret *corev1.Secret, claim *corev1.PersistentVolumeClaim) []pulumi.Resource {
+	resources := []pulumi.Resource{claim}
+	if dbSecret != nil {
+		resources = append(resources, dbSecret)
+	}
+	if keySecret != nil {
+		resources = append(resources, keySecret)
+	}
+	return resources
 }

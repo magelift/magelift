@@ -51,6 +51,26 @@ func TestPlanRetainsChoicesWithoutSecrets(t *testing.T) {
 	}
 }
 
+func TestManagedMySQLARMVersion(t *testing.T) {
+	for _, tc := range []struct{ selected, arm string }{{"8.0", "8.0.21"}, {"8.0.42", "8.0.21"}, {"8.4.7", "8.4"}} {
+		t.Run(tc.selected, func(t *testing.T) {
+			request := testPlanRequest()
+			request.Services["database"] = sdk.ServiceBinding{Family: "mysql", Version: tc.selected, Ownership: "managed"}
+			var result sdk.PlanResult
+			if err := (&Server{}).Plan(request, &result); err != nil || result.Error != nil {
+				t.Fatalf("plan: %v, %v", err, result.Error)
+			}
+			var plan storedPlan
+			if err := json.Unmarshal(result.Plan.Opaque, &plan); err != nil {
+				t.Fatal(err)
+			}
+			if plan.Spec.MySQLVersion != tc.arm || request.Services["database"].Version != tc.selected {
+				t.Fatalf("ARM version %q, requested %q", plan.Spec.MySQLVersion, request.Services["database"].Version)
+			}
+		})
+	}
+}
+
 func TestPlanRejectsUnsupportedBindings(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -60,7 +80,7 @@ func TestPlanRejectsUnsupportedBindings(t *testing.T) {
 		{"unknown service", func(r *sdk.PlanRequest) { r.Services["media"] = sdk.ServiceBinding{Family: "blob"} }, "services.media"},
 		{"attached database", func(r *sdk.PlanRequest) {
 			r.Services["database"] = sdk.ServiceBinding{Family: "mysql", Ownership: "external", Endpoint: "db.example"}
-		}, "managed MySQL"},
+		}, "external database"},
 		{"cache credential", func(r *sdk.PlanRequest) {
 			r.Services["cache"] = sdk.ServiceBinding{Family: "redis", Ownership: "external", Endpoint: "cache.example", Secret: "azure-keyvault://vault/key"}
 		}, "cache authentication"},
@@ -280,7 +300,89 @@ func TestStarterRequiresActionableAzureDependencies(t *testing.T) {
 	request.Envelope.Preset = "high-availability"
 	request.Envelope.EnvironmentClass = "production"
 	result = sdk.PlanResult{}
-	if err := server.Plan(request, &result); err != nil || result.Error == nil || !strings.Contains(result.Error.Message, "services.cache") || !strings.Contains(result.Error.Message, "operator-provided") {
-		t.Fatalf("HA cache guidance: %v %#v", err, result.Error)
+	if err := server.Plan(request, &result); err != nil || result.Error != nil {
+		t.Fatalf("HA web with explicit singleton cache: %v %#v", err, result.Error)
+	}
+	var planned storedPlan
+	if err := json.Unmarshal(result.Plan.Opaque, &planned); err != nil {
+		t.Fatal(err)
+	}
+	if !planned.Spec.HighAvailability || planned.Spec.CacheImage == "" {
+		t.Fatalf("HA workload / selected singleton lost: %#v", planned.Spec)
+	}
+}
+
+func TestPlanKeepsSelfHostedShopServicesAndKeyReference(t *testing.T) {
+	r := testPlanRequest()
+	r.Services["database"] = sdk.ServiceBinding{Family: "mariadb", Ownership: "self-hosted", Version: "11.4", StorageGiB: 50}
+	r.Services["cache"] = sdk.ServiceBinding{Family: "valkey", Ownership: "self-hosted", Version: "8.1", EvictionPolicy: "allkeys-lru", MemoryMiB: 512, StorageGiB: 12}
+	r.Services["session"] = sdk.ServiceBinding{Family: "valkey", Ownership: "self-hosted", Version: "8.1", EvictionPolicy: "noeviction", MemoryMiB: 128, StorageGiB: 8}
+	r.Services["queue"] = sdk.ServiceBinding{Family: "rabbitmq", Ownership: "self-hosted", Version: "4.1", StorageGiB: 20}
+	r.Services["search"] = sdk.ServiceBinding{Family: "opensearch", Ownership: "self-hosted", Version: "3.1", Plugins: []string{"analysis-icu", "analysis-phonetic"}, StorageGiB: 32}
+	r.TargetBlock = append(r.TargetBlock, []byte("encryptionKeySecretName: existing-magento-key\n")...)
+	var result sdk.PlanResult
+	if err := (&Server{}).Plan(r, &result); err != nil || result.Error != nil {
+		t.Fatalf("plan %v / %#v", err, result.Error)
+	}
+	var plan storedPlan
+	if err := json.Unmarshal(result.Plan.Opaque, &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.Spec.DatabaseImage != "mariadb:11.4" || plan.Spec.DatabaseStorageGiB != 50 || plan.Spec.CacheMemoryMiB != 512 || plan.Spec.CacheStorageGiB != 12 || plan.Spec.SessionMemoryMiB != 128 || plan.Spec.SessionStorageGiB != 8 || plan.Spec.QueueStorageGiB != 20 || plan.Spec.SearchStorageGiB != 32 || plan.Spec.CacheEvictionPolicy != "allkeys-lru" || plan.Spec.SessionEvictionPolicy != "noeviction" || plan.Spec.SessionImage != "valkey/valkey:8.1" || plan.Spec.QueueImage != "rabbitmq:4.1-management-alpine" || len(plan.Spec.SearchPlugins) != 2 || plan.Spec.EncryptionKeySecretName != "existing-magento-key" {
+		t.Fatalf("choices not preserved: %#v", plan.Spec)
+	}
+}
+
+func TestAzureEncryptionKeySecretIDValidation(t *testing.T) {
+	const valid = "https://example-vault.vault.azure.net/secrets/magento-key/0123456789abcdef0123456789abcdef"
+	host, name, version, err := parseEncryptionSecretID(valid)
+	if err != nil || host != "https://example-vault.vault.azure.net" || name != "magento-key" || version != "0123456789abcdef0123456789abcdef" {
+		t.Fatalf("parsed %s %s %s: %v", host, name, version, err)
+	}
+	for _, bad := range []string{"http://example-vault.vault.azure.net/secrets/k/0123456789abcdef0123456789abcdef", "https://evil.example/secrets/k/0123456789abcdef0123456789abcdef", "https://example-vault.vault.azure.net/secrets/k", "https://example-vault.vault.azure.net/secrets/k/0123456789abcdef0123456789abcdef?query=secret"} {
+		if _, _, _, err := parseEncryptionSecretID(bad); err == nil {
+			t.Errorf("accepted %q", bad)
+		}
+	}
+}
+
+func TestPlanAttachesTLSDatabaseAndRabbitMQ(t *testing.T) {
+	r := testPlanRequest()
+	r.Services["database"] = sdk.ServiceBinding{Family: "mariadb", Ownership: "external", Endpoint: "db.example.com", Username: "shop", Secret: "kubernetes://shop-db"}
+	r.Services["queue"] = sdk.ServiceBinding{Family: "rabbitmq", Ownership: "existing", Endpoint: "amqps://mq.example.com:5671", Username: "shopmq", Secret: "kubernetes://shop-mq"}
+	var result sdk.PlanResult
+	if err := (&Server{}).Plan(r, &result); err != nil || result.Error != nil {
+		t.Fatalf("plan %v %#v", err, result.Error)
+	}
+	var plan storedPlan
+	if err := json.Unmarshal(result.Plan.Opaque, &plan); err != nil {
+		t.Fatal(err)
+	}
+	if plan.Spec.DatabaseEndpoint != "db.example.com" || plan.Spec.DatabaseSecretName != "shop-db" || plan.Spec.MySQLUsername != "shop" || plan.Spec.QueueEndpoint != "mq.example.com" || plan.Spec.QueuePort != "5671" || plan.Spec.QueueUsername != "shopmq" || plan.Spec.QueueSecretName != "shop-mq" || plan.Spec.QueueImage != "" {
+		t.Fatalf("external connection lost: %#v", plan.Spec)
+	}
+	for _, bad := range []string{"amqp://mq.example.com", "amqps://user:pass@mq.example.com", "amqps://mq.example.com/other"} {
+		r.Services["queue"] = sdk.ServiceBinding{Family: "rabbitmq", Ownership: "external", Endpoint: bad, Username: "shopmq", Secret: "kubernetes://shop-mq"}
+		result = sdk.PlanResult{}
+		if err := (&Server{}).Plan(r, &result); err != nil || result.Error == nil {
+			t.Fatalf("accepted %q: %v %#v", bad, err, result.Error)
+		}
+	}
+}
+
+func TestPlanPreservesHASingletonDataChoices(t *testing.T) {
+	r := testPlanRequest()
+	r.Envelope.Preset = "high-availability"
+	r.Envelope.EnvironmentClass = "production"
+	r.Services["database"] = sdk.ServiceBinding{Family: "mariadb", Ownership: "self-hosted", Version: "11.4", Parameters: map[string]string{"character_set_server": "utf8mb4"}}
+	r.Services["session"] = sdk.ServiceBinding{Family: "valkey", Ownership: "self-hosted", Version: "8.1"}
+	var result sdk.PlanResult
+	if err := (&Server{}).Plan(r, &result); err != nil || result.Error != nil {
+		t.Fatalf("plan: %v %#v", err, result.Error)
+	}
+	var plan storedPlan
+	_ = json.Unmarshal(result.Plan.Opaque, &plan)
+	if !plan.Spec.HighAvailability || plan.Spec.DatabaseImage != "mariadb:11.4" || plan.Spec.SessionImage != "valkey/valkey:8.1" || plan.Spec.DatabaseParameters["character_set_server"] != "utf8mb4" {
+		t.Fatalf("plan choices: %#v", plan.Spec)
 	}
 }
