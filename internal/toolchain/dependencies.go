@@ -172,17 +172,9 @@ func SpecsForFastly() []DependencySpec {
 
 // SpecsForDumpImport selects the actual local dump-import transport. A host
 // mysql client takes precedence over the Docker Compose fallback, matching the
-// importer; Kubernetes mode always uses kubectl. A compressed dump also needs
-// the host gunzip executable because decompression happens before the SQL
-// stream reaches the selected transport.
-func SpecsForDumpImport(runner DependencyRunner, transport string, compressed bool) []DependencySpec {
-	specs := make([]DependencySpec, 0, 3)
-	if compressed {
-		specs = append(specs, DependencySpec{
-			ID: "gunzip", Command: "gunzip", Capability: "compressed dump decompression",
-			Requirement: DependencyRequired, VersionArgs: []string{"--version"}, InstallPackage: "gzip", Installable: true,
-		})
-	}
+// importer; Kubernetes mode always uses kubectl. Gzip is decoded in Go.
+func SpecsForDumpImport(runner DependencyRunner, transport string, _ bool) []DependencySpec {
+	var specs []DependencySpec
 	if strings.EqualFold(strings.TrimSpace(transport), "kube") {
 		return append(specs, DependencySpec{
 			ID: "kubectl", Command: "kubectl", Capability: "Kubernetes dump import transport",

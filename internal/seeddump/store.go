@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"github.com/magelift/magelift/internal/projectphp"
 )
 
 var environmentPattern = regexp.MustCompile(`^[a-z][a-z0-9.-]*$`)
@@ -55,16 +57,44 @@ func (s *Store) Read(ctx context.Context) (*Record, error) {
 	return s.readUnlocked(ctx)
 }
 
+// LockImport serializes imports and journal initialization for this environment.
+func (s *Store) LockImport(ctx context.Context) (func(), error) {
+	return projectphp.LockOverlay(ctx, s.path+".import")
+}
+
+// PrepareExplicit records a user-selected path while the caller holds LockImport.
+func (s *Store) PrepareExplicit(ctx context.Context, dumpPath string) (*Record, error) {
+	release, err := acquireLock(ctx, s.path+".lock")
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	current, err := s.readUnlocked(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if current != nil && current.Status == StatusImporting {
+		return nil, errors.New("seed dump journal records an in-flight import; inspect and recover it before selecting another dump")
+	}
+	record := Record{Status: StatusRecorded, DumpPath: dumpPath, UpdatedAt: s.now().UTC()}
+	if err := writeAtomic(s.path, record); err != nil {
+		return nil, err
+	}
+	return &record, nil
+}
+
 // InitRecorded writes status=recorded (idempotent overwrite of recorded→recorded).
 func InitRecorded(ctx context.Context, projectRoot, environment, dumpPath string) (*Record, error) {
 	store, err := New(projectRoot, environment)
 	if err != nil {
 		return nil, err
 	}
-	return store.write(ctx, Record{
-		Status:   StatusRecorded,
-		DumpPath: dumpPath,
-	})
+	release, err := store.LockImport(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	return store.PrepareExplicit(ctx, dumpPath)
 }
 
 // MarkImporting transitions recorded|failed|importing → importing (clears reason).
@@ -129,19 +159,6 @@ func (s *Store) transition(ctx context.Context, mutate func(*Record) error) (*Re
 		return nil, err
 	}
 	return &next, nil
-}
-
-func (s *Store) write(ctx context.Context, record Record) (*Record, error) {
-	release, err := acquireLock(ctx, s.path+".lock")
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	record.UpdatedAt = s.now().UTC()
-	if err := writeAtomic(s.path, record); err != nil {
-		return nil, err
-	}
-	return &record, nil
 }
 
 func (s *Store) readUnlocked(ctx context.Context) (*Record, error) {

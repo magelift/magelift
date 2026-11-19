@@ -51,8 +51,8 @@ func TestEnvImportDumpSuccessMovesJournalImported(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("importer calls = %d, want 1", calls)
 	}
-	if !sawYes {
-		t.Fatal("recorded first path must pass Yes=true to importer (Pattern 3)")
+	if sawYes {
+		t.Fatal("recording a dump must not authorize replacing a nonempty database")
 	}
 
 	var result map[string]any
@@ -306,5 +306,104 @@ func TestEnvImportDumpCommandNamedImportDumpNotSeed(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("env import-dump command missing from tree")
+	}
+}
+
+func TestEnvImportDumpFirstAttemptRefusesNonEmptyWithoutYes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "magelift.php")
+	dump := filepath.Join(dir, "seed.sql")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeTestProjectFile(dump, []byte("-- fixture\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	create := newCommandWithOptions(testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false}))
+	create.SetArgs([]string{"--config", path, "env", "create", "preview-seed", "--dump", dump})
+	if err := create.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.configPath = path
+	o.importSeedDump = func(_ context.Context, opts dumpimport.Options) error {
+		if opts.Yes {
+			t.Fatal("implicit authorization")
+		}
+		return dumpimport.ErrNonEmptyRequiresYes
+	}
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "env", "import-dump", "preview-seed"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "--yes") {
+		t.Fatalf("error=%v", err)
+	}
+}
+
+func TestEnvImportDumpFromExistingEnvironment(t *testing.T) {
+	for _, nonempty := range []bool{false, true} {
+		t.Run(map[bool]string{false: "empty", true: "nonempty"}[nonempty], func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "magelift.php")
+			if err := writeTestProjectFile(path, []byte(starterConfig), 0600); err != nil {
+				t.Fatal(err)
+			}
+			dump := filepath.Join(dir, "export.sql.gz")
+			var called bool
+			o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+			o.importSeedDump = func(_ context.Context, opts dumpimport.Options) error {
+				called = true
+				if opts.DumpPath != dump || opts.Yes {
+					t.Fatalf("unexpected options: %#v", opts)
+				}
+				if nonempty {
+					return dumpimport.ErrNonEmptyRequiresYes
+				}
+				return nil
+			}
+			cmd := newCommandWithOptions(o)
+			cmd.SetArgs([]string{"--config", path, "env", "import-dump", "staging", "--from", dump})
+			err := cmd.Execute()
+			if !called || (nonempty && !errors.Is(err, dumpimport.ErrNonEmptyRequiresYes)) || (!nonempty && err != nil) {
+				t.Fatalf("called=%v err=%v", called, err)
+			}
+			store, _ := seeddump.New(dir, "staging")
+			record, err := store.Read(context.Background())
+			if err != nil || record == nil || record.DumpPath != dump {
+				t.Fatalf("record=%#v err=%v", record, err)
+			}
+			want := seeddump.StatusImported
+			if nonempty {
+				want = seeddump.StatusFailed
+			}
+			if record.Status != want {
+				t.Fatalf("status=%s", record.Status)
+			}
+		})
+	}
+}
+
+func TestEnvImportDumpFromPreservesInFlightJournal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := seeddump.InitRecorded(context.Background(), dir, "staging", "original.sql"); err != nil {
+		t.Fatal(err)
+	}
+	store, _ := seeddump.New(dir, "staging")
+	if _, err := store.MarkImporting(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
+	o.importSeedDump = func(context.Context, dumpimport.Options) error { t.Fatal("import unexpectedly started"); return nil }
+	cmd := newCommandWithOptions(o)
+	cmd.SetArgs([]string{"--config", path, "env", "import-dump", "staging", "--from", "other.sql"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "in-flight") {
+		t.Fatalf("error=%v", err)
+	}
+	record, err := store.Read(context.Background())
+	if err != nil || record.Status != seeddump.StatusImporting || record.DumpPath != "original.sql" {
+		t.Fatalf("record=%#v err=%v", record, err)
 	}
 }

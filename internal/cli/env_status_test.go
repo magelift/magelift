@@ -196,3 +196,34 @@ extensions: {}
 		t.Fatalf("seedDumpStatus without journal = %#v (want unavailable)", result["seedDumpStatus"])
 	}
 }
+
+func TestEnvStatusShowsDirectDumpFailure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "magelift.php")
+	if err := writeTestProjectFile(path, []byte(starterConfig), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := seeddump.InitRecorded(context.Background(), dir, "staging", "/tmp/example.sql.gz"); err != nil {
+		t.Fatal(err)
+	}
+	store, _ := seeddump.New(dir, "staging")
+	if _, err := store.MarkImporting(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.MarkFailed(context.Background(), "password=supersecret123"); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	cmd := newCommandWithOptions(testOptions(&out, &fakeTerminal{interactive: false}))
+	cmd.SetArgs([]string{"--config", path, "--output", "json", "env", "status", "staging"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["seedDump"] != "/tmp/example.sql.gz" || result["seedDumpStatus"] != seeddump.StatusFailed || result["seedDumpReason"] != "[REDACTED]" {
+		t.Fatalf("status=%#v", result)
+	}
+}

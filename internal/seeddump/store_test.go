@@ -3,6 +3,7 @@ package seeddump
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -321,5 +322,27 @@ func TestMarkConcurrentWritersSerialize(t *testing.T) {
 	}
 	if raw["status"] != StatusImporting {
 		t.Fatalf("raw status = %#v", raw["status"])
+	}
+}
+
+func TestImportLockSerializesJournalInitialization(t *testing.T) {
+	root := t.TempDir()
+	store, err := New(root, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := store.LockImport(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if _, err := InitRecorded(ctx, root, "staging", "other.sql"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected lock timeout, got %v", err)
+	}
+	record, err := store.Read(context.Background())
+	if err != nil || record != nil {
+		t.Fatalf("record=%#v err=%v", record, err)
 	}
 }

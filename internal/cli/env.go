@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/projectphp"
 	"github.com/magelift/magelift/internal/providerhost"
+	"github.com/magelift/magelift/internal/secretsafe"
 	"github.com/magelift/magelift/internal/seeddump"
 	"github.com/magelift/magelift/internal/toolchain"
 	"github.com/magelift/magelift/sdk"
@@ -77,7 +79,7 @@ func envCreateCommand(o *options) *cobra.Command {
 				if _, err := os.Stat(dumpPath); err != nil {
 					return guidedWrap(err,
 						fmt.Sprintf("database dump %q is not readable", dumpPath),
-						"pass an existing .sql or .sql.gz path; import runs after the environment first deploy (ADR 0010)",
+						"pass an existing .sql or .sql.gz path; import it explicitly before the first application deploy",
 						"docs/adr/0009-dump-seed-and-attach.md",
 					)
 				}
@@ -150,7 +152,7 @@ func envCreateCommand(o *options) *cobra.Command {
 	command.Flags().Int64Var(&monthlyBudgetCents, "monthly-budget-cents", 0, "maximum monthly AWS budget in cents")
 	command.Flags().BoolVar(&protection, "protection", false, "protect destructive operations")
 	command.Flags().StringSliceVar(&branches, "branches", nil, "Git branches mapped to this environment")
-	command.Flags().StringVar(&dumpPath, "dump", "", "path to a MySQL dump to seed after first deploy (ADR 0010)")
+	command.Flags().StringVar(&dumpPath, "dump", "", "path to a MySQL dump for explicit import before application deploy")
 	return command
 }
 
@@ -652,23 +654,29 @@ func normalizeManagementUITarget(target string) (string, error) {
 }
 
 func envImportDumpCommand(o *options) *cobra.Command {
-	return &cobra.Command{
+	var from string
+	command := &cobra.Command{
 		Use:   "import-dump <environment>",
-		Short: "Import the environment seedDump into the target database",
-		Long:  "Runs the dump importer with journal transitions (recorded|failed → importing → imported|failed). Retries into a non-empty database require persistent --yes (D-04). Named import-dump to avoid colliding with magelift local seed.",
+		Short: "Import a dump into the environment database",
+		Long:  "Import the recorded dump or a local file supplied with --from. Importing into a non-empty database replaces its schema and requires --yes.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			if !environmentName.MatchString(name) {
 				return invalid(errors.New("environment name must be a lowercase stable name"))
 			}
-			result, err := o.runSeedDumpImport(cmd.Context(), name, seedDumpImportExplicit)
+			if cmd.Flags().Changed("from") && strings.TrimSpace(from) == "" {
+				return invalid(errors.New("--from requires a dump path"))
+			}
+			result, err := o.runSeedDumpImport(cmd.Context(), name, from)
 			if err != nil {
 				return err
 			}
 			return o.write(result)
 		},
 	}
+	command.Flags().StringVar(&from, "from", "", "local SQL or SQL.gz file to import")
+	return command
 }
 
 func envMediaSyncCommand(o *options) *cobra.Command {
@@ -956,10 +964,6 @@ func envStatusCommand(o *options) *cobra.Command {
 				result["storefrontOrigin"] = origin
 			}
 			seedDump := effective.Config.SeedDump
-			if seedDump == "" {
-				return o.write(result)
-			}
-			result["seedDump"] = seedDump
 			projectRoot := filepath.Dir(filepath.Clean(o.configPath))
 			store, err := seeddump.New(projectRoot, resolvedName)
 			if err != nil {
@@ -970,28 +974,29 @@ func envStatusCommand(o *options) *cobra.Command {
 				return fmt.Errorf("read seed dump journal: %w", err)
 			}
 			if record == nil {
-				result["seedDumpStatus"] = "unavailable"
+				if seedDump != "" {
+					result["seedDump"] = seedDump
+					result["seedDumpStatus"] = "unavailable"
+				}
 				return o.write(result)
+			}
+			if record.DumpPath != "" {
+				seedDump = record.DumpPath
+			}
+			if seedDump != "" {
+				result["seedDump"] = seedDump
 			}
 			result["seedDumpStatus"] = record.Status
 			if record.Status == seeddump.StatusFailed && record.Reason != "" {
-				result["seedDumpReason"] = record.Reason
+				result["seedDumpReason"], _ = secretsafe.RedactSensitiveText(record.Reason)
 			}
 			return o.write(result)
 		},
 	}
 }
 
-type seedDumpImportKind int
-
-const (
-	seedDumpImportExplicit seedDumpImportKind = iota
-	seedDumpImportAuto
-)
-
-// runSeedDumpImport marks journal importing, runs dumpimport, then imported|failed.
-// First recorded path forces Yes=true (Pattern 3 / D-04); retries from failed require o.yes when nonempty.
-func (o *options) runSeedDumpImport(ctx context.Context, environment string, kind seedDumpImportKind) (map[string]any, error) {
+// runSeedDumpImport records the result of an explicit dump import.
+func (o *options) runSeedDumpImport(ctx context.Context, environment, from string) (map[string]any, error) {
 	file, err := o.load()
 	if err != nil {
 		return nil, invalid(err)
@@ -1001,10 +1006,10 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 		return nil, invalid(err)
 	}
 	dumpPath := strings.TrimSpace(effective.Config.SeedDump)
+	if strings.TrimSpace(from) != "" {
+		dumpPath = strings.TrimSpace(from)
+	}
 	if dumpPath == "" {
-		if kind == seedDumpImportAuto {
-			return nil, nil
-		}
 		return nil, invalid(errors.New("environment has no seedDump configured"))
 	}
 
@@ -1013,29 +1018,27 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 	if err != nil {
 		return nil, invalid(err)
 	}
-	record, err := store.Read(ctx)
+	unlock, err := store.LockImport(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("read seed dump journal: %w", err)
+		return nil, err
 	}
-	if record == nil {
-		if kind == seedDumpImportAuto {
-			return nil, nil
+	defer unlock()
+	if strings.TrimSpace(from) == "" {
+		record, err := store.Read(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read seed dump journal: %w", err)
 		}
-		return nil, invalid(errors.New("seed dump journal is missing; run env create --dump first"))
-	}
-	if kind == seedDumpImportAuto && record.Status != seeddump.StatusRecorded {
-		return nil, nil
-	}
-
-	yes := o.yes
-	if record.Status == seeddump.StatusRecorded {
-		// First recorded path: operator intent already recorded via --dump (D-01/D-04 Pattern 3).
-		yes = true
+		if record == nil {
+			return nil, invalid(errors.New("seed dump journal is missing; use --from or run env create --dump first"))
+		}
+		if record.DumpPath != "" && record.DumpPath != dumpPath {
+			return nil, invalid(errors.New("seed dump journal refers to a different path; select the intended dump with --from"))
+		}
 	}
 
 	opts := dumpimport.Options{
 		DumpPath: dumpPath,
-		Yes:      yes,
+		Yes:      o.yes,
 		WorkDir:  projectRoot,
 	}
 	if name := strings.TrimSpace(effective.Config.Project.Name); name != "" {
@@ -1050,6 +1053,11 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 	), "database dump import"); err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(from) != "" {
+		if _, err := store.PrepareExplicit(ctx, dumpPath); err != nil {
+			return nil, invalid(err)
+		}
+	}
 	if _, err := store.MarkImporting(ctx); err != nil {
 		return nil, invalid(err)
 	}
@@ -1061,6 +1069,10 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 
 	if err := importFn(ctx, opts); err != nil {
 		reason := strings.TrimSpace(err.Error())
+		if opts.Password != "" {
+			reason = strings.ReplaceAll(reason, opts.Password, "[REDACTED]")
+		}
+		reason, _ = secretsafe.RedactSensitiveText(reason)
 		if reason == "" {
 			reason = "dump import failed"
 		}
@@ -1082,12 +1094,6 @@ func (o *options) runSeedDumpImport(ctx context.Context, environment string, kin
 		"seedDump":       dumpPath,
 		"seedDumpStatus": imported.Status,
 	}, nil
-}
-
-// maybeAutoImportSeedDump runs once after successful deploy when status is recorded (D-01/D-02).
-func (o *options) maybeAutoImportSeedDump(ctx context.Context, environment string) error {
-	_, err := o.runSeedDumpImport(ctx, environment, seedDumpImportAuto)
-	return err
 }
 
 func (o *options) applyDumpimportTransportEnv(opts *dumpimport.Options) {
@@ -1118,6 +1124,15 @@ func (o *options) applyDumpimportTransportEnv(opts *dumpimport.Options) {
 	if kc := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_KUBECONFIG")); kc != "" {
 		opts.Kubeconfig = kc
 	}
+	if value := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_PORT")); value != "" {
+		port, err := strconv.Atoi(value)
+		if err != nil {
+			port = -1
+		}
+		opts.Port = port
+	}
+	opts.TLSMode = strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_TLS"))
+	opts.CAFile = strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_CA"))
 	if db := strings.TrimSpace(o.getenv("MAGELIFT_DUMPIMPORT_DATABASE")); db != "" {
 		opts.Database = db
 	}

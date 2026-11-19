@@ -122,7 +122,7 @@ func TestSpecsForStandaloneLocalImageBuildRequireGitAndDockerOnly(t *testing.T) 
 func TestSpecsForDumpImportSelectsHostMySQLBeforeCompose(t *testing.T) {
 	probe := &dependencyProbe{paths: map[string]string{"mysql": "/usr/local/bin/mysql"}}
 	specs := SpecsForDumpImport(probe, "", true)
-	if len(specs) != 2 || specs[0].ID != "gunzip" || specs[1].ID != "mysql" {
+	if len(specs) != 1 || specs[0].ID != "mysql" {
 		t.Fatalf("specs = %#v", specs)
 	}
 }

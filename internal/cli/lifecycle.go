@@ -364,10 +364,6 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 				return infrastructureResult{}, runErr
 			}
 			out := infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: result.Preview, Update: result.Update, Adopted: adopted}
-			// Auto-import after lock release (deployflow.Run completed); D-01/D-02 once-from-recorded.
-			if err := o.maybeAutoImportSeedDump(ctx, environment); err != nil {
-				return out, err
-			}
 			originURL := ""
 			if outputs, outputErr := backend.Outputs(ctx); outputErr == nil {
 				if applicationURL, ok := outputs[platform.OutputApplicationURL].(string); ok {
