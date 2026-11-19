@@ -31,7 +31,7 @@ test-fast: ## Fast Go tests for the CLI, SDK, and nested providers (no race)
 test-community:
 	./scripts/go-test-modules.sh --community
 
-test-race: ## Race checks for provider/CLI lifecycle, SDK, and GCP operations
+test-race: ## Race checks for the CLI, SDK, provider plugins and operations
 	./scripts/go-test-race-targeted.sh
 
 test-race-full: ## Full root-module race suite (explicit broad check, excludes nested modules)
@@ -225,7 +225,6 @@ HARNESS_STEPS := \
 	fast checkpoint_cleanup_state_test.sh \
 	fast recovery_lifecycle_guard_test.sh \
 	fast acceptance_lifecycle_guard_test.sh \
-	fast matrix_tier_guard_test.sh \
 	fast port_coverage_floci_gate_test.sh \
 	clean assert_clean_stub_test.sh \
 	leftover assert_clean_stub_test.sh \

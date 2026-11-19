@@ -15,6 +15,7 @@ fail() {
 list="$(bash "$SCRIPT" --list-modules)"
 printf '%s\n' "$list" | grep -qx root || fail "--list-modules must include root"
 printf '%s\n' "$list" | grep -qx sdk || fail "--list-modules must include sdk"
+printf '%s\n' "$list" | grep -qx aws || fail "--list-modules must include aws"
 printf '%s\n' "$list" | grep -qx gcp || fail "--list-modules must include gcp"
 printf '%s\n' "$list" | grep -qx azure || fail "--list-modules must include azure"
 
@@ -59,7 +60,7 @@ trap 'rm -rf "$TMP"' EXIT
 cat > "$TMP/go-community" <<'STUB'
 #!/usr/bin/env bash
 if [[ "$1" == list ]]; then
-  printf '%s\n' example/internal/cli example/internal/cloud/kube/runtime example/internal/cloud/aws/runtime example/internal/cloud/ovh/stack example/internal/cloud/scaleway/stack example/internal/external/fastly example/cmd/aws-recovery-acceptance
+  printf '%s\n' example/internal/cli example/internal/cloud/kube/runtime example/internal/cloud/ovh/stack example/internal/cloud/scaleway/stack example/internal/external/fastly example/tests/acceptance/cmd/ovh-recovery-acceptance
   exit "${COMMUNITY_LIST_EXIT:-0}"
 fi
 printf '%s\n' "$@" > "$COMMUNITY_TEST_ARGS"
@@ -69,7 +70,7 @@ export COMMUNITY_TEST_ARGS="$TMP/args"
 MAGELIFT_GO_TEST_WRAPPER="$TMP/go-community" bash "$SCRIPT" --community --only root >/dev/null
 grep -Fx 'example/internal/cli' "$COMMUNITY_TEST_ARGS" >/dev/null
 grep -Fx 'example/internal/cloud/kube/runtime' "$COMMUNITY_TEST_ARGS" >/dev/null
-if grep -E '/(aws|ovh|scaleway|external)/|/cmd/aws-' "$COMMUNITY_TEST_ARGS" >/dev/null; then
+if grep -E '/(ovh|scaleway|external)/|/cmd/ovh-' "$COMMUNITY_TEST_ARGS" >/dev/null; then
   fail 'community gate executed frozen-provider/vendor suites'
 fi
 status=0

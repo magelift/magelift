@@ -113,9 +113,9 @@ run_root() {
     while IFS= read -r package; do
       packages+=("$package")
     done < <(printf '%s\n' "$package_output" | awk '
-      !/\/internal\/cloud\/(aws|ovh|scaleway)(\/|$)/ &&
+      !/\/internal\/cloud\/(ovh|scaleway)(\/|$)/ &&
       !/\/internal\/external(\/|$)/ &&
-      !/\/cmd\/(aws-|ovh-|scaleway-|newrelic-|failed-deployment-probe)/
+      !/\/cmd\/(ovh-|scaleway-|newrelic-|failed-deployment-probe)/
     ')
     if [[ "${#packages[@]}" -eq 0 ]]; then
       printf 'go-test-modules: no community root packages found\n' >&2

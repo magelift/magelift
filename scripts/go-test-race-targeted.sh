@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Bounded go test -race suites for local/verify-community use. Full monorepo
-# race (go test -race ./...) remains available as test-race-full.
+# Race-sensitive paths in the CLI, SDK and providers.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,8 +28,10 @@ if ! run bash "$ROOT/scripts/go-test-modules.sh" --race --only sdk; then
   status=1
 fi
 for provider_dir in "$ROOT"/providers/*; do
-  [[ -d "$provider_dir/operations" ]] || continue
-  if ! (cd "$provider_dir" && run go test -race ./operations/ -count=1); then
+  [[ -f "$provider_dir/go.mod" ]] || continue
+  packages=(./plugin/)
+  if [[ -d "$provider_dir/operations" ]]; then packages+=(./operations/); fi
+  if ! (cd "$provider_dir" && run go test -race "${packages[@]}" -count=1); then
     status=1
   fi
 done

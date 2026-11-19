@@ -1,12 +1,12 @@
 # Tests
 
-Verification layers vs Make targets and CI.
+Use these commands to run the same checks locally.
 
 | Layer | Location | How to run | Cloud account? |
 | --- | --- | --- | --- |
 | Go unit / package | Root, `sdk/`, and every module under `providers/` | `make test-fast` | No |
 | Community alpha | Core, SDK, provider modules, PHP and local contracts | `make verify-community` | No |
-| Targeted race | Provider/CLI lifecycle, SDK, AWS/GCP operations | `make test-race` | No |
+| Targeted race | CLI lifecycle, SDK and provider operations | `make test-race` | No |
 | Pulumi mock graphs | `internal/cloud/**`, AWS, GCP and Azure provider stacks | `make pulumi-mock-test` | No |
 | Offline harness | `tests/acceptance/` | `make acceptance-harness-test` | No |
 | Account-free stack | provider module tests + mocks + harness + Floci | `make local-gates` | No (Docker for Floci) |
@@ -24,10 +24,11 @@ Verification layers vs Make targets and CI.
 
 ## Daily path
 
-1. `make verify-community` for the GCP alpha. Root AWS, OVH, Scaleway and external-vendor suites are excluded; `make test-fast` runs every module suite. `make verify` adds broader format, generated files, lint, root race, licenses, docs and workflow checks.
+1. `make verify-community` runs the core, SDK and standalone provider suites. `make test-fast` also covers the embedded OVH, Scaleway and vendor packages. `make verify` checks formatting, generated files, lint, races, licenses, docs and workflows.
 2. `make local-gates` when you change providers, Floci contracts, or acceptance harnesses.
 3. `make floci-aws-test` alone when you change AWS bootstrap, locks, secrets, logs, media restore, ECS candidates, or IAM OIDC.
-4. `make floci-gcp-test` alone when you change GCP object, secret, Pub/Sub, logging, or monitoring SDK paths that Floci GCP covers.
+4. `make floci-gcp-test` for Cloud Storage, Secret Manager, Pub/Sub, logging or monitoring changes.
+5. `make floci-azure-test` for Blob Storage, state locks or Key Vault changes.
 
 Skip real-cloud acceptance unless you own the account and have read:
 
