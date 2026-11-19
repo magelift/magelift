@@ -40,6 +40,10 @@ func TestMediaStorageGraphIsPrivateVersionedAndEncrypted(t *testing.T) {
 		t.Fatalf("media graph does not contain one bucket and distribution: %#v", m.resources)
 	}
 	block := m.one(t, "aws:s3/bucketPublicAccessBlock:BucketPublicAccessBlock").Inputs
+	ownership := m.one(t, "aws:s3/bucketOwnershipControls:BucketOwnershipControls").Inputs
+	if ownership["rule"].ObjectValue()["objectOwnership"].StringValue() != "BucketOwnerPreferred" {
+		t.Fatal("Magento's private ACL requires ACL-enabled ownership")
+	}
 	for _, key := range []string{"blockPublicAcls", "blockPublicPolicy", "ignorePublicAcls", "restrictPublicBuckets"} {
 		if !block[resource.PropertyKey(key)].BoolValue() {
 			t.Fatalf("%s is not enabled", key)
@@ -56,7 +60,7 @@ func TestMediaStorageGraphIsPrivateVersionedAndEncrypted(t *testing.T) {
 		}
 	}
 	policy := m.one(t, "aws:s3/bucketPolicy:BucketPolicy").Inputs[resource.PropertyKey("policy")].StringValue()
-	for _, required := range []string{"cloudfront.amazonaws.com", "s3:GetObject", "AWS:SourceArn"} {
+	for _, required := range []string{"cloudfront.amazonaws.com", "s3:GetObject", "AWS:SourceArn", "aws:PrincipalAccount", "123456789012", "s3:PutObject", "Deny"} {
 		if !strings.Contains(policy, required) {
 			t.Fatalf("bucket policy lacks %s: %s", required, policy)
 		}
@@ -84,7 +88,7 @@ func TestRejectsUnsafeStorageInputsBeforeRegistration(t *testing.T) {
 
 func validArgs() Args {
 	return Args{
-		Region: "eu-west-3", BucketName: "shop-media", KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000",
+		Region: "eu-west-3", AccountID: "123456789012", BucketName: "shop-media", KMSKeyARN: "arn:aws:kms:eu-west-3:123456789012:key/00000000-0000-0000-0000-000000000000",
 		NoncurrentVersionRetentionDays: 30, AbortMultipartUploadDays: 7, Tags: map[string]string{"magelift:managed-by": "magelift"},
 	}
 }

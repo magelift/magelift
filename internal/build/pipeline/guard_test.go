@@ -8,6 +8,29 @@ import (
 	"testing"
 )
 
+func TestRuntimeMediaTemplateSupportsIAMAndStaticKeys(t *testing.T) {
+	php, err := exec.LookPath("php")
+	if err != nil {
+		t.Skip("PHP unavailable")
+	}
+	template, err := filepath.Abs(filepath.Join("..", "..", "..", "images", "php-nginx", "env.php"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := filepath.Abs(filepath.Join("..", "..", "..", "images", "php-nginx", "deployment-config.php"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	program := `require $argv[1]; $c = mageliftResolveDeploymentConfig(require $argv[2]); $s = $c['remote_storage']; if ($s['driver'] !== 'aws-s3' || $s['config']['bucket'] !== 'bucket' || $s['config']['region'] !== 'eu-west-3' || $s['config']['endpoint'] !== 'https://s3.eu-west-3.amazonaws.com' || $s['config']['credentials']['key'] !== $argv[3] || $s['config']['credentials']['secret'] !== $argv[4]) { fwrite(STDERR, 'unexpected S3 template'); exit(1); }`
+	for _, tc := range []struct{ key, secret string }{{"", ""}, {"example-key", "example-secret"}} {
+		command := exec.Command(php, "-r", program, runtime, template, tc.key, tc.secret)
+		command.Env = append(os.Environ(), "MAGENTO_DC_MEDIA__DRIVER=aws-s3", "MAGENTO_DC_MEDIA__BUCKET=bucket", "MAGENTO_DC_MEDIA__REGION=eu-west-3", "MAGENTO_DC_MEDIA__ENDPOINT=https://s3.eu-west-3.amazonaws.com", "MAGENTO_DC_MEDIA__KEY="+tc.key, "MAGENTO_DC_MEDIA__SECRET="+tc.secret)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("resolve media template: %v: %s", err, output)
+		}
+	}
+}
+
 // TestApplicationDockerfileGuardAcceptsRuntimeTemplate executes the baked
 // config guard predicates from the actual generated application
 // Dockerfile against the supported runtime template. The template and

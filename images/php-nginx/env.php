@@ -128,9 +128,9 @@ return [
     // 'file' default keeps local media for runtimes without object
     // storage configured. GCP sets aws-s3 with GCS S3-interop endpoint
     // and HMAC credentials; every value defaults so an unset variable
-    // can never break a runtime that does not use remote storage, while
-    // a selected driver with empty bucket or credentials still fails
-    // closed in the driver factory. Markers use MAGENTO_DC_* names:
+    // can never break a runtime that does not use remote storage. Magento
+    // requires a bucket and region, and falls back to the AWS credential
+    // provider chain when either static credential is empty. Markers use MAGENTO_DC_* names:
     // the application image build rejects anything else here.
     // The root prefix stays empty: Magento appends each directory URI
     // below it (media/ for MEDIA, import_export/ for VAR_IMPORT_EXPORT),

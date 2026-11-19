@@ -17,12 +17,14 @@ import (
 const ComponentToken = "magelift:aws:MediaStorage"
 
 var bucketNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
+var accountIDPattern = regexp.MustCompile(`^[0-9]{12}$`)
 var kmsARNPattern = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):kms:[a-z0-9-]+:[0-9]{12}:key/[A-Za-z0-9-]+$`)
 var certificateARNPattern = regexp.MustCompile(`^arn:(?:aws|aws-us-gov|aws-cn):acm:[a-z0-9-]+:[0-9]{12}:certificate/[A-Za-z0-9-]+$`)
 var domainPattern = regexp.MustCompile(`^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$`)
 
 type Args struct {
 	Region                         string
+	AccountID                      string
 	BucketName                     string
 	KMSKeyARN                      string
 	NoncurrentVersionRetentionDays int
@@ -67,7 +69,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		return nil, fmt.Errorf("create media bucket: %w", err)
 	}
 	if _, err := s3.NewBucketOwnershipControls(ctx, name+"-ownership", &s3.BucketOwnershipControlsArgs{
-		Bucket: bucket.ID(), Region: pulumi.String(args.Region), Rule: &s3.BucketOwnershipControlsRuleArgs{ObjectOwnership: pulumi.String("BucketOwnerEnforced")},
+		Bucket: bucket.ID(), Region: pulumi.String(args.Region), Rule: &s3.BucketOwnershipControlsRuleArgs{ObjectOwnership: pulumi.String("BucketOwnerPreferred")},
 	}, regionalChild...); err != nil {
 		return nil, fmt.Errorf("configure media bucket ownership: %w", err)
 	}
@@ -129,7 +131,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	policy := pulumi.All(bucket.Arn, distribution.Arn).ApplyT(func(values []interface{}) (string, error) {
 		bucketARN, _ := values[0].(string)
 		distributionARN, _ := values[1].(string)
-		return bucketPolicy(bucketARN, distributionARN)
+		return bucketPolicy(bucketARN, distributionARN, args.AccountID)
 	}).(pulumi.StringOutput)
 	if _, err := s3.NewBucketPolicy(ctx, name+"-policy", &s3.BucketPolicyArgs{Bucket: bucket.ID(), Region: pulumi.String(args.Region), Policy: policy}, regionalChild...); err != nil {
 		return nil, fmt.Errorf("restrict media bucket to CloudFront: %w", err)
@@ -143,8 +145,8 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 }
 
 func validate(name string, args Args) error {
-	if strings.TrimSpace(name) == "" || strings.TrimSpace(args.Region) == "" || !bucketNamePattern.MatchString(args.BucketName) || !kmsARNPattern.MatchString(args.KMSKeyARN) {
-		return errors.New("media storage requires a valid name, region, bucket name, and customer-managed KMS key ARN")
+	if strings.TrimSpace(name) == "" || strings.TrimSpace(args.Region) == "" || !accountIDPattern.MatchString(args.AccountID) || !bucketNamePattern.MatchString(args.BucketName) || !kmsARNPattern.MatchString(args.KMSKeyARN) {
+		return errors.New("media storage requires a valid name, account, region, bucket name, and customer-managed KMS key ARN")
 	}
 	if args.NoncurrentVersionRetentionDays < 1 || args.NoncurrentVersionRetentionDays > 3650 || args.AbortMultipartUploadDays < 1 || args.AbortMultipartUploadDays > 30 {
 		return errors.New("media lifecycle retention values are outside the supported bounds")
@@ -168,11 +170,14 @@ func aliasValues(domain string) pulumi.StringArrayInput {
 	return pulumi.StringArray{pulumi.String(domain)}
 }
 
-func bucketPolicy(bucketARN, distributionARN string) (string, error) {
+func bucketPolicy(bucketARN, distributionARN, accountID string) (string, error) {
 	document := struct {
 		Version   string        `json:"Version"`
 		Statement []policyEntry `json:"Statement"`
-	}{Version: "2012-10-17", Statement: []policyEntry{{Effect: "Allow", Principal: map[string]string{"Service": "cloudfront.amazonaws.com"}, Action: []string{"s3:GetObject"}, Resource: bucketARN + "/*", Condition: map[string]map[string]string{"StringEquals": {"AWS:SourceArn": distributionARN}}}}}
+	}{Version: "2012-10-17", Statement: []policyEntry{
+		{Effect: "Allow", Principal: map[string]string{"Service": "cloudfront.amazonaws.com"}, Action: []string{"s3:GetObject"}, Resource: bucketARN + "/*", Condition: map[string]map[string]string{"StringEquals": {"AWS:SourceArn": distributionARN}}},
+		{Effect: "Deny", Principal: map[string]string{"AWS": "*"}, Action: []string{"s3:PutObject"}, Resource: bucketARN + "/*", Condition: map[string]map[string]string{"StringNotEquals": {"aws:PrincipalAccount": accountID}}},
+	}}
 	encoded, err := json.Marshal(document)
 	return string(encoded), err
 }

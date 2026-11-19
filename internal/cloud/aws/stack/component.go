@@ -265,7 +265,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, providers Providers, opts 
 	}
 
 	component.Storage, err = storage.New(ctx, name+"-storage", storage.Args{
-		Region: spec.Identity.Region, BucketName: name + "-media", KMSKeyARN: spec.Dependencies.KMSKeyARN, NoncurrentVersionRetentionDays: spec.Catalog.Retention.ArtifactDays, AbortMultipartUploadDays: 7,
+		Region: spec.Identity.Region, AccountID: spec.Identity.AccountID, BucketName: name + "-media", KMSKeyARN: spec.Dependencies.KMSKeyARN, NoncurrentVersionRetentionDays: spec.Catalog.Retention.ArtifactDays, AbortMultipartUploadDays: 7,
 		Domain: spec.Policy.MediaDomain, CertificateARN: spec.Existing.Certificate.ExternalID, RegionalProvider: providers.Regional, GlobalProvider: providers.Global, Tags: tags,
 	}, regional...)
 	if err != nil {
@@ -429,7 +429,7 @@ func taskPolicy(spec Spec, component *Component, searchARN pulumi.StringOutput) 
 		}
 		statements := []map[string]interface{}{
 			{"Effect": "Allow", "Action": []string{"s3:ListBucket", "s3:ListBucketMultipartUploads"}, "Resource": bucketARN},
-			{"Effect": "Allow", "Action": []string{"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"}, "Resource": bucketARN + "/*"},
+			{"Effect": "Allow", "Action": []string{"s3:GetObject", "s3:PutObject", "s3:PutObjectAcl", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"}, "Resource": bucketARN + "/*"},
 			{"Effect": "Allow", "Action": []string{"kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"}, "Resource": spec.Dependencies.KMSKeyARN},
 			{"Effect": "Allow", "Action": []string{"ssmmessages:CreateControlChannel", "ssmmessages:CreateDataChannel", "ssmmessages:OpenControlChannel", "ssmmessages:OpenDataChannel"}, "Resource": "*"},
 			{"Effect": "Allow", "Action": []string{"secretsmanager:GetSecretValue"}, "Resource": secrets},
