@@ -40,6 +40,10 @@ test-race-full: ## Full root-module race suite (explicit broad check, excludes n
 sdk-test: ## Run the SDK module suite standalone with race (GOWORK=off hermeticity)
 	cd sdk && GOWORK=off go test -race ./... -count=1
 
+provider-tidy-check: ## Check provider dependency files against the current CLI and SDK
+	bash scripts/check-provider-tidy.sh gcp
+	bash scripts/check-provider-tidy.sh azure
+
 provider-gcp-test: ## Run the GCP provider module suite (workspace; no race)
 	cd providers/gcp && go test ./... -count=1
 
@@ -383,7 +387,7 @@ workflow-check: ## Validate GitHub Actions workflow syntax and expressions
 		tests/fixtures/ci/azure/.github/workflows/*.yml \
 		tests/act/*.yml
 
-verify: generate-check cli-docs-check fmt-check lint test-fast test-race-full sdk-test license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
+verify: generate-check cli-docs-check fmt-check lint test-fast test-race-full sdk-test provider-tidy-check license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
 generate: certification-docs ## Generate configuration, certification, reference, and skill artifacts
 	go generate ./internal/config ./agents
 
