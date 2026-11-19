@@ -68,8 +68,8 @@ core-leanness: ## Prove the CLI carries no GCP provider code or GCP cloud SDKs
 # stays in-process by design until aws-provider-parity extracts it. Full
 # provider-SDK independence is a post-parity gate, not this one.
 
-lint: ## Run static Go checks
-	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
+lint: ## Run static Go checks across the CLI, SDK and provider modules
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./... ./sdk/... ./providers/gcp/... ./providers/azure/...
 
 license-check: ## Check Go dependency licenses
 	go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown \
