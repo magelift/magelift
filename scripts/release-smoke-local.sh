@@ -25,7 +25,7 @@ trap 'rm -rf "$WORK"' EXIT
 export MAGELIFT_RELEASE_SMOKE_DIST="$WORK/dist"
 SMOKE_DIST="$MAGELIFT_RELEASE_SMOKE_DIST"
 { printf "dist: '%s'\n" "${SMOKE_DIST//\'/\'\'}"; cat .goreleaser.dialproof.yaml; } > "$WORK/goreleaser.yaml"
-go run github.com/goreleaser/goreleaser/v2@v2.20.2 release --snapshot --clean \
+go run github.com/goreleaser/goreleaser/v2@v2.20.2 release --snapshot --clean --parallelism 1 \
 	-f "$WORK/goreleaser.yaml" --skip=publish,sign,sbom
 
 cli_archive="$(find "$SMOKE_DIST" -maxdepth 1 -type f -name 'magelift_*.tar.gz' -o -maxdepth 1 -type f -name 'magelift_*.zip' | head -1 || true)"
