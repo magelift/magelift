@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -113,7 +114,7 @@ func requireLocalMySQL(t *testing.T) dumpimport.Options {
 	deadline := time.Now().Add(90 * time.Second)
 	for {
 		ping := exec.CommandContext(ctx, "docker", "compose", "-f", composePath, "--project-name", project, "exec", "-T", "database",
-			"mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot", "--silent")
+			"sh", "-c", `MYSQL_PWD="$MYSQL_PASSWORD" exec mysql -h 127.0.0.1 -u "$MYSQL_USER" "$MYSQL_DATABASE" -N -e 'SELECT 1'`)
 		ping.Dir = workDir
 		if err := ping.Run(); err == nil {
 			break
@@ -288,26 +289,12 @@ func TestCorruptSQLSurfacesClearError(t *testing.T) {
 
 func assertProbeRow(t *testing.T, opts dumpimport.Options) error {
 	t.Helper()
-	composePath := filepath.Join(opts.WorkDir, opts.ComposeFile)
-	cmd := exec.Command("docker", "compose", "-f", composePath, "--project-name", opts.ComposeProject,
-		"exec", "-T", "database",
-		"mysql", "-N", "-uroot", "-proot", "magento",
-		"-e", "SELECT label FROM magelift_seed_probe WHERE id = 1")
-	cmd.Dir = opts.WorkDir
-	out, err := cmd.CombinedOutput()
+	label, err := dumpimport.Query(t.Context(), opts, "SELECT label FROM magelift_seed_probe WHERE id = 1")
 	if err != nil {
-		return errors.New(string(out) + ": " + err.Error())
+		return err
 	}
-	label := ""
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(strings.ToLower(line), "mysql: [warning]") {
-			continue
-		}
-		label = line
-	}
-	if label != "tiny-fixture" {
-		return errors.New("magelift_seed_probe row missing or wrong: " + label)
+	if strings.TrimSpace(label) != "tiny-fixture" {
+		return fmt.Errorf("unexpected imported probe row %q", label)
 	}
 	return nil
 }
