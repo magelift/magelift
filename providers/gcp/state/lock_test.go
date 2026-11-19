@@ -12,9 +12,10 @@ import (
 )
 
 type memObjects struct {
-	mu   sync.Mutex
-	data map[string][]byte
-	gen  map[string]int64
+	mu                    sync.Mutex
+	data                  map[string][]byte
+	gen                   map[string]int64
+	deleteGenerationCalls int
 }
 
 func newMem() *memObjects { return &memObjects{data: map[string][]byte{}, gen: map[string]int64{}} }
@@ -54,6 +55,7 @@ func (m *memObjects) Delete(_ context.Context, _, key string) error {
 func (m *memObjects) DeleteGeneration(_ context.Context, _, key, generation string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.deleteGenerationCalls++
 	if _, ok := m.data[key]; !ok {
 		return nil
 	}
@@ -63,6 +65,26 @@ func (m *memObjects) DeleteGeneration(_ context.Context, _, key, generation stri
 	delete(m.data, key)
 	delete(m.gen, key)
 	return nil
+}
+
+func TestReleaseReceiptRejectsInvalidGenerationWithoutDelete(t *testing.T) {
+	t.Parallel()
+	objects := newMem()
+	manager, err := NewManager(objects, "magelift-state-bucket-test", "shop", "preview")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := Info{Project: "shop", Environment: "preview", Owner: "owner", AcquiredAt: time.Now().UTC()}
+	for _, generation := range []string{"", "0", "-1", "+1", "1.0", "abc", "9223372036854775808"} {
+		receipt := base
+		receipt.Generation = generation
+		if err := manager.ReleaseReceipt(context.Background(), receipt); !errors.Is(err, ErrLockReplaced) {
+			t.Errorf("generation %q error = %v, want ErrLockReplaced", generation, err)
+		}
+	}
+	if objects.deleteGenerationCalls != 0 {
+		t.Fatalf("invalid receipts invoked conditional delete %d times", objects.deleteGenerationCalls)
+	}
 }
 func (m *memObjects) Copy(_ context.Context, _, srcKey, _, dstKey string) error {
 	m.mu.Lock()

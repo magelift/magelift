@@ -20,11 +20,12 @@ import (
 )
 
 var (
-	ErrLocked       = errors.New("deployment lock is held")
-	ErrNotLocked    = errors.New("deployment lock is not held")
-	ErrLockReplaced = errors.New("deployment lock was replaced")
-	stableName      = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,30}$`)
-	bucketName      = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
+	ErrLocked            = errors.New("deployment lock is held")
+	ErrNotLocked         = errors.New("deployment lock is not held")
+	ErrLockReplaced      = errors.New("deployment lock was replaced")
+	ErrInvalidGeneration = errors.New("invalid GCS object generation")
+	stableName           = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,30}$`)
+	bucketName           = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
 )
 
 type ObjectAPI interface {
@@ -117,6 +118,9 @@ func (m *Manager) Acquire(ctx context.Context, project, environment, owner strin
 		}
 		return nil, fmt.Errorf("acquire deployment lock: %w", err)
 	}
+	if !positiveGeneration(generation) {
+		return nil, fmt.Errorf("acquire deployment lock: %w", ErrInvalidGeneration)
+	}
 	info.Generation = generation
 	return &Handle{manager: m, info: info}, nil
 }
@@ -154,7 +158,7 @@ func (m *Manager) ReleaseReceipt(ctx context.Context, receipt Info) error {
 	if m == nil || m.client == nil {
 		return errors.New("state lock manager is required")
 	}
-	if receipt.Project != m.project || receipt.Environment != m.environment || receipt.Generation == "" || strings.TrimSpace(receipt.Owner) == "" || receipt.AcquiredAt.IsZero() {
+	if receipt.Project != m.project || receipt.Environment != m.environment || !positiveGeneration(receipt.Generation) || strings.TrimSpace(receipt.Owner) == "" || receipt.AcquiredAt.IsZero() {
 		return ErrLockReplaced
 	}
 	current, err := m.inspect(ctx)
@@ -165,8 +169,14 @@ func (m *Manager) ReleaseReceipt(ctx context.Context, receipt Info) error {
 		return ErrLockReplaced
 	}
 	if err := m.client.DeleteGeneration(ctx, m.bucket, m.key, receipt.Generation); err != nil {
+		if errors.Is(err, ErrNotLocked) {
+			return ErrNotLocked
+		}
 		latest, inspectErr := m.inspect(ctx)
-		if errors.Is(inspectErr, ErrNotLocked) || inspectErr == nil && latest.Generation != receipt.Generation {
+		if errors.Is(inspectErr, ErrNotLocked) {
+			return ErrNotLocked
+		}
+		if inspectErr == nil && latest.Generation != receipt.Generation {
 			return ErrLockReplaced
 		}
 		if inspectErr != nil {
@@ -294,7 +304,10 @@ func (g gcsObjects) Get(ctx context.Context, bucket, key string) ([]byte, string
 	if err != nil {
 		return nil, "", err
 	}
-	return data, fmt.Sprintf("%d", reader.Attrs.Generation), nil
+	if reader.Attrs.Generation <= 0 {
+		return nil, "", ErrInvalidGeneration
+	}
+	return data, strconv.FormatInt(reader.Attrs.Generation, 10), nil
 }
 
 func (g gcsObjects) PutIfAbsent(ctx context.Context, bucket, key string, body []byte) (string, error) {
@@ -310,7 +323,11 @@ func (g gcsObjects) PutIfAbsent(ctx context.Context, bucket, key string, body []
 		}
 		return "", err
 	}
-	return fmt.Sprintf("%d", writer.Attrs().Generation), nil
+	generation := writer.Attrs().Generation
+	if generation <= 0 {
+		return "", ErrInvalidGeneration
+	}
+	return strconv.FormatInt(generation, 10), nil
 }
 
 func (g gcsObjects) Put(ctx context.Context, bucket, key string, body []byte) (string, error) {
@@ -327,23 +344,35 @@ func (g gcsObjects) Put(ctx context.Context, bucket, key string, body []byte) (s
 }
 
 func (g gcsObjects) Delete(ctx context.Context, bucket, key string) error {
-	return g.DeleteGeneration(ctx, bucket, key, "")
+	return g.client.Bucket(bucket).Object(key).Delete(ctx)
 }
 
 func (g gcsObjects) DeleteGeneration(ctx context.Context, bucket, key, generation string) error {
-	obj := g.client.Bucket(bucket).Object(key)
-	if generation != "" {
-		gen, err := strconv.ParseInt(generation, 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid lock object generation: %w", err)
-		}
-		obj = obj.If(storage.Conditions{GenerationMatch: gen})
+	gen, err := strconv.ParseInt(generation, 10, 64)
+	if err != nil || gen <= 0 {
+		return ErrInvalidGeneration
 	}
-	err := obj.Delete(ctx)
-	if err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
+	err = g.client.Bucket(bucket).Object(key).If(storage.Conditions{GenerationMatch: gen}).Delete(ctx)
+	if errors.Is(err, storage.ErrObjectNotExist) {
+		return ErrNotLocked
+	}
+	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func positiveGeneration(generation string) bool {
+	if generation == "" {
+		return false
+	}
+	for _, digit := range generation {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	value, err := strconv.ParseInt(generation, 10, 64)
+	return err == nil && value > 0
 }
 
 func (g gcsObjects) Copy(ctx context.Context, srcBucket, srcKey, dstBucket, dstKey string) error {

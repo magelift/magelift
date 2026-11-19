@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -217,10 +218,23 @@ func decodeGCPStateLockReceipt(token string) (gcpStateLockReceipt, error) {
 		return gcpStateLockReceipt{}, gcpstate.ErrLockReplaced
 	}
 	var receipt gcpStateLockReceipt
-	if err := json.Unmarshal(body, &receipt); err != nil || receipt.Version != 1 || receipt.BackendURL == "" || receipt.StackName == "" || receipt.Lock.Generation == "" {
+	if err := json.Unmarshal(body, &receipt); err != nil || receipt.Version != 1 || receipt.BackendURL == "" || receipt.StackName == "" || !positiveGCPGeneration(receipt.Lock.Generation) {
 		return gcpStateLockReceipt{}, gcpstate.ErrLockReplaced
 	}
 	return receipt, nil
+}
+
+func positiveGCPGeneration(generation string) bool {
+	if generation == "" {
+		return false
+	}
+	for _, digit := range generation {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	value, err := strconv.ParseInt(generation, 10, 64)
+	return err == nil && value > 0
 }
 
 // StateBackup mirrors State.Backup (Pulumi state snapshot).
