@@ -27,6 +27,7 @@ const (
 )
 
 type Args struct {
+	StorageGiB       int
 	Namespace        string
 	Replicas         int
 	Username         string
@@ -64,6 +65,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		args.Username = "magento"
 	}
 
+	if args.StorageGiB < 0 {
+		return nil, errors.New("storageGiB must be positive")
+	}
+	if args.StorageGiB == 0 {
+		args.StorageGiB = 10
+	}
 	component := &Component{}
 	if strings.TrimSpace(args.Namespace) == "" {
 		args.Namespace = "default"
@@ -223,7 +230,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 							Name:    pulumi.String("rabbitmq-configure"),
 							Image:   pulumi.String(args.Image),
 							Command: pulumi.StringArray{pulumi.String("/bin/sh"), pulumi.String("-ec")},
-							Args:    pulumi.StringArray{pulumi.String("cp /config/rabbitmq.conf /etc/rabbitmq/rabbitmq.conf && rabbitmq-plugins --offline enable rabbitmq_peer_discovery_k8s && chown -R 100:101 /etc/rabbitmq /var/lib/rabbitmq && if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then chmod 600 /var/lib/rabbitmq/.erlang.cookie; fi")},
+							Args:    pulumi.StringArray{pulumi.String("cp /config/rabbitmq.conf /etc/rabbitmq/rabbitmq.conf && rabbitmq-plugins --offline enable rabbitmq_peer_discovery_k8s && chown -R rabbitmq:rabbitmq /etc/rabbitmq /var/lib/rabbitmq && if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then chmod 600 /var/lib/rabbitmq/.erlang.cookie; fi")},
 							SecurityContext: &corev1.SecurityContextArgs{
 								RunAsUser:    pulumi.Int(0),
 								RunAsGroup:   pulumi.Int(0),
@@ -285,7 +292,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 						AccessModes:      pulumi.StringArray{pulumi.String("ReadWriteOnce")},
 						StorageClassName: storageClassName,
 						Resources: &corev1.VolumeResourceRequirementsArgs{
-							Requests: pulumi.StringMap{"storage": pulumi.String("10Gi")},
+							Requests: pulumi.StringMap{"storage": pulumi.String(fmt.Sprintf("%dGi", args.StorageGiB))},
 						},
 					},
 				},

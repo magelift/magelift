@@ -129,6 +129,16 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 			searchMode = SearchModeOpenSearch
 		}
 	}
+	search := cfg.Services["search"]
+	searchImage := search.Image
+	if searchImage == "" && search.Version != "" {
+		searchImage = "opensearchproject/opensearch:" + sdk.OpenSearchContainerTag(search.Version)
+	}
+	queueBinding := cfg.Services["queue"]
+	queueImage := queueBinding.Image
+	if queueImage == "" && queueBinding.Family == "rabbitmq" && queueBinding.Version != "" {
+		queueImage = "rabbitmq:" + queueBinding.Version + "-management-alpine"
+	}
 	searchReplicas := aws.Catalog.EKS.SearchReplicas
 	if searchMode == SearchModeOpenSearch && searchReplicas == 0 {
 		searchReplicas = 1
@@ -189,7 +199,7 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 		Catalog: CatalogSelection{
 			DatabaseEngine: engine, KubernetesVersion: kubernetesVersion, ComputeMode: computeMode,
 			NodeInstanceType: nodeInstanceType, NodeAMI: aws.Catalog.EKS.NodeAMI, NodeMinSize: nodeMinSize, NodeDesiredSize: nodeDesiredSize, NodeMaxSize: nodeMaxSize, FargateNamespaces: fargateNamespaces,
-			SearchMode: searchMode, SearchReplicas: searchReplicas,
+			SearchMode: searchMode, SearchReplicas: searchReplicas, SearchPlugins: search.Plugins, SearchImage: searchImage, SearchStorageGiB: search.StorageGiB, QueueStorageGiB: queueBinding.StorageGiB, QueueImage: queueImage,
 			QueueMode: queueMode, QueueReplicas: queueReplicas,
 			AuroraMinACU: aws.Catalog.Aurora.MinimumACU, AuroraMaxACU: aws.Catalog.Aurora.MaximumACU,
 			AuroraAutoPause: aws.Catalog.Aurora.AutoPauseSeconds, AuroraAutoPauseOK: aws.Catalog.Aurora.EngineSupportsAutoPause,

@@ -391,7 +391,7 @@ func TestProgramBuildsStandardPresetGraph(t *testing.T) {
 						continue
 					}
 					initCommand := initValue["args"].ArrayValue()[0].StringValue()
-					if !strings.Contains(initCommand, "chown -R 100:101 /etc/rabbitmq /var/lib/rabbitmq") || !strings.Contains(initCommand, "chmod 600 /var/lib/rabbitmq/.erlang.cookie") {
+					if !strings.Contains(initCommand, "chown -R rabbitmq:rabbitmq /etc/rabbitmq /var/lib/rabbitmq") || !strings.Contains(initCommand, "chmod 600 /var/lib/rabbitmq/.erlang.cookie") {
 						t.Fatal("RabbitMQ configuration init container must repair the persistent data volume ownership")
 					}
 					securityContext, ok := initValue["securityContext"]

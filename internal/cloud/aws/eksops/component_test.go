@@ -3,6 +3,7 @@ package eksops
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/netip"
 	"strings"
@@ -186,6 +187,9 @@ func TestProgramBuildsEKSOpenSearchAndRabbitMQGraph(t *testing.T) {
 	spec.Catalog.KubernetesVersion = DefaultKubernetesVersion
 	spec.Catalog.SearchMode = SearchModeOpenSearch
 	spec.Catalog.SearchReplicas = 1
+	spec.Catalog.SearchPlugins = []string{"analysis-icu"}
+	spec.Catalog.SearchStorageGiB = 37
+	spec.Catalog.QueueStorageGiB = 19
 	spec.Catalog.QueueMode = QueueModeRabbitMQ
 	spec.Catalog.QueueReplicas = 1
 	spec.Catalog.QueueConsumerCount = 1
@@ -198,6 +202,21 @@ func TestProgramBuildsEKSOpenSearchAndRabbitMQGraph(t *testing.T) {
 	}
 	if componentCount(mocks, "magelift:aws:EKSOpenSearch") != 1 || componentCount(mocks, "magelift:aws:EKSRabbitMQ") != 1 {
 		t.Fatalf("expected EKS search + queue components, got %#v", resourceTokens(mocks))
+	}
+	for _, r := range mocks.resources {
+		if r.TypeToken != "kubernetes:apps/v1:StatefulSet" {
+			continue
+		}
+		manifest, err := json.Marshal(r.Inputs.Mappable())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(r.Name, "search") && (!strings.Contains(string(manifest), "analysis-icu") || !strings.Contains(string(manifest), "37Gi")) {
+			t.Fatalf("EKS search lost plugins or storage: %s", manifest)
+		}
+		if strings.Contains(r.Name, "rabbitmq") && !strings.Contains(string(manifest), "19Gi") {
+			t.Fatalf("EKS RabbitMQ lost storage: %s", manifest)
+		}
 	}
 	if got := resourceInputString(mocks, "aws:eks/cluster:Cluster", "version"); got != DefaultKubernetesVersion {
 		t.Fatalf("EKS cluster version = %q, want %q", got, DefaultKubernetesVersion)

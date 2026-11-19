@@ -123,6 +123,9 @@ type Args struct {
 	SearchMode              string
 	SearchReplicas          int
 	SearchImage             string
+	SearchPlugins           []string
+	SearchStorageGiB        int
+	QueueStorageGiB         int
 	QueueMode               string
 	QueueReplicas           int
 	QueueImage              string
@@ -464,7 +467,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	var searchResource pulumi.Resource
 	if args.SearchMode == "opensearch" {
 		searchComponent, err := kubesearch.New(ctx, name+"-search", kubesearch.Args{
-			Replicas: args.SearchReplicas, Image: args.SearchImage, K8sProvider: k8sProvider,
+			Replicas: args.SearchReplicas, Image: args.SearchImage, Plugins: args.SearchPlugins, StorageGiB: args.SearchStorageGiB, K8sProvider: k8sProvider,
 			StorageClassName: storageClassName, Dependencies: []pulumi.Resource{storageClass},
 			TypeToken: openSearchTypeToken,
 		}, k8sOpts...)
@@ -481,7 +484,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	var queueResource pulumi.Resource
 	if args.QueueMode == "rabbitmq" {
 		queueComponent, err := kubequeue.New(ctx, name+"-rabbitmq", kubequeue.Args{
-			Replicas: args.QueueReplicas, Image: args.QueueImage, K8sProvider: k8sProvider,
+			Replicas: args.QueueReplicas, Image: args.QueueImage, StorageGiB: args.QueueStorageGiB, K8sProvider: k8sProvider,
 			StorageClassName: storageClassName, Dependencies: []pulumi.Resource{storageClass},
 			Username: "magento", TypeToken: rabbitMQTypeToken,
 		}, k8sOpts...)

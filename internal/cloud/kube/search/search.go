@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/magelift/magelift/internal/searchplugins"
+
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
@@ -19,6 +21,9 @@ const OpenSearchPort = 9200
 const DefaultImage = "opensearchproject/opensearch:3.9.0@sha256:3b55f6b6249cfdb92b52ee59adc8a266203ba9ef9f5d82544fad6f1af2f3609e"
 
 type Args struct {
+	StorageGiB       int
+	Namespace        string
+	Plugins          []string
 	Replicas         int
 	Image            string
 	K8sProvider      *kubernetes.Provider
@@ -49,6 +54,23 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		args.Image = DefaultImage
 	}
 
+	if err := searchplugins.Validate(args.Plugins); err != nil {
+		return nil, err
+	}
+	var namespace pulumi.StringPtrInput
+	if args.Namespace != "" {
+		namespace = pulumi.StringPtr(args.Namespace)
+	}
+	var command pulumi.StringArray
+	if entrypoint := searchplugins.Entrypoint(args.Plugins); entrypoint != nil {
+		command = pulumi.ToStringArray(entrypoint)
+	}
+	if args.StorageGiB < 0 {
+		return nil, errors.New("storageGiB must be positive")
+	}
+	if args.StorageGiB == 0 {
+		args.StorageGiB = 10
+	}
 	component := &Component{}
 	resourceType := TypeToken
 	if strings.TrimSpace(args.TypeToken) != "" {
@@ -70,7 +92,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	headless, err := corev1.NewService(ctx, name+"-headless", &corev1.ServiceArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(headlessName)},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(headlessName), Namespace: namespace},
 		Spec: &corev1.ServiceSpecArgs{
 			ClusterIP:                pulumi.String("None"),
 			PublishNotReadyAddresses: pulumi.Bool(true),
@@ -83,7 +105,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	service, err := corev1.NewService(ctx, name+"-svc", &corev1.ServiceArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name)},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name), Namespace: namespace},
 		Spec: &corev1.ServiceSpecArgs{
 			Selector: labels,
 			Ports:    openSearchServicePorts(),
@@ -94,7 +116,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 
 	_, err = appsv1.NewStatefulSet(ctx, name, &appsv1.StatefulSetArgs{
-		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name)},
+		Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(name), Namespace: namespace},
 		Spec: &appsv1.StatefulSetSpecArgs{
 			PodManagementPolicy: pulumi.String("Parallel"),
 			PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicyArgs{
@@ -112,6 +134,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 					Containers: corev1.ContainerArray{
 						&corev1.ContainerArgs{
 							Name:           pulumi.String("opensearch"),
+							Command:        command,
 							Image:          pulumi.String(args.Image),
 							Ports:          corev1.ContainerPortArray{&corev1.ContainerPortArgs{Name: pulumi.String("http"), ContainerPort: pulumi.Int(OpenSearchPort)}},
 							Env:            openSearchEnv(name, headlessName, args.Replicas),
@@ -131,7 +154,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 						AccessModes:      pulumi.StringArray{pulumi.String("ReadWriteOnce")},
 						StorageClassName: storageClassName,
 						Resources: &corev1.VolumeResourceRequirementsArgs{
-							Requests: pulumi.StringMap{"storage": pulumi.String("10Gi")},
+							Requests: pulumi.StringMap{"storage": pulumi.String(fmt.Sprintf("%dGi", args.StorageGiB))},
 						},
 					},
 				},

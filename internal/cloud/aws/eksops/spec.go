@@ -107,6 +107,11 @@ type CatalogSelection struct {
 	FargateNamespaces              []string
 	SearchMode                     string
 	SearchReplicas                 int
+	SearchPlugins                  []string
+	SearchImage                    string
+	SearchStorageGiB               int
+	QueueImage                     string
+	QueueStorageGiB                int
 	QueueMode                      string
 	QueueReplicas                  int
 	LiveQueueReplicas              int

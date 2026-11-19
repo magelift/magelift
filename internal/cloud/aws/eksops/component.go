@@ -134,7 +134,7 @@ func New(ctx *pulumi.Context, name string, spec Spec, provider *awsprovider.Prov
 		DatabaseReady: []pulumi.Resource{component.Database},
 		CacheEndpoint: component.Cache.CachePrimaryEndpoint, SessionEndpoint: component.Cache.SessionPrimaryEndpoint,
 		DatabaseSecurityGroupID: component.Security.DataSecurityGroupID, CacheSecurityGroupID: component.Security.CacheSecurityGroupID,
-		SearchMode: spec.Catalog.SearchMode, SearchReplicas: spec.Catalog.SearchReplicas,
+		SearchMode: spec.Catalog.SearchMode, SearchReplicas: spec.Catalog.SearchReplicas, SearchImage: spec.Catalog.SearchImage, SearchPlugins: spec.Catalog.SearchPlugins, SearchStorageGiB: spec.Catalog.SearchStorageGiB, QueueImage: spec.Catalog.QueueImage, QueueStorageGiB: spec.Catalog.QueueStorageGiB,
 		QueueMode: spec.Catalog.QueueMode, QueueReplicas: spec.Catalog.QueueReplicas,
 		CPURequest: spec.Catalog.CPURequest, MemoryRequest: spec.Catalog.MemoryRequest,
 		DesiredWebReplicas: spec.Catalog.DesiredWebReplicas, QueueConsumerCount: spec.Catalog.QueueConsumerCount,
