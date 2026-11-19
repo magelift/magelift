@@ -19,6 +19,78 @@ import (
 const releaseOne = "registry.example.invalid/shop@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 const releaseTwo = "registry.example.invalid/shop@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
+type rollbackAdmission struct {
+	calls  int
+	digest string
+}
+
+func (a *rollbackAdmission) Admit(_ context.Context, planned platform.PlannedStack) (platform.PlannedStack, error) {
+	a.calls++
+	a.digest = planned.ImageDigest()
+	return planned, nil
+}
+
+type rollbackAdmissionAWSModule struct {
+	stubAWSModule
+	admission platform.PlanAdmission
+}
+
+func (m rollbackAdmissionAWSModule) PlanAdmission() platform.PlanAdmission { return m.admission }
+
+func TestRollbackAdmitsImageBoundPlanBeforeDeployment(t *testing.T) {
+	directory := t.TempDir()
+	configPath := filepath.Join(directory, "magelift.php")
+	if err := writeTestProjectFile(configPath, []byte(starterConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := releasejournal.New(directory, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, digest := range []string{releaseOne, releaseTwo} {
+		if _, err := store.Append(context.Background(), releasejournal.Entry{
+			Action: releasejournal.ActionPromote, Environment: "staging", DigestReference: digest,
+			SignatureIdentity: "release@example.invalid", SignatureIssuer: "https://issuer.example.invalid",
+			ForwardOnly: true, SchemaEpoch: 1,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	admission := &rollbackAdmission{}
+	modules := platform.NewModuleRegistry()
+	if err := modules.RegisterModule(rollbackAdmissionAWSModule{stubAWSModule: stubAWSModule{}, admission: admission}); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	o := testOptions(&stdout, &fakeTerminal{interactive: false})
+	o.modules = modules
+	o.configPath, o.environment, o.output, o.yes = configPath, "staging", "json", true
+	o.newReleaseStore = func(root, environment string) (releaseStore, error) { return releasejournal.New(root, environment) }
+	o.verifyRelease = func(context.Context, string, cosign.VerifyOptions) error { return nil }
+	o.liveSchemaEpoch = func(context.Context) (int, error) { return 1, nil }
+	o.newBackend = func(context.Context, platform.PlannedStack, string) (infrastructureBackend, error) {
+		return &fakeInfrastructureBackend{}, nil
+	}
+	o.newDeploySteps = func(context.Context, infrastructureBackend, platform.PlannedStack, io.Writer) (deployflow.Steps, error) {
+		order := []string{}
+		return fakeDeploymentSteps{order: &order}, nil
+	}
+	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
+		return func(context.Context) error { return nil }, nil
+	}
+	command := newCommandWithOptions(o)
+	command.SetArgs([]string{"rollback", "--to-sequence", "1", "--ack-forward-only"})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if admission.calls != 1 || admission.digest != releaseOne {
+		t.Fatalf("admission calls=%d digest=%q, want one admitted rollback to %q", admission.calls, admission.digest, releaseOne)
+	}
+	if !strings.Contains(stdout.String(), `"action": "rollback"`) || strings.Contains(stderr.String(), "provider plan admission") {
+		t.Fatalf("stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+}
+
 func TestPromoteRollbackAndHistoryUseForwardJournalEntries(t *testing.T) {
 	directory := t.TempDir()
 	configPath := filepath.Join(directory, "magelift.php")

@@ -19,13 +19,10 @@ import (
 	"github.com/scaleway/scaleway-sdk-go/scw"
 )
 
-// RegisterHooks returns the first-party provider hook constructors used by the
-// released CLI. GCP hooks dial the verified provider plugin lazily (one
-// session shared across hooks per CLI invocation); other providers construct
-// in-process clients. No constructor runs here; each hook builds its client
-// only when the CLI invokes it, so registration needs no credentials.
+// RegisterHooks constructs cloud clients lazily. Each plugin session is shared
+// for the lifetime of a CLI invocation.
 func RegisterHooks() internalcli.Hooks {
-	return registerHooks(newProviderDialer("gcp", nil), newProviderDialer("aws", awsOperations))
+	return registerHooks(newProviderDialer(string(providerhost.StandaloneProviderGCP)), newProviderDialer(string(providerhost.StandaloneProviderAWS)))
 }
 
 func registerHooks(gcpDialer, awsDialer *providerhost.CachedDialer) internalcli.Hooks {
@@ -163,7 +160,7 @@ func newFirstPartyCleanupProvider(dialer *providerhost.CachedDialer) func(contex
 	gcp := newGCPCleanupProvider(dialer)
 	return func(ctx context.Context, ledger sdk.CleanupLedger) (internalcli.CleanupProvider, error) {
 		switch ledger.Provider {
-		case "gcp":
+		case string(providerhost.StandaloneProviderGCP):
 			return gcp(ctx, ledger)
 		case "ovh":
 			return newOVHDatabaseCleanupProvider(ctx, ledger)

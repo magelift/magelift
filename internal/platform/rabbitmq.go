@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -45,6 +46,12 @@ type LiveQueueReplicaBinder interface {
 	WithLiveQueueReplicas(replicas int) (PlannedStack, error)
 }
 
+// ContextLiveQueueReplicaBinder lets plugin-backed plans honor cancellation
+// while resolving the replica-aware immutable plan.
+type ContextLiveQueueReplicaBinder interface {
+	WithLiveQueueReplicasContext(context.Context, int) (PlannedStack, error)
+}
+
 // QueueReplicasFromOutputs reads the optional live broker replica export.
 func QueueReplicasFromOutputs(outputs map[string]any) (int, bool) {
 	if len(outputs) == 0 {
@@ -84,16 +91,24 @@ func QueueReplicasFromOutputs(outputs map[string]any) (int, bool) {
 // Validate can refuse an in-place 1↔quorum Magento broker change. Missing
 // outputs (first create) leave the plan unchanged.
 func BindLiveQueueReplicas(planned PlannedStack, outputs map[string]any) (PlannedStack, error) {
+	return BindLiveQueueReplicasContext(context.Background(), planned, outputs)
+}
+
+// BindLiveQueueReplicasContext prefers the cancellation-aware binder where
+// available and preserves compatibility with in-process modules.
+func BindLiveQueueReplicasContext(ctx context.Context, planned PlannedStack, outputs map[string]any) (PlannedStack, error) {
 	if planned == nil {
 		return nil, fmt.Errorf("planned stack is required")
-	}
-	binder, ok := planned.(LiveQueueReplicaBinder)
-	if !ok {
-		return planned, nil
 	}
 	replicas, found := QueueReplicasFromOutputs(outputs)
 	if !found {
 		return planned, nil
 	}
-	return binder.WithLiveQueueReplicas(replicas)
+	if binder, ok := planned.(ContextLiveQueueReplicaBinder); ok {
+		return binder.WithLiveQueueReplicasContext(ctx, replicas)
+	}
+	if binder, ok := planned.(LiveQueueReplicaBinder); ok {
+		return binder.WithLiveQueueReplicas(replicas)
+	}
+	return planned, nil
 }

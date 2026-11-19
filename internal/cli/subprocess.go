@@ -12,7 +12,7 @@ import (
 
 // defaultLoadProvider acquires the target's signed release when first activated.
 func (o *options) defaultLoadProvider(ctx context.Context, provider string) (providerhost.Loaded, error) {
-	if provider != "aws" && provider != "gcp" && provider != "azure" {
+	if !providerhost.IsStandaloneProvider(provider) {
 		return o.loadInstalledProvider(ctx, provider)
 	}
 	return providerhost.Acquire(ctx, provider, Version, providerhost.AcquireOptions{
@@ -85,7 +85,7 @@ type providerProvenance struct {
 
 func (o *options) subprocessProvenance(ctx context.Context) []providerProvenance {
 	var result []providerProvenance
-	for _, id := range []string{"gcp", "azure"} {
+	for _, id := range providerhost.StandaloneProviderIDs() {
 		entry := providerProvenance{Name: providerhost.ExtractName(id), Mode: "not-installed"}
 		if o.inspectProvider != nil {
 			loaded, err := o.inspectProvider(ctx, id)

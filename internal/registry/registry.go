@@ -13,14 +13,11 @@ import (
 	"github.com/magelift/magelift/sdk"
 )
 
-var awsOperations = []sdk.Operation{
+// A first-party deployment must be able to release its lock and complete a
+// Magento rollout before the host starts any infrastructure change.
+var deploymentOperations = []sdk.Operation{
 	sdk.OpDescribe, sdk.OpValidateConfig, sdk.OpPlan, sdk.OpPreview, sdk.OpApply,
-	sdk.OpOutputs, sdk.OpDestroy, sdk.OpBootstrapVerify, sdk.OpBootstrapEnsure,
-	sdk.OpStateStatus, sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpStateBackup,
-	sdk.OpStateRestore, sdk.OpSecretList, sdk.OpSecretSet, sdk.OpSecretRemove,
-	sdk.OpSecretRead, sdk.OpTailLogs, sdk.OpCheckRuntime, sdk.OpPrepareExec,
-	sdk.OpPrepareTunnel, sdk.OpCostInputs, sdk.OpDeployAppPhase,
-	sdk.OpMediaExport, sdk.OpMediaImport,
+	sdk.OpOutputs, sdk.OpDestroy, sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpDeployAppPhase,
 }
 
 // NewDefault returns the default first-party module set.
@@ -49,12 +46,12 @@ func NewDefaultExperimentalSet() (*platform.ModuleRegistry, internalcli.Hooks, e
 
 func newDefaultSet(experimental bool) (*platform.ModuleRegistry, internalcli.Hooks, error) {
 	modules := platform.NewModuleRegistry()
-	awsDialer := newProviderDialer("aws", awsOperations)
-	gcpDialer := newProviderDialer("gcp", nil)
-	azureDialer := newProviderDialer("azure", []sdk.Operation{sdk.OpDescribe, sdk.OpValidateConfig, sdk.OpPlan})
-	modules.RegisterCloser(awsDialer.Close)
-	modules.RegisterCloser(gcpDialer.Close)
-	modules.RegisterCloser(azureDialer.Close)
+	dialers := make(map[sdk.ProviderID]*providerhost.CachedDialer)
+	for _, provider := range providerhost.StandaloneProviderIDs() {
+		dialer := newProviderDialer(provider)
+		dialers[sdk.ProviderID(provider)] = dialer
+		modules.RegisterCloser(dialer.Close)
+	}
 
 	if experimental {
 		for _, module := range []platform.StackModule{ovhstack.Module{}, scwstack.Module{}} {
@@ -63,67 +60,27 @@ func newDefaultSet(experimental bool) (*platform.ModuleRegistry, internalcli.Hoo
 			}
 		}
 	}
-	if err := registerAWSShims(modules, awsDialer, experimental); err != nil {
-		return nil, internalcli.Hooks{}, err
+	for _, descriptor := range providerhost.StandaloneRuntimes() {
+		if descriptor.OptIn && !experimental {
+			continue
+		}
+		dialer := dialers[descriptor.Provider]
+		shim, err := providerhost.NewLazyProviderShimModule(
+			descriptor.Provider, descriptor.Runtime, descriptor.Tier, descriptor.OutputKeys, dialer.Do,
+		)
+		if err != nil {
+			return nil, internalcli.Hooks{}, err
+		}
+		if err := modules.RegisterModule(shim); err != nil {
+			return nil, internalcli.Hooks{}, fmt.Errorf("register %s shim: %w", descriptor.Runtime, err)
+		}
 	}
-	if err := registerGCPShims(modules, gcpDialer); err != nil {
-		return nil, internalcli.Hooks{}, err
-	}
-	if err := registerAzureShim(modules, azureDialer); err != nil {
-		return nil, internalcli.Hooks{}, err
-	}
-	hooks := registerHooks(gcpDialer, awsDialer)
+	hooks := registerHooks(dialers[providerhost.StandaloneProviderGCP], dialers[providerhost.StandaloneProviderAWS])
 	hooks.Close = nil
 	return modules, hooks, nil
 }
 
-func registerAWSShims(modules *platform.ModuleRegistry, dialer *providerhost.CachedDialer, experimental bool) error {
-	for _, target := range []struct {
-		runtime sdk.RuntimeID
-		tier    platform.CertificationTier
-	}{
-		{runtime: "ecs-fargate", tier: platform.TierBuiltIn},
-		{runtime: "eks", tier: platform.TierExperimental},
-	} {
-		if target.runtime == "eks" && !experimental {
-			continue
-		}
-		shim, err := providerhost.NewLazyProviderShimModule("aws", target.runtime, target.tier, platform.RequiredOutputKeys(), dialer.Do)
-		if err != nil {
-			return err
-		}
-		if err := modules.RegisterModule(shim); err != nil {
-			return fmt.Errorf("register AWS %s shim: %w", target.runtime, err)
-		}
-	}
-	return nil
-}
-
-func registerAzureShim(modules *platform.ModuleRegistry, dialer *providerhost.CachedDialer) error {
-	shim, err := providerhost.NewLazyAzureShimModule(dialer.Do)
-	if err != nil {
-		return err
-	}
-	if err := modules.RegisterModule(shim); err != nil {
-		return fmt.Errorf("register Azure AKS shim: %w", err)
-	}
-	return nil
-}
-
-func registerGCPShims(modules *platform.ModuleRegistry, dialer *providerhost.CachedDialer) error {
-	for _, runtime := range []sdk.RuntimeID{"gke-autopilot", "gke-standard"} {
-		shim, err := providerhost.NewLazyShimModule(runtime, dialer.Do)
-		if err != nil {
-			return err
-		}
-		if err := modules.RegisterModule(shim); err != nil {
-			return fmt.Errorf("register GCP %s shim: %w", runtime, err)
-		}
-	}
-	return nil
-}
-
-func newProviderDialer(provider string, required []sdk.Operation) *providerhost.CachedDialer {
+func newProviderDialer(provider string) *providerhost.CachedDialer {
 	return &providerhost.CachedDialer{Dial: func(ctx context.Context) (*providerhost.Client, error) {
 		executable, err := os.Executable()
 		if err != nil {
@@ -137,7 +94,7 @@ func newProviderDialer(provider string, required []sdk.Operation) *providerhost.
 		}
 		return providerhost.Dial(ctx, loaded.Binary, providerhost.DialOptions{
 			ExpectedProvider: sdk.ProviderID(provider),
-			Required:         required,
+			Required:         deploymentOperations,
 		})
 	}}
 }

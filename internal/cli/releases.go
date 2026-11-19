@@ -147,6 +147,10 @@ func rollbackCommand(o *options) *cobra.Command {
 			if err != nil {
 				return invalid(err)
 			}
+			planned, err = o.admitPlanned(cmd.Context(), planned)
+			if err != nil {
+				return invalid(fmt.Errorf("provider plan admission: %w", err))
+			}
 			if _, err := o.runDeploymentWithOptions(cmd.Context(), environment, planned, source.DigestReference, deploymentOptions{rollback: true, acknowledgeForwardOnlyDB: acknowledgeForwardOnlyDB}); err != nil {
 				return err
 			}

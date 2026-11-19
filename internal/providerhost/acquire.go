@@ -37,8 +37,8 @@ func Acquire(ctx context.Context, provider, cliVersion string, opts AcquireOptio
 		ctx = context.Background()
 	}
 	id := strings.TrimSpace(provider)
-	if id != "aws" && id != "gcp" && id != "azure" {
-		return Loaded{}, fmt.Errorf("lazy provider acquisition supports aws, gcp, or azure, got %q", provider)
+	if !IsStandaloneProvider(id) {
+		return Loaded{}, fmt.Errorf("automatic provider acquisition is limited to first-party standalone plugins, got %q", provider)
 	}
 	cacheDir, err := EffectiveCacheDir(opts.Resolve.CacheDir)
 	if err != nil {

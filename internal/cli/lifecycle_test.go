@@ -29,6 +29,43 @@ type fakeInfrastructureBackend struct {
 	destroyErr error
 }
 
+type contextReplicaPlanned struct {
+	stubPlanned
+	boundContext context.Context
+	replicas     int
+}
+
+func (p *contextReplicaPlanned) WithLiveQueueReplicas(replicas int) (platform.PlannedStack, error) {
+	return p.WithLiveQueueReplicasContext(context.Background(), replicas)
+}
+
+func (p *contextReplicaPlanned) WithLiveQueueReplicasContext(ctx context.Context, replicas int) (platform.PlannedStack, error) {
+	return &contextReplicaPlanned{stubPlanned: p.stubPlanned, boundContext: ctx, replicas: replicas}, nil
+}
+
+func TestRebindLiveQueuePlanPropagatesContextAndRebuildsBackend(t *testing.T) {
+	ctx := context.WithValue(context.Background(), struct{}{}, "request")
+	planned := &contextReplicaPlanned{stubPlanned: stubPlanned{stackName: "shop-staging", provider: "aws", runtime: "eks"}}
+	oldBackend := &fakeInfrastructureBackend{outputs: map[string]any{platform.OutputQueueReplicas: 3}}
+	var backendPlan platform.PlannedStack
+	newBackend := &fakeInfrastructureBackend{outputs: map[string]any{}}
+	o := &options{newBackend: func(_ context.Context, got platform.PlannedStack, _ string) (infrastructureBackend, error) {
+		backendPlan = got
+		return newBackend, nil
+	}}
+	backend, bound, err := o.rebindLiveQueuePlan(ctx, oldBackend, planned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, ok := bound.(*contextReplicaPlanned)
+	if !ok || updated.boundContext != ctx || updated.replicas != 3 {
+		t.Fatalf("bound plan = %#v", bound)
+	}
+	if backend != newBackend || backend == oldBackend || backendPlan != bound {
+		t.Fatalf("backend=%T old=%T backend plan=%T bound=%T", backend, oldBackend, backendPlan, bound)
+	}
+}
+
 func (b *fakeInfrastructureBackend) Outputs(context.Context) (map[string]any, error) {
 	b.calls = append(b.calls, "outputs")
 	return b.outputs, nil

@@ -338,7 +338,7 @@ func TestFailure_ExpiredPreviewRefusesPlan(t *testing.T) {
 		*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Error: &sdk.OperationError{Code: sdk.ErrCodeInvalid, Message: "preview expired at 2020-01-01"}}
 		return nil
 	}), nil)
-	module, err := providerhost.NewShimModule("gke-autopilot", client)
+	module, err := providerhost.NewShimModule("gcp", "gke-autopilot", client)
 	if err != nil {
 		t.Fatal(err)
 	}

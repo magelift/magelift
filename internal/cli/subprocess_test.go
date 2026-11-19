@@ -42,7 +42,7 @@ func testDescribe() *sdk.DescribeResponse {
 
 func testShimPlan(t *testing.T, client *providerhost.Client) platform.PlannedStack {
 	t.Helper()
-	module, err := providerhost.NewShimModule("gke-autopilot", client)
+	module, err := providerhost.NewShimModule("gcp", "gke-autopilot", client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,10 +192,10 @@ func TestSubprocessProvenance(t *testing.T) {
 		},
 	}
 	provenance := withArtifact.subprocessProvenance(context.Background())
-	if len(provenance) != 2 || provenance[1].Name != "magelift-provider-azure" || provenance[1].Mode != "subprocess" {
+	if len(provenance) != 3 || provenance[0].Name != "magelift-provider-aws" || provenance[0].Mode != "subprocess" || provenance[2].Name != "magelift-provider-azure" || provenance[2].Mode != "subprocess" {
 		t.Fatalf("provenance = %v", provenance)
 	}
-	got := provenance[0]
+	got := provenance[1]
 	if got.Name != "magelift-provider-gcp" || got.Version != "0.1.0" || got.Digest != "sha256:abc" || got.Mode != "subprocess" {
 		t.Fatalf("provenance = %+v", got)
 	}
@@ -208,7 +208,7 @@ func TestSubprocessProvenance(t *testing.T) {
 		},
 	}
 	provenance = withoutArtifact.subprocessProvenance(context.Background())
-	if len(provenance) != 2 || provenance[0].Mode != "not-installed" || provenance[0].Version != "" || provenance[1].Mode != "unverified" {
+	if len(provenance) != 3 || provenance[0].Name != "magelift-provider-aws" || provenance[0].Mode != "not-installed" || provenance[0].Version != "" || provenance[1].Mode != "not-installed" || provenance[2].Mode != "unverified" {
 		t.Fatalf("provenance = %v", provenance)
 	}
 }
@@ -228,7 +228,7 @@ func TestExtensionsListShowsProviderProvenance(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := stdout.String()
-	for _, want := range []string{`"providers"`, "magelift-provider-gcp", "magelift-provider-azure", `"mode": "subprocess"`, `"version": "0.1.0"`} {
+	for _, want := range []string{`"providers"`, "magelift-provider-aws", "magelift-provider-gcp", "magelift-provider-azure", `"mode": "subprocess"`, `"version": "0.1.0"`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing %q:\n%s", want, out)
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -51,6 +52,16 @@ func shimTestConfig() config.Config {
 	}
 }
 
+func awsShimTestConfig() config.Config {
+	cfg := shimTestConfig()
+	cfg.Target.Provider = "aws"
+	cfg.Target.Runtime = "ecs-fargate"
+	cfg.Target.GCP = nil
+	cfg.Target.AWS = &config.AWSTarget{}
+	cfg.Defaults.Region = "eu-west-3"
+	return cfg
+}
+
 func cannedStoredPlan() sdk.StoredPlan {
 	return sdk.StoredPlan{
 		StackName: "shop-staging-gcp-gke-autopilot", Provider: "gcp", Runtime: "gke-autopilot",
@@ -61,7 +72,16 @@ func cannedStoredPlan() sdk.StoredPlan {
 
 func shimTestModule(t *testing.T, caller *stubCaller) *ShimModule {
 	t.Helper()
-	module, err := NewShimModule("gke-autopilot", &Client{caller: caller, describe: cannedDescribe()})
+	module, err := NewShimModule("gcp", "gke-autopilot", &Client{caller: caller, describe: cannedDescribe()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return module
+}
+
+func awsShimTestModule(t *testing.T, caller *stubCaller) *ShimModule {
+	t.Helper()
+	module, err := newShimModule("aws", "ecs-fargate", platform.TierBuiltIn, awsOutputKeys(), &Client{caller: caller, describe: cannedDescribe()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,13 +100,13 @@ func planResponder(plan sdk.StoredPlan) func(string, any) error {
 
 func TestNewShimModule(t *testing.T) {
 	t.Parallel()
-	if _, err := NewShimModule("gke-autopilot", nil); err == nil {
+	if _, err := NewShimModule("gcp", "gke-autopilot", nil); err == nil {
 		t.Fatal("nil client was accepted")
 	}
-	if _, err := NewShimModule("gke-autopilot", &Client{}); err != nil {
+	if _, err := NewShimModule("gcp", "gke-autopilot", &Client{}); err != nil {
 		t.Fatalf("lazy client was refused: %v", err)
 	}
-	if _, err := NewShimModule("ecs-fargate", &Client{describe: cannedDescribe()}); err == nil {
+	if _, err := NewShimModule("gcp", "ecs-fargate", &Client{describe: cannedDescribe()}); err == nil {
 		t.Fatal("unserved runtime was accepted")
 	}
 	module := shimTestModule(t, &stubCaller{})
@@ -96,7 +116,7 @@ func TestNewShimModule(t *testing.T) {
 	if module.CertificationTier() != platform.TierBuiltIn {
 		t.Fatalf("tier = %q", module.CertificationTier())
 	}
-	standard, err := NewShimModule("gke-standard", &Client{describe: cannedDescribe()})
+	standard, err := NewShimModule("gcp", "gke-standard", &Client{describe: cannedDescribe()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,6 +203,136 @@ func TestShimPlanDefaultsMissingTierToNegotiatedTier(t *testing.T) {
 	}
 	if planned.CertificationTier() != platform.TierBuiltIn {
 		t.Fatalf("plan tier = %q, want negotiated built-in tier", planned.CertificationTier())
+	}
+}
+
+func TestShimPlanOutputKeysFallBackWhenDescribeOmitsThem(t *testing.T) {
+	t.Parallel()
+	module := shimTestModule(t, &stubCaller{respond: planResponder(cannedStoredPlan())})
+	module.client.describe.OutputKeys = nil
+	planned, err := module.Plan(shimTestConfig(), "staging", platform.PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	shim, ok := AsShimPlanned(planned)
+	if !ok {
+		t.Fatalf("planned = %T", planned)
+	}
+	if !slices.Equal(shim.OutputKeys(), module.OutputKeys()) {
+		t.Fatalf("planned output keys = %v, module fallback = %v", shim.OutputKeys(), module.OutputKeys())
+	}
+}
+
+func TestAWSAccountOnlyAdmissionVerifiesIdentityBeforeBootstrapMutation(t *testing.T) {
+	t.Parallel()
+	stored := cannedStoredPlan()
+	stored.Provider, stored.Runtime = "aws", "ecs-fargate"
+	stored.Tier = sdk.ExtensionTierBuiltIn
+	var methods []string
+	caller := &stubCaller{respond: func(method string, reply any) error {
+		methods = append(methods, method)
+		switch method {
+		case "Plugin.Plan":
+			*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: stored}
+		case "Plugin.BootstrapVerify":
+			*(reply.(*sdk.BootstrapVerifyResult)) = sdk.BootstrapVerifyResult{Verified: true}
+		case "Plugin.BootstrapEnsure":
+			*(reply.(*sdk.BootstrapEnsureResult)) = sdk.BootstrapEnsureResult{ResultJSON: []byte(`{"backendURL":"s3://state","keyRef":"key"}`)}
+		default:
+			return errors.New("unexpected method " + method)
+		}
+		return nil
+	}}
+	module := awsShimTestModule(t, caller)
+	planned, err := module.Plan(awsShimTestConfig(), "staging", platform.PlanOptions{AccountOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	admitted, err := platform.AdmitPlan(context.Background(), module, planned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if admitted != planned {
+		t.Fatal("account-only bootstrap admission should leave the plan unchanged")
+	}
+	bootstrap := module.Bootstrap()
+	if err := bootstrap.VerifyAccount(context.Background(), admitted); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bootstrap.Ensure(context.Background(), admitted, platform.BootstrapRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(caller.args) != 3 {
+		t.Fatalf("provider RPC count = %d", len(caller.args))
+	}
+	planRequest, ok := caller.args[0].(*sdk.PlanRequest)
+	if !ok || planRequest.Admit || !planRequest.AccountOnly {
+		t.Fatalf("account-only plan request = %#v", caller.args[0])
+	}
+	wantMethods := []string{"Plugin.Plan", "Plugin.BootstrapVerify", "Plugin.BootstrapEnsure"}
+	if !slices.Equal(methods, wantMethods) {
+		t.Fatalf("provider call order = %v, want %v", methods, wantMethods)
+	}
+}
+
+func TestAWSShimValidatesFirstPartyEdgeAndObservabilityBeforePlanning(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name   string
+		mutate func(*config.Config)
+		want   string
+	}{
+		{
+			name:   "edge",
+			mutate: func(cfg *config.Config) { cfg.Edge.NativeProvider = "cloud-cdn" },
+			want:   `native edge provider "cloud-cdn" does not match target.provider "aws"`,
+		},
+		{
+			name:   "observability",
+			mutate: func(cfg *config.Config) { cfg.Observability.NativeProvider = "google-cloud-operations" },
+			want:   `observability provider "google-cloud-operations" requires target.provider gcp`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			caller := &stubCaller{respond: planResponder(cannedStoredPlan())}
+			module := awsShimTestModule(t, caller)
+			cfg := awsShimTestConfig()
+			test.mutate(&cfg)
+			if _, err := module.Plan(cfg, "staging", platform.PlanOptions{}); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("Plan error = %v, want %q", err, test.want)
+			}
+			if len(caller.calls) != 0 {
+				t.Fatalf("provider called before host validation: %v", caller.calls)
+			}
+		})
+	}
+}
+
+func TestAWSShimBuildsNativeEdgeAdapterFromDescribe(t *testing.T) {
+	t.Parallel()
+	stored := cannedStoredPlan()
+	stored.Provider, stored.Runtime = "aws", "ecs-fargate"
+	described := cannedDescribe()
+	described.ProviderID = "aws"
+	described.Edge = &sdk.EdgeAdapterDescriptor{APIVersion: sdk.ExtensionAPIVersion, ID: "aws.edge.cloudfront", Provider: "aws", Version: "1.0.0"}
+	caller := &stubCaller{respond: planResponder(stored)}
+	module, err := newShimModule("aws", "ecs-fargate", platform.TierBuiltIn, awsOutputKeys(), &Client{caller: caller, describe: described})
+	if err != nil {
+		t.Fatal(err)
+	}
+	planned, err := module.Plan(awsShimTestConfig(), "staging", platform.PlanOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if module.Edge == nil {
+		t.Fatal("AWS shim has no edge factory")
+	}
+	adapter, err := module.Edge(context.Background(), planned)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if adapter.EdgeDescriptor().ID != described.Edge.ID {
+		t.Fatalf("edge descriptor = %#v", adapter.EdgeDescriptor())
 	}
 }
 
@@ -519,7 +669,7 @@ func TestShimOpsAcquireLock(t *testing.T) {
 			*(reply.(*sdk.PlanResult)) = sdk.PlanResult{Plan: cannedStoredPlan()}
 			return nil
 		case "Plugin.StateLock":
-			*(reply.(*sdk.StateLockResult)) = sdk.StateLockResult{Locked: true}
+			*(reply.(*sdk.StateLockResult)) = sdk.StateLockResult{Locked: true, ReleaseToken: "receipt-1"}
 			return nil
 		case "Plugin.StateUnlock":
 			unlocked++
@@ -550,6 +700,10 @@ func TestShimOpsAcquireLock(t *testing.T) {
 	}
 	if unlocked != 1 {
 		t.Fatalf("unlocked = %d", unlocked)
+	}
+	unlockRequest, ok := caller.args[2].(*sdk.StateUnlockCall)
+	if !ok || unlockRequest.ReleaseToken != "receipt-1" {
+		t.Fatalf("unlock release token = %#v", caller.args[2])
 	}
 }
 

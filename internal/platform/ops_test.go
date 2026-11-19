@@ -12,7 +12,7 @@ import (
 
 func TestPluginModulePorts(t *testing.T) {
 	t.Parallel()
-	gcp, err := providerhost.NewShimModule("gke-autopilot", providerhost.NewLazyClient(func(context.Context) (*providerhost.Client, error) {
+	gcp, err := providerhost.NewShimModule("gcp", "gke-autopilot", providerhost.NewLazyClient(func(context.Context) (*providerhost.Client, error) {
 		return nil, errors.New("must not dial")
 	}))
 	if err != nil {

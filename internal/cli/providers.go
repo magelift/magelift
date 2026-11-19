@@ -41,9 +41,7 @@ func providersInstallCommand(o *options) *cobra.Command {
 			}
 			remote := providers[:0]
 			for _, provider := range providers {
-				switch provider {
-				case "ovh", "scaleway":
-				default:
+				if providerhost.IsStandaloneProvider(provider) {
 					remote = append(remote, provider)
 				}
 			}

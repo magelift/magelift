@@ -18,7 +18,7 @@ import (
 func registerMediaTestShim(t *testing.T, o *options, caller *scriptedCaller) {
 	t.Helper()
 	client := providerhost.NewTestClient(caller, testDescribe())
-	module, err := providerhost.NewShimModule("gke-autopilot", client)
+	module, err := providerhost.NewShimModule("gcp", "gke-autopilot", client)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -42,22 +42,14 @@ var (
 	_ platform.HasRuntimeTunnel  = (*ShimModule)(nil)
 )
 
-// NewLazyShimModule binds one runtime to a dialer. Registration spawns no
-// processes and needs no credentials; the first fallible use dials once
-// via the shared lazy client.
-func NewLazyShimModule(runtime sdk.RuntimeID, dial DialFunc) (*ShimModule, error) {
-	return NewLazyProviderShimModule("gcp", runtime, platformTierForRuntime(runtime), gcpOutputKeys(), dial)
-}
-
-// NewShimModule binds a client to one runtime. Tier and output keys are
-// static pre-dial values matching the retired in-process module; the
-// live-binary tripwire test fails loudly if they ever drift from the
-// advertised values.
-func NewShimModule(runtime sdk.RuntimeID, client *Client) (*ShimModule, error) {
-	if runtime != "gke-autopilot" && runtime != "gke-standard" {
-		return nil, fmt.Errorf("GCP provider shim cannot serve runtime %q", runtime)
+// NewShimModule binds a provider runtime to an already connected client using
+// the same descriptor table as production registration and acquisition.
+func NewShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, client *Client) (*ShimModule, error) {
+	descriptor, found := standaloneRuntime(provider, runtime)
+	if !found {
+		return nil, fmt.Errorf("standalone provider %q cannot serve runtime %q", provider, runtime)
 	}
-	return newShimModule("gcp", runtime, platformTierForRuntime(runtime), gcpOutputKeys(), client)
+	return newShimModule(provider, runtime, descriptor.Tier, descriptor.OutputKeys, client)
 }
 
 // NewLazyProviderShimModule binds one provider runtime to a verified plugin.
@@ -85,7 +77,7 @@ func newShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform
 		outputKeys: append([]string(nil), outputKeys...),
 		client:     client,
 	}
-	if provider == "gcp" {
+	if provider == StandaloneProviderGCP || provider == StandaloneProviderAWS {
 		module.Edge = func(ctx context.Context, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
 			return NewShimEdgeAdapter(ctx, client, planned)
 		}
@@ -93,7 +85,7 @@ func newShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform
 			return NewShimResilienceAdapter(ctx, client, planned)
 		}
 	}
-	if provider == "aws" {
+	if provider == StandaloneProviderAWS {
 		module.Admission = func(_ context.Context, planned platform.PlannedStack) (platform.PlanAdmission, error) {
 			shim, ok := AsShimPlanned(planned)
 			if !ok || shim.module != module {
@@ -105,21 +97,20 @@ func newShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform
 	return module, nil
 }
 
-// NewLazyAzureShimModule binds the AKS runtime to an independently negotiated
-// Azure provider. The session is opened only when a command needs the provider.
-func NewLazyAzureShimModule(dial DialFunc) (*ShimModule, error) {
-	return NewLazyProviderShimModule("azure", "aks", platform.TierExperimental, azureOutputKeys(), dial)
-}
-
-func platformTierForRuntime(runtime sdk.RuntimeID) platform.CertificationTier {
-	if runtime == "gke-autopilot" {
-		return platform.TierBuiltIn
-	}
-	return platform.TierExperimental
-}
-
 func gcpOutputKeys() []string {
 	return append(append([]string(nil), platform.RequiredOutputKeys()...), "mediaURL", "mediaBucket", platform.OutputSearchEndpoint, platform.OutputQueueHost, platform.OutputQueueReplicas, platform.OutputDatabaseConnectionName, "queueMode", platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, "securityPolicyName")
+}
+
+func awsOutputKeys() []string {
+	keys := append([]string(nil), platform.RequiredOutputKeys()...)
+	keys = append(keys,
+		"edgeDistributionId", "mediaURL", "mediaBucket", "mediaDistributionId", "searchEndpoint", "queueMode",
+		"clusterArn", "taskDefinitionArn", "deployTaskDefinitionArn", "cronServiceName", "cronTaskDefinitionArn",
+		"queueServiceName", "queueTaskDefinitionArn", "taskRoleArn", "deploymentRoleArn", "securityGroupId",
+		"queueHost", platform.OutputQueueReplicas, platform.OutputDatabaseSecretName,
+		platform.OutputQueuePasswordSecretName, platform.OutputEncryptionKeySecretName,
+	)
+	return keys
 }
 
 func azureOutputKeys() []string {
@@ -131,7 +122,7 @@ func (m *ShimModule) Descriptor() sdk.TargetDescriptor {
 	if m != nil && m.runtime != "" {
 		runtime = m.runtime
 	}
-	provider := sdk.ProviderID("gcp")
+	provider := StandaloneProviderGCP
 	if m != nil && m.provider != "" {
 		provider = m.provider
 	}
@@ -142,7 +133,10 @@ func (m *ShimModule) CertificationTier() platform.CertificationTier {
 	if m != nil && m.tier != "" {
 		return m.tier
 	}
-	return platformTierForRuntime(m.runtime)
+	if descriptor, found := standaloneRuntime(m.provider, m.runtime); found {
+		return descriptor.Tier
+	}
+	return platform.TierExperimental
 }
 
 func platformTier(tier sdk.ExtensionCertificationTier) platform.CertificationTier {
@@ -186,17 +180,17 @@ func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.P
 	}
 	var target any
 	switch m.provider {
-	case "aws":
+	case StandaloneProviderAWS:
 		if cfg.Target.AWS == nil {
 			return nil, errors.New("target.aws is required for AWS deployment")
 		}
 		target = cfg.Target.AWS
-	case "azure":
+	case StandaloneProviderAzure:
 		if cfg.Target.Azure == nil {
 			return nil, errors.New("target.azure is required for Azure deployment")
 		}
 		target = cfg.Target.Azure
-	case "gcp":
+	case StandaloneProviderGCP:
 		if cfg.Target.GCP == nil {
 			return nil, errors.New("target.gcp is required for GCP deployment")
 		}
@@ -215,19 +209,21 @@ func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.P
 		accountOnly: opts.AccountOnly, runtimeObserve: opts.RuntimeObserve,
 		useProviderDefaultEdge: cfg.Edge.Mode == "" && cfg.Edge.NativeProvider == "" && cfg.Edge.ExternalProvider == "",
 	}
-	if m.provider == "aws" {
+	if m.provider == StandaloneProviderAWS {
 		inputs.allowUnsupported = cfg.Compatibility.AllowUnsupported
 	}
-	if opts.AccountOnly || opts.AllowExpiredPreview {
-		return m.replan(planContext(opts), inputs)
-	}
-	if m.provider == "gcp" {
+	if m.provider == StandaloneProviderAWS || m.provider == StandaloneProviderGCP {
 		if err := platform.ValidateFirstPartyEdge(cfg); err != nil {
 			return nil, err
 		}
 		if err := platform.ValidateFirstPartyObservability(cfg); err != nil {
 			return nil, err
 		}
+	}
+	if opts.AccountOnly || opts.AllowExpiredPreview {
+		return m.replan(planContext(opts), inputs)
+	}
+	if m.provider == StandaloneProviderGCP {
 		requirement, _ := config.ServiceRequirementForRelease(cfg.Application.Version, config.CompatibilityCache, "valkey")
 		if len(requirement.Versions) > 0 {
 			inputs.valkeyRequirement = requirement.Versions[0]
@@ -291,9 +287,11 @@ func (m *ShimModule) replan(ctx context.Context, inputs retainedInputs) (*ShimPl
 	} else if resp.Plan.Tier != sdk.ExtensionTierBuiltIn && resp.Plan.Tier != sdk.ExtensionTierExperimental {
 		return nil, fmt.Errorf("provider returned invalid plan tier %q", resp.Plan.Tier)
 	}
-	var outputKeys []string
+	outputKeys := append([]string(nil), m.outputKeys...)
 	if described := m.client.Describe(); described != nil {
-		outputKeys = append(outputKeys, described.OutputKeys...)
+		if len(described.OutputKeys) > 0 {
+			outputKeys = append(outputKeys[:0], described.OutputKeys...)
+		}
 	}
 	return &ShimPlanned{module: m, stored: resp.Plan, inputs: inputs, outputKeys: outputKeys}, nil
 }
@@ -469,6 +467,12 @@ func (a shimPlanAdmission) Admit(ctx context.Context, planned platform.PlannedSt
 	if !ok || shim.module != a.module {
 		return nil, errors.New("AWS admission requires a plan from this provider shim")
 	}
+	// Account-only bootstrap has its own read-only AWS identity check directly
+	// before the bootstrap operation. It intentionally has no catalog selections
+	// to admit as a deployment plan.
+	if shim.inputs.accountOnly {
+		return planned, nil
+	}
 	inputs := shim.inputs
 	inputs.admitted = true
 	return a.module.replan(ctx, inputs)
@@ -536,12 +540,16 @@ func (p *ShimPlanned) WithImageDigest(digest string) (platform.PlannedStack, err
 // WithLiveQueueReplicas re-plans with the observed live replica count so
 // validation keeps refusing in-place RabbitMQ topology changes.
 func (p *ShimPlanned) WithLiveQueueReplicas(replicas int) (platform.PlannedStack, error) {
+	return p.WithLiveQueueReplicasContext(context.Background(), replicas)
+}
+
+func (p *ShimPlanned) WithLiveQueueReplicasContext(ctx context.Context, replicas int) (platform.PlannedStack, error) {
 	if p == nil || p.module == nil {
 		return nil, errors.New("shim plan has no module")
 	}
 	next := p.inputs
 	next.liveQueueReplicas = replicas
-	return p.module.replan(context.Background(), next)
+	return p.module.replan(ctx, next)
 }
 
 // ShimOps orchestrates Magento deploys core-side while the provider executes
@@ -561,28 +569,9 @@ func (o ShimOps) WithRecordRelease(fn func(context.Context, deployflow.Request, 
 }
 
 func (o ShimOps) AcquireLock(ctx context.Context, planned platform.PlannedStack) (func(context.Context) error, error) {
-	shim, ok := AsShimPlanned(planned)
-	if !ok {
-		return nil, fmt.Errorf("provider operations received unexpected plan type %T", planned)
-	}
-	if o.client == nil {
-		return nil, errors.New("provider client is required")
-	}
 	host, _ := os.Hostname()
 	owner := fmt.Sprintf("magelift-cli-%s-%d", host, os.Getpid())
-	resp, err := Call[sdk.StateLockCall, sdk.StateLockResult](ctx, o.client, sdk.OpStateLock, &sdk.StateLockCall{
-		ProtocolVersion: sdk.ProtocolV1, Envelope: shim.inputs.envelope, Plan: shim.stored, Owner: owner,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if resp.Error != nil {
-		return nil, AsPluginError(sdk.OpStateLock, resp.Error)
-	}
-	return func(releaseCtx context.Context) error {
-		_, err := (ShimState{client: o.client}).unlock(releaseCtx, shim, resp.ReleaseToken)
-		return err
-	}, nil
+	return (ShimState{client: o.client}).Lock(ctx, planned, owner)
 }
 
 func (o ShimOps) NewDeploySteps(_ context.Context, backend any, planned platform.PlannedStack, diagnostics io.Writer) (deployflow.Steps, error) {

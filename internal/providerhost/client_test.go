@@ -288,7 +288,7 @@ func TestStaticPreDialValuesMatchAdvertised(t *testing.T) {
 		t.Fatal("no describe response")
 	}
 	for _, runtime := range []string{"gke-autopilot", "gke-standard"} {
-		module, err := NewShimModule(sdk.RuntimeID(runtime), client)
+		module, err := NewShimModule("gcp", sdk.RuntimeID(runtime), client)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -310,7 +310,7 @@ func TestStaticPreDialValuesMatchAdvertised(t *testing.T) {
 	for _, key := range described.OutputKeys {
 		advertised[key] = true
 	}
-	module, err := NewShimModule("gke-autopilot", client)
+	module, err := NewShimModule("gcp", "gke-autopilot", client)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,9 +25,22 @@ func acquireTestLock(version, digest, url, bundle string) string {
 
 func TestAcquireRejectsUnsupportedProvider(t *testing.T) {
 	t.Parallel()
-	_, err := Acquire(context.Background(), "ovh", "v1.0.0", AcquireOptions{})
-	if err == nil || !strings.Contains(err.Error(), "aws, gcp, or azure") {
+	_, err := Acquire(context.Background(), "community", "v1.0.0", AcquireOptions{})
+	if err == nil || !strings.Contains(err.Error(), "first-party standalone plugins") {
 		t.Fatalf("err = %v, want unsupported-provider refusal", err)
+	}
+}
+
+func TestAcquireUsesStandaloneProviderDescriptorSet(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, provider := range StandaloneProviderIDs() {
+		_, err := Acquire(context.Background(), provider, "dev", AcquireOptions{Resolve: ResolveOptions{CacheDir: t.TempDir()}})
+		if err == nil || strings.Contains(err.Error(), "first-party standalone plugins") {
+			t.Errorf("Acquire(%q) = %v; descriptor providers must enter acquisition", provider, err)
+		}
+	}
+	if IsStandaloneProvider("community") || IsStandaloneProvider("ovh") || IsStandaloneProvider("scaleway") {
+		t.Fatal("community and in-process providers must not be auto-acquired")
 	}
 }
 

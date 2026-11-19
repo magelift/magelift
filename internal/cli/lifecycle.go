@@ -72,15 +72,33 @@ func mapPluginError(err error) error {
 	}
 }
 
-func bindLiveQueueReplicas(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack) (platform.PlannedStack, error) {
-	if _, ok := planned.(platform.LiveQueueReplicaBinder); !ok {
-		return planned, nil
+func bindLiveQueueReplicas(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack) (platform.PlannedStack, bool, error) {
+	_, legacy := planned.(platform.LiveQueueReplicaBinder)
+	_, contextual := planned.(platform.ContextLiveQueueReplicaBinder)
+	if !legacy && !contextual {
+		return planned, false, nil
 	}
 	outputs, err := backend.Outputs(ctx)
 	if err != nil {
-		return planned, nil
+		return planned, false, nil
 	}
-	return platform.BindLiveQueueReplicas(planned, outputs)
+	if _, found := platform.QueueReplicasFromOutputs(outputs); !found {
+		return planned, false, nil
+	}
+	bound, err := platform.BindLiveQueueReplicasContext(ctx, planned, outputs)
+	return bound, err == nil, err
+}
+
+func (o *options) rebindLiveQueuePlan(ctx context.Context, backend infrastructureBackend, planned platform.PlannedStack) (infrastructureBackend, platform.PlannedStack, error) {
+	bound, changed, err := bindLiveQueueReplicas(ctx, backend, planned)
+	if err != nil || !changed {
+		return backend, bound, err
+	}
+	rebuilt, err := o.newBackend(ctx, bound, o.infrastructureBackendURL(bound))
+	if err != nil {
+		return nil, planned, fmt.Errorf("recreate infrastructure backend for replica-aware plan: %w", err)
+	}
+	return rebuilt, bound, nil
 }
 
 type infrastructureResult struct {
@@ -241,7 +259,7 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
 	if name != "destroy" {
-		planned, err = bindLiveQueueReplicas(ctx, backend, planned)
+		backend, planned, err = o.rebindLiveQueuePlan(ctx, backend, planned)
 		if err != nil {
 			return infrastructureResult{}, invalid(err)
 		}
@@ -311,7 +329,7 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 	if err != nil {
 		return infrastructureResult{}, fmt.Errorf("create infrastructure backend: %w", err)
 	}
-	planned, err = bindLiveQueueReplicas(ctx, backend, planned)
+	backend, planned, err = o.rebindLiveQueuePlan(ctx, backend, planned)
 	if err != nil {
 		return infrastructureResult{}, invalid(err)
 	}
