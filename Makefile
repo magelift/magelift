@@ -407,10 +407,10 @@ workflow-check: ## Validate GitHub Actions workflow syntax and expressions
 		tests/act/*.yml
 
 verify: generate-check cli-docs-check fmt-check lint test-fast test-race-full sdk-test provider-tidy-check license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
-generate: certification-docs cli-docs ## Generate configuration, CLI reference, and skill artifacts
+generate: evidence-docs cli-docs ## Generate configuration, CLI reference, and skill artifacts
 	go generate ./internal/config ./agents
 
-generate-check: certification-docs-check ## Check generated configuration, reference, and evidence files for drift
+generate-check: evidence-docs-check ## Check generated configuration, reference, and evidence files for drift
 	go run ./cmd/genconfig --check
 
 cli-docs: ## Generate the CLI reference from the Cobra command tree
@@ -419,11 +419,11 @@ cli-docs: ## Generate the CLI reference from the Cobra command tree
 cli-docs-check: ## Check the generated CLI reference for drift
 	go run ./cmd/gendocs --check
 
-certification-docs: ## Generate source-dated capability, architecture, resilience, and evidence summaries
-	go run ./cmd/gencertdocs
+evidence-docs: ## Generate source-dated capability, architecture, resilience, and evidence summaries
+	go run ./cmd/genevidence
 
-certification-docs-check: ## Check generated capability and evidence summaries for drift
-	go run ./cmd/gencertdocs --check
+evidence-docs-check: ## Check generated capability and evidence summaries for drift
+	go run ./cmd/genevidence --check
 
 # Every named target is an action. Derived so a new target cannot miss .PHONY.
 .PHONY: $(shell awk -F: '/^[a-zA-Z0-9_-]+:/ {print $$1}' $(firstword $(MAKEFILE_LIST)))

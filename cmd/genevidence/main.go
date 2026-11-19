@@ -20,10 +20,10 @@ const defaultEvidenceDir = "docs/evidence/runs"
 
 func main() {
 	check := flag.Bool("check", false, "fail if the generated capability report is stale")
-	evidenceDir := flag.String("evidence-dir", defaultEvidenceDir, "relative directory containing sealed JSONL certification evidence")
+	evidenceDir := flag.String("evidence-dir", defaultEvidenceDir, "relative directory containing archived JSONL run records")
 	flag.Parse()
 	if flag.NArg() != 0 {
-		fatalf("usage: gencertdocs [--check] [--evidence-dir relative-directory]")
+		fatalf("usage: genevidence [--check] [--evidence-dir relative-directory]")
 	}
 
 	catalog := certification.CurrentCapabilityCatalog()
@@ -38,19 +38,19 @@ func main() {
 	}
 	bundle, err := certification.LoadEvidenceBundle(os.DirFS("."), *evidenceDir)
 	if err != nil {
-		fatalf("load certification evidence: %v", err)
+		fatalf("load archived run records: %v", err)
 	}
 	contents := render(catalog, coverage, architecture, certification.CurrentResilienceProfiles(), bundle)
 	if *check {
 		current, err := os.ReadFile(outputPath)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				fatalf("%s is missing; run make certification-docs", outputPath)
+				fatalf("run make evidence-docs to create %s", outputPath)
 			}
 			fatalf("read %s: %v", outputPath, err)
 		}
 		if !bytes.Equal(current, contents) {
-			fatalf("%s is stale; run make certification-docs", outputPath)
+			fatalf("run make evidence-docs to update %s", outputPath)
 		}
 		return
 	}
