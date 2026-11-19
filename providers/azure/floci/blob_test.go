@@ -1,4 +1,4 @@
-//go:build floci_azure
+//go:build floci
 
 package floci_test
 

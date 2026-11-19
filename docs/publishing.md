@@ -8,9 +8,9 @@ MageLift does not publish central builder/runtime images.
 
 ## Historical v1.0.0 publishing notes
 
-Notes for the public `v1.0.0` surface. AWS ECS Fargate and GCP GKE Autopilot are
-already certified. This milestone is packaging, docs, and repo trust - not a new
-round of paid cloud cells.
+Notes for the public `v1.0.0` surface. Earlier release planning recorded live
+results for AWS ECS Fargate and GCP GKE Autopilot. This milestone covers
+packaging, documentation, and repository trust without new paid cloud runs.
 
 ## What waits until later
 

@@ -196,27 +196,33 @@ Run `./scripts/release-smoke-local.sh` or `make release-smoke` for a host-only
 check (snapshot release on the dialproof config, signing and SBOM skipped).
 The script sets `GOMEMLIMIT` to 75% of available RAM and does not pin
 `GOMAXPROCS` or goreleaser `--parallelism`. It asserts the CLI archive, the
-provider binary, and the provider checksums entry. Do not use a full
+provider binaries, and their checksum entries. Do not use a full
 multi-platform `goreleaser release` as a local smoke; that matrix belongs
 on CI.
 
-### Tag sequence (module tags before the release tag)
+### Module and release tags
 
-Tags stay ask-first. When the release is approved:
+Each Go module needs a tag that includes its directory. MageLift releases the
+root module, SDK, and all provider modules at the same version. Follow the
+staging procedure in the [release skill](https://github.com/magelift/magelift/blob/main/contrib/skills/magelift-release/SKILL.md)
+before creating tags.
 
-1. Prove the mechanics: `go test ./tests/distribution/ -count=1`,
-   `make release-smoke`, `make installer-harness-test` green.
-2. Push module tags first: `sdk/vX.Y.Z`, then
-   `providers/gcp/vX.Y.Z`. Wait for proxy propagation and confirm
-   `GOWORK=off GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org go list -m github.com/magelift/magelift/sdk@vX.Y.Z`
-   (and the provider path) resolve.
-3. Push `vX.Y.Z` last. It triggers `release.yml`, which builds,
-   signs, and publishes the CLI archives, provider binaries,
-   bundles, and lockfiles.
-4. Tag-then-require: bump root and provider `go.mod` files to the
-   tagged SDK version, run `go mod tidy` (it fails pre-tag by
-   design: unpublished modules have no resolvable versions),
-   and re-run the distribution proof against the real versions.
+The manual Release Please workflow tracks the root package only. It does not
+create the SDK or provider module tags. Create those module tags at the same
+commit as the root tag so the release workflow can resolve every module.
+
+After approval, create these tags at the same commit and push them together:
+
+- `vX.Y.Z`
+- `sdk/vX.Y.Z`
+- `providers/aws/vX.Y.Z`
+- `providers/gcp/vX.Y.Z`
+- `providers/azure/vX.Y.Z`
+
+The root tag starts `release.yml`. It waits five minutes before checking that
+the root, SDK, and provider modules are available through the Go proxy. The
+workflow builds and signs the CLI and provider binaries, generates lockfiles,
+and keeps the GitHub release in draft until its checks pass.
 
 ### Packaging smoke record
 

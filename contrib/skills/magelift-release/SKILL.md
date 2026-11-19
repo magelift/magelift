@@ -21,8 +21,7 @@ Never run a full multi-platform `goreleaser release` on a laptop.
 Do not pin `GOMAXPROCS` or go `-p`. `GOMEMLIMIT` is 75% of
 available RAM (`scripts/go-memlimit.sh`). The hosted full matrix
 passes GoReleaser `--parallelism 1` (pipe concurrency, not Go
-threads): twelve Pulumi-heavy targets on ubuntu-latest 16GB OOM
-when they share that limit.
+threads) because parallel Pulumi builds exceeded the runner memory limit.
 
 ## Identities and registries
 
@@ -91,13 +90,14 @@ minutes. Order matters; never move a tag:
    way CI will: fresh clone at HEAD plus `go mod tidy`
    plus `git diff --exit-code` in each module and the
    linter. Only then tag.
-8. Tag `sdk/<v>`, `<v>`, `providers/gcp/<v>` and `providers/azure/<v>` at that commit
-   and push all four in one `git push`. The release starts; its
-   visibility-wait sleeps first, then polls.
+8. Tag `sdk/<v>`, `<v>`, and every provider module at that commit, using
+   `providers/<name>/<v>` for each provider. Push all five tags together for
+   the current AWS, GCP, and Azure modules. The root tag starts the release;
+   its visibility check sleeps first, then polls.
 9. Wait five minutes in silence (no proxy, sumdb, or CI requests:
-   an early 404 seeds a 30-minute negative). Then one primer per
+   an early 404 seeds a 30-minute negative). Then run one primer per
    module (`go mod download <module>@<v>` with default proxy and
-   sumdb); all four must pass.
+   sumdb); all five must pass.
 10. Only then dispatch full CI on the release tag
    (`gh workflow run ci.yml --ref <v> -f all=true`); the publish
    gate requires actual success on the tag commit, and CI jobs
@@ -109,9 +109,7 @@ minutes. Order matters; never move a tag:
 
 ## Community alpha
 
-Milestone A is the GCP community alpha in `docs/release-readiness.md`. A public
-alpha does not wait until every provider, catalog intersection, and open
-issue is certified. Historical capability evidence stays as written.
+Milestone A is the community alpha described in `docs/release-readiness.md`. Release notes name the provider paths exercised on that build. Historical runs retain their original scope and date.
 
 Checks on the distributed artifact stay: publisher, signature, digest,
 protocol, and the Cosign identities below. Non-blocking bugs are
@@ -120,7 +118,7 @@ documented. Untested capabilities are named, including `NOT_RUN`.
 Local commands for this alpha:
 
 ```sh
-make test-fast            # root, standalone SDK, GCP and Azure modules
+make test-fast            # root, standalone SDK, and AWS, GCP, and Azure modules
 make test-race            # targeted race
 make verify-community     # alpha gate; also runs the targeted race
 ```

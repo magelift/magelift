@@ -32,7 +32,7 @@ updates:
       go-dependencies:
         patterns: ["*"]
   - package-ecosystem: gomod
-    directories: ["/providers/gcp", "/providers/azure"]
+    directories: ["/providers/aws", "/providers/gcp", "/providers/azure"]
     schedule:
       interval: weekly
     cooldown:

@@ -1,5 +1,5 @@
 # Ephemeral dialproof config: linux/amd64 only, no SBOM, taps, or attest.
-# Debug loop for provider bundles plus lockfiles (~5 min). Real tags use
+# Debug loop for provider binaries plus lockfiles (~5 min). Real tags use
 # .goreleaser.yaml. Keep the signs/checksum/archive shape identical so a
 # dialproof green means the same lockfile steps pass on the full matrix.
 version: 2
@@ -18,6 +18,18 @@ builds:
       - -s
       - -w
       - -X github.com/magelift/magelift/internal/cli.Version={{ .Version }}
+  - id: magelift-provider-aws
+    dir: providers/aws
+    main: ./cmd/magelift-provider-aws
+    binary: magelift-provider-aws
+    goos: [linux]
+    goarch: [amd64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
+      - -X main.Version={{ .Version }}
   - id: magelift-provider-gcp
     dir: providers/gcp
     main: ./cmd/magelift-provider-gcp
@@ -44,6 +56,9 @@ builds:
       - -X main.Version={{ .Version }}
 
 archives:
+  - id: provider-aws
+    ids: [magelift-provider-aws]
+    formats: [binary]
   - id: cli
     ids: [magelift]
     formats: [tar.gz]
@@ -76,6 +91,16 @@ signs:
       - "${artifact}"
       - "--yes"
     artifacts: checksum
+  - id: provider-aws
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: binary
+    ids: [provider-aws]
   - id: provider-gcp
     cmd: cosign
     signature: "${artifact}.sigstore.json"

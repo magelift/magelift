@@ -44,7 +44,7 @@ func TestStagePublishesCoherentWorkspaceModules(t *testing.T) {
 		}
 	}
 	rootZip := filepath.Join(proxy, "github.com/magelift/magelift", "@v", version+".zip")
-	assertNoNestedModules(t, rootZip, version)
+	assertNoNestedModules(t, rootZip, version, root)
 }
 
 func zippedGoMod(t *testing.T, archive, name string) string {
@@ -73,9 +73,21 @@ func zippedGoMod(t *testing.T, archive, name string) string {
 	return ""
 }
 
-func assertNoNestedModules(t *testing.T, archive, version string) {
+func assertNoNestedModules(t *testing.T, archive, version, root string) {
 	t.Helper()
 	prefix := "github.com/magelift/magelift@" + version + "/"
+	nestedPaths := []string{"sdk"}
+	providerManifests, err := filepath.Glob(filepath.Join(root, "providers", "*", "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, manifest := range providerManifests {
+		relative, err := filepath.Rel(root, filepath.Dir(manifest))
+		if err != nil {
+			t.Fatal(err)
+		}
+		nestedPaths = append(nestedPaths, filepath.ToSlash(relative))
+	}
 	reader, err := zip.OpenReader(archive)
 	if err != nil {
 		t.Fatal(err)
@@ -84,12 +96,10 @@ func assertNoNestedModules(t *testing.T, archive, version string) {
 	modCount := 0
 	for _, file := range reader.File {
 		relative := strings.TrimPrefix(file.Name, prefix)
-		top := relative
-		if index := strings.IndexByte(relative, '/'); index >= 0 {
-			top = relative[:index]
-		}
-		if top == "providers" || top == "sdk" {
-			t.Fatalf("root zip contains nested module path %q", file.Name)
+		for _, nestedPath := range nestedPaths {
+			if strings.HasPrefix(relative, nestedPath+"/") {
+				t.Fatalf("root zip contains nested module path %q", file.Name)
+			}
 		}
 		if strings.HasSuffix(file.Name, "/go.mod") || file.Name == prefix+"go.mod" {
 			modCount++
@@ -149,10 +159,45 @@ func TestNestedModuleInheritsRootLicense(t *testing.T) {
 	if err := run(repo, "HEAD", version, proxy); err != nil {
 		t.Fatal(err)
 	}
-	zipPath := filepath.Join(proxy, "github.com/magelift/magelift/providers/gcp", "@v", version+".zip")
-	got := zippedGoMod(t, zipPath, "github.com/magelift/magelift/providers/gcp@"+version+"/LICENSE")
+	zipPath := filepath.Join(proxy, "github.com/magelift/magelift/providers/aws", "@v", version+".zip")
+	got := zippedGoMod(t, zipPath, "github.com/magelift/magelift/providers/aws@"+version+"/LICENSE")
 	if got != string(license) {
 		t.Fatalf("nested module license = %q, want root LICENSE", got)
+	}
+}
+
+func TestStageDiscoversEveryProviderModule(t *testing.T) {
+	repo := t.TempDir()
+	writeModuleTree(t, repo)
+	commitTree(t, repo)
+
+	proxy := t.TempDir()
+	const version = "v0.0.0-providers"
+	if err := run(repo, "HEAD", version, proxy); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, module := range []string{
+		"github.com/magelift/magelift",
+		"github.com/magelift/magelift/sdk",
+		"github.com/magelift/magelift/providers/aws",
+		"github.com/magelift/magelift/providers/gcp",
+		"github.com/magelift/magelift/providers/azure",
+	} {
+		atDir := filepath.Join(proxy, filepath.FromSlash(module), "@v")
+		for _, file := range []string{version + ".info", version + ".mod", version + ".zip"} {
+			if _, err := os.Stat(filepath.Join(atDir, file)); err != nil {
+				t.Fatalf("%s %s: %v", module, file, err)
+			}
+		}
+		servedMod, err := os.ReadFile(filepath.Join(atDir, version+".mod"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		zippedMod := zippedGoMod(t, filepath.Join(atDir, version+".zip"), module+"@"+version+"/go.mod")
+		if string(servedMod) != zippedMod {
+			t.Fatalf("%s: served .mod diverges from zipped go.mod", module)
+		}
 	}
 }
 
@@ -210,7 +255,9 @@ func writeModuleTree(t *testing.T, repo string) {
 	for _, spec := range []struct{ dir, body string }{
 		{".", "module github.com/magelift/magelift\n\ngo 1.27.0\n"},
 		{"sdk", "module github.com/magelift/magelift/sdk\n\ngo 1.27.0\n"},
+		{"providers/aws", "module github.com/magelift/magelift/providers/aws\n\ngo 1.27.0\n"},
 		{"providers/gcp", "module github.com/magelift/magelift/providers/gcp\n\ngo 1.27.0\n"},
+		{"providers/azure", "module github.com/magelift/magelift/providers/azure\n\ngo 1.27.0\n"},
 	} {
 		dir := filepath.Join(repo, spec.dir)
 		if err := os.MkdirAll(dir, 0o755); err != nil {

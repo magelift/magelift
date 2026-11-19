@@ -2,10 +2,12 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-case "${1:-}" in
-  gcp|azure) cd "$root/providers/$1" ;;
-  *) echo 'usage: check-provider-tidy.sh gcp|azure' >&2; exit 2 ;;
-esac
+provider="${1:-}"
+if [[ ! "$provider" =~ ^[a-z0-9-]+$ || ! -f "$root/providers/$provider/go.mod" ]]; then
+  printf 'usage: check-provider-tidy.sh <provider> (expected providers/<provider>/go.mod)\n' >&2
+  exit 2
+fi
+cd "$root/providers/$provider"
 
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT

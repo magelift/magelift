@@ -35,25 +35,31 @@ if [[ -z "$cli_archive" ]]; then
 	exit 1
 fi
 
-provider_bin="$(find "$SMOKE_DIST" -type f \( -name 'magelift-provider-gcp' -o -name 'magelift-provider-gcp.exe' \) | head -1 || true)"
-if [[ -z "$provider_bin" ]]; then
-	printf 'magelift-provider-gcp binary missing under dist/\n' >&2
-	find "$SMOKE_DIST" -maxdepth 4 -type f 2>/dev/null | head -40 >&2 || true
+provider_bins=()
+provider_names=()
+provider_bytes=0
+for manifest in "$ROOT"/providers/*/go.mod; do
+	[[ -f "$manifest" ]] || continue
+	provider="${manifest%/go.mod}"
+	provider="${provider##*/}"
+	binary_name="magelift-provider-$provider"
+	provider_bin="$(find "$SMOKE_DIST" -type f \( -name "$binary_name" -o -name "$binary_name.exe" \) | head -1 || true)"
+	if [[ -z "$provider_bin" ]]; then
+		printf '%s binary missing under dist/\n' "$binary_name" >&2
+		exit 1
+	fi
+	if ! grep -q "${binary_name}_" "$SMOKE_DIST/checksums.txt"; then
+		printf '%s missing from %s/checksums.txt\n' "$binary_name" "$SMOKE_DIST" >&2
+		exit 1
+	fi
+	provider_bins+=("$provider_bin")
+	provider_names+=("$provider")
+	provider_bytes=$((provider_bytes + $(wc -c < "$provider_bin")))
+done
+if [[ "${#provider_bins[@]}" -eq 0 ]]; then
+	printf 'no provider binaries were built under %s/\n' "$SMOKE_DIST" >&2
 	exit 1
 fi
-
-azure_provider_bin="$(find "$SMOKE_DIST" -type f \( -name 'magelift-provider-azure' -o -name 'magelift-provider-azure.exe' \) | head -1 || true)"
-if [[ -z "$azure_provider_bin" ]]; then
-	printf 'magelift-provider-azure binary missing under dist/\n' >&2
-	exit 1
-fi
-
-# The release matrix must carry the provider into checksums.txt, or the
-# lockfile generator has nothing to pin on a real tag.
-grep -q 'magelift-provider-gcp_' "$SMOKE_DIST/checksums.txt" \
-	|| { printf 'provider missing from "$SMOKE_DIST/checksums.txt"\n' >&2; exit 1; }
-grep -q 'magelift-provider-azure_' "$SMOKE_DIST/checksums.txt" \
-	|| { printf 'Azure provider missing from "$SMOKE_DIST/checksums.txt"\n' >&2; exit 1; }
 
 # Archives.files in .goreleaser.yaml; confirm the real archive packs them.
 tar -tzf "$cli_archive" > "$WORK/archive-files.txt"
@@ -68,9 +74,9 @@ else
 	"$bin_dir/magelift" version >/dev/null
 fi
 
-printf 'bytes cli_archive=%s installed_cli=%s provider=%s (tools and Docker images excluded)\n' \
+printf 'bytes cli_archive=%s installed_cli=%s provider_binaries=%s (tools and Docker images excluded)\n' \
 	"$(wc -c < "$cli_archive" | tr -d ' ')" \
 	"$(wc -c < "$bin_dir/magelift" | tr -d ' ')" \
-	"$(wc -c < "$provider_bin" | tr -d ' ')"
+	"$provider_bytes"
 
-printf 'release smoke ok archive=%s provider=%s\n' "$cli_archive" "$provider_bin"
+printf 'release smoke ok archive=%s providers=%s\n' "$cli_archive" "${provider_names[*]}"

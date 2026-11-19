@@ -70,9 +70,7 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
               - 'internal/cli/ci_setup_pulumi.bash'
-              - 'docker-compose.floci.yml'
-              - 'docker-compose.floci-gcp.yml'
-              - 'docker-compose.floci-azure.yml'
+              - 'providers/*/docker-compose.floci.yml'
             sdk:
               - 'sdk/**/*.go'
               - 'sdk/go.mod'
@@ -110,7 +108,9 @@ jobs:
             release:
               - '.goreleaser.yml'
               - '.goreleaser.yaml'
+              - '.goreleaser.dialproof.yaml'
               - 'cmd/**'
+              - 'providers/*/cmd/**'
 
   cache-prime:
     needs: changes
@@ -131,9 +131,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-
             go-prime-${{ runner.os }}-
           lookup-only: true
       - uses: ./.github/actions/go-memlimit
@@ -146,7 +146,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-${{ github.sha }}
 
   lint:
     name: lint
@@ -173,10 +173,10 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
-            go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-
+            go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
@@ -205,9 +205,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - run: |
           gofmt="$(go env GOROOT)/bin/gofmt"
@@ -219,7 +219,7 @@ jobs:
       - run: go test ./... -count=1
       - name: Provider process and CLI lifecycle race checks
         run: go test -race ./internal/providerhost/ ./internal/cli/ -count=1
-      - run: go test -tags synthetic ./tests/synthetic/ -count=1
+      - run: env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN go test -tags synthetic ./tests/synthetic/ -count=1
       - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
           go-version-file: go.mod
@@ -250,9 +250,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - run: GOWORK=off go build ./...
         working-directory: sdk
@@ -274,69 +274,52 @@ jobs:
           go-package: ./...
           work-dir: sdk
 
-  provider-verify:
+  provider:
+    name: provider-${{ matrix.provider }}
     needs: [changes, cache-prime]
-    # Nested GCP provider module: build, vet, full suite, lint, vuln scan.
-    # Runs whenever any Go changes: the provider still imports root
-    # internals, so root edits re-verify it until import decoupling
-    # (alpha-review-corrections 2.1) lands. Workspace mode is correct
-    # here (tree tested against tree); GOWORK=off standalone proofs
-    # belong to the release pipeline, where requires equal the tag.
     if: ${{ always() && !cancelled() && (needs.changes.outputs.go == 'true' || needs.changes.outputs.provider == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [aws, gcp, azure]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version-file: providers/gcp/go.mod
+          go-version-file: providers/${{ matrix.provider }}/go.mod
           cache: false
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
+      - uses: ./.github/actions/setup-pulumi
       - run: go build ./...
-        working-directory: providers/gcp
+        working-directory: providers/${{ matrix.provider }}
       - run: go vet ./...
-        working-directory: providers/gcp
+        working-directory: providers/${{ matrix.provider }}
       - run: go test -race ./... -count=1
-        working-directory: providers/gcp
-      - run: bash scripts/check-provider-tidy.sh gcp
+        working-directory: providers/${{ matrix.provider }}
+      - run: bash scripts/check-provider-tidy.sh "${{ matrix.provider }}"
       - name: golangci-lint (provider module)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
           args: ./...
-          working-directory: providers/gcp
+          working-directory: providers/${{ matrix.provider }}
       - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
-          go-version-file: providers/gcp/go.mod
+          go-version-file: providers/${{ matrix.provider }}/go.mod
           go-package: ./...
-          work-dir: providers/gcp
-
-  azure-provider:
-    needs: changes
-    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.provider == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
-        with:
-          go-version-file: providers/azure/go.mod
-      - uses: ./.github/actions/go-memlimit
-      - uses: ./.github/actions/setup-pulumi
-      - run: go test -race ./providers/azure/... -count=1
-      - run: bash scripts/check-provider-tidy.sh azure
-      - run: make floci-azure-test
+          work-dir: providers/${{ matrix.provider }}
 
   docs:
     needs: changes
@@ -527,13 +510,13 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version-file: go.mod
+          go-version-file: providers/aws/go.mod
       - uses: ./.github/actions/go-memlimit
       - name: Run Floci AWS contract tests
         env:
           MAGELIFT_FLOCI: '1'
           MAGELIFT_FLOCI_ENDPOINT: http://127.0.0.1:4566
-        run: go test -race -tags=floci ./tests/floci -count=1
+        run: go test -race -tags=floci ./providers/aws/floci -count=1
 
   floci-gcp:
     needs: changes
@@ -554,7 +537,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version-file: go.mod
+          go-version-file: providers/gcp/go.mod
       - uses: ./.github/actions/go-memlimit
       - uses: ./.github/actions/setup-pulumi
       - name: Run floci-gcp contract tests
@@ -566,8 +549,34 @@ jobs:
           PUBSUB_EMULATOR_HOST: 127.0.0.1:4588
           GOOGLE_CLOUD_PROJECT: floci-local
         run: |
-          go test -race -tags=floci_gcp ./providers/gcp/floci/floci-gcp -count=1
-          go test -tags=floci_gcp ./providers/gcp/plugin -run '^TestGCPFlociPreviewSweepUsesSharedBucket$' -count=1
+          go test -race -tags=floci ./providers/gcp/floci -count=1
+          go test -tags=floci ./providers/gcp/plugin -run '^TestGCPFlociPreviewSweepUsesSharedBucket$' -count=1
+
+  floci-azure:
+    needs: changes
+    if: needs.changes.outputs.go == 'true' || needs.changes.outputs.provider == 'true'
+    runs-on: ubuntu-latest
+    services:
+      floci-azure:
+        image: floci/floci-az:0.17.0@sha256:40f1bbf1ef13569c6eacb47e565bf4cd28785ca833208dcc074910e13aec64ea
+        ports:
+          - 4577:4577
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: providers/azure/go.mod
+          cache: false
+      - uses: ./.github/actions/go-memlimit
+      - name: Run Floci Azure contract tests
+        env:
+          MAGELIFT_FLOCI_AZURE: '1'
+          MAGELIFT_AZURE_ENDPOINT: http://127.0.0.1:4577
+        run: |
+          go test -race -tags=floci ./providers/azure/floci -count=1
+          go test -race -tags=floci ./providers/azure/plugin -run '^TestAzureFloci' -count=1
 
   release-config:
     needs: changes
@@ -633,9 +642,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-${{ github.sha }}
+          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/gcp/go.sum', 'providers/azure/go.sum', 'go.work.sum') }}-
+            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
       - name: Install pinned JSON/YAML tools
         env:
@@ -671,8 +680,8 @@ jobs:
       - varnish
       - floci-aws
       - floci-gcp
-      - provider-verify
-      - azure-provider
+      - floci-azure
+      - provider
       - release-config
       - workflow-lint
       - shellcheck

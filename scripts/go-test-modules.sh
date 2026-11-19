@@ -10,7 +10,7 @@ magelift_apply_go_memlimit
 
 usage() {
   cat <<'EOF'
-usage: go-test-modules.sh [--community] [--race] [--only root|sdk|gcp|azure] [--list-modules]
+usage: go-test-modules.sh [--community] [--race] [--only <module>] [--list-modules]
 
   --community     omit frozen provider/vendor suites from the root module
   --race          pass -race to go test
@@ -22,6 +22,12 @@ EOF
 race=0
 community=0
 declare -a only=()
+declare -a module_names=(root sdk)
+for manifest in "$ROOT"/providers/*/go.mod; do
+  [[ -f "$manifest" ]] || continue
+  provider="${manifest%/go.mod}"
+  module_names+=("${provider##*/}")
+done
 
 go_cmd() {
   if [[ -n "${MAGELIFT_GO_TEST_WRAPPER:-}" ]]; then
@@ -33,10 +39,11 @@ go_cmd() {
 }
 
 valid_module() {
-  case "$1" in
-  root | sdk | gcp | azure) return 0 ;;
-  *) return 1 ;;
-  esac
+  local module
+  for module in "${module_names[@]}"; do
+    [[ "$module" == "$1" ]] && return 0
+  done
+  return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -55,14 +62,14 @@ while [[ $# -gt 0 ]]; do
       exit 2
     }
     if ! valid_module "$2"; then
-      printf 'go-test-modules: unknown module %s (want root, sdk, gcp, or azure)\n' "$2" >&2
+      printf 'go-test-modules: unknown module %s (available: %s)\n' "$2" "${module_names[*]}" >&2
       exit 2
     fi
     only+=("$2")
     shift 2
     ;;
   --list-modules)
-    printf '%s\n' root sdk gcp azure
+    printf '%s\n' "${module_names[@]}"
     exit 0
     ;;
   -h | --help)
@@ -141,7 +148,7 @@ if module_wanted sdk; then
     status=1
   fi
 fi
-for provider in gcp azure; do
+for provider in "${module_names[@]:2}"; do
   if module_wanted "$provider" && ! run_provider "$provider"; then
     status=1
   fi

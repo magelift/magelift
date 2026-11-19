@@ -28,8 +28,11 @@ fi
 if ! run bash "$ROOT/scripts/go-test-modules.sh" --race --only sdk; then
   status=1
 fi
-if ! (cd "$ROOT/providers/gcp" && run go test -race ./operations/ -count=1); then
-  status=1
-fi
+for provider_dir in "$ROOT"/providers/*; do
+  [[ -d "$provider_dir/operations" ]] || continue
+  if ! (cd "$provider_dir" && run go test -race ./operations/ -count=1); then
+    status=1
+  fi
+done
 
 exit "$status"

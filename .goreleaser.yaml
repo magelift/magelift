@@ -5,7 +5,7 @@ version: 2
 # (dialproof config, host only). Full multi-platform matrices belong on CI.
 # Cap Go with GOMEMLIMIT from scripts/go-memlimit.sh; do not pin
 # GOMAXPROCS. Hosted release.yml passes --parallelism 1 so the
-# twelve-target matrix runs one compile at a time.
+# full platform matrix runs one compile at a time.
 
 project_name: magelift
 
@@ -21,10 +21,20 @@ builds:
       - -s
       - -w
       - -X github.com/magelift/magelift/internal/cli.Version={{ .Version }}
-  # Autonomous provider: built from its nested module (providers/gcp owns
-  # its go.mod), same matrix as the CLI, same lockstep version for alpha.
-  # The binary reports its version via Describe; keep the main.Version
-  # ldflag or releases ship as v0.0.0-dev.
+  # Each provider has a standalone binary with the same platform matrix as
+  # the CLI. The binary reports its version through main.Version.
+  - id: magelift-provider-aws
+    dir: providers/aws
+    main: ./cmd/magelift-provider-aws
+    binary: magelift-provider-aws
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s
+      - -w
+      - -X main.Version={{ .Version }}
   - id: magelift-provider-gcp
     dir: providers/gcp
     main: ./cmd/magelift-provider-gcp
@@ -51,6 +61,9 @@ builds:
       - -X main.Version={{ .Version }}
 
 archives:
+  - id: provider-aws
+    ids: [magelift-provider-aws]
+    formats: [binary]
   - id: cli
     ids: [magelift]
     formats: [tar.gz]
@@ -93,6 +106,16 @@ signs:
       - "${artifact}"
       - "--yes"
     artifacts: checksum
+  - id: provider-aws
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: binary
+    ids: [provider-aws]
   - id: provider-gcp
     cmd: cosign
     # Per-binary bundle for the provider artifacts. signs (unlike
@@ -125,9 +148,8 @@ signs:
 # upgrade path: a GitHub App with contents:write on homebrew-tap + scoop-bucket.
 homebrew_casks:
   - name: magelift
-    # The cask ships the CLI only: two binaries share every OS/arch
-    # archive combination since the provider split, and one tap
-    # handles a single archive per combination.
+    # The cask installs the CLI archive. Provider binaries remain separate
+    # release assets and are downloaded by the CLI when needed.
     ids:
       - cli
     repository:
@@ -136,7 +158,7 @@ homebrew_casks:
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://magelift.dev
-    description: Open-source Magento CLI for your AWS or GCP account
+    description: Open-source Magento CLI for AWS, Google Cloud and Azure
     license: Apache-2.0
     binaries:
       - magelift
@@ -153,11 +175,11 @@ scoops:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: bucket
     homepage: https://magelift.dev
-    description: Open-source Magento CLI for your AWS or GCP account
+    description: Open-source Magento CLI for AWS, Google Cloud and Azure
     license: Apache-2.0
 
 release:
-  # Fail before the six-arch Pulumi compile if GitHub cannot publish this tag
+  # Fail before cross-compiling if GitHub cannot publish this tag
   # (missing token, or an immutable release that cannot be updated).
   preflight:
     fail_on_error: true

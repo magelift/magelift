@@ -26,10 +26,12 @@ runs = [
     {"name": "lint", "status": "completed", "conclusion": "success", "id": 1, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/1"},
     {"name": "go-verify", "status": "completed", "conclusion": "success", "id": 2, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/2"},
     {"name": "sdk-verify", "status": "completed", "conclusion": "success", "id": 3, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/3"},
-    {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 4, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/4"},
+    {"name": "provider-aws", "status": "completed", "conclusion": "success", "id": 14, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/14"},
+    {"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 4, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/4"},
     {"name": "floci-gcp", "status": "completed", "conclusion": "success", "id": 5, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/5"},
-    {"name": "azure-provider", "status": "completed", "conclusion": "success", "id": 15, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/15"},
+    {"name": "provider-azure", "status": "completed", "conclusion": "success", "id": 15, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/15"},
     {"name": "floci-aws", "status": "completed", "conclusion": "success", "id": 25, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/25"},
+    {"name": "floci-azure", "status": "completed", "conclusion": "success", "id": 26, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/26"},
     {"name": "php (8.3)", "status": "completed", "conclusion": "success", "id": 61, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/61"},
     {"name": "php (8.5)", "status": "completed", "conclusion": "success", "id": 62, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/62"},
     {"name": "unrelated", "status": "completed", "conclusion": "failure", "id": 7, "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/7"},
@@ -63,7 +65,7 @@ if ! "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/pass.out" 2>
 	printf 'gate rejected a green commit\n' >&2
 	exit 1
 fi
-grep -q "PASS     provider-verify: success" "$WORK/pass.out" || {
+grep -q "PASS     provider-gcp: success" "$WORK/pass.out" || {
 	printf 'gate hid the provider verdict\n' >&2
 	exit 1
 }
@@ -74,23 +76,23 @@ grep -q "PASS     CI passed: success" "$WORK/pass.out" || {
 
 # 2. A failing provider-only test blocks promotion, even when the root
 # suite is green.
-mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "failure", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"}]'
+mutate provider-gcp '[{"name": "provider-gcp", "status": "completed", "conclusion": "failure", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"}]'
 if "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/fail.out" 2>&1; then
-	printf 'gate promoted despite provider-verify failure\n' >&2
+	printf 'gate promoted despite provider-gcp failure\n' >&2
 	exit 1
 fi
-grep -q "BLOCKED  provider-verify: conclusion=failure" "$WORK/fail.out" || {
+grep -q "BLOCKED  provider-gcp: conclusion=failure" "$WORK/fail.out" || {
 	printf 'gate did not name the failing check\n' >&2
 	exit 1
 }
 
 # 3. A skipped check blocks: releases need actual verification.
-mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "skipped", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"}]'
+mutate provider-gcp '[{"name": "provider-gcp", "status": "completed", "conclusion": "skipped", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"}]'
 if "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/skip.out" 2>&1; then
 	printf 'gate promoted on a skipped check\n' >&2
 	exit 1
 fi
-grep -q "BLOCKED  provider-verify: conclusion=skipped" "$WORK/skip.out" || {
+grep -q "BLOCKED  provider-gcp: conclusion=skipped" "$WORK/skip.out" || {
 	printf 'gate did not flag the skipped check\n' >&2
 	exit 1
 }
@@ -126,20 +128,20 @@ grep -q "PENDING" "$WORK/active.out" || {
 # 6. An older success with a newer rerun in progress reports pending:
 # the latest attempt wins.
 write_payload
-mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"}, {"name": "provider-verify", "status": "in_progress", "conclusion": null, "id": 14, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/14"}]'
+mutate provider-gcp '[{"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"}, {"name": "provider-gcp", "status": "in_progress", "conclusion": null, "id": 14, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/14"}]'
 code=0
 "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/rerun.out" 2>&1 || code="$?"
 if [[ "$code" != "2" ]]; then
 	printf 'gate exit = %s, want 2 (pending rerun)\n' "$code" >&2
 	exit 1
 fi
-grep -q "PENDING  provider-verify" "$WORK/rerun.out" || {
+grep -q "PENDING  provider-gcp" "$WORK/rerun.out" || {
 	printf 'gate did not flag the in-progress rerun\n' >&2
 	exit 1
 }
 
 # 7. A failure repaired by a later success passes.
-mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "failure", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"}, {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 14, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/14"}]'
+mutate provider-gcp '[{"name": "provider-gcp", "status": "completed", "conclusion": "failure", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"}, {"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 14, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/14"}]'
 if ! "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/repaired.out" 2>&1; then
 	cat "$WORK/repaired.out" >&2
 	printf 'gate rejected a repaired check\n' >&2
@@ -160,27 +162,27 @@ fi
 
 # 9. A queued rerun without a start time supersedes its older success.
 write_payload
-mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 10, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/10"}, {"name": "provider-verify", "status": "queued", "conclusion": null, "id": 11, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/11"}]'
+mutate provider-gcp '[{"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 10, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/10"}, {"name": "provider-gcp", "status": "queued", "conclusion": null, "id": 11, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/11"}]'
 code=0
 "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/queued.out" 2>&1 || code="$?"
 if [[ "$code" != "2" ]]; then
 	printf 'gate exit = %s, want 2 (queued rerun)\n' "$code" >&2
 	exit 1
 fi
-grep -q "PENDING  provider-verify" "$WORK/queued.out" || {
+grep -q "PENDING  provider-gcp" "$WORK/queued.out" || {
 	printf 'gate did not flag the queued rerun\n' >&2
 	exit 1
 }
 
 # 10. A waiting rerun likewise reports pending, and its later success passes.
-mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 10, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/10"}, {"name": "provider-verify", "status": "waiting", "conclusion": null, "id": 11, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/11"}]'
+mutate provider-gcp '[{"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 10, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/10"}, {"name": "provider-gcp", "status": "waiting", "conclusion": null, "id": 11, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/11"}]'
 code=0
 "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/waiting.out" 2>&1 || code="$?"
 if [[ "$code" != "2" ]]; then
 	printf 'gate exit = %s, want 2 (waiting rerun)\n' "$code" >&2
 	exit 1
 fi
-mutate provider-verify '[{"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 10, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/10"}, {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 11, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/11"}]'
+mutate provider-gcp '[{"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 10, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/10"}, {"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 11, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/11"}]'
 if ! "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/queuedone.out" 2>&1; then
 	cat "$WORK/queuedone.out" >&2
 	printf 'gate rejected a completed rerun\n' >&2
@@ -266,7 +268,7 @@ import sys
 
 runs = [
     {"name": "CI passed", "status": "completed", "conclusion": "success", "id": 10, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/10"},
-    {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"},
+    {"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"},
     {"name": "phpunit", "status": "completed", "conclusion": "success", "id": 6, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/6"},
 ]
 with open(sys.argv[1], "w") as handle:
@@ -312,7 +314,7 @@ import sys
 
 runs = [
     {"name": "CI passed", "status": "completed", "conclusion": "success", "id": 10, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/10"},
-    {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"},
+    {"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 4, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/4"},
     {"name": "php (8.3)", "status": "completed", "conclusion": "success", "id": 61, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/61"},
     {"name": "php (8.5)", "status": "completed", "conclusion": "success", "id": 62, "html_url": "https://github.com/magelift/magelift/actions/runs/200/job/62"},
 ]
@@ -343,10 +345,12 @@ page2 = {"check_runs": [
     {"name": "CI passed", "status": "completed", "conclusion": "success", "id": 201, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/201"},
     {"name": "go-verify", "status": "completed", "conclusion": "success", "id": 202, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/202"},
     {"name": "sdk-verify", "status": "completed", "conclusion": "success", "id": 203, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/203"},
-    {"name": "provider-verify", "status": "completed", "conclusion": "success", "id": 204, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/204"},
+    {"name": "provider-aws", "status": "completed", "conclusion": "success", "id": 214, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/214"},
+    {"name": "provider-gcp", "status": "completed", "conclusion": "success", "id": 204, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/204"},
     {"name": "floci-gcp", "status": "completed", "conclusion": "success", "id": 205, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/205"},
-    {"name": "azure-provider", "status": "completed", "conclusion": "success", "id": 215, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/215"},
+    {"name": "provider-azure", "status": "completed", "conclusion": "success", "id": 215, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/215"},
     {"name": "floci-aws", "status": "completed", "conclusion": "success", "id": 225, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/225"},
+    {"name": "floci-azure", "status": "completed", "conclusion": "success", "id": 226, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/226"},
     {"name": "php (8.3)", "status": "completed", "conclusion": "success", "id": 206, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/206"},
     {"name": "php (8.5)", "status": "completed", "conclusion": "success", "id": 207, "html_url": "https://github.com/magelift/magelift/actions/runs/100/job/207"},
 ]}
@@ -387,11 +391,11 @@ def job(run, name, status, conclusion, ident):
         "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/{ident}",
     }
 
-names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-verify", "azure-provider", "floci-aws", "floci-gcp", "php (8.3)", "php (8.5)"]
+names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-aws", "provider-gcp", "provider-azure", "floci-aws", "floci-gcp", "floci-azure", "php (8.3)", "php (8.5)"]
 runs = [job("100", name, "completed", "success", 10 + i) for i, name in enumerate(names)]
 runs.extend([
     job("200", "CI passed", "queued", None, 20),
-    job("200", "provider-verify", "queued", None, 21),
+    job("200", "provider-gcp", "queued", None, 21),
 ])
 with open(sys.argv[1], "w") as handle:
     json.dump({"check_runs": runs}, handle)
@@ -428,7 +432,7 @@ def job(run, name, status, conclusion, ident):
         "html_url": f"https://github.com/magelift/magelift/actions/runs/{run}/job/{ident}",
     }
 
-names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-verify", "azure-provider", "floci-aws", "floci-gcp", "php (8.3)", "php (8.5)"]
+names = ["CI passed", "lint", "go-verify", "sdk-verify", "provider-aws", "provider-gcp", "provider-azure", "floci-aws", "floci-gcp", "floci-azure", "php (8.3)", "php (8.5)"]
 runs = [job("100", name, "completed", "success", 10 + i) for i, name in enumerate(names)]
 runs.append(job("200", "lint", "in_progress", None, 30))
 with open(sys.argv[1], "w") as handle:
@@ -449,7 +453,7 @@ fi
 
 # 24. Aggregate success with skipped release-mandatory jobs blocks.
 write_payload
-for name in lint go-verify sdk-verify azure-provider floci-aws floci-gcp; do
+for name in lint go-verify sdk-verify provider-aws provider-gcp provider-azure floci-aws floci-gcp floci-azure; do
 	mutate "$name" "[{\"name\": \"$name\", \"status\": \"completed\", \"conclusion\": \"skipped\", \"id\": 80, \"html_url\": \"https://github.com/magelift/magelift/actions/runs/100/job/80\"}]"
 done
 if "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/skipped-mand.out" 2>&1; then

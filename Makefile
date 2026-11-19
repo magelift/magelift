@@ -41,11 +41,20 @@ sdk-test: ## Run the SDK module suite standalone with race (GOWORK=off hermetici
 	cd sdk && GOWORK=off go test -race ./... -count=1
 
 provider-tidy-check: ## Check provider dependency files against the current CLI and SDK
-	bash scripts/check-provider-tidy.sh gcp
-	bash scripts/check-provider-tidy.sh azure
+	@for manifest in providers/*/go.mod; do \
+		[ -f "$$manifest" ] || continue; \
+		provider=$${manifest#providers/}; provider=$${provider%/go.mod}; \
+		bash scripts/check-provider-tidy.sh "$$provider" || exit; \
+	done
+
+provider-aws-test: ## Run the AWS provider module suite (workspace; no race)
+	cd providers/aws && go test ./... -count=1
 
 provider-gcp-test: ## Run the GCP provider module suite (workspace; no race)
 	cd providers/gcp && go test ./... -count=1
+
+provider-azure-test: ## Run the Azure provider module suite (workspace; no race)
+	cd providers/azure && go test ./... -count=1
 
 community-test-helpers: ## Regression tests for the make, Go, and PHP helper scripts
 	bash tests/acceptance/go_test_modules_test.sh
@@ -65,15 +74,26 @@ verify-community: test-community test-race php-test lifecycle-golden-check check
 provider-gcp-build: ## Build the autonomous GCP provider plugin binary
 	go build -o dist/magelift-provider-gcp ./providers/gcp/cmd/magelift-provider-gcp
 
-core-leanness: ## Prove the CLI carries no GCP provider code or GCP cloud SDKs
-	test -z "$$(go list -deps ./cmd/magelift | grep -E 'magelift/providers/|magelift/internal/cloud/gcp|cloud\.google\.com/go|google\.golang\.org/api/')"
-# NOTE: OVH/Scaleway SDKs stay linked (cleanup recovery needs them) but
-# unregistered by default; see registry.NewDefault and ADR 0013. AWS ECS
-# stays in-process by design until aws-provider-parity extracts it. Full
-# provider-SDK independence is a post-parity gate, not this one.
+provider-aws-build: ## Build the autonomous AWS provider plugin binary
+	go build -o dist/magelift-provider-aws ./providers/aws/cmd/magelift-provider-aws
+
+provider-azure-build: ## Build the autonomous Azure provider plugin binary
+	go build -o dist/magelift-provider-azure ./providers/azure/cmd/magelift-provider-azure
+
+core-leanness: ## Prove the CLI carries no first-party cloud provider implementation
+	@if ! deps="$$(go list -deps ./cmd/magelift)"; then \
+		echo 'could not list CLI dependencies for the provider boundary check' >&2; exit 1; \
+	fi; \
+	forbidden="$$(printf '%s\n' "$$deps" | grep -E 'magelift/providers/|magelift/internal/cloud/(gcp|azure)(/|$$)|cloud\.google\.com/go|google\.golang\.org/api/|github\.com/Azure/azure-sdk-for-go|github\.com/AzureAD/microsoft-authentication-library-for-go' || true)"; \
+	if [ -n "$$forbidden" ]; then \
+		printf 'CLI dependency boundary violation:\n%s\n' "$$forbidden" >&2; exit 1; \
+	fi
+# OVH and Scaleway SDKs stay linked for cleanup recovery. AWS SDK packages
+# used by shared S3-compatible integrations may remain in the CLI. Provider
+# implementations and their cloud SDKs are built into their own binaries.
 
 lint: ## Run static Go checks across the CLI, SDK and provider modules
-	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./... ./sdk/... ./providers/gcp/... ./providers/azure/...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./... ./sdk/... ./providers/aws/... ./providers/gcp/... ./providers/azure/...
 
 license-check: ## Check Go dependency licenses
 	go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown \
@@ -138,12 +158,12 @@ build-e2e-test: builder-image-test ## Build the fixture through the CLI, Docker,
 
 pulumi-mock-test: ## Run Pulumi mock graph tests for cloud adapters (no account)
 	go test -race ./internal/cloud/... -count=1
-	go test ./providers/gcp/stack ./providers/azure/stack -count=1
+	go test ./providers/aws/stack ./providers/gcp/stack ./providers/azure/stack -count=1
 
-floci-test-aws: ## Run account-free AWS contract tests through Floci
-	./scripts/floci-test-aws.sh
+floci-aws-test: ## Run account-free AWS contract tests through Floci
+	./providers/aws/scripts/floci-aws-test.sh
 
-floci-gcp-test: ## Run account-free GCP contract tests through floci-gcp
+floci-gcp-test: ## Run account-free GCP contract tests through Floci
 	./providers/gcp/scripts/floci-gcp-test.sh
 
 magento-dev-smoke: ## Install a real Magento fixture locally and verify HTTP, GraphQL and repeat startup
@@ -155,7 +175,7 @@ floci-azure-test: ## Run account-free Azure Blob and Key Vault tests through Flo
 azure-mysql-tls-test: ## Verify Magento and bootstrap PDO against a local TLS-only MySQL server
 	./providers/azure/scripts/mysql-tls-test.sh
 
-local-gates: pulumi-mock-test acceptance-harness-test floci-test-aws floci-gcp-test floci-azure-test ## Account-free stack: Pulumi mocks, harness, Floci AWS/GCP/Azure
+local-gates: pulumi-mock-test acceptance-harness-test provider-aws-test provider-gcp-test provider-azure-test floci-aws-test floci-gcp-test floci-azure-test ## Account-free stack: Pulumi mocks, providers, Floci AWS/GCP/Azure
 
 # Offline harness steps print a label and die at a ceiling so a stuck child
 # cannot hang `make acceptance-harness-test` with no output. Shape/dry-run
@@ -388,10 +408,10 @@ workflow-check: ## Validate GitHub Actions workflow syntax and expressions
 		tests/act/*.yml
 
 verify: generate-check cli-docs-check fmt-check lint test-fast test-race-full sdk-test provider-tidy-check license-check check-clean-room php-test docs workflow-check ## Run the local verification suite
-generate: certification-docs ## Generate configuration, certification, reference, and skill artifacts
+generate: certification-docs cli-docs ## Generate configuration, CLI reference, and skill artifacts
 	go generate ./internal/config ./agents
 
-generate-check: certification-docs-check ## Check generated configuration and certification files for drift
+generate-check: certification-docs-check ## Check generated configuration, reference, and evidence files for drift
 	go run ./cmd/genconfig --check
 
 cli-docs: ## Generate the CLI reference from the Cobra command tree
@@ -400,10 +420,10 @@ cli-docs: ## Generate the CLI reference from the Cobra command tree
 cli-docs-check: ## Check the generated CLI reference for drift
 	go run ./cmd/gendocs --check
 
-certification-docs: ## Generate source-dated capability, architecture, and resilience coverage
+certification-docs: ## Generate source-dated capability, architecture, resilience, and evidence summaries
 	go run ./cmd/gencertdocs
 
-certification-docs-check: ## Check source-dated certification coverage for drift
+certification-docs-check: ## Check generated capability and evidence summaries for drift
 	go run ./cmd/gencertdocs --check
 
 # Every named target is an action. Derived so a new target cannot miss .PHONY.

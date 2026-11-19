@@ -1,6 +1,6 @@
 // Package distribution proves publication with GOWORK=off: an SDK consumer
-// builds against a file proxy, and the GCP and Azure providers resolve
-// their dependencies and compile. Magelift modules resolve only from the file
+// builds against a file proxy, and every provider module resolves its
+// dependencies and compiles. Magelift modules resolve only from the file
 // proxy (synthetic versions staged from the working tree); third-party
 // modules resolve upstream for the provider build.
 package distribution
@@ -185,6 +185,11 @@ func copyDir(t *testing.T, src, dst string) {
 
 func copyDirSkipping(t *testing.T, src, dst string, skip map[string]bool) {
 	t.Helper()
+	copyDirSkippingPath(t, src, dst, "", skip)
+}
+
+func copyDirSkippingPath(t *testing.T, src, dst, relative string, skip map[string]bool) {
+	t.Helper()
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		t.Fatal(err)
@@ -193,13 +198,14 @@ func copyDirSkipping(t *testing.T, src, dst string, skip map[string]bool) {
 		t.Fatal(err)
 	}
 	for _, entry := range entries {
-		if skip[entry.Name()] {
+		childRelative := filepath.Join(relative, entry.Name())
+		if skip[childRelative] {
 			continue
 		}
 		from := filepath.Join(src, entry.Name())
 		to := filepath.Join(dst, entry.Name())
 		if entry.IsDir() {
-			copyDirSkipping(t, from, to, skip)
+			copyDirSkippingPath(t, from, to, childRelative, skip)
 			continue
 		}
 		info, err := entry.Info()
@@ -278,13 +284,26 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	// require-bump commit). The provider under test is the main module
 	// on disk; SDK and root resolve from the proxy.
 	rootCopy := filepath.Join(work, "root")
-	copyDirSkipping(t, root, rootCopy, map[string]bool{
-		"providers": true, "sdk": true, ".git": true, ".magelift": true, "dist": true,
+	skip := map[string]bool{
+		"sdk": true, ".git": true, ".magelift": true, "dist": true,
 		".venv": true, "node_modules": true, "website": true,
-	})
+	}
+	providerManifests, err := filepath.Glob(filepath.Join(root, "providers", "*", "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, manifest := range providerManifests {
+		relative, err := filepath.Rel(root, filepath.Dir(manifest))
+		if err != nil {
+			t.Fatal(err)
+		}
+		skip[relative] = true
+	}
+	copyDirSkipping(t, root, rootCopy, skip)
 	setRequire(t, filepath.Join(rootCopy, "go.mod"), sdkModule, version)
 	publishModule(t, proxy, rootModule, version, rootCopy)
 	assertProxyCoherent(t, proxy, rootModule, version)
+	assertZipContains(t, filepath.Join(proxy, "github.com", "magelift", "magelift", "@v", version+".zip"), "providers/README.md")
 
 	tidyEnv := append([]string{}, env...)
 	for i, entry := range tidyEnv {
@@ -292,7 +311,15 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 			tidyEnv[i] = "GOFLAGS=-mod=mod"
 		}
 	}
-	for _, name := range []string{"gcp", "azure"} {
+	providerManifests, err = filepath.Glob(filepath.Join(root, "providers", "*", "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(providerManifests) == 0 {
+		t.Fatal("no provider modules found")
+	}
+	for _, manifest := range providerManifests {
+		name := filepath.Base(filepath.Dir(manifest))
 		t.Run(name, func(t *testing.T) {
 			copied := filepath.Join(work, "providers", name)
 			copyDir(t, filepath.Join(root, "providers", name), copied)
@@ -309,6 +336,21 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 			runGo(t, copied, env, "build", "./...")
 		})
 	}
+}
+
+func assertZipContains(t *testing.T, archivePath, suffix string) {
+	t.Helper()
+	archive, err := zip.OpenReader(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	for _, file := range archive.File {
+		if strings.HasSuffix(file.Name, "/"+suffix) {
+			return
+		}
+	}
+	t.Fatalf("zip %s does not contain %s", archivePath, suffix)
 }
 
 // setRequire points modulePath at version, replacing any existing

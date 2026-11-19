@@ -1,4 +1,4 @@
-//go:build floci_gcp
+//go:build floci
 
 package plugin
 
