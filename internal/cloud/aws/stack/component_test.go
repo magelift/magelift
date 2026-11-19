@@ -156,7 +156,7 @@ func TestNewComposesPreviewAWSStackWithPulumiOutputs(t *testing.T) {
 	}
 	policy := resourceInput(m, "aws:iam/rolePolicy:RolePolicy", "shop-preview-1-task-policy")
 	policyText := policy["policy"].StringValue()
-	for _, required := range []string{"s3:GetObject", "aoss:APIAccessAll", "secretsmanager:GetSecretValue", "kms:Decrypt", "ssmmessages:OpenDataChannel"} {
+	for _, required := range []string{"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts", "kms:GenerateDataKey", "aoss:APIAccessAll", "secretsmanager:GetSecretValue", "kms:Decrypt", "ssmmessages:OpenDataChannel"} {
 		if !strings.Contains(policyText, required) {
 			t.Fatalf("task policy is missing %q: %s", required, policyText)
 		}

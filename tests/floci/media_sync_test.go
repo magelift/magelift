@@ -63,12 +63,18 @@ func TestMediaSyncListingDiffAgainstFloci(t *testing.T) {
 		Source: source,
 		Bucket: bucket,
 		Client: client,
+		Prefix: "media/",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !result.Diff.Empty() {
 		t.Fatalf("listing diff = %#v, want empty", result.Diff)
+	}
+	for _, key := range result.Keys {
+		if len(key) < 6 || key[:6] != "media/" {
+			t.Fatalf("unexpected media key %q", key)
+		}
 	}
 	if result.Uploaded < 1 {
 		t.Fatalf("uploaded = %d", result.Uploaded)

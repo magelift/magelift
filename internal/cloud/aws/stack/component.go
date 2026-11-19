@@ -379,7 +379,7 @@ func (c *Component) Outputs() pulumi.Map {
 	}
 	outputs := pulumi.Map{
 		"networkVpcId": c.Network.VpcID, "edgeDistributionId": edgeDistributionID,
-		"applicationURL": applicationURL, "mediaURL": c.Storage.DistributionURL, "mediaBucket": c.Storage.BucketName,
+		"applicationURL": applicationURL, "mediaURL": pulumi.Sprintf("%s/media/", c.Storage.DistributionURL), "mediaBucket": c.Storage.BucketName,
 		"databaseWriter": c.Database.WriterEndpoint, "cacheEndpoint": c.Cache.CachePrimaryEndpoint, "searchEndpoint": searchEndpoint, "queueMode": c.Queue.QueueMode,
 		"clusterName": c.Runtime.ClusterName, "clusterArn": c.Runtime.ClusterARN, "serviceName": c.Runtime.ServiceName,
 		"taskDefinitionArn": c.Runtime.TaskDefinitionARN, "deployTaskDefinitionArn": c.Runtime.DeployTaskDefinitionARN,
@@ -427,8 +427,8 @@ func taskPolicy(spec Spec, component *Component, searchARN pulumi.StringOutput) 
 			secrets = append(secrets, databaseSecretARN)
 		}
 		statements := []map[string]interface{}{
-			{"Effect": "Allow", "Action": []string{"s3:ListBucket"}, "Resource": bucketARN},
-			{"Effect": "Allow", "Action": []string{"s3:GetObject", "s3:PutObject", "s3:DeleteObject"}, "Resource": bucketARN + "/*"},
+			{"Effect": "Allow", "Action": []string{"s3:ListBucket", "s3:ListBucketMultipartUploads"}, "Resource": bucketARN},
+			{"Effect": "Allow", "Action": []string{"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"}, "Resource": bucketARN + "/*"},
 			{"Effect": "Allow", "Action": []string{"kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"}, "Resource": spec.Dependencies.KMSKeyARN},
 			{"Effect": "Allow", "Action": []string{"ssmmessages:CreateControlChannel", "ssmmessages:CreateDataChannel", "ssmmessages:OpenControlChannel", "ssmmessages:OpenDataChannel"}, "Resource": "*"},
 			{"Effect": "Allow", "Action": []string{"secretsmanager:GetSecretValue"}, "Resource": secrets},

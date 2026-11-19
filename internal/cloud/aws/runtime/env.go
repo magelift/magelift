@@ -101,6 +101,21 @@ func capabilityEnvironment(args Args) pulumi.Output {
 			containerEnvironment{Name: "MAGELIFT_QUEUE_ENDPOINT", Value: queueEndpoint},
 			containerEnvironment{Name: "MAGELIFT_MEDIA_BUCKET", Value: values[8].(string)},
 		)
+		bucket := values[8].(string)
+		if bucket != "" {
+			suffix := "amazonaws.com"
+			if strings.HasPrefix(args.Region, "cn-") {
+				suffix = "amazonaws.com.cn"
+			}
+			environment = append(environment,
+				containerEnvironment{Name: platform.EnvMagentoMediaDriver, Value: "aws-s3"},
+				containerEnvironment{Name: platform.EnvMagentoMediaBucket, Value: bucket},
+				containerEnvironment{Name: platform.EnvMagentoMediaRegion, Value: args.Region},
+				containerEnvironment{Name: platform.EnvMagentoMediaEndpoint, Value: "https://s3." + args.Region + "." + suffix},
+				containerEnvironment{Name: platform.EnvMagentoBaseMediaURL, Value: "{{unsecure_base_url}}media/"},
+				containerEnvironment{Name: platform.EnvMagentoBaseMediaURLSecure, Value: "{{secure_base_url}}media/"},
+			)
+		}
 		environment = appendSmtpEnvironment(environment, values[9].(string), values[10].(string), capabilities.EmailFrom)
 		return environment
 	})

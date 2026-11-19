@@ -27,6 +27,7 @@ type API interface {
 type Options struct {
 	Source string
 	Bucket string
+	Prefix string
 	Client API
 }
 
@@ -69,12 +70,17 @@ func Sync(ctx context.Context, opts Options) (Result, error) {
 		return Result{}, fmt.Errorf("mediasync: source %q contains no files", source)
 	}
 
+	prefix := strings.TrimSpace(opts.Prefix)
+	if prefix != "" && (strings.HasPrefix(prefix, "/") || strings.Contains(prefix, "..") || !strings.HasSuffix(prefix, "/")) {
+		return Result{}, errors.New("mediasync: prefix must be a relative directory ending in /")
+	}
 	keys := make([]string, 0, len(files))
 	for _, file := range files {
 		key, mapErr := objectKey(source, file)
 		if mapErr != nil {
 			return Result{}, mapErr
 		}
+		key = prefix + key
 		if err := putFile(ctx, opts.Client, bucket, key, file); err != nil {
 			return Result{}, err
 		}
@@ -82,7 +88,7 @@ func Sync(ctx context.Context, opts Options) (Result, error) {
 	}
 	sort.Strings(keys)
 
-	listed, err := listAllKeys(ctx, opts.Client, bucket)
+	listed, err := listAllKeys(ctx, opts.Client, bucket, prefix)
 	if err != nil {
 		return Result{}, err
 	}
@@ -217,12 +223,13 @@ func putFile(ctx context.Context, client API, bucket, key, path string) error {
 	return nil
 }
 
-func listAllKeys(ctx context.Context, client API, bucket string) ([]string, error) {
+func listAllKeys(ctx context.Context, client API, bucket, prefix string) ([]string, error) {
 	var keys []string
 	var token *string
 	for {
 		out, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 			Bucket:            awssdk.String(bucket),
+			Prefix:            awssdk.String(prefix),
 			ContinuationToken: token,
 		})
 		if err != nil {

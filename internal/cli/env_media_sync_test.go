@@ -29,9 +29,9 @@ func TestEnvMediaSyncUploadsFixtureListingDiffEmpty(t *testing.T) {
 	var out bytes.Buffer
 	o := testOptions(&out, &fakeTerminal{interactive: false})
 	o.configPath = path
-	var sawSource string
+	var sawSource, sawPrefix string
 	o.mediaSync = func(_ context.Context, opts mediasync.Options) (mediasync.Result, error) {
-		sawSource = opts.Source
+		sawSource, sawPrefix = opts.Source, opts.Prefix
 		return mediasync.Result{
 			Uploaded: 1,
 			Keys:     []string{"catalog/product/fixture.txt"},
@@ -43,8 +43,8 @@ func TestEnvMediaSyncUploadsFixtureListingDiffEmpty(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if sawSource != absSource {
-		t.Fatalf("source = %q, want %q", sawSource, absSource)
+	if sawSource != absSource || sawPrefix != "media/" {
+		t.Fatalf("source = %q, prefix = %q", sawSource, sawPrefix)
 	}
 	var result map[string]any
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {

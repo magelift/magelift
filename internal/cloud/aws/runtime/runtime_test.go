@@ -599,6 +599,10 @@ func TestRuntimeInjectsNonSecretCapabilityReferences(t *testing.T) {
 				"MAGELIFT_DATABASE_WRITER":  "shop.writer", "MAGELIFT_DATABASE_SECRET_ARN": "arn:aws:secretsmanager:eu-west-3:123456789012:secret:database",
 				"MAGELIFT_CACHE_ENDPOINT": "shop.cache", "MAGELIFT_SESSION_ENDPOINT": "shop.sessions", "MAGELIFT_SEARCH_ENDPOINT": "https://shop.search",
 				"MAGELIFT_QUEUE_MODE": "rabbitmq", "MAGELIFT_QUEUE_ENDPOINT": "amqps://shop.queue:5671", "MAGELIFT_MEDIA_BUCKET": "shop-media",
+				"MAGENTO_DC_MEDIA__DRIVER": "aws-s3", "MAGENTO_DC_MEDIA__BUCKET": "shop-media", "MAGENTO_DC_MEDIA__REGION": "eu-west-3",
+				"MAGENTO_DC_MEDIA__ENDPOINT":                     "https://s3.eu-west-3.amazonaws.com",
+				"CONFIG__DEFAULT__WEB__UNSECURE__BASE_MEDIA_URL": "{{unsecure_base_url}}media/",
+				"CONFIG__DEFAULT__WEB__SECURE__BASE_MEDIA_URL":   "{{secure_base_url}}media/",
 			}
 			for name, value := range want {
 				if environment[name] != value {

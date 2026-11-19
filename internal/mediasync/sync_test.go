@@ -29,9 +29,12 @@ func (f *fakeMediaS3) PutObject(_ context.Context, input *s3.PutObjectInput, _ .
 	return &s3.PutObjectOutput{}, nil
 }
 
-func (f *fakeMediaS3) ListObjectsV2(_ context.Context, _ *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+func (f *fakeMediaS3) ListObjectsV2(_ context.Context, input *s3.ListObjectsV2Input, _ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
 	contents := make([]s3types.Object, 0, len(f.objects))
 	for key := range f.objects {
+		if !strings.HasPrefix(key, awssdk.ToString(input.Prefix)) {
+			continue
+		}
 		contents = append(contents, s3types.Object{Key: awssdk.String(key)})
 	}
 	return &s3.ListObjectsV2Output{Contents: contents}, nil
@@ -134,5 +137,16 @@ func fixtureMediaRoot(t *testing.T) string {
 func TestMediaSyncRequiresBucketAndClient(t *testing.T) {
 	if _, err := Sync(context.Background(), Options{Source: t.TempDir()}); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestMediaSyncUsesMagentoMediaSubtree(t *testing.T) {
+	fake := &fakeMediaS3{objects: map[string][]byte{"import_export/old.csv": []byte("other")}}
+	result, err := Sync(context.Background(), Options{Source: fixtureMediaRoot(t), Bucket: "shop-media", Client: fake, Prefix: "media/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Keys) != 1 || result.Keys[0] != "media/catalog/product/fixture.txt" || string(fake.objects[result.Keys[0]]) != "fixture-media\n" {
+		t.Fatalf("result=%#v", result)
 	}
 }

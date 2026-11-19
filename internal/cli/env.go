@@ -679,7 +679,7 @@ func envMediaSyncCommand(o *options) *cobra.Command {
 		Long: strings.TrimSpace(`
 Upload files from --source into the environment's media object-storage bucket (stack output mediaBucket).
 
-Key mapping: if a path contains pub/media/, object keys are relative to that prefix; otherwise --source is treated as the media root and keys are relative to it.
+Key mapping: files are stored under media/. If a path contains pub/media/, keys are relative to that directory; otherwise --source is treated as the media root.
 
 Default mode is merge: each local file is PutObject (overwrite on conflict). Remote keys absent locally are not deleted. After upload, listing is checked so every source key is present (empty missing-key diff).
 
@@ -853,7 +853,7 @@ func (o *options) runMediaSync(ctx context.Context, environment, source string) 
 		}
 		syncFn = mediasync.Sync
 	}
-	syncResult, err := syncFn(ctx, mediasync.Options{Source: source, Bucket: bucket, Client: client})
+	syncResult, err := syncFn(ctx, mediasync.Options{Source: source, Bucket: bucket, Client: client, Prefix: "media/"})
 	if err != nil {
 		return nil, err
 	}
