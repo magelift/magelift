@@ -20,7 +20,13 @@ go mod edit -modfile="$modfile" -replace="$module=$root" -replace="$module/sdk=$
 go mod tidy -modfile="$modfile"
 go mod edit -modfile="$modfile" -dropreplace="$module" -dropreplace="$module/sdk"
 
-# Restore the checksums for the release pins that downstream consumers use.
-go mod download -modfile="$modfile" "$module" "$module/sdk"
 diff -u go.mod "$modfile"
-diff -u go.sum "$scratch/go.sum"
+
+# Local replacements have no checksums. Release builds verify those modules
+# from the public proxy once their tags are available.
+external_sums() {
+  awk -v core="$module" '$1 != core && $1 != core "/sdk"' "$1"
+}
+external_sums go.sum > "$scratch/expected.sum"
+external_sums "$scratch/go.sum" > "$scratch/tidy.sum"
+diff -u "$scratch/expected.sum" "$scratch/tidy.sum"

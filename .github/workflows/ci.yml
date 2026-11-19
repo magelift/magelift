@@ -65,6 +65,7 @@ jobs:
               - 'schema/**'
               - 'Makefile'
               - '.golangci.yml'
+              - 'scripts/check-provider-tidy.sh'
               # CI Go jobs live here — workflow-only edits must still exercise them.
               - '.github/workflows/ci.yml'
               - '.github/actions/**'

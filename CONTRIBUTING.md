@@ -95,6 +95,7 @@ otherwise.
 | --- | --- |
 | Community alpha local gate | `make verify-community` |
 | Go suites for the CLI, SDK, GCP and Azure | `make test-fast` |
+| Provider dependency files against this checkout | `make provider-tidy-check` |
 | Broader verification suite | `make verify` |
 | Account-free stack (mocks + harness + Floci) | `make local-gates` |
 | Pulumi mock graphs | `make pulumi-mock-test` |

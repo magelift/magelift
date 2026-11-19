@@ -93,6 +93,14 @@ jobs:
               fi
             done
           done
+      - name: Verify provider modules against the published release
+        if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.'))"
+        env:
+          GOWORK: "off"
+        run: |
+          for provider in gcp azure; do
+            (cd "providers/$provider" && go mod tidy -diff && go build ./...)
+          done
       # Forensics: workspace resolution is what keeps tag builds local;
       # print it so the next visibility failure starts from evidence.
       - name: Show module resolution
