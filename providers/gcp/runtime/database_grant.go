@@ -13,7 +13,7 @@ import (
 )
 
 const databaseGrantCommand = `for attempt in $(seq 1 60); do
-  if mysql --protocol=tcp --connect-timeout=10 --host="$MAGELIFT_DB_HOST" --port=3306 --user="$MAGELIFT_DB_ADMIN_USER" --password="$MAGELIFT_DB_ADMIN_PASSWORD" --database="$MAGELIFT_DB_NAME" --execute="$MAGELIFT_DB_GRANT_SQL"; then
+  if MYSQL_PWD="$MAGELIFT_DB_ADMIN_PASSWORD" mysql --protocol=tcp --connect-timeout=10 --host="$MAGELIFT_DB_HOST" --port=3306 --user="$MAGELIFT_DB_ADMIN_USER" --database="$MAGELIFT_DB_NAME" --execute="$MAGELIFT_DB_GRANT_SQL"; then
     exit 0
   fi
   sleep 5
@@ -93,13 +93,13 @@ func databaseGrantStatement(databaseName, username string) (string, error) {
 		return "", errors.New("database name and username must not contain control characters")
 	}
 	return fmt.Sprintf(
-		"GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%';",
-		escapeMySQLIdentifier(databaseName), escapeMySQLString(username),
+		"GRANT ALL PRIVILEGES ON %s.* TO '%s'@'%%';",
+		quoteMySQLIdentifier(databaseName), escapeMySQLString(username),
 	), nil
 }
 
-func escapeMySQLIdentifier(value string) string {
-	return strings.ReplaceAll(value, "`", "``")
+func quoteMySQLIdentifier(value string) string {
+	return "`" + strings.ReplaceAll(value, "`", "``") + "`"
 }
 
 func escapeMySQLString(value string) string {
