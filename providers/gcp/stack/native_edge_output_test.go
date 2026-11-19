@@ -13,6 +13,7 @@ const nativeEdgeMockIngressIP = "192.0.2.10"
 
 type nativeEdgeOutputMocks struct {
 	*stackMocks
+	urlMapName string
 }
 
 func (m *nativeEdgeOutputMocks) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
@@ -21,6 +22,15 @@ func (m *nativeEdgeOutputMocks) NewResource(args pulumi.MockResourceArgs) (strin
 		return id, state, err
 	}
 	if args.TypeToken == "kubernetes:networking.k8s.io/v1:Ingress" {
+		metadata := state["metadata"].ObjectValue().Copy()
+		metadata["namespace"] = resource.NewStringProperty("default")
+		annotations := metadata["annotations"].ObjectValue().Copy()
+		annotations["ingress.kubernetes.io/redirect-url-map"] = resource.NewStringProperty("redirect-only")
+		if m.urlMapName != "" {
+			annotations["ingress.kubernetes.io/url-map"] = resource.NewStringProperty(m.urlMapName)
+		}
+		metadata["annotations"] = resource.NewObjectProperty(annotations)
+		state["metadata"] = resource.NewObjectProperty(metadata)
 		state["status"] = resource.NewObjectProperty(resource.PropertyMap{
 			"loadBalancer": resource.NewObjectProperty(resource.PropertyMap{
 				"ingress": resource.NewArrayProperty([]resource.PropertyValue{
@@ -33,6 +43,12 @@ func (m *nativeEdgeOutputMocks) NewResource(args pulumi.MockResourceArgs) (strin
 }
 
 func TestProgramNativeEdgeOutputsUseDomainAndRawAddress(t *testing.T) {
+	t.Run("serving URL map", func(t *testing.T) { checkNativeEdgeOutputs(t, "k8s2-um-serving-shop") })
+	t.Run("controller has not published the URL map", func(t *testing.T) { checkNativeEdgeOutputs(t, "") })
+}
+
+func checkNativeEdgeOutputs(t *testing.T, urlMapName string) {
+	t.Helper()
 	in := gcpDeploymentInputs()
 	in.Envelope.Domain = "shop.example.com"
 	in.Edge = sdk.EdgeIntent{
@@ -44,8 +60,9 @@ func TestProgramNativeEdgeOutputsUseDomainAndRawAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mocks := &nativeEdgeOutputMocks{stackMocks: &stackMocks{}}
+	mocks := &nativeEdgeOutputMocks{stackMocks: &stackMocks{}, urlMapName: urlMapName}
 	var applicationURL, ingressAddress string
+	var ingressOwner, ingressNamespace, servingMap string
 	err = pulumi.RunErr(func(ctx *pulumi.Context) error {
 		if err := Program(spec)(ctx); err != nil {
 			return err
@@ -55,9 +72,12 @@ func TestProgramNativeEdgeOutputsUseDomainAndRawAddress(t *testing.T) {
 		if !ok || address == nil {
 			t.Fatal("stack outputs missing nativeEdgeIngressAddress")
 		}
-		pulumi.All(exports["applicationURL"], address).ApplyT(func(values []interface{}) string {
+		pulumi.All(exports["applicationURL"], address, exports["nativeEdgeIngressOwner"], exports["nativeEdgeIngressNamespace"], exports["nativeEdgeURLMapName"]).ApplyT(func(values []interface{}) string {
 			applicationURL, _ = values[0].(string)
 			ingressAddress, _ = values[1].(string)
+			ingressOwner, _ = values[2].(string)
+			ingressNamespace, _ = values[3].(string)
+			servingMap, _ = values[4].(string)
 			return ""
 		})
 		return nil
@@ -73,6 +93,9 @@ func TestProgramNativeEdgeOutputsUseDomainAndRawAddress(t *testing.T) {
 	}
 	if ingressAddress != nativeEdgeMockIngressIP {
 		t.Fatalf("nativeEdgeIngressAddress = %q", ingressAddress)
+	}
+	if ingressOwner != in.Edge.OwnershipMarker || ingressNamespace != "default" || servingMap != urlMapName {
+		t.Fatalf("Ingress owner=%q namespace=%q serving URL map=%q", ingressOwner, ingressNamespace, servingMap)
 	}
 	ingresses := 0
 	for _, res := range mocks.resources {

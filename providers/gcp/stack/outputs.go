@@ -9,5 +9,6 @@ import (
 // the provider list.
 func OutputKeys() []string {
 	keys := append([]string(nil), platform.RequiredOutputKeys()...)
-	return append(keys, "mediaURL", "mediaBucket", platform.OutputSearchEndpoint, platform.OutputQueueHost, platform.OutputQueueReplicas, platform.OutputDatabaseConnectionName, "queueMode", platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, "securityPolicyName")
+	return append(keys, "mediaURL", "mediaBucket", platform.OutputSearchEndpoint, platform.OutputQueueHost, platform.OutputQueueReplicas, platform.OutputDatabaseConnectionName, "queueMode", platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, "securityPolicyName",
+		"nativeEdgeIngressName", "nativeEdgeIngressAddress", "nativeEdgeIngressNamespace", "nativeEdgeIngressOwner", "nativeEdgeURLMapName")
 }

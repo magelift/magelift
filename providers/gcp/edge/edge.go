@@ -19,6 +19,11 @@ import (
 
 const TypeToken = "magelift:gcp:Edge"
 
+const (
+	ownerAnnotation  = "magelift.io/edge-owner"
+	urlMapAnnotation = "ingress.kubernetes.io/url-map"
+)
+
 type Args struct {
 	Project         string
 	Enabled         bool
@@ -36,6 +41,9 @@ type Component struct {
 	SecurityPolicyName pulumi.StringOutput
 	BackendConfigName  pulumi.StringOutput
 	IngressName        pulumi.StringOutput
+	IngressNamespace   pulumi.StringOutput
+	IngressOwner       pulumi.StringOutput
+	URLMapName         pulumi.StringOutput
 	CertificateName    pulumi.StringOutput
 	ApplicationURL     pulumi.StringOutput
 	IngressAddress     pulumi.StringOutput
@@ -44,6 +52,7 @@ type Component struct {
 	DomainName         string
 	TLS                bool
 	SecurityEnabled    bool
+	ownershipMarker    string
 }
 
 type AttachArgs struct {
@@ -81,8 +90,12 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.DomainName = args.DomainName
 	component.TLS = args.TLS
 	component.SecurityEnabled = args.Enabled
+	component.ownershipMarker = args.OwnershipMarker
 	component.ApplicationURL = pulumi.String("").ToStringOutput()
 	component.IngressAddress = pulumi.String("").ToStringOutput()
+	component.IngressNamespace = pulumi.String("").ToStringOutput()
+	component.IngressOwner = pulumi.String("").ToStringOutput()
+	component.URLMapName = pulumi.String("").ToStringOutput()
 	if component.NativeEdgeEnabled {
 		component.BackendConfigName = pulumi.String(name + "-backend").ToStringOutput()
 		component.IngressName = pulumi.String(name + "-ingress").ToStringOutput()
@@ -151,6 +164,7 @@ func Attach(ctx *pulumi.Context, name string, component *Component, args AttachA
 		return fmt.Errorf("create GKE BackendConfig: %w", err)
 	}
 	annotations := pulumi.StringMap{
+		ownerAnnotation:                   pulumi.String(component.ownershipMarker),
 		"cloud.google.com/backend-config": pulumi.Sprintf(`{"default":"%s"}`, component.BackendConfigName),
 		"cloud.google.com/neg":            pulumi.String(`{"ingress": true}`),
 		// GKE's external Ingress controller still selects the classic
@@ -182,6 +196,11 @@ func Attach(ctx *pulumi.Context, name string, component *Component, args AttachA
 	if err != nil {
 		return fmt.Errorf("create GKE native edge Ingress: %w", err)
 	}
+	// GKE writes the serving URL map name to the Ingress after reconciliation.
+	// A missing annotation leaves the output empty until the controller is ready.
+	component.URLMapName = ingress.Metadata.Annotations().MapIndex(pulumi.String(urlMapAnnotation))
+	component.IngressOwner = ingress.Metadata.Annotations().MapIndex(pulumi.String(ownerAnnotation))
+	component.IngressNamespace = ingress.Metadata.Namespace().Elem()
 	component.ApplicationURL = ingress.Status.ApplyT(func(status *networkingv1.IngressStatus) string {
 		return nativeEdgeApplicationURL(component.DomainName, component.TLS, nativeEdgeIngressAddress(status))
 	}).(pulumi.StringOutput)
@@ -196,6 +215,9 @@ func (c *Component) resourceOutputs() pulumi.Map {
 		"securityPolicyName": c.SecurityPolicyName,
 		"backendConfigName":  c.BackendConfigName,
 		"ingressName":        c.IngressName,
+		"ingressNamespace":   c.IngressNamespace,
+		"ingressOwner":       c.IngressOwner,
+		"urlMapName":         c.URLMapName,
 		"certificateName":    c.CertificateName,
 		"applicationURL":     c.ApplicationURL,
 		"ingressAddress":     c.IngressAddress,
