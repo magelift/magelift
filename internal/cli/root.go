@@ -378,6 +378,9 @@ func configCommand(o *options) *cobra.Command {
 				return invalid(fmt.Errorf("environment %s: %w", env, err))
 			}
 			warnings = append(warnings, effective.Compatibility.Warnings...)
+			for _, warning := range effective.Config.ServiceWarnings() {
+				warnings = append(warnings, env+": "+warning)
+			}
 		}
 		for _, warning := range warnings {
 			if o.stderr != nil {

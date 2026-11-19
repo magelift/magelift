@@ -30,7 +30,7 @@ type Config struct {
 	PreviewTTL         string                    `yaml:"previewTtl,omitempty" json:"previewTtl,omitempty" config:"Preview lifetime from the triggering event, for example 168h" schema:"nullable"`
 	MonthlyBudgetCents int64                     `yaml:"monthlyBudgetCents,omitempty" json:"monthlyBudgetCents,omitempty" config:"Monthly budget planning input in cents (alerts only, never enforced)" schema:"nullable"`
 	Branches           []string                  `yaml:"branches,omitempty" json:"branches,omitempty"`
-	SeedDump           string                    `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local MySQL dump path seeded after first deploy" schema:"nullable"`
+	SeedDump           string                    `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local SQL dump path for an explicit env import-dump operation" schema:"nullable"`
 }
 
 type Project struct {
@@ -61,7 +61,7 @@ type MagentoRuntime struct {
 }
 
 type MagentoConsumers struct {
-	Mode  string   `yaml:"mode,omitempty" json:"mode,omitempty" config:"Consumer runner" schema:"nullable,enum=cron|processes|both"`
+	Mode  string   `yaml:"mode,omitempty" json:"mode,omitempty" config:"Consumer runner" schema:"nullable,enum=cron|processes|both|disabled"`
 	Names []string `yaml:"names,omitempty" json:"names,omitempty" config:"Named Magento consumers"`
 }
 
@@ -95,6 +95,7 @@ type BuildCache struct {
 // LocalRuntime contains workstation-only choices. Provider-managed services
 // remain under Target; a local choice never changes the cloud topology.
 type LocalRuntime struct {
+	Session     LocalService       `yaml:"session,omitempty" json:"session,omitempty" config:"Separate cache engine for Magento sessions"`
 	Database    LocalService       `yaml:"database,omitempty" json:"database,omitempty" config:"Local database family and version"`
 	Cache       LocalService       `yaml:"cache,omitempty" json:"cache,omitempty" config:"Local cache family and version"`
 	Search      LocalService       `yaml:"search,omitempty" json:"search,omitempty" config:"Local search family and version"`
@@ -106,9 +107,13 @@ type LocalRuntime struct {
 }
 
 type LocalService struct {
-	Image   string `yaml:"image,omitempty" json:"image,omitempty" config:"Container image selected by the project for local development" schema:"nullable"`
-	Family  string `yaml:"family,omitempty" json:"family,omitempty" config:"Service family" schema:"nullable"`
-	Version string `yaml:"version,omitempty" json:"version,omitempty" config:"Service version" schema:"nullable"`
+	Parameters     map[string]string `yaml:"parameters,omitempty" json:"parameters,omitempty" config:"Local database server defaults"`
+	MemoryMiB      int               `yaml:"memoryMiB,omitempty" json:"memoryMiB,omitempty" config:"Local cache or session memory limit in MiB"`
+	EvictionPolicy string            `yaml:"evictionPolicy,omitempty" json:"evictionPolicy,omitempty" config:"Valkey or Redis eviction policy"`
+	Plugins        []string          `yaml:"plugins,omitempty" json:"plugins,omitempty" config:"OpenSearch plugins to load"`
+	Image          string            `yaml:"image,omitempty" json:"image,omitempty" config:"Container image selected by the project for local development" schema:"nullable"`
+	Family         string            `yaml:"family,omitempty" json:"family,omitempty" config:"Service family" schema:"nullable"`
+	Version        string            `yaml:"version,omitempty" json:"version,omitempty" config:"Service version" schema:"nullable"`
 }
 
 type LocalEmailSettings struct {
@@ -145,10 +150,11 @@ type EmailManaged struct {
 // StaticContentSettings configures Magento setup:static-content:deploy.
 // Locales and themes form a cartesian product; strategy/threads apply to each pair (-s/-j).
 type StaticContentSettings struct {
-	Locales  []string `yaml:"locales,omitempty" json:"locales,omitempty" config:"Locales passed to setup:static-content:deploy --language"`
-	Themes   []string `yaml:"themes,omitempty" json:"themes,omitempty" config:"Themes passed to setup:static-content:deploy --theme"`
-	Strategy string   `yaml:"strategy,omitempty" json:"strategy,omitempty" config:"Static content deploy strategy (-s)" schema:"enum=quick|standard|compact,nullable"`
-	Threads  int      `yaml:"threads,omitempty" json:"threads,omitempty" config:"Static content deploy thread count (-j)" schema:"minimum=1,nullable"`
+	Matrix   map[string][]string `yaml:"matrix,omitempty" json:"matrix,omitempty" config:"Locales to build for each Magento theme"`
+	Locales  []string            `yaml:"locales,omitempty" json:"locales,omitempty" config:"Locales passed to setup:static-content:deploy --language"`
+	Themes   []string            `yaml:"themes,omitempty" json:"themes,omitempty" config:"Themes passed to setup:static-content:deploy --theme"`
+	Strategy string              `yaml:"strategy,omitempty" json:"strategy,omitempty" config:"Static content deploy strategy (-s)" schema:"enum=quick|standard|compact,nullable"`
+	Threads  int                 `yaml:"threads,omitempty" json:"threads,omitempty" config:"Static content deploy thread count (-j)" schema:"minimum=1,nullable"`
 }
 
 // BuildHook is keyed by its stable ID in Build.Hooks. Commands are argument
@@ -194,17 +200,19 @@ type Target struct {
 // AzureTarget identifies the subscription and resource group used by the
 // Azure provider. The provider owns the rest of the Azure-specific planning.
 type AzureTarget struct {
-	SubscriptionID     string            `yaml:"subscriptionId" json:"subscriptionId" config:"Azure subscription ID"`
-	ResourceGroup      string            `yaml:"resourceGroup" json:"resourceGroup" config:"Azure resource group name"`
-	TenantID           string            `yaml:"tenantId,omitempty" json:"tenantId,omitempty" config:"Microsoft Entra tenant ID"`
-	ImageDigest        string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Immutable application image"`
-	StateBackendURL    string            `yaml:"stateBackendUrl,omitempty" json:"stateBackendUrl,omitempty" config:"Existing Azure Blob Pulumi state backend"`
-	ImagePullSecret    string            `yaml:"imagePullSecret,omitempty" json:"imagePullSecret,omitempty" config:"Existing Kubernetes secret for private registry access"`
-	ACRResourceID      string            `yaml:"acrResourceId,omitempty" json:"acrResourceId,omitempty" config:"Azure Container Registry resource ID for AKS pull access"`
-	IngressClass       string            `yaml:"ingressClass,omitempty" json:"ingressClass,omitempty" config:"Existing Kubernetes ingress class"`
-	TLSSecret          string            `yaml:"tlsSecret,omitempty" json:"tlsSecret,omitempty" config:"Existing Kubernetes TLS secret in the environment namespace"`
-	MonitorWorkspaceID string            `yaml:"monitorWorkspaceId,omitempty" json:"monitorWorkspaceId,omitempty" config:"Existing Azure Log Analytics workspace resource ID"`
-	PreviewPool        *AzurePreviewPool `yaml:"previewPool,omitempty" json:"previewPool,omitempty" config:"Existing AKS cluster and private network for preview environments" schema:"nullable"`
+	EncryptionKeySecret     string            `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Versioned Key Vault secret URL for the source Magento encryption key"`
+	EncryptionKeySecretName string            `yaml:"encryptionKeySecretName,omitempty" json:"encryptionKeySecretName,omitempty" config:"Existing Kubernetes Secret containing the Magento encryption key"`
+	SubscriptionID          string            `yaml:"subscriptionId" json:"subscriptionId" config:"Azure subscription ID"`
+	ResourceGroup           string            `yaml:"resourceGroup" json:"resourceGroup" config:"Azure resource group name"`
+	TenantID                string            `yaml:"tenantId,omitempty" json:"tenantId,omitempty" config:"Microsoft Entra tenant ID"`
+	ImageDigest             string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Immutable application image"`
+	StateBackendURL         string            `yaml:"stateBackendUrl,omitempty" json:"stateBackendUrl,omitempty" config:"Existing Azure Blob Pulumi state backend"`
+	ImagePullSecret         string            `yaml:"imagePullSecret,omitempty" json:"imagePullSecret,omitempty" config:"Existing Kubernetes secret for private registry access"`
+	ACRResourceID           string            `yaml:"acrResourceId,omitempty" json:"acrResourceId,omitempty" config:"Azure Container Registry resource ID for AKS pull access"`
+	IngressClass            string            `yaml:"ingressClass,omitempty" json:"ingressClass,omitempty" config:"Existing Kubernetes ingress class"`
+	TLSSecret               string            `yaml:"tlsSecret,omitempty" json:"tlsSecret,omitempty" config:"Existing Kubernetes TLS secret in the environment namespace"`
+	MonitorWorkspaceID      string            `yaml:"monitorWorkspaceId,omitempty" json:"monitorWorkspaceId,omitempty" config:"Existing Azure Log Analytics workspace resource ID"`
+	PreviewPool             *AzurePreviewPool `yaml:"previewPool,omitempty" json:"previewPool,omitempty" config:"Existing AKS cluster and private network for preview environments" schema:"nullable"`
 }
 
 type AzurePreviewPool struct {
@@ -666,7 +674,7 @@ type Environment struct {
 	PreviewTTL         string                    `yaml:"previewTtl,omitempty" json:"previewTtl,omitempty" config:"Preview lifetime from the triggering event, for example 168h" schema:"nullable"`
 	MonthlyBudgetCents int64                     `yaml:"monthlyBudgetCents,omitempty" json:"monthlyBudgetCents,omitempty" config:"Monthly budget planning input in cents (alerts only, never enforced)" schema:"nullable"`
 	Branches           []string                  `yaml:"branches,omitempty" json:"branches,omitempty" config:"Git branches mapped to this environment" schema:"nullable"`
-	SeedDump           string                    `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local MySQL dump path seeded after first deploy" schema:"nullable"`
+	SeedDump           string                    `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local SQL dump path for an explicit env import-dump operation" schema:"nullable"`
 	Project            *Project                  `yaml:"project,omitempty" json:"project,omitempty"`
 	Application        *Application              `yaml:"application,omitempty" json:"application,omitempty"`
 	Build              *Build                    `yaml:"build,omitempty" json:"build,omitempty"`

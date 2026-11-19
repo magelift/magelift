@@ -2,6 +2,7 @@ package platform
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -59,7 +60,7 @@ func TestPlanResolvesExplicitServiceAdapter(t *testing.T) {
 	if err := plan(); err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Services["search"] != input || a.input.Binding != input || a.input.Environment != "uat" || a.input.Project != "shop" || string(a.input.Options) != `"eu"` || m.binding.Version != input.Version || m.binding.Endpoint != a.output.Endpoint || !m.binding.Attached() {
+	if !reflect.DeepEqual(cfg.Services["search"], input) || !reflect.DeepEqual(a.input.Binding, input) || a.input.Environment != "uat" || a.input.Project != "shop" || string(a.input.Options) != `"eu"` || m.binding.Version != input.Version || m.binding.Endpoint != a.output.Endpoint || !m.binding.Attached() {
 		t.Fatalf("unexpected adapter input or planned binding: %#v %#v", a.input, m.binding)
 	}
 	a.output.Endpoint = "https://somebody:password@search.example.org"

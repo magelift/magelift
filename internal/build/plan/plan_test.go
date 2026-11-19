@@ -284,3 +284,25 @@ defaults: {region: eu-west-3, preset: preview}
 environments:
   staging: {account: "123456789012", domain: staging.example.com}
 `
+
+func TestExplicitStaticContentMatrix(t *testing.T) {
+	settings := config.StaticContentSettings{Matrix: map[string][]string{"Example/books": {"it_IT", "de_DE"}, "Magento/backend": {"en_US"}, "Empty/theme": {}}, Threads: 3}
+	got, err := staticContent(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 || got[0].Locale != "de_DE" || got[1].Locale != "en_US" || got[1].Theme != "Magento/backend" || got[2].Locale != "it_IT" || got[0].Threads != 3 {
+		t.Fatal(got)
+	}
+	settings.Locales, settings.Themes = []string{"en_US"}, []string{"Other/theme"}
+	if _, err := staticContent(settings); err == nil {
+		t.Fatal("accepted ambiguous theme selections")
+	}
+}
+
+func TestStaticContentMatrixCanExcludeEveryTheme(t *testing.T) {
+	content, err := staticContent(config.StaticContentSettings{Matrix: map[string][]string{"Magento/blank": {}}})
+	if err != nil || content == nil || len(content) != 0 {
+		t.Fatalf("fully excluded theme matrix = %v, %v", content, err)
+	}
+}

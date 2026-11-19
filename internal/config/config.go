@@ -791,6 +791,12 @@ func validateLocalRuntime(local LocalRuntime) []string {
 	}
 	validateService("local.database", local.Database, "mariadb", "mysql")
 	validateService("local.cache", local.Cache, "redis", "valkey")
+	validateService("local.session", local.Session, "redis", "valkey")
+	for role, b := range map[string]LocalService{"cache": local.Cache, "session": local.Session, "database": local.Database, "search": local.Search} {
+		if err := validateServiceSettings(role, ServiceBinding{Ownership: "self-hosted", Family: b.Family, EvictionPolicy: b.EvictionPolicy, MemoryMiB: b.MemoryMiB, Plugins: b.Plugins, Parameters: b.Parameters}); err != nil {
+			problems = append(problems, "local."+role+": "+err.Error())
+		}
+	}
 	validateService("local.search", local.Search, "elasticsearch", "opensearch")
 	validateService("local.queue", local.Queue, "artemis", "database", "rabbitmq")
 	validateService("local.webServer", local.WebServer, "nginx")
@@ -834,8 +840,8 @@ func validateMagentoRuntime(application Application) []string {
 		problems = append(problems, "application.magento.cookieDomain contains a forbidden character")
 	}
 	mode := strings.TrimSpace(runtime.Consumers.Mode)
-	if mode != "" && !containsString([]string{"cron", "processes", "both"}, mode) {
-		problems = append(problems, "application.magento.consumers.mode must be cron, processes, or both")
+	if mode != "" && !containsString([]string{"cron", "processes", "both", "disabled"}, mode) {
+		problems = append(problems, "application.magento.consumers.mode must be cron, processes, both, or disabled")
 	}
 	for _, origin := range runtime.CORSOrigins {
 		if err := ValidateStorefrontOrigin(origin); err != nil {

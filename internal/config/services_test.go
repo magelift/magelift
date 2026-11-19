@@ -79,7 +79,8 @@ func TestServiceAddressHonorsExplicitPort(t *testing.T) {
 func TestGCPServiceVersionsKeepExplicitChoices(t *testing.T) {
 	for _, test := range []struct{ database, cache, wantSQL, wantCache string }{
 		{"8", "8", "MYSQL_8_0", "VALKEY_8_0"},
-		{"8.0.35", "8.1", "MYSQL_8_0_35", "VALKEY_8_1"},
+		{"8.0.35", "8.1", "MYSQL_8_0", "VALKEY_8_1"},
+		{"8.4.3", "9.0.1", "MYSQL_8_4", "VALKEY_9_0"},
 	} {
 		value := map[string]any{
 			"target": map[string]any{"provider": "gcp"},
@@ -99,6 +100,23 @@ func TestGCPServiceVersionsKeepExplicitChoices(t *testing.T) {
 		}
 		if got := nestedString(value, "local", "cache", "version"); got != test.cache {
 			t.Errorf("local cache version = %q, want %q", got, test.cache)
+		}
+	}
+}
+
+func TestGCPRedisOnlySupportsSelfHostedOrAttached(t *testing.T) {
+	for _, role := range []string{"cache", "session"} {
+		for _, tc := range []struct {
+			ownership string
+			accepted  bool
+		}{
+			{"self-hosted", true}, {"managed", false}, {"", false},
+		} {
+			cfg := Config{Target: Target{Provider: "gcp", Runtime: "gke-autopilot"}, Services: map[string]ServiceBinding{role: {Family: "redis", Ownership: tc.ownership, Version: "7.2"}}}
+			err := cfg.CheckServiceCapabilities()
+			if (err == nil) != tc.accepted {
+				t.Errorf("%s ownership %q: %v", role, tc.ownership, err)
+			}
 		}
 	}
 }

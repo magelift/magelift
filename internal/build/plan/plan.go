@@ -160,7 +160,7 @@ func staticContent(settings config.StaticContentSettings) ([]buildrunner.StaticC
 	if (len(locales) == 0) != (len(themes) == 0) {
 		return nil, errors.New("build.staticContent.locales and themes must be configured together")
 	}
-	if len(locales) == 0 {
+	if len(locales) == 0 && len(settings.Matrix) == 0 {
 		return nil, errors.New("build.staticContent.locales and themes are required; static content bakes into the image at build, never at deploy")
 	}
 	strategy, err := staticContentStrategy(settings.Strategy)
@@ -171,18 +171,27 @@ func staticContent(settings config.StaticContentSettings) ([]buildrunner.StaticC
 	if err != nil {
 		return nil, err
 	}
-	if (strategy != "" || threads > 0) && len(locales) == 0 {
-		return nil, errors.New("build.staticContent.strategy and threads require locales and themes")
+	matrix := settings.Matrix
+	if len(matrix) > 0 && len(themes) > 0 {
+		return nil, errors.New("choose build.staticContent.matrix or locales and themes")
 	}
-	result := make([]buildrunner.StaticContent, 0, len(locales)*len(themes))
-	for _, locale := range locales {
+	if len(matrix) == 0 {
+		matrix = make(map[string][]string, len(themes))
 		for _, theme := range themes {
-			result = append(result, buildrunner.StaticContent{
-				Locale:   locale,
-				Theme:    theme,
-				Strategy: strategy,
-				Threads:  threads,
-			})
+			matrix[theme] = locales
+		}
+	}
+	result := []buildrunner.StaticContent{}
+	for theme, languages := range matrix {
+		if _, err := uniqueStrings("themes", []string{theme}); err != nil {
+			return nil, err
+		}
+		languages, err = uniqueStrings("locales", languages)
+		if err != nil {
+			return nil, err
+		}
+		for _, locale := range languages {
+			result = append(result, buildrunner.StaticContent{Locale: locale, Theme: theme, Strategy: strategy, Threads: threads})
 		}
 	}
 	sort.Slice(result, func(i, j int) bool {

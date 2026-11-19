@@ -25,15 +25,20 @@ func OpenSearchContainerTag(version string) string {
 // ServiceBinding describes an operator-selected Magento dependency. Endpoint
 // and Secret identify an existing service without transferring its ownership.
 type ServiceBinding struct {
-	Adapter   string `json:"adapter,omitempty" yaml:"adapter,omitempty" config:"Explicitly linked service connection adapter ID"`
-	Family    string `json:"family" yaml:"family" config:"Service engine or implementation"`
-	Version   string `json:"version,omitempty" yaml:"version,omitempty" config:"Selected engine version"`
-	Ownership string `json:"ownership,omitempty" yaml:"ownership,omitempty" config:"Provisioning ownership" schema:"enum=managed|self-hosted|existing|external,nullable"`
-	Endpoint  string `json:"endpoint,omitempty" yaml:"endpoint,omitempty" config:"Hostname or URL of an existing service"`
-	Secret    string `json:"secret,omitempty" yaml:"secret,omitempty" config:"Provider secret reference for a connection"`
-	Image     string `json:"image,omitempty" yaml:"image,omitempty" config:"Shop-selected service container image"`
-	Port      int    `json:"port,omitempty" yaml:"port,omitempty" config:"Service connection port"`
-	Username  string `json:"username,omitempty" yaml:"username,omitempty" config:"Service connection username"`
+	Parameters     map[string]string `json:"parameters,omitempty" yaml:"parameters,omitempty" config:"Database server defaults for charset, collation and packet size"`
+	Adapter        string            `json:"adapter,omitempty" yaml:"adapter,omitempty" config:"Explicitly linked service connection adapter ID"`
+	Family         string            `json:"family" yaml:"family" config:"Service engine or implementation"`
+	Version        string            `json:"version,omitempty" yaml:"version,omitempty" config:"Selected engine version"`
+	Ownership      string            `json:"ownership,omitempty" yaml:"ownership,omitempty" config:"Provisioning ownership" schema:"enum=managed|self-hosted|existing|external,nullable"`
+	Endpoint       string            `json:"endpoint,omitempty" yaml:"endpoint,omitempty" config:"Hostname or URL of an existing service"`
+	Secret         string            `json:"secret,omitempty" yaml:"secret,omitempty" config:"Provider secret reference for a connection"`
+	Image          string            `json:"image,omitempty" yaml:"image,omitempty" config:"Shop-selected service container image"`
+	Port           int               `json:"port,omitempty" yaml:"port,omitempty" config:"Service connection port"`
+	Username       string            `json:"username,omitempty" yaml:"username,omitempty" config:"Service connection username"`
+	EvictionPolicy string            `json:"evictionPolicy,omitempty" yaml:"evictionPolicy,omitempty" config:"Eviction policy for the cache or session store"`
+	Plugins        []string          `json:"plugins,omitempty" yaml:"plugins,omitempty" config:"OpenSearch plugins required by the shop"`
+	MemoryMiB      int               `json:"memoryMiB,omitempty" yaml:"memoryMiB,omitempty" config:"Redis or Valkey eviction threshold in MiB"`
+	StorageGiB     int               `json:"storageGiB,omitempty" yaml:"storageGiB,omitempty" config:"Persistent volume size in GiB for a self-hosted service"`
 }
 
 // VersionWithMinor expands a numeric major for APIs that require major.minor.
@@ -42,6 +47,16 @@ func (b ServiceBinding) VersionWithMinor() string {
 		return b.Version + ".0"
 	}
 	return b.Version
+}
+
+// ManagedBranch returns the major.minor selector used by cloud APIs that select their own patch.
+func (b ServiceBinding) ManagedBranch() string {
+	version := b.VersionWithMinor()
+	parts := strings.Split(version, ".")
+	if len(parts) == 3 && parts[2] != "" && strings.Trim(parts[2], "0123456789") == "" {
+		return parts[0] + "." + parts[1]
+	}
+	return version
 }
 
 // ServiceAdapter translates one project-selected dependency into an attached

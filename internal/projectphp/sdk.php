@@ -68,9 +68,9 @@ final class Target extends Definition
 /** Service settings passed to a provider or extension. */
 final class Service extends Definition
 {
-    public function __construct(array $values = [], ?string $family = null, ?string $version = null, ?string $ownership = null, ?string $endpoint = null, ?string $secret = null, ?string $image = null, ?int $port = null, ?string $username = null, ?string $adapter = null)
+    public function __construct(array $values = [], ?string $family = null, ?string $version = null, ?string $ownership = null, ?string $endpoint = null, ?string $secret = null, ?string $image = null, ?int $port = null, ?string $username = null, ?string $adapter = null, ?string $evictionPolicy = null, ?array $plugins = null, ?int $storageGiB = null, ?int $memoryMiB = null, ?array $parameters = null)
     {
-        foreach (compact('family', 'version', 'ownership', 'endpoint', 'secret', 'image', 'port', 'username', 'adapter') as $key => $value) {
+        foreach (compact('family', 'version', 'ownership', 'endpoint', 'secret', 'image', 'port', 'username', 'adapter', 'evictionPolicy', 'plugins', 'storageGiB', 'memoryMiB', 'parameters') as $key => $value) {
             if ($value !== null) {
                 $values[$key] = $value;
             }

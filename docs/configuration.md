@@ -160,6 +160,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | Field | Type | Required | Accepted values | Description |
 | --- | --- | --- | --- | --- |
 | `services` | object | no |  | Magento service families, versions, ownership and connection settings |
+| `services.*.parameters` | object | no |  | Database server defaults for charset, collation and packet size |
 | `services.*.adapter` | string | no |  | Explicitly linked service connection adapter ID |
 | `services.*.family` | string | yes |  | Service engine or implementation |
 | `services.*.version` | string | no |  | Selected engine version |
@@ -169,6 +170,10 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `services.*.image` | string | no |  | Shop-selected service container image |
 | `services.*.port` | integer | no |  | Service connection port |
 | `services.*.username` | string | no |  | Service connection username |
+| `services.*.evictionPolicy` | string | no |  | Eviction policy for the cache or session store |
+| `services.*.plugins` | array | no |  | OpenSearch plugins required by the shop |
+| `services.*.memoryMiB` | integer | no |  | Redis or Valkey eviction threshold in MiB |
+| `services.*.storageGiB` | integer | no |  | Persistent volume size in GiB for a self-hosted service |
 | `schemaVersion` | integer | yes | 1 | MageLift configuration schema version |
 | `project` | object | yes |  | Project identity |
 | `project.name` | string | yes |  | Project name |
@@ -185,7 +190,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `application.magento.corsOrigins` | array | no |  | Allowed CORS origins for the Magento API |
 | `application.magento.storefrontOrigin` | string | no |  | Headless storefront origin allowed by CORS |
 | `application.magento.consumers` | object | no |  | Magento message consumer runners |
-| `application.magento.consumers.mode` | string or null | no | cron, processes, both | Consumer runner |
+| `application.magento.consumers.mode` | string or null | no | cron, processes, both, disabled | Consumer runner |
 | `application.magento.consumers.names` | array | no |  | Named Magento consumers |
 | `application.magento.queueTransport` | string or null | no | sqs, pubsub | Optional Magento-module queue transport |
 | `application.magento.queueModule` | string or null | no |  | Locked Composer Magento package providing SQS or Pub/Sub transport |
@@ -199,6 +204,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `build.composer.version` | string or null | no |  | Required Composer 2 major, minor, or patch version |
 | `build.composer.credentials` | string | no |  | Composer credentials secret reference |
 | `build.staticContent` | object | no |  | Static content deployment settings |
+| `build.staticContent.matrix` | object | no |  | Locales to build for each Magento theme |
 | `build.staticContent.locales` | array | no |  | Locales passed to setup:static-content:deploy --language |
 | `build.staticContent.themes` | array | no |  | Themes passed to setup:static-content:deploy --theme |
 | `build.staticContent.strategy` | string or null | no | quick, standard, compact | Static content deploy strategy (-s) |
@@ -225,27 +231,59 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `build.cache.mode` | string or null | no | min, max | BuildKit cache export mode |
 | `build.cache.ignoreExportErrors` | boolean | no |  | Continue when cache export fails |
 | `local` | object | no |  | Local runtime service and email choices |
+| `local.session` | object | no |  | Separate cache engine for Magento sessions |
+| `local.session.parameters` | object | no |  | Local database server defaults |
+| `local.session.memoryMiB` | integer | no |  | Local cache or session memory limit in MiB |
+| `local.session.evictionPolicy` | string | no |  | Valkey or Redis eviction policy |
+| `local.session.plugins` | array | no |  | OpenSearch plugins to load |
+| `local.session.image` | string or null | no |  | Container image selected by the project for local development |
+| `local.session.family` | string or null | no |  | Service family |
+| `local.session.version` | string or null | no |  | Service version |
 | `local.database` | object | no |  | Local database family and version |
+| `local.database.parameters` | object | no |  | Local database server defaults |
+| `local.database.memoryMiB` | integer | no |  | Local cache or session memory limit in MiB |
+| `local.database.evictionPolicy` | string | no |  | Valkey or Redis eviction policy |
+| `local.database.plugins` | array | no |  | OpenSearch plugins to load |
 | `local.database.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.database.family` | string or null | no |  | Service family |
 | `local.database.version` | string or null | no |  | Service version |
 | `local.cache` | object | no |  | Local cache family and version |
+| `local.cache.parameters` | object | no |  | Local database server defaults |
+| `local.cache.memoryMiB` | integer | no |  | Local cache or session memory limit in MiB |
+| `local.cache.evictionPolicy` | string | no |  | Valkey or Redis eviction policy |
+| `local.cache.plugins` | array | no |  | OpenSearch plugins to load |
 | `local.cache.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.cache.family` | string or null | no |  | Service family |
 | `local.cache.version` | string or null | no |  | Service version |
 | `local.search` | object | no |  | Local search family and version |
+| `local.search.parameters` | object | no |  | Local database server defaults |
+| `local.search.memoryMiB` | integer | no |  | Local cache or session memory limit in MiB |
+| `local.search.evictionPolicy` | string | no |  | Valkey or Redis eviction policy |
+| `local.search.plugins` | array | no |  | OpenSearch plugins to load |
 | `local.search.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.search.family` | string or null | no |  | Service family |
 | `local.search.version` | string or null | no |  | Service version |
 | `local.queue` | object | no |  | Local queue family and version |
+| `local.queue.parameters` | object | no |  | Local database server defaults |
+| `local.queue.memoryMiB` | integer | no |  | Local cache or session memory limit in MiB |
+| `local.queue.evictionPolicy` | string | no |  | Valkey or Redis eviction policy |
+| `local.queue.plugins` | array | no |  | OpenSearch plugins to load |
 | `local.queue.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.queue.family` | string or null | no |  | Service family |
 | `local.queue.version` | string or null | no |  | Service version |
 | `local.webServer` | object | no |  | Local web server family and version |
+| `local.webServer.parameters` | object | no |  | Local database server defaults |
+| `local.webServer.memoryMiB` | integer | no |  | Local cache or session memory limit in MiB |
+| `local.webServer.evictionPolicy` | string | no |  | Valkey or Redis eviction policy |
+| `local.webServer.plugins` | array | no |  | OpenSearch plugins to load |
 | `local.webServer.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.webServer.family` | string or null | no |  | Service family |
 | `local.webServer.version` | string or null | no |  | Service version |
 | `local.webCache` | object | no |  | Local web cache family and version |
+| `local.webCache.parameters` | object | no |  | Local database server defaults |
+| `local.webCache.memoryMiB` | integer | no |  | Local cache or session memory limit in MiB |
+| `local.webCache.evictionPolicy` | string | no |  | Valkey or Redis eviction policy |
+| `local.webCache.plugins` | array | no |  | OpenSearch plugins to load |
 | `local.webCache.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.webCache.family` | string or null | no |  | Service family |
 | `local.webCache.version` | string or null | no |  | Service version |
@@ -426,6 +464,8 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `target.gcp.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
 | `target.gcp.labels` | object or null | no |  | Resource labels |
 | `target.azure` | object or null | no |  | Azure deployment inputs |
+| `target.azure.encryptionKeySecret` | string | no |  | Versioned Key Vault secret URL for the source Magento encryption key |
+| `target.azure.encryptionKeySecretName` | string | no |  | Existing Kubernetes Secret containing the Magento encryption key |
 | `target.azure.subscriptionId` | string | yes |  | Azure subscription ID |
 | `target.azure.resourceGroup` | string | yes |  | Azure resource group name |
 | `target.azure.tenantId` | string | no |  | Microsoft Entra tenant ID |
@@ -595,6 +635,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `compatibility.allowUnsupported` | boolean | no |  | Legacy compatibility override; Adobe deviations now produce warnings |
 | `environments` | object | yes |  | Named deployment environments |
 | `environments.*.services` | object | no |  | Magento service families, versions, ownership and connection settings |
+| `environments.*.services.*.parameters` | object | no |  | Database server defaults for charset, collation and packet size |
 | `environments.*.services.*.adapter` | string | no |  | Explicitly linked service connection adapter ID |
 | `environments.*.services.*.family` | string | yes |  | Service engine or implementation |
 | `environments.*.services.*.version` | string | no |  | Selected engine version |
@@ -604,6 +645,10 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.services.*.image` | string | no |  | Shop-selected service container image |
 | `environments.*.services.*.port` | integer | no |  | Service connection port |
 | `environments.*.services.*.username` | string | no |  | Service connection username |
+| `environments.*.services.*.evictionPolicy` | string | no |  | Eviction policy for the cache or session store |
+| `environments.*.services.*.plugins` | array | no |  | OpenSearch plugins required by the shop |
+| `environments.*.services.*.memoryMiB` | integer | no |  | Redis or Valkey eviction threshold in MiB |
+| `environments.*.services.*.storageGiB` | integer | no |  | Persistent volume size in GiB for a self-hosted service |
 | `environments.*.inherits` | string | no |  | Parent environment |
 | `environments.*.account` | string or null | no |  | AWS account ID |
 | `environments.*.class` | string or null | no |  | Environment class |
@@ -614,7 +659,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.previewTtl` | string or null | no |  | Preview lifetime from the triggering event, for example 168h |
 | `environments.*.monthlyBudgetCents` | integer or null | no |  | Monthly budget planning input in cents (alerts only, never enforced) |
 | `environments.*.branches` | array or null | no |  | Git branches mapped to this environment |
-| `environments.*.seedDump` | string or null | no |  | Local MySQL dump path seeded after first deploy |
+| `environments.*.seedDump` | string or null | no |  | Local SQL dump path for an explicit env import-dump operation |
 | `environments.*.project` | object or null | no |  |  |
 | `environments.*.project.name` | string | no |  | Project name |
 | `environments.*.application` | object or null | no |  |  |
@@ -630,7 +675,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.application.magento.corsOrigins` | array | no |  | Allowed CORS origins for the Magento API |
 | `environments.*.application.magento.storefrontOrigin` | string | no |  | Headless storefront origin allowed by CORS |
 | `environments.*.application.magento.consumers` | object | no |  | Magento message consumer runners |
-| `environments.*.application.magento.consumers.mode` | string or null | no | cron, processes, both | Consumer runner |
+| `environments.*.application.magento.consumers.mode` | string or null | no | cron, processes, both, disabled | Consumer runner |
 | `environments.*.application.magento.consumers.names` | array | no |  | Named Magento consumers |
 | `environments.*.application.magento.queueTransport` | string or null | no | sqs, pubsub | Optional Magento-module queue transport |
 | `environments.*.application.magento.queueModule` | string or null | no |  | Locked Composer Magento package providing SQS or Pub/Sub transport |
@@ -644,6 +689,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.build.composer.version` | string or null | no |  | Required Composer 2 major, minor, or patch version |
 | `environments.*.build.composer.credentials` | string | no |  | Composer credentials secret reference |
 | `environments.*.build.staticContent` | object | no |  | Static content deployment settings |
+| `environments.*.build.staticContent.matrix` | object | no |  | Locales to build for each Magento theme |
 | `environments.*.build.staticContent.locales` | array | no |  | Locales passed to setup:static-content:deploy --language |
 | `environments.*.build.staticContent.themes` | array | no |  | Themes passed to setup:static-content:deploy --theme |
 | `environments.*.build.staticContent.strategy` | string or null | no | quick, standard, compact | Static content deploy strategy (-s) |
@@ -838,6 +884,8 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.target.gcp.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
 | `environments.*.target.gcp.labels` | object or null | no |  | Resource labels |
 | `environments.*.target.azure` | object or null | no |  | Azure deployment inputs |
+| `environments.*.target.azure.encryptionKeySecret` | string | no |  | Versioned Key Vault secret URL for the source Magento encryption key |
+| `environments.*.target.azure.encryptionKeySecretName` | string | no |  | Existing Kubernetes Secret containing the Magento encryption key |
 | `environments.*.target.azure.subscriptionId` | string | no |  | Azure subscription ID |
 | `environments.*.target.azure.resourceGroup` | string | no |  | Azure resource group name |
 | `environments.*.target.azure.tenantId` | string | no |  | Microsoft Entra tenant ID |

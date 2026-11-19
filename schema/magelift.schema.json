@@ -2149,6 +2149,14 @@
           "description": "Azure Container Registry resource ID for AKS pull access",
           "type": "string"
         },
+        "encryptionKeySecret": {
+          "description": "Versioned Key Vault secret URL for the source Magento encryption key",
+          "type": "string"
+        },
+        "encryptionKeySecretName": {
+          "description": "Existing Kubernetes Secret containing the Magento encryption key",
+          "type": "string"
+        },
         "imageDigest": {
           "description": "Immutable application image",
           "type": "string"
@@ -2208,6 +2216,14 @@
       "properties": {
         "acrResourceId": {
           "description": "Azure Container Registry resource ID for AKS pull access",
+          "type": "string"
+        },
+        "encryptionKeySecret": {
+          "description": "Versioned Key Vault secret URL for the source Magento encryption key",
+          "type": "string"
+        },
+        "encryptionKeySecretName": {
+          "description": "Existing Kubernetes Secret containing the Magento encryption key",
           "type": "string"
         },
         "imageDigest": {
@@ -3872,7 +3888,7 @@
         "seedDump": {
           "anyOf": [
             {
-              "description": "Local MySQL dump path seeded after first deploy",
+              "description": "Local SQL dump path for an explicit env import-dump operation",
               "type": "string"
             },
             {
@@ -5272,6 +5288,10 @@
           "$ref": "#/$defs/localService",
           "description": "Local search family and version"
         },
+        "session": {
+          "$ref": "#/$defs/localService",
+          "description": "Separate cache engine for Magento sessions"
+        },
         "webCache": {
           "$ref": "#/$defs/localService",
           "description": "Local web cache family and version"
@@ -5286,6 +5306,10 @@
     "localService": {
       "additionalProperties": false,
       "properties": {
+        "evictionPolicy": {
+          "description": "Valkey or Redis eviction policy",
+          "type": "string"
+        },
         "family": {
           "anyOf": [
             {
@@ -5307,6 +5331,24 @@
               "type": "null"
             }
           ]
+        },
+        "memoryMiB": {
+          "description": "Local cache or session memory limit in MiB",
+          "type": "integer"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Local database server defaults",
+          "type": "object"
+        },
+        "plugins": {
+          "description": "OpenSearch plugins to load",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "version": {
           "anyOf": [
@@ -5332,7 +5374,8 @@
               "enum": [
                 "cron",
                 "processes",
-                "both"
+                "both",
+                "disabled"
               ],
               "type": "string"
             },
@@ -5361,7 +5404,8 @@
               "enum": [
                 "cron",
                 "processes",
-                "both"
+                "both",
+                "disabled"
               ],
               "type": "string"
             },
@@ -8420,6 +8464,10 @@
           "description": "Hostname or URL of an existing service",
           "type": "string"
         },
+        "evictionPolicy": {
+          "description": "Eviction policy for the cache or session store",
+          "type": "string"
+        },
         "family": {
           "description": "Service engine or implementation",
           "type": "string"
@@ -8427,6 +8475,10 @@
         "image": {
           "description": "Shop-selected service container image",
           "type": "string"
+        },
+        "memoryMiB": {
+          "description": "Redis or Valkey eviction threshold in MiB",
+          "type": "integer"
         },
         "ownership": {
           "anyOf": [
@@ -8445,6 +8497,20 @@
             }
           ]
         },
+        "parameters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Database server defaults for charset, collation and packet size",
+          "type": "object"
+        },
+        "plugins": {
+          "description": "OpenSearch plugins required by the shop",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "port": {
           "description": "Service connection port",
           "type": "integer"
@@ -8452,6 +8518,10 @@
         "secret": {
           "description": "Provider secret reference for a connection",
           "type": "string"
+        },
+        "storageGiB": {
+          "description": "Persistent volume size in GiB for a self-hosted service",
+          "type": "integer"
         },
         "username": {
           "description": "Service connection username",
@@ -8478,6 +8548,10 @@
           "description": "Hostname or URL of an existing service",
           "type": "string"
         },
+        "evictionPolicy": {
+          "description": "Eviction policy for the cache or session store",
+          "type": "string"
+        },
         "family": {
           "description": "Service engine or implementation",
           "type": "string"
@@ -8485,6 +8559,10 @@
         "image": {
           "description": "Shop-selected service container image",
           "type": "string"
+        },
+        "memoryMiB": {
+          "description": "Redis or Valkey eviction threshold in MiB",
+          "type": "integer"
         },
         "ownership": {
           "anyOf": [
@@ -8503,6 +8581,20 @@
             }
           ]
         },
+        "parameters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Database server defaults for charset, collation and packet size",
+          "type": "object"
+        },
+        "plugins": {
+          "description": "OpenSearch plugins required by the shop",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "port": {
           "description": "Service connection port",
           "type": "integer"
@@ -8510,6 +8602,10 @@
         "secret": {
           "description": "Provider secret reference for a connection",
           "type": "string"
+        },
+        "storageGiB": {
+          "description": "Persistent volume size in GiB for a self-hosted service",
+          "type": "integer"
         },
         "username": {
           "description": "Service connection username",
@@ -8531,6 +8627,16 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "matrix": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": "Locales to build for each Magento theme",
+          "type": "object"
         },
         "strategy": {
           "anyOf": [
@@ -8579,6 +8685,16 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "matrix": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": "Locales to build for each Magento theme",
+          "type": "object"
         },
         "strategy": {
           "anyOf": [
