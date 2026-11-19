@@ -45,6 +45,8 @@ An available service version does not guarantee regional capacity.
 
 ## Build the shop
 
+For a shop with an older lock, try the bundled Composer with a minimum such as `2.9.8+`. Use a digest-pinned `build.composer.image` only when the shop needs another binary. A critical advisory for the selected Composer stops the build. Review locked package advisories separately.
+
 Run `magelift build` from the shop repository after committing the PHP project, the Composer
 lock and existing module configuration. The bundled nginx-fpm recipe supports PHP 8.3, 8.4, and 8.5 on Linux amd64. Recipes and pinned upstream inputs ship with
 the CLI. The user's Docker engine/CI builds the builder, runtime and application

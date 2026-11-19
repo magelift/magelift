@@ -62,6 +62,10 @@ func BuildImages(ctx context.Context, diagnostics io.Writer, tempRoot, platform,
 
 // BuildImagesForPHP builds the bundled builder and runtime for a PHP branch.
 func BuildImagesForPHP(ctx context.Context, diagnostics io.Writer, tempRoot, platform, imagePrefix, php string, cacheFrom ...string) (Images, error) {
+	return BuildImagesForPHPAndComposer(ctx, diagnostics, tempRoot, platform, imagePrefix, php, "", cacheFrom...)
+}
+
+func BuildImagesForPHPAndComposer(ctx context.Context, diagnostics io.Writer, tempRoot, platform, imagePrefix, php, composer string, cacheFrom ...string) (Images, error) {
 	if diagnostics == nil {
 		return Images{}, errors.New("image build diagnostics writer is required")
 	}
@@ -80,7 +84,7 @@ func BuildImagesForPHP(ctx context.Context, diagnostics io.Writer, tempRoot, pla
 		}
 	}
 
-	contextDir, fingerprint, cleanup, err := buildcontext.MaterializePrivateContextForPHP(tempRoot, platform, php)
+	contextDir, fingerprint, cleanup, err := buildcontext.MaterializePrivateContextForPHPAndComposer(tempRoot, platform, php, composer)
 	if err != nil {
 		return Images{}, err
 	}

@@ -69,7 +69,13 @@ The CLI adds the full inspected commit checksum to the provenance URL. It reject
 
 BuildKit publishes the SBOM and SLSA provenance. MageLift signs the pushed digest with Cosign. Give the GitHub build job `id-token: write` so it can sign with its job identity. On a workstation, use your current Google login and the bootstrapped CI service account, or complete Cosign’s browser login. For automation, use `MAGELIFT_COSIGN_IDENTITY_TOKEN_FILE`, `MAGELIFT_COSIGN_IDENTITY_TOKEN_ARGV` or `--identity-token-file` to supply a token explicitly. MageLift passes Cosign a file path and keeps the token out of the process arguments.
 
-Composer credentials are mounted as a private file during preparation. They are not passed to BuildKit, copied into the image, or written to the artifact manifest.
+### Composer
+
+The bundled builder uses Composer 2.11.2. An older shop can usually keep its existing `composer.lock` and use the bundled binary. Check that its plugins accept the builder’s Composer plugin API. Set `build.composer.version` to a minimum (`2.9.8+`), a minor branch (`2.10`), a patch range within one branch (`~2.9.8`), or one release (`2.11.2`). If a plugin requires an older binary, set both its version constraint and `build.composer.image` to match. The image must run `/usr/bin/composer --version` and is selected by digest. When you supply a complete builder with `--builder-image`, MageLift checks the Composer installed in that builder. [Composer platform dependencies](https://getcomposer.org/doc/articles/composer-platform-dependencies.md)
+
+Before reading the shop’s Composer credentials, `magelift build` queries OSV with the Composer package name and the version in the selected builder. A reported critical advisory stops the build. High-severity findings produce a warning. If OSV is unavailable or cannot classify a finding, the CLI says which check was incomplete. A feed can lag the upstream release notes. Use `composer audit --locked` to review advisories for the shop’s locked packages. [OSV package queries](https://google.github.io/osv.dev/post-v1-query/) · [Composer security releases](https://getcomposer.org/changelog/2.11.2) · [Composer audit](https://getcomposer.org/doc/03-cli.md#audit)
+
+During preparation, the runner mounts Composer credentials as a private file for the shop’s dependency install.
 
 Before BuildKit creates the application image, MageLift compares the isolated
 builder's reported PHP branch, Composer version, and loaded extensions with the

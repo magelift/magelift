@@ -2697,11 +2697,23 @@
           "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
           "type": "string"
         },
+        "image": {
+          "anyOf": [
+            {
+              "description": "Digest-pinned Composer image",
+              "pattern": "^[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "version": {
           "anyOf": [
             {
               "description": "Required Composer 2 major, minor, or patch version",
-              "pattern": "^2\\.\\d+(?:\\.\\d+)?$",
+              "pattern": "^(?:2\\.\\d+(?:\\.\\d+)?\\+?|~2\\.\\d+\\.\\d+)$",
               "type": "string"
             },
             {
@@ -2720,11 +2732,23 @@
           "pattern": "^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$",
           "type": "string"
         },
+        "image": {
+          "anyOf": [
+            {
+              "description": "Digest-pinned Composer image",
+              "pattern": "^[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "version": {
           "anyOf": [
             {
               "description": "Required Composer 2 major, minor, or patch version",
-              "pattern": "^2\\.\\d+(?:\\.\\d+)?$",
+              "pattern": "^(?:2\\.\\d+(?:\\.\\d+)?\\+?|~2\\.\\d+\\.\\d+)$",
               "type": "string"
             },
             {

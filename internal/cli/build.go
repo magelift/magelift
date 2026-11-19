@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	buildcontext "github.com/magelift/magelift"
@@ -75,6 +77,9 @@ func buildCommand(o *options) *cobra.Command {
 		if err := validateDefaultImageRecipe(spec.Build.PHP, string(spec.Application.WebRuntime), builderImage, runtimeImage); err != nil {
 			return invalid(err)
 		}
+		if spec.Build.Composer.Image != "" && (builderImage != "" || runtimeImage != "") {
+			return invalid(errors.New("build.composer.image cannot be combined with custom builder/runtime images"))
+		}
 		if exportRecipe != "" {
 			if push || imageReference != "" || builderImage != "" || runtimeImage != "" || sourceURL != "" {
 				return invalid(errors.New("--export-recipe cannot be combined with image or push overrides"))
@@ -83,7 +88,7 @@ func buildCommand(o *options) *cobra.Command {
 			if err != nil {
 				return invalid(err)
 			}
-			result, err := exportBuildRecipeForPHP(exportRecipe, platform, spec.Build.PHP)
+			result, err := exportBuildRecipeForPHPAndComposer(exportRecipe, platform, spec.Build.PHP, spec.Build.Composer.Image)
 			if err != nil {
 				return invalid(err)
 			}
@@ -104,11 +109,6 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
-		composerAuth, err := o.loadComposerCredentials(cmd.Context(), spec.Build.Composer.Credentials, defaults.Region)
-		if err != nil {
-			return &exitError{code: 3, err: err}
-		}
-		defer clear(composerAuth)
 		artifactDirectory, err := artifactDirectory()
 		if err != nil {
 			return err
@@ -127,7 +127,6 @@ func buildCommand(o *options) *cobra.Command {
 			Repository:        repository,
 			ProjectName:       spec.Project.Name,
 			ArtifactDirectory: artifactDirectory,
-			ComposerAuth:      composerAuth,
 		})
 		if err != nil {
 			return invalid(err)
@@ -144,29 +143,53 @@ func buildCommand(o *options) *cobra.Command {
 		if err != nil {
 			return invalid(err)
 		}
+		containerPlatform := request.Platform
+		if containerPlatform == "" && len(request.Platforms) > 0 {
+			containerPlatform = request.Platforms[0]
+		}
 		var images toolchain.Images
+		var composerImage, composerEntrypoint string
 		if builderImage == "" && runtimeImage == "" {
-			// Intermediates stay on the runner. Only the final app is published.
+			composerImage, err = buildcontext.ComposerRecipe(spec.Build.Composer.Image)
+			composerEntrypoint = "/usr/bin/composer"
+		} else {
+			images, err = resolver.Resolve(cmd.Context())
+			composerImage, composerEntrypoint = images.BuilderID, "composer"
+		}
+		if err != nil {
+			return &exitError{code: 3, err: err}
+		}
+		composerVersion, err := detectComposer(cmd.Context(), composerImage, containerPlatform, composerEntrypoint)
+		if err != nil {
+			return &exitError{code: 3, err: err}
+		}
+		if !composerVersionMatches(spec.Build.Composer.Version, composerVersion) {
+			return invalid(fmt.Errorf("Composer %s is required, but the selected image provides Composer %s; select a compatible image or change the requirement", spec.Build.Composer.Version, composerVersion))
+		}
+		if err := checkComposerAdvisories(cmd.Context(), &http.Client{Timeout: 15 * time.Second}, "https://api.osv.dev/v1/query", composerVersion, o.stderr); err != nil {
+			return &exitError{code: 3, err: err}
+		}
+		if builderImage == "" && runtimeImage == "" {
 			var cacheFrom []string
 			if spec.Build.Cache != nil {
 				cacheFrom = spec.Build.Cache.From
 			}
-			images, err = toolchain.BuildImagesForPHP(cmd.Context(), o.stderr, tempRoot, defaultBuildPlatform, "", spec.Build.PHP, cacheFrom...)
+			images, err = toolchain.BuildImagesForPHPAndComposer(cmd.Context(), o.stderr, tempRoot, defaultBuildPlatform, "", spec.Build.PHP, spec.Build.Composer.Image, cacheFrom...)
 			request.UseEmbeddedRecipe = true
 			if err == nil {
 				resolver = toolchain.NewResolver(toolchain.SystemCommandRunner(), images.BuilderID, images.RuntimeReference)
 			}
-		} else {
-			images, err = resolver.Resolve(cmd.Context())
 		}
 		if err != nil {
 			return &exitError{code: 3, err: err}
 		}
 		applyResolvedImages(&request, images)
-		containerPlatform := request.Platform
-		if containerPlatform == "" && len(request.Platforms) > 0 {
-			containerPlatform = request.Platforms[0]
+		composerAuth, err := o.loadComposerCredentials(cmd.Context(), spec.Build.Composer.Credentials, defaults.Region)
+		if err != nil {
+			return &exitError{code: 3, err: err}
 		}
+		defer clear(composerAuth)
+		request.ComposerAuth = composerAuth
 		builder := buildkit.NewRunner(o.stderr)
 		builder.TempRoot = tempRoot
 		pipeline := buildpipeline.New(
@@ -595,7 +618,11 @@ func exportBuildRecipe(destination, platform string) (map[string]string, error) 
 }
 
 func exportBuildRecipeForPHP(destination, platform, php string) (map[string]string, error) {
-	fingerprint, err := buildcontext.ContentFingerprintForPHP(platform, php)
+	return exportBuildRecipeForPHPAndComposer(destination, platform, php, "")
+}
+
+func exportBuildRecipeForPHPAndComposer(destination, platform, php, composer string) (map[string]string, error) {
+	fingerprint, err := buildcontext.ContentFingerprintForPHPAndComposer(platform, php, composer)
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +636,7 @@ func exportBuildRecipeForPHP(destination, platform, php string) (map[string]stri
 	if err := os.Mkdir(absolute, 0o700); err != nil {
 		return nil, fmt.Errorf("recipe destination must not exist: %w", err)
 	}
-	if err := buildcontext.WriteContextForPHP(absolute, php); err != nil {
+	if err := buildcontext.WriteContextForPHPAndComposer(absolute, php, composer); err != nil {
 		os.RemoveAll(absolute)
 		return nil, err
 	}

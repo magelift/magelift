@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	buildrunner "github.com/magelift/magelift/internal/build/runner"
 )
 
 //go:embed LICENSE NOTICE
@@ -29,8 +31,32 @@ const alphaPlatform = "linux/amd64"
 var forbiddenEmbedPath = []string{"/vendor/", "/tests/", "/auth/", "/.git/"}
 var phpVersionPattern = regexp.MustCompile(`^(8\.[345])(?:\.[0-9]+)?$`)
 var bakePHPBasePattern = regexp.MustCompile(`\{\s*branch\s*=\s*"(8\.[345])",\s*base\s*=\s*"(docker\.io/library/php:[^"\s]+@sha256:[a-f0-9]{64})"\s*\}`)
+var recipeComposerBaseLine = regexp.MustCompile(`(?m)^ARG COMPOSER_BASE=[^\n]+$`)
 var recipePHPBaseLine = regexp.MustCompile(`(?m)^ARG PHP_BASE=docker\.io/library/php:[^\n]+$`)
 var recipePHPBranchLine = regexp.MustCompile(`(?m)^ARG PHP_BRANCH=8\.5$`)
+
+// ComposerRecipe returns the exact pinned source copied into the bundled builder.
+func ComposerRecipe(override string) (string, error) {
+	if override != "" {
+		if err := buildrunner.ValidatePinnedRepositoryDigest("Composer image", override); err != nil {
+			return "", err
+		}
+		return override, nil
+	}
+	data, err := fs.ReadFile(embedded, "images/php-nginx/Dockerfile")
+	if err != nil {
+		return "", err
+	}
+	lines := recipeComposerBaseLine.FindAllString(string(data), -1)
+	if len(lines) != 1 {
+		return "", errors.New("bundled PHP recipe has an unexpected Composer base declaration")
+	}
+	image := strings.TrimPrefix(lines[0], "ARG COMPOSER_BASE=")
+	if err := buildrunner.ValidatePinnedRepositoryDigest("Composer image", image); err != nil {
+		return "", err
+	}
+	return image, nil
+}
 
 // PHPRecipe resolves a bundled PHP branch and its digest-pinned Bake base.
 func PHPRecipe(version string) (string, string, error) {
@@ -54,13 +80,22 @@ func PHPRecipe(version string) (string, string, error) {
 	return branch, base, nil
 }
 
-func recipeContents(name string, contents []byte, branch, base string) ([]byte, error) {
+func recipeContents(name string, contents []byte, branch, base, composer string) ([]byte, error) {
 	if name != "images/php-nginx/Dockerfile" {
 		return contents, nil
 	}
 	text := string(contents)
 	if len(recipePHPBaseLine.FindAllStringIndex(text, -1)) != 1 || len(recipePHPBranchLine.FindAllStringIndex(text, -1)) != 2 {
 		return nil, errors.New("bundled PHP recipe has unexpected base or branch declarations")
+	}
+	if composer != "" {
+		if err := buildrunner.ValidatePinnedRepositoryDigest("Composer image", composer); err != nil {
+			return nil, err
+		}
+		if len(recipeComposerBaseLine.FindAllStringIndex(text, -1)) != 1 {
+			return nil, errors.New("bundled PHP recipe has an unexpected Composer base declaration")
+		}
+		text = recipeComposerBaseLine.ReplaceAllLiteralString(text, "ARG COMPOSER_BASE="+composer)
 	}
 	text = recipePHPBaseLine.ReplaceAllString(text, "ARG PHP_BASE="+base)
 	text = recipePHPBranchLine.ReplaceAllString(text, "ARG PHP_BRANCH="+branch)
@@ -75,6 +110,10 @@ func WriteContext(destination string) error {
 
 // WriteContextForPHP writes the recipe with the selected digest-pinned PHP base.
 func WriteContextForPHP(destination, version string) error {
+	return WriteContextForPHPAndComposer(destination, version, "")
+}
+
+func WriteContextForPHPAndComposer(destination, version, composer string) error {
 	branch, base, err := PHPRecipe(version)
 	if err != nil {
 		return err
@@ -104,7 +143,7 @@ func WriteContextForPHP(destination, version string) error {
 	if err != nil {
 		return err
 	}
-	contents, err = recipeContents("images/php-nginx/Dockerfile", contents, branch, base)
+	contents, err = recipeContents("images/php-nginx/Dockerfile", contents, branch, base, composer)
 	if err != nil {
 		return err
 	}
@@ -118,10 +157,14 @@ func MaterializePrivateContext(tempRoot, platform string) (contextDir string, fi
 }
 
 func MaterializePrivateContextForPHP(tempRoot, platform, version string) (contextDir string, fingerprint string, cleanup func(), err error) {
+	return MaterializePrivateContextForPHPAndComposer(tempRoot, platform, version, "")
+}
+
+func MaterializePrivateContextForPHPAndComposer(tempRoot, platform, version, composer string) (contextDir string, fingerprint string, cleanup func(), err error) {
 	if err := validatePlatform(platform); err != nil {
 		return "", "", nil, err
 	}
-	fingerprint, err = ContentFingerprintForPHP(platform, version)
+	fingerprint, err = ContentFingerprintForPHPAndComposer(platform, version, composer)
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -134,7 +177,7 @@ func MaterializePrivateContextForPHP(tempRoot, platform, version string) (contex
 		return "", "", nil, fmt.Errorf("create private build context directory: %w", err)
 	}
 	cleanup = func() { os.RemoveAll(contextDir) }
-	if err := WriteContextForPHP(contextDir, version); err != nil {
+	if err := WriteContextForPHPAndComposer(contextDir, version, composer); err != nil {
 		cleanup()
 		return "", "", nil, err
 	}
@@ -149,6 +192,10 @@ func ContentFingerprint(platform string) (string, error) {
 
 // ContentFingerprintForPHP hashes the exact selected recipe and target platform.
 func ContentFingerprintForPHP(platform, version string) (string, error) {
+	return ContentFingerprintForPHPAndComposer(platform, version, "")
+}
+
+func ContentFingerprintForPHPAndComposer(platform, version, composer string) (string, error) {
 	if err := validatePlatform(platform); err != nil {
 		return "", err
 	}
@@ -168,7 +215,7 @@ func ContentFingerprintForPHP(platform, version string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("read embedded file %q: %w", name, err)
 		}
-		contents, err = recipeContents(name, contents, branch, base)
+		contents, err = recipeContents(name, contents, branch, base, composer)
 		if err != nil {
 			return "", err
 		}

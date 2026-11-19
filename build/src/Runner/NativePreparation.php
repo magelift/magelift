@@ -223,11 +223,14 @@ final readonly class NativePreparation implements Preparation
             throw new RuntimeException('Composer version check returned an unreadable version.');
         }
         $actual = $matches[1];
+        $tilde = str_starts_with($required, '~');
         $minimum = str_ends_with($required, '+');
-        $requiredVersion = rtrim($required, '+');
-        $matchesRequirement = $minimum
+        $requiredVersion = ltrim(rtrim($required, '+'), '~');
+        $matchesRequirement = $tilde
+            ? (str_starts_with($actual, implode('.', array_slice(explode('.', $requiredVersion), 0, 2)).'.') && version_compare($actual, $requiredVersion, '>='))
+            : ($minimum
             ? version_compare($actual, $requiredVersion, '>=')
-            : ($actual === $requiredVersion || str_starts_with($actual, $requiredVersion.'.'));
+            : ($actual === $requiredVersion || str_starts_with($actual, $requiredVersion.'.')));
         if (!$matchesRequirement) {
             throw new RuntimeException(sprintf(
                 'Composer %s is required, but the builder provides Composer %s.',

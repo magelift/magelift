@@ -73,6 +73,10 @@ func (f *File) resolveProjectConfig() (Config, error) {
 	if err := decoder.Decode(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode build configuration: %w", err)
 	}
+	if cfg.Build.Composer.Version == "" {
+		defaults := runtimeDefaults(applicationVersion(f.root, nil, nil))
+		cfg.Build.Composer.Version = defaults["build"].(map[string]any)["composer"].(map[string]any)["version"].(string)
+	}
 	return cfg, nil
 }
 

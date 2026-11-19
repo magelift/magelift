@@ -18,6 +18,8 @@ PHP. The catalog also includes MageLift choices for database-backed messaging,
 no Varnish, and Fastly edge migration. Redis is marked unsupported wherever the
 latest Adobe row marks it unsupported.
 
+Adobe lists Composer 2.10 for Magento 2.4.9 and 2.4.8-p5. Its 2.4.9 release notes also record compatibility with Composer 2.9. When revisiting an older checkout, check the shop’s locked plugins against the Composer binary you intend to run. Composer 2.11.2 fixed high-severity issues affecting earlier builds. Updating the build tool can leave the shop’s locked packages in place. [Adobe system requirements](https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements) · [Adobe 2.4.9 release notes](https://experienceleague.adobe.com/en/docs/commerce-operations/release/notes/adobe-commerce/2-4-9) · [Composer 2.11.2 fixes](https://getcomposer.org/changelog/2.11.2)
+
 Inspect the full matrix without reading generated documentation:
 
 ```sh

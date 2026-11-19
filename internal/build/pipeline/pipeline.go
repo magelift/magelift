@@ -134,6 +134,14 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 		return Result{}, err
 	}
 
+	spec, err := request.Config.ResolveBuild()
+	if err != nil {
+		return Result{}, fmt.Errorf("resolve build configuration: %w", err)
+	}
+	if !request.UseEmbeddedRecipe && spec.Build.Composer.Image != "" {
+		return Result{}, errors.New("build.composer.image requires the bundled builder")
+	}
+
 	prepareRequest, err := buildplan.PrepareRequest(request.Config, request.Repository, "/workspace")
 	if err != nil {
 		return Result{}, fmt.Errorf("plan application build: %w", err)
@@ -178,11 +186,11 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 	var recipeTrace *buildrunner.BuildRecipe
 	var dockerfilePath string
 	if request.UseEmbeddedRecipe {
-		recipeFingerprint, err = buildcontext.ContentFingerprintForPHP(platform, prepareRequest.Prepare.PHPVersion)
+		recipeFingerprint, err = buildcontext.ContentFingerprintForPHPAndComposer(platform, prepareRequest.Prepare.PHPVersion, spec.Build.Composer.Image)
 		if err != nil {
 			return Result{}, fmt.Errorf("embedded recipe fingerprint: %w", err)
 		}
-		if err := buildcontext.WriteContextForPHP(prepared.OutputDir, prepareRequest.Prepare.PHPVersion); err != nil {
+		if err := buildcontext.WriteContextForPHPAndComposer(prepared.OutputDir, prepareRequest.Prepare.PHPVersion, spec.Build.Composer.Image); err != nil {
 			return Result{}, fmt.Errorf("materialize embedded recipe context: %w", err)
 		}
 		bases, traceErr := recipeBaseImages(prepared.OutputDir)
@@ -293,10 +301,10 @@ func validatePreparedRuntimeContract(request *buildrunner.PrepareRequest, respon
 	if request == nil || response == nil {
 		return errors.New("prepare request and response are required")
 	}
-	if !runtimeVersionMatches(request.PHPVersion, response.PHPVersion) {
+	if !RuntimeVersionMatches(request.PHPVersion, response.PHPVersion) {
 		return fmt.Errorf("prepared PHP version %q does not satisfy requested %q", response.PHPVersion, request.PHPVersion)
 	}
-	if !runtimeVersionMatches(request.ComposerVersion, response.ComposerVersion) {
+	if !RuntimeVersionMatches(request.ComposerVersion, response.ComposerVersion) {
 		return fmt.Errorf("prepared Composer version %q does not satisfy requested %q", response.ComposerVersion, request.ComposerVersion)
 	}
 	availableExtensions, err := canonicalPHPExtensions(response.PHPExtensions)
@@ -370,11 +378,17 @@ func canonicalPHPExtensionName(value string) string {
 	return builder.String()
 }
 
-func runtimeVersionMatches(requested, prepared string) bool {
+// RuntimeVersionMatches checks a major.minor, exact patch, or minimum version.
+func RuntimeVersionMatches(requested, prepared string) bool {
 	requested = strings.TrimSpace(requested)
 	prepared = strings.TrimSpace(prepared)
 	if requested == "" || prepared == "" {
 		return requested == prepared
+	}
+	if strings.HasPrefix(requested, "~") {
+		floor := strings.TrimPrefix(requested, "~")
+		parts := strings.Split(floor, ".")
+		return len(parts) == 3 && strings.HasPrefix(prepared, parts[0]+"."+parts[1]+".") && numericVersionAtLeast(prepared, floor)
 	}
 	if strings.HasSuffix(requested, "+") {
 		return numericVersionAtLeast(prepared, strings.TrimSuffix(requested, "+"))

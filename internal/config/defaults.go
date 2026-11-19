@@ -421,7 +421,7 @@ func runtimeDefaults(version string) map[string]any {
 			break
 		}
 	}
-	composer := map[string]any{"version": "2.10"}
+	composer := map[string]any{"version": "2.10+"}
 	if line == "2.4.6" {
 		composer["version"] = "2.2.26+"
 	}

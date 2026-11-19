@@ -3,13 +3,47 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	buildcontext "github.com/magelift/magelift"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/projectphp"
 )
+
+func TestExampleProjectsAcceptBundledComposer(t *testing.T) {
+	image, err := buildcontext.ComposerRecipe("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tagged, _, _ := strings.Cut(image, "@")
+	version := tagged[strings.LastIndexByte(tagged, ':')+1:]
+	for _, example := range []string{"magelift.php", "advanced-aws-fck-nat.php", "sample-shop/magelift.php"} {
+		t.Run(example, func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join("..", "..", "examples", example))
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "magelift.php")
+			if err := os.WriteFile(path, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			file, err := (&options{configPath: path, planContext: t.Context()}).load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			spec, err := file.ResolveBuild()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !composerVersionMatches(spec.Build.Composer.Version, version) {
+				t.Fatalf("example requires Composer %q, bundled image supplies %s", spec.Build.Composer.Version, version)
+			}
+		})
+	}
+}
 
 func TestInitAppliesCloudAccountRegionAndDomainsAcrossStages(t *testing.T) {
 	for _, tc := range []struct{ provider, account, region string }{

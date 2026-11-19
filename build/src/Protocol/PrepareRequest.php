@@ -77,7 +77,7 @@ final readonly class PrepareRequest
         $composerVersion = '';
         if (array_key_exists('composerVersion', $payload)) {
             $composerVersion = self::requiredString($payload['composerVersion'], 'prepare.composerVersion');
-            if (preg_match('/^2\.\d+(?:\.\d+)?\+?$/D', $composerVersion) !== 1) {
+            if (preg_match('/^(?:2\.\d+(?:\.\d+)?\+?|~2\.\d+\.\d+)$/D', $composerVersion) !== 1) {
                 throw new InvalidProtocolRequest('prepare.composerVersion must be a Composer 2 major.minor, major.minor.patch, or minimum version with +.');
             }
         }

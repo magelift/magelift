@@ -347,6 +347,8 @@ github.com/ovh/okms-sdk-go v0.5.5 h1:xHdBeaDDwRk2xru4qmz/t4IOUAl35phcozKcWANOvkg
 github.com/ovh/okms-sdk-go v0.5.5/go.mod h1:dsh/ZdvFWFJYkR3+JjNiR6F47guRizzR1O63lGacrIQ=
 github.com/ovh/pulumi-ovh/sdk/v2 v2.22.0 h1:mGwAxaWU5viynYQ+rGw0BM6kiVj527rpSVeGssAKJHg=
 github.com/ovh/pulumi-ovh/sdk/v2 v2.22.0/go.mod h1:uKc6SFavaTdsxPtSCNgEq3W9aAf9N2OYXhNMKqMzYrQ=
+github.com/pandatix/go-cvss v0.6.4 h1:9w2RCO/Q4UTiJyEgpCHRiVc6CfrsFEnkoX+OtATqKio=
+github.com/pandatix/go-cvss v0.6.4/go.mod h1:/ukvQnYlrKl3o/DVp7/GO2UZyZheuo/maOK0U1nBEhQ=
 github.com/peterhellberg/link v1.2.0 h1:UA5pg3Gp/E0F2WdX7GERiNrPQrM1K6CVJUUWfHa4t6c=
 github.com/peterhellberg/link v1.2.0/go.mod h1:gYfAh+oJgQu2SrZHg5hROVRQe1ICoK0/HHJTcE0edxc=
 github.com/pgavlin/fx v0.1.6 h1:r9jEg69DhNoCd3Xh0+5mIbdbS3PqWrVWujkY76MFRTU=

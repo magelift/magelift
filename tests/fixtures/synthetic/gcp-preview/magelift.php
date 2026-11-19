@@ -16,7 +16,7 @@ return new Project([
     ],
     'build' => [
         'composer' => [
-            'version' => '2.10',
+            'version' => '2.10+',
         ],
         'php' => '8.5',
     ],

@@ -133,6 +133,7 @@ var sourceRevision = regexp.MustCompile(`^(?:[a-f0-9]{40}|[a-f0-9]{64})$`)
 var stableID = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
 var phpExtensionName = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
 var composerVersion = regexp.MustCompile(`^2\.\d+(?:\.\d+)?\+?$`)
+var composerRequirement = regexp.MustCompile(`^(?:2\.\d+(?:\.\d+)?\+?|~2\.\d+\.\d+)$`)
 var qualityPatchID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 var buildPlatform = regexp.MustCompile(`^linux/(?:amd64|arm64)$`)
 var pinnedRepositoryDigest = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
@@ -199,7 +200,7 @@ func (request PrepareRequest) validate() error {
 		}
 		seenExtensions[extension] = struct{}{}
 	}
-	if request.ComposerVersion != "" && !composerVersion.MatchString(request.ComposerVersion) {
+	if request.ComposerVersion != "" && !composerRequirement.MatchString(request.ComposerVersion) {
 		problems = append(problems, fmt.Errorf("Composer version %q must be a Composer 2 major.minor or major.minor.patch version", request.ComposerVersion))
 	}
 	seenPatches := make(map[string]struct{}, len(request.QualityPatches))
@@ -345,7 +346,7 @@ func (recipe BuildRecipe) validate() error {
 			continue
 		}
 		seen[role] = struct{}{}
-		problems = append(problems, validatePinnedRepositoryDigest("buildRecipe baseImages "+role, reference))
+		problems = append(problems, ValidatePinnedRepositoryDigest("buildRecipe baseImages "+role, reference))
 	}
 	for _, role := range requiredBaseImageRoles {
 		if _, exists := seen[role]; !exists {
@@ -355,7 +356,8 @@ func (recipe BuildRecipe) validate() error {
 	return errors.Join(problems...)
 }
 
-func validatePinnedRepositoryDigest(name, reference string) error {
+// ValidatePinnedRepositoryDigest checks an image reference used by a build recipe.
+func ValidatePinnedRepositoryDigest(name, reference string) error {
 	if reference != strings.TrimSpace(reference) || strings.ContainsAny(reference, "\x00\r\n\t ") {
 		return fmt.Errorf("%s must be a registry-qualified digest reference without whitespace", name)
 	}

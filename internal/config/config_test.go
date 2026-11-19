@@ -1469,6 +1469,11 @@ func TestBuildToolchainRequirementsAreTypedAndValidated(t *testing.T) {
 			message: "duplicate",
 		},
 		{
+			name:    "mutable Composer image",
+			input:   strings.Replace(input, `version: "2.10"`, `version: "2.10", image: composer:latest`, 1),
+			message: "image reference at @sha256",
+		},
+		{
 			name:    "unsupported Composer major",
 			input:   strings.Replace(input, `version: "2.10"`, `version: "1.10"`, 1),
 			message: "Composer 2",
@@ -1497,9 +1502,9 @@ func TestRuntimeDefaultsResolveComposerRequirementByRelease(t *testing.T) {
 		php     string
 		want    string
 	}{
-		{release: "2.4.7-p10", php: "8.3", want: "2.10"},
-		{release: "2.4.8-p5", php: "8.3", want: "2.10"},
-		{release: "2.4.9", php: "8.5", want: "2.10"},
+		{release: "2.4.7-p10", php: "8.3", want: "2.10+"},
+		{release: "2.4.8-p5", php: "8.3", want: "2.10+"},
+		{release: "2.4.9", php: "8.5", want: "2.10+"},
 	}
 	for _, test := range tests {
 		t.Run(test.release, func(t *testing.T) {

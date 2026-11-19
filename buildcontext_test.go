@@ -153,3 +153,29 @@ func TestMaterializePrivateContextRejectsUnsupportedPlatform(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestComposerOverrideIsPinnedAndChangesRecipeFingerprint(t *testing.T) {
+	image := "docker.io/library/composer:2.2.32@sha256:" + strings.Repeat("a", 64)
+	base, err := ContentFingerprintForPHP("linux/amd64", "8.5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed, err := ContentFingerprintForPHPAndComposer("linux/amd64", "8.5", image)
+	if err != nil || changed == base {
+		t.Fatalf("override fingerprint %q, error %v", changed, err)
+	}
+	dir, actual, cleanup, err := MaterializePrivateContextForPHPAndComposer(t.TempDir(), "linux/amd64", "8.5", image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	content, err := os.ReadFile(filepath.Join(dir, "images/php-nginx/Dockerfile"))
+	if err != nil || !strings.Contains(string(content), "ARG COMPOSER_BASE="+image) || actual != changed {
+		t.Fatalf("materialized override mismatch: %v", err)
+	}
+	for _, invalid := range []string{"composer:latest", "https://" + image, "${COMPOSER_IMAGE}@sha256:" + strings.Repeat("a", 64)} {
+		if _, err := ContentFingerprintForPHPAndComposer("linux/amd64", "8.5", invalid); err == nil {
+			t.Errorf("accepted invalid Composer image %q", invalid)
+		}
+	}
+}

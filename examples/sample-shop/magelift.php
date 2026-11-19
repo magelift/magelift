@@ -17,7 +17,7 @@ return new Project([
     'build' => [
         'composer' => [
             'credentials' => 'aws-secrets-manager://magelift/composer',
-            'version' => '2.10',
+            'version' => '2.10+',
         ],
         'extensions' => [
             'apcu',

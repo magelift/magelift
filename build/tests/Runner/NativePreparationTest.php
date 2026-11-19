@@ -145,6 +145,24 @@ final class NativePreparationTest extends TestCase
         self::assertSame(['composer', '--version', '--no-ansi'], $runner->requests[0]->argv);
     }
 
+    public function testComposerTildeRequiresSameMinorAndPatchFloor(): void
+    {
+        $preparation = new NativePreparation(new ComposerVersionRunner(), '/tmp', new FixedCapabilities(), new ConfigModuleReader());
+        $method = new \ReflectionMethod(NativePreparation::class, 'assertComposerVersion');
+        [$source] = self::minimalSource();
+        $json = str_replace('"composerVersion":"2.10"', '"composerVersion":"~2.10.1"', self::request($source));
+        self::assertSame('~2.10.1', PrepareRequest::fromJson($json)->composerVersion);
+        self::assertSame('2.10.2', $method->invoke($preparation, '~2.10.1', '/tmp'));
+        foreach (['~2.10.3', '~2.9.0'] as $requirement) {
+            try {
+                $method->invoke($preparation, $requirement, '/tmp');
+                self::fail('Expected Composer requirement to be rejected.');
+            } catch (RuntimeException $exception) {
+                self::assertStringContainsString('is required', $exception->getMessage());
+            }
+        }
+    }
+
     public function testRejectsSymlinkedMagentoEnvironmentBeforeCreatingWorkspace(): void
     {
         [$source, $workspace] = self::minimalSource();

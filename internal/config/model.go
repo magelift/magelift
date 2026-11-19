@@ -177,7 +177,8 @@ type BuildHookRetries struct {
 }
 
 type Composer struct {
-	Version     string `yaml:"version,omitempty" json:"version,omitempty" config:"Required Composer 2 major, minor, or patch version" schema:"nullable,pattern=^2\\.\\d+(?:\\.\\d+)?$"`
+	Image       string `yaml:"image,omitempty" json:"image,omitempty" config:"Digest-pinned Composer image" schema:"nullable,pattern=^[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}$"`
+	Version     string `yaml:"version,omitempty" json:"version,omitempty" config:"Required Composer 2 major, minor, or patch version" schema:"nullable,pattern=^(?:2\\.\\d+(?:\\.\\d+)?\\+?|~2\\.\\d+\\.\\d+)$"`
 	Credentials string `yaml:"credentials,omitempty" json:"credentials,omitempty" config:"Composer credentials secret reference" schema:"pattern=^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$"`
 }
 type Target struct {

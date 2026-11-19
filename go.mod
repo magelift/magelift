@@ -37,6 +37,7 @@ require (
 	github.com/ovh/go-ovh v1.10.0
 	github.com/ovh/okms-sdk-go v0.5.5
 	github.com/ovh/pulumi-ovh/sdk/v2 v2.22.0
+	github.com/pandatix/go-cvss v0.6.4
 	github.com/pulumi/pulumi-aws/sdk/v7 v7.55.0
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.34.3
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.6

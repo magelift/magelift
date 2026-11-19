@@ -122,7 +122,7 @@ type localServiceRow struct {
 // Default service families are independent of a Magento compatibility matrix.
 func defaultServices() localReleaseRow {
 	return localReleaseRow{
-		Release: "2.4.9", PHPBranches: []string{"8.5"}, Composer: "2.10",
+		Release: "2.4.9", PHPBranches: []string{"8.5"}, Composer: "2.10+",
 		Database:  databaseRows(localServiceRow{Family: "mysql", Version: "8.4", Image: localMySQL84Image}, localServiceRow{Family: "mariadb", Version: "11.8", Image: localMariaDB118Image}),
 		Cache:     cacheRows(localServiceRow{Family: "valkey", Version: "9", Image: localValkey9Image}, localServiceRow{Family: "redis", Version: "7.2", Image: localRedis72Image}),
 		Search:    searchRows(localServiceRow{Family: "opensearch", Version: "3", Image: localOpenSearch3Image}),

@@ -752,3 +752,25 @@ func TestPipelineTransfersExplicitRegistryCachePolicy(t *testing.T) {
 		t.Fatalf("cache policy lost: %+v", builder.request)
 	}
 }
+
+func TestComposerImageRejectedBeforePrepareWithCustomBuilder(t *testing.T) {
+	request := pipelineRequest(t)
+	image := "docker.io/library/composer@sha256:" + strings.Repeat("a", 64)
+	file, err := config.Load([]byte(`schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: 2.4.9, mode: integrated}
+build: {php: "8.5", composer: {image: "` + image + `"}}
+target: {provider: aws, runtime: ecs-fargate}
+defaults: {region: eu-west-3, preset: preview}
+environments: {staging: {account: "123456789012"}}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Config = file
+	events := []string{}
+	_, err = New(&fakeContainers{t: t, events: &events}, &fakeBuilder{t: t}).Run(context.Background(), request)
+	if err == nil || !strings.Contains(err.Error(), "requires the bundled builder") || len(events) != 0 {
+		t.Fatalf("error %v, events %v", err, events)
+	}
+}

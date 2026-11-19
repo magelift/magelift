@@ -52,3 +52,21 @@ func TestResolveBuildRejectsEnvironmentArtifactOverrides(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestResolveBuildDefaultsNullComposerVersion(t *testing.T) {
+	file, err := Load([]byte(`schemaVersion: 1
+project: {name: shop}
+application: {edition: open-source, version: 2.4.9, mode: integrated}
+build: {php: "8.5", composer: {version: null}}
+target: {provider: aws, runtime: ecs-fargate}
+defaults: {region: eu-west-3, preset: preview}
+environments: {staging: {account: "123456789012"}}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, err := file.ResolveBuild()
+	if err != nil || spec.Build.Composer.Version != "2.10+" {
+		t.Fatalf("version %q, error %v", spec.Build.Composer.Version, err)
+	}
+}

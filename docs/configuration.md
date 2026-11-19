@@ -121,9 +121,9 @@ single instance is never labeled highly available.
 See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
 
 `build.extensions` declares the PHP extensions that the selected builder must load.
-`build.composer.version` accepts a Composer 2 major.minor or patch version; append `+` for a minimum. Both
-requirements are checked inside the isolated builder before dependency installation; an
-unsupported extension or Composer version fails the build instead of being ignored.
+Set `build.composer.version` to a branch such as `2.10`, an exact release such as `2.11.2`, a minimum such as `2.9.8+`, or a patch range such as `~2.9.8`.
+The bundled recipe supplies a patched Composer 2 binary. To use a different binary, set `build.composer.image` to an image by digest.
+The builder checks the requested version and extensions before it installs the shop's locked packages. [Composer build settings](builds.md#composer)
 
 `observability.nativeProvider` selects a matching cloud telemetry destination and
 `observability.externalProvider` selects an extension-owned adapter without putting vendor credentials
@@ -195,6 +195,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `build.php` | string | yes |  | Exact PHP branch or patch version |
 | `build.extensions` | array | no |  | Required PHP extensions |
 | `build.composer` | object | no |  | Composer settings |
+| `build.composer.image` | string or null | no |  | Digest-pinned Composer image |
 | `build.composer.version` | string or null | no |  | Required Composer 2 major, minor, or patch version |
 | `build.composer.credentials` | string | no |  | Composer credentials secret reference |
 | `build.staticContent` | object | no |  | Static content deployment settings |
@@ -639,6 +640,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.build.php` | string | no |  | Exact PHP branch or patch version |
 | `environments.*.build.extensions` | array | no |  | Required PHP extensions |
 | `environments.*.build.composer` | object | no |  | Composer settings |
+| `environments.*.build.composer.image` | string or null | no |  | Digest-pinned Composer image |
 | `environments.*.build.composer.version` | string or null | no |  | Required Composer 2 major, minor, or patch version |
 | `environments.*.build.composer.credentials` | string | no |  | Composer credentials secret reference |
 | `environments.*.build.staticContent` | object | no |  | Static content deployment settings |

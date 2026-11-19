@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	buildrunner "github.com/magelift/magelift/internal/build/runner"
 	"github.com/magelift/magelift/internal/secretref"
 	"go.yaml.in/yaml/v4"
 )
@@ -585,7 +586,7 @@ func cloneMap(input map[string]any) map[string]any {
 var extensionNamespace = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*\.)+[a-z0-9][a-z0-9-]*$`)
 var lifecycleID = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`)
 var phpExtensionName = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
-var composerVersion = regexp.MustCompile(`^2\.\d+(?:\.\d+)?\+?$`)
+var composerVersion = regexp.MustCompile(`^(?:2\.\d+(?:\.\d+)?\+?|~2\.\d+\.\d+)$`)
 var localServiceVersion = regexp.MustCompile(`^[0-9][0-9A-Za-z.+_-]*$`)
 var localPHPSettingName = regexp.MustCompile(`^[a-z][a-z0-9_.-]*$`)
 var localCredentialEnvName = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
@@ -1164,8 +1165,13 @@ func validateBuildRequirements(build Build) []string {
 		}
 		seen[extension] = struct{}{}
 	}
+	if build.Composer.Image != "" {
+		if err := buildrunner.ValidatePinnedRepositoryDigest("build.composer.image", build.Composer.Image); err != nil {
+			problems = append(problems, err.Error())
+		}
+	}
 	if build.Composer.Version != "" && !composerVersion.MatchString(build.Composer.Version) {
-		problems = append(problems, fmt.Sprintf("build.composer.version %q must be a Composer 2 major.minor, major.minor.patch, or minimum version with +", build.Composer.Version))
+		problems = append(problems, fmt.Sprintf("build.composer.version %q must be a Composer 2 major.minor, major.minor.patch, minimum version with +, or ~2.minor.patch", build.Composer.Version))
 	}
 	if build.Cache != nil {
 		problems = append(problems, validateBuildCache(build.Cache)...)

@@ -3,7 +3,7 @@
     "name": "magelift-configure",
     "description": "Configure a MageLift PHP project and choose Magento services. Use when selecting PHP, database, search, queue, cache, Varnish, edge, or provider options.",
     "version": "1.0.0",
-    "digest": "519c8f5d995c67ee902efac5cfb69039950f70bfdcc5b24e78081e73f741eda5",
+    "digest": "143e8bf0bb2f11d284ab1114af9edddcebe010cf6046fc59ef267e44714f4958",
     "sources": [
       "embedded",
       "skills-cli"
