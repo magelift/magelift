@@ -41,12 +41,13 @@ When `preview`, `deploy`, or `destroy` fails because another Pulumi update
 holds the stack lock, the command exits 5 with a wait-and-retry sentence
 instead of the generic failure, so CI can tell a collision from a graph bug.
 
-After a GCP CI deployment, outputs, exec, logs, tunnels and health in
-outputs/runtime mode use existing stack outputs. They do not require an image digest in the project or a
-local build journal. Deploy and preview still require the immutable application
-image. Destroy can remove an owned environment without an application build;
-its protection and ownership checks still apply. See
-[ADR 0019](adr/0019-gcp-runtime-operation-plans.md).
+If CI supplied the image digest during deployment, you can still run
+`magelift edge purge --env staging` from a fresh checkout. On ECS with CloudFront
+or GKE with Cloud CDN, the provider reads the deployed cache identity and checks
+that it belongs to the storefront. GKE also uses existing stack outputs for
+exec, logs, tunnels and runtime health checks. Supply an immutable image for
+deploy and preview. Destroy checks environment protection and resource ownership.
+[GKE runtime operations](adr/0019-gcp-runtime-operation-plans.md)
 
 For a database with zero tables, the deployment migration first runs Magento's
 schema and data upgrade commands, then the normal upgrade, configuration import
@@ -105,7 +106,7 @@ stable and preview environments. Pull requests use a smaller, time-limited
 topology and database-backed messaging by default. Managed databases and
 search services can still incur substantial per-environment charges.
 
-`magelift env list` lists configured environments without contacting AWS. `magelift
+`magelift env list` reads the environments in your PHP project locally. `magelift
 env create <name>` adds a validated overlay using the supplied account, preset,
 class, domain, TTL, budget, protection, and branch flags. `magelift env destroy
 <name> --yes` destroys the selected infrastructure before removing its overlay.
@@ -114,19 +115,15 @@ env protect <name> --on|--off` updates only that environment's protection flag u
 an atomic file replacement. Disabling protection for a production class requires
 `--yes`. `magelift status` reports the selected environment and its resolved target
 settings.
-`magelift env sweep --dry-run` reports expired preview overlays without contacting
-AWS. A scheduled cleanup job can run `magelift env sweep --yes`; it destroys only
-expired, unprotected environments with `class: preview`, then removes their
-configuration overlays. Production and protected environments are always skipped.
-MageLift ships the sweep command and the generated hourly workflow step; it does
-not run a hosted expiry scheduler. The customer's scheduler (cron or CI) owns
-the run, sweep authenticates with the operator's configured cloud credentials
-(same as deploy and destroy), and if the scheduler skips or a sweep fails
-partway the expired stacks keep billing until the next successful sweep or an
-explicit destroy. After teardown, state backups (90-day retention), log and
-metric retention, unattached addresses or volumes outside the stack, and
-provider billing delay can all keep costing money; the ledger plus direct
-provider inventory show what remains.
+
+`magelift env sweep --dry-run` shows which preview environments have expired.
+It reads their local configuration. The generated hourly workflow runs
+`magelift env sweep --yes` with the shop’s cloud credentials. It destroys
+expired, unprotected previews and removes each overlay after teardown succeeds.
+If your scheduler misses a run or teardown fails, those resources keep accruing
+charges. Check the deployment ledger and the provider inventory for retained
+backups, logs, addresses and volumes.
+
 `magelift login --env staging` asks the configured provider to check the current
 credentials against the environment's cloud account.
 `magelift upgrade --check` checks the latest GitHub release without changing the
