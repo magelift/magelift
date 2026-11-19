@@ -138,7 +138,10 @@ func (s *Server) EdgePlan(req *sdk.EdgePlanCall, resp *sdk.EdgePlanResult) error
 		if err != nil {
 			return err
 		}
-		adapter, err := platform.ModuleEdgeFor(ctx, m, p)
+		if string(request.TargetProvider) != req.Plan.Provider || string(request.TargetRuntime) != req.Plan.Runtime {
+			return integrity("AWS edge request target differs from its stored plan")
+		}
+		adapter, err := s.edgeAdapter(ctx, m, p)
 		if err != nil {
 			return err
 		}
@@ -149,17 +152,33 @@ func (s *Server) EdgePlan(req *sdk.EdgePlanCall, resp *sdk.EdgePlanResult) error
 		if err != nil {
 			return err
 		}
-		return encode(&resp.PlanJSON, result)
+		encoded, err := sdk.EncodeEdgePlanRPC(result, sdk.EdgeRPCBindingFor(req.Envelope, req.Plan))
+		if err != nil {
+			return err
+		}
+		resp.PlanJSON = encoded
+		return nil
 	})
 }
 
 func (s *Server) EdgeExecute(req *sdk.EdgeExecuteCall, resp *sdk.EdgeExecuteResult) error {
 	return withPlan(req.ProtocolVersion, &resp.Error, req.Envelope, req.Plan, func(ctx context.Context, m platform.StackModule, p platform.PlannedStack) error {
-		request, err := decode[sdk.EdgeExecutionRequest](req.RequestJSON)
+		request, binding, version, err := sdk.DecodeEdgeExecutionRPC(req.RequestJSON)
 		if err != nil {
-			return err
+			return invalid(err)
 		}
-		adapter, err := platform.ModuleEdgeFor(ctx, m, p)
+		if version == 0 && request.Plan.AdapterID == "aws.edge.native" && request.Plan.Opaque == nil {
+			return invalid(errors.New("AWS edge execution requires a host/plugin version that carries opaque plan state"))
+		}
+		if binding.Provider != "" {
+			if err := binding.ValidateFor(req.Envelope, req.Plan); err != nil {
+				return integrity(err.Error())
+			}
+		}
+		if string(request.Plan.TargetProvider) != req.Plan.Provider || string(request.Plan.TargetRuntime) != req.Plan.Runtime {
+			return integrity("AWS edge execution target differs from its stored plan")
+		}
+		adapter, err := s.edgeAdapter(ctx, m, p)
 		if err != nil {
 			return err
 		}
@@ -172,4 +191,11 @@ func (s *Server) EdgeExecute(req *sdk.EdgeExecuteCall, resp *sdk.EdgeExecuteResu
 		}
 		return encode(&resp.ResultJSON, result)
 	})
+}
+
+func (s *Server) edgeAdapter(ctx context.Context, module platform.StackModule, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
+	if s != nil && s.NewEdgeAdapter != nil {
+		return s.NewEdgeAdapter(ctx, module, planned)
+	}
+	return platform.ModuleEdgeFor(ctx, module, planned)
 }

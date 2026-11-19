@@ -69,9 +69,21 @@ func (a *ShimEdgeAdapter) PlanEdge(ctx context.Context, req sdk.EdgePlanRequest)
 	if resp.Error != nil {
 		return sdk.EdgePlan{}, AsPluginError(sdk.OpEdgePlan, resp.Error)
 	}
-	var plan sdk.EdgePlan
-	if err := json.Unmarshal(resp.PlanJSON, &plan); err != nil {
+	plan, binding, version, err := sdk.DecodeEdgePlanRPC(resp.PlanJSON)
+	if err != nil {
 		return sdk.EdgePlan{}, fmt.Errorf("decode edge plan: %w", err)
+	}
+	if version == 0 && req.Intent.Mode != "none" {
+		return sdk.EdgePlan{}, errors.New("provider edge RPC omits required opaque plan state; update the provider plugin")
+	}
+	if binding.Provider != "" {
+		if err := binding.ValidateFor(a.envelope, a.stored); err != nil {
+			return sdk.EdgePlan{}, err
+		}
+		plan.Opaque = sdk.BoundEdgeOpaque{Binding: binding, State: json.RawMessage(plan.Opaque.(json.RawMessage))}
+	}
+	if string(plan.TargetProvider) != a.stored.Provider || string(plan.TargetRuntime) != a.stored.Runtime {
+		return sdk.EdgePlan{}, errors.New("provider edge plan target differs from the verified provider plan")
 	}
 	return plan, nil
 }
@@ -80,7 +92,16 @@ func (a *ShimEdgeAdapter) ExecuteEdge(ctx context.Context, req sdk.EdgeExecution
 	if a == nil || a.client == nil {
 		return sdk.EdgeExecutionResult{}, errors.New("provider client is required")
 	}
-	encoded, err := json.Marshal(req)
+	bound, ok := req.Plan.Opaque.(sdk.BoundEdgeOpaque)
+	if !ok {
+		return sdk.EdgeExecutionResult{}, errors.New("edge plan is not bound to a verified provider session")
+	}
+	if err := bound.Binding.ValidateFor(a.envelope, a.stored); err != nil {
+		return sdk.EdgeExecutionResult{}, err
+	}
+	request := req
+	request.Plan.Opaque = bound.State
+	encoded, err := sdk.EncodeEdgeExecutionRPC(request, bound.Binding)
 	if err != nil {
 		return sdk.EdgeExecutionResult{}, err
 	}

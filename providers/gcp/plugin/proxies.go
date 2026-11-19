@@ -23,6 +23,9 @@ func (s *Server) EdgePlan(ctx context.Context, req *sdk.EdgePlanCall) (*sdk.Edge
 	if operr := unmarshalJSON(req.RequestJSON, &edgeReq, "edge plan request"); operr != nil {
 		return nil, operr
 	}
+	if string(edgeReq.TargetProvider) != req.Plan.Provider || string(edgeReq.TargetRuntime) != req.Plan.Runtime {
+		return nil, &sdk.OperationError{Code: sdk.ErrCodeIntegrity, Message: "GCP edge request target differs from its stored plan"}
+	}
 	adapter, operr := s.edgeAdapter(ctx, spec.Identity.GCPProject)
 	if operr != nil {
 		return nil, operr
@@ -31,9 +34,9 @@ func (s *Server) EdgePlan(ctx context.Context, req *sdk.EdgePlanCall) (*sdk.Edge
 	if err != nil {
 		return nil, proxyError(err)
 	}
-	encoded, operr := marshalJSON(plan)
-	if operr != nil {
-		return nil, operr
+	encoded, err := sdk.EncodeEdgePlanRPC(plan, sdk.EdgeRPCBindingFor(req.Envelope, req.Plan))
+	if err != nil {
+		return nil, proxyError(err)
 	}
 	return &sdk.EdgePlanResult{PlanJSON: encoded}, nil
 }
@@ -47,9 +50,20 @@ func (s *Server) EdgeExecute(ctx context.Context, req *sdk.EdgeExecuteCall) (*sd
 	if operr != nil {
 		return nil, operr
 	}
-	var execReq sdk.EdgeExecutionRequest
-	if operr := unmarshalJSON(req.RequestJSON, &execReq, "edge execution request"); operr != nil {
-		return nil, operr
+	execReq, binding, version, err := sdk.DecodeEdgeExecutionRPC(req.RequestJSON)
+	if err != nil {
+		return nil, InvalidError("invalid edge execution request")
+	}
+	if version == 0 && execReq.Plan.AdapterID == "gcp.edge.native" && execReq.Plan.Opaque == nil {
+		return nil, InvalidError("GCP edge execution requires a host/plugin version that carries opaque plan state")
+	}
+	if binding.Provider != "" {
+		if err := binding.ValidateFor(req.Envelope, req.Plan); err != nil {
+			return nil, &sdk.OperationError{Code: sdk.ErrCodeIntegrity, Message: err.Error()}
+		}
+	}
+	if string(execReq.Plan.TargetProvider) != req.Plan.Provider || string(execReq.Plan.TargetRuntime) != req.Plan.Runtime {
+		return nil, &sdk.OperationError{Code: sdk.ErrCodeIntegrity, Message: "GCP edge execution target differs from its stored plan"}
 	}
 	adapter, operr := s.edgeAdapter(ctx, spec.Identity.GCPProject)
 	if operr != nil {

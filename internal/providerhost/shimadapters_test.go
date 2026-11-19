@@ -3,6 +3,7 @@ package providerhost
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"testing"
@@ -13,17 +14,34 @@ import (
 
 func TestShimEdgeAdapter(t *testing.T) {
 	t.Parallel()
+	var caller *stubCaller
 	module, planned := scriptedModule(t, func(method string, reply any) error {
 		switch method {
 		case "Plugin.EdgePlan":
-			*(reply.(*sdk.EdgePlanResult)) = sdk.EdgePlanResult{PlanJSON: mustJSON(t, sdk.EdgePlan{AdapterID: "gcp.edge.native"})}
+			call := caller.args[len(caller.args)-1].(*sdk.EdgePlanCall)
+			plan := sdk.EdgePlan{AdapterID: "gcp.edge.native", TargetProvider: "gcp", TargetRuntime: "gke-autopilot", OwnershipMarker: "magelift/test", Opaque: map[string]string{"opaque": "state"}}
+			encoded, err := sdk.EncodeEdgePlanRPC(plan, sdk.EdgeRPCBindingFor(call.Envelope, call.Plan))
+			if err != nil {
+				return err
+			}
+			*(reply.(*sdk.EdgePlanResult)) = sdk.EdgePlanResult{PlanJSON: encoded}
 		case "Plugin.EdgeExecute":
+			call := caller.args[len(caller.args)-1].(*sdk.EdgeExecuteCall)
+			execution, binding, version, err := sdk.DecodeEdgeExecutionRPC(call.RequestJSON)
+			if err != nil || version != sdk.EdgeRPCOpaqueVersion || binding.Account != call.Envelope.Account {
+				return errors.New("edge opaque RPC envelope did not preserve the stack binding")
+			}
+			opaque, ok := execution.Plan.Opaque.(json.RawMessage)
+			if !ok || string(opaque) != `{"opaque":"state"}` {
+				return errors.New("edge opaque state did not round-trip as JSON")
+			}
 			*(reply.(*sdk.EdgeExecuteResult)) = sdk.EdgeExecuteResult{ResultJSON: mustJSON(t, sdk.EdgeExecutionResult{OperationID: "op-1"})}
 		default:
 			return errors.New("unexpected method " + method)
 		}
 		return nil
 	})
+	caller = module.client.caller.(*stubCaller)
 	shim, ok := AsShimPlanned(planned)
 	if !ok {
 		t.Fatalf("planned = %T", planned)
@@ -39,14 +57,23 @@ func TestShimEdgeAdapter(t *testing.T) {
 	if err != nil || edge == nil {
 		t.Fatalf("factory edge = %v %v", edge, err)
 	}
-	plan, err := adapter.PlanEdge(context.Background(), sdk.EdgePlanRequest{TargetProvider: "gcp"})
+	plan, err := adapter.PlanEdge(context.Background(), sdk.EdgePlanRequest{TargetProvider: "gcp", TargetRuntime: "gke-autopilot", Intent: sdk.EdgeIntent{Mode: "native"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if plan.AdapterID != "gcp.edge.native" {
 		t.Fatalf("plan = %#v", plan)
 	}
-	result, err := adapter.ExecuteEdge(context.Background(), sdk.EdgeExecutionRequest{Action: sdk.EdgePurge})
+	beforeReplay := len(caller.calls)
+	otherStack := *adapter.(*ShimEdgeAdapter)
+	otherStack.envelope.Environment = "production"
+	if _, err := otherStack.ExecuteEdge(context.Background(), sdk.EdgeExecutionRequest{Plan: plan, Action: sdk.EdgePurge, IdempotencyKey: "purge/production", OwnershipMarker: plan.OwnershipMarker}); err == nil {
+		t.Fatal("adapter accepted a plan bound to another stack environment")
+	}
+	if len(caller.calls) != beforeReplay {
+		t.Fatal("cross-stack plan replay reached the provider RPC")
+	}
+	result, err := adapter.ExecuteEdge(context.Background(), sdk.EdgeExecutionRequest{Plan: plan, Action: sdk.EdgePurge, IdempotencyKey: "purge/staging", OwnershipMarker: plan.OwnershipMarker})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -204,6 +204,68 @@ func TestCloudFrontPlanIsProviderTypedAndDoesNotMutate(t *testing.T) {
 	}
 }
 
+func TestCloudFrontPurgePlansWithoutOriginConfigurationAndRevalidatesOwnership(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		comment     string
+		wantPurge   bool
+	}{
+		{name: "owned distribution", comment: cloudFrontCommentPrefix + "magelift/test/cloudfront", wantPurge: true},
+		{name: "foreign distribution", comment: "foreign owner"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			api := newFakeCloudFrontAPI()
+			api.distributions["E1"] = &cloudfronttypes.Distribution{
+				Id: aws.String("E1"), DomainName: aws.String("shop.example.com"), Status: aws.String(cloudFrontStatusDeployed),
+				DistributionConfig: &cloudfronttypes.DistributionConfig{Comment: aws.String(test.comment), Enabled: aws.Bool(true)},
+			}
+			native, err := NewNativeAPI(api, AlwaysHealthy{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := cloudFrontTestRequest()
+			request.Configuration = nil
+			plan, err := native.Plan(context.Background(), request)
+			if err != nil {
+				t.Fatalf("purge-only plan failed without origin configuration: %v", err)
+			}
+			providerPlan := plan.Opaque.(cloudFrontPlan)
+			if providerPlan.config != nil || providerPlan.targetRuntime != "ecs-fargate" {
+				t.Fatalf("purge plan unexpectedly requires an origin configuration: %#v", providerPlan)
+			}
+			operation := sdk.EdgeOperationRequest{Provider: "aws", Action: sdk.EdgePurge, Request: sdk.EdgeExecutionRequest{
+				Plan: plan, Action: sdk.EdgePurge, IdempotencyKey: "purge/staging/nonce", OwnershipMarker: plan.OwnershipMarker,
+				ResourceReferences: []string{cloudFrontDistribution + "E1"},
+			}}
+			started, err := native.Start(context.Background(), operation)
+			if test.wantPurge {
+				if err != nil {
+					t.Fatal(err)
+				}
+				completed, err := native.Poll(context.Background(), started.OperationID)
+				if err != nil || completed.Status != sdk.EdgeOperationSucceeded || api.invalidationsCreated != 1 {
+					t.Fatalf("purge = %#v err=%v invalidations=%d", completed, err, api.invalidationsCreated)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "unowned") || api.invalidationsCreated != 0 {
+				t.Fatalf("foreign distribution purge = %v invalidations=%d", err, api.invalidationsCreated)
+			}
+		})
+	}
+}
+
+func TestCloudFrontPurgeOperationIDRequiresOwnerAndInvalidationInputs(t *testing.T) {
+	id := distributionOperationID(sdk.EdgePurge, "E1", true, "purge/staging/nonce", []string{"/*"}, "magelift/test/cloudfront")
+	kind, action, distribution, purge, callerReference, paths, _, owner, err := parseDistributionOperationID(id)
+	if err != nil || kind != "distribution" || action != sdk.EdgePurge || distribution != "E1" || !purge || callerReference != "purge/staging/nonce" || len(paths) != 1 || owner != "magelift/test/cloudfront" {
+		t.Fatalf("parsed purge ID=%q kind=%q action=%q distribution=%q purge=%v ref=%q paths=%v owner=%q err=%v", id, kind, action, distribution, purge, callerReference, paths, owner, err)
+	}
+	if _, _, _, _, _, _, _, _, err := parseDistributionOperationID("aws.cloudfront:distribution:purge:E1"); err == nil {
+		t.Fatal("purge operation without caller reference, paths, and owner was accepted")
+	}
+}
+
 func TestCloudFrontPlanCoversCacheBypassTLSDNSWAFAndPurgePolicy(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -131,11 +132,73 @@ func NewCloudFrontSDKClient(ctx context.Context, health OriginHealthProbe, opts 
 }
 
 type cloudFrontPlan struct {
+	version          int
+	targetProvider   sdk.ProviderID
+	targetRuntime    sdk.RuntimeID
 	config           *cloudfronttypes.DistributionConfig
 	originHealthRefs []string
 	purgeOnDeploy    bool
 	purgePaths       []string
 	ownershipMarker  string
+}
+
+type cloudFrontPlanWire struct {
+	Version          int                                 `json:"version"`
+	TargetProvider   sdk.ProviderID                      `json:"targetProvider"`
+	TargetRuntime    sdk.RuntimeID                       `json:"targetRuntime"`
+	Config           *cloudfronttypes.DistributionConfig `json:"config,omitempty"`
+	OriginHealthRefs []string                            `json:"originHealthRefs,omitempty"`
+	PurgeOnDeploy    bool                                `json:"purgeOnDeploy,omitempty"`
+	PurgePaths       []string                            `json:"purgePaths,omitempty"`
+	OwnershipMarker  string                              `json:"ownershipMarker"`
+}
+
+func (p cloudFrontPlan) MarshalJSON() ([]byte, error) {
+	return json.Marshal(cloudFrontPlanWire{
+		Version: p.version, TargetProvider: p.targetProvider, TargetRuntime: p.targetRuntime,
+		Config: p.config, OriginHealthRefs: p.originHealthRefs, PurgeOnDeploy: p.purgeOnDeploy,
+		PurgePaths: p.purgePaths, OwnershipMarker: p.ownershipMarker,
+	})
+}
+
+func (p *cloudFrontPlan) UnmarshalJSON(data []byte) error {
+	var wire cloudFrontPlanWire
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if wire.Version != 1 || wire.TargetProvider != "aws" || wire.TargetRuntime != "ecs-fargate" || strings.TrimSpace(wire.OwnershipMarker) == "" {
+		return errors.New("CloudFront plan state has an unsupported version or target")
+	}
+	*p = cloudFrontPlan{
+		version: wire.Version, targetProvider: wire.TargetProvider, targetRuntime: wire.TargetRuntime,
+		config: wire.Config, originHealthRefs: wire.OriginHealthRefs, purgeOnDeploy: wire.PurgeOnDeploy,
+		purgePaths: wire.PurgePaths, ownershipMarker: wire.OwnershipMarker,
+	}
+	return nil
+}
+
+func cloudFrontPlanFromOpaque(value any) (cloudFrontPlan, error) {
+	switch plan := value.(type) {
+	case cloudFrontPlan:
+		if plan.version != 1 || plan.targetProvider != "aws" || plan.targetRuntime != "ecs-fargate" || strings.TrimSpace(plan.ownershipMarker) == "" {
+			return cloudFrontPlan{}, errors.New("CloudFront plan state has an unsupported version or target")
+		}
+		return plan, nil
+	case json.RawMessage:
+		var decoded cloudFrontPlan
+		if err := json.Unmarshal(plan, &decoded); err != nil {
+			return cloudFrontPlan{}, err
+		}
+		return decoded, nil
+	case []byte:
+		var decoded cloudFrontPlan
+		if err := json.Unmarshal(plan, &decoded); err != nil {
+			return cloudFrontPlan{}, err
+		}
+		return decoded, nil
+	default:
+		return cloudFrontPlan{}, errors.New("CloudFront plan state has an unexpected transport type")
+	}
 }
 
 type cloudFrontOrigin struct {
@@ -192,17 +255,22 @@ func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sd
 		return sdk.EdgePlan{}, errors.New("CloudFront alternate domains require TLS")
 	}
 	marker := strings.TrimSpace(request.Intent.OwnershipMarker)
-	comment := cloudFrontCommentPrefix + marker
-	if len(comment) > 128 {
-		return sdk.EdgePlan{}, errors.New("CloudFront ownership comment exceeds the 128-byte service limit")
-	}
-	origins, err := parseCloudFrontOriginSet(request)
+	comment, err := ownershipComment(marker)
 	if err != nil {
-		return sdk.EdgePlan{}, fmt.Errorf("parse CloudFront origins: %w", err)
+		return sdk.EdgePlan{}, err
 	}
-	config, err := buildDistributionConfig(request, origins, comment)
-	if err != nil {
-		return sdk.EdgePlan{}, fmt.Errorf("build CloudFront distribution configuration: %w", err)
+	var config *cloudfronttypes.DistributionConfig
+	var originHealthRefs []string
+	if len(request.Configuration) > 0 {
+		origins, err := parseCloudFrontOriginSet(request)
+		if err != nil {
+			return sdk.EdgePlan{}, fmt.Errorf("parse CloudFront origins: %w", err)
+		}
+		config, err = buildDistributionConfig(request, origins, comment)
+		if err != nil {
+			return sdk.EdgePlan{}, fmt.Errorf("build CloudFront distribution configuration: %w", err)
+		}
+		originHealthRefs = origins.healthRefs
 	}
 	purgePaths, err := parsePurgePaths(request.Configuration, request.Intent.PurgeOnDeploy)
 	if err != nil {
@@ -212,7 +280,7 @@ func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sd
 		AdapterID: cloudFrontEdgeAdapterID, TargetProvider: request.TargetProvider, TargetRuntime: request.TargetRuntime,
 		OwnershipMarker: marker,
 		Outputs:         []sdk.AdapterOutput{{Key: "distributionId"}, {Key: "distributionDomainName"}, {Key: "distributionStatus"}},
-		Opaque:          cloudFrontPlan{config: config, originHealthRefs: origins.healthRefs, purgeOnDeploy: request.Intent.PurgeOnDeploy, purgePaths: purgePaths, ownershipMarker: marker},
+		Opaque:          cloudFrontPlan{version: 1, targetProvider: request.TargetProvider, targetRuntime: request.TargetRuntime, config: config, originHealthRefs: originHealthRefs, purgeOnDeploy: request.Intent.PurgeOnDeploy, purgePaths: purgePaths, ownershipMarker: marker},
 	}
 	if request.Intent.WAFPolicyRef != "" {
 		plan.Outputs = append(plan.Outputs, sdk.AdapterOutput{Key: "webACLId"})
@@ -233,14 +301,20 @@ func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequ
 	if operation.Provider != "aws" {
 		return sdk.EdgeOperationObservation{}, fmt.Errorf("CloudFront operation provider must be aws, got %q", operation.Provider)
 	}
-	plan, ok := operation.Request.Plan.Opaque.(cloudFrontPlan)
-	if !ok {
+	plan, err := cloudFrontPlanFromOpaque(operation.Request.Plan.Opaque)
+	if err != nil {
 		return sdk.EdgeOperationObservation{}, errors.New("CloudFront operation plan is missing provider configuration")
+	}
+	if operation.Request.Plan.AdapterID != cloudFrontEdgeAdapterID || operation.Request.Plan.TargetProvider != plan.targetProvider || operation.Request.Plan.TargetRuntime != plan.targetRuntime {
+		return sdk.EdgeOperationObservation{}, errors.New("CloudFront operation target does not match its provider-owned plan")
 	}
 	if plan.ownershipMarker != operation.Request.OwnershipMarker {
 		return sdk.EdgeOperationObservation{}, errors.New("CloudFront operation ownership marker does not match plan")
 	}
 	if operation.Action == sdk.EdgeApply || operation.Action == sdk.EdgeVerify || operation.Action == sdk.EdgeFailover || operation.Action == sdk.EdgeRollback {
+		if plan.config == nil {
+			return sdk.EdgeOperationObservation{}, errors.New("CloudFront operation requires a full origin configuration")
+		}
 		for _, healthRef := range plan.originHealthRefs {
 			if err := api.health.VerifyOrigin(ctx, healthRef); err != nil {
 				return sdk.EdgeOperationObservation{}, fmt.Errorf("verify CloudFront origin health before mutation: %w", err)
@@ -255,7 +329,7 @@ func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequ
 		if err != nil {
 			return sdk.EdgeOperationObservation{}, err
 		}
-		return pendingObservation(sdk.EdgeVerify, distributionOperationID(sdk.EdgeVerify, id, false, "", nil), operation.Request.OwnershipMarker), nil
+		return pendingObservation(sdk.EdgeVerify, distributionOperationID(sdk.EdgeVerify, id, false, "", nil, operation.Request.OwnershipMarker), operation.Request.OwnershipMarker), nil
 	case sdk.EdgeDestroy:
 		return api.startDestroy(ctx, operation)
 	case sdk.EdgeFailover:
@@ -269,16 +343,23 @@ func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequ
 	}
 }
 
-func (api *NativeAPI) startPurge(_ context.Context, operation sdk.EdgeOperationRequest, plan cloudFrontPlan) (sdk.EdgeOperationObservation, error) {
+func (api *NativeAPI) startPurge(ctx context.Context, operation sdk.EdgeOperationRequest, plan cloudFrontPlan) (sdk.EdgeOperationObservation, error) {
 	id, err := distributionIDFromReferences(operation.Request.ResourceReferences)
 	if err != nil {
 		return sdk.EdgeOperationObservation{}, err
+	}
+	distribution, err := api.api.GetDistribution(ctx, &cloudfront.GetDistributionInput{Id: aws.String(id)})
+	if err != nil {
+		return sdk.EdgeOperationObservation{}, fmt.Errorf("read CloudFront distribution before purge: %w", err)
+	}
+	if distribution == nil || distribution.Distribution == nil || !ownedDistributionConfig(distribution.Distribution.DistributionConfig, operation.Request.OwnershipMarker) {
+		return sdk.EdgeOperationObservation{}, errors.New("refusing to purge an unowned CloudFront distribution")
 	}
 	paths := plan.purgePaths
 	if len(paths) == 0 {
 		paths = []string{"/*"}
 	}
-	return pendingObservation(sdk.EdgePurge, distributionOperationID(sdk.EdgePurge, id, true, operation.Request.IdempotencyKey, paths), operation.Request.OwnershipMarker), nil
+	return pendingObservation(sdk.EdgePurge, distributionOperationID(sdk.EdgePurge, id, true, operation.Request.IdempotencyKey, paths, operation.Request.OwnershipMarker), operation.Request.OwnershipMarker), nil
 }
 
 func (api *NativeAPI) startOriginTransition(ctx context.Context, operation sdk.EdgeOperationRequest, plan cloudFrontPlan, failover bool) (sdk.EdgeOperationObservation, error) {
@@ -336,7 +417,7 @@ func (api *NativeAPI) startApply(ctx context.Context, operation sdk.EdgeOperatio
 		if distribution == nil || aws.ToString(distribution.Id) == "" {
 			return sdk.EdgeOperationObservation{}, errors.New("CloudFront create response did not contain a distribution identity")
 		}
-		return pendingObservation(sdk.EdgeApply, distributionOperationID(sdk.EdgeApply, aws.ToString(distribution.Id), plan.purgeOnDeploy, operation.Request.IdempotencyKey, plan.purgePaths), operation.Request.OwnershipMarker), nil
+		return pendingObservation(sdk.EdgeApply, distributionOperationID(sdk.EdgeApply, aws.ToString(distribution.Id), plan.purgeOnDeploy, operation.Request.IdempotencyKey, plan.purgePaths, operation.Request.OwnershipMarker), operation.Request.OwnershipMarker), nil
 	}
 	id := aws.ToString(distribution.Id)
 	if id == "" {
@@ -361,7 +442,7 @@ func (api *NativeAPI) startApply(ctx context.Context, operation sdk.EdgeOperatio
 			return sdk.EdgeOperationObservation{}, errors.New("CloudFront update response did not contain a distribution")
 		}
 	}
-	return pendingObservation(sdk.EdgeApply, distributionOperationID(sdk.EdgeApply, id, plan.purgeOnDeploy, operation.Request.IdempotencyKey, plan.purgePaths), operation.Request.OwnershipMarker), nil
+	return pendingObservation(sdk.EdgeApply, distributionOperationID(sdk.EdgeApply, id, plan.purgeOnDeploy, operation.Request.IdempotencyKey, plan.purgePaths, operation.Request.OwnershipMarker), operation.Request.OwnershipMarker), nil
 }
 
 func (api *NativeAPI) startDestroy(ctx context.Context, operation sdk.EdgeOperationRequest) (sdk.EdgeOperationObservation, error) {
@@ -372,7 +453,7 @@ func (api *NativeAPI) startDestroy(ctx context.Context, operation sdk.EdgeOperat
 	distribution, getErr := api.api.GetDistribution(ctx, &cloudfront.GetDistributionInput{Id: aws.String(id)})
 	if getErr != nil {
 		if isNoSuchDistribution(getErr) {
-			return succeededObservation(sdk.EdgeDestroy, distributionOperationID(sdk.EdgeDestroy, id, false, "", nil), operation.Request.OwnershipMarker, []string{cloudFrontDistribution + id}, []string{"aws.cloudfront.owning-service-inventory-empty"}), nil
+			return succeededObservation(sdk.EdgeDestroy, distributionOperationID(sdk.EdgeDestroy, id, false, "", nil, operation.Request.OwnershipMarker), operation.Request.OwnershipMarker, []string{cloudFrontDistribution + id}, []string{"aws.cloudfront.owning-service-inventory-empty"}), nil
 		}
 		return sdk.EdgeOperationObservation{}, fmt.Errorf("read CloudFront distribution for destroy: %w", getErr)
 	}
@@ -382,7 +463,7 @@ func (api *NativeAPI) startDestroy(ctx context.Context, operation sdk.EdgeOperat
 	if err := api.disableIfNeeded(ctx, id, distribution.Distribution); err != nil {
 		return sdk.EdgeOperationObservation{}, err
 	}
-	return pendingObservation(sdk.EdgeDestroy, distributionOperationID(sdk.EdgeDestroy, id, false, "", nil), operation.Request.OwnershipMarker), nil
+	return pendingObservation(sdk.EdgeDestroy, distributionOperationID(sdk.EdgeDestroy, id, false, "", nil, operation.Request.OwnershipMarker), operation.Request.OwnershipMarker), nil
 }
 
 func (api *NativeAPI) Poll(ctx context.Context, operationID string) (sdk.EdgeOperationObservation, error) {
@@ -392,7 +473,7 @@ func (api *NativeAPI) Poll(ctx context.Context, operationID string) (sdk.EdgeOpe
 	if ctx == nil {
 		return sdk.EdgeOperationObservation{}, errors.New("CloudFront polling context is required")
 	}
-	kind, action, id, purge, callerReference, paths, transitionState, err := parseDistributionOperationID(operationID)
+	kind, action, id, purge, callerReference, paths, transitionState, expectedOwner, err := parseDistributionOperationID(operationID)
 	if err != nil {
 		return sdk.EdgeOperationObservation{}, err
 	}
@@ -412,6 +493,9 @@ func (api *NativeAPI) Poll(ctx context.Context, operationID string) (sdk.EdgeOpe
 		marker, markerErr := markerFromDistribution(distribution)
 		if markerErr != nil {
 			return failedObservation(action, operationID, markerErr.Error()), nil
+		}
+		if purge && marker != expectedOwner {
+			return failedObservation(action, operationID, "CloudFront distribution ownership marker changed before purge"), nil
 		}
 		if action == sdk.EdgeDestroy {
 			if distribution.DistributionConfig != nil && aws.ToBool(distribution.DistributionConfig.Enabled) {
@@ -844,13 +928,16 @@ func distributionCallerReference(comment string, originSet cloudFrontOriginSet, 
 	return "magelift-" + hex.EncodeToString(hash[:])
 }
 
-func distributionOperationID(action sdk.EdgeAction, id string, purge bool, callerReference string, paths []string) string {
+func distributionOperationID(action sdk.EdgeAction, id string, purge bool, callerReference string, paths []string, ownershipMarker string) string {
 	operation := cloudFrontOperation + ":distribution:" + string(action) + ":" + id
 	if !purge {
 		return operation
 	}
+	if strings.TrimSpace(callerReference) == "" || strings.TrimSpace(ownershipMarker) == "" || len(paths) == 0 {
+		return ""
+	}
 	pathBytes := []byte(strings.Join(paths, "\x00"))
-	return operation + ":purge:" + base64.RawURLEncoding.EncodeToString([]byte(callerReference)) + ":" + base64.RawURLEncoding.EncodeToString(pathBytes)
+	return operation + ":purge:" + base64.RawURLEncoding.EncodeToString([]byte(callerReference)) + ":" + base64.RawURLEncoding.EncodeToString(pathBytes) + ":owner:" + base64.RawURLEncoding.EncodeToString([]byte(ownershipMarker))
 }
 
 func transitionOperationID(action sdk.EdgeAction, id string, groups *cloudfronttypes.OriginGroups) (string, error) {
@@ -902,56 +989,63 @@ func originGroupStatusCodeIdentity(group cloudfronttypes.OriginGroup) string {
 	return strings.Join(codes, ",")
 }
 
-func parseDistributionOperationID(value string) (kind string, action sdk.EdgeAction, id string, purge bool, callerReference string, paths, transitionState []string, err error) {
+func parseDistributionOperationID(value string) (kind string, action sdk.EdgeAction, id string, purge bool, callerReference string, paths, transitionState []string, ownershipMarker string, err error) {
 	parts := strings.Split(value, ":")
 	if len(parts) < 4 || parts[0] != "aws.cloudfront" || (parts[1] != "distribution" && parts[1] != "invalidation") {
-		return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront operation ID %q", value)
+		return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront operation ID %q", value)
 	}
 	kind, action, id = parts[1], sdk.EdgeAction(parts[2]), parts[3]
-	if id == "" || (action != sdk.EdgeApply && action != sdk.EdgeVerify && action != sdk.EdgeFailover && action != sdk.EdgeRollback && action != sdk.EdgeDestroy) {
-		return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront operation ID %q", value)
+	if id == "" || (action != sdk.EdgeApply && action != sdk.EdgeVerify && action != sdk.EdgeFailover && action != sdk.EdgeRollback && action != sdk.EdgeDestroy && action != sdk.EdgePurge) {
+		return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront operation ID %q", value)
 	}
 	if kind == "invalidation" {
 		if len(parts) != 5 || parts[4] == "" {
-			return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront invalidation operation ID %q", value)
+			return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront invalidation operation ID %q", value)
 		}
-		return kind, action, id, false, parts[4], nil, nil, nil
+		return kind, action, id, false, parts[4], nil, nil, "", nil
 	}
 	if len(parts) == 4 {
-		return kind, action, id, false, "", nil, nil, nil
+		if action == sdk.EdgePurge {
+			return "", "", "", false, "", nil, nil, "", fmt.Errorf("CloudFront purge operation ID is missing its ownership and invalidation inputs")
+		}
+		return kind, action, id, false, "", nil, nil, "", nil
 	}
 	if len(parts) == 6 && parts[4] == "transition" {
 		if action != sdk.EdgeFailover && action != sdk.EdgeRollback {
-			return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront transition operation ID %q", value)
+			return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront transition operation ID %q", value)
 		}
 		stateBytes, decodeErr := base64.RawURLEncoding.DecodeString(parts[5])
 		if decodeErr != nil {
-			return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront transition operation ID %q", value)
+			return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront transition operation ID %q", value)
 		}
 		transitionState = strings.Split(string(stateBytes), "\x00")
 		if len(transitionState) != 4 {
-			return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront transition operation ID %q", value)
+			return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront transition operation ID %q", value)
 		}
 		for _, value := range transitionState {
 			if value == "" || strings.ContainsAny(value, "\r\n\x00") {
-				return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront transition operation ID %q", value)
+				return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront transition operation ID %q", value)
 			}
 		}
-		return kind, action, id, false, "", nil, transitionState, nil
+		return kind, action, id, false, "", nil, transitionState, "", nil
 	}
-	if len(parts) != 7 || parts[4] != "purge" {
-		return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront distribution operation ID %q", value)
+	if len(parts) != 9 || parts[4] != "purge" || parts[7] != "owner" {
+		return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront distribution operation ID %q", value)
+	}
+	if action != sdk.EdgePurge && action != sdk.EdgeApply {
+		return "", "", "", false, "", nil, nil, "", fmt.Errorf("CloudFront action %q cannot carry purge operation inputs", action)
 	}
 	callerBytes, callerErr := base64.RawURLEncoding.DecodeString(parts[5])
 	pathBytes, pathErr := base64.RawURLEncoding.DecodeString(parts[6])
-	if callerErr != nil || pathErr != nil || len(callerBytes) == 0 {
-		return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront purge operation ID %q", value)
+	ownerBytes, ownerErr := base64.RawURLEncoding.DecodeString(parts[8])
+	if callerErr != nil || pathErr != nil || ownerErr != nil || len(callerBytes) == 0 || len(ownerBytes) == 0 {
+		return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront purge operation ID %q", value)
 	}
 	paths = strings.Split(string(pathBytes), "\x00")
 	if len(paths) == 0 || paths[0] == "" {
-		return "", "", "", false, "", nil, nil, fmt.Errorf("invalid CloudFront purge operation ID %q", value)
+		return "", "", "", false, "", nil, nil, "", fmt.Errorf("invalid CloudFront purge operation ID %q", value)
 	}
-	return kind, action, id, true, string(callerBytes), paths, nil, nil
+	return kind, action, id, true, string(callerBytes), paths, nil, string(ownerBytes), nil
 }
 
 func distributionIDFromReferences(references []string) (string, error) {

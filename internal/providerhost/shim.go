@@ -77,10 +77,13 @@ func newShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform
 		outputKeys: append([]string(nil), outputKeys...),
 		client:     client,
 	}
-	if provider == StandaloneProviderGCP || provider == StandaloneProviderAWS {
+	descriptor, _ := standaloneRuntime(provider, runtime)
+	if descriptor.Edge {
 		module.Edge = func(ctx context.Context, planned platform.PlannedStack) (sdk.EdgeAdapter, error) {
 			return NewShimEdgeAdapter(ctx, client, planned)
 		}
+	}
+	if descriptor.Resilience {
 		module.Resilience = func(ctx context.Context, planned platform.PlannedStack) (sdk.ResilienceAdapter, error) {
 			return NewShimResilienceAdapter(ctx, client, planned)
 		}
@@ -98,7 +101,7 @@ func newShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform
 }
 
 func gcpOutputKeys() []string {
-	return append(append([]string(nil), platform.RequiredOutputKeys()...), "mediaURL", "mediaBucket", platform.OutputSearchEndpoint, platform.OutputQueueHost, platform.OutputQueueReplicas, platform.OutputDatabaseConnectionName, "queueMode", platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, "securityPolicyName")
+	return append(append([]string(nil), platform.RequiredOutputKeys()...), "mediaURL", "mediaBucket", platform.OutputSearchEndpoint, platform.OutputQueueHost, platform.OutputQueueReplicas, platform.OutputDatabaseConnectionName, "queueMode", platform.OutputDatabaseSecretName, platform.OutputQueuePasswordSecretName, "securityPolicyName", "nativeEdgeIngressAddress", "nativeEdgeIngressName", "nativeEdgeIngressNamespace", "nativeEdgeIngressOwner", "nativeEdgeURLMapName")
 }
 
 func awsOutputKeys() []string {

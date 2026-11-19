@@ -22,14 +22,16 @@ type StandaloneRuntime struct {
 	Runtime    sdk.RuntimeID
 	Tier       platform.CertificationTier
 	OptIn      bool
+	Edge       bool
+	Resilience bool
 	OutputKeys []string
 }
 
 var standaloneRuntimes = []StandaloneRuntime{
-	{Provider: StandaloneProviderAWS, Runtime: "ecs-fargate", Tier: platform.TierBuiltIn, OutputKeys: awsOutputKeys()},
+	{Provider: StandaloneProviderAWS, Runtime: "ecs-fargate", Tier: platform.TierBuiltIn, Edge: true, OutputKeys: awsOutputKeys()},
 	{Provider: StandaloneProviderAWS, Runtime: "eks", Tier: platform.TierExperimental, OptIn: true, OutputKeys: awsOutputKeys()},
-	{Provider: StandaloneProviderGCP, Runtime: "gke-autopilot", Tier: platform.TierBuiltIn, OutputKeys: gcpOutputKeys()},
-	{Provider: StandaloneProviderGCP, Runtime: "gke-standard", Tier: platform.TierExperimental, OutputKeys: gcpOutputKeys()},
+	{Provider: StandaloneProviderGCP, Runtime: "gke-autopilot", Tier: platform.TierBuiltIn, Edge: true, Resilience: true, OutputKeys: gcpOutputKeys()},
+	{Provider: StandaloneProviderGCP, Runtime: "gke-standard", Tier: platform.TierExperimental, Edge: true, Resilience: true, OutputKeys: gcpOutputKeys()},
 	{Provider: StandaloneProviderAzure, Runtime: "aks", Tier: platform.TierExperimental, OutputKeys: azureOutputKeys()},
 }
 

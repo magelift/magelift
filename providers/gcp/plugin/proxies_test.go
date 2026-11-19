@@ -11,7 +11,7 @@ import (
 func TestEdgeProxyRoundTrip(t *testing.T) {
 	t.Parallel()
 	adapter := stubEdgeAdapter{
-		plan:   sdk.EdgePlan{AdapterID: "gcp.edge", OwnershipMarker: "magelift/test"},
+		plan:   sdk.EdgePlan{AdapterID: "gcp.edge", TargetProvider: "gcp", TargetRuntime: "gke-autopilot", OwnershipMarker: "magelift/test"},
 		result: sdk.EdgeExecutionResult{OperationID: "op-1", OwnershipVerified: true, IdempotencyVerified: true},
 	}
 	server := &Server{NewEdgeAdapter: func(context.Context, string) (sdk.EdgeAdapter, error) { return adapter, nil }}
@@ -24,14 +24,14 @@ func TestEdgeProxyRoundTrip(t *testing.T) {
 	if operr != nil {
 		t.Fatal(operr)
 	}
-	var decoded sdk.EdgePlan
-	if err := json.Unmarshal(planned.PlanJSON, &decoded); err != nil {
+	decoded, _, _, err := sdk.DecodeEdgePlanRPC(planned.PlanJSON)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if decoded.AdapterID != "gcp.edge" {
 		t.Fatalf("plan = %#v", decoded)
 	}
-	execReq, err := json.Marshal(sdk.EdgeExecutionRequest{Plan: decoded, Action: sdk.EdgePurge, IdempotencyKey: "purge/staging"})
+	execReq, err := sdk.EncodeEdgeExecutionRPC(sdk.EdgeExecutionRequest{Plan: decoded, Action: sdk.EdgePurge, IdempotencyKey: "purge/staging"}, sdk.EdgeRPCBindingFor(envelope, plan))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestEdgeProxyCapabilityErrorIsInvalid(t *testing.T) {
 	adapter := stubEdgeAdapter{err: sdk.EdgeCapabilityError{AdapterID: "gcp.edge", Action: sdk.EdgePurge, Status: sdk.EdgeCapabilityUnsupported, Reason: "no cdn"}}
 	server := &Server{NewEdgeAdapter: func(context.Context, string) (sdk.EdgeAdapter, error) { return adapter, nil }}
 	envelope, plan := planCall(testEnvelope(), storedTestPlan(t, testSpec()))
-	planReq, err := json.Marshal(sdk.EdgePlanRequest{TargetProvider: "gcp"})
+	planReq, err := json.Marshal(sdk.EdgePlanRequest{TargetProvider: "gcp", TargetRuntime: "gke-autopilot"})
 	if err != nil {
 		t.Fatal(err)
 	}

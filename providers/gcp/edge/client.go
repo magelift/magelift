@@ -56,6 +56,10 @@ type GoogleEdgeApplyRequest struct {
 	PurgeOnDeploy              bool
 	PurgePaths                 []string
 	Domains                    []string
+	GKEIngressName             string
+	GKEIngressNamespace        string
+	GKEIngressOwner            string
+	Hostname                   string
 }
 
 // GoogleEdgeState contains opaque resource identities and user-visible
@@ -116,7 +120,57 @@ func NewNativeAPI(api GoogleEdgeAPI, project string, health GoogleOriginHealthPr
 }
 
 type googleEdgePlan struct {
-	request GoogleEdgeApplyRequest
+	version        int
+	targetProvider sdk.ProviderID
+	targetRuntime  sdk.RuntimeID
+	request        GoogleEdgeApplyRequest
+}
+
+type googleEdgePlanWire struct {
+	Version        int                    `json:"version"`
+	TargetProvider sdk.ProviderID         `json:"targetProvider"`
+	TargetRuntime  sdk.RuntimeID          `json:"targetRuntime"`
+	Request        GoogleEdgeApplyRequest `json:"request"`
+}
+
+func (p googleEdgePlan) MarshalJSON() ([]byte, error) {
+	return json.Marshal(googleEdgePlanWire{Version: p.version, TargetProvider: p.targetProvider, TargetRuntime: p.targetRuntime, Request: p.request})
+}
+
+func (p *googleEdgePlan) UnmarshalJSON(data []byte) error {
+	var wire googleEdgePlanWire
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if wire.Version != 1 || wire.TargetProvider != "gcp" || strings.TrimSpace(string(wire.TargetRuntime)) == "" || strings.TrimSpace(wire.Request.OwnershipMarker) == "" {
+		return errors.New("Google Cloud edge plan state has an unsupported version or target")
+	}
+	*p = googleEdgePlan{version: wire.Version, targetProvider: wire.TargetProvider, targetRuntime: wire.TargetRuntime, request: wire.Request}
+	return nil
+}
+
+func googleEdgePlanFromOpaque(value any) (googleEdgePlan, error) {
+	switch plan := value.(type) {
+	case googleEdgePlan:
+		if plan.version != 1 || plan.targetProvider != "gcp" || strings.TrimSpace(string(plan.targetRuntime)) == "" || strings.TrimSpace(plan.request.OwnershipMarker) == "" {
+			return googleEdgePlan{}, errors.New("Google Cloud edge plan state has an unsupported version or target")
+		}
+		return plan, nil
+	case json.RawMessage:
+		var decoded googleEdgePlan
+		if err := json.Unmarshal(plan, &decoded); err != nil {
+			return googleEdgePlan{}, err
+		}
+		return decoded, nil
+	case []byte:
+		var decoded googleEdgePlan
+		if err := json.Unmarshal(plan, &decoded); err != nil {
+			return googleEdgePlan{}, err
+		}
+		return decoded, nil
+	default:
+		return googleEdgePlan{}, errors.New("Google Cloud edge plan state has an unexpected transport type")
+	}
 }
 
 func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sdk.EdgePlan, error) {
@@ -150,6 +204,40 @@ func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sd
 	if !request.Intent.TLS {
 		return sdk.EdgePlan{}, errors.New("Google Cloud external HTTPS edge requires TLS")
 	}
+	marker := strings.TrimSpace(request.Intent.OwnershipMarker)
+	if value, found := request.Configuration["gkeIngress"]; found {
+		gke, ok := value.(map[string]any)
+		if !ok {
+			return sdk.EdgePlan{}, errors.New("GCP gkeIngress configuration must be an object")
+		}
+		urlMapName := stringOption(gke, "urlMapName")
+		ingressName := stringOption(gke, "ingressName")
+		namespace := stringOption(gke, "namespace")
+		owner := stringOption(gke, "owner")
+		hostname := strings.ToLower(stringOption(gke, "hostname"))
+		if urlMapName == "" || ingressName == "" || namespace == "" || owner == "" || hostname == "" {
+			return sdk.EdgePlan{}, errors.New("GCP GKE purge requires the verified Ingress identity, owner, URL map, and hostname")
+		}
+		if owner != marker || len(request.Intent.Domains) != 1 || hostname != strings.ToLower(strings.TrimSpace(request.Intent.Domains[0])) {
+			return sdk.EdgePlan{}, errors.New("GCP GKE purge references do not match the configured owner and unique hostname")
+		}
+		purgePaths, err := parseGooglePurgePaths(request.Configuration, request.Intent.PurgeOnDeploy)
+		if err != nil {
+			return sdk.EdgePlan{}, err
+		}
+		planRequest := GoogleEdgeApplyRequest{
+			Project: api.project, OwnershipMarker: marker, URLMapName: urlMapName,
+			PurgeOnDeploy: request.Intent.PurgeOnDeploy, PurgePaths: purgePaths, Domains: sortedCopy(request.Intent.Domains),
+			GKEIngressName: ingressName, GKEIngressNamespace: namespace, GKEIngressOwner: owner, Hostname: hostname,
+		}
+		return sdk.EdgePlan{
+			AdapterID: googleEdgeAdapterID, TargetProvider: request.TargetProvider, TargetRuntime: request.TargetRuntime,
+			OwnershipMarker: marker, Opaque: googleEdgePlan{version: 1, targetProvider: request.TargetProvider, targetRuntime: request.TargetRuntime, request: planRequest},
+		}, nil
+	}
+	if len(request.Configuration) == 0 {
+		return sdk.EdgePlan{}, errors.New("GCP native purge requires verified GKE Ingress outputs; refresh infrastructure outputs and retry")
+	}
 	backendURL, err := backendServiceURL(api.project, stringOption(request.Configuration, "backendService"))
 	if err != nil {
 		return sdk.EdgePlan{}, fmt.Errorf("parse GCP backend service: %w", err)
@@ -180,7 +268,6 @@ func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sd
 	if err != nil {
 		return sdk.EdgePlan{}, err
 	}
-	marker := strings.TrimSpace(request.Intent.OwnershipMarker)
 	digest := markerDigest(marker)
 	planRequest := GoogleEdgeApplyRequest{
 		Project: api.project, OwnershipMarker: marker, OriginHealthRef: request.Intent.OriginHealthRef, OriginHealthRefs: originHealthRefs,
@@ -190,7 +277,7 @@ func (api *NativeAPI) Plan(ctx context.Context, request sdk.EdgePlanRequest) (sd
 		Domains: sortedCopy(request.Intent.Domains),
 	}
 	return sdk.EdgePlan{AdapterID: googleEdgeAdapterID, TargetProvider: request.TargetProvider, TargetRuntime: request.TargetRuntime, OwnershipMarker: marker,
-		Outputs: []sdk.AdapterOutput{{Key: "forwardingRuleName"}, {Key: "forwardingIPAddress"}, {Key: "targetHttpsProxyName"}, {Key: "urlMapName"}}, Opaque: googleEdgePlan{request: planRequest}}, nil
+		Outputs: []sdk.AdapterOutput{{Key: "forwardingRuleName"}, {Key: "forwardingIPAddress"}, {Key: "targetHttpsProxyName"}, {Key: "urlMapName"}}, Opaque: googleEdgePlan{version: 1, targetProvider: request.TargetProvider, targetRuntime: request.TargetRuntime, request: planRequest}}, nil
 }
 
 func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequest) (sdk.EdgeOperationObservation, error) {
@@ -203,9 +290,12 @@ func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequ
 	if operation.Provider != "gcp" {
 		return sdk.EdgeOperationObservation{}, fmt.Errorf("Google Cloud edge operation provider must be gcp, got %q", operation.Provider)
 	}
-	plan, ok := operation.Request.Plan.Opaque.(googleEdgePlan)
-	if !ok {
+	plan, err := googleEdgePlanFromOpaque(operation.Request.Plan.Opaque)
+	if err != nil {
 		return sdk.EdgeOperationObservation{}, errors.New("Google Cloud edge plan is missing provider configuration")
+	}
+	if operation.Request.Plan.AdapterID != googleEdgeAdapterID || operation.Request.Plan.TargetProvider != plan.targetProvider || operation.Request.Plan.TargetRuntime != plan.targetRuntime {
+		return sdk.EdgeOperationObservation{}, errors.New("Google Cloud edge operation target does not match its provider-owned plan")
 	}
 	if plan.request.OwnershipMarker != operation.Request.OwnershipMarker {
 		return sdk.EdgeOperationObservation{}, errors.New("Google Cloud edge ownership marker does not match the plan")
@@ -232,27 +322,27 @@ func (api *NativeAPI) Start(ctx context.Context, operation sdk.EdgeOperationRequ
 		return pendingGoogleEdgeOperation(operation.Action, googleEdgeOperationID(operation.Action, transitionRequest, ""), operation.Request.OwnershipMarker, "GCP URL-map backend transition submitted"), nil
 	}
 	var state GoogleEdgeState
-	var err error
+	var stateErr error
 	switch operation.Action {
 	case sdk.EdgeApply:
-		state, err = api.api.Apply(ctx, plan.request)
+		state, stateErr = api.api.Apply(ctx, plan.request)
 	case sdk.EdgeVerify:
-		state, err = api.api.Verify(ctx, plan.request)
+		state, stateErr = api.api.Verify(ctx, plan.request)
 	case sdk.EdgeDestroy:
 		state = stateFromReferences(plan.request, operation.Request.ResourceReferences)
-		err = api.api.Destroy(ctx, plan.request, state)
+		stateErr = api.api.Destroy(ctx, plan.request, state)
 	case sdk.EdgePurge:
 		request := plan.request
 		request.PurgeOnDeploy = true
 		if len(request.PurgePaths) == 0 {
 			request.PurgePaths = []string{"/*"}
 		}
-		state, err = api.api.Purge(ctx, request)
+		state, stateErr = api.api.Purge(ctx, request)
 	default:
 		return sdk.EdgeOperationObservation{}, fmt.Errorf("unsupported GCP edge action %q", operation.Action)
 	}
-	if err != nil {
-		return sdk.EdgeOperationObservation{}, err
+	if stateErr != nil {
+		return sdk.EdgeOperationObservation{}, stateErr
 	}
 	operationID := googleEdgeOperationID(operation.Action, plan.request, state.Invalidation)
 	if operation.Action == sdk.EdgeDestroy {
@@ -451,8 +541,22 @@ func (api *computeGoogleEdgeAPI) Apply(ctx context.Context, request GoogleEdgeAp
 }
 
 func (api *computeGoogleEdgeAPI) Purge(ctx context.Context, request GoogleEdgeApplyRequest) (GoogleEdgeState, error) {
-	if err := validateGoogleEdgeApplyRequest(request); err != nil {
+	if err := validateGoogleEdgePurgeRequest(request); err != nil {
 		return GoogleEdgeState{}, err
+	}
+	urlMap, err := api.service.UrlMaps.Get(request.Project, request.URLMapName).Context(ctx).Do()
+	if err != nil {
+		return GoogleEdgeState{}, fmt.Errorf("read GCP URL map before purge: %w", err)
+	}
+	if urlMap == nil {
+		return GoogleEdgeState{}, errors.New("GCP URL map response is empty")
+	}
+	if request.GKEIngressName != "" {
+		if request.GKEIngressOwner != request.OwnershipMarker || urlMap.Name != request.URLMapName || !googleURLMapHasOnlyHost(urlMap, request.Hostname) {
+			return GoogleEdgeState{}, errors.New("refusing to purge a GKE URL map that does not match the verified Ingress outputs and unique hostname")
+		}
+	} else if urlMap.Description != googleOwnedPrefix+request.OwnershipMarker {
+		return GoogleEdgeState{}, errors.New("refusing to purge an unowned GCP URL map")
 	}
 	if len(request.PurgePaths) == 0 {
 		request.PurgePaths = []string{"/*"}
@@ -834,7 +938,7 @@ func (api *computeGoogleEdgeAPI) ensureForwardingRule(ctx context.Context, reque
 func (api *computeGoogleEdgeAPI) invalidateCache(ctx context.Context, request GoogleEdgeApplyRequest) (string, error) {
 	var operationNames []string
 	for _, path := range request.PurgePaths {
-		op, err := api.service.UrlMaps.InvalidateCache(request.Project, request.URLMapName, &compute.CacheInvalidationRule{Path: path}).Context(ctx).Do()
+		op, err := api.service.UrlMaps.InvalidateCache(request.Project, request.URLMapName, &compute.CacheInvalidationRule{Host: request.Hostname, Path: path}).Context(ctx).Do()
 		if err != nil {
 			return "", fmt.Errorf("invalidate GCP URL map cache for %q: %w", path, err)
 		}
@@ -915,6 +1019,55 @@ func validateGoogleEdgeApplyRequest(request GoogleEdgeApplyRequest) error {
 		return errors.New("GCP edge purge requires at least one path")
 	}
 	return nil
+}
+
+func validateGoogleEdgePurgeRequest(request GoogleEdgeApplyRequest) error {
+	for name, value := range map[string]string{"project": request.Project, "ownership marker": request.OwnershipMarker, "URL map name": request.URLMapName} {
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("GCP edge purge %s is required", name)
+		}
+		if strings.ContainsAny(value, "\r\n\x00") {
+			return fmt.Errorf("GCP edge purge %s must be single-line", name)
+		}
+	}
+	if len(request.PurgePaths) == 0 {
+		return nil
+	}
+	for _, path := range request.PurgePaths {
+		if !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\r\n\x00") {
+			return errors.New("GCP edge purge paths must be absolute single-line paths")
+		}
+	}
+	if request.GKEIngressName != "" || request.GKEIngressNamespace != "" || request.GKEIngressOwner != "" || request.Hostname != "" {
+		for name, value := range map[string]string{"GKE Ingress name": request.GKEIngressName, "GKE Ingress namespace": request.GKEIngressNamespace, "GKE Ingress owner": request.GKEIngressOwner, "hostname": request.Hostname} {
+			if strings.TrimSpace(value) == "" || strings.ContainsAny(value, "\r\n\x00") {
+				return fmt.Errorf("GCP edge purge %s is required and must be single-line", name)
+			}
+		}
+		if request.GKEIngressOwner != request.OwnershipMarker {
+			return errors.New("GCP GKE Ingress owner does not match the edge ownership marker")
+		}
+		if len(request.Domains) != 1 || strings.ToLower(strings.TrimSpace(request.Domains[0])) != strings.ToLower(request.Hostname) {
+			return errors.New("GCP GKE purge must match its unique configured hostname")
+		}
+	}
+	return nil
+}
+
+func googleURLMapHasOnlyHost(urlMap *compute.UrlMap, hostname string) bool {
+	if urlMap == nil || strings.TrimSpace(hostname) == "" {
+		return false
+	}
+	var hosts []string
+	for _, rule := range urlMap.HostRules {
+		if rule == nil {
+			return false
+		}
+		for _, host := range rule.Hosts {
+			hosts = append(hosts, strings.ToLower(strings.TrimSpace(host)))
+		}
+	}
+	return len(hosts) == 1 && hosts[0] == strings.ToLower(strings.TrimSpace(hostname))
 }
 
 func verifyGoogleOriginHealth(ctx context.Context, health GoogleOriginHealthProbe, request GoogleEdgeApplyRequest) error {

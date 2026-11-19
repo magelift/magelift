@@ -144,6 +144,29 @@ func TestNewShimModule(t *testing.T) {
 	}
 }
 
+func TestShimLifecycleFactoriesMatchStandaloneRuntimeCapabilities(t *testing.T) {
+	for _, test := range []struct {
+		provider, runtime string
+		edge, resilience  bool
+	}{
+		{provider: "aws", runtime: "ecs-fargate", edge: true},
+		{provider: "aws", runtime: "eks"},
+		{provider: "gcp", runtime: "gke-autopilot", edge: true, resilience: true},
+		{provider: "gcp", runtime: "gke-standard", edge: true, resilience: true},
+		{provider: "azure", runtime: "aks"},
+	} {
+		t.Run(test.provider+"/"+test.runtime, func(t *testing.T) {
+			module, err := NewShimModule(sdk.ProviderID(test.provider), sdk.RuntimeID(test.runtime), &Client{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (module.Edge != nil) != test.edge || (module.Resilience != nil) != test.resilience {
+				t.Fatalf("edge factory=%v resilience factory=%v, want edge=%t resilience=%t", module.Edge != nil, module.Resilience != nil, test.edge, test.resilience)
+			}
+		})
+	}
+}
+
 func TestShimPlan(t *testing.T) {
 	t.Parallel()
 	caller := &stubCaller{respond: planResponder(cannedStoredPlan())}

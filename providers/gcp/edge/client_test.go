@@ -24,6 +24,7 @@ type fakeGoogleEdgeAPI struct {
 	purgeCalls      int
 	transitionCalls int
 	state           GoogleEdgeState
+	purgeRequest    GoogleEdgeApplyRequest
 	err             error
 	inventory       []sdk.EdgeInventoryResource
 	inventoryErr    error
@@ -68,6 +69,7 @@ func (api *fakeGoogleEdgeAPI) Destroy(_ context.Context, _ GoogleEdgeApplyReques
 
 func (api *fakeGoogleEdgeAPI) Purge(_ context.Context, request GoogleEdgeApplyRequest) (GoogleEdgeState, error) {
 	api.purgeCalls++
+	api.purgeRequest = request
 	if api.err != nil {
 		return GoogleEdgeState{}, api.err
 	}
@@ -76,6 +78,58 @@ func (api *fakeGoogleEdgeAPI) Purge(_ context.Context, request GoogleEdgeApplyRe
 		api.state.Invalidation = "purge-all"
 	}
 	return api.state, nil
+}
+
+func TestGKENativePurgeUsesOnlyVerifiedControllerOutputs(t *testing.T) {
+	providerAPI := &fakeGoogleEdgeAPI{}
+	native, err := NewNativeAPI(providerAPI, "project-1", &fakeGoogleHealth{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := googleEdgeTestRequest()
+	request.Configuration = map[string]any{"gkeIngress": map[string]any{
+		"urlMapName": "k8s2-um-serving-shop", "ingressName": "magelift-shop", "namespace": "default",
+		"owner": request.Intent.OwnershipMarker, "hostname": "shop.example.com",
+	}}
+	plan, err := native.Plan(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if providerAPI.purgeCalls != 0 {
+		t.Fatal("planning purged the URL map")
+	}
+	operation := sdk.EdgeOperationRequest{Provider: "gcp", Action: sdk.EdgePurge, Request: sdk.EdgeExecutionRequest{
+		Plan: plan, Action: sdk.EdgePurge, IdempotencyKey: "purge/staging/nonce", OwnershipMarker: plan.OwnershipMarker,
+	}}
+	started, err := native.Start(context.Background(), operation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if started.Action != sdk.EdgePurge || providerAPI.purgeCalls != 1 || providerAPI.purgeRequest.URLMapName != "k8s2-um-serving-shop" || providerAPI.purgeRequest.Hostname != "shop.example.com" || providerAPI.purgeRequest.GKEIngressOwner != request.Intent.OwnershipMarker {
+		t.Fatalf("GKE purge request = %#v result=%#v", providerAPI.purgeRequest, started)
+	}
+}
+
+func TestGKENativePurgeRejectsStaleOrUnboundControllerOutputs(t *testing.T) {
+	for name, mutate := range map[string]func(map[string]any){
+		"missing url map": func(gke map[string]any) { delete(gke, "urlMapName") },
+		"foreign owner":   func(gke map[string]any) { gke["owner"] = "another/shop" },
+		"wrong hostname":  func(gke map[string]any) { gke["hostname"] = "other.example.com" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			native, err := NewNativeAPI(&fakeGoogleEdgeAPI{}, "project-1", &fakeGoogleHealth{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			gke := map[string]any{"urlMapName": "k8s2-um-serving-shop", "ingressName": "magelift-shop", "namespace": "default", "owner": "magelift/test/gcp-edge", "hostname": "shop.example.com"}
+			mutate(gke)
+			request := googleEdgeTestRequest()
+			request.Configuration = map[string]any{"gkeIngress": gke}
+			if _, err := native.Plan(context.Background(), request); err == nil {
+				t.Fatal("stale GKE outputs were accepted")
+			}
+		})
+	}
 }
 
 func (api *fakeGoogleEdgeAPI) Inventory(_ context.Context, marker string) ([]sdk.EdgeInventoryResource, error) {

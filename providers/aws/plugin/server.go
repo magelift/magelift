@@ -39,10 +39,11 @@ func PluginMap(server *Server) map[string]plugin.Plugin {
 }
 
 type Server struct {
-	Version    string
-	mu         sync.Mutex
-	candidates map[string]*deploymentCandidate
-	admit      func(context.Context, platform.StackModule, platform.PlannedStack) (platform.PlannedStack, error)
+	Version        string
+	mu             sync.Mutex
+	candidates     map[string]*deploymentCandidate
+	admit          func(context.Context, platform.StackModule, platform.PlannedStack) (platform.PlannedStack, error)
+	NewEdgeAdapter func(context.Context, platform.StackModule, platform.PlannedStack) (sdk.EdgeAdapter, error)
 }
 
 func module(runtime string) (platform.StackModule, error) {
