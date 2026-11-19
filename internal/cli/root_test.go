@@ -407,17 +407,32 @@ func TestNewWithModulesAndHooksThreadsCleanupAndMediaHooks(t *testing.T) {
 		}
 	})
 
-	t.Run("media endpoint defaults without hook", func(t *testing.T) {
-		t.Setenv("MAGELIFT_AWS_ENDPOINT_URL", "")
-		o := &options{}
-		client, err := o.newMediaS3Client(context.Background(), "eu-west-3")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if endpoint := client.Options().BaseEndpoint; endpoint != nil {
-			t.Fatalf("BaseEndpoint = %q, want nil default endpoints", *endpoint)
-		}
-	})
+	for _, tc := range []struct{ name, endpoint string }{
+		{"default media endpoint", ""},
+		{"Floci endpoint from AWS configuration", "http://127.0.0.1:4566"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("AWS_CONFIG_FILE", filepath.Join(t.TempDir(), "config"))
+			t.Setenv("AWS_PROFILE", "")
+			t.Setenv("AWS_DEFAULT_PROFILE", "")
+			t.Setenv("AWS_ENDPOINT_URL_S3", "")
+			t.Setenv("AWS_ENDPOINT_URL", tc.endpoint)
+			t.Setenv("AWS_IGNORE_CONFIGURED_ENDPOINT_URLS", "false")
+			t.Setenv("MAGELIFT_AWS_ENDPOINT_URL", "")
+			client, err := (&options{}).newMediaS3Client(context.Background(), "eu-west-3")
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := client.Options().BaseEndpoint
+			if tc.endpoint == "" {
+				if got != nil {
+					t.Fatalf("unexpected base endpoint %q", *got)
+				}
+			} else if got == nil || *got != tc.endpoint {
+				t.Fatalf("base endpoint = %v, want %s", got, tc.endpoint)
+			}
+		})
+	}
 
 	t.Run("set media hook overrides the endpoint", func(t *testing.T) {
 		o := &options{mediaEndpoint: func() (string, error) { return "http://127.0.0.1:4566", nil }}
