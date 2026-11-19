@@ -570,6 +570,7 @@ jobs:
           go-version-file: providers/azure/go.mod
           cache: false
       - uses: ./.github/actions/go-memlimit
+      - uses: ./.github/actions/setup-pulumi
       - name: Run Floci Azure contract tests
         env:
           MAGELIFT_FLOCI_AZURE: '1'
