@@ -32,7 +32,7 @@ All 13 cells PASS: `bootstrap:wif`, `composer:sm-write`, `composer:sm-read`,
 Unsealed JSONL run `run-20260820t100542z-15777` recorded those cells as
 PASS (reuse-boundary identities exported). Cleanup SKIP while KEEP was set
 was superseded after destroy: cleanup PASS, `assert_clean ok`, sealed bundle
-[`runs/gcp-gke-autopilot-magento-gcap28-20260820.sealed.jsonl`](runs/gcp-gke-autopilot-magento-gcap28-20260820.sealed.jsonl).
+[`runs/gcp-gke-autopilot-magento-gcap28-20260820.sealed.jsonl`](https://github.com/magelift/magelift/blob/85ad4e75c47195ef1f9f43e50be1e81138b66283/docs/evidence/runs/gcp-gke-autopilot-magento-gcap28-20260820.sealed.jsonl).
 Destroy emptied the KEEP stack (`assert_clean ok`). Do not reuse `gcap28`.
 
 ## Leftover

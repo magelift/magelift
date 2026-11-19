@@ -37,7 +37,7 @@ All 16 cells PASS: `bootstrap:wif`, `composer:sm-write`, `composer:sm-read`,
 Unsealed JSONL run `run-20260914t180332z-649081` recorded those cells as
 PASS (candidates redacted to the `gcap28` mapping, then sealed):
 cleanup PASS, `assert_clean ok`, sealed bundle
-[`runs/gcp-gke-ha-standard-magento-mldp5-20260914.sealed.jsonl`](runs/gcp-gke-ha-standard-magento-mldp5-20260914.sealed.jsonl).
+[`runs/gcp-gke-ha-standard-magento-mldp5-20260914.sealed.jsonl`](https://github.com/magelift/magelift/blob/85ad4e75c47195ef1f9f43e50be1e81138b66283/docs/evidence/runs/gcp-gke-ha-standard-magento-mldp5-20260914.sealed.jsonl).
 
 ## Spend
 

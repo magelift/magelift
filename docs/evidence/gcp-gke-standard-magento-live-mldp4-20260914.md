@@ -36,7 +36,7 @@ HTTP 200 (`runtime.web`, `layer=magento`) and Magento CLI 2.4.9.
 Unsealed JSONL run `run-20260914t171509z-569079` recorded those cells as
 PASS (candidates redacted to the `gcap28` mapping, then sealed):
 cleanup PASS, `assert_clean ok`, sealed bundle
-[`runs/gcp-gke-standard-magento-mldp4-20260914.sealed.jsonl`](runs/gcp-gke-standard-magento-mldp4-20260914.sealed.jsonl).
+[`runs/gcp-gke-standard-magento-mldp4-20260914.sealed.jsonl`](https://github.com/magelift/magelift/blob/85ad4e75c47195ef1f9f43e50be1e81138b66283/docs/evidence/runs/gcp-gke-standard-magento-mldp4-20260914.sealed.jsonl).
 
 ## Spend
 

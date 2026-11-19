@@ -71,7 +71,7 @@ recorded the cells plus a SKIP cleanup (retention), the RESUME run
 recorded the PASS cleanup (candidates redacted to the `gcap28`
 mapping, SKIP record dropped, then sealed): cleanup PASS,
 `assert_clean ok`, sealed bundle
-[`runs/gcp-gke-autopilot-magento-search-mldp6-20260914.sealed.jsonl`](runs/gcp-gke-autopilot-magento-search-mldp6-20260914.sealed.jsonl).
+[`runs/gcp-gke-autopilot-magento-search-mldp6-20260914.sealed.jsonl`](https://github.com/magelift/magelift/blob/85ad4e75c47195ef1f9f43e50be1e81138b66283/docs/evidence/runs/gcp-gke-autopilot-magento-search-mldp6-20260914.sealed.jsonl).
 
 ## Spend
 

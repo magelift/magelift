@@ -180,7 +180,7 @@ gitignored `.magelift/`.
 
 ### License checklist (pre-tag)
 
-1. Root [`NOTICE`](../NOTICE) and [`LICENSE`](../LICENSE) present (Apache-2.0 + Adobe non-affiliation).
+1. Root [`NOTICE`](https://github.com/magelift/magelift/blob/main/NOTICE) and [`LICENSE`](https://github.com/magelift/magelift/blob/main/LICENSE) present (Apache-2.0 + Adobe non-affiliation).
 2. `make license-check` (or CI `go-licenses`) clean for disallowed types.
 3. GoReleaser archives retain LICENSE + NOTICE (verified by `scripts/release-smoke-local.sh`).
 
