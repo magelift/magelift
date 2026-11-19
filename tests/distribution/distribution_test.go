@@ -1,6 +1,6 @@
 // Package distribution proves publication with GOWORK=off: an SDK consumer
-// builds against a file proxy, and the real provider module resolves its
-// full graph and compiles. Magelift modules resolve only from the file
+// builds against a file proxy, and the GCP and Azure providers resolve
+// their dependencies and compile. Magelift modules resolve only from the file
 // proxy (synthetic versions staged from the working tree); third-party
 // modules resolve upstream for the provider build.
 package distribution
@@ -23,9 +23,8 @@ import (
 )
 
 const (
-	sdkModule      = "github.com/magelift/magelift/sdk"
-	providerModule = "github.com/magelift/magelift/providers/gcp"
-	rootModule     = "github.com/magelift/magelift"
+	sdkModule  = "github.com/magelift/magelift/sdk"
+	rootModule = "github.com/magelift/magelift"
 )
 
 // version is unique per test run: staged content follows the
@@ -280,34 +279,36 @@ func TestProviderBuildsOutsideWorkspace(t *testing.T) {
 	// on disk; SDK and root resolve from the proxy.
 	rootCopy := filepath.Join(work, "root")
 	copyDirSkipping(t, root, rootCopy, map[string]bool{
-		"providers": true, "sdk": true, ".git": true, "dist": true,
+		"providers": true, "sdk": true, ".git": true, ".magelift": true, "dist": true,
 		".venv": true, "node_modules": true, "website": true,
 	})
 	setRequire(t, filepath.Join(rootCopy, "go.mod"), sdkModule, version)
 	publishModule(t, proxy, rootModule, version, rootCopy)
 	assertProxyCoherent(t, proxy, rootModule, version)
 
-	copied := filepath.Join(work, "provider")
-	copyDir(t, filepath.Join(root, "providers", "gcp"), copied)
-	setRequire(t, filepath.Join(copied, "go.mod"), sdkModule, version)
-	setRequire(t, filepath.Join(copied, "go.mod"), rootModule, version)
-
-	// Resolve the full graph, then compile the real provider: every
-	// package including the plugin binary. GOWORK=off throughout.
 	tidyEnv := append([]string{}, env...)
 	for i, entry := range tidyEnv {
 		if strings.HasPrefix(entry, "GOFLAGS=") {
 			tidyEnv[i] = "GOFLAGS=-mod=mod"
 		}
 	}
-	runGo(t, copied, tidyEnv, "mod", "tidy")
-	listed := runGo(t, copied, env, "list", "-m", "all")
-	for _, want := range []string{sdkModule + " " + version, rootModule + " " + version} {
-		if !strings.Contains(listed, want) {
-			t.Fatalf("module graph lacks %s", want)
-		}
+	for _, name := range []string{"gcp", "azure"} {
+		t.Run(name, func(t *testing.T) {
+			copied := filepath.Join(work, "providers", name)
+			copyDir(t, filepath.Join(root, "providers", name), copied)
+			setRequire(t, filepath.Join(copied, "go.mod"), sdkModule, version)
+			setRequire(t, filepath.Join(copied, "go.mod"), rootModule, version)
+			runGo(t, copied, tidyEnv, "mod", "tidy")
+			runGo(t, copied, tidyEnv, "mod", "tidy", "-diff")
+			listed := runGo(t, copied, env, "list", "-m", "all")
+			for _, want := range []string{sdkModule + " " + version, rootModule + " " + version} {
+				if !strings.Contains(listed, want) {
+					t.Fatalf("module graph lacks %s", want)
+				}
+			}
+			runGo(t, copied, env, "build", "./...")
+		})
 	}
-	runGo(t, copied, env, "build", "./...")
 }
 
 // setRequire points modulePath at version, replacing any existing

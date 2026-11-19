@@ -53,52 +53,31 @@ func run(root, ref, version, out string) error {
 	if err := extractArchive(root, ref, ".", work); err != nil {
 		return err
 	}
-	// Prune only nested modules: everything else the archive holds is
-	// in the published zip exactly as archived.
-	for _, nested := range []string{"providers", "sdk"} {
-		if err := os.RemoveAll(filepath.Join(work, nested)); err != nil {
-			return err
-		}
+	providerManifests, err := filepath.Glob(filepath.Join(work, "providers", "*", "go.mod"))
+	if err != nil {
+		return err
 	}
-	staged := []struct{ module, dir string }{
-		{"github.com/magelift/magelift", work},
-	}
-	var subs []string
-	defer func() {
-		for _, sub := range subs {
-			_ = os.RemoveAll(sub)
-		}
-	}()
-	for _, module := range []struct {
-		path, dir string
-	}{
-		{"github.com/magelift/magelift/sdk", "sdk"},
-		{"github.com/magelift/magelift/providers/gcp", "providers/gcp"},
-	} {
-		sub, err := os.MkdirTemp("", "modproxy-sub")
+	const core = "github.com/magelift/magelift"
+	manifests := append([]string{filepath.Join(work, "sdk", "go.mod")}, providerManifests...)
+	for _, manifest := range manifests {
+		dir := filepath.Dir(manifest)
+		relative, err := filepath.Rel(work, dir)
 		if err != nil {
 			return err
 		}
-		subs = append(subs, sub)
-		if err := extractArchive(root, ref, module.dir, sub); err != nil {
+		// The public Go proxy includes the root license in nested modules
+		// that lack their own. Include it before computing the module zip.
+		if err := inheritRootLicense(dir, work); err != nil {
 			return err
 		}
-		moduleDir := filepath.Join(sub, module.dir)
-		// Go's repository-to-module conversion copies a root license
-		// into a nested module that has none of its own
-		// (go.dev/ref/mod#vcs-dir). Staging must do the same or the
-		// provider zip hash diverges from proxy.golang.org.
-		if err := inheritRootLicense(moduleDir, work); err != nil {
+		if err := publish(out, core+"/"+filepath.ToSlash(relative), version, dir); err != nil {
 			return err
 		}
-		staged = append(staged, struct{ module, dir string }{module.path, moduleDir})
-	}
-	for _, module := range staged {
-		if err := publish(out, module.module, version, module.dir); err != nil {
+		if err := os.RemoveAll(dir); err != nil {
 			return err
 		}
 	}
-	return nil
+	return publish(out, core, version, work)
 }
 
 func extractArchive(root, ref, path, dest string) error {

@@ -14,7 +14,7 @@ import (
 	"golang.org/x/mod/sumdb/dirhash"
 )
 
-func TestStagePublishesThreeCoherentModules(t *testing.T) {
+func TestStagePublishesCoherentWorkspaceModules(t *testing.T) {
 	root := filepath.Join("..", "..")
 	proxy := t.TempDir()
 	version := "v0.7.0-modproxy-test"
@@ -22,9 +22,10 @@ func TestStagePublishesThreeCoherentModules(t *testing.T) {
 		t.Fatal(err)
 	}
 	modules := map[string]string{
-		"github.com/magelift/magelift":               "github.com/magelift/magelift",
-		"github.com/magelift/magelift/sdk":           "github.com/magelift/magelift/sdk",
-		"github.com/magelift/magelift/providers/gcp": "github.com/magelift/magelift/providers/gcp",
+		"github.com/magelift/magelift":                 "github.com/magelift/magelift",
+		"github.com/magelift/magelift/sdk":             "github.com/magelift/magelift/sdk",
+		"github.com/magelift/magelift/providers/gcp":   "github.com/magelift/magelift/providers/gcp",
+		"github.com/magelift/magelift/providers/azure": "github.com/magelift/magelift/providers/azure",
 	}
 	for module, escaped := range modules {
 		atDir := filepath.Join(proxy, filepath.FromSlash(escaped), "@v")
