@@ -24,6 +24,12 @@ func TestGCPFlociPreviewSweepUsesSharedBucket(t *testing.T) {
 	if os.Getenv("MAGELIFT_FLOCI_GCP") != "1" {
 		t.Skip("GCP emulator is required")
 	}
+	if os.Getenv("STORAGE_EMULATOR_HOST") == "" {
+		t.Fatal("set STORAGE_EMULATOR_HOST to the Floci storage endpoint")
+	}
+	// Pulumi resolves credentials before it opens an emulated GCS bucket.
+	t.Setenv("GOOGLE_CREDENTIALS", "")
+	t.Setenv("GOOGLE_OAUTH_ACCESS_TOKEN", "floci-test-only")
 	t.Setenv("PULUMI_CONFIG_PASSPHRASE", "test-only-passphrase")
 	t.Setenv("PULUMI_HOME", t.TempDir())
 	ctx := context.Background()
