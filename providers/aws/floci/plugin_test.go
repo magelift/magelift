@@ -21,8 +21,8 @@ import (
 	"github.com/magelift/magelift/sdk"
 )
 
-func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
-	endpoint := flociEndpoint(t)
+func awsFlociPlugin(t *testing.T, endpoint string, operations ...sdk.Operation) *providerhost.CachedDialer {
+	t.Helper()
 	t.Setenv("AWS_ACCESS_KEY_ID", "test")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "test")
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
@@ -34,9 +34,16 @@ func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
 		t.Fatalf("build plugin: %v\n%s", err, output)
 	}
 	shared := &providerhost.CachedDialer{Dial: func(ctx context.Context) (*providerhost.Client, error) {
-		return providerhost.Dial(ctx, binary, providerhost.DialOptions{ExpectedProvider: "aws", Required: []sdk.Operation{sdk.OpPlan, sdk.OpMediaImport, sdk.OpMediaExport, sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpSecretSet, sdk.OpSecretRead, sdk.OpSecretRemove}})
+		return providerhost.Dial(ctx, binary, providerhost.DialOptions{ExpectedProvider: "aws", Required: operations})
 	}}
 	t.Cleanup(shared.Close)
+	return shared
+}
+
+func TestAWSPluginTransfersMediaAndHoldsItsOwnLock(t *testing.T) {
+	endpoint := flociEndpoint(t)
+	shared := awsFlociPlugin(t, endpoint, sdk.OpPlan, sdk.OpMediaImport, sdk.OpMediaExport, sdk.OpStateLock, sdk.OpStateUnlock, sdk.OpSecretSet, sdk.OpSecretRead, sdk.OpSecretRemove)
+	ctx := t.Context()
 	const region = "us-east-1"
 	buckets, err := awsendpoint.S3Client(ctx, region, endpoint)
 	if err != nil {
