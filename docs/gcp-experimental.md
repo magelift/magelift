@@ -36,17 +36,21 @@ See [capability matrix](capability-matrix.md).
 
 ## Target
 
-```yaml
-target:
-  provider: gcp
-  runtime: gke-autopilot
-  gcp:
-    project: your-gcp-project-id
-    region: europe-west1
-    networkCidr: 10.20.0.0/16
-    zones: [europe-west1-b, europe-west1-c]   # HA needs 3 zones
-    imageDigest: ghcr.io/org/magento@sha256:...
-    encryptionKeySecret: magento-crypt-key
+Use this array for the `target` entry in `magelift.php`.
+
+```php
+$target = [
+    'provider' => 'gcp',
+    'runtime' => 'gke-autopilot',
+    'gcp' => [
+        'project' => 'your-gcp-project-id',
+        'region' => 'europe-west1',
+        'networkCidr' => '10.20.0.0/16',
+        'zones' => ['europe-west1-b', 'europe-west1-c'],
+        'imageDigest' => 'ghcr.io/org/magento@sha256:...',
+        'encryptionKeySecret' => 'magento-crypt-key',
+    ],
+];
 ```
 
 ## Magento capability map (production-shaped)
@@ -91,7 +95,7 @@ That checks IAM on the account. It does not present a token signed by
 ## Offline verification
 
 - Pulumi mocks: `go test ./providers/gcp/...` (preview / standard / HA graphs)
-- floci-gcp (`make floci-gcp-test`): digest-pinned `floci/floci-gcp:0.11.0` on port 4588. Closes GCS, Secret Manager, Pub/Sub publish, Cloud Logging write/list, and Cloud Monitoring time-series write/list against the official Go clients without a GCP project. Does **not** certify Autopilot, Memorystore Valkey 9.0, Cloud Armor, Google-managed TLS, or Magento Cloud SQL PITR.
+- floci-gcp (`make floci-gcp-test`): digest-pinned `floci/floci-gcp:0.12.0` on port 4588. Closes GCS, Secret Manager, Pub/Sub publish, Cloud Logging write/list, and Cloud Monitoring time-series write/list against the official Go clients without a GCP project. Does **not** certify Autopilot, Memorystore Valkey 9.0, Cloud Armor, Google-managed TLS, or Magento Cloud SQL PITR.
 - WIF unit proof: `go test ./providers/gcp/bootstrap/ -count=1 -run 'WIF|Identity'`
 - Composer SM: `go test ./providers/gcp/secrets/ ./internal/cli/ -count=1 -run 'Secret|Composer|GCP'`
 

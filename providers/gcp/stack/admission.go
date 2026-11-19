@@ -20,6 +20,11 @@ func (a RegionAdmission) AdmitSpec(ctx context.Context, spec Spec) (Spec, error)
 	if ctx == nil {
 		return Spec{}, errors.New("GCP plan admission context is required")
 	}
+	// Teardown reads an existing state snapshot and must remain possible when
+	// current service versions or admission APIs are unavailable.
+	if spec.AllowExpiredPreview {
+		return spec, nil
+	}
 	clientFactory := a.NewClient
 	if clientFactory == nil {
 		clientFactory = func(clientContext context.Context) (gcpprovider.CapabilityAPI, error) {
@@ -50,6 +55,9 @@ func selectionFromSpec(spec Spec) gcpprovider.AdmissionSelection {
 	}
 	selection := gcpprovider.AdmissionSelection{
 		ProjectID:          spec.Identity.GCPProject,
+		SkipCloudSQL:       spec.Services["database"].Attached(),
+		SkipMemorystore:    spec.Services["cache"].Attached(),
+		ExistingCluster:    spec.PreviewPool != nil,
 		Region:             spec.Identity.Region,
 		Zones:              append([]string(nil), spec.Policy.Zones...),
 		RequiredServices:   requiredServices(spec),
@@ -77,11 +85,15 @@ func requiredServices(spec Spec) []string {
 		"compute.googleapis.com",
 		"container.googleapis.com",
 		"cloudbilling.googleapis.com",
-		"memorystore.googleapis.com",
 		"secretmanager.googleapis.com",
 		"serviceusage.googleapis.com",
-		"sqladmin.googleapis.com",
 		"storage.googleapis.com",
+	}
+	if !spec.Services["database"].Attached() {
+		services = append(services, "sqladmin.googleapis.com")
+	}
+	if !spec.Services["cache"].Attached() {
+		services = append(services, "memorystore.googleapis.com")
 	}
 	if spec.Observability.NativeProvider == "google-cloud-operations" {
 		services = append(services, "logging.googleapis.com", "monitoring.googleapis.com")

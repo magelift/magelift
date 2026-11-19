@@ -60,6 +60,20 @@ func defaultNewStack(ctx context.Context, stackName string, spec gcpstack.Spec, 
 	if err != nil {
 		return nil, err
 	}
+	if spec.AllowExpiredPreview {
+		env := make(map[string]string, len(passphraseEnv)+1)
+		for key, value := range passphraseEnv {
+			env[key] = value
+		}
+		if backendURL != "" {
+			env["PULUMI_BACKEND_URL"] = backendURL
+		}
+		selected, err := auto.SelectStackInlineSource(ctx, stackName, "magelift", gcpstack.Program(spec), auto.EnvVars(env))
+		if err != nil {
+			return nil, fmt.Errorf("select existing GCP preview stack: %w", err)
+		}
+		return pulumiAutomation{backend: automation.NewPulumiBackend(&selected), stack: &selected}, nil
+	}
 	stack, err := automation.NewInlineStackWithEnvironment(ctx, stackName, gcpstack.Program(spec), backendURL, passphraseEnv)
 	if err != nil {
 		return nil, err
@@ -132,12 +146,19 @@ func (s *Server) Plan(ctx context.Context, req *sdk.PlanRequest) (*sdk.PlanResul
 	if problems := providerschema.Validate(&target, req.Runtime); len(problems) > 0 {
 		return nil, InvalidError("target block is invalid: " + strings.Join(problems, "; "))
 	}
+	edge, observability := req.Edge, req.Observability
+	if req.AllowExpiredPreview {
+		// Destroy uses the existing Pulumi snapshot with RunProgram(false), so
+		// present-day edge certificates and telemetry are irrelevant to cleanup.
+		edge, observability = sdk.EdgeIntent{}, sdk.ObservabilityIntent{}
+	}
 	spec, err := gcpstack.PlanFromInputs(gcpstack.PlanInputs{
 		Envelope:            req.Envelope,
 		Application:         req.Application,
 		Target:              target,
-		Edge:                req.Edge,
-		Observability:       req.Observability,
+		Services:            req.Services,
+		Edge:                edge,
+		Observability:       observability,
 		Runtime:             sdk.RuntimeID(req.Runtime),
 		LiveQueueReplicas:   req.LiveQueueReplicas,
 		ValkeyRequirement:   req.ValkeyRequirement,
@@ -145,6 +166,7 @@ func (s *Server) Plan(ctx context.Context, req *sdk.PlanRequest) (*sdk.PlanResul
 		AllowExpiredPreview: req.AllowExpiredPreview,
 		AccountOnly:         req.AccountOnly,
 		RuntimeObserve:      req.RuntimeObserve,
+		StateEnvironment:    req.StateEnvironment,
 	})
 	if err != nil {
 		return nil, InvalidError(err.Error())
@@ -158,7 +180,7 @@ func (s *Server) Plan(ctx context.Context, req *sdk.PlanRequest) (*sdk.PlanResul
 		return nil, &sdk.OperationError{Code: sdk.ErrCodeInternal, Message: err.Error()}
 	}
 	backendURL, err := gcpbootstrap.StateBackendURL(gcpbootstrap.Spec{
-		Project: admitted.Identity.Project, Environment: admitted.Identity.Environment,
+		Project: admitted.Identity.Project, Environment: admitted.Identity.StateScope(),
 		GCPProject: admitted.Identity.GCPProject, Region: admitted.Identity.Region,
 	})
 	if err != nil {

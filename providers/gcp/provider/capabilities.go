@@ -15,7 +15,6 @@ import (
 	container "cloud.google.com/go/container/apiv1"
 	containerpb "cloud.google.com/go/container/apiv1/containerpb"
 	"github.com/magelift/magelift/providers/gcp/auth"
-	gcpdatabase "github.com/magelift/magelift/providers/gcp/database"
 	"golang.org/x/oauth2"
 	cloudbilling "google.golang.org/api/cloudbilling/v1"
 	"google.golang.org/api/cloudresourcemanager/v1"
@@ -248,12 +247,7 @@ func (c *SDKCapabilityClient) RegionQuota(ctx context.Context, projectID, region
 }
 
 func (c *SDKCapabilityClient) CloudSQLDatabaseVersion(_ context.Context, _ string, version string) (bool, error) {
-	switch strings.TrimSpace(version) {
-	case "MYSQL_8_0", "MYSQL_8_4":
-		return true, nil
-	default:
-		return false, nil
-	}
+	return strings.HasPrefix(strings.TrimSpace(version), "MYSQL_"), nil
 }
 
 func (c *SDKCapabilityClient) CloudSQLTier(ctx context.Context, projectID, region, tier string) (bool, error) {
@@ -271,10 +265,7 @@ func (c *SDKCapabilityClient) CloudSQLTier(ctx context.Context, projectID, regio
 	if result == nil {
 		return false, errors.New("GCP Cloud SQL returned no tier catalog")
 	}
-	custom := strings.HasPrefix(tier, "db-custom-")
-	if custom && gcpdatabase.ValidateTier(gcpdatabase.DatabaseVersionMySQL84, tier) != nil {
-		return false, nil
-	}
+	custom := validDedicatedCustomTier(tier)
 	for _, candidate := range result.Items {
 		if candidate == nil {
 			continue
@@ -298,6 +289,24 @@ func (c *SDKCapabilityClient) CloudSQLTier(ctx context.Context, projectID, regio
 	return false, nil
 }
 
+// tiers.list usually returns a regional machine series instead of every custom size.
+func validDedicatedCustomTier(tier string) bool {
+	suffix, ok := strings.CutPrefix(tier, "db-custom-")
+	if !ok {
+		return false
+	}
+	cores, memory, ok := strings.Cut(suffix, "-")
+	if !ok {
+		return false
+	}
+	cpu, cpuErr := strconv.ParseUint(cores, 10, 8)
+	mb, memErr := strconv.ParseUint(memory, 10, 32)
+	if cpuErr != nil || memErr != nil || cpu == 0 || cpu > 96 || (cpu != 1 && cpu%2 != 0) {
+		return false
+	}
+	return mb >= 3840 && mb%256 == 0 && mb*10 >= cpu*9*1024 && mb <= cpu*6656
+}
+
 func (c *SDKCapabilityClient) MemorystoreValkey(ctx context.Context, projectID, region, engineVersion, nodeType, mode string) (bool, error) {
 	if c == nil || c.valkey == nil {
 		return false, errors.New("GCP Memorystore capability client is required")
@@ -307,17 +316,8 @@ func (c *SDKCapabilityClient) MemorystoreValkey(ctx context.Context, projectID, 
 	if projectID == "" || region == "" || engineVersion == "" || nodeType == "" {
 		return false, errors.New("GCP Memorystore project, region, engine version, and node type are required")
 	}
-	if !supportedValkeyVersions[engineVersion] {
-		return false, nil
-	}
-	if !supportedValkeyNodeTypes[nodeType] {
-		return false, nil
-	}
 	if mode == "" {
 		mode = "CLUSTER_DISABLED"
-	}
-	if strings.HasPrefix(nodeType, "CUSTOM_") && mode != "CLUSTER_DISABLED" {
-		return false, nil
 	}
 	if err := c.valkey.ListInstances(ctx, projectID, region); err != nil {
 		return false, fmt.Errorf("read GCP Memorystore Valkey instances in %q: %w", region, err)
@@ -414,26 +414,6 @@ func (c *SDKCapabilityClient) readMachineType(ctx context.Context, projectID, zo
 		return nil, fmt.Errorf("read GCP machine type %q in %q: %w", machineType, zone, err)
 	}
 	return value, nil
-}
-
-var supportedValkeyVersions = map[string]bool{
-	"VALKEY_7_2": true,
-	"VALKEY_8_0": true,
-	"VALKEY_9_0": true,
-	"VALKEY_9_1": true,
-}
-
-var supportedValkeyNodeTypes = map[string]bool{
-	"SHARED_CORE_NANO": true,
-	"CUSTOM_PICO":      true,
-	"CUSTOM_MICRO":     true,
-	"CUSTOM_MINI":      true,
-	"STANDARD_SMALL":   true,
-	"HIGHMEM_MEDIUM":   true,
-	"HIGHCPU_MEDIUM":   true,
-	"STANDARD_LARGE":   true,
-	"HIGHMEM_XLARGE":   true,
-	"HIGHMEM_2XLARGE":  true,
 }
 
 const defaultValkeyBaseURL = "https://memorystore.googleapis.com"

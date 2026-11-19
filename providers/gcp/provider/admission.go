@@ -13,6 +13,9 @@ type AdmissionSelection struct {
 	Zones              []string
 	RequiredServices   []string
 	RequiredQuotas     map[string]float64
+	SkipCloudSQL       bool
+	SkipMemorystore    bool
+	ExistingCluster    bool
 	CloudSQLVersion    string
 	CloudSQLTier       string
 	MemorystoreVersion string
@@ -125,46 +128,50 @@ func ValidateSelection(ctx context.Context, client CapabilityAPI, selection Admi
 		}
 	}
 
-	version := strings.TrimSpace(selection.CloudSQLVersion)
-	if version == "" {
-		return errors.New("GCP Cloud SQL database version is required")
+	var available bool
+	if !selection.SkipCloudSQL {
+		version := strings.TrimSpace(selection.CloudSQLVersion)
+		if version == "" {
+			return errors.New("GCP Cloud SQL database version is required")
+		}
+		available, err = client.CloudSQLDatabaseVersion(ctx, projectID, version)
+		if err != nil {
+			return fmt.Errorf("check GCP Cloud SQL database version %q: %w", version, err)
+		}
+		if !available {
+			return fmt.Errorf("GCP Cloud SQL database version %q is not supported by MageLift's current provider catalog", version)
+		}
+		tier := strings.TrimSpace(selection.CloudSQLTier)
+		if tier == "" {
+			return errors.New("GCP Cloud SQL tier is required")
+		}
+		available, err = client.CloudSQLTier(ctx, projectID, region, tier)
+		if err != nil {
+			return fmt.Errorf("check GCP Cloud SQL tier %q: %w", tier, err)
+		}
+		if !available {
+			return fmt.Errorf("GCP Cloud SQL tier %q is not available in %q", tier, region)
+		}
 	}
-	available, err := client.CloudSQLDatabaseVersion(ctx, projectID, version)
-	if err != nil {
-		return fmt.Errorf("check GCP Cloud SQL database version %q: %w", version, err)
-	}
-	if !available {
-		return fmt.Errorf("GCP Cloud SQL database version %q is not supported by MageLift's current provider catalog", version)
-	}
-	tier := strings.TrimSpace(selection.CloudSQLTier)
-	if tier == "" {
-		return errors.New("GCP Cloud SQL tier is required")
-	}
-	available, err = client.CloudSQLTier(ctx, projectID, region, tier)
-	if err != nil {
-		return fmt.Errorf("check GCP Cloud SQL tier %q: %w", tier, err)
-	}
-	if !available {
-		return fmt.Errorf("GCP Cloud SQL tier %q is not available in %q", tier, region)
+	if !selection.SkipMemorystore {
+		memorystoreVersion := strings.TrimSpace(selection.MemorystoreVersion)
+		memorystoreNode := strings.TrimSpace(selection.MemorystoreNode)
+		if memorystoreVersion == "" || memorystoreNode == "" {
+			return errors.New("GCP Memorystore admission requires engine version and node type")
+		}
+		available, err = client.MemorystoreValkey(ctx, projectID, region, memorystoreVersion, memorystoreNode, selection.MemorystoreMode)
+		if err != nil {
+			return fmt.Errorf("check GCP Memorystore Valkey catalog: %w", err)
+		}
+		if !available {
+			return fmt.Errorf("GCP Memorystore Valkey shape %q/%q is not available in %q", memorystoreVersion, memorystoreNode, region)
+		}
+		if zone := strings.TrimSpace(selection.MemorystoreZone); zone != "" && !containsName(availableZones, zone) {
+			return fmt.Errorf("GCP Memorystore zone %q is not available in %q", zone, region)
+		}
 	}
 
-	memorystoreVersion := strings.TrimSpace(selection.MemorystoreVersion)
-	memorystoreNode := strings.TrimSpace(selection.MemorystoreNode)
-	if memorystoreVersion == "" || memorystoreNode == "" {
-		return errors.New("GCP Memorystore admission requires engine version and node type")
-	}
-	available, err = client.MemorystoreValkey(ctx, projectID, region, memorystoreVersion, memorystoreNode, selection.MemorystoreMode)
-	if err != nil {
-		return fmt.Errorf("check GCP Memorystore Valkey catalog: %w", err)
-	}
-	if !available {
-		return fmt.Errorf("GCP Memorystore Valkey shape %q/%q is not available in %q", memorystoreVersion, memorystoreNode, region)
-	}
-	if zone := strings.TrimSpace(selection.MemorystoreZone); zone != "" && !containsName(availableZones, zone) {
-		return fmt.Errorf("GCP Memorystore zone %q is not available in %q", zone, region)
-	}
-
-	if runtime := strings.TrimSpace(selection.Runtime); runtime == "" || runtime == "gke-autopilot" || runtime == "gke-standard" {
+	if runtime := strings.TrimSpace(selection.Runtime); !selection.ExistingCluster && (runtime == "" || runtime == "gke-autopilot" || runtime == "gke-standard") {
 		available, err = client.KubernetesVersion(ctx, projectID, region, selection.ReleaseChannel, selection.KubernetesVersion)
 		if err != nil {
 			return fmt.Errorf("check GCP GKE Kubernetes version: %w", err)

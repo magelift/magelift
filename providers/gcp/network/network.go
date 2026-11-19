@@ -15,12 +15,14 @@ import (
 const TypeToken = "magelift:gcp:Network"
 
 type Args struct {
-	Preset      sdk.PresetID
-	Project     string
-	Region      string
-	NetworkCIDR string
-	Zones       []string
-	Labels      map[string]string
+	Preset          sdk.PresetID
+	Project         string
+	Region          string
+	NetworkCIDR     string
+	Zones           []string
+	Labels          map[string]string
+	ExistingNetwork string
+	ExistingSubnet  string
 }
 
 type Component struct {
@@ -39,6 +41,25 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	if strings.TrimSpace(args.Project) == "" || strings.TrimSpace(args.Region) == "" {
 		return nil, errors.New("GCP project and region are required")
+	}
+	if args.ExistingNetwork != "" || args.ExistingSubnet != "" {
+		if args.ExistingNetwork == "" || args.ExistingSubnet == "" {
+			return nil, errors.New("existing network and subnet are both required")
+		}
+		component := &Component{}
+		if err := ctx.RegisterComponentResourceV2(TypeToken, name, pulumi.Map{"project": pulumi.String(args.Project), "existingNetwork": pulumi.String(args.ExistingNetwork)}, component, opts...); err != nil {
+			return nil, err
+		}
+		component.NetworkID = pulumi.ID(args.ExistingNetwork).ToIDOutput()
+		component.NetworkName = pulumi.String(args.ExistingNetwork).ToStringOutput()
+		component.NetworkSelfLink = pulumi.String(args.ExistingNetwork).ToStringOutput()
+		component.PrivateSubnetIDs = pulumi.ToStringArray([]string{args.ExistingSubnet}).ToStringArrayOutput()
+		component.PublicSubnetIDs = pulumi.StringArray{}.ToStringArrayOutput()
+		component.PrivateSubnetNames = pulumi.ToStringArray([]string{args.ExistingSubnet}).ToStringArrayOutput()
+		if err := ctx.RegisterResourceOutputs(component, pulumi.Map{"networkId": component.NetworkID, "privateSubnetIds": component.PrivateSubnetIDs}); err != nil {
+			return nil, err
+		}
+		return component, nil
 	}
 	prefix, err := netip.ParsePrefix(args.NetworkCIDR)
 	if err != nil || !prefix.Addr().Is4() {

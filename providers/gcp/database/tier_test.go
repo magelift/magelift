@@ -93,57 +93,19 @@ func TestValidateTierMySQL84DedicatedCustomAccepted(t *testing.T) {
 	}
 }
 
-func TestValidateTierMySQL84RejectsInvalidDedicatedCustom(t *testing.T) {
-	invalid := []string{
-		"db-f1-micro",
-		"db-g1-small",
-		"db-custom-N4-2-7680",
-		"db-perf-optimized-C4-2",
-		"db-custom-3-7680",
-		"db-custom-98-7680",
-		"db-custom-2-3839",
-		"db-custom-2-3584",
-		"db-custom-2-13313",
-		"db-custom-2-7680-extra",
-		"db-custom--7680",
-	}
-	for _, tier := range invalid {
-		if err := ValidateTier(DatabaseVersionMySQL84, tier); err == nil {
-			t.Fatalf("invalid MySQL 8.4 tier %q was accepted", tier)
+func TestValidateTierLeavesProviderTiersSelectable(t *testing.T) {
+	for _, tier := range []string{"db-f1-micro", "db-custom-N4-2-7680", "db-perf-optimized-C4-2"} {
+		if err := ValidateTier(DatabaseVersionMySQL84, tier); err != nil {
+			t.Fatalf("tier %q was rejected: %v", tier, err)
 		}
 	}
 }
 
 func TestValidateTierUnsupportedEngineAndRequiredTier(t *testing.T) {
-	if err := ValidateTier("MYSQL_5_7", "db-custom-1-3840"); err == nil || !strings.Contains(err.Error(), "unsupported Cloud SQL database version") {
+	if err := ValidateTier("POSTGRES_15", "db-custom-1-3840"); err == nil || !strings.Contains(err.Error(), "invalid Cloud SQL MySQL version") {
 		t.Fatalf("unsupported engine: %v", err)
 	}
 	if err := ValidateTier(DatabaseVersionMySQL84, "   "); err == nil || !strings.Contains(err.Error(), "Cloud SQL tier is required") {
 		t.Fatalf("empty tier: %v", err)
-	}
-}
-
-func TestMySQL84DedicatedCustomTierBoundaries(t *testing.T) {
-	for _, tt := range []struct {
-		tier string
-		want bool
-	}{
-		{"db-custom-2-13312", true},
-		{"db-custom-2-13568", false},
-		{"db-custom-96-88320", false},
-		{"db-custom-96-88576", true},
-		{"db-custom-96-638976", true},
-		{"db-custom-96-639232", false},
-		{"db-custom-0-3840", false},
-		{"db-custom-02-7680", false},
-		{"db-custom-2-07680", false},
-		{"db-custom-+2-7680", false},
-		{"db-custom-2-9223372036854775552", false},
-	} {
-		t.Run(tt.tier, func(t *testing.T) {
-			if err := ValidateTier(DatabaseVersionMySQL84, tt.tier); (err == nil) != tt.want {
-				t.Fatalf("ValidateTier(%q) = %v; valid=%v", tt.tier, err, tt.want)
-			}
-		})
 	}
 }

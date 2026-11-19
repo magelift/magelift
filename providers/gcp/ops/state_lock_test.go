@@ -60,3 +60,24 @@ func (missingBucketObjects) DeleteGeneration(context.Context, string, string, st
 func (missingBucketObjects) Copy(context.Context, string, string, string, string) error {
 	return storage.ErrBucketNotExist
 }
+
+func TestPreviewLocksUseSharedStateBucketAndDistinctScopes(t *testing.T) {
+	var buckets, environments []string
+	state := State{NewManager: func(_ context.Context, bucket, project, environment string) (*gcpstate.Manager, error) {
+		buckets = append(buckets, bucket)
+		environments = append(environments, environment)
+		return gcpstate.NewManager(&missingBucketObjects{}, bucket, project, environment)
+	}}
+	for _, env := range []string{"preview-pr-1", "preview-pr-2"} {
+		spec := gcpTestSpec()
+		spec.Identity.Environment = env
+		spec.Identity.StateEnvironment = "preview"
+		_, _, err := state.stateManager(context.Background(), spec)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(buckets) != 2 || buckets[0] != buckets[1] || environments[0] == environments[1] {
+		t.Fatalf("bucket/env = %v / %v", buckets, environments)
+	}
+}

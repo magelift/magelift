@@ -203,15 +203,11 @@ func TestValidateSelectionFailsClosedForBillingServiceAndQuotaGaps(t *testing.T)
 	}
 }
 
-func TestCurrentMemorystoreCatalogIncludesGAAndPreviewValkeyNine(t *testing.T) {
-	for _, version := range []string{"VALKEY_9_0", "VALKEY_9_1"} {
-		if !supportedValkeyVersions[version] {
-			t.Errorf("supportedValkeyVersions[%q] = false", version)
-		}
-	}
-	for _, nodeType := range []string{"STANDARD_SMALL", "CUSTOM_MICRO", "HIGHMEM_2XLARGE"} {
-		if !supportedValkeyNodeTypes[nodeType] {
-			t.Errorf("supportedValkeyNodeTypes[%q] = false", nodeType)
+func TestCloudSQLAcceptsSelectableMySQLAPIVersions(t *testing.T) {
+	client := &SDKCapabilityClient{}
+	for _, version := range []string{"MYSQL_5_7", "MYSQL_8_4", "MYSQL_10_0"} {
+		if ok, err := client.CloudSQLDatabaseVersion(context.Background(), "shop", version); err != nil || !ok {
+			t.Fatalf("version %s: %t %v", version, ok, err)
 		}
 	}
 }

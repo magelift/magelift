@@ -105,3 +105,16 @@ func TestSDKCapabilityClientUsesProjectNumberForBatchedServiceUsage(t *testing.T
 		t.Fatalf("EnabledServices() = %#v, want compute enabled and container disabled", result)
 	}
 }
+
+func TestMemorystoreAvailabilityDoesNotRequireLocalVersionCatalog(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"instances":[]}`)
+	}))
+	defer server.Close()
+	client := &SDKCapabilityClient{valkey: NewValkeyRESTClient(server.Client(), server.URL)}
+	available, err := client.MemorystoreValkey(context.Background(), "shop", "europe-west1", "VALKEY_10_0", "CUSTOM_FUTURE", "CLUSTER_DISABLED")
+	if err != nil || !available {
+		t.Fatalf("future version/node was rejected: available=%t err=%v", available, err)
+	}
+}

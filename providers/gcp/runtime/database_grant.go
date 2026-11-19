@@ -29,6 +29,7 @@ func newDatabaseGrantJob(
 	databaseAdminUsername string,
 	adminSecretName string,
 	grantStatement string,
+	serviceAccount string,
 	opts ...pulumi.ResourceOption,
 ) (*batchv1.Job, error) {
 	return batchv1.NewJob(ctx, runtimeName+"-db-grant", &batchv1.JobArgs{
@@ -43,7 +44,8 @@ func newDatabaseGrantJob(
 			BackoffLimit:          pulumi.IntPtr(2),
 			Template: &corev1.PodTemplateSpecArgs{
 				Spec: &corev1.PodSpecArgs{
-					RestartPolicy: pulumi.StringPtr("Never"),
+					RestartPolicy:      pulumi.StringPtr("Never"),
+					ServiceAccountName: pulumi.String(serviceAccount),
 					Containers: corev1.ContainerArray{
 						&corev1.ContainerArgs{
 							Name:  pulumi.String("grant"),

@@ -46,7 +46,7 @@ func (b Bootstrap) Ensure(ctx context.Context, spec gcpstack.Spec, req platform.
 		return platform.BootstrapResult{}, errors.New("CI permission grants require --github-owner and --github-repo")
 	}
 	preparationSpec := gcpbootstrap.Spec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+		Project: spec.Identity.Project, Environment: spec.Identity.StateScope(),
 		GCPProject: spec.Identity.GCPProject, Region: spec.Identity.Region,
 	}
 	preparationPlan, err := gcpbootstrap.BuildPreparationPlan(preparationSpec)
@@ -205,7 +205,7 @@ func (s State) Lock(ctx context.Context, spec gcpstack.Spec, owner string) error
 	_, err = manager.Acquire(ctx, spec.Identity.Project, spec.Identity.Environment, owner)
 	if err != nil {
 		if isGCSNotFound(err) {
-			return fmt.Errorf("%w: run magelift bootstrap --env %s: %w", ErrStateBucketMissing, spec.Identity.Environment, err)
+			return fmt.Errorf("%w: run magelift bootstrap --env %s: %w", ErrStateBucketMissing, spec.Identity.StateScope(), err)
 		}
 		return err
 	}
@@ -309,7 +309,7 @@ func (s Secrets) Remove(ctx context.Context, spec gcpstack.Spec, name string) er
 
 func (s State) stateManager(ctx context.Context, spec gcpstack.Spec) (*gcpstate.Manager, string, error) {
 	plan, err := gcpbootstrap.BuildPlan(gcpbootstrap.Spec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+		Project: spec.Identity.Project, Environment: spec.Identity.StateScope(),
 		GCPProject: spec.Identity.GCPProject, Region: spec.Identity.Region,
 	})
 	if err != nil {
@@ -328,7 +328,7 @@ func (s State) stateManager(ctx context.Context, spec gcpstack.Spec) (*gcpstate.
 
 func (s State) stateArchive(ctx context.Context, spec gcpstack.Spec) (*gcpstate.Archive, error) {
 	plan, err := gcpbootstrap.BuildPlan(gcpbootstrap.Spec{
-		Project: spec.Identity.Project, Environment: spec.Identity.Environment,
+		Project: spec.Identity.Project, Environment: spec.Identity.StateScope(),
 		GCPProject: spec.Identity.GCPProject, Region: spec.Identity.Region,
 	})
 	if err != nil {

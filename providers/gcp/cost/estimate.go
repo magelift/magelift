@@ -78,7 +78,7 @@ func accountFree(in EstimateInputs) platform.CostReport {
 		Environment: in.Envelope.Environment, Provider: "gcp", Region: region, Preset: preset,
 		Mode: "account-free", Currency: "USD", MonthlyBudgetCents: in.Envelope.MonthlyBudgetCents,
 		Priced: []platform.CostPricedItem{}, MonthlyTotalCents: nil,
-		Notice: "Account-free mode does not call the GCP Catalog API or claim current Google list prices. Capacity is derived from magelift.yaml; Catalog live pricing is optional and not wired yet.",
+		Notice: "Account-free mode does not call the GCP Catalog API or claim current Google list prices. Capacity is derived from magelift.php; Catalog live pricing is optional and not wired yet.",
 		Unsupported: []platform.CostUnsupportedItem{
 			{Resource: "GCP unit prices", Reason: "current regional prices require live Cloud Billing Catalog data"},
 			{Resource: "usage-based services", Reason: "egress, requests, storage growth, logging, and Cloud Armor request volume depend on workload measurements"},

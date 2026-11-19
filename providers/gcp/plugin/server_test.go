@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"google.golang.org/api/googleapi"
@@ -423,5 +424,103 @@ func TestOutputs(t *testing.T) {
 	}
 	if len(result.SecretKeys) != 1 || result.SecretKeys[0] != "kubeconfig" {
 		t.Fatalf("secret keys = %#v", result.SecretKeys)
+	}
+}
+
+func TestPreviewStateSharesBootstrapBucketAndPassphrase(t *testing.T) {
+	server := &Server{Admission: stubAdmission{}}
+	base := testPlanRequest()
+	base.Envelope.Environment, base.Envelope.EnvironmentClass, base.Envelope.Preset = "preview", "preview", "preview"
+	base.Envelope.StackName, base.Envelope.StateBackendURL = "shop-preview-gcp-gke-autopilot", ""
+	base.AccountOnly = true
+	bootstrap, opErr := server.Plan(context.Background(), base)
+	if opErr != nil {
+		t.Fatal(opErr)
+	}
+	var stacks, passphrases []string
+	for _, environment := range []string{"preview-pr-1", "preview-pr-2"} {
+		request := testPlanRequest()
+		request.Envelope.Environment, request.Envelope.EnvironmentClass, request.Envelope.Preset = environment, "preview", "preview"
+		request.Envelope.StackName, request.Envelope.StateBackendURL = "shop-"+environment+"-gcp-gke-autopilot", ""
+		request.Envelope.ExpiresAt = time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+		request.StateEnvironment = "preview"
+		planned, opErr := server.Plan(context.Background(), request)
+		if opErr != nil {
+			t.Fatal(opErr)
+		}
+		if planned.Plan.StateBackendURL != bootstrap.Plan.StateBackendURL {
+			t.Fatalf("backend %q != bootstrap %q", planned.Plan.StateBackendURL, bootstrap.Plan.StateBackendURL)
+		}
+		var spec gcpstack.Spec
+		if err := json.Unmarshal(planned.Plan.Opaque, &spec); err != nil {
+			t.Fatal(err)
+		}
+		ref, err := pulumiStatePassphraseVersionRef(spec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stacks = append(stacks, planned.Plan.StackName)
+		passphrases = append(passphrases, ref)
+	}
+	if stacks[0] == stacks[1] || passphrases[0] != passphrases[1] {
+		t.Fatalf("stack/passphrase mismatch: %v %v", stacks, passphrases)
+	}
+}
+
+func TestMaterializedGCPPreviewRequiresExpiration(t *testing.T) {
+	server := &Server{Admission: stubAdmission{}}
+	request := testPlanRequest()
+	request.Envelope.Preset = "preview" // staging can use preview-sized resources indefinitely.
+	if _, err := server.Plan(context.Background(), request); err != nil {
+		t.Fatalf("staging: %v", err)
+	}
+	request.Envelope.Environment, request.Envelope.EnvironmentClass = "preview-pr-1", "preview"
+	request.Envelope.StateBackendURL = ""
+	request.StateEnvironment = "preview"
+	if _, err := server.Plan(context.Background(), request); err == nil || !strings.Contains(err.Message, "expiration") {
+		t.Fatalf("missing preview expiration: %#v", err)
+	}
+}
+
+func TestGCPExpiredPreviewDestroyPlanNeedsNoDigest(t *testing.T) {
+	server := &Server{Admission: stubAdmission{}}
+	request := testPlanRequest()
+	request.StateEnvironment = "preview"
+	request.AllowExpiredPreview = true
+	request.Edge = sdk.EdgeIntent{Mode: "native", NativeProvider: "google-cloud-load-balancing", TLS: true}
+	request.Envelope.Environment, request.Envelope.EnvironmentClass, request.Envelope.Preset = "preview-pr-1", "preview", "preview"
+	request.Envelope.StackName, request.Envelope.StateBackendURL = "shop-preview-pr-1-gcp-gke-autopilot", ""
+	request.Envelope.ExpiresAt = "2020-01-01T00:00:00Z"
+	request.TargetBlock = []byte("project: example-gcp-project\nregion: europe-west1\n")
+	planned, opErr := server.Plan(context.Background(), request)
+	if opErr != nil {
+		t.Fatal(opErr)
+	}
+	if planned.Plan.ImageDigest != "" || planned.Plan.StateBackendURL == "" {
+		t.Fatalf("cleanup plan = %#v", planned.Plan)
+	}
+}
+
+func TestGCPPlansWithoutDatedMagentoRecommendation(t *testing.T) {
+	for _, attached := range []bool{false, true} {
+		request := testPlanRequest()
+		request.Application.Version = "2.99.1"
+		request.ValkeyRequirement = ""
+		request.TargetBlock = append(request.TargetBlock, []byte("memorystoreEngineVersion: VALKEY_8_0\n")...)
+		request.Services = map[string]sdk.ServiceBinding{"database": {Family: "mysql", Ownership: "managed", Version: "8.4"}}
+		if attached {
+			request.Services["cache"] = sdk.ServiceBinding{Family: "valkey", Ownership: "external", Endpoint: "cache.internal"}
+		}
+		planned, opErr := (&Server{Admission: stubAdmission{}}).Plan(context.Background(), request)
+		if opErr != nil {
+			t.Fatalf("attached %v: %v", attached, opErr)
+		}
+		var spec gcpstack.Spec
+		if err := json.Unmarshal(planned.Plan.Opaque, &spec); err != nil {
+			t.Fatal(err)
+		}
+		if spec.Catalog.MemorystoreEngineVersion != "VALKEY_8_0" || spec.Catalog.ValkeyRequirement != "8" || spec.Catalog.CloudSQLDatabaseVersion != "MYSQL_8_4" {
+			t.Fatalf("selection lost: %#v", spec.Catalog)
+		}
 	}
 }

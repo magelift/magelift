@@ -179,13 +179,13 @@ func TestPlanFromInputsSelectsValkeyNineForMagento249(t *testing.T) {
 	}
 }
 
-func TestPlanFromInputsRejectsMismatchedMemorystoreEngineVersion(t *testing.T) {
+func TestPlanFromInputsAllowsMismatchedMemorystoreEngineVersion(t *testing.T) {
 	in := gcpDeploymentInputs()
 	in.Application.Version = "2.4.9"
 	in.ValkeyRequirement = "9"
 	in.Target.MemorystoreEngineVersion = "VALKEY_8_0"
-	if _, err := PlanFromInputs(in); err == nil || !strings.Contains(err.Error(), "VALKEY_9_0") {
-		t.Fatalf("mismatched Memorystore engine version was accepted: %v", err)
+	if spec, err := PlanFromInputs(in); err != nil || spec.Catalog.MemorystoreEngineVersion != "VALKEY_8_0" {
+		t.Fatalf("configured Memorystore engine version was not retained: %v", err)
 	}
 }
 
@@ -334,6 +334,24 @@ func gcpDeploymentInputs() PlanInputs {
 	}
 }
 
+func TestPreviewPoolRequiresIsolationPrerequisites(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Envelope.EnvironmentClass, in.Envelope.Preset = "preview", "preview"
+	in.Target.PreviewPool = &sdk.GCPPreviewPool{Cluster: "shared", Network: "network", Subnet: "subnet"}
+	if _, err := PlanFromInputs(in); err == nil || !strings.Contains(err.Error(), "networkPolicyEnforced") || !strings.Contains(err.Error(), "ingressCidrs") {
+		t.Fatalf("missing pool isolation prerequisites were accepted: %v", err)
+	}
+	in.Target.PreviewPool.NetworkPolicyEnforced = true
+	in.Target.PreviewPool.IngressCIDRs = []string{"not-a-cidr"}
+	if _, err := PlanFromInputs(in); err == nil || !strings.Contains(err.Error(), "ingress CIDR") {
+		t.Fatalf("invalid pool ingress CIDR accepted: %v", err)
+	}
+	in.Envelope.EnvironmentClass, in.Envelope.Preset = "staging", "standard"
+	if _, err := PlanFromInputs(in); err == nil || !strings.Contains(err.Error(), "preview environment") {
+		t.Fatalf("non-preview pool attachment accepted: %v", err)
+	}
+}
+
 func TestPlanFromInputsDeployRejectsMissingImage(t *testing.T) {
 	in := gcpDeploymentInputs()
 	in.Target.ImageDigest = ""
@@ -467,5 +485,18 @@ func TestPlanFromInputsValidatesEmailRelay(t *testing.T) {
 				t.Fatalf("error = %v, want %q", err, tc.want)
 			}
 		})
+	}
+}
+
+func TestPlanAcceptsExplicitUncataloguedProviderVersions(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Target.CloudSQLDatabaseVersion = "MYSQL_5_7"
+	in.Target.MemorystoreEngineVersion = "VALKEY_10_0"
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Catalog.CloudSQLDatabaseVersion != "MYSQL_5_7" || spec.Catalog.MemorystoreEngineVersion != "VALKEY_10_0" {
+		t.Fatalf("versions changed in plan: %#v", spec.Catalog)
 	}
 }

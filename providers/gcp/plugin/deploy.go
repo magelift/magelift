@@ -89,7 +89,11 @@ func (s *Server) deployStores(outputs map[string]any) (*kube.CandidateStore, *ku
 	if err != nil {
 		return nil, nil, mapError(err)
 	}
-	runtime, err := kube.NewRuntimeFromClient(client)
+	namespace, ok := outputs[platform.OutputNamespace].(string)
+	if _, exists := outputs[platform.OutputNamespace]; exists && !ok {
+		return nil, nil, InvalidError("stack namespace must be a Kubernetes DNS label")
+	}
+	runtime, err := kube.NewRuntimeFromClientWithNamespace(client, namespace)
 	if err != nil {
 		return nil, nil, mapError(err)
 	}
@@ -178,7 +182,7 @@ func (s *Server) deployHealth(ctx context.Context, candidate *kube.CandidateStor
 	if err != nil {
 		return nil, mapError(err)
 	}
-	storefront, err := kube.ResolveStorefrontURL(ctx, client, "", outputs, request.ServiceName)
+	storefront, err := kube.ResolveStorefrontURL(ctx, client, request.Namespace, outputs, request.ServiceName)
 	if err != nil {
 		return nil, InvalidError(err.Error())
 	}

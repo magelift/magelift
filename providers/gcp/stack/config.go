@@ -2,6 +2,8 @@ package stack
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -26,6 +28,7 @@ type PlanInputs struct {
 	Envelope            sdk.Envelope
 	Application         sdk.Application
 	Target              providerschema.GCPTarget
+	Services            map[string]sdk.ServiceBinding
 	Edge                sdk.EdgeIntent
 	Observability       sdk.ObservabilityIntent
 	Runtime             sdk.RuntimeID
@@ -35,6 +38,7 @@ type PlanInputs struct {
 	AllowExpiredPreview bool
 	AccountOnly         bool
 	RuntimeObserve      bool
+	StateEnvironment    string
 }
 
 func PlanFromInputs(in PlanInputs) (Spec, error) {
@@ -76,8 +80,17 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 	}); err != nil {
 		return Spec{}, fmt.Errorf("GCP target validation failed: %w", err)
 	}
-	cloudSQLDatabaseVersion, err := gcpdatabase.DatabaseVersionForMagento(in.Application.Version)
-	if err != nil {
+	cloudSQLDatabaseVersion := gcp.CloudSQLDatabaseVersion
+	if cloudSQLDatabaseVersion == "" && !in.Services["database"].Attached() && in.Services["database"].Version != "" {
+		cloudSQLDatabaseVersion = "MYSQL_" + strings.ReplaceAll(in.Services["database"].VersionWithMinor(), ".", "_")
+	}
+	if cloudSQLDatabaseVersion == "" {
+		cloudSQLDatabaseVersion, err = gcpdatabase.DatabaseVersionForMagento(in.Application.Version)
+		if err != nil {
+			cloudSQLDatabaseVersion, err = gcpdatabase.DatabaseVersionMySQL84, nil
+		}
+	}
+	if err != nil && !in.Services["database"].Attached() {
 		return Spec{}, fmt.Errorf("resolve GCP Cloud SQL database version: %w", err)
 	}
 	cidr := gcp.NetworkCIDR
@@ -188,16 +201,19 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 	if gcp.MemorystorePSCConnectionLimit != nil {
 		memorystorePSCConnectionLimit = *gcp.MemorystorePSCConnectionLimit
 	}
+	configuredMemorystoreEngineVersion := strings.TrimSpace(gcp.MemorystoreEngineVersion)
+	if configuredMemorystoreEngineVersion == "" && !in.Services["cache"].Attached() && in.Services["cache"].Version != "" {
+		configuredMemorystoreEngineVersion = "VALKEY_" + strings.ReplaceAll(in.Services["cache"].VersionWithMinor(), ".", "_")
+	}
 	memorystoreRequirement := strings.TrimSpace(in.ValkeyRequirement)
 	if memorystoreRequirement == "" {
-		return Spec{}, fmt.Errorf("GCP Valkey compatibility requirement is required")
-	}
-	configuredMemorystoreEngineVersion := strings.TrimSpace(gcp.MemorystoreEngineVersion)
-	if strings.HasPrefix(memorystoreRequirement, "8") && !in.AllowUnsupported {
-		return Spec{}, fmt.Errorf("the managed GCP Valkey mapping for Adobe %s is VALKEY_8_0 while the Adobe requirement is Valkey %s; use an explicitly supported managed or self-hosted Valkey 8 architecture, or set compatibility.allowUnsupported: true for a non-certifying probe", in.Application.Version, memorystoreRequirement)
+		memorystoreRequirement = "9"
+		if strings.HasPrefix(configuredMemorystoreEngineVersion, "VALKEY_8") {
+			memorystoreRequirement = "8"
+		}
 	}
 	memorystoreEngineVersion, err := memorystoreAPIEngineVersionForMagento(in.Application.Version, configuredMemorystoreEngineVersion, memorystoreRequirement)
-	if err != nil {
+	if err != nil && !in.Services["cache"].Attached() {
 		return Spec{}, fmt.Errorf("resolve GCP Memorystore engine version: %w", err)
 	}
 	openSearchImage := strings.TrimSpace(gcp.OpenSearchImage)
@@ -266,9 +282,20 @@ func PlanFromInputs(in PlanInputs) (Spec, error) {
 	for key, value := range gcp.Labels {
 		labels[key] = value
 	}
+	namespace := ""
+	if gcp.PreviewPool != nil {
+		digest := sha256.Sum256([]byte(in.Envelope.Project + "\x00" + environment))
+		namespace = "ml-preview-" + hex.EncodeToString(digest[:8])
+	}
+	if in.Services["queue"].Attached() {
+		queueMode = "rabbitmq"
+	}
 	spec := Spec{
+		Services:    in.Services,
+		PreviewPool: gcp.PreviewPool,
+		Namespace:   namespace,
 		Identity: Identity{
-			Project: in.Envelope.Project, GCPProject: gcp.Project, Environment: environment, Region: region,
+			Project: in.Envelope.Project, GCPProject: gcp.Project, Environment: environment, StateEnvironment: in.StateEnvironment, Region: region,
 			EnvironmentClass: class, Preset: preset, Runtime: runtimeID, Labels: labels,
 		},
 		Application: Application{Edition: in.Application.Edition, Version: in.Application.Version, Mode: in.Application.Mode, WebRuntime: in.Application.WebRuntime, Magento: platform.NewMagentoOverlays(in.Application.Magento.FrontName, in.Application.Magento.CookieDomain, in.Application.Magento.UnsecureBaseURL, in.Application.Magento.SecureBaseURL, in.Application.Magento.StorefrontOrigin, in.Application.Magento.ConsumersMode, in.Application.Magento.CORSOrigins, in.Application.Magento.ConsumerNames, in.Application.Magento.Variables)},

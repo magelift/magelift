@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/secretref"
 	"github.com/magelift/magelift/providers/gcp/database"
@@ -15,9 +16,10 @@ import (
 )
 
 var (
-	stableName = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
-	digest     = regexp.MustCompile(`^[^@\s]+@sha256:[a-f0-9]{64}$`)
-	gcpRegion  = regexp.MustCompile(`^[a-z]+-[a-z]+[0-9]+$`)
+	stableName           = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
+	digest               = regexp.MustCompile(`^[^@\s]+@sha256:[a-f0-9]{64}$`)
+	gcpRegion            = regexp.MustCompile(`^[a-z]+-[a-z]+[0-9]+$`)
+	valkeyVersionPattern = regexp.MustCompile(`^VALKEY_[0-9]+_[0-9]+$`)
 )
 
 type Spec struct {
@@ -28,6 +30,9 @@ type Spec struct {
 	Policy        NetworkPolicy
 	Catalog       CatalogSelection
 	Dependencies  Dependencies
+	Services      map[string]sdk.ServiceBinding
+	PreviewPool   *sdk.GCPPreviewPool
+	Namespace     string
 	Email         EmailSelection
 	Edge          sdk.EdgeIntent
 	Observability sdk.ObservabilityIntent
@@ -43,11 +48,22 @@ type Identity struct {
 	Project          string // Magento project name
 	GCPProject       string
 	Environment      string
+	StateEnvironment string
 	Region           string
 	Runtime          sdk.RuntimeID
 	EnvironmentClass string
 	Preset           sdk.PresetID
 	Labels           map[string]string
+}
+
+// StateScope names the authored environment whose state bucket and passphrase
+// are shared by materialized previews. Resource and lock identities remain
+// scoped to Environment.
+func (i Identity) StateScope() string {
+	if strings.TrimSpace(i.StateEnvironment) != "" {
+		return i.StateEnvironment
+	}
+	return i.Environment
 }
 
 type Application struct {
@@ -189,15 +205,10 @@ func (e EmailSelection) validate() []error {
 // manually constructed Spec may omit the catalog field, so derive the same
 // value used by PlanFromInputs instead of falling back to an old default.
 func (s Spec) CloudSQLDatabaseVersion() (string, error) {
-	expected, err := database.DatabaseVersionForMagento(s.Application.Version)
-	if err != nil {
-		return "", err
+	if configured := strings.TrimSpace(s.Catalog.CloudSQLDatabaseVersion); configured != "" {
+		return configured, nil
 	}
-	configured := strings.TrimSpace(s.Catalog.CloudSQLDatabaseVersion)
-	if configured != "" && configured != expected {
-		return "", fmt.Errorf("Cloud SQL database version %q does not match Magento %s; want %q", configured, s.Application.Version, expected)
-	}
-	return expected, nil
+	return database.DatabaseVersionForMagento(s.Application.Version)
 }
 
 // MemorystoreEngineVersion returns the provider API value for the selected
@@ -213,30 +224,21 @@ func (s Spec) MemorystoreEngineVersion() (string, error) {
 }
 
 func memorystoreAPIEngineVersionForMagento(version, configured, requirement string) (string, error) {
-	requirement = strings.TrimSpace(requirement)
-	if requirement == "" {
-		return "", fmt.Errorf("Adobe Valkey requirement for Magento %s is required", version)
-	}
-	// This is the provider adapter's API translation. The core requirement is
-	// Valkey 9 for current Adobe releases; GCP's GA enum is VALKEY_9_0 and its
-	// Preview enum is VALKEY_9_1. Older rows remain available only where their
-	// Adobe/provider compatibility record explicitly maps them to VALKEY_8_0.
-	expected := ""
-	if strings.HasPrefix(requirement, "9") {
-		expected = "VALKEY_9_0"
-	} else if strings.HasPrefix(requirement, "8") {
-		expected = "VALKEY_8_0"
-	} else {
-		return "", fmt.Errorf("GCP Memorystore has no API mapping for Adobe Valkey %q", requirement)
-	}
 	configured = strings.TrimSpace(configured)
-	if configured == "" {
-		return expected, nil
-	}
-	if configured == expected || (expected == "VALKEY_9_0" && configured == "VALKEY_9_1") {
+	if configured != "" {
+		if !valkeyVersionPattern.MatchString(configured) {
+			return "", fmt.Errorf("invalid Memorystore engine version %q; use an API value such as VALKEY_9_0", configured)
+		}
 		return configured, nil
 	}
-	return "", fmt.Errorf("Memorystore engine version %q does not match Magento %s; want %q or the documented Preview value VALKEY_9_1", configured, version, expected)
+	requirement = strings.TrimSpace(requirement)
+	if strings.HasPrefix(requirement, "9") {
+		return "VALKEY_9_0", nil
+	}
+	if strings.HasPrefix(requirement, "8") {
+		return "VALKEY_8_0", nil
+	}
+	return "", fmt.Errorf("select a Memorystore engine version for Magento %s", version)
 }
 
 func (s Spec) Validate() error {
@@ -290,14 +292,44 @@ func (s Spec) artifactDigestProblems(options validateOptions) []error {
 func (s Spec) validate(options validateOptions) error {
 	var problems []error
 	problems = append(problems, s.Email.validate()...)
-	databaseVersion, err := s.CloudSQLDatabaseVersion()
-	if err != nil {
-		problems = append(problems, fmt.Errorf("Cloud SQL database version: %w", err))
-	} else if err := database.ValidateTier(databaseVersion, s.Catalog.CloudSQLTier); err != nil {
+	if s.PreviewPool != nil {
+		if s.Identity.Preset != sdk.PresetPreview || s.Identity.EnvironmentClass != "preview" {
+			problems = append(problems, errors.New("GCP previewPool requires a preview environment and preset"))
+		}
+		if strings.TrimSpace(s.PreviewPool.Cluster) == "" || strings.TrimSpace(s.PreviewPool.Network) == "" || strings.TrimSpace(s.PreviewPool.Subnet) == "" {
+			problems = append(problems, errors.New("GCP previewPool requires cluster, network, and subnet"))
+		}
+		if strings.TrimSpace(s.Namespace) == "" {
+			problems = append(problems, errors.New("GCP previewPool namespace is required"))
+		}
+		if !s.PreviewPool.NetworkPolicyEnforced {
+			problems = append(problems, errors.New("GCP previewPool requires networkPolicyEnforced: true after enabling NetworkPolicy enforcement on the shared cluster"))
+		}
+		if len(s.PreviewPool.IngressCIDRs) == 0 {
+			problems = append(problems, errors.New("GCP previewPool requires ingressCidrs for web traffic and load-balancer health checks"))
+		}
+		for _, cidr := range s.PreviewPool.IngressCIDRs {
+			if _, err := netip.ParsePrefix(cidr); err != nil {
+				problems = append(problems, fmt.Errorf("invalid GCP previewPool ingress CIDR %q", cidr))
+			}
+		}
+	}
+	selection := config.Config{Target: config.Target{Provider: "gcp", Runtime: string(s.Identity.Runtime)}, Services: s.Services}
+	if err := selection.CheckServiceCapabilities(); err != nil {
 		problems = append(problems, err)
 	}
-	if _, err := s.MemorystoreEngineVersion(); err != nil {
-		problems = append(problems, err)
+	if !s.Services["database"].Attached() {
+		databaseVersion, err := s.CloudSQLDatabaseVersion()
+		if err != nil {
+			problems = append(problems, fmt.Errorf("Cloud SQL database version: %w", err))
+		} else if err := database.ValidateTier(databaseVersion, s.Catalog.CloudSQLTier); err != nil {
+			problems = append(problems, err)
+		}
+	}
+	if !s.Services["cache"].Attached() {
+		if _, err := s.MemorystoreEngineVersion(); err != nil {
+			problems = append(problems, err)
+		}
 	}
 	if s.Catalog.MemorystoreShardCount < 0 {
 		problems = append(problems, errors.New("Memorystore shard count cannot be negative"))
@@ -338,6 +370,12 @@ func (s Spec) validate(options validateOptions) error {
 	if !stableName.MatchString(s.Identity.Environment) {
 		problems = append(problems, errors.New("environment name must be a stable lowercase identifier"))
 	}
+	if s.Identity.StateEnvironment != "" && (!stableName.MatchString(s.Identity.StateEnvironment) || s.Identity.EnvironmentClass != "preview") {
+		problems = append(problems, errors.New("state environment must be a stable name on a preview environment"))
+	}
+	if s.Identity.StateEnvironment != "" && !options.accountOnly && !options.allowExpiredPreview && s.Lifecycle.ExpiresAt.IsZero() {
+		problems = append(problems, errors.New("materialized GCP previews require an expiration"))
+	}
 	if !gcpRegion.MatchString(s.Identity.Region) {
 		problems = append(problems, fmt.Errorf("invalid GCP region %q", s.Identity.Region))
 	}
@@ -377,7 +415,7 @@ func (s Spec) validate(options validateOptions) error {
 	if s.Catalog.QueueMode != "database" && s.Catalog.QueueMode != "rabbitmq" {
 		problems = append(problems, fmt.Errorf("invalid GCP queue mode %q", s.Catalog.QueueMode))
 	}
-	if s.Catalog.QueueMode == "rabbitmq" {
+	if s.Catalog.QueueMode == "rabbitmq" && !s.Services["queue"].Attached() {
 		if err := platform.RefuseInPlaceRabbitMQTopologyChange(s.Catalog.LiveQueueReplicas, s.Catalog.QueueReplicas); err != nil {
 			problems = append(problems, err)
 		}

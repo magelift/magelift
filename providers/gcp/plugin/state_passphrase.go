@@ -25,7 +25,7 @@ func explicitPulumiPassphraseConfigured() bool {
 func pulumiStatePassphraseVersionRef(spec gcpstack.Spec) (string, error) {
 	plan, err := gcpbootstrap.BuildPreparationPlan(gcpbootstrap.Spec{
 		Project:     spec.Identity.Project,
-		Environment: spec.Identity.Environment,
+		Environment: spec.Identity.StateScope(),
 		GCPProject:  spec.Identity.GCPProject,
 		Region:      spec.Identity.Region,
 	})

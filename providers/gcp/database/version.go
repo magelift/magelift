@@ -2,7 +2,7 @@ package database
 
 import (
 	"fmt"
-	"strconv"
+	"regexp"
 	"strings"
 )
 
@@ -37,13 +37,10 @@ func DatabaseVersionForMagento(version string) (string, error) {
 	}
 }
 
+var mysqlVersionPattern = regexp.MustCompile(`^MYSQL_[0-9]+_[0-9]+(_[0-9]+)?$`)
+
 func isSupportedDatabaseVersion(version string) bool {
-	switch version {
-	case DatabaseVersionMySQL80, DatabaseVersionMySQL84:
-		return true
-	default:
-		return false
-	}
+	return mysqlVersionPattern.MatchString(version)
 }
 
 // DefaultTier selects a Cloud SQL tier for the resolved database version and
@@ -62,124 +59,39 @@ func DefaultTier(databaseVersion, preset string) string {
 // EditionForDatabaseVersion returns the default Cloud SQL edition for the
 // release-aware database version.
 func EditionForDatabaseVersion(databaseVersion string) (string, error) {
-	switch databaseVersion {
-	case DatabaseVersionMySQL80:
-		return DatabaseEditionEnterprise, nil
-	case DatabaseVersionMySQL84:
-		return DatabaseEditionEnterprisePlus, nil
-	default:
-		return "", fmt.Errorf("unsupported Cloud SQL database version %q", databaseVersion)
+	if !isSupportedDatabaseVersion(databaseVersion) {
+		return "", fmt.Errorf("invalid Cloud SQL MySQL version %q", databaseVersion)
 	}
+	if databaseVersion == DatabaseVersionMySQL84 {
+		return DatabaseEditionEnterprisePlus, nil
+	}
+	return DatabaseEditionEnterprise, nil
 }
 
-// EditionForDatabaseVersionAndTier resolves the Cloud SQL edition from the
-// database version and machine tier. MySQL 8.4 predefined N2 and C4A tiers
-// stay on Enterprise Plus; valid db-custom-* dedicated-core tiers use Enterprise.
+// EditionForDatabaseVersionAndTier chooses an edition from the requested tier.
 func EditionForDatabaseVersionAndTier(databaseVersion, tier string) (string, error) {
-	switch databaseVersion {
-	case DatabaseVersionMySQL80:
-		return DatabaseEditionEnterprise, nil
-	case DatabaseVersionMySQL84:
-		tier = strings.TrimSpace(tier)
-		if err := ValidateTier(databaseVersion, tier); err != nil {
-			return "", err
-		}
-		if strings.HasPrefix(tier, dedicatedCustomTierPrefix) {
-			return DatabaseEditionEnterprise, nil
-		}
+	if err := ValidateTier(databaseVersion, tier); err != nil {
+		return "", err
+	}
+	tier = strings.TrimSpace(tier)
+	if strings.HasPrefix(tier, "db-perf-optimized-") || strings.HasPrefix(tier, "db-c4a-") {
 		return DatabaseEditionEnterprisePlus, nil
-	default:
-		return "", fmt.Errorf("unsupported Cloud SQL database version %q", databaseVersion)
 	}
+	return DatabaseEditionEnterprise, nil
 }
 
-const dedicatedCustomTierPrefix = "db-custom-"
-
-// isMySQL84DedicatedCustomTier reports whether tier is a valid Enterprise
-// dedicated-core db-custom-<cpus>-<memoryMB> machine type for MySQL 8.4.
-func isMySQL84DedicatedCustomTier(tier string) bool {
-	if !strings.HasPrefix(tier, dedicatedCustomTierPrefix) {
-		return false
-	}
-	if strings.HasPrefix(tier, dedicatedCustomTierPrefix+"N4-") {
-		return false
-	}
-	suffix := tier[len(dedicatedCustomTierPrefix):]
-	sep := strings.LastIndexByte(suffix, '-')
-	if sep <= 0 || sep >= len(suffix)-1 {
-		return false
-	}
-	cpuStr := suffix[:sep]
-	memStr := suffix[sep+1:]
-	if cpuStr[0] == '0' || memStr[0] == '0' {
-		return false
-	}
-	for _, c := range cpuStr {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	for _, c := range memStr {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	cpus, err := strconv.Atoi(cpuStr)
-	if err != nil || !validDedicatedCustomCPUs(cpus) {
-		return false
-	}
-	memoryMB, err := strconv.Atoi(memStr)
-	if err != nil || !validDedicatedCustomMemoryMB(cpus, memoryMB) {
-		return false
-	}
-	return true
-}
-
-func validDedicatedCustomCPUs(cpus int) bool {
-	if cpus == 1 {
-		return true
-	}
-	return cpus >= 2 && cpus <= 96 && cpus%2 == 0
-}
-
-func validDedicatedCustomMemoryMB(cpus, memoryMB int) bool {
-	if memoryMB < 3840 || memoryMB%256 != 0 {
-		return false
-	}
-	// Bound memory before multiplication, then compare the 0.9 GiB minimum
-	// with integer arithmetic. CPU validation bounds the right-hand side.
-	const minGiBNumer, minGiBDenom = 9, 10
-	const maxGiBPerCPU = 6656 // 6.5 * 1024 MiB
-	if memoryMB > cpus*maxGiBPerCPU {
-		return false
-	}
-	if memoryMB*minGiBDenom < cpus*minGiBNumer*1024 {
-		return false
-	}
-	return true
-}
-
-// ValidateTier rejects the Cloud SQL tier combinations that the API rejects
-// for the release-aware database version.
+// ValidateTier checks the syntax needed by the Cloud SQL API. Availability
+// of the selected version and tier remains a provider decision.
 func ValidateTier(databaseVersion, tier string) error {
 	if !isSupportedDatabaseVersion(databaseVersion) {
-		return fmt.Errorf("unsupported Cloud SQL database version %q", databaseVersion)
+		return fmt.Errorf("invalid Cloud SQL MySQL version %q; use an API value such as MYSQL_8_4", databaseVersion)
 	}
 	tier = strings.TrimSpace(tier)
 	if tier == "" {
 		return fmt.Errorf("Cloud SQL tier is required")
 	}
-	if databaseVersion == DatabaseVersionMySQL84 {
-		if strings.HasPrefix(tier, "db-perf-optimized-N-") || strings.HasPrefix(tier, "db-c4a-") {
-			return nil
-		}
-		if isMySQL84DedicatedCustomTier(tier) {
-			return nil
-		}
-		return fmt.Errorf(
-			"Cloud SQL tier %q is not valid for %s; use db-perf-optimized-N-*, db-c4a-*, or a valid db-custom-<cpus>-<memoryMB> Enterprise dedicated-core tier",
-			tier, databaseVersion,
-		)
+	if strings.ContainsAny(tier, " \t\r\n\x00") {
+		return fmt.Errorf("invalid Cloud SQL tier %q", tier)
 	}
 	return nil
 }

@@ -17,20 +17,21 @@ const memorystoreServiceClass = "gcp-memorystore"
 const TypeToken = "magelift:gcp:MemorystoreValkey"
 
 type Args struct {
-	Project              string
-	Region               string
-	NetworkID            pulumi.StringInput
-	PrivateSubnetIDs     pulumi.StringArrayInput
-	NodeType             string
-	ShardCount           int
-	EngineVersion        string
-	ReplicaCount         int
-	Mode                 string
-	ZoneDistributionMode string
-	Zone                 string
-	DeletionProtection   bool
-	PSCConnectionLimit   int
-	Labels               map[string]string
+	Project                            string
+	Region                             string
+	NetworkID                          pulumi.StringInput
+	PrivateSubnetIDs                   pulumi.StringArrayInput
+	NodeType                           string
+	ShardCount                         int
+	EngineVersion                      string
+	ReplicaCount                       int
+	Mode                               string
+	ZoneDistributionMode               string
+	Zone                               string
+	DeletionProtection                 bool
+	UseExistingServiceConnectionPolicy bool
+	PSCConnectionLimit                 int
+	Labels                             map[string]string
 }
 
 type Component struct {
@@ -99,20 +100,25 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	// DesiredAutoCreatedEndpoints requires a regional Service Connection Policy
 	// for gcp-memorystore on the consumer VPC before the instance can be created.
-	scp, err := networkconnectivity.NewServiceConnectionPolicy(ctx, name+"-scp", &networkconnectivity.ServiceConnectionPolicyArgs{
-		Name:         pulumi.String(name + "-memorystore"),
-		Location:     pulumi.String(args.Region),
-		ServiceClass: pulumi.String(memorystoreServiceClass),
-		Description:  pulumi.String("MageLift Memorystore for Valkey PSC automation"),
-		Network:      args.NetworkID,
-		PscConfig: &networkconnectivity.ServiceConnectionPolicyPscConfigArgs{
-			Subnetworks: args.PrivateSubnetIDs,
-			Limit:       pulumi.String(fmt.Sprintf("%d", args.PSCConnectionLimit)),
-		},
-	}, parent)
-	if err != nil {
-		return nil, fmt.Errorf("create Memorystore service connection policy: %w", err)
+	var connectionDependencies []pulumi.Resource
+	if !args.UseExistingServiceConnectionPolicy {
+		scp, err := networkconnectivity.NewServiceConnectionPolicy(ctx, name+"-scp", &networkconnectivity.ServiceConnectionPolicyArgs{
+			Name:         pulumi.String(name + "-memorystore"),
+			Location:     pulumi.String(args.Region),
+			ServiceClass: pulumi.String(memorystoreServiceClass),
+			Description:  pulumi.String("MageLift Memorystore for Valkey PSC automation"),
+			Network:      args.NetworkID,
+			PscConfig: &networkconnectivity.ServiceConnectionPolicyPscConfigArgs{
+				Subnetworks: args.PrivateSubnetIDs,
+				Limit:       pulumi.String(fmt.Sprintf("%d", args.PSCConnectionLimit)),
+			},
+		}, parent)
+		if err != nil {
+			return nil, fmt.Errorf("create Memorystore service connection policy: %w", err)
+		}
+		connectionDependencies = append(connectionDependencies, scp)
 	}
+
 	instance, err := memorystore.NewInstance(ctx, name, &memorystore.InstanceArgs{
 		Project:                   pulumi.String(args.Project),
 		InstanceId:                pulumi.String(instanceID),
@@ -136,7 +142,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 			Zone: pulumi.String(args.Zone),
 		},
 		Labels: pulumi.ToStringMap(args.Labels),
-	}, parent, pulumi.DependsOn([]pulumi.Resource{scp}))
+	}, parent, pulumi.DependsOn(connectionDependencies))
 	if err != nil {
 		return nil, fmt.Errorf("create Memorystore Valkey instance: %w", err)
 	}

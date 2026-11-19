@@ -427,7 +427,7 @@ func TestProgramBuildsStandardPresetGraph(t *testing.T) {
 					if containerValue["name"].StringValue() != "rabbitmq" {
 						continue
 					}
-					if !strings.Contains(containerValue["image"].StringValue(), "rabbitmq:4.2-management-alpine@sha256:") {
+					if !strings.Contains(containerValue["image"].StringValue(), "rabbitmq:4.3-management-alpine@sha256:") {
 						t.Fatalf("RabbitMQ StatefulSet must use the Adobe-compatible default image, got %q", containerValue["image"].StringValue())
 					}
 					readiness, ok := containerValue["readinessProbe"]
@@ -436,7 +436,7 @@ func TestProgramBuildsStandardPresetGraph(t *testing.T) {
 					}
 					readinessValue := readiness.ObjectValue()
 					if readinessValue["initialDelaySeconds"].NumberValue() != 30 || readinessValue["periodSeconds"].NumberValue() != 10 || readinessValue["timeoutSeconds"].NumberValue() != 10 || readinessValue["failureThreshold"].NumberValue() != 30 {
-						t.Fatalf("RabbitMQ readiness probe must allow a slow 4.2 startup: %v", readinessValue)
+						t.Fatalf("RabbitMQ readiness probe must allow a slow 4.3 startup: %v", readinessValue)
 					}
 					execProbe, ok := readiness.ObjectValue()["exec"]
 					if !ok {
@@ -456,7 +456,7 @@ func TestProgramBuildsStandardPresetGraph(t *testing.T) {
 					}
 					startupValue := startup.ObjectValue()
 					if startupValue["initialDelaySeconds"].NumberValue() != 30 || startupValue["periodSeconds"].NumberValue() != 10 || startupValue["timeoutSeconds"].NumberValue() != 10 || startupValue["failureThreshold"].NumberValue() != 60 {
-						t.Fatalf("RabbitMQ startup probe must allow a slow 4.2 startup: %v", startupValue)
+						t.Fatalf("RabbitMQ startup probe must allow a slow 4.3 startup: %v", startupValue)
 					}
 					startupExec, ok := startup.ObjectValue()["exec"]
 					if !ok {
@@ -738,6 +738,7 @@ func (m *stackMocks) NewResource(args pulumi.MockResourceArgs) (string, resource
 		state["secret"] = resource.MakeSecret(resource.NewStringProperty("mock-hmac-secret"))
 	case "gcp:serviceaccount/account:Account":
 		state["email"] = resource.NewStringProperty(args.Name + "@example-gcp-project.iam.gserviceaccount.com")
+		state["name"] = resource.NewStringProperty("projects/example-gcp-project/serviceAccounts/" + args.Name)
 	case "gcp:compute/securityPolicy:SecurityPolicy":
 		state["name"] = resource.NewStringProperty(args.Name)
 	case "kubernetes:core/v1:Service":
@@ -759,6 +760,81 @@ func (m *stackMocks) NewResource(args pulumi.MockResourceArgs) (string, resource
 		state["secretData"] = resource.MakeSecret(resource.NewStringProperty("mock-magento-crypt-key"))
 	}
 	return args.Name + "-id", state, nil
+}
+
+func TestPreviewPoolReadsSharedClusterAndCreatesIsolatedWorkloads(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Envelope.Environment = "pr-123"
+	in.Envelope.EnvironmentClass = "preview"
+	in.Envelope.Preset = "preview"
+	in.Target.PreviewPool = &sdk.GCPPreviewPool{Cluster: "shared-cluster", Network: "projects/example-gcp-project/global/networks/shared", Subnet: "projects/example-gcp-project/regions/europe-west1/subnetworks/shared", NetworkPolicyEnforced: true, IngressCIDRs: []string{"192.0.2.0/24"}}
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Namespace == "" || !selectionFromSpec(spec).ExistingCluster {
+		t.Fatal("shared preview was not configured")
+	}
+	other := in
+	other.Envelope.Environment = "pr-124"
+	otherSpec, err := PlanFromInputs(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Namespace == otherSpec.Namespace {
+		t.Fatal("preview namespaces must differ")
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-pr-123", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, res := range mocks.resources {
+		switch res.TypeToken {
+		case "gcp:container/cluster:Cluster":
+			if res.ID == "" {
+				t.Error("shared cluster was created instead of read")
+			}
+			found["cluster"] = true
+		case "gcp:container/nodePool:NodePool", "gcp:compute/network:Network", "gcp:compute/subnetwork:Subnetwork", "gcp:compute/router:Router", "gcp:compute/routerNat:RouterNat", "gcp:servicenetworking/connection:Connection", "gcp:networkconnectivity/serviceConnectionPolicy:ServiceConnectionPolicy":
+			t.Errorf("shared pool resource was created: %s", res.TypeToken)
+		case "gcp:sql/databaseInstance:DatabaseInstance":
+			found["database"] = true
+		case "gcp:memorystore/instance:Instance":
+			found["cache"] = true
+		case "kubernetes:core/v1:Namespace":
+			found["namespace"] = true
+		case "kubernetes:core/v1:ServiceAccount":
+			found["serviceAccount"] = true
+		case "kubernetes:networking.k8s.io/v1:NetworkPolicy":
+			data, err := json.Marshal(res.Inputs.Mappable())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(res.Name, "preview-internal") {
+				found["internalPolicy"] = true
+				for _, term := range []string{"podSelector", "Ingress", "Egress", "egress"} {
+					if !strings.Contains(string(data), term) {
+						t.Errorf("internal policy lacks %s", term)
+					}
+				}
+			} else if strings.Contains(res.Name, "preview-web") {
+				found["webPolicy"] = true
+				if !strings.Contains(string(data), "192.0.2.0/24") {
+					t.Error("web policy lacks permitted ingress CIDR")
+				}
+			}
+		case "pulumi:providers:kubernetes":
+			if v, ok := res.Inputs["namespace"]; ok && v.IsString() && v.StringValue() == spec.Namespace {
+				found["provider"] = true
+			}
+		}
+	}
+	for _, name := range []string{"cluster", "database", "cache", "namespace", "serviceAccount", "provider", "internalPolicy", "webPolicy"} {
+		if !found[name] {
+			t.Errorf("missing %s", name)
+		}
+	}
 }
 
 func (m *stackMocks) Call(args pulumi.MockCallArgs) (resource.PropertyMap, error) {
@@ -969,4 +1045,121 @@ func TestMediaAppURLUsesStorefront(t *testing.T) {
 	if got := mediaAppURLValue("preview.example.com"); strings.Contains(got, "storage.googleapis.com") {
 		t.Fatalf("mediaURL addresses the private bucket: %q", got)
 	}
+}
+
+func TestExternalSearchIsInjectedWithoutOpenSearchWorkload(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Services = map[string]sdk.ServiceBinding{"search": {Family: "opensearch", Ownership: "external", Endpoint: "https://search.example.internal", Port: 9201}}
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-staging", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	var webFound bool
+	for _, res := range mocks.resources {
+		if res.TypeToken == "kubernetes:apps/v1:StatefulSet" && strings.Contains(res.Name, "search") {
+			t.Fatalf("external search created StatefulSet %s", res.Name)
+		}
+		if res.TypeToken != "kubernetes:apps/v1:Deployment" || !strings.HasSuffix(res.Name, "-web") {
+			continue
+		}
+		payload, err := json.Marshal(res.Inputs.Mappable())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(payload), "search.example.internal") || !strings.Contains(string(payload), "9201") {
+			t.Fatalf("external search endpoint missing from web deployment: %s", payload)
+		}
+		webFound = true
+	}
+	if !webFound {
+		t.Fatal("web deployment was not created")
+	}
+}
+
+func TestExternalServicesConnectWithoutProvisioningGCPDependencies(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Services = map[string]sdk.ServiceBinding{
+		"database": {Family: "mysql", Ownership: "external", Endpoint: "db.example.internal", Secret: "gcp-secret-manager://projects/test/secrets/db/versions/latest", Username: "shop_db"},
+		"cache":    {Family: "valkey", Ownership: "external", Endpoint: "cache.example.internal", Secret: "gcp-secret-manager://projects/test/secrets/cache/versions/latest"},
+		"search":   {Family: "opensearch", Ownership: "external", Endpoint: "https://search.example.internal", Port: 9201},
+		"queue":    {Family: "rabbitmq", Ownership: "external", Endpoint: "amqps://queue.example.internal", Port: 5671, Username: "shop_queue", Secret: "gcp-secret-manager://projects/test/secrets/queue/versions/latest"},
+	}
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection := selectionFromSpec(spec)
+	if !selection.SkipCloudSQL || !selection.SkipMemorystore {
+		t.Fatalf("external services were admitted as managed: %#v", selection)
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-staging", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	webFound := false
+	for _, res := range mocks.resources {
+		switch res.TypeToken {
+		case "magelift:gcp:CloudSQL", "magelift:gcp:MemorystoreValkey", "magelift:gcp:RabbitMQ":
+			t.Errorf("external service created resource %s", res.TypeToken)
+		case "kubernetes:apps/v1:StatefulSet":
+			if strings.Contains(res.Name, "search") {
+				t.Errorf("external search created %s", res.Name)
+			}
+		case "kubernetes:batch/v1:Job":
+			if strings.Contains(res.Name, "database-grant") {
+				t.Errorf("external database created grant job %s", res.Name)
+			}
+		case "kubernetes:apps/v1:Deployment":
+			if !strings.HasSuffix(res.Name, "-web") {
+				continue
+			}
+			payload, err := json.Marshal(res.Inputs.Mappable())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range []string{"db.example.internal", "cache.example.internal", "search.example.internal", "queue.example.internal", "shop_queue", "5671", "cache-password"} {
+				if !strings.Contains(string(payload), want) {
+					t.Errorf("web deployment missing %q", want)
+				}
+			}
+			if strings.Contains(string(payload), "mock-magento-crypt-key") {
+				t.Error("password appeared as a literal in the pod")
+			}
+			webFound = true
+		}
+	}
+	if !webFound {
+		t.Fatal("web deployment was not created")
+	}
+}
+
+func TestHeadlessOriginReachesGKEFPM(t *testing.T) {
+	in := gcpDeploymentInputs()
+	in.Application.Mode = "headless"
+	in.Application.Magento.StorefrontOrigin = "https://shop.example"
+	spec, err := PlanFromInputs(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mocks := &stackMocks{}
+	if err := pulumi.RunErr(Program(spec), pulumi.WithMocks("magelift", "shop-staging", mocks)); err != nil {
+		t.Fatal(err)
+	}
+	for _, res := range mocks.resources {
+		if res.TypeToken == "kubernetes:apps/v1:Deployment" && strings.HasSuffix(res.Name, "-web") {
+			payload, err := json.Marshal(res.Inputs.Mappable())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(payload), "CONFIG__DEFAULT__WEB__GRAPHQL__CORS_ALLOWED_ORIGINS") || !strings.Contains(string(payload), "https://shop.example") {
+				t.Fatalf("web workload lacks CORS environment: %s", payload)
+			}
+			return
+		}
+	}
+	t.Fatal("web workload missing")
 }

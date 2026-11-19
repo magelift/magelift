@@ -7,6 +7,7 @@ package schema
 
 import (
 	"fmt"
+	"github.com/magelift/magelift/sdk"
 	"regexp"
 	"sort"
 	"strings"
@@ -16,56 +17,58 @@ import (
 // GCPTarget holds provider-specific GCP semantic inputs. The adapter owns the
 // SDK topology; supported topology choices remain explicit and typed here.
 type GCPTarget struct {
-	Project                         string            `yaml:"project" json:"project" config:"GCP project ID" schema:"minLength=1"`
-	Region                          string            `yaml:"region,omitempty" json:"region,omitempty" config:"GCP region" schema:"nullable"`
-	NetworkCIDR                     string            `yaml:"networkCidr,omitempty" json:"networkCidr,omitempty" config:"VPC IPv4 CIDR" schema:"nullable"`
-	Zones                           []string          `yaml:"zones,omitempty" json:"zones,omitempty" config:"GCP zones" schema:"nullable"`
-	ImageDigest                     string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Signed immutable OCI image digest" schema:"nullable"`
-	DatabaseName                    string            `yaml:"databaseName,omitempty" json:"databaseName,omitempty" config:"Magento database name" schema:"nullable"`
-	MasterUsername                  string            `yaml:"masterUsername,omitempty" json:"masterUsername,omitempty" config:"Cloud SQL master username" schema:"nullable"`
-	EncryptionKeySecret             string            `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Secret Manager secret ID for Magento encryption key" schema:"nullable"`
-	CloudSQLTier                    string            `yaml:"cloudSqlTier,omitempty" json:"cloudSqlTier,omitempty" config:"Cloud SQL machine tier" schema:"nullable"`
-	CloudSQLAvailability            string            `yaml:"cloudSqlAvailability,omitempty" json:"cloudSqlAvailability,omitempty" config:"Cloud SQL availability type" schema:"nullable,enum=ZONAL|REGIONAL"`
-	CloudSQLBackupEnabled           *bool             `yaml:"cloudSqlBackupEnabled,omitempty" json:"cloudSqlBackupEnabled,omitempty" config:"Enable Cloud SQL automated backups" schema:"nullable"`
-	CloudSQLBinaryLogEnabled        *bool             `yaml:"cloudSqlBinaryLogEnabled,omitempty" json:"cloudSqlBinaryLogEnabled,omitempty" config:"Enable Cloud SQL MySQL binary logging for point-in-time recovery" schema:"nullable"`
-	CloudSQLBackupRetentionCount    *int              `yaml:"cloudSqlBackupRetentionCount,omitempty" json:"cloudSqlBackupRetentionCount,omitempty" config:"Cloud SQL retained automated backup count" schema:"nullable,minimum=1"`
-	CloudSQLTransactionLogRetention *int              `yaml:"cloudSqlTransactionLogRetentionDays,omitempty" json:"cloudSqlTransactionLogRetentionDays,omitempty" config:"Cloud SQL MySQL transaction log retention in days (1-7)" schema:"nullable,minimum=1,maximum=7"`
-	CloudSQLBackupStartTime         string            `yaml:"cloudSqlBackupStartTime,omitempty" json:"cloudSqlBackupStartTime,omitempty" config:"Cloud SQL automated backup start time (HH:MM)" schema:"nullable"`
-	CloudSQLBackupLocation          string            `yaml:"cloudSqlBackupLocation,omitempty" json:"cloudSqlBackupLocation,omitempty" config:"Cloud SQL automated backup storage location" schema:"nullable"`
-	CloudSQLDeletionProtection      *bool             `yaml:"cloudSqlDeletionProtection,omitempty" json:"cloudSqlDeletionProtection,omitempty" config:"Enable Cloud SQL service and IaC deletion protection" schema:"nullable"`
-	MemorystoreNodeType             string            `yaml:"memorystoreNodeType,omitempty" json:"memorystoreNodeType,omitempty" config:"Memorystore for Valkey node type" schema:"nullable"`
-	MemorystoreShardCount           *int              `yaml:"memorystoreShardCount,omitempty" json:"memorystoreShardCount,omitempty" config:"Memorystore for Valkey shard count" schema:"nullable,minimum=1"`
-	MemorystoreReplicas             *int              `yaml:"memorystoreReplicas,omitempty" json:"memorystoreReplicas,omitempty" config:"Memorystore for Valkey replica count per shard (0-5)" schema:"nullable,minimum=0,maximum=5"`
-	MemorystoreEngineVersion        string            `yaml:"memorystoreEngineVersion,omitempty" json:"memorystoreEngineVersion,omitempty" config:"Memorystore for Valkey engine version (VALKEY_9_0 GA or VALKEY_9_1 Preview)" schema:"nullable,enum=VALKEY_8_0|VALKEY_9_0|VALKEY_9_1"`
-	MemorystoreMode                 string            `yaml:"memorystoreMode,omitempty" json:"memorystoreMode,omitempty" config:"Memorystore for Valkey cluster mode" schema:"nullable,enum=CLUSTER|CLUSTER_DISABLED"`
-	MemorystoreZoneDistributionMode string            `yaml:"memorystoreZoneDistributionMode,omitempty" json:"memorystoreZoneDistributionMode,omitempty" config:"Memorystore for Valkey zone distribution mode" schema:"nullable,enum=MULTI_ZONE|SINGLE_ZONE"`
-	MemorystoreZone                 string            `yaml:"memorystoreZone,omitempty" json:"memorystoreZone,omitempty" config:"Memorystore for Valkey single-zone placement" schema:"nullable"`
-	MemorystoreDeletionProtection   *bool             `yaml:"memorystoreDeletionProtection,omitempty" json:"memorystoreDeletionProtection,omitempty" config:"Enable Memorystore for Valkey deletion protection" schema:"nullable"`
-	MemorystorePSCConnectionLimit   *int              `yaml:"memorystorePscConnectionLimit,omitempty" json:"memorystorePscConnectionLimit,omitempty" config:"Maximum automatic Memorystore PSC connections" schema:"nullable,minimum=1"`
-	OpenSearchMode                  string            `yaml:"openSearchMode,omitempty" json:"openSearchMode,omitempty" config:"GKE OpenSearch workload mode" schema:"nullable,enum=opensearch|disabled"`
-	OpenSearchReplicas              int               `yaml:"openSearchReplicas,omitempty" json:"openSearchReplicas,omitempty" config:"GKE OpenSearch replica count" schema:"nullable"`
-	OpenSearchImage                 string            `yaml:"openSearchImage,omitempty" json:"openSearchImage,omitempty" config:"GKE OpenSearch image reference" schema:"nullable"`
-	QueueMode                       string            `yaml:"queueMode,omitempty" json:"queueMode,omitempty" config:"GKE queue workload mode" schema:"nullable,enum=database|rabbitmq"`
-	QueueReplicas                   int               `yaml:"queueReplicas,omitempty" json:"queueReplicas,omitempty" config:"GKE RabbitMQ replica count" schema:"nullable"`
-	RabbitMQImage                   string            `yaml:"rabbitMqImage,omitempty" json:"rabbitMqImage,omitempty" config:"GKE RabbitMQ image reference" schema:"nullable"`
-	EnableCloudArmor                *bool             `yaml:"enableCloudArmor,omitempty" json:"enableCloudArmor,omitempty" config:"Create a GCP Cloud Armor security policy" schema:"nullable"`
-	KubernetesVersion               string            `yaml:"kubernetesVersion,omitempty" json:"kubernetesVersion,omitempty" config:"GKE Kubernetes version" schema:"nullable"`
-	ReleaseChannel                  string            `yaml:"releaseChannel,omitempty" json:"releaseChannel,omitempty" config:"GKE release channel" schema:"nullable,enum=RAPID|REGULAR|STABLE"`
-	ClusterIPv4CIDR                 string            `yaml:"clusterIpv4Cidr,omitempty" json:"clusterIpv4Cidr,omitempty" config:"GKE cluster pod IPv4 CIDR" schema:"nullable"`
-	ServicesIPv4CIDR                string            `yaml:"servicesIpv4Cidr,omitempty" json:"servicesIpv4Cidr,omitempty" config:"GKE services IPv4 CIDR" schema:"nullable"`
-	StandardNodeType                string            `yaml:"standardNodeType,omitempty" json:"standardNodeType,omitempty" config:"GKE Standard node machine type" schema:"nullable"`
-	StandardNodeCount               int               `yaml:"standardNodeCount,omitempty" json:"standardNodeCount,omitempty" config:"GKE Standard initial node count per zone" schema:"nullable"`
-	StandardNodeMinCount            int               `yaml:"standardNodeMinCount,omitempty" json:"standardNodeMinCount,omitempty" config:"GKE Standard minimum nodes per zone" schema:"nullable"`
-	StandardNodeMaxCount            int               `yaml:"standardNodeMaxCount,omitempty" json:"standardNodeMaxCount,omitempty" config:"GKE Standard maximum nodes per zone" schema:"nullable"`
-	StandardNodeDiskType            string            `yaml:"standardNodeDiskType,omitempty" json:"standardNodeDiskType,omitempty" config:"GKE Standard node boot disk type" schema:"nullable"`
-	StandardNodeDiskSizeGiB         int               `yaml:"standardNodeDiskSizeGiB,omitempty" json:"standardNodeDiskSizeGiB,omitempty" config:"GKE Standard node boot disk size" schema:"nullable"`
-	StandardNodeImageType           string            `yaml:"standardNodeImageType,omitempty" json:"standardNodeImageType,omitempty" config:"GKE Standard node image type" schema:"nullable"`
-	StandardNodeSpot                bool              `yaml:"standardNodeSpot,omitempty" json:"standardNodeSpot,omitempty" config:"Use Spot VMs for GKE Standard nodes"`
-	AutopilotCPURequest             string            `yaml:"autopilotCpuRequest,omitempty" json:"autopilotCpuRequest,omitempty" config:"GKE Autopilot CPU request" schema:"nullable"`
-	AutopilotMemoryRequest          string            `yaml:"autopilotMemoryRequest,omitempty" json:"autopilotMemoryRequest,omitempty" config:"GKE Autopilot memory request" schema:"nullable"`
-	DesiredWebReplicas              int               `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
-	QueueConsumerCount              int               `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
-	Labels                          map[string]string `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
+	PreviewPool                     *sdk.GCPPreviewPool `yaml:"previewPool,omitempty" json:"previewPool,omitempty" config:"Existing cluster and network for preview environments" schema:"nullable"`
+	Project                         string              `yaml:"project" json:"project" config:"GCP project ID" schema:"minLength=1"`
+	Region                          string              `yaml:"region,omitempty" json:"region,omitempty" config:"GCP region" schema:"nullable"`
+	NetworkCIDR                     string              `yaml:"networkCidr,omitempty" json:"networkCidr,omitempty" config:"VPC IPv4 CIDR" schema:"nullable"`
+	Zones                           []string            `yaml:"zones,omitempty" json:"zones,omitempty" config:"GCP zones" schema:"nullable"`
+	ImageDigest                     string              `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Signed immutable OCI image digest" schema:"nullable"`
+	DatabaseName                    string              `yaml:"databaseName,omitempty" json:"databaseName,omitempty" config:"Magento database name" schema:"nullable"`
+	MasterUsername                  string              `yaml:"masterUsername,omitempty" json:"masterUsername,omitempty" config:"Cloud SQL master username" schema:"nullable"`
+	EncryptionKeySecret             string              `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Secret Manager secret ID for Magento encryption key" schema:"nullable"`
+	CloudSQLDatabaseVersion         string              `yaml:"cloudSqlDatabaseVersion,omitempty" json:"cloudSqlDatabaseVersion,omitempty" config:"Cloud SQL MySQL API engine version"`
+	CloudSQLTier                    string              `yaml:"cloudSqlTier,omitempty" json:"cloudSqlTier,omitempty" config:"Cloud SQL machine tier" schema:"nullable"`
+	CloudSQLAvailability            string              `yaml:"cloudSqlAvailability,omitempty" json:"cloudSqlAvailability,omitempty" config:"Cloud SQL availability type" schema:"nullable,enum=ZONAL|REGIONAL"`
+	CloudSQLBackupEnabled           *bool               `yaml:"cloudSqlBackupEnabled,omitempty" json:"cloudSqlBackupEnabled,omitempty" config:"Enable Cloud SQL automated backups" schema:"nullable"`
+	CloudSQLBinaryLogEnabled        *bool               `yaml:"cloudSqlBinaryLogEnabled,omitempty" json:"cloudSqlBinaryLogEnabled,omitempty" config:"Enable Cloud SQL MySQL binary logging for point-in-time recovery" schema:"nullable"`
+	CloudSQLBackupRetentionCount    *int                `yaml:"cloudSqlBackupRetentionCount,omitempty" json:"cloudSqlBackupRetentionCount,omitempty" config:"Cloud SQL retained automated backup count" schema:"nullable,minimum=1"`
+	CloudSQLTransactionLogRetention *int                `yaml:"cloudSqlTransactionLogRetentionDays,omitempty" json:"cloudSqlTransactionLogRetentionDays,omitempty" config:"Cloud SQL MySQL transaction log retention in days (1-7)" schema:"nullable,minimum=1,maximum=7"`
+	CloudSQLBackupStartTime         string              `yaml:"cloudSqlBackupStartTime,omitempty" json:"cloudSqlBackupStartTime,omitempty" config:"Cloud SQL automated backup start time (HH:MM)" schema:"nullable"`
+	CloudSQLBackupLocation          string              `yaml:"cloudSqlBackupLocation,omitempty" json:"cloudSqlBackupLocation,omitempty" config:"Cloud SQL automated backup storage location" schema:"nullable"`
+	CloudSQLDeletionProtection      *bool               `yaml:"cloudSqlDeletionProtection,omitempty" json:"cloudSqlDeletionProtection,omitempty" config:"Enable Cloud SQL service and IaC deletion protection" schema:"nullable"`
+	MemorystoreNodeType             string              `yaml:"memorystoreNodeType,omitempty" json:"memorystoreNodeType,omitempty" config:"Memorystore for Valkey node type" schema:"nullable"`
+	MemorystoreShardCount           *int                `yaml:"memorystoreShardCount,omitempty" json:"memorystoreShardCount,omitempty" config:"Memorystore for Valkey shard count" schema:"nullable,minimum=1"`
+	MemorystoreReplicas             *int                `yaml:"memorystoreReplicas,omitempty" json:"memorystoreReplicas,omitempty" config:"Memorystore for Valkey replica count per shard (0-5)" schema:"nullable,minimum=0,maximum=5"`
+	MemorystoreEngineVersion        string              `yaml:"memorystoreEngineVersion,omitempty" json:"memorystoreEngineVersion,omitempty" config:"Memorystore for Valkey API engine version" schema:"nullable"`
+	MemorystoreMode                 string              `yaml:"memorystoreMode,omitempty" json:"memorystoreMode,omitempty" config:"Memorystore for Valkey cluster mode" schema:"nullable,enum=CLUSTER|CLUSTER_DISABLED"`
+	MemorystoreZoneDistributionMode string              `yaml:"memorystoreZoneDistributionMode,omitempty" json:"memorystoreZoneDistributionMode,omitempty" config:"Memorystore for Valkey zone distribution mode" schema:"nullable,enum=MULTI_ZONE|SINGLE_ZONE"`
+	MemorystoreZone                 string              `yaml:"memorystoreZone,omitempty" json:"memorystoreZone,omitempty" config:"Memorystore for Valkey single-zone placement" schema:"nullable"`
+	MemorystoreDeletionProtection   *bool               `yaml:"memorystoreDeletionProtection,omitempty" json:"memorystoreDeletionProtection,omitempty" config:"Enable Memorystore for Valkey deletion protection" schema:"nullable"`
+	MemorystorePSCConnectionLimit   *int                `yaml:"memorystorePscConnectionLimit,omitempty" json:"memorystorePscConnectionLimit,omitempty" config:"Maximum automatic Memorystore PSC connections" schema:"nullable,minimum=1"`
+	OpenSearchMode                  string              `yaml:"openSearchMode,omitempty" json:"openSearchMode,omitempty" config:"GKE OpenSearch workload mode" schema:"nullable,enum=opensearch|disabled"`
+	OpenSearchReplicas              int                 `yaml:"openSearchReplicas,omitempty" json:"openSearchReplicas,omitempty" config:"GKE OpenSearch replica count" schema:"nullable"`
+	OpenSearchImage                 string              `yaml:"openSearchImage,omitempty" json:"openSearchImage,omitempty" config:"GKE OpenSearch image reference" schema:"nullable"`
+	QueueMode                       string              `yaml:"queueMode,omitempty" json:"queueMode,omitempty" config:"GKE queue workload mode" schema:"nullable,enum=database|rabbitmq"`
+	QueueReplicas                   int                 `yaml:"queueReplicas,omitempty" json:"queueReplicas,omitempty" config:"GKE RabbitMQ replica count" schema:"nullable"`
+	RabbitMQImage                   string              `yaml:"rabbitMqImage,omitempty" json:"rabbitMqImage,omitempty" config:"GKE RabbitMQ image reference" schema:"nullable"`
+	EnableCloudArmor                *bool               `yaml:"enableCloudArmor,omitempty" json:"enableCloudArmor,omitempty" config:"Create a GCP Cloud Armor security policy" schema:"nullable"`
+	KubernetesVersion               string              `yaml:"kubernetesVersion,omitempty" json:"kubernetesVersion,omitempty" config:"GKE Kubernetes version" schema:"nullable"`
+	ReleaseChannel                  string              `yaml:"releaseChannel,omitempty" json:"releaseChannel,omitempty" config:"GKE release channel" schema:"nullable,enum=RAPID|REGULAR|STABLE"`
+	ClusterIPv4CIDR                 string              `yaml:"clusterIpv4Cidr,omitempty" json:"clusterIpv4Cidr,omitempty" config:"GKE cluster pod IPv4 CIDR" schema:"nullable"`
+	ServicesIPv4CIDR                string              `yaml:"servicesIpv4Cidr,omitempty" json:"servicesIpv4Cidr,omitempty" config:"GKE services IPv4 CIDR" schema:"nullable"`
+	StandardNodeType                string              `yaml:"standardNodeType,omitempty" json:"standardNodeType,omitempty" config:"GKE Standard node machine type" schema:"nullable"`
+	StandardNodeCount               int                 `yaml:"standardNodeCount,omitempty" json:"standardNodeCount,omitempty" config:"GKE Standard initial node count per zone" schema:"nullable"`
+	StandardNodeMinCount            int                 `yaml:"standardNodeMinCount,omitempty" json:"standardNodeMinCount,omitempty" config:"GKE Standard minimum nodes per zone" schema:"nullable"`
+	StandardNodeMaxCount            int                 `yaml:"standardNodeMaxCount,omitempty" json:"standardNodeMaxCount,omitempty" config:"GKE Standard maximum nodes per zone" schema:"nullable"`
+	StandardNodeDiskType            string              `yaml:"standardNodeDiskType,omitempty" json:"standardNodeDiskType,omitempty" config:"GKE Standard node boot disk type" schema:"nullable"`
+	StandardNodeDiskSizeGiB         int                 `yaml:"standardNodeDiskSizeGiB,omitempty" json:"standardNodeDiskSizeGiB,omitempty" config:"GKE Standard node boot disk size" schema:"nullable"`
+	StandardNodeImageType           string              `yaml:"standardNodeImageType,omitempty" json:"standardNodeImageType,omitempty" config:"GKE Standard node image type" schema:"nullable"`
+	StandardNodeSpot                bool                `yaml:"standardNodeSpot,omitempty" json:"standardNodeSpot,omitempty" config:"Use Spot VMs for GKE Standard nodes"`
+	AutopilotCPURequest             string              `yaml:"autopilotCpuRequest,omitempty" json:"autopilotCpuRequest,omitempty" config:"GKE Autopilot CPU request" schema:"nullable"`
+	AutopilotMemoryRequest          string              `yaml:"autopilotMemoryRequest,omitempty" json:"autopilotMemoryRequest,omitempty" config:"GKE Autopilot memory request" schema:"nullable"`
+	DesiredWebReplicas              int                 `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
+	QueueConsumerCount              int                 `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
+	Labels                          map[string]string   `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
 }
 
 // Validate checks a parsed GCP target block plus runtime. A nil target fails

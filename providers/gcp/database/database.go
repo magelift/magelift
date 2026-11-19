@@ -20,23 +20,24 @@ const AdminUsername = "magelift-admin"
 const logBinTrustFunctionCreatorsFlag = "log_bin_trust_function_creators"
 
 type Args struct {
-	Project                 string
-	Region                  string
-	NetworkID               pulumi.StringInput
-	NetworkSelfLink         pulumi.StringInput
-	DatabaseName            string
-	MasterUsername          string
-	DatabaseVersion         string // MYSQL_8_0 | MYSQL_8_4
-	Tier                    string
-	AvailabilityType        string // ZONAL | REGIONAL
-	BackupEnabled           bool
-	BinaryLogEnabled        bool
-	BackupRetentionCount    int
-	TransactionLogRetention int
-	BackupStartTime         string
-	BackupLocation          string
-	DeletionProtection      bool
-	Labels                  map[string]string
+	Project                             string
+	Region                              string
+	NetworkID                           pulumi.StringInput
+	NetworkSelfLink                     pulumi.StringInput
+	UseExistingPrivateServiceConnection bool
+	DatabaseName                        string
+	MasterUsername                      string
+	DatabaseVersion                     string // MYSQL_8_0 | MYSQL_8_4
+	Tier                                string
+	AvailabilityType                    string // ZONAL | REGIONAL
+	BackupEnabled                       bool
+	BinaryLogEnabled                    bool
+	BackupRetentionCount                int
+	TransactionLogRetention             int
+	BackupStartTime                     string
+	BackupLocation                      string
+	DeletionProtection                  bool
+	Labels                              map[string]string
 	// Preferred primary zone for a new instance. Empty leaves zone selection
 	// to Cloud SQL.
 	Zone string
@@ -118,29 +119,34 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	parent := pulumi.Parent(component)
 
-	address, err := compute.NewGlobalAddress(ctx, name+"-psa", &compute.GlobalAddressArgs{
-		Project:      pulumi.String(args.Project),
-		Name:         pulumi.String(name + "-psa"),
-		Purpose:      pulumi.String("VPC_PEERING"),
-		AddressType:  pulumi.String("INTERNAL"),
-		PrefixLength: pulumi.Int(16),
-		Network:      args.NetworkID,
-	}, parent)
-	if err != nil {
-		return nil, fmt.Errorf("create private service access address: %w", err)
-	}
-	connection, err := servicenetworking.NewConnection(ctx, name+"-psa", &servicenetworking.ConnectionArgs{
-		Network: args.NetworkSelfLink,
-		Service: pulumi.String("servicenetworking.googleapis.com"),
-		ReservedPeeringRanges: pulumi.StringArray{
-			address.Name,
-		},
-	}, parent, pulumi.DependsOn([]pulumi.Resource{address}),
-		// Cloud SQL can keep the producer allocation briefly after instance delete;
-		// give the provider time before surfacing FLOW_SN_DC_* to the stack.
-		pulumi.Timeouts(&pulumi.CustomTimeouts{Delete: "45m"}))
-	if err != nil {
-		return nil, fmt.Errorf("create private service connection: %w", err)
+	var connectionDependencies []pulumi.Resource
+	if !args.UseExistingPrivateServiceConnection {
+		address, err := compute.NewGlobalAddress(ctx, name+"-psa", &compute.GlobalAddressArgs{
+			Project:      pulumi.String(args.Project),
+			Name:         pulumi.String(name + "-psa"),
+			Purpose:      pulumi.String("VPC_PEERING"),
+			AddressType:  pulumi.String("INTERNAL"),
+			PrefixLength: pulumi.Int(16),
+			Network:      args.NetworkID,
+		}, parent)
+		if err != nil {
+			return nil, fmt.Errorf("create private service access address: %w", err)
+		}
+		connection, err := servicenetworking.NewConnection(ctx, name+"-psa", &servicenetworking.ConnectionArgs{
+			Network: args.NetworkSelfLink,
+			Service: pulumi.String("servicenetworking.googleapis.com"),
+			ReservedPeeringRanges: pulumi.StringArray{
+				address.Name,
+			},
+		}, parent, pulumi.DependsOn([]pulumi.Resource{address}),
+			// Cloud SQL can keep the producer allocation briefly after instance delete;
+			// give the provider time before surfacing FLOW_SN_DC_* to the stack.
+			pulumi.Timeouts(&pulumi.CustomTimeouts{Delete: "45m"}))
+		if err != nil {
+			return nil, fmt.Errorf("create private service connection: %w", err)
+		}
+
+		connectionDependencies = append(connectionDependencies, connection)
 	}
 
 	password, err := random.NewRandomPassword(ctx, name+"-password", &random.RandomPasswordArgs{
@@ -240,7 +246,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		Region:             pulumi.String(args.Region),
 		Settings:           settings,
 		DeletionProtection: pulumi.Bool(args.DeletionProtection),
-	}, parent, pulumi.DependsOn([]pulumi.Resource{connection}), sqlZoneCreationOnly)
+	}, parent, pulumi.DependsOn(connectionDependencies), sqlZoneCreationOnly)
 	if err != nil {
 		return nil, fmt.Errorf("create Cloud SQL instance: %w", err)
 	}

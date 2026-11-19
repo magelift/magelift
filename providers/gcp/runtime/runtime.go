@@ -13,10 +13,12 @@ import (
 	"github.com/magelift/magelift/providers/gcp/naming"
 	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/container"
 	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/organizations"
+	"github.com/pulumi/pulumi-gcp/sdk/v10/go/gcp/serviceaccount"
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
+	networkingv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
@@ -34,6 +36,9 @@ const (
 )
 
 type Args struct {
+	ExistingCluster             string
+	Namespace                   string
+	IngressCIDRs                []string
 	Project                     string
 	MagentoProject              string
 	Environment                 string
@@ -65,12 +70,20 @@ type Args struct {
 	DatabaseAdminUsername       string
 	DatabaseAdminPassword       pulumi.StringInput
 	DatabaseUsersReady          []pulumi.Resource
+	ExternalDatabase            bool
 	EncryptionKey               pulumi.StringInput
+	ExternalCachePassword       pulumi.StringInput
 	CacheEndpoint               pulumi.StringInput
 	SessionEndpoint             pulumi.StringInput
+	ExternalSearchEndpoint      string
 	SearchMode                  string
 	SearchReplicas              int
 	SearchImage                 string
+	ExternalQueueHost           string
+	ExternalQueuePort           string
+	ExternalQueueSSL            string
+	ExternalQueueUsername       string
+	ExternalQueuePassword       pulumi.StringInput
 	QueueMode                   string
 	QueueReplicas               int
 	QueueImage                  string
@@ -102,8 +115,14 @@ type Component struct {
 	ClusterEndpoint         pulumi.StringOutput
 	SearchEndpoint          pulumi.StringOutput
 	QueueHost               pulumi.StringOutput
+	Namespace               pulumi.StringOutput
+	WorkloadServiceAccount  pulumi.StringOutput
 	QueueMode               pulumi.StringOutput
+	QueueUsername           pulumi.StringOutput
+	QueuePort               pulumi.StringOutput
+	QueueSSL                pulumi.StringOutput
 	QueuePasswordSecretName pulumi.StringOutput
+	CachePasswordSecretName pulumi.StringOutput
 	DatabaseSecretName      pulumi.StringOutput
 	EncryptionKeySecretName pulumi.StringOutput
 	Kubeconfig              pulumi.StringOutput
@@ -165,7 +184,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		}
 	}
 	if strings.TrimSpace(args.DatabaseUsername) == "" || args.DatabasePassword == nil ||
-		strings.TrimSpace(args.DatabaseAdminUsername) == "" || args.DatabaseAdminPassword == nil {
+		(!args.ExternalDatabase && (strings.TrimSpace(args.DatabaseAdminUsername) == "" || args.DatabaseAdminPassword == nil)) {
 		return nil, errors.New("database username, password, admin username, and admin password are required")
 	}
 	if args.EncryptionKey == nil {
@@ -262,59 +281,137 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		nodeIdentityIgnoreChanges = []string{"nodeConfig.serviceAccount", "nodeConfig.oauthScopes"}
 	}
 	nodeIdentityCreationOnly := pulumi.IgnoreChanges(nodeIdentityIgnoreChanges)
-	cluster, err := container.NewCluster(ctx, name+"-cluster", clusterArgs, parent, nodeIdentityCreationOnly)
-	if err != nil {
-		return nil, fmt.Errorf("create GKE %s cluster: %w", args.Runtime, err)
-	}
-	clusterResources = append(clusterResources, cluster)
-	if args.Runtime == "gke-standard" {
-		nodePool, err := container.NewNodePool(ctx, name+"-standard-nodes", &container.NodePoolArgs{
-			Project:          pulumi.String(args.Project),
-			Name:             pulumi.String(naming.NodePoolName(args.MagentoProject, args.Environment)),
-			Cluster:          cluster.Name,
-			Location:         pulumi.String(args.Region),
-			InitialNodeCount: pulumi.Int(args.StandardNodeCount),
-			NodeLocations:    pulumi.ToStringArray(args.Zones),
-			NodeConfig: &container.NodePoolNodeConfigArgs{
-				ServiceAccount: pulumi.String(nodeServiceAccount),
-				OauthScopes:    nodeScopes,
-				MachineType:    pulumi.String(args.StandardNodeType),
-				DiskType:       pulumi.String(args.StandardNodeDiskType),
-				DiskSizeGb:     pulumi.Int(args.StandardNodeDiskSizeGiB),
-				ImageType:      pulumi.String(args.StandardNodeImageType),
-				Spot:           pulumi.Bool(args.StandardNodeSpot),
-				LinuxNodeConfig: &container.NodePoolNodeConfigLinuxNodeConfigArgs{
-					Sysctls: pulumi.StringMap{"vm.max_map_count": pulumi.String("262144")},
-				},
-			},
-			NetworkConfig: &container.NodePoolNetworkConfigArgs{
-				EnablePrivateNodes: pulumi.Bool(true),
-				Subnetwork:         args.PrivateSubnetNames.ToStringArrayOutput().Index(pulumi.Int(0)),
-			},
-			Management: &container.NodePoolManagementArgs{AutoRepair: pulumi.Bool(true), AutoUpgrade: pulumi.Bool(true)},
-			Autoscaling: &container.NodePoolAutoscalingArgs{
-				MinNodeCount: pulumi.Int(args.StandardNodeMinCount),
-				MaxNodeCount: pulumi.Int(args.StandardNodeMaxCount),
-			},
-		}, parent, nodeIdentityCreationOnly, pulumi.DependsOn([]pulumi.Resource{cluster}))
-		if err != nil {
-			return nil, fmt.Errorf("create GKE Standard node pool: %w", err)
+	var cluster *container.Cluster
+	var err error
+	if args.ExistingCluster != "" {
+		clusterID := args.ExistingCluster
+		if !strings.HasPrefix(clusterID, "projects/") {
+			clusterID = "projects/" + args.Project + "/locations/" + args.Region + "/clusters/" + clusterID
 		}
-		clusterResources = append(clusterResources, nodePool)
+		cluster, err = container.GetCluster(ctx, name+"-existing-cluster", pulumi.ID(clusterID), nil, parent)
+		if err != nil {
+			return nil, fmt.Errorf("read shared GKE cluster: %w", err)
+		}
+		clusterResources = append(clusterResources, cluster)
+	} else {
+		cluster, err = container.NewCluster(ctx, name+"-cluster", clusterArgs, parent, nodeIdentityCreationOnly)
+		if err != nil {
+			return nil, fmt.Errorf("create GKE %s cluster: %w", args.Runtime, err)
+		}
+		clusterResources = append(clusterResources, cluster)
+		if args.Runtime == "gke-standard" {
+			nodePool, err := container.NewNodePool(ctx, name+"-standard-nodes", &container.NodePoolArgs{
+				Project:          pulumi.String(args.Project),
+				Name:             pulumi.String(naming.NodePoolName(args.MagentoProject, args.Environment)),
+				Cluster:          cluster.Name,
+				Location:         pulumi.String(args.Region),
+				InitialNodeCount: pulumi.Int(args.StandardNodeCount),
+				NodeLocations:    pulumi.ToStringArray(args.Zones),
+				NodeConfig: &container.NodePoolNodeConfigArgs{
+					ServiceAccount: pulumi.String(nodeServiceAccount),
+					OauthScopes:    nodeScopes,
+					MachineType:    pulumi.String(args.StandardNodeType),
+					DiskType:       pulumi.String(args.StandardNodeDiskType),
+					DiskSizeGb:     pulumi.Int(args.StandardNodeDiskSizeGiB),
+					ImageType:      pulumi.String(args.StandardNodeImageType),
+					Spot:           pulumi.Bool(args.StandardNodeSpot),
+					LinuxNodeConfig: &container.NodePoolNodeConfigLinuxNodeConfigArgs{
+						Sysctls: pulumi.StringMap{"vm.max_map_count": pulumi.String("262144")},
+					},
+				},
+				NetworkConfig: &container.NodePoolNetworkConfigArgs{
+					EnablePrivateNodes: pulumi.Bool(true),
+					Subnetwork:         args.PrivateSubnetNames.ToStringArrayOutput().Index(pulumi.Int(0)),
+				},
+				Management: &container.NodePoolManagementArgs{AutoRepair: pulumi.Bool(true), AutoUpgrade: pulumi.Bool(true)},
+				Autoscaling: &container.NodePoolAutoscalingArgs{
+					MinNodeCount: pulumi.Int(args.StandardNodeMinCount),
+					MaxNodeCount: pulumi.Int(args.StandardNodeMaxCount),
+				},
+			}, parent, nodeIdentityCreationOnly, pulumi.DependsOn([]pulumi.Resource{cluster}))
+			if err != nil {
+				return nil, fmt.Errorf("create GKE Standard node pool: %w", err)
+			}
+			clusterResources = append(clusterResources, nodePool)
+		}
+
 	}
 
 	kubeconfig := pulumi.ToSecret(generateKubeconfig(ctx, args.Project, cluster.Name, cluster.Endpoint, cluster.MasterAuth)).(pulumi.StringOutput)
-	k8sProvider, err := kubernetes.NewProvider(ctx, name+"-k8s", &kubernetes.ProviderArgs{
-		Kubeconfig:        kubeconfig,
-		ClusterIdentifier: cluster.ID().ToStringOutput(),
-	}, parent, pulumi.DependsOn(clusterResources))
+	providerArgs := &kubernetes.ProviderArgs{Kubeconfig: kubeconfig, ClusterIdentifier: cluster.ID().ToStringOutput()}
+	providerName := name + "-k8s"
+	if args.Namespace != "" {
+		providerName += "-cluster"
+	}
+	clusterProvider, err := kubernetes.NewProvider(ctx, providerName, providerArgs, parent, pulumi.DependsOn(clusterResources))
 	if err != nil {
 		return nil, fmt.Errorf("create Kubernetes provider for GKE %s: %w", args.Runtime, err)
+	}
+	k8sProvider := clusterProvider
+	workloadServiceAccount := ""
+	if args.Namespace != "" {
+		namespace, err := corev1.NewNamespace(ctx, name+"-namespace", &corev1.NamespaceArgs{Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(args.Namespace), Annotations: skipAwait}}, parent, pulumi.Provider(clusterProvider), pulumi.DependsOn(clusterResources))
+		if err != nil {
+			return nil, fmt.Errorf("create preview namespace: %w", err)
+		}
+		providerArgs.Namespace = pulumi.StringPtr(args.Namespace)
+		k8sProvider, err = kubernetes.NewProvider(ctx, name+"-k8s", providerArgs, parent, pulumi.DependsOn([]pulumi.Resource{namespace}))
+		if err != nil {
+			return nil, fmt.Errorf("create preview Kubernetes provider: %w", err)
+		}
+		workloadServiceAccount = "magelift"
+		accountID := "mlp-" + strings.TrimPrefix(args.Namespace, "ml-preview-")
+		account, err := serviceaccount.NewAccount(ctx, name+"-workload-identity", &serviceaccount.AccountArgs{Project: pulumi.String(args.Project), AccountId: pulumi.String(accountID), DisplayName: pulumi.String("MageLift preview workload")}, parent)
+		if err != nil {
+			return nil, fmt.Errorf("create preview workload identity: %w", err)
+		}
+		member, err := serviceaccount.NewIAMMember(ctx, name+"-workload-identity-binding", &serviceaccount.IAMMemberArgs{
+			ServiceAccountId: account.Name, Role: pulumi.String("roles/iam.workloadIdentityUser"),
+			Member: pulumi.String("serviceAccount:" + args.Project + ".svc.id.goog[" + args.Namespace + "/" + workloadServiceAccount + "]"),
+		}, parent)
+		if err != nil {
+			return nil, fmt.Errorf("bind preview workload identity: %w", err)
+		}
+		workloadAccount, err := corev1.NewServiceAccount(ctx, name+"-workload-service-account", &corev1.ServiceAccountArgs{
+			Metadata: &metav1.ObjectMetaArgs{Name: pulumi.String(workloadServiceAccount), Annotations: pulumi.StringMap{"iam.gke.io/gcp-service-account": account.Email}},
+		}, parent, pulumi.Provider(k8sProvider), pulumi.DependsOn([]pulumi.Resource{member}))
+		if err != nil {
+			return nil, fmt.Errorf("create preview service account: %w", err)
+		}
+		clusterResources = append(clusterResources, workloadAccount)
+		internalPolicy, err := networkingv1.NewNetworkPolicy(ctx, name+"-preview-internal", &networkingv1.NetworkPolicyArgs{
+			Spec: &networkingv1.NetworkPolicySpecArgs{
+				PodSelector: &metav1.LabelSelectorArgs{},
+				PolicyTypes: pulumi.StringArray{pulumi.String("Ingress"), pulumi.String("Egress")},
+				Ingress:     networkingv1.NetworkPolicyIngressRuleArray{&networkingv1.NetworkPolicyIngressRuleArgs{From: networkingv1.NetworkPolicyPeerArray{&networkingv1.NetworkPolicyPeerArgs{PodSelector: &metav1.LabelSelectorArgs{}}}}},
+				Egress:      networkingv1.NetworkPolicyEgressRuleArray{&networkingv1.NetworkPolicyEgressRuleArgs{}},
+			},
+		}, parent, pulumi.Provider(k8sProvider))
+		if err != nil {
+			return nil, fmt.Errorf("create preview network isolation policy: %w", err)
+		}
+		peers := networkingv1.NetworkPolicyPeerArray{}
+		for _, cidr := range args.IngressCIDRs {
+			peers = append(peers, &networkingv1.NetworkPolicyPeerArgs{IpBlock: &networkingv1.IPBlockArgs{Cidr: pulumi.String(cidr)}})
+		}
+		webPolicy, err := networkingv1.NewNetworkPolicy(ctx, name+"-preview-web", &networkingv1.NetworkPolicyArgs{
+			Spec: &networkingv1.NetworkPolicySpecArgs{
+				PodSelector: &metav1.LabelSelectorArgs{MatchLabels: pulumi.StringMap{"app": pulumi.String(name + "-web")}},
+				PolicyTypes: pulumi.StringArray{pulumi.String("Ingress")},
+				Ingress:     networkingv1.NetworkPolicyIngressRuleArray{&networkingv1.NetworkPolicyIngressRuleArgs{From: peers}},
+			},
+		}, parent, pulumi.Provider(k8sProvider))
+		if err != nil {
+			return nil, fmt.Errorf("create preview web ingress policy: %w", err)
+		}
+		clusterResources = append(clusterResources, internalPolicy, webPolicy)
 	}
 	k8sOpts := []pulumi.ResourceOption{parent, pulumi.Provider(k8sProvider), pulumi.DependsOn(clusterResources)}
 
 	searchEndpoint := pulumi.String("").ToStringOutput()
-	if args.SearchMode == "opensearch" {
+	if args.ExternalSearchEndpoint != "" {
+		searchEndpoint = pulumi.String(args.ExternalSearchEndpoint).ToStringOutput()
+	} else if args.SearchMode == "opensearch" {
 		searchComp, err := search.New(ctx, naming.Resource(args.MagentoProject, args.Environment, "search"), search.Args{
 			Replicas: args.SearchReplicas, Image: args.SearchImage, K8sProvider: k8sProvider,
 		}, k8sOpts...)
@@ -327,9 +424,16 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	queueHost := pulumi.String("").ToStringOutput()
 	queueUser := ""
 	var queuePassword pulumi.StringInput
-	if args.QueueMode == "rabbitmq" {
+	if args.QueueMode == "rabbitmq" && args.ExternalQueueHost != "" {
+		if args.ExternalQueueUsername == "" || args.ExternalQueuePassword == nil {
+			return nil, errors.New("external queue username and password are required")
+		}
+		queueHost = pulumi.String(args.ExternalQueueHost).ToStringOutput()
+		queueUser = args.ExternalQueueUsername
+		queuePassword = args.ExternalQueuePassword
+	} else if args.QueueMode == "rabbitmq" {
 		queueComp, err := queue.New(ctx, naming.Resource(args.MagentoProject, args.Environment, "rabbitmq"), queue.Args{
-			Replicas: args.QueueReplicas, Image: args.QueueImage, K8sProvider: k8sProvider, Username: "magento",
+			Replicas: args.QueueReplicas, Image: args.QueueImage, K8sProvider: k8sProvider, Username: "magento", Namespace: args.Namespace,
 		}, k8sOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("create RabbitMQ: %w", err)
@@ -352,11 +456,16 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	}
 	databaseSecretName := kube.DatabaseCredentialsSecretName(name)
 	env = kube.AppendDatabaseCredentialEnv(env, databaseSecretName)
-	databaseAdminSecret, err := kube.NewDatabaseAdminCredentialsSecret(ctx, name, args.DatabaseAdminUsername, args.DatabaseAdminPassword, k8sOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("create database admin credentials Secret: %w", err)
+	var databaseAdminSecret pulumi.Resource
+	databaseAdminSecretName := ""
+	if !args.ExternalDatabase {
+		databaseAdminSecret, err = kube.NewDatabaseAdminCredentialsSecret(ctx, name, args.DatabaseAdminUsername, args.DatabaseAdminPassword, k8sOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("create database admin credentials Secret: %w", err)
+		}
+		databaseAdminSecretName = kube.DatabaseAdminCredentialsSecretName(name)
 	}
-	databaseAdminSecretName := kube.DatabaseAdminCredentialsSecretName(name)
+
 	smtpPasswordSecretName := ""
 	var smtpPasswordSecret pulumi.Resource
 	if args.SmtpPassword != nil {
@@ -367,6 +476,16 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		}
 		smtpPasswordSecretName = kube.SmtpPasswordSecretName(name)
 		env = kube.AppendSmtpPasswordEnv(env, smtpPasswordSecretName)
+	}
+	cachePasswordSecretName := ""
+	var cachePasswordSecret pulumi.Resource
+	if args.ExternalCachePassword != nil {
+		cachePasswordSecret, err = kube.NewCachePasswordSecret(ctx, name, args.ExternalCachePassword, k8sOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("create cache password Secret: %w", err)
+		}
+		cachePasswordSecretName = name + "-cache-password"
+		env = kube.AppendCachePasswordEnv(env, cachePasswordSecretName)
 	}
 	mediaHmacSecretName := ""
 	var mediaHmacSecret pulumi.Resource
@@ -390,19 +509,26 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 		queuePasswordSecretName = kube.QueuePasswordSecretName(name)
 		env = kube.AppendQueuePasswordEnv(env, queuePasswordSecretName)
 	}
-	grantStatement, err := databaseGrantStatement(args.DatabaseName, args.DatabaseUsername)
-	if err != nil {
-		return nil, fmt.Errorf("build database privilege grant: %w", err)
+	workloadDependencies := []pulumi.Resource{databaseSecret, encryptionKeySecret}
+	if !args.ExternalDatabase {
+		grantStatement, err := databaseGrantStatement(args.DatabaseName, args.DatabaseUsername)
+		if err != nil {
+			return nil, fmt.Errorf("build database privilege grant: %w", err)
+		}
+		grantDependencies := []pulumi.Resource{databaseSecret, databaseAdminSecret}
+		grantDependencies = append(grantDependencies, args.DatabaseUsersReady...)
+		grantOpts := append(k8sOpts, pulumi.DependsOn(grantDependencies))
+		grantOpts = append(grantOpts, pulumi.Timeouts(&pulumi.CustomTimeouts{Create: "15m", Delete: "15m"}))
+		databaseGrant, err := newDatabaseGrantJob(ctx, name, args.DatabaseWriter, args.DatabaseName, args.DatabaseAdminUsername, databaseAdminSecretName, grantStatement, workloadServiceAccount, grantOpts...)
+		if err != nil {
+			return nil, fmt.Errorf("create database privilege grant Job: %w", err)
+		}
+		workloadDependencies = append(workloadDependencies, databaseGrant)
 	}
-	grantDependencies := []pulumi.Resource{databaseSecret, databaseAdminSecret}
-	grantDependencies = append(grantDependencies, args.DatabaseUsersReady...)
-	grantOpts := append(k8sOpts, pulumi.DependsOn(grantDependencies))
-	grantOpts = append(grantOpts, pulumi.Timeouts(&pulumi.CustomTimeouts{Create: "15m", Delete: "15m"}))
-	databaseGrant, err := newDatabaseGrantJob(ctx, name, args.DatabaseWriter, args.DatabaseName, args.DatabaseAdminUsername, databaseAdminSecretName, grantStatement, grantOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("create database privilege grant Job: %w", err)
+	workloadOpts := append(k8sOpts, pulumi.DependsOn(workloadDependencies))
+	if cachePasswordSecret != nil {
+		workloadOpts = append(workloadOpts, pulumi.DependsOn([]pulumi.Resource{cachePasswordSecret}))
 	}
-	workloadOpts := append(k8sOpts, pulumi.DependsOn([]pulumi.Resource{databaseSecret, databaseGrant, encryptionKeySecret}))
 	if queuePasswordSecret != nil {
 		workloadOpts = append(workloadOpts, pulumi.DependsOn([]pulumi.Resource{queuePasswordSecret}))
 	}
@@ -425,7 +551,8 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 			Template: &corev1.PodTemplateSpecArgs{
 				Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String(name + "-web")}},
 				Spec: &corev1.PodSpecArgs{
-					Containers: webContainers,
+					ServiceAccountName: pulumi.String(workloadServiceAccount),
+					Containers:         webContainers,
 				},
 			},
 		},
@@ -466,6 +593,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 			Template: &corev1.PodTemplateSpecArgs{
 				Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String(name + "-cron")}},
 				Spec: &corev1.PodSpecArgs{
+					ServiceAccountName: pulumi.String(workloadServiceAccount),
 					Containers: corev1.ContainerArray{
 						&corev1.ContainerArgs{
 							Name:    pulumi.String("cron"),
@@ -494,6 +622,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 				Template: &corev1.PodTemplateSpecArgs{
 					Metadata: &metav1.ObjectMetaArgs{Labels: pulumi.StringMap{"app": pulumi.String(name + "-queue")}},
 					Spec: &corev1.PodSpecArgs{
+						ServiceAccountName: pulumi.String(workloadServiceAccount),
 						Containers: corev1.ContainerArray{
 							&corev1.ContainerArgs{
 								Name:    pulumi.String("queue"),
@@ -519,8 +648,14 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	component.ClusterEndpoint = cluster.Endpoint
 	component.SearchEndpoint = searchEndpoint
 	component.QueueHost = queueHost
+	component.Namespace = pulumi.String(args.Namespace).ToStringOutput()
+	component.WorkloadServiceAccount = pulumi.String(workloadServiceAccount).ToStringOutput()
 	component.QueueMode = pulumi.String(args.QueueMode).ToStringOutput()
+	component.QueueUsername = pulumi.String(queueUser).ToStringOutput()
+	component.QueuePort = pulumi.String(args.ExternalQueuePort).ToStringOutput()
+	component.QueueSSL = pulumi.String(args.ExternalQueueSSL).ToStringOutput()
 	component.QueuePasswordSecretName = pulumi.String(queuePasswordSecretName).ToStringOutput()
+	component.CachePasswordSecretName = pulumi.String(cachePasswordSecretName).ToStringOutput()
 	component.DatabaseSecretName = pulumi.String(databaseSecretName).ToStringOutput()
 	component.EncryptionKeySecretName = pulumi.String(encryptionKeySecretName).ToStringOutput()
 	component.Kubeconfig = kubeconfig
@@ -579,6 +714,8 @@ func containerEnv(args Args, searchEndpoint, queueHost pulumi.StringOutput, queu
 			QueueMode:          args.QueueMode,
 			QueueHost:          values[4].(string),
 			QueueUsername:      queueUser,
+			QueuePort:          args.ExternalQueuePort,
+			QueueSSL:           args.ExternalQueueSSL,
 			Magento:            args.Magento,
 		}), args)
 		bindings = appendMediaDCBindings(bindings, values[5].(string), values[6].(string), args.Region, args.MediaS3Prefix)

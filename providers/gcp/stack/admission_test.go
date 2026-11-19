@@ -48,3 +48,13 @@ func TestAdmitSpecFailsClosed(t *testing.T) {
 		t.Fatal("AdmitSpec(client error) succeeded, want error")
 	}
 }
+
+func TestTeardownDoesNotDependOnCurrentCloudServiceCatalog(t *testing.T) {
+	admission := RegionAdmission{NewClient: func(context.Context) (gcpprovider.CapabilityAPI, error) {
+		return nil, errors.New("catalog unavailable")
+	}}
+	spec := Spec{AllowExpiredPreview: true}
+	if _, err := admission.AdmitSpec(context.Background(), spec); err != nil {
+		t.Fatalf("teardown admission: %v", err)
+	}
+}
