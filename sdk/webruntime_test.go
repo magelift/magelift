@@ -70,8 +70,9 @@ func TestAdmitWebRuntimeAppliesAdobeHatch(t *testing.T) {
 	if err != nil || len(warnings) != 0 {
 		t.Fatalf("nginx-fpm admit: warnings=%v err=%v", warnings, err)
 	}
-	if _, err := AdmitWebRuntime(WebRuntimeFrankenPHPClassic, "2.4.9", false); err == nil || !strings.Contains(err.Error(), "frankenphp-classic") || !strings.Contains(err.Error(), "Adobe-unsupported") {
-		t.Fatalf("frankenphp without hatch: %v", err)
+	warnings, err = AdmitWebRuntime(WebRuntimeFrankenPHPClassic, "2.4.9", false)
+	if err != nil || len(warnings) != 1 || !strings.Contains(warnings[0], "Adobe-unsupported") {
+		t.Fatalf("missing advisory: %v %v", warnings, err)
 	}
 	warnings, err = AdmitWebRuntime(WebRuntimeFrankenPHPClassic, "2.4.9", true)
 	if err != nil {

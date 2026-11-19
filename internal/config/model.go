@@ -1,29 +1,36 @@
 package config
 
+import "github.com/magelift/magelift/sdk"
+
 type Config struct {
-	SchemaVersion      int                 `yaml:"schemaVersion" json:"schemaVersion" config:"MageLift configuration schema version" schema:"const=1"`
-	Project            Project             `yaml:"project" json:"project"`
-	Application        Application         `yaml:"application" json:"application"`
-	Build              Build               `yaml:"build" json:"build"`
-	Local              LocalRuntime        `yaml:"local,omitempty" json:"local,omitempty" config:"Local runtime service and email choices"`
-	Target             Target              `yaml:"target" json:"target"`
-	Edge               EdgeConfig          `yaml:"edge,omitempty" json:"edge,omitempty" config:"Optional edge delivery provider"`
-	Observability      ObservabilityConfig `yaml:"observability,omitempty" json:"observability,omitempty" config:"Optional observability provider"`
-	Email              EmailConfig         `yaml:"email,omitempty" json:"email,omitempty" config:"Cloud transactional email"`
-	Resilience         ResilienceConfig    `yaml:"resilience,omitempty" json:"resilience,omitempty" config:"Availability, backup, and disaster-recovery policy"`
-	Defaults           Defaults            `yaml:"defaults" json:"defaults"`
-	Compatibility      Compatibility       `yaml:"compatibility,omitempty" json:"compatibility,omitempty"`
-	PreviewIdentity    *PreviewIdentity    `yaml:"previewIdentity,omitempty" json:"previewIdentity,omitempty" config:"Derived pull-request preview identity" schema:"nullable"`
-	Extensions         map[string]any      `yaml:"extensions,omitempty" json:"extensions,omitempty"`
-	Account            string              `yaml:"account,omitempty" json:"account,omitempty"`
-	Class              string              `yaml:"class,omitempty" json:"class,omitempty"`
-	Preset             string              `yaml:"preset,omitempty" json:"preset,omitempty"`
-	Domain             string              `yaml:"domain,omitempty" json:"domain,omitempty"`
-	Protection         bool                `yaml:"protection,omitempty" json:"protection,omitempty"`
-	ExpiresAt          string              `yaml:"expiresAt,omitempty" json:"expiresAt,omitempty" config:"Preview expiration as RFC3339" schema:"nullable"`
-	MonthlyBudgetCents int64               `yaml:"monthlyBudgetCents,omitempty" json:"monthlyBudgetCents,omitempty" config:"Monthly budget planning input in cents (alerts only, never enforced)" schema:"nullable"`
-	Branches           []string            `yaml:"branches,omitempty" json:"branches,omitempty"`
-	SeedDump           string              `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local MySQL dump path seeded after first deploy" schema:"nullable"`
+	// StateEnvironment is derived from the authored preview environment.
+	// It selects the shared bootstrap backend while the PR owns its stack.
+	StateEnvironment   string                    `yaml:"-" json:"-"`
+	Services           map[string]ServiceBinding `yaml:"services,omitempty" json:"services,omitempty" config:"Magento service families, versions, ownership and connection settings"`
+	SchemaVersion      int                       `yaml:"schemaVersion" json:"schemaVersion" config:"MageLift configuration schema version" schema:"const=1"`
+	Project            Project                   `yaml:"project" json:"project"`
+	Application        Application               `yaml:"application" json:"application"`
+	Build              Build                     `yaml:"build" json:"build"`
+	Local              LocalRuntime              `yaml:"local,omitempty" json:"local,omitempty" config:"Local runtime service and email choices"`
+	Target             Target                    `yaml:"target" json:"target"`
+	Edge               EdgeConfig                `yaml:"edge,omitempty" json:"edge,omitempty" config:"Optional edge delivery provider"`
+	Observability      ObservabilityConfig       `yaml:"observability,omitempty" json:"observability,omitempty" config:"Optional observability provider"`
+	Email              EmailConfig               `yaml:"email,omitempty" json:"email,omitempty" config:"Cloud transactional email"`
+	Resilience         ResilienceConfig          `yaml:"resilience,omitempty" json:"resilience,omitempty" config:"Availability, backup, and disaster-recovery policy"`
+	Defaults           Defaults                  `yaml:"defaults" json:"defaults"`
+	Compatibility      Compatibility             `yaml:"compatibility,omitempty" json:"compatibility,omitempty"`
+	PreviewIdentity    *PreviewIdentity          `yaml:"previewIdentity,omitempty" json:"previewIdentity,omitempty" config:"Derived pull-request preview identity" schema:"nullable"`
+	Extensions         map[string]any            `yaml:"extensions,omitempty" json:"extensions,omitempty"`
+	Account            string                    `yaml:"account,omitempty" json:"account,omitempty"`
+	Class              string                    `yaml:"class,omitempty" json:"class,omitempty"`
+	Preset             string                    `yaml:"preset,omitempty" json:"preset,omitempty"`
+	Domain             string                    `yaml:"domain,omitempty" json:"domain,omitempty"`
+	Protection         bool                      `yaml:"protection,omitempty" json:"protection,omitempty"`
+	ExpiresAt          string                    `yaml:"expiresAt,omitempty" json:"expiresAt,omitempty" config:"Preview expiration as RFC3339" schema:"nullable"`
+	PreviewTTL         string                    `yaml:"previewTtl,omitempty" json:"previewTtl,omitempty" config:"Preview lifetime from the triggering event, for example 168h" schema:"nullable"`
+	MonthlyBudgetCents int64                     `yaml:"monthlyBudgetCents,omitempty" json:"monthlyBudgetCents,omitempty" config:"Monthly budget planning input in cents (alerts only, never enforced)" schema:"nullable"`
+	Branches           []string                  `yaml:"branches,omitempty" json:"branches,omitempty"`
+	SeedDump           string                    `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local MySQL dump path seeded after first deploy" schema:"nullable"`
 }
 
 type Project struct {
@@ -99,6 +106,7 @@ type LocalRuntime struct {
 }
 
 type LocalService struct {
+	Image   string `yaml:"image,omitempty" json:"image,omitempty" config:"Container image selected by the project for local development" schema:"nullable"`
 	Family  string `yaml:"family,omitempty" json:"family,omitempty" config:"Service family" schema:"nullable"`
 	Version string `yaml:"version,omitempty" json:"version,omitempty" config:"Service version" schema:"nullable"`
 }
@@ -173,12 +181,36 @@ type Composer struct {
 	Credentials string `yaml:"credentials,omitempty" json:"credentials,omitempty" config:"Composer credentials secret reference" schema:"pattern=^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$"`
 }
 type Target struct {
-	Provider string          `yaml:"provider" json:"provider" config:"Infrastructure provider" schema:"enum=aws|gcp|ovh|scaleway"`
-	Runtime  string          `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"enum=ecs-fargate|eks|gke-autopilot|gke-standard|mks|kapsule"`
+	Provider string          `yaml:"provider" json:"provider" config:"Infrastructure provider" schema:"enum=aws|gcp|azure|ovh|scaleway"`
+	Runtime  string          `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"enum=ecs-fargate|eks|gke-autopilot|gke-standard|aks|mks|kapsule"`
 	AWS      *AWSTarget      `yaml:"aws,omitempty" json:"aws,omitempty" config:"AWS deployment inputs"`
 	GCP      *GCPTarget      `yaml:"gcp,omitempty" json:"gcp,omitempty" config:"GCP deployment inputs"`
+	Azure    *AzureTarget    `yaml:"azure,omitempty" json:"azure,omitempty" config:"Azure deployment inputs"`
 	OVH      *OVHTarget      `yaml:"ovh,omitempty" json:"ovh,omitempty" config:"OVHcloud deployment inputs (experimental)"`
 	Scaleway *ScalewayTarget `yaml:"scaleway,omitempty" json:"scaleway,omitempty" config:"Scaleway deployment inputs (experimental)"`
+}
+
+// AzureTarget identifies the subscription and resource group used by the
+// Azure provider. The provider owns the rest of the Azure-specific planning.
+type AzureTarget struct {
+	SubscriptionID     string            `yaml:"subscriptionId" json:"subscriptionId" config:"Azure subscription ID"`
+	ResourceGroup      string            `yaml:"resourceGroup" json:"resourceGroup" config:"Azure resource group name"`
+	TenantID           string            `yaml:"tenantId,omitempty" json:"tenantId,omitempty" config:"Microsoft Entra tenant ID"`
+	ImageDigest        string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Immutable application image"`
+	StateBackendURL    string            `yaml:"stateBackendUrl,omitempty" json:"stateBackendUrl,omitempty" config:"Existing Azure Blob Pulumi state backend"`
+	ImagePullSecret    string            `yaml:"imagePullSecret,omitempty" json:"imagePullSecret,omitempty" config:"Existing Kubernetes secret for private registry access"`
+	ACRResourceID      string            `yaml:"acrResourceId,omitempty" json:"acrResourceId,omitempty" config:"Azure Container Registry resource ID for AKS pull access"`
+	IngressClass       string            `yaml:"ingressClass,omitempty" json:"ingressClass,omitempty" config:"Existing Kubernetes ingress class"`
+	TLSSecret          string            `yaml:"tlsSecret,omitempty" json:"tlsSecret,omitempty" config:"Existing Kubernetes TLS secret in the environment namespace"`
+	MonitorWorkspaceID string            `yaml:"monitorWorkspaceId,omitempty" json:"monitorWorkspaceId,omitempty" config:"Existing Azure Log Analytics workspace resource ID"`
+	PreviewPool        *AzurePreviewPool `yaml:"previewPool,omitempty" json:"previewPool,omitempty" config:"Existing AKS cluster and private network for preview environments" schema:"nullable"`
+}
+
+type AzurePreviewPool struct {
+	ClusterName    string `yaml:"clusterName" json:"clusterName" config:"Existing AKS cluster name in the configured resource group"`
+	NodeSubnetID   string `yaml:"nodeSubnetId" json:"nodeSubnetId" config:"Existing AKS node subnet resource ID"`
+	MySQLSubnetID  string `yaml:"mysqlSubnetId" json:"mysqlSubnetId" config:"Existing delegated MySQL subnet resource ID"`
+	MySQLDNSZoneID string `yaml:"mysqlDnsZoneId" json:"mysqlDnsZoneId" config:"Existing private DNS zone linked to the cluster network"`
 }
 
 // EdgeConfig describes an optional edge provider without carrying provider
@@ -402,59 +434,66 @@ type ScalewayTarget struct {
 // GCPTarget holds provider-specific GCP semantic inputs. The adapter owns the
 // SDK topology; supported topology choices remain explicit and typed here.
 type GCPTarget struct {
-	Project                         string            `yaml:"project" json:"project" config:"GCP project ID" schema:"minLength=1"`
-	Region                          string            `yaml:"region,omitempty" json:"region,omitempty" config:"GCP region" schema:"nullable"`
-	NetworkCIDR                     string            `yaml:"networkCidr,omitempty" json:"networkCidr,omitempty" config:"VPC IPv4 CIDR" schema:"nullable"`
-	Zones                           []string          `yaml:"zones,omitempty" json:"zones,omitempty" config:"GCP zones" schema:"nullable"`
-	ImageDigest                     string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Signed immutable OCI image digest" schema:"nullable"`
-	DatabaseName                    string            `yaml:"databaseName,omitempty" json:"databaseName,omitempty" config:"Magento database name" schema:"nullable"`
-	MasterUsername                  string            `yaml:"masterUsername,omitempty" json:"masterUsername,omitempty" config:"Cloud SQL master username" schema:"nullable"`
-	EncryptionKeySecret             string            `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Secret Manager secret ID for Magento encryption key" schema:"nullable"`
-	CloudSQLTier                    string            `yaml:"cloudSqlTier,omitempty" json:"cloudSqlTier,omitempty" config:"Cloud SQL machine tier" schema:"nullable"`
-	CloudSQLAvailability            string            `yaml:"cloudSqlAvailability,omitempty" json:"cloudSqlAvailability,omitempty" config:"Cloud SQL availability type" schema:"nullable,enum=ZONAL|REGIONAL"`
-	CloudSQLBackupEnabled           *bool             `yaml:"cloudSqlBackupEnabled,omitempty" json:"cloudSqlBackupEnabled,omitempty" config:"Enable Cloud SQL automated backups" schema:"nullable"`
-	CloudSQLBinaryLogEnabled        *bool             `yaml:"cloudSqlBinaryLogEnabled,omitempty" json:"cloudSqlBinaryLogEnabled,omitempty" config:"Enable Cloud SQL MySQL binary logging for point-in-time recovery" schema:"nullable"`
-	CloudSQLBackupRetentionCount    *int              `yaml:"cloudSqlBackupRetentionCount,omitempty" json:"cloudSqlBackupRetentionCount,omitempty" config:"Cloud SQL retained automated backup count" schema:"nullable,minimum=1"`
-	CloudSQLTransactionLogRetention *int              `yaml:"cloudSqlTransactionLogRetentionDays,omitempty" json:"cloudSqlTransactionLogRetentionDays,omitempty" config:"Cloud SQL MySQL transaction log retention in days (1-7)" schema:"nullable,minimum=1,maximum=7"`
-	CloudSQLBackupStartTime         string            `yaml:"cloudSqlBackupStartTime,omitempty" json:"cloudSqlBackupStartTime,omitempty" config:"Cloud SQL automated backup start time (HH:MM)" schema:"nullable"`
-	CloudSQLBackupLocation          string            `yaml:"cloudSqlBackupLocation,omitempty" json:"cloudSqlBackupLocation,omitempty" config:"Cloud SQL automated backup storage location" schema:"nullable"`
-	CloudSQLDeletionProtection      *bool             `yaml:"cloudSqlDeletionProtection,omitempty" json:"cloudSqlDeletionProtection,omitempty" config:"Enable Cloud SQL service and IaC deletion protection" schema:"nullable"`
-	MemorystoreNodeType             string            `yaml:"memorystoreNodeType,omitempty" json:"memorystoreNodeType,omitempty" config:"Memorystore for Valkey node type" schema:"nullable"`
-	MemorystoreShardCount           *int              `yaml:"memorystoreShardCount,omitempty" json:"memorystoreShardCount,omitempty" config:"Memorystore for Valkey shard count" schema:"nullable,minimum=1"`
-	MemorystoreReplicas             *int              `yaml:"memorystoreReplicas,omitempty" json:"memorystoreReplicas,omitempty" config:"Memorystore for Valkey replica count per shard (0-5)" schema:"nullable,minimum=0,maximum=5"`
-	MemorystoreEngineVersion        string            `yaml:"memorystoreEngineVersion,omitempty" json:"memorystoreEngineVersion,omitempty" config:"Memorystore for Valkey engine version (VALKEY_9_0 GA or VALKEY_9_1 Preview)" schema:"nullable,enum=VALKEY_8_0|VALKEY_9_0|VALKEY_9_1"`
-	MemorystoreMode                 string            `yaml:"memorystoreMode,omitempty" json:"memorystoreMode,omitempty" config:"Memorystore for Valkey cluster mode" schema:"nullable,enum=CLUSTER|CLUSTER_DISABLED"`
-	MemorystoreZoneDistributionMode string            `yaml:"memorystoreZoneDistributionMode,omitempty" json:"memorystoreZoneDistributionMode,omitempty" config:"Memorystore for Valkey zone distribution mode" schema:"nullable,enum=MULTI_ZONE|SINGLE_ZONE"`
-	MemorystoreZone                 string            `yaml:"memorystoreZone,omitempty" json:"memorystoreZone,omitempty" config:"Memorystore for Valkey single-zone placement" schema:"nullable"`
-	MemorystoreDeletionProtection   *bool             `yaml:"memorystoreDeletionProtection,omitempty" json:"memorystoreDeletionProtection,omitempty" config:"Enable Memorystore for Valkey deletion protection" schema:"nullable"`
-	MemorystorePSCConnectionLimit   *int              `yaml:"memorystorePscConnectionLimit,omitempty" json:"memorystorePscConnectionLimit,omitempty" config:"Maximum automatic Memorystore PSC connections" schema:"nullable,minimum=1"`
-	OpenSearchMode                  string            `yaml:"openSearchMode,omitempty" json:"openSearchMode,omitempty" config:"GKE OpenSearch workload mode" schema:"nullable,enum=opensearch|disabled"`
-	OpenSearchReplicas              int               `yaml:"openSearchReplicas,omitempty" json:"openSearchReplicas,omitempty" config:"GKE OpenSearch replica count" schema:"nullable"`
-	OpenSearchImage                 string            `yaml:"openSearchImage,omitempty" json:"openSearchImage,omitempty" config:"GKE OpenSearch image reference" schema:"nullable"`
-	QueueMode                       string            `yaml:"queueMode,omitempty" json:"queueMode,omitempty" config:"GKE queue workload mode" schema:"nullable,enum=database|rabbitmq"`
-	QueueReplicas                   int               `yaml:"queueReplicas,omitempty" json:"queueReplicas,omitempty" config:"GKE RabbitMQ replica count" schema:"nullable"`
-	RabbitMQImage                   string            `yaml:"rabbitMqImage,omitempty" json:"rabbitMqImage,omitempty" config:"GKE RabbitMQ image reference" schema:"nullable"`
-	EnableCloudArmor                *bool             `yaml:"enableCloudArmor,omitempty" json:"enableCloudArmor,omitempty" config:"Create a GCP Cloud Armor security policy" schema:"nullable"`
-	KubernetesVersion               string            `yaml:"kubernetesVersion,omitempty" json:"kubernetesVersion,omitempty" config:"GKE Kubernetes version" schema:"nullable"`
-	ReleaseChannel                  string            `yaml:"releaseChannel,omitempty" json:"releaseChannel,omitempty" config:"GKE release channel" schema:"nullable,enum=RAPID|REGULAR|STABLE"`
-	ClusterIPv4CIDR                 string            `yaml:"clusterIpv4Cidr,omitempty" json:"clusterIpv4Cidr,omitempty" config:"GKE cluster pod IPv4 CIDR" schema:"nullable"`
-	ServicesIPv4CIDR                string            `yaml:"servicesIpv4Cidr,omitempty" json:"servicesIpv4Cidr,omitempty" config:"GKE services IPv4 CIDR" schema:"nullable"`
-	StandardNodeType                string            `yaml:"standardNodeType,omitempty" json:"standardNodeType,omitempty" config:"GKE Standard node machine type" schema:"nullable"`
-	StandardNodeCount               int               `yaml:"standardNodeCount,omitempty" json:"standardNodeCount,omitempty" config:"GKE Standard initial node count per zone" schema:"nullable"`
-	StandardNodeMinCount            int               `yaml:"standardNodeMinCount,omitempty" json:"standardNodeMinCount,omitempty" config:"GKE Standard minimum nodes per zone" schema:"nullable"`
-	StandardNodeMaxCount            int               `yaml:"standardNodeMaxCount,omitempty" json:"standardNodeMaxCount,omitempty" config:"GKE Standard maximum nodes per zone" schema:"nullable"`
-	StandardNodeDiskType            string            `yaml:"standardNodeDiskType,omitempty" json:"standardNodeDiskType,omitempty" config:"GKE Standard node boot disk type" schema:"nullable"`
-	StandardNodeDiskSizeGiB         int               `yaml:"standardNodeDiskSizeGiB,omitempty" json:"standardNodeDiskSizeGiB,omitempty" config:"GKE Standard node boot disk size" schema:"nullable"`
-	StandardNodeImageType           string            `yaml:"standardNodeImageType,omitempty" json:"standardNodeImageType,omitempty" config:"GKE Standard node image type" schema:"nullable"`
-	StandardNodeSpot                bool              `yaml:"standardNodeSpot,omitempty" json:"standardNodeSpot,omitempty" config:"Use Spot VMs for GKE Standard nodes"`
-	AutopilotCPURequest             string            `yaml:"autopilotCpuRequest,omitempty" json:"autopilotCpuRequest,omitempty" config:"GKE Autopilot CPU request" schema:"nullable"`
-	AutopilotMemoryRequest          string            `yaml:"autopilotMemoryRequest,omitempty" json:"autopilotMemoryRequest,omitempty" config:"GKE Autopilot memory request" schema:"nullable"`
-	DesiredWebReplicas              int               `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
-	QueueConsumerCount              int               `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
-	Labels                          map[string]string `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
+	PreviewPool                     *sdk.GCPPreviewPool `yaml:"previewPool,omitempty" json:"previewPool,omitempty" config:"Existing cluster and network for preview environments" schema:"nullable"`
+	Project                         string              `yaml:"project" json:"project" config:"GCP project ID" schema:"minLength=1"`
+	Region                          string              `yaml:"region,omitempty" json:"region,omitempty" config:"GCP region" schema:"nullable"`
+	NetworkCIDR                     string              `yaml:"networkCidr,omitempty" json:"networkCidr,omitempty" config:"VPC IPv4 CIDR" schema:"nullable"`
+	Zones                           []string            `yaml:"zones,omitempty" json:"zones,omitempty" config:"GCP zones" schema:"nullable"`
+	ImageDigest                     string              `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Signed immutable OCI image digest" schema:"nullable"`
+	DatabaseName                    string              `yaml:"databaseName,omitempty" json:"databaseName,omitempty" config:"Magento database name" schema:"nullable"`
+	MasterUsername                  string              `yaml:"masterUsername,omitempty" json:"masterUsername,omitempty" config:"Cloud SQL master username" schema:"nullable"`
+	EncryptionKeySecret             string              `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Secret Manager secret ID for Magento encryption key" schema:"nullable"`
+	CloudSQLDatabaseVersion         string              `yaml:"cloudSqlDatabaseVersion,omitempty" json:"cloudSqlDatabaseVersion,omitempty" config:"Cloud SQL MySQL API engine version"`
+	CloudSQLTier                    string              `yaml:"cloudSqlTier,omitempty" json:"cloudSqlTier,omitempty" config:"Cloud SQL machine tier" schema:"nullable"`
+	CloudSQLAvailability            string              `yaml:"cloudSqlAvailability,omitempty" json:"cloudSqlAvailability,omitempty" config:"Cloud SQL availability type" schema:"nullable,enum=ZONAL|REGIONAL"`
+	CloudSQLBackupEnabled           *bool               `yaml:"cloudSqlBackupEnabled,omitempty" json:"cloudSqlBackupEnabled,omitempty" config:"Enable Cloud SQL automated backups" schema:"nullable"`
+	CloudSQLBinaryLogEnabled        *bool               `yaml:"cloudSqlBinaryLogEnabled,omitempty" json:"cloudSqlBinaryLogEnabled,omitempty" config:"Enable Cloud SQL MySQL binary logging for point-in-time recovery" schema:"nullable"`
+	CloudSQLBackupRetentionCount    *int                `yaml:"cloudSqlBackupRetentionCount,omitempty" json:"cloudSqlBackupRetentionCount,omitempty" config:"Cloud SQL retained automated backup count" schema:"nullable,minimum=1"`
+	CloudSQLTransactionLogRetention *int                `yaml:"cloudSqlTransactionLogRetentionDays,omitempty" json:"cloudSqlTransactionLogRetentionDays,omitempty" config:"Cloud SQL MySQL transaction log retention in days (1-7)" schema:"nullable,minimum=1,maximum=7"`
+	CloudSQLBackupStartTime         string              `yaml:"cloudSqlBackupStartTime,omitempty" json:"cloudSqlBackupStartTime,omitempty" config:"Cloud SQL automated backup start time (HH:MM)" schema:"nullable"`
+	CloudSQLBackupLocation          string              `yaml:"cloudSqlBackupLocation,omitempty" json:"cloudSqlBackupLocation,omitempty" config:"Cloud SQL automated backup storage location" schema:"nullable"`
+	CloudSQLDeletionProtection      *bool               `yaml:"cloudSqlDeletionProtection,omitempty" json:"cloudSqlDeletionProtection,omitempty" config:"Enable Cloud SQL service and IaC deletion protection" schema:"nullable"`
+	MemorystoreNodeType             string              `yaml:"memorystoreNodeType,omitempty" json:"memorystoreNodeType,omitempty" config:"Memorystore for Valkey node type" schema:"nullable"`
+	MemorystoreShardCount           *int                `yaml:"memorystoreShardCount,omitempty" json:"memorystoreShardCount,omitempty" config:"Memorystore for Valkey shard count" schema:"nullable,minimum=1"`
+	MemorystoreReplicas             *int                `yaml:"memorystoreReplicas,omitempty" json:"memorystoreReplicas,omitempty" config:"Memorystore for Valkey replica count per shard (0-5)" schema:"nullable,minimum=0,maximum=5"`
+	MemorystoreEngineVersion        string              `yaml:"memorystoreEngineVersion,omitempty" json:"memorystoreEngineVersion,omitempty" config:"Memorystore for Valkey API engine version" schema:"nullable"`
+	MemorystoreMode                 string              `yaml:"memorystoreMode,omitempty" json:"memorystoreMode,omitempty" config:"Memorystore for Valkey cluster mode" schema:"nullable,enum=CLUSTER|CLUSTER_DISABLED"`
+	MemorystoreZoneDistributionMode string              `yaml:"memorystoreZoneDistributionMode,omitempty" json:"memorystoreZoneDistributionMode,omitempty" config:"Memorystore for Valkey zone distribution mode" schema:"nullable,enum=MULTI_ZONE|SINGLE_ZONE"`
+	MemorystoreZone                 string              `yaml:"memorystoreZone,omitempty" json:"memorystoreZone,omitempty" config:"Memorystore for Valkey single-zone placement" schema:"nullable"`
+	MemorystoreDeletionProtection   *bool               `yaml:"memorystoreDeletionProtection,omitempty" json:"memorystoreDeletionProtection,omitempty" config:"Enable Memorystore for Valkey deletion protection" schema:"nullable"`
+	MemorystorePSCConnectionLimit   *int                `yaml:"memorystorePscConnectionLimit,omitempty" json:"memorystorePscConnectionLimit,omitempty" config:"Maximum automatic Memorystore PSC connections" schema:"nullable,minimum=1"`
+	OpenSearchMode                  string              `yaml:"openSearchMode,omitempty" json:"openSearchMode,omitempty" config:"GKE OpenSearch workload mode" schema:"nullable,enum=opensearch|disabled"`
+	OpenSearchReplicas              int                 `yaml:"openSearchReplicas,omitempty" json:"openSearchReplicas,omitempty" config:"GKE OpenSearch replica count" schema:"nullable"`
+	OpenSearchImage                 string              `yaml:"openSearchImage,omitempty" json:"openSearchImage,omitempty" config:"GKE OpenSearch image reference" schema:"nullable"`
+	QueueMode                       string              `yaml:"queueMode,omitempty" json:"queueMode,omitempty" config:"GKE queue workload mode" schema:"nullable,enum=database|rabbitmq"`
+	QueueReplicas                   int                 `yaml:"queueReplicas,omitempty" json:"queueReplicas,omitempty" config:"GKE RabbitMQ replica count" schema:"nullable"`
+	RabbitMQImage                   string              `yaml:"rabbitMqImage,omitempty" json:"rabbitMqImage,omitempty" config:"GKE RabbitMQ image reference" schema:"nullable"`
+	EnableCloudArmor                *bool               `yaml:"enableCloudArmor,omitempty" json:"enableCloudArmor,omitempty" config:"Create a GCP Cloud Armor security policy" schema:"nullable"`
+	KubernetesVersion               string              `yaml:"kubernetesVersion,omitempty" json:"kubernetesVersion,omitempty" config:"GKE Kubernetes version" schema:"nullable"`
+	ReleaseChannel                  string              `yaml:"releaseChannel,omitempty" json:"releaseChannel,omitempty" config:"GKE release channel" schema:"nullable,enum=RAPID|REGULAR|STABLE"`
+	ClusterIPv4CIDR                 string              `yaml:"clusterIpv4Cidr,omitempty" json:"clusterIpv4Cidr,omitempty" config:"GKE cluster pod IPv4 CIDR" schema:"nullable"`
+	ServicesIPv4CIDR                string              `yaml:"servicesIpv4Cidr,omitempty" json:"servicesIpv4Cidr,omitempty" config:"GKE services IPv4 CIDR" schema:"nullable"`
+	StandardNodeType                string              `yaml:"standardNodeType,omitempty" json:"standardNodeType,omitempty" config:"GKE Standard node machine type" schema:"nullable"`
+	StandardNodeCount               int                 `yaml:"standardNodeCount,omitempty" json:"standardNodeCount,omitempty" config:"GKE Standard initial node count per zone" schema:"nullable"`
+	StandardNodeMinCount            int                 `yaml:"standardNodeMinCount,omitempty" json:"standardNodeMinCount,omitempty" config:"GKE Standard minimum nodes per zone" schema:"nullable"`
+	StandardNodeMaxCount            int                 `yaml:"standardNodeMaxCount,omitempty" json:"standardNodeMaxCount,omitempty" config:"GKE Standard maximum nodes per zone" schema:"nullable"`
+	StandardNodeDiskType            string              `yaml:"standardNodeDiskType,omitempty" json:"standardNodeDiskType,omitempty" config:"GKE Standard node boot disk type" schema:"nullable"`
+	StandardNodeDiskSizeGiB         int                 `yaml:"standardNodeDiskSizeGiB,omitempty" json:"standardNodeDiskSizeGiB,omitempty" config:"GKE Standard node boot disk size" schema:"nullable"`
+	StandardNodeImageType           string              `yaml:"standardNodeImageType,omitempty" json:"standardNodeImageType,omitempty" config:"GKE Standard node image type" schema:"nullable"`
+	StandardNodeSpot                bool                `yaml:"standardNodeSpot,omitempty" json:"standardNodeSpot,omitempty" config:"Use Spot VMs for GKE Standard nodes"`
+	AutopilotCPURequest             string              `yaml:"autopilotCpuRequest,omitempty" json:"autopilotCpuRequest,omitempty" config:"GKE Autopilot CPU request" schema:"nullable"`
+	AutopilotMemoryRequest          string              `yaml:"autopilotMemoryRequest,omitempty" json:"autopilotMemoryRequest,omitempty" config:"GKE Autopilot memory request" schema:"nullable"`
+	DesiredWebReplicas              int                 `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
+	QueueConsumerCount              int                 `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
+	Labels                          map[string]string   `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
+}
+
+type AWSPreviewPool struct {
+	ClusterARN string `yaml:"clusterArn" json:"clusterArn" config:"ECS Fargate cluster owned outside the preview stack" schema:"required"`
 }
 
 type AWSTarget struct {
+	PreviewPool              *AWSPreviewPool      `yaml:"previewPool,omitempty" json:"previewPool,omitempty" config:"Shared preview compute in an existing VPC" schema:"nullable"`
 	KMSKeyARN                string               `yaml:"kmsKeyArn,omitempty" json:"kmsKeyArn,omitempty" config:"Customer-managed KMS key ARN" schema:"nullable"`
 	HostedZoneID             string               `yaml:"hostedZoneId,omitempty" json:"hostedZoneId,omitempty" config:"Route 53 hosted zone ID" schema:"nullable"`
 	CloudFrontCertificateARN string               `yaml:"cloudFrontCertificateArn,omitempty" json:"cloudFrontCertificateArn,omitempty" config:"us-east-1 ACM certificate ARN" schema:"nullable"`
@@ -611,48 +650,51 @@ type Defaults struct {
 	Preset string `yaml:"preset,omitempty" json:"preset,omitempty" config:"Default infrastructure preset" schema:"enum=preview|standard|high-availability"`
 }
 type Compatibility struct {
-	AllowUnsupported bool `yaml:"allowUnsupported,omitempty" json:"allowUnsupported,omitempty" config:"Allow an unsupported service combination"`
+	AllowUnsupported bool `yaml:"allowUnsupported,omitempty" json:"allowUnsupported,omitempty" config:"Legacy compatibility override; Adobe deviations now produce warnings"`
 }
 
 type Environment struct {
-	Inherits           string               `yaml:"inherits,omitempty" json:"inherits,omitempty" config:"Parent environment"`
-	Account            string               `yaml:"account,omitempty" json:"account,omitempty" config:"AWS account ID" schema:"nullable"`
-	Class              string               `yaml:"class,omitempty" json:"class,omitempty" config:"Environment class" schema:"nullable"`
-	Preset             string               `yaml:"preset,omitempty" json:"preset,omitempty" config:"Infrastructure preset" schema:"nullable,enum=preview|standard|high-availability"`
-	Domain             string               `yaml:"domain,omitempty" json:"domain,omitempty" config:"Environment domain" schema:"nullable"`
-	Protection         bool                 `yaml:"protection,omitempty" json:"protection,omitempty" config:"Protect against destructive commands" schema:"nullable"`
-	ExpiresAt          string               `yaml:"expiresAt,omitempty" json:"expiresAt,omitempty" config:"Preview expiration as RFC3339" schema:"nullable"`
-	MonthlyBudgetCents int64                `yaml:"monthlyBudgetCents,omitempty" json:"monthlyBudgetCents,omitempty" config:"Monthly budget planning input in cents (alerts only, never enforced)" schema:"nullable"`
-	Branches           []string             `yaml:"branches,omitempty" json:"branches,omitempty" config:"Git branches mapped to this environment" schema:"nullable"`
-	SeedDump           string               `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local MySQL dump path seeded after first deploy" schema:"nullable"`
-	Project            *Project             `yaml:"project,omitempty" json:"project,omitempty"`
-	Application        *Application         `yaml:"application,omitempty" json:"application,omitempty"`
-	Build              *Build               `yaml:"build,omitempty" json:"build,omitempty"`
-	Target             *Target              `yaml:"target,omitempty" json:"target,omitempty"`
-	Edge               *EdgeConfig          `yaml:"edge,omitempty" json:"edge,omitempty"`
-	Observability      *ObservabilityConfig `yaml:"observability,omitempty" json:"observability,omitempty"`
-	Email              *EmailConfig         `yaml:"email,omitempty" json:"email,omitempty"`
-	Resilience         *ResilienceConfig    `yaml:"resilience,omitempty" json:"resilience,omitempty"`
-	Defaults           *Defaults            `yaml:"defaults,omitempty" json:"defaults,omitempty"`
-	Compatibility      *Compatibility       `yaml:"compatibility,omitempty" json:"compatibility,omitempty"`
-	Extensions         map[string]any       `yaml:"extensions,omitempty" json:"extensions,omitempty"`
+	Services           map[string]ServiceBinding `yaml:"services,omitempty" json:"services,omitempty" config:"Magento service families, versions, ownership and connection settings"`
+	Inherits           string                    `yaml:"inherits,omitempty" json:"inherits,omitempty" config:"Parent environment"`
+	Account            string                    `yaml:"account,omitempty" json:"account,omitempty" config:"AWS account ID" schema:"nullable"`
+	Class              string                    `yaml:"class,omitempty" json:"class,omitempty" config:"Environment class" schema:"nullable"`
+	Preset             string                    `yaml:"preset,omitempty" json:"preset,omitempty" config:"Infrastructure preset" schema:"nullable,enum=preview|standard|high-availability"`
+	Domain             string                    `yaml:"domain,omitempty" json:"domain,omitempty" config:"Environment domain" schema:"nullable"`
+	Protection         bool                      `yaml:"protection,omitempty" json:"protection,omitempty" config:"Protect against destructive commands" schema:"nullable"`
+	ExpiresAt          string                    `yaml:"expiresAt,omitempty" json:"expiresAt,omitempty" config:"Preview expiration as RFC3339" schema:"nullable"`
+	PreviewTTL         string                    `yaml:"previewTtl,omitempty" json:"previewTtl,omitempty" config:"Preview lifetime from the triggering event, for example 168h" schema:"nullable"`
+	MonthlyBudgetCents int64                     `yaml:"monthlyBudgetCents,omitempty" json:"monthlyBudgetCents,omitempty" config:"Monthly budget planning input in cents (alerts only, never enforced)" schema:"nullable"`
+	Branches           []string                  `yaml:"branches,omitempty" json:"branches,omitempty" config:"Git branches mapped to this environment" schema:"nullable"`
+	SeedDump           string                    `yaml:"seedDump,omitempty" json:"seedDump,omitempty" config:"Local MySQL dump path seeded after first deploy" schema:"nullable"`
+	Project            *Project                  `yaml:"project,omitempty" json:"project,omitempty"`
+	Application        *Application              `yaml:"application,omitempty" json:"application,omitempty"`
+	Build              *Build                    `yaml:"build,omitempty" json:"build,omitempty"`
+	Target             *Target                   `yaml:"target,omitempty" json:"target,omitempty"`
+	Edge               *EdgeConfig               `yaml:"edge,omitempty" json:"edge,omitempty"`
+	Observability      *ObservabilityConfig      `yaml:"observability,omitempty" json:"observability,omitempty"`
+	Email              *EmailConfig              `yaml:"email,omitempty" json:"email,omitempty"`
+	Resilience         *ResilienceConfig         `yaml:"resilience,omitempty" json:"resilience,omitempty"`
+	Defaults           *Defaults                 `yaml:"defaults,omitempty" json:"defaults,omitempty"`
+	Compatibility      *Compatibility            `yaml:"compatibility,omitempty" json:"compatibility,omitempty"`
+	Extensions         map[string]any            `yaml:"extensions,omitempty" json:"extensions,omitempty"`
 }
 
 type document struct {
-	SchemaVersion int                    `yaml:"schemaVersion" config:"MageLift configuration schema version" schema:"const=1"`
-	Project       Project                `yaml:"project" config:"Project identity"`
-	Application   Application            `yaml:"application" config:"Magento application settings"`
-	Build         Build                  `yaml:"build" config:"Application build settings"`
-	Local         LocalRuntime           `yaml:"local,omitempty" config:"Local runtime service and email choices"`
-	Target        Target                 `yaml:"target" config:"Deployment target"`
-	Edge          EdgeConfig             `yaml:"edge,omitempty" config:"Optional edge delivery provider"`
-	Observability ObservabilityConfig    `yaml:"observability,omitempty" config:"Optional observability provider"`
-	Email         EmailConfig            `yaml:"email,omitempty" config:"Cloud transactional email"`
-	Resilience    ResilienceConfig       `yaml:"resilience,omitempty" config:"Availability, backup, and disaster-recovery policy"`
-	Defaults      Defaults               `yaml:"defaults" config:"Project defaults"`
-	Compatibility Compatibility          `yaml:"compatibility,omitempty" config:"Compatibility policy"`
-	Environments  map[string]Environment `yaml:"environments,omitempty" config:"Named deployment environments" schema:"required,minProperties=1"`
-	Extensions    map[string]any         `yaml:"extensions,omitempty" config:"Namespaced extension settings"`
+	Services      map[string]ServiceBinding `yaml:"services,omitempty" json:"services,omitempty" config:"Magento service families, versions, ownership and connection settings"`
+	SchemaVersion int                       `yaml:"schemaVersion" config:"MageLift configuration schema version" schema:"const=1"`
+	Project       Project                   `yaml:"project" config:"Project identity"`
+	Application   Application               `yaml:"application" config:"Magento application settings"`
+	Build         Build                     `yaml:"build" config:"Application build settings"`
+	Local         LocalRuntime              `yaml:"local,omitempty" config:"Local runtime service and email choices"`
+	Target        Target                    `yaml:"target" config:"Deployment target"`
+	Edge          EdgeConfig                `yaml:"edge,omitempty" config:"Optional edge delivery provider"`
+	Observability ObservabilityConfig       `yaml:"observability,omitempty" config:"Optional observability provider"`
+	Email         EmailConfig               `yaml:"email,omitempty" config:"Cloud transactional email"`
+	Resilience    ResilienceConfig          `yaml:"resilience,omitempty" config:"Availability, backup, and disaster-recovery policy"`
+	Defaults      Defaults                  `yaml:"defaults" config:"Project defaults"`
+	Compatibility Compatibility             `yaml:"compatibility,omitempty" config:"Compatibility policy"`
+	Environments  map[string]Environment    `yaml:"environments,omitempty" config:"Named deployment environments" schema:"required,minProperties=1"`
+	Extensions    map[string]any            `yaml:"extensions,omitempty" config:"Namespaced extension settings"`
 }
 
 type Provenance struct {

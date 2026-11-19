@@ -32,7 +32,7 @@ func (p observePlanned) Project() string          { return p.project }
 func (p observePlanned) Environment() string      { return p.env }
 func (p observePlanned) Region() string           { return "europe-west9" }
 func (p observePlanned) CertificationTier() platform.CertificationTier {
-	return platform.TierCertified
+	return platform.TierBuiltIn
 }
 func (p observePlanned) EnvironmentClass() string { return "preview" }
 func (p observePlanned) Protected() bool          { return false }

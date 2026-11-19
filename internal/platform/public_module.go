@@ -48,8 +48,8 @@ func newPublicModuleAdapter(module sdk.Module) (publicModuleAdapter, error) {
 func (m publicModuleAdapter) Descriptor() sdk.TargetDescriptor { return m.target }
 
 func (m publicModuleAdapter) CertificationTier() CertificationTier {
-	if m.descriptor.Tier == sdk.ExtensionTierCertified {
-		return TierCertified
+	if m.descriptor.Tier == sdk.ExtensionTierBuiltIn {
+		return TierBuiltIn
 	}
 	return TierExperimental
 }
@@ -244,8 +244,8 @@ func (p publicPlannedStack) TargetDescriptor() sdk.TargetDescriptor {
 	return p.plan.Target
 }
 func (p publicPlannedStack) CertificationTier() CertificationTier {
-	if p.plan.Tier == sdk.ExtensionTierCertified {
-		return TierCertified
+	if p.plan.Tier == sdk.ExtensionTierBuiltIn {
+		return TierBuiltIn
 	}
 	return TierExperimental
 }

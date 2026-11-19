@@ -22,7 +22,7 @@ func (stubAWSModule) Descriptor() sdk.TargetDescriptor {
 }
 
 func (stubAWSModule) CertificationTier() platform.CertificationTier {
-	return platform.TierCertified
+	return platform.TierBuiltIn
 }
 
 func (stubAWSModule) OutputKeys() []string { return platform.RequiredOutputKeys() }
@@ -61,7 +61,7 @@ func (stubAWSModule) Plan(cfg config.Config, environment string, _ platform.Plan
 		envClass:           cfg.Class,
 		protected:          cfg.Protection,
 		digest:             digest,
-		tier:               platform.TierCertified,
+		tier:               platform.TierBuiltIn,
 		adopted:            adopted,
 		networkExternalID:  networkExternalID,
 		networkLabel:       networkLabel,
@@ -175,7 +175,7 @@ func (p stubPlanned) Environment() string      { return p.environment }
 func (p stubPlanned) Region() string           { return p.region }
 func (p stubPlanned) CertificationTier() platform.CertificationTier {
 	if p.tier == "" {
-		return platform.TierCertified
+		return platform.TierBuiltIn
 	}
 	return p.tier
 }
@@ -252,7 +252,7 @@ func (stubGCPModule) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: "gcp.gke-autopilot", Provider: "gcp", Runtime: "gke-autopilot"}
 }
 
-func (stubGCPModule) CertificationTier() platform.CertificationTier { return platform.TierCertified }
+func (stubGCPModule) CertificationTier() platform.CertificationTier { return platform.TierBuiltIn }
 
 func (stubGCPModule) OutputKeys() []string { return platform.RequiredOutputKeys() }
 
@@ -269,7 +269,7 @@ func (stubGCPModule) Plan(cfg config.Config, environment string, _ platform.Plan
 	return stubPlanned{
 		stackName: cfg.Project.Name + "-" + environment, provider: "gcp", runtime: "gke-autopilot",
 		project: cfg.Project.Name, environment: environment, region: cfg.Defaults.Region,
-		envClass: cfg.Class, protected: cfg.Protection, digest: digest, tier: platform.TierCertified,
+		envClass: cfg.Class, protected: cfg.Protection, digest: digest, tier: platform.TierBuiltIn,
 	}, nil
 }
 

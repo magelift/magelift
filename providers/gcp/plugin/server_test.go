@@ -146,7 +146,7 @@ func TestDescribe(t *testing.T) {
 	for _, runtime := range result.Runtimes {
 		tiers[runtime.Runtime] = runtime.Tier
 	}
-	if tiers["gke-autopilot"] != sdk.ExtensionTierCertified || tiers["gke-standard"] != sdk.ExtensionTierExperimental {
+	if tiers["gke-autopilot"] != sdk.ExtensionTierBuiltIn || tiers["gke-standard"] != sdk.ExtensionTierExperimental {
 		t.Fatalf("runtime tiers = %#v", tiers)
 	}
 	if len(result.OutputKeys) == 0 {

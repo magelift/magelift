@@ -81,14 +81,14 @@ func (m *ShimModule) Descriptor() sdk.TargetDescriptor {
 
 func (m *ShimModule) CertificationTier() platform.CertificationTier {
 	if m != nil && m.runtime == "gke-autopilot" {
-		return platform.TierCertified
+		return platform.TierBuiltIn
 	}
 	return platform.TierExperimental
 }
 
 func platformTier(tier sdk.ExtensionCertificationTier) platform.CertificationTier {
-	if tier == sdk.ExtensionTierCertified {
-		return platform.TierCertified
+	if tier == sdk.ExtensionTierBuiltIn {
+		return platform.TierBuiltIn
 	}
 	return platform.TierExperimental
 }

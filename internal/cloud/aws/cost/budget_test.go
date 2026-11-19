@@ -164,7 +164,7 @@ func (p budgetPlanned) Project() string          { return "shop" }
 func (p budgetPlanned) Environment() string      { return p.environment }
 func (p budgetPlanned) Region() string           { return p.region }
 func (p budgetPlanned) CertificationTier() platform.CertificationTier {
-	return platform.TierCertified
+	return platform.TierBuiltIn
 }
 func (p budgetPlanned) EnvironmentClass() string { return "staging" }
 func (p budgetPlanned) Protected() bool          { return false }

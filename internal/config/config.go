@@ -160,6 +160,9 @@ func (f *File) Resolve(environment string, opts ResolveOptions) (Effective, erro
 		apply(value, overlay, "environment "+name, "", provenance)
 	}
 	apply(value, opts.Overrides, "CLI override", "", provenance)
+	if err := resolveServiceBindings(value, provenance); err != nil {
+		return Effective{}, err
+	}
 	materializeContextualDefaults(value, provenance)
 	normalizeDisabledProviderDefaults(value, provenance)
 	data, err := yaml.Marshal(value)
@@ -178,6 +181,15 @@ func (f *File) Resolve(environment string, opts ResolveOptions) (Effective, erro
 			return Effective{}, fmt.Errorf("preview identity: %w", err)
 		}
 		cfg.PreviewIdentity = &identity
+		cfg.StateEnvironment = environment
+		if identity.Domain != "" {
+			cfg.Domain = identity.Domain
+			provenance["domain"] = Provenance{Source: "derived preview identity"}
+		}
+		if identity.ExpiresAt != "" {
+			cfg.ExpiresAt = identity.ExpiresAt
+			provenance["expiresAt"] = Provenance{Source: "derived preview identity"}
+		}
 		provenance["previewIdentity"] = Provenance{Source: "derived preview identity"}
 	}
 	leaf := chain[len(chain)-1]
@@ -198,9 +210,14 @@ func (f *File) Resolve(environment string, opts ResolveOptions) (Effective, erro
 	if err := validateQueueModuleLock(cfg, lock); err != nil {
 		return Effective{}, err
 	}
-	if cfg.Target.Provider == "aws" && !cfg.Compatibility.AllowUnsupported {
+	if cfg.Target.Provider == "aws" {
+		if err := ValidateAWSProviderConstraints(cfg); err != nil {
+			return Effective{}, err
+		}
 		if err := ValidateAWSServiceCompatibility(cfg); err != nil {
-			return Effective{}, fmt.Errorf("invalid AWS service compatibility: %w", err)
+			compatibility.Status = CompatibilityUnsupportedAllowed
+			compatibility.Reasons = append(compatibility.Reasons, err.Error())
+			compatibility.Warnings = append(compatibility.Warnings, err.Error())
 		}
 	}
 	fingerprint, err := ResolvedFingerprint(cfg)
@@ -636,6 +653,12 @@ func validateAWSTarget(c Config) []string {
 
 func validate(c Config) (CompatibilityAssessment, error) {
 	var problems []string
+	if c.PreviewTTL != "" {
+		duration, err := time.ParseDuration(c.PreviewTTL)
+		if c.Class != "preview" || err != nil || duration <= 0 {
+			problems = append(problems, "previewTtl requires a positive duration on a preview environment")
+		}
+	}
 	if c.PreviewIdentity != nil {
 		if err := c.PreviewIdentity.Validate(); err != nil {
 			problems = append(problems, "previewIdentity: "+err.Error())
@@ -673,6 +696,13 @@ func validate(c Config) (CompatibilityAssessment, error) {
 		}
 		// Target semantics validate provider-side (ValidateConfig); the
 		// core keeps structural presence only.
+	case "azure":
+		if c.Target.Runtime != "aks" {
+			problems = append(problems, "target.runtime must be aks when provider is azure")
+		}
+		if c.Target.Azure == nil || strings.TrimSpace(c.Target.Azure.SubscriptionID) == "" || strings.TrimSpace(c.Target.Azure.ResourceGroup) == "" {
+			problems = append(problems, "target.azure.subscriptionId and target.azure.resourceGroup are required when provider is azure")
+		}
 	case "ovh":
 		if c.Target.Runtime != "mks" {
 			problems = append(problems, "target.runtime must be mks when provider is ovh")
@@ -707,7 +737,7 @@ func validate(c Config) (CompatibilityAssessment, error) {
 			problems = append(problems, validateScalewayBackupSettings(*c.Target.Scaleway)...)
 		}
 	default:
-		problems = append(problems, "target.provider must be aws, gcp, ovh, or scaleway")
+		problems = append(problems, "target.provider must be aws, gcp, azure, ovh, or scaleway")
 	}
 	if c.Defaults.Preset != "preview" && c.Defaults.Preset != "standard" && c.Defaults.Preset != "high-availability" {
 		problems = append(problems, "defaults.preset must be preview, standard, or high-availability")
@@ -807,8 +837,13 @@ func validateMagentoRuntime(application Application) []string {
 		problems = append(problems, "application.magento.consumers.mode must be cron, processes, or both")
 	}
 	for _, origin := range runtime.CORSOrigins {
-		if strings.TrimSpace(origin) == "" || strings.ContainsAny(origin, " \x00\r\n") {
-			problems = append(problems, "application.magento.corsOrigins must be absolute origins without whitespace")
+		if err := ValidateStorefrontOrigin(origin); err != nil {
+			problems = append(problems, "application.magento.corsOrigins must contain explicit HTTP or HTTPS origins without paths, credentials, wildcards or whitespace")
+		}
+	}
+	if runtime.StorefrontOrigin != "" {
+		if err := ValidateStorefrontOrigin(runtime.StorefrontOrigin); err != nil {
+			problems = append(problems, "application.magento.storefrontOrigin must be an explicit HTTP or HTTPS origin without a path, credentials, wildcard or whitespace")
 		}
 	}
 	if application.Mode != "headless" && (len(runtime.CORSOrigins) > 0 || strings.TrimSpace(runtime.StorefrontOrigin) != "") {
@@ -843,6 +878,19 @@ func validateMagentoRuntime(application Application) []string {
 	}
 	sort.Strings(problems)
 	return problems
+}
+
+// ValidateStorefrontOrigin accepts concrete browser origins only. Wildcards
+// cannot be combined safely with credentialed CORS.
+func ValidateStorefrontOrigin(value string) error {
+	if value == "" || strings.TrimSpace(value) != value || strings.ContainsAny(value, " \t\r\n\x00,*\\") {
+		return errors.New("origin must be an explicit HTTP or HTTPS origin")
+	}
+	u, err := url.Parse(value)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Hostname() == "" || u.User != nil || u.Opaque != "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
+		return errors.New("origin must be an explicit HTTP or HTTPS origin")
+	}
+	return nil
 }
 
 func mapHasKey(m map[string]any, key string) bool {
@@ -959,6 +1007,9 @@ func validateSingleTargetBlock(c Config) []string {
 	if c.Target.GCP != nil {
 		set = append(set, "target.gcp")
 	}
+	if c.Target.Azure != nil {
+		set = append(set, "target.azure")
+	}
 	if c.Target.OVH != nil {
 		set = append(set, "target.ovh")
 	}
@@ -970,7 +1021,7 @@ func validateSingleTargetBlock(c Config) []string {
 		return []string{fmt.Sprintf("only one target block may be set; found %s", strings.Join(set, ", "))}
 	}
 	if len(set) == 1 {
-		want := map[string]string{"aws": "target.aws", "gcp": "target.gcp", "ovh": "target.ovh", "scaleway": "target.scaleway"}[c.Target.Provider]
+		want := map[string]string{"aws": "target.aws", "gcp": "target.gcp", "azure": "target.azure", "ovh": "target.ovh", "scaleway": "target.scaleway"}[c.Target.Provider]
 		if want != "" && set[0] != want {
 			return []string{fmt.Sprintf("%s is not valid when provider is %s", set[0], c.Target.Provider)}
 		}
@@ -1678,14 +1729,14 @@ func ValidateAWSServiceCompatibility(c Config) error {
 		return fmt.Errorf("Magento %s requires an Adobe-listed AWS Valkey version", versionLine)
 	}
 	if queueMode == "amazon-mq" || queueMode == "ecs-rabbitmq" {
-		if !strings.HasPrefix(versions.RabbitMQ, "3.13") && !strings.HasPrefix(versions.RabbitMQ, "4.2") {
-			return fmt.Errorf("Magento %s requires RabbitMQ 3.13 or 4.2 for queueMode %s", versionLine, queueMode)
+		if !strings.HasPrefix(versions.RabbitMQ, "3.13") && !strings.HasPrefix(versions.RabbitMQ, "4.2") && !strings.HasPrefix(versions.RabbitMQ, "4.3") {
+			return fmt.Errorf("Magento %s requires RabbitMQ 3.13, 4.2, or 4.3 for queueMode %s", versionLine, queueMode)
 		}
 	}
-	if queueMode == "amazon-mq" && strings.HasPrefix(versions.RabbitMQ, "4.2") {
+	if queueMode == "amazon-mq" && (strings.HasPrefix(versions.RabbitMQ, "4.2") || strings.HasPrefix(versions.RabbitMQ, "4.3")) {
 		instanceType := strings.TrimSpace(c.Target.AWS.Catalog.RabbitMQ.InstanceType)
 		if instanceType != "" && !strings.HasPrefix(instanceType, "mq.m7g.") {
-			return errors.New("AWS MQ RabbitMQ 4.2 requires an mq.m7g instance type")
+			return errors.New("AWS MQ RabbitMQ 4.2 or 4.3 requires an mq.m7g instance type")
 		}
 	}
 	if c.Target.AWS.Catalog.DatabaseEngine == "rds-mysql" {
@@ -1708,6 +1759,21 @@ func ValidateAWSServiceCompatibility(c Config) error {
 	}
 	if !strings.Contains(versions.AuroraMySQL, ".3.12") && !strings.Contains(versions.AuroraMySQL, ".3.11") {
 		return fmt.Errorf("Magento %s requires an AWS Aurora MySQL 3.11 or 3.12 engine", versionLine)
+	}
+	return nil
+}
+
+// ValidateAWSProviderConstraints checks known provider requirements independent of Adobe recommendations.
+func ValidateAWSProviderConstraints(c Config) error {
+	if c.Target.AWS == nil {
+		return nil
+	}
+	catalog := c.Target.AWS.Catalog
+	if catalog.QueueMode == "amazon-mq" && (strings.HasPrefix(catalog.Versions.RabbitMQ, "4.2") || strings.HasPrefix(catalog.Versions.RabbitMQ, "4.3")) {
+		instance := strings.TrimSpace(catalog.RabbitMQ.InstanceType)
+		if instance != "" && !strings.HasPrefix(instance, "mq.m7g.") {
+			return errors.New("AWS MQ RabbitMQ 4.2 or 4.3 requires an mq.m7g instance type")
+		}
 	}
 	return nil
 }

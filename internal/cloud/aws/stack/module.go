@@ -32,7 +32,7 @@ func (p Planned) Environment() string    { return p.Spec.Identity.Environment }
 func (p Planned) Region() string         { return p.Spec.Identity.Region }
 func (p Planned) CertificationTier() platform.CertificationTier {
 	if awsPreviewFargateMagentoCertified(p.Spec) {
-		return platform.TierCertified
+		return platform.TierBuiltIn
 	}
 	return platform.TierExperimental
 }
@@ -67,7 +67,7 @@ func (Module) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: "aws.ecs-fargate", Provider: "aws", Runtime: "ecs-fargate"}
 }
 
-func (Module) CertificationTier() platform.CertificationTier { return platform.TierCertified }
+func (Module) CertificationTier() platform.CertificationTier { return platform.TierBuiltIn }
 
 // PlanAdmission resolves current AWS account and catalog availability before
 // the Pulumi program can begin any paid resource mutation.

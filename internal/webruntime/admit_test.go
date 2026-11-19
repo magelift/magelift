@@ -26,10 +26,10 @@ func TestAdmitWorkerUnregistered(t *testing.T) {
 	}
 }
 
-func TestAdmitHatchFailClosed(t *testing.T) {
+func TestAdmitReportsAdvisoryWithoutHatch(t *testing.T) {
 	for _, id := range []string{"frankenphp-classic", "php-apache"} {
-		_, err := Admit(id, "2.4.9", false)
-		if err == nil || !strings.Contains(err.Error(), "allowUnsupported") || !strings.Contains(err.Error(), "Adobe-unsupported") {
+		warning, err := Admit(id, "2.4.9", false)
+		if err != nil || !strings.Contains(warning, "Adobe-unsupported") {
 			t.Fatalf("%s error = %v", id, err)
 		}
 	}

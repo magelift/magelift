@@ -34,6 +34,15 @@ func TestSupportedMagentoPHPIntersections(t *testing.T) {
 	}
 }
 
+func TestLatestAdobeRowsRecommendRabbitMQ43(t *testing.T) {
+	for _, release := range []string{"2.4.7-p10", "2.4.8-p5", "2.4.9"} {
+		requirement, err := ValidateCompatibilitySelection(CompatibilitySelection{Release: release, Component: CompatibilityQueue, Option: "rabbitmq", Version: "4.3"})
+		if err != nil || requirement.Status != CompatibilityAdobeSupported {
+			t.Fatalf("%s RabbitMQ recommendation = %#v, %v", release, requirement, err)
+		}
+	}
+}
+
 func TestFuturePatchesAreUnsupported(t *testing.T) {
 	for _, version := range []string{"2.4.9-p1", "2.4.8-p6", "2.4.7-p11", "2.4.6-p16", "2.4.5-p18", "2.4.4-p19"} {
 		t.Run(version, func(t *testing.T) {
@@ -50,9 +59,9 @@ func TestFuturePatchesAreUnsupported(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = f.Resolve("staging", ResolveOptions{})
-			if err == nil || !strings.Contains(err.Error(), "newer than the latest patch") {
-				t.Fatalf("unexpected error: %v", err)
+			initial, err := f.Resolve("staging", ResolveOptions{})
+			if err != nil || !strings.Contains(strings.Join(initial.Compatibility.Warnings, " "), "newer than the latest patch") {
+				t.Fatalf("expected advisory, got %#v, %v", initial.Compatibility, err)
 			}
 
 			input = strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)
@@ -89,9 +98,9 @@ func TestUnsupportedCombinationRequiresCommittedOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "allowUnsupported: true") {
-		t.Fatalf("unexpected error: %v", err)
+	initial, err := f.Resolve("staging", ResolveOptions{})
+	if err != nil || initial.Compatibility.Status != CompatibilityUnsupportedAllowed || len(initial.Compatibility.Warnings) == 0 {
+		t.Fatalf("expected advisory, got %#v, %v", initial.Compatibility, err)
 	}
 
 	input = strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)
@@ -114,18 +123,18 @@ func TestAdobeListedPHP81LinesAreUnavailable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "below MageLift's PHP 8.3 minimum") {
-		t.Fatalf("unexpected error: %v", err)
+	effective, err := f.Resolve("staging", ResolveOptions{})
+	if err != nil || !strings.Contains(strings.Join(effective.Compatibility.Warnings, " "), "below MageLift's PHP 8.3 minimum") {
+		t.Fatalf("expected advisory, got %#v, %v", effective.Compatibility, err)
 	}
 }
 
 func TestCompatibilityCatalogMetadataAndCopies(t *testing.T) {
 	catalog := CurrentCompatibilityCatalog()
-	if catalog.Metadata.UpdatedAt != "2026-10-19" || catalog.Metadata.AdobeSnapshotAt != "2026-06-01" || len(catalog.Metadata.Sources) != 5 {
+	if catalog.Metadata.UpdatedAt != "2026-11-02" || catalog.Metadata.AdobeSnapshotAt != "2026-11-02" || len(catalog.Metadata.Sources) != 5 {
 		t.Fatalf("metadata = %#v", catalog.Metadata)
 	}
-	if err := catalog.Validate(time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)); err != nil {
+	if err := catalog.Validate(time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)); err != nil {
 		t.Fatalf("catalog validation = %v", err)
 	}
 	if !strings.Contains(catalog.Metadata.Scope, "service choices") {
@@ -140,13 +149,13 @@ func TestCompatibilityCatalogMetadataAndCopies(t *testing.T) {
 func TestCompatibilityCatalogRejectsStaleOrMissingSources(t *testing.T) {
 	catalog := CurrentCompatibilityCatalog()
 	catalog.Metadata.Sources[0].RetrievedAt = "2025-01-01"
-	if err := catalog.Validate(time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)); err == nil || !strings.Contains(err.Error(), "stale") {
-		t.Fatalf("stale source was accepted: %v", err)
+	if err := catalog.Validate(time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)); err != nil {
+		t.Fatalf("old source blocked catalog: %v", err)
 	}
 
 	catalog = CurrentCompatibilityCatalog()
 	catalog.Metadata.Sources[0].URL = ""
-	if err := catalog.Validate(time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)); err == nil || !strings.Contains(err.Error(), "HTTPS") {
+	if err := catalog.Validate(time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)); err == nil || !strings.Contains(err.Error(), "HTTPS") {
 		t.Fatalf("missing source URL was accepted: %v", err)
 	}
 }
@@ -268,9 +277,9 @@ func TestAdobeUnsupportedMySQLFailsClosedUnlessHatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = file.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "Adobe") || !strings.Contains(err.Error(), "mysql") || !strings.Contains(err.Error(), "mariadb") {
-		t.Fatalf("Adobe-unsupported MySQL error = %v", err)
+	initial, err := file.Resolve("staging", ResolveOptions{})
+	if err != nil || !strings.Contains(strings.Join(initial.Compatibility.Warnings, " "), "mysql") {
+		t.Fatalf("expected MySQL advisory, got %#v, %v", initial.Compatibility, err)
 	}
 
 	input = strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)
@@ -324,7 +333,7 @@ func TestExperimentalAuroraWarnsWithoutHatch(t *testing.T) {
 		t.Fatalf("status = %q", effective.Compatibility.Status)
 	}
 	joined := strings.Join(effective.Compatibility.Warnings, "\n")
-	if !strings.Contains(joined, "MageLift") || !strings.Contains(joined, "Aurora") || !strings.Contains(joined, "experimental") || !strings.Contains(joined, "not certified") {
+	if !strings.Contains(joined, "MageLift") || !strings.Contains(joined, "Aurora") || !strings.Contains(joined, "experimental") {
 		t.Fatalf("warnings = %#v", effective.Compatibility.Warnings)
 	}
 }

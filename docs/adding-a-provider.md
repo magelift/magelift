@@ -1,26 +1,12 @@
 # Adding a provider
 
-New clouds are adapters. Do not share Pulumi `Network`/`Database` components with
-a provider switch ([ADR 0003](adr/0003-portable-contracts-vs-topology.md), [ADR 0004](adr/0004-ports-and-adapters.md)). The core owns configuration envelopes,
-command UX, plugin discovery, trust, locking, and orchestration policy; the
-provider owns its cloud implementation, stack execution, and operating
-capabilities ([ADR 0013](adr/0013-provider-plugin-contract.md)). Magento-facing
-code stays in `sdk`, `internal/platform`, `internal/deploy`, and
-`internal/config`. VPC, DB, and runtime stay under `internal/cloud/<provider>/`
-until Order 5 moves providers to nested `providers/<name>/` modules; new
-providers are specified as out-of-module plugins, not in-process copies.
-SaaS edge and observability
-adapters live under `internal/external/`, provider-neutral ports under
-`internal/shared/`, and the Magento-safe WAF contract under `internal/edge/waf`.
-SES (`email.mode`) and Cloudflare DNS are adapter-less by decision: config
-strings and shell helpers with no Go adapter package. The full rule is
-§ Provider roots below.
+A provider owns its network, database, compute, service integrations and Pulumi program. The core selects an adapter, validates project settings and coordinates deployments. Share the Magento contracts in `sdk`, `internal/platform`, `internal/deploy` and `internal/config`. GCP and Azure each build a separate plugin from `providers/<name>/`. Use that layout for a new cloud. [Provider contract](adr/0013-provider-plugin-contract.md) · [Ports and adapters](adr/0004-ports-and-adapters.md)
 
 ## Provider roots
 
 | Root | Holds | Examples |
 | --- | --- | --- |
-| `internal/cloud/<provider>/` | IaaS topology only: one cloud's network, database, cache, search, queue, runtime, native edge/observability, and stack. Each cloud owns its Pulumi graph; no `if provider ==` switches. | `internal/cloud/aws`, `internal/cloud/ovh`, `internal/cloud/scaleway` (GCP lives in `providers/gcp` as the reference autonomous plugin) |
+| `internal/cloud/<provider>/` | IaaS topology only: one cloud's network, database, cache, search, queue, runtime, native edge/observability, and stack. Each cloud owns its Pulumi graph; no `if provider ==` switches. | `internal/cloud/aws`, `internal/cloud/ovh`, `internal/cloud/scaleway` (GCP and Azure use `providers/gcp` and `providers/azure`) |
 | `internal/external/<vendor>/` | SaaS edge/observability adapters behind typed SDK intents. | `internal/external/fastly`, `internal/external/newrelic`, `internal/external/edge` (composition), `internal/external/observability` (composition) |
 | `internal/shared/<port>/` | Provider-neutral durable engines and ports. Stdlib plus `sdk` plus `internal/provider` only; no cloud SDK, no Pulumi. | `internal/shared/recovery`, `internal/shared/resilience`, `internal/shared/statearchive` |
 | `internal/edge/waf/` | Provider-neutral Magento-safe WAF contract every edge adapter translates. | `internal/edge/waf` (`waf/magento-safe`) |
@@ -43,7 +29,7 @@ New providers follow [ADR 0013](adr/0013-provider-plugin-contract.md): a nested
 `providers/<name>/` module built outside the root module against the public
 SDK, speaking versioned typed operations mirroring the module interfaces
 with explicit negotiation and fail-closed compatibility (`providers/gcp`
-is the reference: 30 operations over go-plugin net/rpc).
+and `providers/azure` show the interface in use).
 The in-process checklist below describes the remaining in-process tree
 (AWS, OVH, Scaleway); do not start new in-process providers from it.
 
@@ -52,7 +38,7 @@ The in-process checklist below describes the remaining in-process tree
 3. Capability packages (`network`, `database`, …) as needed; keep them typed and small.
 4. Optional day-2 ports on the module (`HasOps`, `HasBootstrap`, `HasState`,
    `HasSecrets`, `HasRuntimeObserve`). Return `ErrNotSupported` until ready.
-   See [ADR 0004](adr/0004-ports-and-adapters.md). GCP's certified module
+   See [ADR 0004](adr/0004-ports-and-adapters.md). The GCP plugin
    implements these in `providers/gcp/ops`, reached through the plugin protocol.
 5. Optional `sdk.ResilienceAdapter` for backup, restore, integrity, fencing,
    failover, and cleanup. Its descriptor MUST declare each data-class status,
@@ -112,8 +98,8 @@ The in-process checklist below describes the remaining in-process tree
    CI runners; non-test code under `cli/` and `internal/cli/` imports zero
    `internal/cloud/*`.
 9. Mock Pulumi graph tests; docs for experimental vs acceptance.
-10. Later for certification: implement the day-2 ports end-to-end ([ADR 0010](adr/0010-live-certification.md)
-    packed sessions; [ADR 0003](adr/0003-portable-contracts-vs-topology.md) layout).
+10. Record the operation, provider and test type when you add a day-2 adapter.
+    Keep historical runs attributable to their original environment and date.
 
 ## Required stack outputs
 
@@ -121,48 +107,27 @@ The in-process checklist below describes the remaining in-process tree
 native IDs into those names (e.g. GCP network → `networkVpcId`). Extra keys are
 fine.
 
-## Tiers
+## Service connection adapters
 
-| Tier | Meaning |
-| --- | --- |
-| Certified | Shared Magento acceptance on a real account; full ops |
-| Experimental | In-tree; may be infra-only; labeled in docs/CLI |
-| Community | Out-of-tree `sdk.Module`; custom binary calls `cli.NewWithExtensions` |
+A community binary can connect a new service vendor to an existing cloud runtime.
+Implement `sdk.ServiceAdapter` and pass it to `cli.NewWithServiceAdapters`. Its
+descriptor identifies the source, version, exact targets and service roles.
+Run `magelift extensions list` to see which connection adapters the binary contains.
+The project's PHP explicitly selects the adapter, for example
+`new Service(family: 'hosted-search', version: '3.1', adapter: 'vendor.search')`.
+Settings in `extensions['vendor.search']` are available to that resolver.
 
-Two certified first-party Magento origins (GCP Autopilot + AWS ECS Fargate)
-satisfy the multi-cloud claim gate
-([ADR 0002](adr/0002-certified-vs-experimental.md);
-[ADR 0008](adr/0008-provider-load-path.md)).
-
-For AWS product choices (runtime, natMode, databaseEngine, searchMode), see the
-matrix in [architecture.md](architecture.md#aws-magento-product-matrix). Full Magento
-on AWS is not every SKU.
+The resolver runs during planning and returns an existing or external
+`sdk.ServiceBinding` using a protocol the target understands. Preserve the
+selected version, store credentials as provider secret references, and keep
+resolution deterministic and independent of cloud access. For ownership of
+new Pulumi resources and their lifecycle, implement a full `sdk.Module`.
 
 ## Community binary
 
-The released `magelift` binary loads providers as signed subprocess
-artifacts (`magelift.providers.lock`, Cosign, HashiCorp go-plugin).
-`internal/providerhost` refuses unsigned or digest-mismatched lock entries,
-then `Dial` starts a gRPC subprocess that serves the versioned typed
-operations: Describe (negotiation), ValidateConfig, stack lifecycle (plan,
-preview, apply, destroy, refresh, outputs with a redacted variant), and the
-seven day-2 operations ([ADR 0013](adr/0013-provider-plugin-contract.md)).
-`Dial` negotiates protocol versions and fails closed on incompatibility or
-integrity failure; there is no silent fallback to embedded execution (an
-explicit `--migration-mode` flag is the only sanctioned fallback).
-`extensions list` reports the installed provider version, digest, and mode.
-Day-2 operations run inside the provider; the `outputs` op returns secrets
-decrypted for day-2 consumers while `redacted-outputs` redacts for display.
-The provider subprocess runs with the user's cloud privileges: the process
-boundary is a deployment and compatibility boundary, not a security sandbox.
-Tests and Floci suites always load in-process. External providers
-may still ship as a **compile-time custom binary** that calls
-`cli.NewWithExtensions` (`examples/custom-cli`). There is no Go `plugin.Open`
-ABI and no unsigned remote loader ([ADR 0008](adr/0008-provider-load-path.md)).
-Current code still speaks the single-version JSON proof with exact-version
-equality and in-process day-2 ports ([ADR 0011](adr/0011-subprocess-dial-proof.md));
-Order 5 implements the contract above. Post-alpha extraction order: AWS ECS
-Fargate next, then the experimental providers, then community plugin onboarding.
+The CLI verifies the signed provider binary against `magelift.providers.lock` and starts it through HashiCorp go-plugin using net/rpc. `Describe` reports the protocol version and operations. The host checks that the plugin supports the requested operation before using it. The plugin runs with the operator’s cloud privileges.
+
+GCP and Azure use this interface for planning, lifecycle and day-to-day operations. User-facing `outputs` uses the redacted operation. Internal consumers can request decrypted outputs when a supported operation needs them. `magelift extensions list` shows installed plugin versions and digests. AWS, OVH and Scaleway still run inside the CLI. A custom binary can register a community provider with `cli.NewWithExtensions`. [Provider load paths](adr/0008-provider-load-path.md)
 
 The public extension boundary avoids `internal/` imports. An extension implements
 the versioned provider operations, returns provider-neutral plan data, and
@@ -234,5 +199,5 @@ build cache without consulting core source beyond the example tree's imports.
 ## Non-goals
 
 - Shared Pulumi components that switch on provider
-- One YAML catalog for every cloud product
+- A single list of settings for every cloud product
 - Paid multi-cloud CI matrices by default

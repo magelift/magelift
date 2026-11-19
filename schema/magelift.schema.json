@@ -1432,6 +1432,29 @@
       },
       "type": "object"
     },
+    "aWSPreviewPool": {
+      "additionalProperties": false,
+      "properties": {
+        "clusterArn": {
+          "description": "ECS Fargate cluster owned outside the preview stack",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clusterArn"
+      ],
+      "type": "object"
+    },
+    "aWSPreviewPoolOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "clusterArn": {
+          "description": "ECS Fargate cluster owned outside the preview stack",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "aWSTarget": {
       "additionalProperties": false,
       "properties": {
@@ -1638,6 +1661,17 @@
                 "multi-az"
               ],
               "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previewPool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSPreviewPool",
+              "description": "Shared preview compute in an existing VPC"
             },
             {
               "type": "null"
@@ -1903,6 +1937,17 @@
             }
           ]
         },
+        "previewPool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/aWSPreviewPoolOverlay",
+              "description": "Shared preview compute in an existing VPC"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "queueSecretArn": {
           "anyOf": [
             {
@@ -2042,6 +2087,174 @@
             "frankenphp-classic",
             "php-apache"
           ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "azurePreviewPool": {
+      "additionalProperties": false,
+      "properties": {
+        "clusterName": {
+          "description": "Existing AKS cluster name in the configured resource group",
+          "type": "string"
+        },
+        "mysqlDnsZoneId": {
+          "description": "Existing private DNS zone linked to the cluster network",
+          "type": "string"
+        },
+        "mysqlSubnetId": {
+          "description": "Existing delegated MySQL subnet resource ID",
+          "type": "string"
+        },
+        "nodeSubnetId": {
+          "description": "Existing AKS node subnet resource ID",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clusterName",
+        "nodeSubnetId",
+        "mysqlSubnetId",
+        "mysqlDnsZoneId"
+      ],
+      "type": "object"
+    },
+    "azurePreviewPoolOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "clusterName": {
+          "description": "Existing AKS cluster name in the configured resource group",
+          "type": "string"
+        },
+        "mysqlDnsZoneId": {
+          "description": "Existing private DNS zone linked to the cluster network",
+          "type": "string"
+        },
+        "mysqlSubnetId": {
+          "description": "Existing delegated MySQL subnet resource ID",
+          "type": "string"
+        },
+        "nodeSubnetId": {
+          "description": "Existing AKS node subnet resource ID",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "azureTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "acrResourceId": {
+          "description": "Azure Container Registry resource ID for AKS pull access",
+          "type": "string"
+        },
+        "imageDigest": {
+          "description": "Immutable application image",
+          "type": "string"
+        },
+        "imagePullSecret": {
+          "description": "Existing Kubernetes secret for private registry access",
+          "type": "string"
+        },
+        "ingressClass": {
+          "description": "Existing Kubernetes ingress class",
+          "type": "string"
+        },
+        "monitorWorkspaceId": {
+          "description": "Existing Azure Log Analytics workspace resource ID",
+          "type": "string"
+        },
+        "previewPool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/azurePreviewPool",
+              "description": "Existing AKS cluster and private network for preview environments"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resourceGroup": {
+          "description": "Azure resource group name",
+          "type": "string"
+        },
+        "stateBackendUrl": {
+          "description": "Existing Azure Blob Pulumi state backend",
+          "type": "string"
+        },
+        "subscriptionId": {
+          "description": "Azure subscription ID",
+          "type": "string"
+        },
+        "tenantId": {
+          "description": "Microsoft Entra tenant ID",
+          "type": "string"
+        },
+        "tlsSecret": {
+          "description": "Existing Kubernetes TLS secret in the environment namespace",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subscriptionId",
+        "resourceGroup"
+      ],
+      "type": "object"
+    },
+    "azureTargetOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "acrResourceId": {
+          "description": "Azure Container Registry resource ID for AKS pull access",
+          "type": "string"
+        },
+        "imageDigest": {
+          "description": "Immutable application image",
+          "type": "string"
+        },
+        "imagePullSecret": {
+          "description": "Existing Kubernetes secret for private registry access",
+          "type": "string"
+        },
+        "ingressClass": {
+          "description": "Existing Kubernetes ingress class",
+          "type": "string"
+        },
+        "monitorWorkspaceId": {
+          "description": "Existing Azure Log Analytics workspace resource ID",
+          "type": "string"
+        },
+        "previewPool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/azurePreviewPoolOverlay",
+              "description": "Existing AKS cluster and private network for preview environments"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resourceGroup": {
+          "description": "Azure resource group name",
+          "type": "string"
+        },
+        "stateBackendUrl": {
+          "description": "Existing Azure Blob Pulumi state backend",
+          "type": "string"
+        },
+        "subscriptionId": {
+          "description": "Azure subscription ID",
+          "type": "string"
+        },
+        "tenantId": {
+          "description": "Microsoft Entra tenant ID",
+          "type": "string"
+        },
+        "tlsSecret": {
+          "description": "Existing Kubernetes TLS secret in the environment namespace",
           "type": "string"
         }
       },
@@ -2460,7 +2673,7 @@
       "additionalProperties": false,
       "properties": {
         "allowUnsupported": {
-          "description": "Allow an unsupported service combination",
+          "description": "Legacy compatibility override; Adobe deviations now produce warnings",
           "type": "boolean"
         }
       },
@@ -2470,7 +2683,7 @@
       "additionalProperties": false,
       "properties": {
         "allowUnsupported": {
-          "description": "Allow an unsupported service combination",
+          "description": "Legacy compatibility override; Adobe deviations now produce warnings",
           "type": "boolean"
         }
       },
@@ -3590,6 +3803,17 @@
             }
           ]
         },
+        "previewTtl": {
+          "anyOf": [
+            {
+              "description": "Preview lifetime from the triggering event, for example 168h",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "project": {
           "anyOf": [
             {
@@ -3632,6 +3856,13 @@
             }
           ]
         },
+        "services": {
+          "additionalProperties": {
+            "$ref": "#/$defs/serviceBindingOverlay"
+          },
+          "description": "Magento service families, versions, ownership and connection settings",
+          "type": "object"
+        },
         "target": {
           "anyOf": [
             {
@@ -3641,6 +3872,71 @@
               "type": "null"
             }
           ]
+        }
+      },
+      "type": "object"
+    },
+    "gCPPreviewPool": {
+      "additionalProperties": false,
+      "properties": {
+        "cluster": {
+          "description": "Existing regional GKE cluster name",
+          "type": "string"
+        },
+        "ingressCidrs": {
+          "description": "Source CIDRs reaching preview web pods, including load balancer and health checks",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "network": {
+          "description": "Existing VPC self link or resource ID",
+          "type": "string"
+        },
+        "networkPolicyEnforced": {
+          "description": "Confirm the shared cluster enforces Kubernetes NetworkPolicy",
+          "type": "boolean"
+        },
+        "subnet": {
+          "description": "Existing regional subnet self link or resource ID",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cluster",
+        "network",
+        "subnet",
+        "networkPolicyEnforced",
+        "ingressCidrs"
+      ],
+      "type": "object"
+    },
+    "gCPPreviewPoolOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "cluster": {
+          "description": "Existing regional GKE cluster name",
+          "type": "string"
+        },
+        "ingressCidrs": {
+          "description": "Source CIDRs reaching preview web pods, including load balancer and health checks",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "network": {
+          "description": "Existing VPC self link or resource ID",
+          "type": "string"
+        },
+        "networkPolicyEnforced": {
+          "description": "Confirm the shared cluster enforces Kubernetes NetworkPolicy",
+          "type": "boolean"
+        },
+        "subnet": {
+          "description": "Existing regional subnet self link or resource ID",
+          "type": "string"
         }
       },
       "type": "object"
@@ -3740,6 +4036,10 @@
               "type": "null"
             }
           ]
+        },
+        "cloudSqlDatabaseVersion": {
+          "description": "Cloud SQL MySQL API engine version",
+          "type": "string"
         },
         "cloudSqlDeletionProtection": {
           "anyOf": [
@@ -3891,12 +4191,7 @@
         "memorystoreEngineVersion": {
           "anyOf": [
             {
-              "description": "Memorystore for Valkey engine version (VALKEY_9_0 GA or VALKEY_9_1 Preview)",
-              "enum": [
-                "VALKEY_8_0",
-                "VALKEY_9_0",
-                "VALKEY_9_1"
-              ],
+              "description": "Memorystore for Valkey API engine version",
               "type": "string"
             },
             {
@@ -4034,6 +4329,17 @@
             {
               "description": "GKE OpenSearch replica count",
               "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previewPool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/gCPPreviewPool",
+              "description": "Existing cluster and network for preview environments"
             },
             {
               "type": "null"
@@ -4328,6 +4634,10 @@
             }
           ]
         },
+        "cloudSqlDatabaseVersion": {
+          "description": "Cloud SQL MySQL API engine version",
+          "type": "string"
+        },
         "cloudSqlDeletionProtection": {
           "anyOf": [
             {
@@ -4478,12 +4788,7 @@
         "memorystoreEngineVersion": {
           "anyOf": [
             {
-              "description": "Memorystore for Valkey engine version (VALKEY_9_0 GA or VALKEY_9_1 Preview)",
-              "enum": [
-                "VALKEY_8_0",
-                "VALKEY_9_0",
-                "VALKEY_9_1"
-              ],
+              "description": "Memorystore for Valkey API engine version",
               "type": "string"
             },
             {
@@ -4621,6 +4926,17 @@
             {
               "description": "GKE OpenSearch replica count",
               "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previewPool": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/gCPPreviewPoolOverlay",
+              "description": "Existing cluster and network for preview environments"
             },
             {
               "type": "null"
@@ -4950,6 +5266,17 @@
           "anyOf": [
             {
               "description": "Service family",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "image": {
+          "anyOf": [
+            {
+              "description": "Container image selected by the project for local development",
               "type": "string"
             },
             {
@@ -8058,6 +8385,119 @@
       },
       "type": "object"
     },
+    "serviceBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "description": "Explicitly linked service connection adapter ID",
+          "type": "string"
+        },
+        "endpoint": {
+          "description": "Hostname or URL of an existing service",
+          "type": "string"
+        },
+        "family": {
+          "description": "Service engine or implementation",
+          "type": "string"
+        },
+        "image": {
+          "description": "Shop-selected service container image",
+          "type": "string"
+        },
+        "ownership": {
+          "anyOf": [
+            {
+              "description": "Provisioning ownership",
+              "enum": [
+                "managed",
+                "self-hosted",
+                "existing",
+                "external"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "port": {
+          "description": "Service connection port",
+          "type": "integer"
+        },
+        "secret": {
+          "description": "Provider secret reference for a connection",
+          "type": "string"
+        },
+        "username": {
+          "description": "Service connection username",
+          "type": "string"
+        },
+        "version": {
+          "description": "Selected engine version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "family"
+      ],
+      "type": "object"
+    },
+    "serviceBindingOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "description": "Explicitly linked service connection adapter ID",
+          "type": "string"
+        },
+        "endpoint": {
+          "description": "Hostname or URL of an existing service",
+          "type": "string"
+        },
+        "family": {
+          "description": "Service engine or implementation",
+          "type": "string"
+        },
+        "image": {
+          "description": "Shop-selected service container image",
+          "type": "string"
+        },
+        "ownership": {
+          "anyOf": [
+            {
+              "description": "Provisioning ownership",
+              "enum": [
+                "managed",
+                "self-hosted",
+                "existing",
+                "external"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "port": {
+          "description": "Service connection port",
+          "type": "integer"
+        },
+        "secret": {
+          "description": "Provider secret reference for a connection",
+          "type": "string"
+        },
+        "username": {
+          "description": "Service connection username",
+          "type": "string"
+        },
+        "version": {
+          "description": "Selected engine version",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "staticContentSettings": {
       "additionalProperties": false,
       "properties": {
@@ -8168,6 +8608,17 @@
             }
           ]
         },
+        "azure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/azureTarget",
+              "description": "Azure deployment inputs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "gcp": {
           "anyOf": [
             {
@@ -8195,6 +8646,7 @@
           "enum": [
             "aws",
             "gcp",
+            "azure",
             "ovh",
             "scaleway"
           ],
@@ -8207,6 +8659,7 @@
             "eks",
             "gke-autopilot",
             "gke-standard",
+            "aks",
             "mks",
             "kapsule"
           ],
@@ -8244,6 +8697,17 @@
             }
           ]
         },
+        "azure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/azureTargetOverlay",
+              "description": "Azure deployment inputs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "gcp": {
           "anyOf": [
             {
@@ -8271,6 +8735,7 @@
           "enum": [
             "aws",
             "gcp",
+            "azure",
             "ovh",
             "scaleway"
           ],
@@ -8283,6 +8748,7 @@
             "eks",
             "gke-autopilot",
             "gke-standard",
+            "aks",
             "mks",
             "kapsule"
           ],
@@ -8364,6 +8830,13 @@
       "const": 1,
       "description": "MageLift configuration schema version",
       "type": "integer"
+    },
+    "services": {
+      "additionalProperties": {
+        "$ref": "#/$defs/serviceBinding"
+      },
+      "description": "Magento service families, versions, ownership and connection settings",
+      "type": "object"
     },
     "target": {
       "$ref": "#/$defs/target",

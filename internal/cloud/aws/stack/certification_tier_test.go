@@ -18,7 +18,7 @@ func TestCertificationTierFollowsEvidenceTuple(t *testing.T) {
 			SearchMode:     SearchModeDisabled,
 		},
 	}
-	if got := (Planned{Spec: preview}).CertificationTier(); got != platform.TierCertified {
+	if got := (Planned{Spec: preview}).CertificationTier(); got != platform.TierBuiltIn {
 		t.Fatalf("preview fargate 2.4.9 = %s, want certified", got)
 	}
 	mi := preview

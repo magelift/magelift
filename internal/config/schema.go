@@ -12,7 +12,7 @@ import (
 
 const schemaID = "https://magelift.dev/schema/v1/magelift.schema.json"
 
-// SchemaJSON returns the public configuration schema derived from the YAML model.
+// SchemaJSON returns the public configuration schema derived from the typed project model.
 func SchemaJSON() ([]byte, error) {
 	b := schemaBuilder{definitions: map[string]any{}}
 	root := b.object(reflect.TypeOf(document{}), false)
@@ -28,20 +28,20 @@ func SchemaJSON() ([]byte, error) {
 	return append(data, '\n'), nil
 }
 
-// ReferenceMarkdown returns the concise configuration reference derived from the YAML model.
+// ReferenceMarkdown returns the concise configuration reference derived from the typed project model.
 func ReferenceMarkdown() []byte {
 	var out bytes.Buffer
 	out.WriteString("# Configuration reference\n\n")
 	out.WriteString("This page is generated from the MageLift configuration schema. Do not edit it by hand.\n\n")
-	out.WriteString("`magelift.yaml` uses schema version 1. Unknown fields are rejected.\n\n")
+	out.WriteString("`magelift.php` uses schema version 1. Unknown fields are rejected.\n\n")
 	out.WriteString("When a provider target block is present, the resolver applies the selected preset's\n")
 	out.WriteString("safe provider shape defaults and the service versions from the Magento compatibility catalog.\n")
 	out.WriteString("Project and environment values override them. The defaults do not create secrets,\n")
 	out.WriteString("certificates, or existing-resource references; provider and preset catalogs do\n")
-	out.WriteString("materialize named capacity shapes so advanced YAML can override them deliberately\n")
+	out.WriteString("materialize named capacity shapes so project code can override them deliberately\n")
 	out.WriteString("instead of inheriting an undocumented SDK default.\n")
 	out.WriteString("Use `config effective` to inspect the values and their provenance.\n\n")
-	out.WriteString("See the [advanced AWS example](https://github.com/magelift/magelift/blob/main/examples/advanced-aws-fck-nat.yaml) for a complete\n")
+	out.WriteString("See the [advanced AWS example](https://github.com/magelift/magelift/blob/main/examples/advanced-aws-fck-nat.php) for a complete\n")
 	out.WriteString("typed configuration that composes multi-AZ fck-nat, native and external edge,\n")
 	out.WriteString("native and external observability, recovery policy, and a community extension.\n\n")
 	out.WriteString("Configuration has four intentional levels: the project/defaults/preset layer is the\n")
@@ -53,15 +53,15 @@ func ReferenceMarkdown() []byte {
 	out.WriteString("the effective configuration, provenance, plan, and architecture fingerprint.\n\n")
 	out.WriteString("Cloud transactional email is `email` on the project or an environment overlay.\n")
 	out.WriteString("`ses` requires a provider-matching secret reference in `email.credential`;\n")
-	out.WriteString("plaintext is rejected before Magento SMTP is written. Validation success is not certified delivery.\n")
+	out.WriteString("plaintext is rejected before Magento SMTP is written. Delivery is verified against the configured SMTP service.\n")
 	out.WriteString("Modes `tem` and `ovh`, and `ses` with a `managed` block, provision the sender identity, credentials, and DNS through the provider adapter; explicit host, port, username, and credential values are rejected alongside `managed`.\n")
 	out.WriteString("`local.email` remains the workstation overlay and uses `credentialEnv`. A preview environment that\n")
 	out.WriteString("omits `email` resolves to `disabled` and does not inherit production SES credentials.\n\n")
 	out.WriteString("Resilience projection targets are optional advanced settings: use `resilience.projection.runtime: ecs` with an ECS `cluster`,\n")
 	out.WriteString("`service` (preferred) or pinned `task`, and `container`; use `runtime: kubernetes` with `namespace`, `workload`, and an optional\n")
 	out.WriteString("`container`. These are workload identities only; credentials and application verifiers stay provider-owned.\n\n")
-	out.WriteString("`target.provider: gcp` with `runtime: gke-autopilot` is the certified first-party Magento path for evidenced cells. `runtime: gke-standard` is experimental and remains the node-capable path for workloads such as multi-node OpenSearch.\n")
-	out.WriteString("Historical 2.4.6-p15 and 2.4.9 topology/runtime passes remain scoped evidence. MageLift accepts PHP 8.3 and newer, so Magento 2.4.6 is unavailable. The complete Adobe cache intersection and the rest of the release matrix stay open.\n")
+	out.WriteString("`target.provider: gcp` with `runtime: gke-autopilot` selects the GKE Autopilot adapter. `runtime: gke-standard` is experimental and remains the node-capable path for workloads such as multi-node OpenSearch.\n")
+	out.WriteString("Historical 2.4.6-p15 and 2.4.9 topology/runtime passes remain scoped evidence. The bundled build recipes cover PHP 8.3 through 8.5. Projects may choose their own runtime images. The complete Adobe cache intersection and the rest of the release matrix stay open.\n")
 	out.WriteString("Both require `target.gcp.project` and keep GCP topology under\n")
 	out.WriteString("`target.gcp` only. Do not reuse `target.aws` fields for GCP.\n\n")
 	out.WriteString("GCP Memorystore capacity and failure-domain choices are explicit advanced fields: `memorystoreShardCount`,\n")
@@ -77,7 +77,7 @@ func ReferenceMarkdown() []byte {
 	out.WriteString("`mksPlan`, `zones`, `nodeCount`, `databaseNodeCount`, and `valkeyNodeCount`; `zones` are MKS\n")
 	out.WriteString("availability zones inside the selected OVH region, not database regions. Free MKS is single-zone;\n")
 	out.WriteString("Standard multi-zone MKS creates one worker pool per listed zone and requires at least one worker per zone.\n")
-	out.WriteString("The preview preset selects the current low-cost discovery one-node shape; standard and high-availability select the current production two-node shape. Advanced YAML can choose discovery/essential, business/production, or enterprise/advanced plans plus explicit flavors and node counts, and provider admission checks the selected region before mutation.\n")
+	out.WriteString("The preview preset selects the current low-cost discovery one-node shape; standard and high-availability select the current production two-node shape. Advanced configuration can choose discovery/essential, business/production, or enterprise/advanced plans plus explicit flavors and node counts, and provider admission checks the selected region before mutation.\n")
 	out.WriteString("On Scaleway, `zone` selects the managed-cache zone and `zones`\n")
 	out.WriteString("selects the Kapsule worker zones; multi-zone plans create one worker pool per listed zone\n")
 	out.WriteString("and require at least one configured node per zone. The preview preset may use one zone;\n")
@@ -124,7 +124,7 @@ func ReferenceMarkdown() []byte {
 	out.WriteString("not overloaded into the AWS existing-resource shape.\n\n")
 	out.WriteString("For AWS fck-nat, `natMode`, `natTopology`, and `natReplacementMode` form one\n")
 	out.WriteString("explicit network boundary. Selecting fck-nat materializes the preview or durable-preset\n")
-	out.WriteString("topology, replacement policy, and one cost-optimized ARM64 NAT instance in effective YAML;\n")
+	out.WriteString("topology, replacement policy, and one cost-optimized ARM64 NAT instance in effective configuration;\n")
 	out.WriteString("multi-AZ fck-nat uses one failure-domain target per selected zone and automatic\n")
 	out.WriteString("replacement through an Auto Scaling group unless `none` is explicitly selected.\n")
 	out.WriteString("`target.aws.natInstanceType` overrides the ARM64 Graviton size; it defaults to the\n")
@@ -148,7 +148,7 @@ func ReferenceMarkdown() []byte {
 	out.WriteString("`ovh-logs-data-platform` are first-party native adapters for their matching clouds.\n")
 	out.WriteString("New Relic, Datadog, OTLP, and other external providers are extension-owned. Put\n")
 	out.WriteString("their credentials and provider-specific options under `extensions.<vendor>`.\n")
-	out.WriteString("The core preserves an extension namespace as opaque YAML; its registered adapter\n")
+	out.WriteString("The core preserves an extension namespace as opaque configuration; its registered adapter\n")
 	out.WriteString("must strict-decode and validate that payload before planning or mutation. A\n")
 	out.WriteString("first-party adapter rejects signals it cannot configure rather than silently\n")
 	out.WriteString("dropping them.\n\n")

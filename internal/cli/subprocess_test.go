@@ -34,7 +34,7 @@ func testDescribe() *sdk.DescribeResponse {
 		ProtocolVersion: sdk.ProtocolV1, ProviderID: "gcp", ProviderVersion: "v0.0.0-test",
 		Operations: operations,
 		Runtimes: []sdk.RuntimeAdvertisement{
-			{Runtime: "gke-autopilot", Tier: sdk.ExtensionTierCertified},
+			{Runtime: "gke-autopilot", Tier: sdk.ExtensionTierBuiltIn},
 			{Runtime: "gke-standard", Tier: sdk.ExtensionTierExperimental},
 		},
 	}
@@ -168,7 +168,7 @@ func TestDefaultNewBackendSkipsPluginForOtherCells(t *testing.T) {
 			return nil, nil
 		},
 	}
-	other := stubPlanned{stackName: "shop-prod", provider: "aws", runtime: "eks", tier: platform.TierCertified}
+	other := stubPlanned{stackName: "shop-prod", provider: "aws", runtime: "eks", tier: platform.TierBuiltIn}
 	_, err := o.defaultNewBackend(context.Background(), other, "file:///state")
 	if err == nil || !strings.Contains(err.Error(), "no stack module") {
 		t.Fatalf("err = %v, want in-process path", err)

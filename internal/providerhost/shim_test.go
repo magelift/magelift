@@ -93,7 +93,7 @@ func TestNewShimModule(t *testing.T) {
 	if got := module.Descriptor(); got.ID != "gcp.gke-autopilot" || got.Provider != "gcp" || got.Runtime != "gke-autopilot" {
 		t.Fatalf("descriptor = %#v", got)
 	}
-	if module.CertificationTier() != platform.TierCertified {
+	if module.CertificationTier() != platform.TierBuiltIn {
 		t.Fatalf("tier = %q", module.CertificationTier())
 	}
 	standard, err := NewShimModule("gke-standard", &Client{describe: cannedDescribe()})

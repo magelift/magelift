@@ -5,7 +5,7 @@
 
 ## Context
 
-Magento build and deploy phases are mostly portable. An Aurora cluster, an ECS service, and a GKE workload are not. A shared YAML schema of "the cloud" would hide failure modes and leak lowest-common-denominator fields into `magelift.yaml`.
+Magento build and deploy phases are mostly portable. An Aurora cluster, an ECS service, and a GKE workload are not. A shared YAML schema of "the cloud" would hide failure modes and leak lowest-common-denominator fields into `magelift.php`.
 
 ## Decision
 

@@ -18,9 +18,9 @@ func TestUnaimedAurora84IsRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = file.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "Aurora MySQL 3.11 or 3.12") {
-		t.Fatalf("unaimed Aurora 8.4 error = %v", err)
+	effective, err := file.Resolve("staging", ResolveOptions{})
+	if err != nil || !strings.Contains(strings.Join(effective.Compatibility.Warnings, " "), "Aurora MySQL 3.11 or 3.12") {
+		t.Fatalf("expected Aurora advisory, got %#v, %v", effective.Compatibility, err)
 	}
 }
 

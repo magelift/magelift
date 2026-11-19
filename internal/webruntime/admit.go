@@ -43,8 +43,8 @@ func List() []ListedPlugin {
 }
 
 // Admit looks up application.webRuntime. Empty IDs resolve to nginx-fpm.
-// Unknown IDs fail closed and name the plugin. Adobe-unsupported plugins
-// require compatibility.allowUnsupported and return a hatch warning.
+// Unknown IDs fail with the plugin name. Registered runtimes outside the
+// Adobe recommendations return an advisory for the shop.
 func Admit(id, magentoVersion string, allowUnsupported bool) (warning string, err error) {
 	warnings, err := defaultRegistry.Admit(id, magentoVersion, allowUnsupported)
 	if err != nil {

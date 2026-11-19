@@ -23,7 +23,7 @@ func TestNotSupportedNamesSurfaceTargetAndTier(t *testing.T) {
 			name:     "certified",
 			provider: "aws",
 			runtime:  "ecs-fargate",
-			tier:     platform.TierCertified,
+			tier:     platform.TierBuiltIn,
 			surface:  "cost estimation",
 		},
 		{
@@ -49,8 +49,8 @@ func TestNotSupportedNamesSurfaceTargetAndTier(t *testing.T) {
 			if err.Error() != want {
 				t.Fatalf("message = %q, want %q", err.Error(), want)
 			}
-			other := platform.TierCertified
-			if tt.tier == platform.TierCertified {
+			other := platform.TierBuiltIn
+			if tt.tier == platform.TierBuiltIn {
 				other = platform.TierExperimental
 			}
 			if strings.Contains(err.Error(), string(other)) {
@@ -125,7 +125,7 @@ func TestPortHelpersNameExperimentalTier(t *testing.T) {
 	if err.Error() != want {
 		t.Fatalf("message = %q, want %q", err.Error(), want)
 	}
-	if strings.Contains(err.Error(), string(platform.TierCertified)) {
+	if strings.Contains(err.Error(), string(platform.TierBuiltIn)) {
 		t.Fatalf("experimental message must not contain certified: %v", err)
 	}
 }
@@ -148,7 +148,7 @@ func TestLogsErrNotSupportedNamesTier(t *testing.T) {
 	if !strings.HasPrefix(err.Error(), wantPrefix) {
 		t.Fatalf("leading portion must survive; got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "("+string(platform.TierCertified)+")") {
+	if !strings.Contains(err.Error(), "("+string(platform.TierBuiltIn)+")") {
 		t.Fatalf("message must name certified tier: %v", err)
 	}
 }
@@ -168,7 +168,7 @@ func TestCostErrNotSupportedNamesTierBothDirections(t *testing.T) {
 		if !strings.HasPrefix(err.Error(), costNotSupportedPrefix) {
 			t.Fatalf("01-03 prefix must survive byte-for-byte; got: %v", err)
 		}
-		if !strings.Contains(err.Error(), "("+string(platform.TierCertified)+")") {
+		if !strings.Contains(err.Error(), "("+string(platform.TierBuiltIn)+")") {
 			t.Fatalf("message must name certified tier: %v", err)
 		}
 		if strings.Contains(err.Error(), string(platform.TierExperimental)) {
@@ -193,7 +193,7 @@ func TestCostErrNotSupportedNamesTierBothDirections(t *testing.T) {
 		if !strings.Contains(err.Error(), "("+string(platform.TierExperimental)+")") {
 			t.Fatalf("message must name experimental tier: %v", err)
 		}
-		if strings.Contains(err.Error(), string(platform.TierCertified)) {
+		if strings.Contains(err.Error(), string(platform.TierBuiltIn)) {
 			t.Fatalf("experimental message must not contain certified: %v", err)
 		}
 	})

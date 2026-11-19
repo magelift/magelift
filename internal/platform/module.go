@@ -14,7 +14,7 @@ import (
 type CertificationTier string
 
 const (
-	TierCertified    CertificationTier = "certified"
+	TierBuiltIn      CertificationTier = "built-in"
 	TierExperimental CertificationTier = "experimental"
 )
 
@@ -63,10 +63,11 @@ type StackModule interface {
 
 // ModuleRegistry selects stack modules by provider/runtime.
 type ModuleRegistry struct {
-	byPlatform     map[targetKey]StackModule
-	byID           map[sdk.TargetID]StackModule
-	extensionsByID map[string]sdk.ExtensionDescriptor
-	closers        []func()
+	byPlatform      map[targetKey]StackModule
+	byID            map[sdk.TargetID]StackModule
+	extensionsByID  map[string]sdk.ExtensionDescriptor
+	serviceAdapters map[string]sdk.ServiceAdapter
+	closers         []func()
 }
 
 type targetKey struct {
@@ -184,7 +185,7 @@ func (r *ModuleRegistry) registerModule(module StackModule, manifest *sdk.Extens
 			return fmt.Errorf("stack module %q certification admission adapter target %q/%q does not match %q/%q", descriptor.ID, admissionDescriptor.Provider, admissionDescriptor.Runtime, descriptor.Provider, descriptor.Runtime)
 		}
 	}
-	if tier := module.CertificationTier(); tier != TierCertified && tier != TierExperimental {
+	if tier := module.CertificationTier(); tier != TierBuiltIn && tier != TierExperimental {
 		return fmt.Errorf("stack module %q has invalid certification tier %q", descriptor.ID, tier)
 	}
 	keys := RequiredOutputKeys()
@@ -272,8 +273,8 @@ func (r *ModuleRegistry) Extensions() []sdk.ExtensionDescriptor {
 }
 
 func extensionTier(tier CertificationTier) sdk.ExtensionCertificationTier {
-	if tier == TierCertified {
-		return sdk.ExtensionTierCertified
+	if tier == TierBuiltIn {
+		return sdk.ExtensionTierBuiltIn
 	}
 	return sdk.ExtensionTierExperimental
 }
@@ -307,6 +308,18 @@ func (r *ModuleRegistry) Plan(cfg config.Config, environment string, opts PlanOp
 	module, found := r.Module(sdk.ProviderID(cfg.Target.Provider), sdk.RuntimeID(cfg.Target.Runtime))
 	if !found {
 		return nil, nil, fmt.Errorf("no stack module registered for target %q/%q", cfg.Target.Provider, cfg.Target.Runtime)
+	}
+	if !opts.AccountOnly && !opts.AllowExpiredPreview {
+		var err error
+		cfg, err = r.resolveServiceAdapters(opts.Context, cfg, environment, module.Descriptor())
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, externalModule := module.(publicModuleAdapter); !externalModule {
+			if err := cfg.CheckServiceCapabilities(); err != nil {
+				return nil, nil, err
+			}
+		}
 	}
 	planned, err := module.Plan(cfg, environment, opts)
 	if err != nil {

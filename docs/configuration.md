@@ -2,17 +2,17 @@
 
 This page is generated from the MageLift configuration schema. Do not edit it by hand.
 
-`magelift.yaml` uses schema version 1. Unknown fields are rejected.
+`magelift.php` uses schema version 1. Unknown fields are rejected.
 
 When a provider target block is present, the resolver applies the selected preset's
 safe provider shape defaults and the service versions from the Magento compatibility catalog.
 Project and environment values override them. The defaults do not create secrets,
 certificates, or existing-resource references; provider and preset catalogs do
-materialize named capacity shapes so advanced YAML can override them deliberately
+materialize named capacity shapes so project code can override them deliberately
 instead of inheriting an undocumented SDK default.
 Use `config effective` to inspect the values and their provenance.
 
-See the [advanced AWS example](https://github.com/magelift/magelift/blob/main/examples/advanced-aws-fck-nat.yaml) for a complete
+See the [advanced AWS example](https://github.com/magelift/magelift/blob/main/examples/advanced-aws-fck-nat.php) for a complete
 typed configuration that composes multi-AZ fck-nat, native and external edge,
 native and external observability, recovery policy, and a community extension.
 
@@ -26,7 +26,7 @@ the effective configuration, provenance, plan, and architecture fingerprint.
 
 Cloud transactional email is `email` on the project or an environment overlay.
 `ses` requires a provider-matching secret reference in `email.credential`;
-plaintext is rejected before Magento SMTP is written. Validation success is not certified delivery.
+plaintext is rejected before Magento SMTP is written. Delivery is verified against the configured SMTP service.
 Modes `tem` and `ovh`, and `ses` with a `managed` block, provision the sender identity, credentials, and DNS through the provider adapter; explicit host, port, username, and credential values are rejected alongside `managed`.
 `local.email` remains the workstation overlay and uses `credentialEnv`. A preview environment that
 omits `email` resolves to `disabled` and does not inherit production SES credentials.
@@ -35,8 +35,8 @@ Resilience projection targets are optional advanced settings: use `resilience.pr
 `service` (preferred) or pinned `task`, and `container`; use `runtime: kubernetes` with `namespace`, `workload`, and an optional
 `container`. These are workload identities only; credentials and application verifiers stay provider-owned.
 
-`target.provider: gcp` with `runtime: gke-autopilot` is the certified first-party Magento path for evidenced cells. `runtime: gke-standard` is experimental and remains the node-capable path for workloads such as multi-node OpenSearch.
-Historical 2.4.6-p15 and 2.4.9 topology/runtime passes remain scoped evidence. MageLift accepts PHP 8.3 and newer, so Magento 2.4.6 is unavailable. The complete Adobe cache intersection and the rest of the release matrix stay open.
+`target.provider: gcp` with `runtime: gke-autopilot` selects the GKE Autopilot adapter. `runtime: gke-standard` is experimental and remains the node-capable path for workloads such as multi-node OpenSearch.
+Historical 2.4.6-p15 and 2.4.9 topology/runtime passes remain scoped evidence. The bundled build recipes cover PHP 8.3 through 8.5. Projects may choose their own runtime images. The complete Adobe cache intersection and the rest of the release matrix stay open.
 Both require `target.gcp.project` and keep GCP topology under
 `target.gcp` only. Do not reuse `target.aws` fields for GCP.
 
@@ -54,7 +54,7 @@ blocked until the Magento connector carries cluster discovery endpoints. OVH exp
 `mksPlan`, `zones`, `nodeCount`, `databaseNodeCount`, and `valkeyNodeCount`; `zones` are MKS
 availability zones inside the selected OVH region, not database regions. Free MKS is single-zone;
 Standard multi-zone MKS creates one worker pool per listed zone and requires at least one worker per zone.
-The preview preset selects the current low-cost discovery one-node shape; standard and high-availability select the current production two-node shape. Advanced YAML can choose discovery/essential, business/production, or enterprise/advanced plans plus explicit flavors and node counts, and provider admission checks the selected region before mutation.
+The preview preset selects the current low-cost discovery one-node shape; standard and high-availability select the current production two-node shape. Advanced configuration can choose discovery/essential, business/production, or enterprise/advanced plans plus explicit flavors and node counts, and provider admission checks the selected region before mutation.
 On Scaleway, `zone` selects the managed-cache zone and `zones`
 selects the Kapsule worker zones; multi-zone plans create one worker pool per listed zone
 and require at least one configured node per zone. The preview preset may use one zone;
@@ -107,7 +107,7 @@ not overloaded into the AWS existing-resource shape.
 
 For AWS fck-nat, `natMode`, `natTopology`, and `natReplacementMode` form one
 explicit network boundary. Selecting fck-nat materializes the preview or durable-preset
-topology, replacement policy, and one cost-optimized ARM64 NAT instance in effective YAML;
+topology, replacement policy, and one cost-optimized ARM64 NAT instance in effective configuration;
 multi-AZ fck-nat uses one failure-domain target per selected zone and automatic
 replacement through an Auto Scaling group unless `none` is explicitly selected.
 `target.aws.natInstanceType` overrides the ARM64 Graviton size; it defaults to the
@@ -134,7 +134,7 @@ stream. `cloudwatch`, `google-cloud-operations`, `scaleway-cockpit`, and
 `ovh-logs-data-platform` are first-party native adapters for their matching clouds.
 New Relic, Datadog, OTLP, and other external providers are extension-owned. Put
 their credentials and provider-specific options under `extensions.<vendor>`.
-The core preserves an extension namespace as opaque YAML; its registered adapter
+The core preserves an extension namespace as opaque configuration; its registered adapter
 must strict-decode and validate that payload before planning or mutation. A
 first-party adapter rejects signals it cannot configure rather than silently
 dropping them.
@@ -159,6 +159,16 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 
 | Field | Type | Required | Accepted values | Description |
 | --- | --- | --- | --- | --- |
+| `services` | object | no |  | Magento service families, versions, ownership and connection settings |
+| `services.*.adapter` | string | no |  | Explicitly linked service connection adapter ID |
+| `services.*.family` | string | yes |  | Service engine or implementation |
+| `services.*.version` | string | no |  | Selected engine version |
+| `services.*.ownership` | string or null | no | managed, self-hosted, existing, external | Provisioning ownership |
+| `services.*.endpoint` | string | no |  | Hostname or URL of an existing service |
+| `services.*.secret` | string | no |  | Provider secret reference for a connection |
+| `services.*.image` | string | no |  | Shop-selected service container image |
+| `services.*.port` | integer | no |  | Service connection port |
+| `services.*.username` | string | no |  | Service connection username |
 | `schemaVersion` | integer | yes | 1 | MageLift configuration schema version |
 | `project` | object | yes |  | Project identity |
 | `project.name` | string | yes |  | Project name |
@@ -215,21 +225,27 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `build.cache.ignoreExportErrors` | boolean | no |  | Continue when cache export fails |
 | `local` | object | no |  | Local runtime service and email choices |
 | `local.database` | object | no |  | Local database family and version |
+| `local.database.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.database.family` | string or null | no |  | Service family |
 | `local.database.version` | string or null | no |  | Service version |
 | `local.cache` | object | no |  | Local cache family and version |
+| `local.cache.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.cache.family` | string or null | no |  | Service family |
 | `local.cache.version` | string or null | no |  | Service version |
 | `local.search` | object | no |  | Local search family and version |
+| `local.search.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.search.family` | string or null | no |  | Service family |
 | `local.search.version` | string or null | no |  | Service version |
 | `local.queue` | object | no |  | Local queue family and version |
+| `local.queue.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.queue.family` | string or null | no |  | Service family |
 | `local.queue.version` | string or null | no |  | Service version |
 | `local.webServer` | object | no |  | Local web server family and version |
+| `local.webServer.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.webServer.family` | string or null | no |  | Service family |
 | `local.webServer.version` | string or null | no |  | Service version |
 | `local.webCache` | object | no |  | Local web cache family and version |
+| `local.webCache.image` | string or null | no |  | Container image selected by the project for local development |
 | `local.webCache.family` | string or null | no |  | Service family |
 | `local.webCache.version` | string or null | no |  | Service version |
 | `local.phpSettings` | object or null | no |  | Local PHP ini settings |
@@ -241,9 +257,11 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `local.email.from` | string or null | no |  | Default sender address |
 | `local.email.credentialEnv` | string or null | no |  | Environment variable containing the email credential |
 | `target` | object | yes |  | Deployment target |
-| `target.provider` | string | yes | aws, gcp, ovh, scaleway | Infrastructure provider |
-| `target.runtime` | string | yes | ecs-fargate, eks, gke-autopilot, gke-standard, mks, kapsule | Application runtime |
+| `target.provider` | string | yes | aws, gcp, azure, ovh, scaleway | Infrastructure provider |
+| `target.runtime` | string | yes | ecs-fargate, eks, gke-autopilot, gke-standard, aks, mks, kapsule | Application runtime |
 | `target.aws` | object or null | no |  | AWS deployment inputs |
+| `target.aws.previewPool` | object or null | no |  | Shared preview compute in an existing VPC |
+| `target.aws.previewPool.clusterArn` | string | yes |  | ECS Fargate cluster owned outside the preview stack |
 | `target.aws.kmsKeyArn` | string or null | no |  | Customer-managed KMS key ARN |
 | `target.aws.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID |
 | `target.aws.cloudFrontCertificateArn` | string or null | no |  | us-east-1 ACM certificate ARN |
@@ -349,6 +367,12 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `target.aws.catalog.versions.openSearch` | string | no |  | OpenSearch engine version |
 | `target.aws.catalog.versions.rabbitMq` | string | no |  | RabbitMQ engine version |
 | `target.gcp` | object or null | no |  | GCP deployment inputs |
+| `target.gcp.previewPool` | object or null | no |  | Existing cluster and network for preview environments |
+| `target.gcp.previewPool.cluster` | string | yes |  | Existing regional GKE cluster name |
+| `target.gcp.previewPool.network` | string | yes |  | Existing VPC self link or resource ID |
+| `target.gcp.previewPool.subnet` | string | yes |  | Existing regional subnet self link or resource ID |
+| `target.gcp.previewPool.networkPolicyEnforced` | boolean | yes |  | Confirm the shared cluster enforces Kubernetes NetworkPolicy |
+| `target.gcp.previewPool.ingressCidrs` | array | yes |  | Source CIDRs reaching preview web pods, including load balancer and health checks |
 | `target.gcp.project` | string | yes |  | GCP project ID |
 | `target.gcp.region` | string or null | no |  | GCP region |
 | `target.gcp.networkCidr` | string or null | no |  | VPC IPv4 CIDR |
@@ -357,6 +381,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `target.gcp.databaseName` | string or null | no |  | Magento database name |
 | `target.gcp.masterUsername` | string or null | no |  | Cloud SQL master username |
 | `target.gcp.encryptionKeySecret` | string or null | no |  | Secret Manager secret ID for Magento encryption key |
+| `target.gcp.cloudSqlDatabaseVersion` | string | no |  | Cloud SQL MySQL API engine version |
 | `target.gcp.cloudSqlTier` | string or null | no |  | Cloud SQL machine tier |
 | `target.gcp.cloudSqlAvailability` | string or null | no | ZONAL, REGIONAL | Cloud SQL availability type |
 | `target.gcp.cloudSqlBackupEnabled` | boolean or null | no |  | Enable Cloud SQL automated backups |
@@ -369,7 +394,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `target.gcp.memorystoreNodeType` | string or null | no |  | Memorystore for Valkey node type |
 | `target.gcp.memorystoreShardCount` | integer or null | no |  | Memorystore for Valkey shard count |
 | `target.gcp.memorystoreReplicas` | integer or null | no |  | Memorystore for Valkey replica count per shard (0-5) |
-| `target.gcp.memorystoreEngineVersion` | string or null | no | VALKEY_8_0, VALKEY_9_0, VALKEY_9_1 | Memorystore for Valkey engine version (VALKEY_9_0 GA or VALKEY_9_1 Preview) |
+| `target.gcp.memorystoreEngineVersion` | string or null | no |  | Memorystore for Valkey API engine version |
 | `target.gcp.memorystoreMode` | string or null | no | CLUSTER, CLUSTER_DISABLED | Memorystore for Valkey cluster mode |
 | `target.gcp.memorystoreZoneDistributionMode` | string or null | no | MULTI_ZONE, SINGLE_ZONE | Memorystore for Valkey zone distribution mode |
 | `target.gcp.memorystoreZone` | string or null | no |  | Memorystore for Valkey single-zone placement |
@@ -399,6 +424,22 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `target.gcp.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
 | `target.gcp.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
 | `target.gcp.labels` | object or null | no |  | Resource labels |
+| `target.azure` | object or null | no |  | Azure deployment inputs |
+| `target.azure.subscriptionId` | string | yes |  | Azure subscription ID |
+| `target.azure.resourceGroup` | string | yes |  | Azure resource group name |
+| `target.azure.tenantId` | string | no |  | Microsoft Entra tenant ID |
+| `target.azure.imageDigest` | string | no |  | Immutable application image |
+| `target.azure.stateBackendUrl` | string | no |  | Existing Azure Blob Pulumi state backend |
+| `target.azure.imagePullSecret` | string | no |  | Existing Kubernetes secret for private registry access |
+| `target.azure.acrResourceId` | string | no |  | Azure Container Registry resource ID for AKS pull access |
+| `target.azure.ingressClass` | string | no |  | Existing Kubernetes ingress class |
+| `target.azure.tlsSecret` | string | no |  | Existing Kubernetes TLS secret in the environment namespace |
+| `target.azure.monitorWorkspaceId` | string | no |  | Existing Azure Log Analytics workspace resource ID |
+| `target.azure.previewPool` | object or null | no |  | Existing AKS cluster and private network for preview environments |
+| `target.azure.previewPool.clusterName` | string | yes |  | Existing AKS cluster name in the configured resource group |
+| `target.azure.previewPool.nodeSubnetId` | string | yes |  | Existing AKS node subnet resource ID |
+| `target.azure.previewPool.mysqlSubnetId` | string | yes |  | Existing delegated MySQL subnet resource ID |
+| `target.azure.previewPool.mysqlDnsZoneId` | string | yes |  | Existing private DNS zone linked to the cluster network |
 | `target.ovh` | object or null | no |  | OVHcloud deployment inputs (experimental) |
 | `target.ovh.serviceName` | string | yes |  | OVH Public Cloud project service name |
 | `target.ovh.apiEndpoint` | string or null | no | ovh-eu, ovh-ca, ovh-us | OVHcloud API endpoint alias (ovh-eu, ovh-ca, or ovh-us) |
@@ -550,8 +591,18 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `defaults.region` | string | no |  | Default AWS region |
 | `defaults.preset` | string | no | preview, standard, high-availability | Default infrastructure preset |
 | `compatibility` | object | no |  | Compatibility policy |
-| `compatibility.allowUnsupported` | boolean | no |  | Allow an unsupported service combination |
+| `compatibility.allowUnsupported` | boolean | no |  | Legacy compatibility override; Adobe deviations now produce warnings |
 | `environments` | object | yes |  | Named deployment environments |
+| `environments.*.services` | object | no |  | Magento service families, versions, ownership and connection settings |
+| `environments.*.services.*.adapter` | string | no |  | Explicitly linked service connection adapter ID |
+| `environments.*.services.*.family` | string | yes |  | Service engine or implementation |
+| `environments.*.services.*.version` | string | no |  | Selected engine version |
+| `environments.*.services.*.ownership` | string or null | no | managed, self-hosted, existing, external | Provisioning ownership |
+| `environments.*.services.*.endpoint` | string | no |  | Hostname or URL of an existing service |
+| `environments.*.services.*.secret` | string | no |  | Provider secret reference for a connection |
+| `environments.*.services.*.image` | string | no |  | Shop-selected service container image |
+| `environments.*.services.*.port` | integer | no |  | Service connection port |
+| `environments.*.services.*.username` | string | no |  | Service connection username |
 | `environments.*.inherits` | string | no |  | Parent environment |
 | `environments.*.account` | string or null | no |  | AWS account ID |
 | `environments.*.class` | string or null | no |  | Environment class |
@@ -559,6 +610,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.domain` | string or null | no |  | Environment domain |
 | `environments.*.protection` | boolean or null | no |  | Protect against destructive commands |
 | `environments.*.expiresAt` | string or null | no |  | Preview expiration as RFC3339 |
+| `environments.*.previewTtl` | string or null | no |  | Preview lifetime from the triggering event, for example 168h |
 | `environments.*.monthlyBudgetCents` | integer or null | no |  | Monthly budget planning input in cents (alerts only, never enforced) |
 | `environments.*.branches` | array or null | no |  | Git branches mapped to this environment |
 | `environments.*.seedDump` | string or null | no |  | Local MySQL dump path seeded after first deploy |
@@ -616,9 +668,11 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.build.cache.mode` | string or null | no | min, max | BuildKit cache export mode |
 | `environments.*.build.cache.ignoreExportErrors` | boolean | no |  | Continue when cache export fails |
 | `environments.*.target` | object or null | no |  |  |
-| `environments.*.target.provider` | string | no | aws, gcp, ovh, scaleway | Infrastructure provider |
-| `environments.*.target.runtime` | string | no | ecs-fargate, eks, gke-autopilot, gke-standard, mks, kapsule | Application runtime |
+| `environments.*.target.provider` | string | no | aws, gcp, azure, ovh, scaleway | Infrastructure provider |
+| `environments.*.target.runtime` | string | no | ecs-fargate, eks, gke-autopilot, gke-standard, aks, mks, kapsule | Application runtime |
 | `environments.*.target.aws` | object or null | no |  | AWS deployment inputs |
+| `environments.*.target.aws.previewPool` | object or null | no |  | Shared preview compute in an existing VPC |
+| `environments.*.target.aws.previewPool.clusterArn` | string | no |  | ECS Fargate cluster owned outside the preview stack |
 | `environments.*.target.aws.kmsKeyArn` | string or null | no |  | Customer-managed KMS key ARN |
 | `environments.*.target.aws.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID |
 | `environments.*.target.aws.cloudFrontCertificateArn` | string or null | no |  | us-east-1 ACM certificate ARN |
@@ -724,6 +778,12 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.target.aws.catalog.versions.openSearch` | string | no |  | OpenSearch engine version |
 | `environments.*.target.aws.catalog.versions.rabbitMq` | string | no |  | RabbitMQ engine version |
 | `environments.*.target.gcp` | object or null | no |  | GCP deployment inputs |
+| `environments.*.target.gcp.previewPool` | object or null | no |  | Existing cluster and network for preview environments |
+| `environments.*.target.gcp.previewPool.cluster` | string | no |  | Existing regional GKE cluster name |
+| `environments.*.target.gcp.previewPool.network` | string | no |  | Existing VPC self link or resource ID |
+| `environments.*.target.gcp.previewPool.subnet` | string | no |  | Existing regional subnet self link or resource ID |
+| `environments.*.target.gcp.previewPool.networkPolicyEnforced` | boolean | no |  | Confirm the shared cluster enforces Kubernetes NetworkPolicy |
+| `environments.*.target.gcp.previewPool.ingressCidrs` | array | no |  | Source CIDRs reaching preview web pods, including load balancer and health checks |
 | `environments.*.target.gcp.project` | string | no |  | GCP project ID |
 | `environments.*.target.gcp.region` | string or null | no |  | GCP region |
 | `environments.*.target.gcp.networkCidr` | string or null | no |  | VPC IPv4 CIDR |
@@ -732,6 +792,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.target.gcp.databaseName` | string or null | no |  | Magento database name |
 | `environments.*.target.gcp.masterUsername` | string or null | no |  | Cloud SQL master username |
 | `environments.*.target.gcp.encryptionKeySecret` | string or null | no |  | Secret Manager secret ID for Magento encryption key |
+| `environments.*.target.gcp.cloudSqlDatabaseVersion` | string | no |  | Cloud SQL MySQL API engine version |
 | `environments.*.target.gcp.cloudSqlTier` | string or null | no |  | Cloud SQL machine tier |
 | `environments.*.target.gcp.cloudSqlAvailability` | string or null | no | ZONAL, REGIONAL | Cloud SQL availability type |
 | `environments.*.target.gcp.cloudSqlBackupEnabled` | boolean or null | no |  | Enable Cloud SQL automated backups |
@@ -744,7 +805,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.target.gcp.memorystoreNodeType` | string or null | no |  | Memorystore for Valkey node type |
 | `environments.*.target.gcp.memorystoreShardCount` | integer or null | no |  | Memorystore for Valkey shard count |
 | `environments.*.target.gcp.memorystoreReplicas` | integer or null | no |  | Memorystore for Valkey replica count per shard (0-5) |
-| `environments.*.target.gcp.memorystoreEngineVersion` | string or null | no | VALKEY_8_0, VALKEY_9_0, VALKEY_9_1 | Memorystore for Valkey engine version (VALKEY_9_0 GA or VALKEY_9_1 Preview) |
+| `environments.*.target.gcp.memorystoreEngineVersion` | string or null | no |  | Memorystore for Valkey API engine version |
 | `environments.*.target.gcp.memorystoreMode` | string or null | no | CLUSTER, CLUSTER_DISABLED | Memorystore for Valkey cluster mode |
 | `environments.*.target.gcp.memorystoreZoneDistributionMode` | string or null | no | MULTI_ZONE, SINGLE_ZONE | Memorystore for Valkey zone distribution mode |
 | `environments.*.target.gcp.memorystoreZone` | string or null | no |  | Memorystore for Valkey single-zone placement |
@@ -774,6 +835,22 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.target.gcp.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
 | `environments.*.target.gcp.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
 | `environments.*.target.gcp.labels` | object or null | no |  | Resource labels |
+| `environments.*.target.azure` | object or null | no |  | Azure deployment inputs |
+| `environments.*.target.azure.subscriptionId` | string | no |  | Azure subscription ID |
+| `environments.*.target.azure.resourceGroup` | string | no |  | Azure resource group name |
+| `environments.*.target.azure.tenantId` | string | no |  | Microsoft Entra tenant ID |
+| `environments.*.target.azure.imageDigest` | string | no |  | Immutable application image |
+| `environments.*.target.azure.stateBackendUrl` | string | no |  | Existing Azure Blob Pulumi state backend |
+| `environments.*.target.azure.imagePullSecret` | string | no |  | Existing Kubernetes secret for private registry access |
+| `environments.*.target.azure.acrResourceId` | string | no |  | Azure Container Registry resource ID for AKS pull access |
+| `environments.*.target.azure.ingressClass` | string | no |  | Existing Kubernetes ingress class |
+| `environments.*.target.azure.tlsSecret` | string | no |  | Existing Kubernetes TLS secret in the environment namespace |
+| `environments.*.target.azure.monitorWorkspaceId` | string | no |  | Existing Azure Log Analytics workspace resource ID |
+| `environments.*.target.azure.previewPool` | object or null | no |  | Existing AKS cluster and private network for preview environments |
+| `environments.*.target.azure.previewPool.clusterName` | string | no |  | Existing AKS cluster name in the configured resource group |
+| `environments.*.target.azure.previewPool.nodeSubnetId` | string | no |  | Existing AKS node subnet resource ID |
+| `environments.*.target.azure.previewPool.mysqlSubnetId` | string | no |  | Existing delegated MySQL subnet resource ID |
+| `environments.*.target.azure.previewPool.mysqlDnsZoneId` | string | no |  | Existing private DNS zone linked to the cluster network |
 | `environments.*.target.ovh` | object or null | no |  | OVHcloud deployment inputs (experimental) |
 | `environments.*.target.ovh.serviceName` | string | no |  | OVH Public Cloud project service name |
 | `environments.*.target.ovh.apiEndpoint` | string or null | no | ovh-eu, ovh-ca, ovh-us | OVHcloud API endpoint alias (ovh-eu, ovh-ca, or ovh-us) |
@@ -925,7 +1002,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.defaults.region` | string | no |  | Default AWS region |
 | `environments.*.defaults.preset` | string | no | preview, standard, high-availability | Default infrastructure preset |
 | `environments.*.compatibility` | object or null | no |  |  |
-| `environments.*.compatibility.allowUnsupported` | boolean | no |  | Allow an unsupported service combination |
+| `environments.*.compatibility.allowUnsupported` | boolean | no |  | Legacy compatibility override; Adobe deviations now produce warnings |
 | `environments.*.extensions` | object | no |  |  |
 | `extensions` | object | no |  | Namespaced extension settings |
 

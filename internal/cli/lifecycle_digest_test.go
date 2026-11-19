@@ -45,7 +45,7 @@ func (p *digestProbe) Descriptor() sdk.TargetDescriptor {
 }
 
 func (*digestProbe) CertificationTier() platform.CertificationTier {
-	return platform.TierCertified
+	return platform.TierBuiltIn
 }
 
 func (*digestProbe) OutputKeys() []string { return platform.RequiredOutputKeys() }
@@ -73,7 +73,7 @@ func (p *digestProbe) Plan(cfg config.Config, environment string, opts platform.
 	return stubPlanned{
 		stackName: cfg.Project.Name + "-" + environment, provider: "gcp", runtime: "gke-autopilot",
 		project: cfg.Project.Name, environment: environment, region: cfg.Defaults.Region,
-		envClass: cfg.Class, protected: cfg.Protection, digest: digest, tier: platform.TierCertified,
+		envClass: cfg.Class, protected: cfg.Protection, digest: digest, tier: platform.TierBuiltIn,
 	}, nil
 }
 

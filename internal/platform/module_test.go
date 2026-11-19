@@ -60,7 +60,7 @@ func (p fakePlannedStack) WithImageDigest(string) (PlannedStack, error) {
 func TestRegisterModuleRequiresOutputKeys(t *testing.T) {
 	registry := NewModuleRegistry()
 	err := registry.RegisterModule(fakeModule{
-		id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierCertified,
+		id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierBuiltIn,
 		keys: []string{OutputApplicationURL},
 	})
 	if err == nil {
@@ -71,7 +71,7 @@ func TestRegisterModuleRequiresOutputKeys(t *testing.T) {
 func TestRegisterModuleRejectsDuplicates(t *testing.T) {
 	registry := NewModuleRegistry()
 	module := fakeModule{
-		id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierCertified,
+		id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierBuiltIn,
 		keys: RequiredOutputKeys(),
 	}
 	if err := registry.RegisterModule(module); err != nil {
@@ -85,7 +85,7 @@ func TestRegisterModuleRejectsDuplicates(t *testing.T) {
 func TestRegisterModuleValidatesOptionalResilienceAdapter(t *testing.T) {
 	valid := resilienceModule{
 		fakeModule: fakeModule{
-			id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierCertified,
+			id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierBuiltIn,
 			keys: RequiredOutputKeys(),
 		},
 		adapter: resilienceStub{descriptor: sdk.ResilienceAdapterDescriptor{
@@ -128,7 +128,7 @@ func TestRegisterModuleValidatesOptionalResilienceAdapter(t *testing.T) {
 
 func TestRegisterModuleValidatesOptionalEdgeAndObservabilityAdapters(t *testing.T) {
 	valid := integrationModule{
-		fakeModule:    fakeModule{id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierCertified, keys: RequiredOutputKeys()},
+		fakeModule:    fakeModule{id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierBuiltIn, keys: RequiredOutputKeys()},
 		edge:          integrationStub{edge: true, edgeDescriptor: sdk.EdgeAdapterDescriptor{APIVersion: sdk.ExtensionAPIVersion, ID: "aws.edge", Provider: "aws", Version: "1.0.0", Capabilities: []sdk.EdgeAction{sdk.EdgeApply, sdk.EdgeVerify, sdk.EdgeDestroy}}},
 		observability: integrationStub{observability: true, observabilityDescriptor: sdk.ObservabilityAdapterDescriptor{APIVersion: sdk.ExtensionAPIVersion, ID: "aws.observability", Provider: "aws", Version: "1.0.0", Capabilities: []sdk.ObservabilityAction{sdk.ObservabilityApply, sdk.ObservabilityVerify, sdk.ObservabilityDestroy}}},
 	}
@@ -146,7 +146,7 @@ func TestRegisterModuleValidatesOptionalEdgeAndObservabilityAdapters(t *testing.
 func TestPlannedLifecycleFactoriesUseTheProviderNeutralPorts(t *testing.T) {
 	module := lifecycleFactoryModule{
 		fakeModule: fakeModule{
-			id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierCertified,
+			id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierBuiltIn,
 			keys: RequiredOutputKeys(),
 		},
 		resilience: resilienceStub{descriptor: validResilienceDescriptor("aws")},
@@ -191,7 +191,7 @@ func (collectorDeploymentStub) ExecuteCollector(context.Context, sdk.CollectorDe
 
 func TestPlannedLifecycleFactoriesRejectInvalidInputsAndProviderIdentity(t *testing.T) {
 	module := lifecycleFactoryModule{fakeModule: fakeModule{
-		id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierCertified,
+		id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierBuiltIn,
 		keys: RequiredOutputKeys(),
 	}, resilience: resilienceStub{descriptor: validResilienceDescriptor("aws")}}
 	planned := fakePlannedStack{id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate"}
@@ -219,7 +219,7 @@ func TestPlannedLifecycleFactoriesRejectInvalidInputsAndProviderIdentity(t *test
 func TestModuleRegistryExposesFirstPartyExtensionProvenance(t *testing.T) {
 	registry := NewModuleRegistry()
 	module := fakeModule{
-		id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierCertified,
+		id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierBuiltIn,
 		keys: RequiredOutputKeys(),
 	}
 	if err := registry.RegisterModule(module); err != nil {

@@ -26,7 +26,7 @@ func nginxFPM() sdk.WebRuntime {
 		ID:              sdk.WebRuntimeNginxFPM,
 		Version:         pluginVersion,
 		Source:          "magelift",
-		Tier:            sdk.ExtensionTierCertified,
+		Tier:            sdk.ExtensionTierBuiltIn,
 		Adobe:           sdk.AdobeSupported,
 		MagentoReleases: append([]string(nil), firstPartyMagentoReleases...),
 		LocalCompose:    sdk.WebRuntimeComposeHints{ImageFamily: "php-nginx", HealthPath: sdk.WebRuntimeHealthPath},

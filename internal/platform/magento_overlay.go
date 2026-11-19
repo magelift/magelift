@@ -52,7 +52,7 @@ func NewMagentoOverlays(frontName, cookieDomain, unsecureBaseURL, secureBaseURL,
 	}
 }
 
-// MagentoOverlays are portable Magento runtime values from magelift.yaml.
+// MagentoOverlays are portable Magento runtime values from magelift.php.
 // Adapters inject them through MAGENTO_DC_* / CONFIG__* and MAGENTO_DC__OVERRIDE.
 // MagentoOverlays is the SDK-governed Magento runtime contract. The struct
 // moved to the SDK so deploy inputs are versioned; behavior stays here.

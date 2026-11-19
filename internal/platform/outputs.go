@@ -30,6 +30,10 @@ const (
 	// used by RabbitMQ workloads and candidate migration Jobs for the broker
 	// password. It is present only when the selected queue mode needs AMQP.
 	OutputQueuePasswordSecretName = "queuePasswordSecretName"
+	// OutputCachePasswordSecretName names the optional connected cache secret.
+	OutputCachePasswordSecretName = "cachePasswordSecretName"
+	OutputNamespace               = "namespace"
+	OutputWorkloadServiceAccount  = "workloadServiceAccount"
 	// OutputSearchEndpoint is the internal OpenSearch endpoint consumed by
 	// Magento web and candidate migration workloads. It is optional when
 	// search is disabled.

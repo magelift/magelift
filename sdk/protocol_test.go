@@ -85,7 +85,7 @@ func TestProtocolMessagesGobRoundTrip(t *testing.T) {
 	envelope := Envelope{Project: "p", Environment: "e", Region: "r", EnvironmentClass: "preview", StackName: "s", StateBackendURL: "gs://b", Preset: "preview", MonthlyBudgetCents: 1, AppVersion: "2.4.9"}
 	messages := map[string]any{
 		"DescribeRequest":              &DescribeRequest{ProtocolVersion: ProtocolV1},
-		"DescribeResponse":             &DescribeResponse{ProtocolVersion: ProtocolV1, ProviderID: "gcp", ProviderVersion: "v", Operations: []OperationVersion{{Name: "status", Version: "1.0"}}, Runtimes: []RuntimeAdvertisement{{Runtime: "r", Tier: ExtensionTierCertified}}, OutputKeys: []string{"k"}, Edge: &EdgeAdapterDescriptor{ID: "e"}, Resilience: &ResilienceAdapterDescriptor{ID: "r"}},
+		"DescribeResponse":             &DescribeResponse{ProtocolVersion: ProtocolV1, ProviderID: "gcp", ProviderVersion: "v", Operations: []OperationVersion{{Name: "status", Version: "1.0"}}, Runtimes: []RuntimeAdvertisement{{Runtime: "r", Tier: ExtensionTierBuiltIn}}, OutputKeys: []string{"k"}, Edge: &EdgeAdapterDescriptor{ID: "e"}, Resilience: &ResilienceAdapterDescriptor{ID: "r"}},
 		"ValidateConfigRequest":        &ValidateConfigRequest{ProtocolVersion: ProtocolV1, TargetBlock: []byte("a: b")},
 		"ValidateConfigResult":         &ValidateConfigResult{Valid: true, Problems: []string{"p"}},
 		"PlanRequest":                  &PlanRequest{ProtocolVersion: ProtocolV1, Envelope: envelope, Application: Application{Edition: "e", Magento: MagentoSettings{FrontName: "a"}, Email: EmailSettings{Mode: "smtp", Host: "h", Port: 587}}, TargetBlock: []byte("a: b")},

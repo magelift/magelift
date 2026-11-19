@@ -31,7 +31,7 @@ func (f fakePlanned) Project() string     { return "shop" }
 func (f fakePlanned) Environment() string { return f.env }
 func (f fakePlanned) Region() string      { return f.region }
 func (f fakePlanned) CertificationTier() platform.CertificationTier {
-	return platform.TierCertified
+	return platform.TierBuiltIn
 }
 func (f fakePlanned) EnvironmentClass() string { return "preview" }
 func (f fakePlanned) Protected() bool          { return false }

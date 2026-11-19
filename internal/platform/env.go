@@ -131,6 +131,8 @@ type CapabilityEndpoints struct {
 	QueueMode          string // database | rabbitmq
 	QueueHost          string
 	QueueUsername      string
+	QueuePort          string
+	QueueSSL           string
 	MediaBucket        string
 	MediaURL           string
 	MediaDriver        string
@@ -235,10 +237,18 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 		if user == "" {
 			user = "magento"
 		}
+		port := endpoints.QueuePort
+		if port == "" {
+			port = DefaultAMQPPort
+		}
+		ssl := endpoints.QueueSSL
+		if ssl == "" {
+			ssl = "0"
+		}
 		bindings = append(bindings,
 			EnvBinding{Name: EnvMagentoQueueHost, Value: endpoints.QueueHost},
-			EnvBinding{Name: EnvMagentoQueuePort, Value: DefaultAMQPPort},
-			EnvBinding{Name: EnvMagentoQueueSSL, Value: "0"},
+			EnvBinding{Name: EnvMagentoQueuePort, Value: port},
+			EnvBinding{Name: EnvMagentoQueueSSL, Value: ssl},
 			EnvBinding{Name: EnvMagentoQueueUsername, Value: user},
 		)
 	}

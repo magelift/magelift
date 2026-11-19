@@ -15,7 +15,7 @@ var extensionVersionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.+_-]*$`
 type ExtensionCertificationTier string
 
 const (
-	ExtensionTierCertified    ExtensionCertificationTier = "certified"
+	ExtensionTierBuiltIn      ExtensionCertificationTier = "built-in"
 	ExtensionTierExperimental ExtensionCertificationTier = "experimental"
 )
 
@@ -70,7 +70,7 @@ func ValidateExtensionDescriptor(descriptor ExtensionDescriptor) error {
 	if descriptor.Digest != "" && !strings.HasPrefix(descriptor.Digest, "sha256:") {
 		problems = append(problems, errors.New("extension digest must use sha256: prefix"))
 	}
-	if descriptor.Tier != ExtensionTierCertified && descriptor.Tier != ExtensionTierExperimental {
+	if descriptor.Tier != ExtensionTierBuiltIn && descriptor.Tier != ExtensionTierExperimental {
 		problems = append(problems, fmt.Errorf("invalid extension certification tier %q", descriptor.Tier))
 	}
 	if len(descriptor.Targets) == 0 {

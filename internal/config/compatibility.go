@@ -108,7 +108,7 @@ func ServiceRequirementForRelease(release string, component CompatibilityCompone
 		}
 	}
 	for _, line := range currentCompatibilityCatalog.Lines {
-		if line.Line != requested {
+		if line.Line != requested && !strings.HasPrefix(requested, line.Line+"-p") {
 			continue
 		}
 		for _, requirement := range currentCompatibilityCatalog.Requirements {
@@ -132,13 +132,13 @@ type CompatibilityAssessment struct {
 
 var currentCompatibilityCatalog = CompatibilityCatalog{
 	Metadata: CompatibilityMetadata{
-		UpdatedAt:       "2026-10-19",
-		AdobeSnapshotAt: "2026-06-01",
+		UpdatedAt:       "2026-11-02",
+		AdobeSnapshotAt: "2026-11-02",
 		Scope:           "Adobe Commerce release requirements and MageLift service choices for the RC1 architecture matrix.",
 		Sources: []CompatibilitySource{
-			{Name: "Adobe Commerce system requirements", URL: "https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements?lang=en", RetrievedAt: "2026-08-08"},
+			{Name: "Adobe Commerce system requirements", URL: "https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements?lang=en", RetrievedAt: "2026-11-02"},
 			{Name: "PHP supported versions", URL: "https://www.php.net/supported-versions.php", RetrievedAt: "2026-08-08"},
-			{Name: "Amazon MQ RabbitMQ engine versions", URL: "https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/rabbitmq-version-management.html", RetrievedAt: "2026-08-08"},
+			{Name: "Amazon MQ RabbitMQ engine versions", URL: "https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/rabbitmq-version-management.html", RetrievedAt: "2026-11-02"},
 			{Name: "Amazon ElastiCache engine versions", URL: "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/engine-versions.html", RetrievedAt: "2026-08-08"},
 			{Name: "Google Cloud Memorystore for Valkey supported versions", URL: "https://docs.cloud.google.com/memorystore/docs/valkey/supported-versions", RetrievedAt: "2026-08-12"},
 		},
@@ -162,7 +162,7 @@ var currentCompatibilityCatalog = CompatibilityCatalog{
 		{Release: "2.4.6-p15", Component: CompatibilityDatabase, Option: "mysql", Status: CompatibilityServiceUnsupported, Notes: "Adobe's current latest-patch row does not list MySQL."},
 		{Release: "2.4.6-p15", Component: CompatibilitySearch, Option: "opensearch", Versions: []string{"2", "3"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.6-p15", Component: CompatibilitySearch, Option: "elasticsearch", Status: CompatibilityServiceUnsupported, Notes: "Elasticsearch 7.17 is outside the current latest-patch row."},
-		{Release: "2.4.6-p15", Component: CompatibilityQueue, Option: "rabbitmq", Versions: []string{"4.2"}, Status: CompatibilityAdobeSupported},
+		{Release: "2.4.6-p15", Component: CompatibilityQueue, Option: "rabbitmq", Versions: []string{"4.3"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.6-p15", Component: CompatibilityQueue, Option: "artemis", Versions: []string{"2"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.6-p15", Component: CompatibilityQueue, Option: "database", Status: CompatibilityMageLift, Notes: "Magento database-backed messaging avoids a broker and is a MageLift topology choice."},
 		{Release: "2.4.6-p15", Component: CompatibilityCache, Option: "valkey", Versions: []string{"8.1"}, Status: CompatibilityAdobeSupported},
@@ -178,7 +178,7 @@ var currentCompatibilityCatalog = CompatibilityCatalog{
 		{Release: "2.4.7-p10", Component: CompatibilityDatabase, Option: "mysql", Status: CompatibilityServiceUnsupported, Notes: "Adobe's current latest-patch row does not list MySQL."},
 		{Release: "2.4.7-p10", Component: CompatibilitySearch, Option: "opensearch", Versions: []string{"2", "3"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.7-p10", Component: CompatibilitySearch, Option: "elasticsearch", Versions: []string{"8"}, Status: CompatibilityAdobeSupported},
-		{Release: "2.4.7-p10", Component: CompatibilityQueue, Option: "rabbitmq", Versions: []string{"4.2"}, Status: CompatibilityAdobeSupported},
+		{Release: "2.4.7-p10", Component: CompatibilityQueue, Option: "rabbitmq", Versions: []string{"4.3"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.7-p10", Component: CompatibilityQueue, Option: "artemis", Versions: []string{"2"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.7-p10", Component: CompatibilityQueue, Option: "database", Status: CompatibilityMageLift, Notes: "Magento database-backed messaging avoids a broker and is a MageLift topology choice."},
 		{Release: "2.4.7-p10", Component: CompatibilityCache, Option: "valkey", Versions: []string{"8.1"}, Status: CompatibilityAdobeSupported},
@@ -194,7 +194,7 @@ var currentCompatibilityCatalog = CompatibilityCatalog{
 		{Release: "2.4.8-p5", Component: CompatibilityDatabase, Option: "mysql", Versions: []string{"8.4"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.8-p5", Component: CompatibilitySearch, Option: "opensearch", Versions: []string{"3"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.8-p5", Component: CompatibilitySearch, Option: "elasticsearch", Versions: []string{"8"}, Status: CompatibilityAdobeSupported},
-		{Release: "2.4.8-p5", Component: CompatibilityQueue, Option: "rabbitmq", Versions: []string{"4.2"}, Status: CompatibilityAdobeSupported},
+		{Release: "2.4.8-p5", Component: CompatibilityQueue, Option: "rabbitmq", Versions: []string{"4.3"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.8-p5", Component: CompatibilityQueue, Option: "artemis", Versions: []string{"2"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.8-p5", Component: CompatibilityQueue, Option: "database", Status: CompatibilityMageLift, Notes: "Magento database-backed messaging avoids a broker and is a MageLift topology choice."},
 		{Release: "2.4.8-p5", Component: CompatibilityCache, Option: "valkey", Versions: []string{"8.1"}, Status: CompatibilityAdobeSupported},
@@ -210,7 +210,7 @@ var currentCompatibilityCatalog = CompatibilityCatalog{
 		{Release: "2.4.9", Component: CompatibilityDatabase, Option: "mysql", Versions: []string{"8.4"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.9", Component: CompatibilitySearch, Option: "opensearch", Versions: []string{"3"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.9", Component: CompatibilitySearch, Option: "elasticsearch", Status: CompatibilityServiceUnsupported, Notes: "The current latest-patch row lists OpenSearch 3 instead."},
-		{Release: "2.4.9", Component: CompatibilityQueue, Option: "rabbitmq", Versions: []string{"4.2"}, Status: CompatibilityAdobeSupported},
+		{Release: "2.4.9", Component: CompatibilityQueue, Option: "rabbitmq", Versions: []string{"4.3"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.9", Component: CompatibilityQueue, Option: "artemis", Versions: []string{"2"}, Status: CompatibilityAdobeSupported},
 		{Release: "2.4.9", Component: CompatibilityQueue, Option: "database", Status: CompatibilityMageLift, Notes: "Magento database-backed messaging avoids a broker and is a MageLift topology choice."},
 		{Release: "2.4.9", Component: CompatibilityCache, Option: "valkey", Versions: []string{"9"}, Status: CompatibilityAdobeSupported},
@@ -223,9 +223,7 @@ var currentCompatibilityCatalog = CompatibilityCatalog{
 	},
 }
 
-// Validate rejects a compatibility catalog whose source metadata is missing
-// or stale. Provider-specific API enum translation remains in adapters, but
-// no adapter may silently select a release mapping from an expired catalog.
+// Validate checks the shape and dates of the recorded source metadata.
 func (c CompatibilityCatalog) Validate(now time.Time) error {
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -257,8 +255,8 @@ func (c CompatibilityCatalog) Validate(now time.Time) error {
 		if err != nil {
 			return fmt.Errorf("compatibility catalog source %q retrievedAt: %w", source.Name, err)
 		}
-		if retrieved.After(now.Add(24*time.Hour)) || now.Sub(retrieved) > 90*24*time.Hour {
-			return fmt.Errorf("compatibility catalog source %q is stale", source.Name)
+		if retrieved.After(now.Add(24 * time.Hour)) {
+			return fmt.Errorf("compatibility catalog source %q is in the future", source.Name)
 		}
 	}
 	if len(c.Lines) == 0 || len(c.Requirements) == 0 {
@@ -321,13 +319,16 @@ func ValidateCompatibilitySelection(selection CompatibilitySelection) (Compatibi
 	return CompatibilityRequirement{}, fmt.Errorf("%s/%s is not in the compatibility catalog for %s", selection.Component, selection.Option, selection.Release)
 }
 
-var magentoExactVersion = regexp.MustCompile(`^(2\.4\.\d+)(?:-p([1-9][0-9]*))?$`)
-var phpExactVersion = regexp.MustCompile(`^(8\.\d+)(?:\.\d+)?$`)
+var magentoExactVersion = regexp.MustCompile(`^(2\.\d+\.\d+)(?:-p([1-9][0-9]*))?$`)
+var phpExactVersion = regexp.MustCompile(`^(\d+\.\d+)(?:\.\d+)?$`)
 
 func assessCompatibility(c Config) (CompatibilityAssessment, string) {
 	assessment := CompatibilityAssessment{
 		MagentoVersion:   c.Application.Version,
 		CatalogUpdatedAt: currentCompatibilityCatalog.Metadata.UpdatedAt,
+	}
+	if updated, err := time.Parse("2006-01-02", currentCompatibilityCatalog.Metadata.AdobeSnapshotAt); err == nil && time.Since(updated) > 90*24*time.Hour {
+		assessment.Warnings = append(assessment.Warnings, "Adobe compatibility snapshot is over 90 days old; check current Adobe requirements")
 	}
 	magentoMatch := magentoExactVersion.FindStringSubmatch(c.Application.Version)
 	if magentoMatch == nil {
@@ -362,6 +363,9 @@ func assessCompatibility(c Config) (CompatibilityAssessment, string) {
 		if patch > release.MaximumPatch {
 			reasons = append(reasons, fmt.Sprintf("Magento %s is newer than the latest patch in the Adobe snapshot (%s)", c.Application.Version, release.RecommendedRelease))
 		}
+		if patch < release.MaximumPatch {
+			assessment.Warnings = append(assessment.Warnings, fmt.Sprintf("Magento %s is older than the tested Adobe patch %s", c.Application.Version, release.RecommendedRelease))
+		}
 		if !release.Available {
 			reasons = append(reasons, release.UnavailableReason)
 		}
@@ -376,11 +380,8 @@ func assessCompatibility(c Config) (CompatibilityAssessment, string) {
 		assessment.Status = CompatibilitySupported
 	} else {
 		assessment.Reasons = reasons
-		if c.Compatibility.AllowUnsupported {
-			assessment.Status = CompatibilityUnsupportedAllowed
-		} else {
-			return assessment, strings.Join(reasons, "; ") + "; commit compatibility.allowUnsupported: true to accept this combination"
-		}
+		assessment.Status = CompatibilityUnsupportedAllowed
+		assessment.Warnings = append(assessment.Warnings, reasons...)
 	}
 	if msg := assessSelectedServices(c, &assessment); msg != "" {
 		return assessment, msg
@@ -393,7 +394,14 @@ func assessSelectedServices(c Config, assessment *CompatibilityAssessment) strin
 	if release == "" {
 		release = c.Application.Version
 	}
-	assessment.Warnings = append(assessment.Warnings, experimentalTargetWarnings(c)...)
+	warnings := experimentalTargetWarnings(c)
+	assessment.Warnings = append(assessment.Warnings, warnings...)
+	for _, warning := range warnings {
+		if strings.HasPrefix(warning, "GCP: ") {
+			assessment.Reasons = append(assessment.Reasons, warning)
+			assessment.Status = CompatibilityUnsupportedAllowed
+		}
+	}
 	if msg := providerUnavailableReason(c); msg != "" {
 		return msg
 	}
@@ -413,16 +421,14 @@ func assessSelectedServices(c Config, assessment *CompatibilityAssessment) strin
 	}
 	supported := nearestAdobeDatabaseFamily(release)
 	msg := fmt.Sprintf("Adobe: Magento %s does not list %s as a supported database family; nearest Adobe-supported family is %s", release, family, supported)
-	if c.Compatibility.AllowUnsupported {
-		assessment.Reasons = append(assessment.Reasons, msg)
-		assessment.Status = CompatibilityUnsupportedAllowed
-		return ""
-	}
-	return msg + "; commit compatibility.allowUnsupported: true to accept this Adobe-unsupported combination"
+	assessment.Reasons = append(assessment.Reasons, msg)
+	assessment.Warnings = append(assessment.Warnings, msg)
+	assessment.Status = CompatibilityUnsupportedAllowed
+	return ""
 }
 
 func assessWebRuntime(c Config, assessment *CompatibilityAssessment) string {
-	warning, err := webruntime.Admit(c.Application.WebRuntime, c.Application.Version, c.Compatibility.AllowUnsupported)
+	warning, err := webruntime.Admit(c.Application.WebRuntime, c.Application.Version, true)
 	if err != nil {
 		return err.Error()
 	}
@@ -461,22 +467,28 @@ func nearestAdobeDatabaseFamily(release string) string {
 func experimentalTargetWarnings(c Config) []string {
 	key := strings.TrimSpace(c.Target.Provider) + "/" + strings.TrimSpace(c.Target.Runtime)
 	var warnings []string
+	if c.Target.Provider == "gcp" && (strings.HasPrefix(c.Application.Version, "2.4.7") || strings.HasPrefix(c.Application.Version, "2.4.8")) {
+		warnings = append(warnings, "GCP: the default Memorystore Valkey 8.0 mapping is outside the Adobe Valkey 8.1 recommendation")
+	}
+	if c.Target.Provider == "gcp" && c.Target.GCP != nil && c.Target.GCP.MemorystoreEngineVersion == "VALKEY_8_0" && strings.HasPrefix(c.Application.Version, "2.4.9") {
+		warnings = append(warnings, "GCP: selected Memorystore Valkey 8.0 is outside the Adobe Valkey 9 recommendation")
+	}
 	switch key {
 	case "aws/eks", "gcp/gke-standard", "ovh/mks", "scaleway/kapsule":
-		warnings = append(warnings, fmt.Sprintf("MageLift: target %s is experimental; not certified. See docs/capability-matrix.md", key))
+		warnings = append(warnings, fmt.Sprintf("MageLift: target %s is experimental. See docs/capability-matrix.md", key))
 	}
 	if c.Target.Provider == "aws" && c.Target.AWS != nil {
 		mode := strings.TrimSpace(c.Target.AWS.Catalog.Fargate.ComputeMode)
 		switch mode {
 		case "managed-instances", "ec2-asg", "fargate-spot":
-			warnings = append(warnings, fmt.Sprintf("MageLift: AWS ECS %s is experimental; not certified. See docs/capability-matrix.md", mode))
+			warnings = append(warnings, fmt.Sprintf("MageLift: AWS ECS %s is experimental. See docs/capability-matrix.md", mode))
 		}
 		catalog := c.Target.AWS.Catalog
 		if strings.TrimSpace(catalog.DatabaseEngine) == "aurora-mysql" {
-			warnings = append(warnings, "MageLift: AWS Aurora MySQL is experimental; not certified. See docs/capability-matrix.md")
+			warnings = append(warnings, "MageLift: AWS Aurora MySQL is experimental. See docs/capability-matrix.md")
 		}
 		if strings.TrimSpace(catalog.SearchMode) == "provisioned" {
-			warnings = append(warnings, "MageLift: AWS OpenSearch Magento data-plane is experimental; not certified. See docs/capability-matrix.md")
+			warnings = append(warnings, "MageLift: AWS OpenSearch Magento data-plane is experimental. See docs/capability-matrix.md")
 		}
 		queueMode := strings.TrimSpace(catalog.QueueMode)
 		if queueMode == "" {
@@ -489,10 +501,13 @@ func experimentalTargetWarnings(c Config) []string {
 			}
 		}
 		if queueMode == "amazon-mq" {
-			warnings = append(warnings, "MageLift: AWS Amazon MQ is experimental-warn; not certified. See docs/capability-matrix.md")
+			warnings = append(warnings, "MageLift: AWS Amazon MQ is experimental. See docs/capability-matrix.md")
+		}
+		if queueMode == "ecs-rabbitmq" && catalog.Versions.RabbitMQ != "" && catalog.Versions.RabbitMQ != "4.3" {
+			warnings = append(warnings, "AWS: the selected ECS RabbitMQ version uses an unpinned image outside the tested 4.3 default")
 		}
 		if strings.TrimSpace(catalog.EKS.QueueMode) == "rabbitmq" && catalog.EKS.QueueReplicas >= 3 {
-			warnings = append(warnings, "MageLift: AWS EKS RabbitMQ quorum is experimental; not certified. See docs/capability-matrix.md")
+			warnings = append(warnings, "MageLift: AWS EKS RabbitMQ quorum is experimental. See docs/capability-matrix.md")
 		}
 	}
 	return warnings

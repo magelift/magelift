@@ -26,7 +26,7 @@ func (p plannedTargetStub) Project() string          { return "test-project" }
 func (p plannedTargetStub) Environment() string      { return "preview" }
 func (p plannedTargetStub) Region() string           { return "europe-west1" }
 func (p plannedTargetStub) CertificationTier() platform.CertificationTier {
-	return platform.TierCertified
+	return platform.TierBuiltIn
 }
 func (p plannedTargetStub) EnvironmentClass() string                              { return "preview" }
 func (p plannedTargetStub) Protected() bool                                       { return false }

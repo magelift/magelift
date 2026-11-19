@@ -227,17 +227,19 @@ type StoredPlan struct {
 // PlanRequest asks the provider to plan from core intents plus raw target
 // bytes. The target block stays provider-owned: the core never parses it.
 type PlanRequest struct {
-	ProtocolVersion     string              `json:"protocolVersion"`
-	Envelope            Envelope            `json:"envelope"`
-	Application         Application         `json:"application"`
-	Edge                EdgeIntent          `json:"edge"`
-	Observability       ObservabilityIntent `json:"observability"`
-	TargetBlock         []byte              `json:"targetBlock"`
-	Runtime             string              `json:"runtime,omitempty"`
-	LiveQueueReplicas   int                 `json:"liveQueueReplicas,omitempty"`
-	ValkeyRequirement   string              `json:"valkeyRequirement,omitempty"`
-	AllowUnsupported    bool                `json:"allowUnsupported,omitempty"`
-	AllowExpiredPreview bool                `json:"allowExpiredPreview,omitempty"`
+	StateEnvironment    string                    `json:"stateEnvironment,omitempty"`
+	ProtocolVersion     string                    `json:"protocolVersion"`
+	Envelope            Envelope                  `json:"envelope"`
+	Application         Application               `json:"application"`
+	Edge                EdgeIntent                `json:"edge"`
+	Observability       ObservabilityIntent       `json:"observability"`
+	TargetBlock         []byte                    `json:"targetBlock"`
+	Services            map[string]ServiceBinding `json:"services,omitempty"`
+	Runtime             string                    `json:"runtime,omitempty"`
+	LiveQueueReplicas   int                       `json:"liveQueueReplicas,omitempty"`
+	ValkeyRequirement   string                    `json:"valkeyRequirement,omitempty"`
+	AllowUnsupported    bool                      `json:"allowUnsupported,omitempty"`
+	AllowExpiredPreview bool                      `json:"allowExpiredPreview,omitempty"`
 	// AccountOnly asks for the account-prep plan bootstrap uses. Deploy
 	// planning leaves it false and still requires the image digest and
 	// encryption-key secret.

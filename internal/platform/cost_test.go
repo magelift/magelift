@@ -15,7 +15,7 @@ type costStubModule struct{}
 func (costStubModule) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: "test.plain", Provider: "test", Runtime: "plain"}
 }
-func (costStubModule) CertificationTier() CertificationTier { return TierCertified }
+func (costStubModule) CertificationTier() CertificationTier { return TierBuiltIn }
 func (costStubModule) Plan(config.Config, string, PlanOptions) (PlannedStack, error) {
 	return nil, nil
 }

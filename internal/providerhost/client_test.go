@@ -44,7 +44,7 @@ func cannedDescribe() *sdk.DescribeResponse {
 		ProtocolVersion: sdk.ProtocolV1, ProviderID: "gcp", ProviderVersion: "v9.9.9",
 		Operations: operations,
 		Runtimes: []sdk.RuntimeAdvertisement{
-			{Runtime: "gke-autopilot", Tier: sdk.ExtensionTierCertified},
+			{Runtime: "gke-autopilot", Tier: sdk.ExtensionTierBuiltIn},
 			{Runtime: "gke-standard", Tier: sdk.ExtensionTierExperimental},
 		},
 		OutputKeys: []string{"applicationURL", "kubeconfig"},
@@ -276,8 +276,8 @@ func TestStaticPreDialValuesMatchAdvertised(t *testing.T) {
 			}
 		}
 		got := sdk.ExtensionTierExperimental
-		if module.CertificationTier() == "certified" {
-			got = sdk.ExtensionTierCertified
+		if module.CertificationTier() == "built-in" {
+			got = sdk.ExtensionTierBuiltIn
 		}
 		if got != want {
 			t.Fatalf("runtime %q static tier = %q, advertised = %q", runtime, got, want)

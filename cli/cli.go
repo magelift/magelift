@@ -43,6 +43,16 @@ func NewWithExtensions(extensions ...sdk.Module) (*cobra.Command, error) {
 // explicitly linked community modules, with provider hooks supplied by the
 // caller instead of the default first-party set.
 func NewWithExtensionsAndHooks(hooks internalcli.Hooks, extensions ...sdk.Module) (*cobra.Command, error) {
+	return newWithComponents(hooks, nil, extensions)
+}
+
+// NewWithServiceAdapters builds a CLI with explicitly linked per-service
+// connection adapters and optional additional target modules.
+func NewWithServiceAdapters(adapters []sdk.ServiceAdapter, extensions ...sdk.Module) (*cobra.Command, error) {
+	return newWithComponents(registry.RegisterHooks(), adapters, extensions)
+}
+
+func newWithComponents(hooks internalcli.Hooks, adapters []sdk.ServiceAdapter, extensions []sdk.Module) (*cobra.Command, error) {
 	newDefault := registry.NewDefault
 	if strings.TrimSpace(os.Getenv(ExperimentalProvidersEnv)) != "" {
 		newDefault = registry.NewDefaultWithExperimental
@@ -53,6 +63,11 @@ func NewWithExtensionsAndHooks(hooks internalcli.Hooks, extensions ...sdk.Module
 	}
 	for _, extension := range extensions {
 		if err := modules.RegisterPublicModule(extension); err != nil {
+			return nil, err
+		}
+	}
+	for _, adapter := range adapters {
+		if err := modules.RegisterServiceAdapter(adapter); err != nil {
 			return nil, err
 		}
 	}

@@ -1,10 +1,12 @@
 package config
 
+import "strings"
+
 // DefaultResolveOptions returns the resolver defaults used by the CLI and
 // library callers. The values describe safe, named provider shapes for the
-// simple YAML path. Credentials, existing-resource references, and immutable
+// PHP project. Credentials, existing-resource references, and immutable
 // application artifacts remain project inputs; advanced users can override
-// every materialized provider field in YAML.
+// every materialized provider field in the PHP project.
 func DefaultResolveOptions() ResolveOptions {
 	return ResolveOptions{Presets: map[string]map[string]any{
 		"preview": {
@@ -44,6 +46,9 @@ func defaultProviderPreset(provider, runtime, preset, applicationVersion string)
 		return defaultAWSPreset(runtime, preset, applicationVersion), true
 	case "gcp":
 		return defaultGCPPreset(runtime, preset, applicationVersion), true
+	case "azure":
+		// Azure capacity is resolved by the provider; no AWS defaults apply.
+		return map[string]any{}, true
 	case "scaleway":
 		return defaultScalewayPreset(preset), true
 	case "ovh":
@@ -373,23 +378,35 @@ func defaultOVHPreset(preset string) map[string]any {
 	}}}
 }
 
-func compatibilityDefaults(version string) map[string]any {
-	line := version
-	for index, character := range version {
-		if character == '-' {
-			line = version[:index]
-			break
-		}
+// RecommendedServiceVersions supplies starter values and dated AWS defaults.
+// Unknown Magento lines use the general starter and have no matching advisory row.
+func RecommendedServiceVersions(release string) (AWSCatalogVersions, bool) {
+	line, _, _ := strings.Cut(release, "-")
+	v := AWSCatalogVersions{
+		AuroraMySQL: "8.0.mysql_aurora.3.12.0", MySQL: "8.4.10", MariaDB: "11.8.3",
+		Valkey: "9.0", OpenSearch: "OpenSearch_3.1", RabbitMQ: "4.3",
 	}
-	versions := map[string]map[string]any{
-		"2.4.9": {"auroraMysql": "8.0.mysql_aurora.3.12.0", "mysql": "8.4.10", "mariaDb": "11.8.3", "valkey": "9.0", "openSearch": "OpenSearch_3.1", "rabbitMq": "4.2"},
-		"2.4.8": {"auroraMysql": "8.0.mysql_aurora.3.12.0", "mysql": "8.4.10", "mariaDb": "11.8.3", "valkey": "8.1", "openSearch": "OpenSearch_3.1", "rabbitMq": "4.2"},
-		"2.4.7": {"auroraMysql": "8.0.mysql_aurora.3.12.0", "mysql": "8.4.10", "mariaDb": "10.11.13", "valkey": "8.1", "openSearch": "OpenSearch_2.19", "rabbitMq": "4.2"},
-		"2.4.6": {"auroraMysql": "8.0.mysql_aurora.3.12.0", "mysql": "8.0.45", "mariaDb": "10.11.13", "valkey": "8.1", "openSearch": "OpenSearch_2.19", "rabbitMq": "4.2"},
-	}[line]
-	if versions == nil {
+	switch line {
+	case "2.4.9":
+	case "2.4.8":
+		v.Valkey = "8.1"
+	case "2.4.7", "2.4.6":
+		v.Valkey, v.MariaDB, v.OpenSearch = "8.1", "10.11.13", "OpenSearch_2.19"
+		if line == "2.4.6" {
+			v.MySQL = "8.0.45"
+		}
+	default:
+		return v, false
+	}
+	return v, true
+}
+
+func compatibilityDefaults(version string) map[string]any {
+	v, known := RecommendedServiceVersions(version)
+	if !known {
 		return nil
 	}
+	versions := map[string]any{"auroraMysql": v.AuroraMySQL, "mysql": v.MySQL, "mariaDb": v.MariaDB, "valkey": v.Valkey, "openSearch": v.OpenSearch, "rabbitMq": v.RabbitMQ}
 	return map[string]any{"target": map[string]any{"aws": map[string]any{"catalog": map[string]any{"versions": versions}}}}
 }
 

@@ -28,7 +28,7 @@ func gcpAutopilotPreviewMagentoCertified(spec Spec) bool {
 // CertificationTier reports the evidenced tier for a planned spec.
 func (s Spec) CertificationTier() platform.CertificationTier {
 	if gcpAutopilotPreviewMagentoCertified(s) {
-		return platform.TierCertified
+		return platform.TierBuiltIn
 	}
 	return platform.TierExperimental
 }
@@ -37,15 +37,15 @@ func (s Spec) CertificationTier() platform.CertificationTier {
 // the certified target, every other runtime stays experimental.
 func TierForRuntime(runtime sdk.RuntimeID) sdk.ExtensionCertificationTier {
 	if runtime == "" || runtime == gcptarget.RuntimeAutopilotID {
-		return sdk.ExtensionTierCertified
+		return sdk.ExtensionTierBuiltIn
 	}
 	return sdk.ExtensionTierExperimental
 }
 
 // SDKTier maps a planned spec tier to the wire tier.
 func (s Spec) SDKTier() sdk.ExtensionCertificationTier {
-	if s.CertificationTier() == platform.TierCertified {
-		return sdk.ExtensionTierCertified
+	if s.CertificationTier() == platform.TierBuiltIn {
+		return sdk.ExtensionTierBuiltIn
 	}
 	return sdk.ExtensionTierExperimental
 }

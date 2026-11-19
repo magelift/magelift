@@ -865,7 +865,7 @@ func TestDeployRefusesInfraOnlyWithoutFlag(t *testing.T) {
 	if !strings.Contains(msg, "aws/ecs-fargate") {
 		t.Fatalf("refusal must name target: %v", err)
 	}
-	if !strings.Contains(msg, string(platform.TierCertified)) {
+	if !strings.Contains(msg, string(platform.TierBuiltIn)) {
 		t.Fatalf("refusal must name tier: %v", err)
 	}
 	if !strings.Contains(msg, "--infra-only") {

@@ -87,7 +87,7 @@ func ValidateWebRuntimeDescriptor(descriptor WebRuntimeDescriptor) error {
 	if descriptor.Digest != "" && !strings.HasPrefix(descriptor.Digest, "sha256:") {
 		problems = append(problems, errors.New("web-runtime digest must use sha256: prefix"))
 	}
-	if descriptor.Tier != ExtensionTierCertified && descriptor.Tier != ExtensionTierExperimental {
+	if descriptor.Tier != ExtensionTierBuiltIn && descriptor.Tier != ExtensionTierExperimental {
 		problems = append(problems, fmt.Errorf("invalid web-runtime certification tier %q", descriptor.Tier))
 	}
 	if descriptor.Adobe != AdobeSupported && descriptor.Adobe != AdobeUnsupported {
@@ -150,17 +150,13 @@ func AdobeSupportFor(id WebRuntimeID, magentoVersion string) AdobeSupport {
 	}
 }
 
-// AdmitWebRuntime is the public Adobe hatch. It never calls an Adobe-unsupported
-// plugin Adobe-supported or MageLift-certified.
-func AdmitWebRuntime(id WebRuntimeID, magentoVersion string, allowUnsupported bool) ([]string, error) {
+// AdmitWebRuntime reports the Adobe recommendation for a runtime choice.
+func AdmitWebRuntime(id WebRuntimeID, magentoVersion string, _ bool) ([]string, error) {
 	if AdobeSupportFor(id, magentoVersion) == AdobeSupported {
 		return nil, nil
 	}
-	if !allowUnsupported {
-		return nil, fmt.Errorf("web-runtime plugin %q is Adobe-unsupported on Magento %s; Adobe lists nginx only; set compatibility.allowUnsupported: true to record the Adobe hatch", id, magentoVersion)
-	}
 	return []string{
-		fmt.Sprintf("web-runtime plugin %q is Adobe-unsupported on Magento %s and MageLift-community experimental; compatibility.allowUnsupported records the Adobe hatch", id, magentoVersion),
+		fmt.Sprintf("web-runtime plugin %q is Adobe-unsupported on Magento %s and MageLift-community experimental", id, magentoVersion),
 	}, nil
 }
 

@@ -27,7 +27,7 @@ func TestAdmitPlanRunsProviderAdmissionAndPreservesIdentity(t *testing.T) {
 	planned := fakePlannedStack{id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate"}
 	adapter := &admissionTestAdapter{next: planned}
 	module := admissionTestModule{
-		fakeModule: fakeModule{id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierCertified, keys: RequiredOutputKeys()},
+		fakeModule: fakeModule{id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierBuiltIn, keys: RequiredOutputKeys()},
 		admission:  adapter,
 	}
 	got, err := AdmitPlan(context.Background(), module, planned)
@@ -43,7 +43,7 @@ func TestAdmitPlanRejectsProviderChangingStableIdentity(t *testing.T) {
 	planned := fakePlannedStack{id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate"}
 	changed := admissionIdentityPlanned{fakePlannedStack: planned, region: "other-region"}
 	module := admissionTestModule{
-		fakeModule: fakeModule{id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierCertified, keys: RequiredOutputKeys()},
+		fakeModule: fakeModule{id: "aws.ecs-fargate", provider: "aws", runtime: "ecs-fargate", tier: TierBuiltIn, keys: RequiredOutputKeys()},
 		admission:  &admissionTestAdapter{next: changed},
 	}
 	_, err := AdmitPlan(context.Background(), module, planned)

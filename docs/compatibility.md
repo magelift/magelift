@@ -1,18 +1,16 @@
 # Compatibility
 
-The catalog snapshot is dated 2026-10-19. It records Adobe's latest-patch
+The Adobe catalog snapshot is dated 2026-11-02. It records Adobe's latest-patch
 requirements separately from MageLift's implementation status. A catalog match
 does not certify a provider or an architecture.
 
-| Release | PHP accepted by MageLift | Adobe latest patch |
+| Release | PHP in the bundled runtime recipes | Adobe patch in the snapshot |
 | --- | --- | --- |
 | 2.4.9 | 8.5 | 2.4.9 |
 | 2.4.8 | 8.3, 8.4 | 2.4.8-p5 |
 | 2.4.7 | 8.3 | 2.4.7-p10 |
 
-Magento 2.4.6 and older lines are unavailable. Adobe lists PHP 8.2 for 2.4.6
-and PHP 8.1 for 2.4.4 and 2.4.5, all below MageLift's PHP 8.3 floor. Adobe
-still lists PHP 8.2 for 2.4.7; MageLift accepts PHP 8.3 on that line.
+MageLift tests local images for PHP 8.3 through 8.5. Adobe lists PHP 8.2 for 2.4.6 and PHP 8.1 for 2.4.4 and 2.4.5; those lines need an application image that supplies their PHP version. Adobe also lists PHP 8.2 for 2.4.7.
 
 The Adobe rows include MariaDB, MySQL where listed, OpenSearch, Elasticsearch
 where listed, RabbitMQ, ActiveMQ Artemis, Valkey, Varnish, nginx, Composer, and
@@ -34,10 +32,7 @@ magelift certification seal --file .magelift/acceptance-evidence.jsonl \
 magelift certification verify --file .magelift/acceptance-evidence.sealed.jsonl
 ```
 
-The certification commands expose the provider capability intersection and
-the sealed JSONL evidence gate. A cell marked compatible in the descriptor is
-still pending until a live run records an immutable artifact and a cleanup
-proof with no remaining owned resources.
+The legacy `certification` command also reads the archived provider catalog and verifies sealed JSONL evidence. A catalog entry describes a configuration. A linked run records the image digest, operation and cleanup observed on that date.
 
 Statuses have deliberately narrow meanings:
 
@@ -48,13 +43,9 @@ Statuses have deliberately narrow meanings:
 - `unavailable` means the release or service cannot be used on the selected
   MageLift path.
 
-Provider certification is tracked in the [capability matrix](capability-matrix.md)
-and acceptance evidence, not inferred from this catalog.
+For a recorded cloud run, check the exact provider, runtime and operation. [Provider evidence](capability-matrix.md)
 
-`compatibility.allowUnsupported: true` is the Adobe hatch only. It records that
-an Adobe-unsupported combination is accepted on purpose. It does not recertify a
-cell, silence a MageLift-experimental warning, or open a provider-unavailable
-target.
+Choices outside the snapshot produce warnings and remain selectable. An old snapshot does not block planning. The legacy `compatibility.allowUnsupported` setting remains accepted. Neither the setting nor a warning certifies a cell or makes an unavailable provider feature available. Local versions outside the tested rows use unpinned image tags and are identified in the plan.
 
 Sources:
 

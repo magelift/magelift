@@ -56,11 +56,11 @@ func TestUnknownAndWorkerIDsFailClosedNamingThePlugin(t *testing.T) {
 	}
 }
 
-func TestFrankenPHPAndApacheRequireAdobeHatch(t *testing.T) {
+func TestFrankenPHPAndApacheProduceAdobeAdvisories(t *testing.T) {
 	registry := defaults(t)
 	for _, id := range []string{"frankenphp-classic", "php-apache"} {
-		_, err := registry.Admit(id, "2.4.9", false)
-		if err == nil || !strings.Contains(err.Error(), id) || !strings.Contains(err.Error(), "Adobe-unsupported") {
+		initial, err := registry.Admit(id, "2.4.9", false)
+		if err != nil || len(initial) != 1 || !strings.Contains(initial[0], id) || !strings.Contains(initial[0], "Adobe-unsupported") {
 			t.Fatalf("%s without hatch: %v", id, err)
 		}
 		warnings, err := registry.Admit(id, "2.4.9", true)
@@ -78,9 +78,9 @@ func TestFrankenPHPAndApacheRequireAdobeHatch(t *testing.T) {
 	if err != nil || len(warnings) != 0 {
 		t.Fatalf("nginx-fpm admit: warnings=%v err=%v", warnings, err)
 	}
-	_, err = registry.Admit("frankenphp-classic", "2.4.8-p3", false)
-	if err == nil || !strings.Contains(err.Error(), "Adobe-unsupported") {
-		t.Fatalf("frankenphp on 2.4.8-p3 without hatch: %v", err)
+	warnings, err = registry.Admit("frankenphp-classic", "2.4.8-p3", false)
+	if err != nil || len(warnings) != 1 || !strings.Contains(warnings[0], "Adobe-unsupported") {
+		t.Fatalf("frankenphp on 2.4.8-p3: warnings=%v err=%v", warnings, err)
 	}
 }
 

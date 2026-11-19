@@ -89,9 +89,9 @@ func TestLoadFrankenPHPAndApacheRequireAdobeHatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("load webRuntime %q: %v", runtime, err)
 		}
-		_, err = file.Resolve("staging", ResolveOptions{})
-		if err == nil || !strings.Contains(err.Error(), "allowUnsupported") {
-			t.Fatalf("webRuntime %q without hatch error = %v", runtime, err)
+		initial, err := file.Resolve("staging", ResolveOptions{})
+		if err != nil || initial.Compatibility.Status != CompatibilityUnsupportedAllowed {
+			t.Fatalf("webRuntime %q assessment = %#v, %v", runtime, initial.Compatibility, err)
 		}
 
 		hatched := strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)
@@ -1332,8 +1332,9 @@ func TestResolveRejectsUnsupportedAWSServiceVersionBeforePlanning(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Resolve("staging", ResolveOptions{}); err == nil || !strings.Contains(err.Error(), "OpenSearch") {
-		t.Fatalf("unsupported AWS OpenSearch version was accepted: %v", err)
+	effective, err := f.Resolve("staging", ResolveOptions{})
+	if err != nil || !strings.Contains(strings.Join(effective.Compatibility.Warnings, " "), "OpenSearch") {
+		t.Fatalf("expected OpenSearch advisory, got %#v, %v", effective.Compatibility, err)
 	}
 
 	input = strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)

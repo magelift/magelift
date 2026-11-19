@@ -14,7 +14,7 @@ func TestCertificationTierFollowsEvidenceTuple(t *testing.T) {
 		Identity:    Identity{Runtime: gcptarget.RuntimeAutopilotID, Preset: sdk.PresetPreview},
 		Application: Application{Version: "2.4.9"},
 	}
-	if got := preview.CertificationTier(); got != platform.TierCertified {
+	if got := preview.CertificationTier(); got != platform.TierBuiltIn {
 		t.Fatalf("autopilot preview 2.4.9 = %s, want certified", got)
 	}
 	ha := preview
@@ -31,10 +31,10 @@ func TestCertificationTierFollowsEvidenceTuple(t *testing.T) {
 
 func TestTierForRuntime(t *testing.T) {
 	t.Parallel()
-	if got := TierForRuntime(gcptarget.RuntimeAutopilotID); got != sdk.ExtensionTierCertified {
+	if got := TierForRuntime(gcptarget.RuntimeAutopilotID); got != sdk.ExtensionTierBuiltIn {
 		t.Fatalf("autopilot = %q", got)
 	}
-	if got := TierForRuntime(""); got != sdk.ExtensionTierCertified {
+	if got := TierForRuntime(""); got != sdk.ExtensionTierBuiltIn {
 		t.Fatalf("empty runtime = %q", got)
 	}
 	if got := TierForRuntime(gcptarget.RuntimeStandardID); got != sdk.ExtensionTierExperimental {
