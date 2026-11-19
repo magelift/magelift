@@ -19,7 +19,7 @@ MageLift uses ports and adapters:
 
 ## Consequences
 
-A third cloud is a new adapter plus module wiring. AWS packages stay under `internal/cloud/aws/`. Output keys used by portable CLI commands stay Magento-shaped where possible.
+A third cloud is a new adapter plus module wiring. AWS, GCP and Azure now implement these ports in standalone provider modules under `providers/`. Output keys used by portable CLI commands stay Magento-shaped where possible.
 
 ## Alternatives considered
 

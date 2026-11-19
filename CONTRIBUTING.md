@@ -48,7 +48,7 @@ global install needed for these):
 
 Optional / situational:
 
-- **Docker**, only for Floci, image builds, and local Compose (`make floci-test-aws`,
+- **Docker**, only for Floci, image builds, and local Compose (`make floci-aws-test`,
   `make floci-gcp-test`, `make local-gates`, `magelift local`, image targets). Required for the container PHP fallback when host extensions are missing.
 - **AWS or GCP credentials**, only for real-cloud acceptance targets
   (`make aws-acceptance-local`, `make gcp-acceptance-local`).
@@ -56,6 +56,7 @@ Optional / situational:
 Layout:
 
 - `cmd/`: CLI and generators
+- `providers/<name>/`: AWS, GCP and Azure executables, Pulumi code and Floci tests
 - `internal/`: CLI, config, deploy, automation, `platform`, `cloud/<provider>`
 - `sdk/`: portable Target / Capability / Hook types
 - `build/`: Composer Magento package (not the Go build tree)
@@ -93,12 +94,12 @@ otherwise.
 | Goal | Command |
 | --- | --- |
 | Community alpha local gate | `make verify-community` |
-| Go suites for the CLI, SDK, GCP and Azure | `make test-fast` |
+| Go suites for the CLI, SDK, AWS, GCP and Azure | `make test-fast` |
 | Provider dependency files against this checkout | `make provider-tidy-check` |
 | Broader verification suite | `make verify` |
 | Account-free stack (mocks + harness + Floci) | `make local-gates` |
 | Pulumi mock graphs | `make pulumi-mock-test` |
-| Account-free AWS paths | `make floci-test-aws` |
+| Account-free AWS paths | `make floci-aws-test` |
 | Account-free GCP paths | `make floci-gcp-test` |
 | Account-free Azure paths | `make floci-azure-test` |
 | Shop workflow with a local registry | `make ci-act-project` |

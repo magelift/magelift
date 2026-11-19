@@ -135,7 +135,7 @@ repository's preview.
 
 ## Account-free contract tests
 
-Run `make floci-test-aws` when Docker is available. The pinned [Floci](https://github.com/floci-io/floci)
+Run `make floci-aws-test` when Docker is available. The pinned [Floci](https://github.com/floci-io/floci)
 2.3.0 image exercises
 KMS key reconciliation, S3 state setup and versioned-media restore, conditional lock
 acquisition, ownership diagnostics, lock release, ECS candidate registration, Secrets
@@ -144,7 +144,7 @@ Run `make floci-gcp-test` for GCS, Secret Manager, Pub/Sub, Logging, and Monitor
 
 Floci is an emulator, not a cloud certification environment. Packed live sessions
 are documented in [certification sessions](certification-sessions.md). Floci AWS
-2.3.0 implements IAM Create/Get/Tag OpenID Connect Provider (`make floci-test-aws`
+2.3.0 implements IAM Create/Get/Tag OpenID Connect Provider (`make floci-aws-test`
 `TestIAMOpenIDConnectProviderAgainstFloci`). That is an API contract, not GitHub
 Actions token exchange. Do not weaken the production identity contract. Managed-service
 behavior is not proof of AWS behavior. Identity bootstrap against a real account

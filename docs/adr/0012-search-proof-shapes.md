@@ -93,7 +93,7 @@ checks remain required.
 
 ## Provenance
 
-`internal/cloud/aws/search` (provisioned fields),
+`providers/aws/search` (provisioned fields),
 `internal/cloud/gcp/search` (workload shape),
 `internal/config` compat policy plus defaults. AWS OpenSearch and EBS
 list prices via public mirrors, checked September 2026; Phase 2

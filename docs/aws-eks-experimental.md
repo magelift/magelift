@@ -48,7 +48,7 @@ HTTPS, and synthetics evidence are still deferred. See
 
 ## Day-2 ports
 
-Bootstrap, DIY state locks, and Secrets Manager reuse the certified AWS packages.
+EKS and ECS share the AWS plugin’s bootstrap, S3 state lock and Secrets Manager code.
 `HasOps` Magento deploy steps and `HasRuntimeObserve` use the shared Kubernetes
 adapter. They remain experimental until broader EKS account runs prove the
 required release, managed-service, HA, edge, migration, health, logs, and
@@ -57,14 +57,14 @@ cleanup paths.
 ## Architecture seam
 
 Portable Magento ports stay in `internal/platform`. Runtime lives in
-`internal/cloud/aws/eks`; the `StackModule` is `internal/cloud/aws/eksops`.
+`providers/aws/eks`; the `StackModule` is `providers/aws/eksops`.
 The provider-specific EKS topology reuses the provider-neutral Kubernetes
 workload components for OpenSearch and RabbitMQ with AWS-specific Pulumi type
 tokens, so existing GCP state identities are not changed.
 
 ## Verification
 
-- Unit/mock: `go test ./internal/cloud/aws/eks/... ./internal/cloud/aws/eksops/...`
+- Unit/mock: `go test ./providers/aws/eks/... ./providers/aws/eksops/...`
 - Preview against a real account only when you intend to pay for EKS Auto Mode +
   RDS/ElastiCache; destroy on exit. Prefer Floci + mocks for day-to-day work.
 - Paid warm matrix: use `scripts/aws-acceptance-local.sh` with the EKS profile,

@@ -1,13 +1,6 @@
 # GCP acceptance (local, destroy-on-exit)
 
-Catalog ownership: `certification-gcp` cells in the [capability matrix](capability-matrix.md)
-plus [evidence](evidence/README.md). Certified subset is GKE
-Autopilot evidenced runtime cells. Standard and HA stay experimental.
-`gcap29` KEEP is closed (destroy emptied the prefix). It is not a
-certified-row replacement for `gcap28`. Magento 2.4.8-p5 stays `not-run`
-until a signed digest exists. Cell identity (runtime, Magento release, Cloud SQL
-availability, Memorystore, OpenSearch, queue, digest) belongs in the evidence
-file. GCP KEEP does not wait on AWS.
+These are records from earlier GKE acceptance runs. The `gcap29` environment was destroyed. The separate `gcap28` record documents the Autopilot result. The Magento 2.4.8-p5 path was recorded as `not-run`. Each record names the runtime, image, Magento release and services exercised. [Capability guide](capability-matrix.md) · [Evidence](evidence/README.md)
 
 Status: **current evidence exists for three 2.4.9 profiles, but the complete
 release and service matrix remains open**. On 2026-08-07, the preview profile
@@ -401,12 +394,12 @@ guidance and the offline preflight test.
 
 - Memorystore Valkey needs a regional Service Connection Policy
   (`serviceClass=gcp-memorystore`). Created by the GCP cache component.
-- Non-preview presets remain spend-gated (not free-tier certified).
+- Non-preview presets require explicit approval for cloud spend.
 - This repository does not run a GitHub WIF workflow. The hosted exchange is
   the acceptance shop workflow. See
   [gcp-experimental.md](gcp-experimental.md#github-wif). Do not commit SA keys.
 - Live dump cell requires `MAGELIFT_DUMPIMPORT_RUNNER=kube` (+ mysql client pod
-  when the Magento image lacks `mysql`); evidenced on the Autopilot certified
+  when the Magento image lacks `mysql`); observed on the recorded Autopilot
   path.
 - A 2026-08-04 disposable run passed WIF, Composer Secret Manager, secrets,
   state, and logs, then failed at GKE `No agent available` during `day2:exec`.
@@ -422,6 +415,6 @@ guidance and the offline preflight test.
 | Item | Value |
 |------|--------|
 | Pack | [evidence/README.md](evidence/README.md) |
-| Certified Autopilot Magento | [gcap28](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md) |
+| Recorded Autopilot Magento run | [gcap28](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md) |
 | Experimental Standard | [20260815](evidence/gcp-gke-standard-magento-valkey90-live-20260815.md) |
 | Experimental HA Standard | [gcha36](evidence/gcp-gke-ha-standard-magento-live-gcha36-20260820.md) |

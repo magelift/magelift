@@ -1,18 +1,8 @@
 # Local AWS acceptance
 
-Catalog ownership: `certification-aws` cells in the [capability matrix](capability-matrix.md)
-plus [evidence](evidence/README.md). Shared evidence rules stay in the matrix.
-Certified AWS Magento today is the ECS Fargate preview
-tuple in the [capability matrix](capability-matrix.md) plus
-[evidence](evidence/README.md). Packed KEEP after this tracker is applied still uses the existing
-harness files. Fargate packed catalog `awsba` is closed (destroy plus
-`assert_clean`). Cold Managed Instances `awsmi` and EKS Auto Mode `awsek`
-are closed the same way and stay experimental.
+The archived AWS campaigns exercised an ECS Fargate preview, ECS Managed Instances and EKS Auto Mode. All three recorded teardown. Each result applies to its listed Magento version, services and environment. [AWS evidence](evidence/README.md) · [Provider coverage](capability-matrix.md)
 
-Account-free CI uses Floci AWS, floci-gcp, and Pulumi mocks (`make local-gates`).
-Real AWS acceptance is a **local, opt-in maintainer activity**, not a GitHub
-Actions workflow. Use it sparingly: light smoke only, keep stacks up only for
-the duration of the script, default to the `preview` preset, and destroy on exit.
+Repository cloud CI runs against Floci. Run `make local-gates` for AWS, GCP and Azure emulator and Pulumi tests. A manual live acceptance run requires a dedicated account, explicit authorization and cleanup on exit.
 
 ## Offline harness (dry-run)
 
@@ -181,7 +171,7 @@ excludes it. A packed KEEP campaign may opt in with
 `scripts/acceptance/cells-aws-campaign-fargate-keep.txt` on a three-AZ origin
 YAML. That catalog also warm-patches ECS `searchMode` (`disabled` then
 `serverless`), `databaseEngine` (`rds-mysql` then `aurora-mysql`), and
-`ha:multi-az`. Do not mark those cells certified. Destroy at campaign close.
+`ha:multi-az`. Record the paths exercised. Destroy at campaign close.
 
 1. Prefer `preview` only. Standard and high-availability create Multi-AZ and
    managed-service spend that burns credits quickly.

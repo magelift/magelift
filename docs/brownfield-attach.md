@@ -87,7 +87,7 @@ There is no detach command. To leave cloud VPC/RDS intact while removing MageLif
 ### Offline proof (ATTACH-04)
 
 Reference-without-own is asserted in
-`internal/cloud/aws/stack/adopt_test.go`:
+`providers/aws/stack/adopt_test.go`:
 
 - `TestAdoptedDetachDestroyRecordsNoDeleteForAdoptedIDs`: mock destroy of
   MageLift-owned children never emits Delete for adopted VPC/RDS external IDs;
@@ -97,7 +97,7 @@ Reference-without-own is asserted in
   adopted external ID on mutate.
 
 ```sh
-go test ./internal/cloud/aws/stack/ -count=1 \
+go test ./providers/aws/stack/ -count=1 \
   -run 'Adopt|Refuse|Adopted|Detach'
 ```
 

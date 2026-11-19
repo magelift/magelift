@@ -67,7 +67,7 @@ export const how = {
   lede: 'Start with your Magento checkout, or add --new to have Composer create a shop.',
   steps: [
     'Install the CLI from the MageLift checkout with go install ./cmd/magelift.',
-    'In the shop repository, run magelift init --provider aws, gcp or azure. Start Magento with magelift dev.',
+    'Run magelift init --provider aws in your shop repository, or choose gcp or azure. Start Magento locally with magelift dev.',
     'Connect your cloud account, push a signed shop image to your registry and review the infrastructure changes with magelift preview.',
   ],
   links: [
@@ -128,7 +128,7 @@ export const faqs = [
   },
   {
     q: 'Is MageLift a Magento hosting provider?',
-    a: 'Your cloud provider hosts the store. Your team owns the account and operates the infrastructure with MageLift.',
+    a: 'Your team owns the cloud account. MageLift uses a signed plugin for AWS, Google Cloud or Azure to deploy and operate Magento there.',
   },
   {
     q: 'How much does MageLift cost?',

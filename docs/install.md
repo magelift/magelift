@@ -89,30 +89,16 @@ running executable; rerun the upgrade from a second copy in that case.
 
 ## Providers
 
-The CLI can download the GCP and Azure plugins the first time you use the corresponding target.
-A project `magelift.providers.lock` takes priority; otherwise the CLI uses
-its own release version. No `latest` version is selected. Help, version,
-doctor and configuration validation do not install providers.
+The released CLI downloads the AWS, GCP or Azure plugin selected by your shop when a command first needs it. A project lock in `magelift.providers.lock` selects the exact version. Without a lock, MageLift uses the CLI’s release version. Help, version, doctor and local config validation work before a plugin is installed.
 
-To prepare an offline machine or repair a damaged cache, install explicitly
-while online:
+Run these commands online in the shop checkout to prepare an offline workstation.
 
 ```sh
 magelift providers install
+magelift extensions list
 ```
 
-Providers come from the target named in your `magelift.php`, verified by
-digest and signature before they land in the cache. There is no flag to
-select providers. Automatic downloads are available for the first-party GCP and Azure plugins. A community provider must be installed explicitly.
-
-Cache entries are separated by provider, version, OS and architecture.
-Run `magelift extensions list` to inspect the installed GCP and Azure plugins.
-An `unverified` entry means the resolver or signature check failed. Inspect the
-project lock and run `magelift providers install` to repair the selected plugin.
-Every use verifies content and signature; a corrupt cache fails with a repair
-instruction. Keep the verified cache and project lock available for offline
-use. An offline cache miss cannot be repaired without the matching artifacts.
-Go is needed only for the [source installation](#from-source).
+MageLift verifies the binary digest and Cosign signature, then caches the plugin by provider, version, operating system and architecture. Keep the project lock and verified cache when moving offline. If the CLI reports a damaged or unverified entry, check the lock and run `magelift providers install` to repair it. Community plugins require explicit installation. [Provider trust](adr/0014-distribution-trust.md)
 
 Signed release operations and remote sessions can offer to install missing
 tools through the existing package-manager allowlist. Review the command

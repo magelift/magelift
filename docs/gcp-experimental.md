@@ -1,38 +1,10 @@
 # GCP target (GKE Autopilot and Standard)
 
-Status: **certified** for `gcp` / `gke-autopilot` on evidenced Magento cells;
-`gcp` / `gke-standard` is experimental
-(see [gcp-acceptance.md](gcp-acceptance.md), [capability-matrix.md](capability-matrix.md),
-and the [evidence pack](evidence/README.md)).
-AWS ECS Fargate and GCP GKE Autopilot are the two certified first-party Magento
-origins ([ADR 0002](adr/0002-certified-vs-experimental.md)).
-
-**Still experimental / not certified:** GKE Standard as a release-wide target,
-hosted GitHub Actions WIF, the complete Valkey 9
-runtime/cache boundary, and community providers. The adapter now selects
-Memorystore `VALKEY_9_0` (GA) for Adobe Commerce 2.4.9 by default and accepts
-`VALKEY_9_1` only as an explicit Preview profile. A bounded real-account
-`VALKEY_9_1` Preview provisioning cell passed on 2026-08-11 and was cleaned;
-it proves the current provider version mapping, not the complete runtime,
-backup, HA, or DR claim. Current 2.4.9 Standard application evidence uses
-Memorystore `VALKEY_9_0`; see
-[20260815](evidence/gcp-gke-standard-magento-valkey90-live-20260815.md).
-The Autopilot preview path has a current Magento pass
-([gcap28](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md));
-the remaining service and release matrix is still open.
+The GCP plugin supports GKE Autopilot and experimental GKE Standard. The August 2026 runs exercised Magento 2.4.9, a migration job, Secret Manager, logs, exec and health checks on specific environments. The Standard run used Memorystore Valkey 9.0. A separate run provisioned a 9.1 preview instance. The records list the versions, operations and teardown results for each run. [Autopilot run](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md) · [Standard run](evidence/gcp-gke-standard-magento-valkey90-live-20260815.md) · [Capability guide](capability-matrix.md)
 
 ## Day-2 status
 
-| Surface | Status |
-| --- | --- |
-| Infra preview/deploy | **certified** (preview create-once) |
-| Magento candidate migrate | **certified** (`deploy:candidate` cell) |
-| Bootstrap | state bucket + WIF (pool/provider/CI SA; live STS/impersonation evidenced) |
-| Secrets / Composer SM | `gcp-secret-manager://` via AccessSecretVersion (**certified**) |
-| logs / exec / health | **certified for Autopilot evidenced cells**; Standard shapes have bounded live exercise and stay experimental |
-
-See [capability matrix](capability-matrix.md).
-
+The plugin manages state in Cloud Storage and can provision a Workload Identity Federation pool, provider and CI service account. It reads `gcp-secret-manager://` references through Secret Manager. Tests cover planning, migration jobs and Kubernetes workload operations. Hosted GitHub identity exchange and recovery depend on the identity and services configured in the shop’s account. [Bootstrap](bootstrap.md) · [GCP test records](gcp-acceptance.md)
 
 ## Target
 
@@ -95,7 +67,7 @@ That checks IAM on the account. It does not present a token signed by
 ## Offline verification
 
 - Pulumi mocks: `go test ./providers/gcp/...` (preview / standard / HA graphs)
-- floci-gcp (`make floci-gcp-test`): digest-pinned `floci/floci-gcp:0.12.0` on port 4588. Closes GCS, Secret Manager, Pub/Sub publish, Cloud Logging write/list, and Cloud Monitoring time-series write/list against the official Go clients without a GCP project. Does **not** certify Autopilot, Memorystore Valkey 9.0, Cloud Armor, Google-managed TLS, or Magento Cloud SQL PITR.
+- `make floci-gcp-test` starts the digest-pinned GCP emulator on port 4588 and exercises Cloud Storage, Secret Manager, Pub/Sub, Logging and Monitoring with the Go clients.
 - WIF unit proof: `go test ./providers/gcp/bootstrap/ -count=1 -run 'WIF|Identity'`
 - Composer SM: `go test ./providers/gcp/secrets/ ./internal/cli/ -count=1 -run 'Secret|Composer|GCP'`
 

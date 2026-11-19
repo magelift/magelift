@@ -183,6 +183,12 @@ this ADR's letter. Reconciled position for the alpha:
 - DROPPED: nothing. The autonomous-provider goal stands; this section
   records what alpha proves versus what parity completes.
 
+## First-party provider layout (2026-11-19)
+
+AWS, GCP and Azure build separate executables from `providers/<name>/cmd/magelift-provider-<name>/`. Their runtime registrations use the same verified plugin resolver. AWS serves ECS Fargate and EKS through one process. The core checks the advertised provider identity before accepting operations. Each provider has a nested Go module, a matching release artifact and provider-local Floci tests.
+
+The first-party plugins currently pin the root module alongside the SDK to share Magento rollout, state and Automation API helpers. Community extensions can use the public SDK. Existing OVH and Scaleway adapters still run in process. The module dependency check covers all three standalone plugins. [Contributor guide](../adding-a-provider.md)
+
 ## Provenance
 
 Pre-publication audit F01-F03/F15 and review R05. The intent notes were not

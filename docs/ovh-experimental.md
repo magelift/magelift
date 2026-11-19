@@ -1,15 +1,6 @@
 # Experimental OVHcloud target (Managed Kubernetes)
 
-Catalog ownership: `certification-ovh` cells in the [capability matrix](capability-matrix.md)
-plus [evidence](evidence/README.md). Certified subset is empty.
-`ovh` / `mks` stays experimental. Bootstrap and Secrets remain
-`ErrNotSupported`. Magento runtime is `not-run` until a Magento-compatible
-digest is exercised; current proof is [infrastructure-only](evidence/ovh-mks-infrastructure-live-2026-08-12.md).
-Live bar is at most one MKS preview when credits allow, then destroy. No KEEP.
-
-Status: **experimental** ([ADR 0002](adr/0002-certified-vs-experimental.md)). Not Magento-acceptance certified.
-Certified paths remain AWS ECS Fargate and GCP GKE Autopilot. Validated with Pulumi
-`WithMocks` graph tests, so CI needs no OVH account.
+The experimental OVH MKS adapter has Pulumi graph tests and a dated infrastructure run. Bootstrap and secret management require operator setup. Magento runtime deployment still needs verification. [OVH infrastructure run](evidence/ovh-mks-infrastructure-live-2026-08-12.md) · [Provider coverage](capability-matrix.md)
 
 ## Target
 
@@ -90,7 +81,7 @@ and [MKS regional availability guide](https://docs.ovhcloud.com/en/guides/public
 
 Deferred: search, RabbitMQ, media/CDN, Bootstrap/Secrets, live OVH pricing, and
 DNS/managed dump (Phase 7). Magento deploy Steps exist offline via shared
-`kube.Steps`. Not live-acceptance certified.
+`kube.Steps`. The Magento runtime still needs a live test.
 
 **Day-2:** Observe (logs/exec/health), Magento deploy Steps, and DIY State /
 `AcquireLock` work offline (unit/Floci). Bootstrap and Secrets remain

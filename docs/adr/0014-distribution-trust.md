@@ -33,7 +33,7 @@ execution, fail closed on missing or invalid material, no silent skip.
 
 Community alpha acquisition uses this same resolver and trust policy. A valid
 project lock takes priority over the release lock; an invalid project lock is
-an error. The CLI may acquire the first-party GCP and Azure plugins when their target is activated. With no installed lock, the CLI release version selects the exact
+an error. The CLI may acquire the first-party AWS, GCP and Azure plugins when their target is activated. With no installed lock, the CLI release version selects the exact
 release lock; development builds require an explicit lock or installation.
 No mutable `latest` default or alternative provider is substituted.
 

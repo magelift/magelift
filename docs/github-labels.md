@@ -1,13 +1,14 @@
 # Suggested GitHub labels
 
-These labels exist on the public repo. Use them so issues and PRs stay sortable.
+Use a provider or area label to make related issues and pull requests easier to find.
 
 | Label | Use |
 | --- | --- |
 | `good first issue` | ≤30-minute onboarding work (docs, tests, examples) |
 | `help wanted` | Maintainer-approved external contribution |
-| `provider/aws` | Certified AWS adapter |
-| `provider/gcp` | Certified GCP adapter |
+| `provider/aws` | AWS plugin and runtimes |
+| `provider/gcp` | GCP plugin and runtimes |
+| `provider/azure` | Azure plugin and AKS |
 | `provider/ovh` | Experimental OVH adapter |
 | `provider/scaleway` | Experimental Scaleway adapter |
 | `area/cli` | Cobra commands |

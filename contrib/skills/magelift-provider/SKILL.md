@@ -6,7 +6,7 @@ version: 1.0.0
 
 # Adding a provider
 
-Start in the [provider guide](../../../docs/adding-a-provider.md). GCP and Azure are examples of separately built plugins. AWS, OVH and Scaleway are linked into the CLI. Each provider owns its Pulumi resources.
+Start in the [provider guide](../../../docs/adding-a-provider.md). AWS, GCP and Azure each build a separate plugin. OVH and Scaleway are existing in-process experimental adapters. Each provider owns its Pulumi resources.
 
 1. Define the provider and runtime IDs, supported operations and config. Use the public SDK types for the plugin protocol. Keep vendor resource types inside the adapter.
 2. Implement planning and infrastructure in `providers/<name>/`. A new plugin has its own Go module. Add it to the workspace, build, distribution and tests. See the [plugin contract](../../../docs/adr/0013-provider-plugin-contract.md).

@@ -31,6 +31,8 @@ magelift env diff staging uat
 
 ## Connect the cloud
 
+Cloud commands load the signed plugin for the selected account. You can prepare it ahead of time with `magelift providers install`. [Provider installation](install.md#providers)
+
 Replace the starter’s example account, project, subscription, region and domain with yours. Add the provider-specific identity, state, encryption and artifact registry settings. Keep passwords in your cloud secret manager. The release image belongs in a registry controlled by the shop. Use your own image build or the optional MageLift build recipes. [Bootstrap](bootstrap.md) · [Builds](builds.md) · [Provider coverage](capability-matrix.md)
 
 Generate the GitHub Actions workflow with `magelift ci generate --magelift-version vX.Y.Z`, replacing the version with an available immutable CLI release. Inspect the workflow and configure per-environment identities and GitHub environment protection. After reviewing the current head of a same-repository pull request to `main`, apply `magelift-preview`. Each new head needs a fresh label event. The build uses the reviewed head and the base revision’s PHP configuration. Use protected GitHub environments for both `preview-build` and `preview`. Removing the label or closing the PR schedules teardown. The hourly sweep cleans up expired previews. Set production approvals in GitHub before enabling production promotion.

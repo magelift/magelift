@@ -1,18 +1,6 @@
 # Experimental Scaleway target (Kapsule)
 
-Catalog ownership: `certification-scaleway` cells in the [capability matrix](capability-matrix.md)
-plus [evidence](evidence/README.md). Certified subset is
-empty. `scaleway` / `kapsule` stays experimental. Bootstrap remains
-`ErrNotSupported`. Cache family is Redis (`cacheMode: redis`); do not relabel
-it Valkey. Magento runtime is `not-run` until a Magento-compatible digest is
-exercised inside the $50 own-money cap; current proof is
-[infrastructure-only](evidence/scaleway-kapsule-infrastructure-live-2026-09-15.md).
-Live bar is at most one Kapsule preview, then destroy. No KEEP. Vendors attach
-to a GCP origin.
-
-Status: **experimental** ([ADR 0002](adr/0002-certified-vs-experimental.md)). Not Magento-acceptance certified.
-Certified paths remain AWS ECS Fargate and GCP GKE Autopilot. Validated with Pulumi
-`WithMocks` graph tests, so CI needs no Scaleway account.
+The experimental Scaleway Kapsule adapter has Pulumi graph tests and a dated infrastructure run. The shop supplies bootstrap resources and uses Redis for the managed cache. Magento runtime deployment still needs verification. [Scaleway infrastructure run](evidence/scaleway-kapsule-infrastructure-live-2026-09-15.md) · [Provider coverage](capability-matrix.md)
 
 ## Target
 
@@ -56,14 +44,14 @@ in `go.mod`), not an official Scaleway-owned provider.
 
 Deferred: search, RabbitMQ, Edge Services/CDN, Bootstrap and live Cost
 pricing, DNS/managed dump (Phase 7). Magento deploy Steps exist offline via shared
-`kube.Steps`. Not live-acceptance certified.
+`kube.Steps`.
 
 **Day-2:** Observe (logs/exec/health), Magento deploy Steps, DIY State /
 `AcquireLock`, provider-backed application Secrets, and account-free Cost work
 offline (unit/Floci). Bootstrap remains `ErrNotSupported`; application Secrets
 use the planned project/region and ownership tags, while live CRUD/IAM evidence
 is still pending. `magelift cost --live` fails explicitly until Scaleway live
-pricing is implemented. Experimental shared kube surface; not certified.
+pricing is implemented.
 See [capability matrix](capability-matrix.md).
 
 ### Availability-zone shape

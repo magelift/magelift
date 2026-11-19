@@ -21,7 +21,7 @@ Provider roots:
 
 | Root | Holds | Examples |
 | --- | --- | --- |
-| `internal/cloud/<provider>/` | IaaS topology only: one cloud's network, database, cache, search, queue, runtime, native edge/observability, and stack. Each cloud owns its Pulumi graph; no `if provider ==` switches. | `internal/cloud/aws`, `internal/cloud/gcp`, `internal/cloud/ovh`, `internal/cloud/scaleway` |
+| `providers/<name>/`, existing embedded adapters under `internal/cloud/` | IaaS topology only: one cloud's network, database, cache, search, queue, runtime, native edge/observability, and stack. Each cloud owns its Pulumi graph; no `if provider ==` switches. | `providers/aws`, `providers/gcp`, `providers/azure`, `internal/cloud/ovh`, `internal/cloud/scaleway` |
 | `internal/external/<vendor>/` | SaaS edge/observability adapters behind typed SDK intents. | `internal/external/fastly`, `internal/external/newrelic`, `internal/external/edge` (composition), `internal/external/observability` (composition) |
 | `internal/shared/<port>/` | Provider-neutral durable engines and ports. Stdlib plus `sdk` plus `internal/provider` only; no cloud SDK, no Pulumi. | `internal/shared/recovery`, `internal/shared/resilience`, `internal/shared/statearchive` |
 | `internal/edge/waf/` | Provider-neutral Magento-safe WAF contract every edge adapter translates. | `internal/edge/waf` (`waf/magento-safe`) |
