@@ -565,7 +565,7 @@ func commandGroups(o *options) []*cobra.Command {
 		"secret": {"set", "list", "remove"},
 	}
 	var commands []*cobra.Command
-	commands = append(commands, upgradeCommand(o), loginCommand(o), execCommand(o), sshCommand(o), tunnelCommand(o), devCommand(o), devQuickstartCommand(o))
+	commands = append(commands, migrateCommand(o), upgradeCommand(o), loginCommand(o), execCommand(o), sshCommand(o), tunnelCommand(o), devCommand(o), devQuickstartCommand(o))
 	for _, name := range []string{"cache-flush", "reindex", "cron-run", "queue-status"} {
 		commands = append(commands, magentoOperationCommand(o, name))
 	}

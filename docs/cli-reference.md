@@ -413,7 +413,7 @@ Options:
       --branches strings           Git branches mapped to this environment
       --class string               environment class
       --domain string              environment domain
-      --dump string                path to a MySQL dump to seed after first deploy (ADR 0010)
+      --dump string                path to a MySQL dump for explicit import before application deploy
       --expires-at string          preview expiration as RFC3339
       --monthly-budget-cents int   maximum monthly AWS budget in cents
       --preset string              infrastructure preset
@@ -455,10 +455,16 @@ Options:
 ```
 ### magelift env import-dump
 
-Import the environment seedDump into the target database
+Import a dump into the environment database
 
 ```text
-magelift env import-dump <environment>
+magelift env import-dump <environment> [flags]
+```
+
+Options:
+
+```text
+      --from string   local SQL or SQL.gz file to import
 ```
 ### magelift env list
 
@@ -608,18 +614,19 @@ magelift init [flags]
 Options:
 
 ```text
-      --app string                 Magento application to import from a multi-app Upsun project
-      --cloud-account string       AWS account ID, Google Cloud project ID, or Azure subscription ID
-      --config-out string          output PHP project file for review
-      --domain string              production host, also used as the parent of staging, UAT and preview hosts
-      --edition string             edition to create with --new (open-source or commerce) (default "open-source")
-      --from-acc[=true|false]      import Adobe Commerce Cloud configuration
-      --from-upsun[=true|false]    import Upsun or Platform.sh configuration
-      --magento-version string     exact Magento 2 release to create with --new (defaults to Composer's selection)
-      --new[=true|false]           create a Magento project in an empty directory with Composer
-      --provider string            destination cloud (aws, gcp or azure) (default "gcp")
-      --region string              default cloud region for the shop
-      --storefront-origin string   connect an externally deployed headless storefront at this origin
+      --app string                  Magento application to import from a multi-app Upsun project
+      --cloud-account string        AWS account ID, Google Cloud project ID, or Azure subscription ID
+      --config-out string           output PHP project file for review
+      --domain string               production host, also used as the parent of staging, UAT and preview hosts
+      --edition string              edition to create with --new (open-source or commerce) (default "open-source")
+      --from-acc[=true|false]       import Adobe Commerce Cloud configuration
+      --from-compose[=true|false]   read database, cache, search and queue versions from the shop’s Compose file
+      --from-upsun[=true|false]     import Upsun or Platform.sh configuration
+      --magento-version string      exact Magento 2 release to create with --new (defaults to Composer's selection)
+      --new[=true|false]            create a Magento project in an empty directory with Composer
+      --provider string             destination cloud (aws, gcp or azure) (default "gcp")
+      --region string               default cloud region for the shop
+      --storefront-origin string    connect an externally deployed headless storefront at this origin
 ```
 ## magelift local
 
@@ -737,6 +744,40 @@ Options:
       --service string   log service: web, deploy, or cron (default "web")
       --since string     duration or RFC3339 start time (default "15m")
       --until string     optional duration or RFC3339 end time
+```
+## magelift migrate
+
+Move shop data to a Kubernetes environment
+
+```text
+magelift migrate
+```
+### magelift migrate restore
+
+Plan or restore a SQL dump and media into Kubernetes
+
+```text
+magelift migrate restore [flags]
+```
+
+Options:
+
+```text
+      --allow-nonempty[=true|false]   allow importing into a non-empty database
+      --ca-secret string              namespace-local Secret containing ca.crt for database TLS
+      --context string                destination kubeconfig context
+      --database string               destination database name (default "magento")
+      --database-host string          database hostname reachable from the namespace
+      --database-secret string        namespace-local Secret with password and optionally username keys
+      --database-user string          database username when the Secret contains only a password
+      --execute[=true|false]          execute the reviewed plan
+      --media string                  local media directory to merge into a PVC
+      --media-claim string            existing destination media PVC
+      --namespace string              destination namespace
+      --namespace-uid string          expected namespace UID
+      --sql string                    local SQL or SQL.gz dump
+      --timeout duration              maximum lifetime of each restore helper, for example 4h (default 1h0m0s)
+      --tls string                    database TLS: verify or disabled (default "verify")
 ```
 ## magelift outputs
 
