@@ -38,6 +38,7 @@ return [
                     'server' => '#env(MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__SERVER, "127.0.0.1")',
                     'port' => '#env(MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__PORT, "6379")',
                     'database' => '#env(MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__DATABASE, "0")',
+                    'password' => '#env(MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__PASSWORD, "")',
                 ],
             ],
             'page_cache' => [
@@ -46,6 +47,7 @@ return [
                     'server' => '#env(MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__SERVER, "127.0.0.1")',
                     'port' => '#env(MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__PORT, "6379")',
                     'database' => '#env(MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__DATABASE, "1")',
+                    'password' => '#env(MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__PASSWORD, "")',
                     'compress_data' => '#env(MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__COMPRESS_DATA, "0")',
                 ],
             ],
@@ -57,6 +59,7 @@ return [
             'host' => '#env(MAGENTO_DC_SESSION__REDIS_HOST, "127.0.0.1")',
             'port' => '#env(MAGENTO_DC_SESSION__REDIS_PORT, "6379")',
             'database' => '#env(MAGENTO_DC_SESSION__REDIS_DB, "2")',
+            'password' => '#env(MAGENTO_DC_SESSION__REDIS_PASSWORD, "")',
         ],
     ],
     'crypt' => [
@@ -98,6 +101,11 @@ return [
             'host' => '#env(MAGENTO_DC_QUEUE__AMQP__HOST, "127.0.0.1")',
             'port' => '#env(MAGENTO_DC_QUEUE__AMQP__PORT, "5672")',
             'ssl' => '#env(MAGENTO_DC_QUEUE__AMQP__SSL, "0")',
+            'ssl_options' => [
+                'verify_peer' => '#env(MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__VERIFY_PEER, "1")',
+                'verify_peer_name' => '#env(MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__VERIFY_PEER_NAME, "1")',
+                'cafile' => '#env(MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__CAFILE, "/etc/ssl/certs/ca-certificates.crt")',
+            ],
             // Magento's AMQP config contract calls this field "user". Keep the
             // environment variable named "USERNAME" for clarity at the
             // platform boundary, but emit the key Magento actually reads.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/platform"
+	"github.com/magelift/magelift/internal/searchplugins"
 	"github.com/magelift/magelift/sdk"
 )
 
@@ -44,14 +45,18 @@ var localSupportedExtensions = map[string]struct{}{
 }
 
 type LocalServicePlan struct {
-	Component   string                   `json:"component" yaml:"component"`
-	Family      string                   `json:"family" yaml:"family"`
-	Version     string                   `json:"version" yaml:"version"`
-	Image       string                   `json:"image" yaml:"image"`
-	Ports       []int                    `json:"ports" yaml:"ports"`
-	Healthcheck string                   `json:"healthcheck" yaml:"healthcheck"`
-	Credentials []LocalCredentialBinding `json:"credentials" yaml:"credentials"`
-	Connection  LocalConnectionShape     `json:"connection" yaml:"connection"`
+	Parameters     map[string]string        `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	MemoryMiB      int                      `yaml:"memoryMiB,omitempty" json:"memoryMiB,omitempty"`
+	EvictionPolicy string                   `json:"evictionPolicy,omitempty" yaml:"evictionPolicy,omitempty"`
+	Plugins        []string                 `json:"plugins,omitempty" yaml:"plugins,omitempty"`
+	Component      string                   `json:"component" yaml:"component"`
+	Family         string                   `json:"family" yaml:"family"`
+	Version        string                   `json:"version" yaml:"version"`
+	Image          string                   `json:"image" yaml:"image"`
+	Ports          []int                    `json:"ports" yaml:"ports"`
+	Healthcheck    string                   `json:"healthcheck" yaml:"healthcheck"`
+	Credentials    []LocalCredentialBinding `json:"credentials" yaml:"credentials"`
+	Connection     LocalConnectionShape     `json:"connection" yaml:"connection"`
 }
 
 // LocalCredentialBinding describes the environment variable used to wire a
@@ -319,7 +324,22 @@ func PlanFor(build config.BuildSpec, hints CloudHints) (RuntimePlan, error) {
 		CatalogSource:    localCatalogSource,
 		Magento:          platform.NewMagentoOverlays(build.Application.Magento.FrontName, build.Application.Magento.CookieDomain, build.Application.Magento.UnsecureBaseURL, build.Application.Magento.SecureBaseURL, build.Application.Magento.StorefrontOrigin, build.Application.Magento.Consumers.Mode, build.Application.Magento.CORSOrigins, build.Application.Magento.Consumers.Names, build.Application.Magento.Variables),
 	}
-	if hints.IsolateCacheAndSession {
+	plan.Database.Parameters = local.Database.Parameters
+	plan.Cache.EvictionPolicy = local.Cache.EvictionPolicy
+	plan.Cache.MemoryMiB = local.Cache.MemoryMiB
+	plan.Search.Plugins = local.Search.Plugins
+	if err := searchplugins.Validate(plan.Search.Plugins); err != nil {
+		return RuntimePlan{}, err
+	}
+	if local.Session.Family != "" || local.Session.Version != "" || local.Session.Image != "" {
+		session, _, err := chooseCache(local.Session, row.Cache)
+		if err != nil {
+			return RuntimePlan{}, err
+		}
+		plan.Session = sessionPlanFromCache(session)
+		plan.Session.EvictionPolicy = local.Session.EvictionPolicy
+		plan.Session.MemoryMiB = local.Session.MemoryMiB
+	} else if hints.IsolateCacheAndSession {
 		plan.Session = sessionPlanFromCache(cache)
 	}
 	plan.Substitutes = namedSubstitutes(hints, plan)
@@ -571,6 +591,10 @@ func serviceVersionMatches(requested, catalogued string) bool {
 
 func ComposeTemplateFor(plan RuntimePlan) string {
 	template := ComposeTemplate
+	if len(plan.Database.Parameters) > 0 {
+		command, _ := json.Marshal(sdk.DatabaseArguments(plan.Database.Parameters))
+		template = strings.Replace(template, `["--log-bin-trust-function-creators=1"]`, string(command), 1)
+	}
 	if plan.Queue.Family == "database" {
 		template = strings.Replace(template, "      queue:\n        condition: service_healthy\n", "", 1)
 		template = strings.TrimSuffix(template, "  queue:\n")
@@ -587,6 +611,34 @@ func ComposeTemplateFor(plan RuntimePlan) string {
 	template = strings.Replace(template, "__MAGELIFT_SESSION_VOLUME__", composeSessionVolume(plan), 1)
 	template = strings.Replace(template, "__MAGELIFT_VARNISH_SERVICE__", composeVarnishService(plan), 1)
 	template = strings.Replace(template, `    command: ["php-fpm", "--nodaemonize"]`, composeAppCommand(plan), 1)
+	if command := searchplugins.Entrypoint(plan.Search.Plugins); len(command) > 0 {
+		// Compose interpolates dollar signs before passing arguments to the container.
+		encoded, _ := json.Marshal(command)
+		template = strings.Replace(template, "  search:\n    profiles:", "  search:\n    entrypoint: "+strings.ReplaceAll(string(encoded), "$", "$$")+"\n    profiles:", 1)
+	}
+	for _, store := range []LocalServicePlan{plan.Cache, plan.Session} {
+		if store.EvictionPolicy == "" && store.MemoryMiB == 0 {
+			continue
+		}
+		engine := "valkey-server"
+		if store.Family == "redis" {
+			engine = "redis-server"
+		}
+		size := store.MemoryMiB
+		if size == 0 {
+			size = 256
+		}
+		args := []string{engine, "--maxmemory", fmt.Sprintf("%dmb", size)}
+		if store.EvictionPolicy != "" {
+			args = append(args, "--maxmemory-policy", store.EvictionPolicy)
+		}
+		if store.Component == "session" {
+			args = append(args, "--appendonly", "yes")
+		}
+		command, _ := json.Marshal(args)
+		marker := "  " + store.Component + ":\n    image:"
+		template = strings.Replace(template, marker, "  "+store.Component+":\n    command: "+string(command)+"\n    image:", 1)
+	}
 	if plan.Cache.Family == "redis" {
 		template = strings.Replace(template, `test: ["CMD", "valkey-cli", "ping"]`, `test: ["CMD", "redis-cli", "ping"]`, 1)
 	}

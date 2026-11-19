@@ -573,7 +573,7 @@ func TestCoreEnvBindingsUsesValkeyForAdobeLatestPatches(t *testing.T) {
 		for _, binding := range bindings {
 			found[binding.Name] = binding.Value
 		}
-		if found[EnvMagentoCacheBackend] != ValkeyCacheBackend || found[EnvMagentoPageCacheBackend] != ValkeyCacheBackend || found[EnvMagentoSessionSave] != "valkey" {
+		if found[EnvMagentoCacheBackend] != ValkeyCacheBackend || found[EnvMagentoPageCacheBackend] != ValkeyCacheBackend || found[EnvMagentoSessionSave] != "redis" {
 			t.Fatalf("%s cache bindings = %#v", version, found)
 		}
 	}
@@ -611,5 +611,54 @@ func TestCoreEnvBindingsPermitExplicitMagentoSearchAdapter(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("adapter bindings = %d", count)
+	}
+}
+
+func TestCacheTransportAndSessionHandler(t *testing.T) {
+	for _, tc := range []struct {
+		name, cache, session            string
+		cacheTLS, sessionTLS            bool
+		wantCache, wantSession, backend string
+	}{
+		{"managed both", "cache.internal", "session.internal", true, true, "tls://cache.internal", "tls://session.internal", RedisCacheBackend},
+		{"cache only TLS", "cache.internal", "external.internal", true, false, "tls://cache.internal", "external.internal", RedisCacheBackend},
+		{"session only TLS", "external.internal", "session.internal", false, true, "external.internal", "tls://session.internal", ValkeyCacheBackend},
+		{"external plaintext", "external.internal", "", false, false, "external.internal", "external.internal", ValkeyCacheBackend},
+		{"explicit TLS endpoint", "tls://external.internal", "", false, false, "tls://external.internal", "tls://external.internal", RedisCacheBackend},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			found := map[string]string{}
+			for _, b := range CoreEnvBindings(CapabilityEndpoints{ApplicationVersion: "2.4.9", CacheEndpoint: tc.cache, SessionEndpoint: tc.session, CacheTLS: tc.cacheTLS, SessionTLS: tc.sessionTLS}) {
+				found[b.Name] = b.Value
+			}
+			if found[EnvMagentoCacheServer] != tc.wantCache || found[EnvMagentoPageCacheServer] != tc.wantCache || found[EnvMagentoSessionHost] != tc.wantSession || found[EnvMagentoCacheBackend] != tc.backend || found[EnvMagentoSessionSave] != "redis" {
+				t.Fatalf("bindings: %#v", found)
+			}
+		})
+	}
+}
+
+func TestCoreEnvBindingsSecureAMQPTLS(t *testing.T) {
+	for _, ssl := range []string{"0", "1"} {
+		found := map[string]string{}
+		for _, b := range CoreEnvBindings(CapabilityEndpoints{QueueMode: "rabbitmq", QueueHost: "broker.internal", QueueSSL: ssl}) {
+			found[b.Name] = b.Value
+		}
+		for _, entry := range []struct{ name, want string }{{"MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__VERIFY_PEER", "1"}, {"MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__VERIFY_PEER_NAME", "1"}, {"MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__CAFILE", "/etc/ssl/certs/ca-certificates.crt"}} {
+			value, ok := found[entry.name]
+			if ssl == "1" && (!ok || value != entry.want) {
+				t.Errorf("%s=%q", entry.name, value)
+			}
+			if ssl == "0" && ok {
+				t.Errorf("unexpected TLS option %s", entry.name)
+			}
+		}
+	}
+}
+
+func TestDisabledConsumersLeaveBothRunnersOff(t *testing.T) {
+	run, explicit := magentoCronConsumersRun("disabled")
+	if !explicit || run != "0" || MagentoConsumerProcessCount("disabled", 2) != 0 {
+		t.Fatal("disabled consumers must leave cron and dedicated workers off")
 	}
 }

@@ -127,6 +127,8 @@ type CapabilityEndpoints struct {
 	DatabaseName       string
 	CacheEndpoint      string
 	SessionEndpoint    string
+	CacheTLS           bool
+	SessionTLS         bool
 	SearchEndpoint     string
 	QueueMode          string // database | rabbitmq
 	QueueHost          string
@@ -147,14 +149,16 @@ type CapabilityEndpoints struct {
 // and session. Optional search/queue/media bindings are appended when set.
 func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 	session := endpoints.SessionEndpoint
+	sessionTLS := endpoints.SessionTLS
 	if session == "" {
 		session = endpoints.CacheEndpoint
+		sessionTLS = endpoints.CacheTLS
 	}
+	cacheHost := cacheTransportHost(endpoints.CacheEndpoint, endpoints.CacheTLS)
+	sessionHost := cacheTransportHost(session, sessionTLS)
 	cacheBackend := RedisCacheBackend
-	sessionBackend := "redis"
-	if MagentoUsesValkey(endpoints.ApplicationVersion) {
+	if MagentoUsesValkey(endpoints.ApplicationVersion) && !strings.HasPrefix(cacheHost, "tls://") && !strings.HasPrefix(cacheHost, "ssl://") {
 		cacheBackend = ValkeyCacheBackend
-		sessionBackend = "valkey"
 	}
 	bindings := []EnvBinding{
 		{Name: EnvApplicationMode, Value: endpoints.ApplicationMode},
@@ -175,16 +179,16 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 		// deployment-config environment contract.
 		{Name: EnvMagentoInstallDate, Value: DefaultMagentoInstallDate},
 		{Name: EnvMagentoCacheBackend, Value: cacheBackend},
-		{Name: EnvMagentoCacheServer, Value: endpoints.CacheEndpoint},
+		{Name: EnvMagentoCacheServer, Value: cacheHost},
 		{Name: EnvMagentoCachePort, Value: DefaultValkeyPort},
 		{Name: EnvMagentoCacheDB, Value: "0"},
 		{Name: EnvMagentoPageCacheBackend, Value: cacheBackend},
-		{Name: EnvMagentoPageCacheServer, Value: endpoints.CacheEndpoint},
+		{Name: EnvMagentoPageCacheServer, Value: cacheHost},
 		{Name: EnvMagentoPageCachePort, Value: DefaultValkeyPort},
 		{Name: EnvMagentoPageCacheDB, Value: "1"},
 		{Name: EnvMagentoPageCacheCompress, Value: "0"},
-		{Name: EnvMagentoSessionSave, Value: sessionBackend},
-		{Name: EnvMagentoSessionHost, Value: session},
+		{Name: EnvMagentoSessionSave, Value: "redis"},
+		{Name: EnvMagentoSessionHost, Value: sessionHost},
 		{Name: EnvMagentoSessionPort, Value: DefaultValkeyPort},
 		{Name: EnvMagentoSessionDB, Value: "2"},
 	}
@@ -249,6 +253,13 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 			EnvBinding{Name: EnvMagentoQueueSSL, Value: ssl},
 			EnvBinding{Name: EnvMagentoQueueUsername, Value: user},
 		)
+		if ssl == "1" {
+			bindings = append(bindings,
+				EnvBinding{Name: "MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__VERIFY_PEER", Value: "1"},
+				EnvBinding{Name: "MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__VERIFY_PEER_NAME", Value: "1"},
+				EnvBinding{Name: "MAGENTO_DC_QUEUE__AMQP__SSL_OPTIONS__CAFILE", Value: "/etc/ssl/certs/ca-certificates.crt"},
+			)
+		}
 	}
 	if endpoints.MediaBucket != "" {
 		bindings = append(bindings, EnvBinding{Name: EnvMediaBucket, Value: endpoints.MediaBucket})
@@ -284,6 +295,14 @@ func CoreEnvBindings(endpoints CapabilityEndpoints) []EnvBinding {
 	}
 	bindings = append(bindings, MagentoOverlayEnv(endpoints.Magento)...)
 	return bindings
+}
+
+// cacheTransportHost keeps provider endpoints intact unless TLS is required.
+func cacheTransportHost(host string, tls bool) string {
+	if tls && host != "" && !strings.Contains(host, "://") {
+		return "tls://" + host
+	}
+	return host
 }
 
 // magentoSearchTarget maps a search endpoint onto Magento/ElasticSuite env

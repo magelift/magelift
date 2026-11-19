@@ -438,26 +438,38 @@ var cachePasswordNames = []string{
 	"MAGENTO_DC_SESSION__REDIS_PASSWORD",
 }
 
-// AppendCachePasswordEnv adds cache and session password SecretKeyRefs.
+// AppendCachePasswordEnv binds a shared cache and session credential.
 func AppendCachePasswordEnv(env pulumicorev1.EnvVarArrayOutput, secretName string) pulumicorev1.EnvVarArrayOutput {
+	return AppendStorePasswordEnv(env, secretName, secretName)
+}
+
+// AppendStorePasswordEnv binds only the credentials each Magento store uses.
+func AppendStorePasswordEnv(env pulumicorev1.EnvVarArrayOutput, cache, session string) pulumicorev1.EnvVarArrayOutput {
 	return env.ApplyT(func(values []pulumicorev1.EnvVar) []pulumicorev1.EnvVar {
 		result := append([]pulumicorev1.EnvVar(nil), values...)
-		for _, name := range cachePasswordNames {
-			secret := secretName
-			result = append(result, pulumicorev1.EnvVar{Name: name, ValueFrom: &pulumicorev1.EnvVarSource{SecretKeyRef: &pulumicorev1.SecretKeySelector{Name: &secret, Key: "password"}}})
+		for _, entry := range storePasswordEnvVars(cache, session) {
+			secret := entry.ValueFrom.SecretKeyRef.Name
+			result = append(result, pulumicorev1.EnvVar{Name: entry.Name, ValueFrom: &pulumicorev1.EnvVarSource{SecretKeyRef: &pulumicorev1.SecretKeySelector{Name: &secret, Key: "password"}}})
 		}
 		return result
 	}).(pulumicorev1.EnvVarArrayOutput)
 }
 
-// CachePasswordEnvVars supplies the same secret references to migration Jobs.
+// CachePasswordEnvVars binds a shared cache and session credential to a Job.
 func CachePasswordEnvVars(secretName string) []clientcorev1.EnvVar {
-	if strings.TrimSpace(secretName) == "" {
-		return nil
-	}
-	result := make([]clientcorev1.EnvVar, 0, len(cachePasswordNames))
+	return storePasswordEnvVars(secretName, secretName)
+}
+
+func storePasswordEnvVars(cache, session string) []clientcorev1.EnvVar {
+	var result []clientcorev1.EnvVar
 	for _, name := range cachePasswordNames {
-		result = append(result, clientcorev1.EnvVar{Name: name, ValueFrom: &clientcorev1.EnvVarSource{SecretKeyRef: &clientcorev1.SecretKeySelector{LocalObjectReference: clientcorev1.LocalObjectReference{Name: secretName}, Key: "password"}}})
+		secret := cache
+		if name == "MAGENTO_DC_SESSION__REDIS_PASSWORD" {
+			secret = session
+		}
+		if secret != "" {
+			result = append(result, clientcorev1.EnvVar{Name: name, ValueFrom: &clientcorev1.EnvVarSource{SecretKeyRef: &clientcorev1.SecretKeySelector{LocalObjectReference: clientcorev1.LocalObjectReference{Name: secret}, Key: "password"}}})
+		}
 	}
 	return result
 }

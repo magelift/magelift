@@ -21,7 +21,7 @@ const (
 // MagentoConsumerProcessCount is the dedicated Magento consumer replica count.
 func MagentoConsumerProcessCount(mode string, catalogCount int) int {
 	switch strings.TrimSpace(mode) {
-	case "cron":
+	case "cron", "disabled":
 		return 0
 	case "processes", "both":
 		if catalogCount > 0 {
@@ -172,7 +172,7 @@ func magentoCronConsumersRun(mode string) (string, bool) {
 	switch strings.TrimSpace(mode) {
 	case "cron", "both":
 		return "1", true
-	case "processes":
+	case "processes", "disabled":
 		return "0", true
 	default:
 		return "", false

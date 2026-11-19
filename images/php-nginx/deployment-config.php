@@ -37,6 +37,8 @@ if ($override !== false && trim($override) !== '') {
     }
 }
 
+$configuration = mageliftNormalizeAmqpSSL($configuration);
+
 // Azure MySQL requires TLS. Passing a CA also enables mysqlnd's certificate
 // and hostname verification; never permit an override to disable it.
 $databaseTLSCA = getenv('MAGELIFT_DATABASE_TLS_CA');
@@ -54,6 +56,27 @@ if ($databaseTLSCA !== false && $databaseTLSCA !== '') {
 $encoded = json_encode($configuration, JSON_UNESCAPED_SLASHES);
 if ($encoded !== false) {
     putenv('MAGENTO_DC__OVERRIDE=' . $encoded);
+}
+
+// Magento's AMQP factory uses strict boolean client setters.
+function mageliftNormalizeAmqpSSL(array $configuration): array
+{
+    if (isset($configuration['queue']['amqp']['ssl_options']) && is_array($configuration['queue']['amqp']['ssl_options'])) {
+        foreach (['verify_peer', 'verify_peer_name'] as $option) {
+            if (isset($configuration['queue']['amqp']['ssl_options'][$option])) {
+                $verified = filter_var(
+                    $configuration['queue']['amqp']['ssl_options'][$option],
+                    FILTER_VALIDATE_BOOLEAN,
+                    FILTER_NULL_ON_FAILURE,
+                );
+                if ($verified === null) {
+                    throw new RuntimeException('Invalid AMQP TLS verification setting.');
+                }
+                $configuration['queue']['amqp']['ssl_options'][$option] = $verified;
+            }
+        }
+    }
+    return $configuration;
 }
 
 function mageliftResolveDeploymentConfig(mixed $value): mixed

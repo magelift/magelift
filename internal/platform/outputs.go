@@ -12,13 +12,15 @@ import (
 // deploy orchestration). Adapters must export every RequiredOutputKey from
 // Program. Cloud-specific handles may be exported in addition.
 const (
-	OutputApplicationURL   = "applicationURL"
-	OutputDatabaseWriter   = "databaseWriter"
-	OutputCacheEndpoint    = "cacheEndpoint"
-	OutputNetworkVpcID     = "networkVpcId"
-	OutputClusterName      = "clusterName"
-	OutputServiceName      = "serviceName"
-	OutputPrivateSubnetIDs = "privateSubnetIds"
+	OutputApplicationURL            = "applicationURL"
+	OutputDatabaseWriter            = "databaseWriter"
+	OutputCacheEndpoint             = "cacheEndpoint"
+	OutputSessionEndpoint           = "sessionEndpoint"
+	OutputSessionPasswordSecretName = "sessionPasswordSecretName"
+	OutputNetworkVpcID              = "networkVpcId"
+	OutputClusterName               = "clusterName"
+	OutputServiceName               = "serviceName"
+	OutputPrivateSubnetIDs          = "privateSubnetIds"
 	// OutputDatabaseSecretName is the namespace-local Kubernetes Secret used by
 	// K8s workloads and candidate migration Jobs for DB credentials.
 	OutputDatabaseSecretName = "databaseSecretName"

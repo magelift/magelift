@@ -37,35 +37,38 @@ type CandidateStore struct {
 
 // CandidateRequest describes a Magento migrate Job to register.
 type CandidateRequest struct {
-	Project                 string
-	Region                  string
-	Cluster                 string
-	Namespace               string
-	WorkloadServiceAccount  string
-	ImagePullSecret         string
-	MediaClaim              string
-	DatabaseTLSCA           string
-	ServiceName             string
-	ImageDigest             string
-	DatabaseWriter          string
-	DatabaseName            string
-	DatabaseSecretName      string
-	EncryptionKeySecretName string
-	QueuePasswordSecretName string
-	CachePasswordSecretName string
-	CacheEndpoint           string
-	SearchEndpoint          string
-	QueueMode               string
-	QueueHost               string
-	QueueUsername           string
-	QueuePort               string
-	QueueSSL                string
-	ApplicationMode         string
-	ApplicationVersion      string
-	WebRuntime              string
-	Magento                 platform.MagentoOverlays
-	CPURequest              string
-	MemoryRequest           string
+	Project                   string
+	Region                    string
+	Cluster                   string
+	Namespace                 string
+	WorkloadServiceAccount    string
+	ImagePullSecret           string
+	MediaClaim                string
+	DatabaseTLSCA             string
+	ServiceName               string
+	ImageDigest               string
+	DatabaseWriter            string
+	DatabaseName              string
+	DatabaseUsername          string
+	DatabaseSecretName        string
+	EncryptionKeySecretName   string
+	QueuePasswordSecretName   string
+	CachePasswordSecretName   string
+	SessionPasswordSecretName string
+	SessionEndpoint           string
+	CacheEndpoint             string
+	SearchEndpoint            string
+	QueueMode                 string
+	QueueHost                 string
+	QueueUsername             string
+	QueuePort                 string
+	QueueSSL                  string
+	ApplicationMode           string
+	ApplicationVersion        string
+	WebRuntime                string
+	Magento                   platform.MagentoOverlays
+	CPURequest                string
+	MemoryRequest             string
 	// Outputs supplies stack outputs for ClientFactory-backed stores (kubeconfig).
 	Outputs map[string]any
 }
@@ -372,6 +375,7 @@ func migrationJob(name string, request CandidateRequest) *batchv1.Job {
 		DatabaseWriter:     request.DatabaseWriter,
 		DatabaseName:       request.DatabaseName,
 		CacheEndpoint:      request.CacheEndpoint,
+		SessionEndpoint:    request.SessionEndpoint,
 		SearchEndpoint:     request.SearchEndpoint,
 		QueueMode:          request.QueueMode,
 		QueueHost:          request.QueueHost,
@@ -384,9 +388,17 @@ func migrationJob(name string, request CandidateRequest) *batchv1.Job {
 		env = append(env, corev1.EnvVar{Name: binding.Name, Value: binding.Value})
 	}
 	env = append(env, DatabaseCredentialEnvVars(request.DatabaseSecretName)...)
+	if request.DatabaseUsername != "" {
+		for i := range env {
+			if env[i].Name == platform.EnvMagentoDBUser {
+				env[i].Value = request.DatabaseUsername
+				env[i].ValueFrom = nil
+			}
+		}
+	}
 	env = append(env, EncryptionKeyEnvVars(request.EncryptionKeySecretName)...)
 	env = append(env, QueuePasswordEnvVars(request.QueuePasswordSecretName)...)
-	env = append(env, CachePasswordEnvVars(request.CachePasswordSecretName)...)
+	env = append(env, storePasswordEnvVars(request.CachePasswordSecretName, request.SessionPasswordSecretName)...)
 	if request.DatabaseTLSCA != "" {
 		env = append(env, corev1.EnvVar{Name: "MAGELIFT_DATABASE_TLS_CA", Value: request.DatabaseTLSCA})
 	}

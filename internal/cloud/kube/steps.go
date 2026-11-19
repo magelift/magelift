@@ -223,7 +223,13 @@ func CandidateRequestFromOutputs(outputs map[string]any, spec DeploySpec, imageD
 	imagePullSecret, _ := outputs["imagePullSecret"].(string)
 	mediaClaim, _ := outputs["mediaClaim"].(string)
 	databaseTLSCA, _ := outputs["databaseTLSCA"].(string)
+	databaseUsername, _ := outputs["databaseUsername"].(string)
 	cachePasswordSecretName, _ := outputs[platform.OutputCachePasswordSecretName].(string)
+	sessionEndpoint, _ := outputs[platform.OutputSessionEndpoint].(string)
+	sessionPassword, _ := outputs[platform.OutputSessionPasswordSecretName].(string)
+	if sessionEndpoint == "" {
+		sessionPassword = cachePasswordSecretName
+	}
 	queueUsername, _ := outputs["queueUsername"].(string)
 	if queueUsername == "" {
 		queueUsername = "magento"
@@ -231,36 +237,39 @@ func CandidateRequestFromOutputs(outputs map[string]any, spec DeploySpec, imageD
 	queuePort, _ := outputs["queuePort"].(string)
 	queueSSL, _ := outputs["queueSSL"].(string)
 	return CandidateRequest{
-		Project:                 spec.CloudProject,
-		Region:                  spec.Region,
-		Cluster:                 cluster,
-		Namespace:               namespace,
-		WorkloadServiceAccount:  workloadAccount,
-		ImagePullSecret:         imagePullSecret,
-		MediaClaim:              mediaClaim,
-		DatabaseTLSCA:           databaseTLSCA,
-		ServiceName:             service,
-		ImageDigest:             imageDigest,
-		DatabaseWriter:          databaseWriter,
-		DatabaseName:            spec.DatabaseName,
-		DatabaseSecretName:      databaseSecretName,
-		EncryptionKeySecretName: encryptionKeySecretName,
-		QueuePasswordSecretName: queuePasswordSecretName,
-		CachePasswordSecretName: cachePasswordSecretName,
-		CacheEndpoint:           cacheEndpoint,
-		SearchEndpoint:          searchEndpoint,
-		QueueMode:               queueMode,
-		QueueHost:               queueHost,
-		QueueUsername:           queueUsername,
-		QueuePort:               queuePort,
-		QueueSSL:                queueSSL,
-		ApplicationMode:         spec.ApplicationMode,
-		ApplicationVersion:      spec.ApplicationVersion,
-		WebRuntime:              spec.WebRuntime,
-		Magento:                 spec.Magento,
-		CPURequest:              spec.CPURequest,
-		MemoryRequest:           spec.MemoryRequest,
-		Outputs:                 outputs,
+		Project:                   spec.CloudProject,
+		Region:                    spec.Region,
+		Cluster:                   cluster,
+		Namespace:                 namespace,
+		WorkloadServiceAccount:    workloadAccount,
+		ImagePullSecret:           imagePullSecret,
+		MediaClaim:                mediaClaim,
+		DatabaseTLSCA:             databaseTLSCA,
+		ServiceName:               service,
+		ImageDigest:               imageDigest,
+		DatabaseWriter:            databaseWriter,
+		DatabaseName:              spec.DatabaseName,
+		DatabaseUsername:          databaseUsername,
+		DatabaseSecretName:        databaseSecretName,
+		EncryptionKeySecretName:   encryptionKeySecretName,
+		QueuePasswordSecretName:   queuePasswordSecretName,
+		CachePasswordSecretName:   cachePasswordSecretName,
+		CacheEndpoint:             cacheEndpoint,
+		SessionEndpoint:           sessionEndpoint,
+		SessionPasswordSecretName: sessionPassword,
+		SearchEndpoint:            searchEndpoint,
+		QueueMode:                 queueMode,
+		QueueHost:                 queueHost,
+		QueueUsername:             queueUsername,
+		QueuePort:                 queuePort,
+		QueueSSL:                  queueSSL,
+		ApplicationMode:           spec.ApplicationMode,
+		ApplicationVersion:        spec.ApplicationVersion,
+		WebRuntime:                spec.WebRuntime,
+		Magento:                   spec.Magento,
+		CPURequest:                spec.CPURequest,
+		MemoryRequest:             spec.MemoryRequest,
+		Outputs:                   outputs,
 	}, nil
 }
 

@@ -206,3 +206,19 @@ func TestValidateCandidateRequestRequiresRabbitMQSecret(t *testing.T) {
 		t.Fatalf("expected queue password Secret validation error, got %v", err)
 	}
 }
+
+func TestMigrationJobUsesAttachedDatabaseUsernameAndPasswordSecret(t *testing.T) {
+	job := migrationJob("migration", CandidateRequest{DatabaseUsername: "shopuser", DatabaseSecretName: "external-db"})
+	var username, password bool
+	for _, e := range job.Spec.Template.Spec.Containers[0].Env {
+		if e.Name == platform.EnvMagentoDBUser {
+			username = e.Value == "shopuser" && e.ValueFrom == nil
+		}
+		if e.Name == platform.EnvMagentoDBPass {
+			password = e.Value == "" && e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil && e.ValueFrom.SecretKeyRef.Name == "external-db" && e.ValueFrom.SecretKeyRef.Key == "password"
+		}
+	}
+	if !username || !password {
+		t.Fatalf("username=%t password=%t", username, password)
+	}
+}

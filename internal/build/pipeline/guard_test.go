@@ -184,3 +184,36 @@ func TestRuntimeTemplateLeavesMagentoSearchAdapterUnset(t *testing.T) {
 		t.Fatalf("%v: %s", err, out)
 	}
 }
+
+func TestRuntimeTemplateResolvesCacheAndSessionPasswords(t *testing.T) {
+	php, err := exec.LookPath("php")
+	if err != nil {
+		t.Skip("PHP unavailable")
+	}
+	root, err := filepath.Abs(filepath.Join("..", "..", "..", "images", "php-nginx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := `require $argv[1]; $config=mageliftResolveDeploymentConfig(require $argv[2]); $a=$config['cache']['frontend']['default']['backend_options']['password']; $b=$config['cache']['frontend']['page_cache']['backend_options']['password']; $c=$config['session']['redis']['password']; if ($a !== 'cache-test' || $b !== 'cache-test' || $c !== 'session-test') { exit(1); }`
+	cmd := exec.Command(php, "-r", script, filepath.Join(root, "deployment-config.php"), filepath.Join(root, "env.php"))
+	cmd.Env = append(os.Environ(), "MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__PASSWORD=cache-test", "MAGENTO_DC_CACHE__FRONTEND__PAGE_CACHE__BACKEND_OPTIONS__PASSWORD=cache-test", "MAGENTO_DC_SESSION__REDIS_PASSWORD=session-test")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("password resolution failed: %v: %s", err, out)
+	}
+}
+
+func TestRuntimeTemplateUsesTypedAMQPTLSOptions(t *testing.T) {
+	php, err := exec.LookPath("php")
+	if err != nil {
+		t.Skip("PHP unavailable")
+	}
+	root, err := filepath.Abs(filepath.Join("..", "..", "..", "images", "php-nginx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := `require $argv[1]; $config=mageliftNormalizeAmqpSSL(mageliftResolveDeploymentConfig(require $argv[2])); $options=$config['queue']['amqp']['ssl_options']; if ($options['verify_peer'] !== true || $options['verify_peer_name'] !== true || $options['cafile'] !== '/etc/ssl/certs/ca-certificates.crt') { exit(1); }`
+	cmd := exec.Command(php, "-r", script, filepath.Join(root, "deployment-config.php"), filepath.Join(root, "env.php"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("AMQP TLS options: %v: %s", err, out)
+	}
+}
