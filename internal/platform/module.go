@@ -10,12 +10,12 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
-// CertificationTier matches ADR 0007.
-type CertificationTier string
+// RuntimeTier describes the support level of a cloud runtime.
+type RuntimeTier string
 
 const (
-	TierBuiltIn      CertificationTier = "built-in"
-	TierExperimental CertificationTier = "experimental"
+	TierBuiltIn      RuntimeTier = "built-in"
+	TierExperimental RuntimeTier = "experimental"
 )
 
 // PlanOptions controls validation exceptions that are safe only for a specific
@@ -43,7 +43,7 @@ type PlannedStack interface {
 	Project() string
 	Environment() string
 	Region() string
-	CertificationTier() CertificationTier
+	RuntimeTier() RuntimeTier
 	EnvironmentClass() string
 	Protected() bool
 	ImageDigest() string
@@ -55,7 +55,7 @@ type PlannedStack interface {
 // the cloud or register Pulumi resources.
 type StackModule interface {
 	Descriptor() sdk.TargetDescriptor
-	CertificationTier() CertificationTier
+	RuntimeTier() RuntimeTier
 	Plan(cfg config.Config, environment string, opts PlanOptions) (PlannedStack, error)
 	Program(planned PlannedStack) (pulumi.RunFunc, error)
 	OutputKeys() []string
@@ -167,25 +167,7 @@ func (r *ModuleRegistry) registerModule(module StackModule, manifest *sdk.Extens
 			return fmt.Errorf("stack module %q observability adapter provider %q does not match target provider %q", descriptor.ID, observabilityDescriptor.Provider, descriptor.Provider)
 		}
 	}
-	if certification := ModuleCertification(module); certification != nil {
-		certificationDescriptor := certification.CertificationDescriptor()
-		if err := sdk.ValidateCertificationAdapterDescriptor(certificationDescriptor); err != nil {
-			return fmt.Errorf("register stack module certification adapter: %w", err)
-		}
-		if certificationDescriptor.Provider != descriptor.Provider || certificationDescriptor.Runtime != descriptor.Runtime {
-			return fmt.Errorf("stack module %q certification adapter target %q/%q does not match %q/%q", descriptor.ID, certificationDescriptor.Provider, certificationDescriptor.Runtime, descriptor.Provider, descriptor.Runtime)
-		}
-	}
-	if admission := ModuleCertificationAdmission(module); admission != nil {
-		admissionDescriptor := admission.CertificationAdmissionDescriptor()
-		if err := sdk.ValidateCertificationAdmissionAdapterDescriptor(admissionDescriptor); err != nil {
-			return fmt.Errorf("register stack module certification admission adapter: %w", err)
-		}
-		if admissionDescriptor.Provider != descriptor.Provider || admissionDescriptor.Runtime != descriptor.Runtime {
-			return fmt.Errorf("stack module %q certification admission adapter target %q/%q does not match %q/%q", descriptor.ID, admissionDescriptor.Provider, admissionDescriptor.Runtime, descriptor.Provider, descriptor.Runtime)
-		}
-	}
-	if tier := module.CertificationTier(); tier != TierBuiltIn && tier != TierExperimental {
+	if tier := module.RuntimeTier(); tier != TierBuiltIn && tier != TierExperimental {
 		return fmt.Errorf("stack module %q has invalid runtime tier %q", descriptor.ID, tier)
 	}
 	keys := RequiredOutputKeys()
@@ -211,7 +193,7 @@ func (r *ModuleRegistry) registerModule(module StackModule, manifest *sdk.Extens
 		Version:    "builtin",
 		Source:     "magelift",
 		Build:      "first-party",
-		Tier:       extensionTier(module.CertificationTier()),
+		Tier:       extensionTier(module.RuntimeTier()),
 		Targets:    []sdk.TargetDescriptor{descriptor},
 		OutputKeys: append([]string(nil), module.OutputKeys()...),
 	}
@@ -272,7 +254,7 @@ func (r *ModuleRegistry) Extensions() []sdk.ExtensionDescriptor {
 	return sdk.ExtensionDescriptorsByID(result)
 }
 
-func extensionTier(tier CertificationTier) sdk.ExtensionCertificationTier {
+func extensionTier(tier RuntimeTier) sdk.ExtensionTier {
 	if tier == TierBuiltIn {
 		return sdk.ExtensionTierBuiltIn
 	}

@@ -19,7 +19,7 @@ import (
 
 const TypeToken = "magelift:aws:Network"
 
-// NAT egress modes. nat-gateway is the certified managed path; fck-nat is an
+// nat-gateway uses the AWS managed NAT Gateway. fck-nat is an
 // explicit low-cost alternative that runs a small EC2 instance as a NAT.
 const (
 	NatModeGateway = "nat-gateway"

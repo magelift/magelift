@@ -8,7 +8,7 @@ import (
 )
 
 // CloudHints describes the selected cloud environment so local Compose can
-// follow it with named substitutes instead of a second catalog.
+// identify differences from the configured cloud services.
 type CloudHints struct {
 	Environment string
 	Preset      string
@@ -75,13 +75,6 @@ func HintsFromConfig(cfg config.Config) CloudHints {
 			hints.QueueMode = strings.TrimSpace(cfg.Target.GCP.QueueMode)
 			hints.SearchMode = strings.TrimSpace(cfg.Target.GCP.OpenSearchMode)
 		}
-	case "scaleway":
-		hints.DatabaseEngine = "scaleway-mysql"
-		if cfg.Target.Scaleway != nil && strings.TrimSpace(cfg.Target.Scaleway.CacheMode) == "redis" {
-			hints.CacheProduct = "scaleway-redis"
-		}
-	case "ovh":
-		hints.DatabaseEngine = "ovh-mysql"
 	}
 	return hints
 }
@@ -174,10 +167,6 @@ func databaseSubstitute(engine string) (family, cloudName string, ok bool) {
 		return "mysql", "RDS MySQL", true
 	case "cloudsql-mysql":
 		return "mysql", "Cloud SQL MySQL", true
-	case "scaleway-mysql":
-		return "mysql", "Scaleway MySQL", true
-	case "ovh-mysql":
-		return "mysql", "OVH MySQL", true
 	case "rds-mariadb":
 		return "mariadb", "RDS MariaDB", true
 	default:

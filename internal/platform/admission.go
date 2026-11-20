@@ -108,8 +108,8 @@ func validateAdmittedPlanIdentity(before, after PlannedStack) error {
 			problems = append(problems, fmt.Errorf("%s changed from %q to %q", check.name, check.from, check.to))
 		}
 	}
-	if before.CertificationTier() != after.CertificationTier() {
-		problems = append(problems, fmt.Errorf("runtime tier changed from %q to %q", before.CertificationTier(), after.CertificationTier()))
+	if before.RuntimeTier() != after.RuntimeTier() {
+		problems = append(problems, fmt.Errorf("runtime tier changed from %q to %q", before.RuntimeTier(), after.RuntimeTier()))
 	}
 	if before.Protected() != after.Protected() {
 		problems = append(problems, fmt.Errorf("protection changed from %t to %t", before.Protected(), after.Protected()))

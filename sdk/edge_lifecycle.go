@@ -9,8 +9,7 @@ import (
 )
 
 // EdgeOperationStatus is the provider-neutral state of one asynchronous edge
-// operation. Provider adapters translate CloudFront, Google Cloud, Scaleway,
-// OVHcloud, or community API states before they cross this port.
+// operation. Each adapter translates its API’s states into this result.
 type EdgeOperationStatus string
 
 const (

@@ -19,8 +19,6 @@ target:
   runtime: ecs-fargate
   aws:
     catalog:
-      # Certified cell: no managed search on first run. Managed search
-      # proves in Phase 2; until then this avoids surprise AOSS bills.
       searchMode: disabled
 defaults:
   region: eu-west-3

@@ -313,15 +313,15 @@ func TestCIGenerateGCPUsesFederationAndPRScopedIdentity(t *testing.T) {
 	executeCI(t, configPath, "validate")
 }
 
-func TestCIGenerateRejectsUnsupportedProviderGenerator(t *testing.T) {
+func TestCIGenerateRejectsRemovedCloudProvider(t *testing.T) {
 	directory := t.TempDir()
 	configPath := filepath.Join(directory, "magelift.php")
-	config := strings.Replace(starterConfig, "  provider: aws\n  runtime: ecs-fargate\n  aws:\n    catalog:\n      # Certified cell: no managed search on first run. Managed search\n      # proves in Phase 2; until then this avoids surprise AOSS bills.\n      searchMode: disabled", "  provider: ovh\n  runtime: mks\n  ovh:\n    serviceName: example-service", 1)
+	config := strings.Replace(starterConfig, "  provider: aws\n  runtime: ecs-fargate\n  aws:", "  provider: ovh\n  runtime: mks\n  ovh:", 1)
 	if err := writeTestProjectFile(configPath, []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	err := executeCIError(configPath, "generate")
-	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "ci generator is not registered for target") || !strings.Contains(err.Error(), "ovh") || !strings.Contains(err.Error(), "mks") {
+	if err == nil || ExitCode(err) != 2 || !strings.Contains(err.Error(), "field ovh not found") {
 		t.Fatalf("unsupported provider error = %v", err)
 	}
 	if _, statErr := os.Stat(filepath.Join(directory, ".github", "workflows", "magelift.yml")); !os.IsNotExist(statErr) {

@@ -18,8 +18,6 @@ updates:
       pulumi:
         patterns:
           - "github.com/pulumi/*"
-          - "github.com/pulumiverse/*"
-          - "github.com/ovh/pulumi-*"
       aws-sdk:
         patterns:
           - "github.com/aws/*"
@@ -131,28 +129,6 @@ updates:
   # Dependabot accepts one directory per Docker entry.
   - package-ecosystem: docker
     directory: /images/php-nginx
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 2
-    labels: [dependencies, docker]
-    commit-message:
-      prefix: chore
-      include: scope
-  - package-ecosystem: docker
-    directory: /images/php-apache
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    open-pull-requests-limit: 2
-    labels: [dependencies, docker]
-    commit-message:
-      prefix: chore
-      include: scope
-  - package-ecosystem: docker
-    directory: /images/frankenphp-classic
     schedule:
       interval: weekly
     cooldown:

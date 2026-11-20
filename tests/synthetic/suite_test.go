@@ -1,26 +1,7 @@
 //go:build synthetic
 
-// Package synthetic_test proves offline contracts with original synthetic
-// fixtures. Mock inventory per step (real code vs fake; nothing here touches
-// a network or a cloud API):
-//
-//   - Fixture load/validate: real internal/config Load plus Resolve.
-//   - Routing: real platform.ModuleRegistry dispatch plus real first-party
-//     module Plan for in-process targets (spec build and validation only;
-//     no Pulumi execution). GCP dispatches to the plugin shim; planning
-//     dials the plugin, so the offline suite proves dispatch plus typed
-//     error surfacing with scripted sessions.
-//   - Contracts: fake sdk.Module implementations through the real
-//     RegisterPublicModule bridge plus descriptor validation.
-//   - Importer: real paasimport.MapACC/MapUpsun over synthetic inputs; the
-//     emitted YAML is validated with real config Load/Resolve.
-//   - Local planning: real localdev.Plan plus ComposeTemplateFor over the
-//     synthetic GCP preview fixture; no containers start.
-//   - Failures: real validation and plan errors asserted by class.
-//   - Credentials: refused by denylist before any case runs.
-//
-// Verdicts here cover routing, contracts, failures, validation, and offline
-// planning only. Store-level proof belongs to bounded live acceptance.
+// Package synthetic_test checks shop configuration, provider dispatch, PaaS
+// imports and local Compose planning with fixtures and scripted plugin sessions.
 package synthetic_test
 
 import (
@@ -46,10 +27,8 @@ import (
 var deniedEnvVars = []string{
 	"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE",
 	"GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_OAUTH_ACCESS_TOKEN",
-	"OVH_API_APPLICATION_KEY", "OVH_API_APPLICATION_SECRET", "OVH_API_CONSUMER_KEY", "OVH_CONFIG_FILE",
-	"SCW_ACCESS_KEY", "SCW_SECRET_KEY", "SCW_TOKEN", "SCW_CONFIG_PATH",
+	"AZURE_CLIENT_SECRET", "AZURE_FEDERATED_TOKEN_FILE", "ARM_CLIENT_SECRET",
 	"PULUMI_ACCESS_TOKEN", "PULUMI_CONFIG_PASSPHRASE",
-	"MAGELIFT_ACCEPTANCE_TTL_SECONDS", "MAGELIFT_AWS_ACCEPTANCE_KEEP", "MAGELIFT_GCP_ACCEPTANCE_KEEP_ON_FAILURE",
 }
 
 func TestMain(m *testing.M) {
@@ -98,45 +77,6 @@ func resolveFixture(t *testing.T, rel, environment string) config.Config {
 		t.Fatalf("resolve %s:%s: %v", rel, environment, err)
 	}
 	return effective.Config
-}
-
-// gaps maps live-only capabilities to their owning intent. Scenarios with no
-// offline path fail through requireOffline instead of passing silently.
-var gaps = map[string]string{
-	"magento-index-query-reconnect": "reference-store-acceptance",
-	"live-credential-expiry-ops":    "reference-store-acceptance",
-	"live-backup-restore":           "reference-store-acceptance",
-}
-
-func ownerFor(capability string) (string, bool) {
-	owner, ok := gaps[capability]
-	return owner, ok
-}
-
-func requireOffline(t *testing.T, capability string) {
-	t.Helper()
-	if owner, ok := ownerFor(capability); ok {
-		t.Fatalf("gap: %s owned by %s", capability, owner)
-	}
-	t.Fatalf("gap: %s has no owning intent; file it before merging", capability)
-}
-
-func TestGaps(t *testing.T) {
-	t.Parallel()
-	if len(gaps) == 0 {
-		t.Fatal("gaps table must not be empty")
-	}
-	for capability, owner := range gaps {
-		if strings.TrimSpace(owner) == "" {
-			t.Errorf("gap %q has no owner", capability)
-		}
-		if got, ok := ownerFor(capability); !ok || got != owner {
-			t.Errorf("ownerFor(%q) = %q, %v", capability, got, ok)
-		}
-	}
-	if _, ok := ownerFor("definitely-not-a-capability"); ok {
-		t.Error("ownerFor returned an owner for an unknown capability")
-	}
 }
 
 func TestRouting_ValidFixturesPlan(t *testing.T) {

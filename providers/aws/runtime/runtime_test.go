@@ -527,106 +527,50 @@ func TestRuntimeWritesMagentoOverlayContract(t *testing.T) {
 	}
 }
 
-func TestRuntimeSupportsRegisteredWebRuntimesAndRejectsWorker(t *testing.T) {
-	t.Parallel()
-	for _, test := range []struct {
-		webRuntime string
-		command    string
-	}{
-		{webRuntime: "nginx-fpm", command: "nginx"},
-		{webRuntime: "frankenphp-classic", command: "frankenphp"},
-		{webRuntime: "php-apache", command: "sh"},
-	} {
-		test := test
-		t.Run(test.webRuntime, func(t *testing.T) {
-			t.Parallel()
-			args := validArgs()
-			args.WebRuntime = test.webRuntime
-			args.ApplicationMode = "headless"
-			args.ContainerPort = ApplicationPort
-			args.VarnishImage = ""
-			m := deploy(t, args)
-			definitions := definitionsByName(decodeDefinitions(t, m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task").inputs["containerDefinitions"].StringValue()))
-			web := definitions["web"]
-			if web == nil || web["command"].([]any)[0] != test.command {
-				t.Fatalf("%s web container = %#v", test.webRuntime, web)
-			}
-			if test.webRuntime == "nginx-fpm" {
-				if definitions["php-fpm"] == nil {
-					t.Fatal("nginx-fpm must retain its PHP-FPM container")
-				}
-			} else {
-				if definitions["php-fpm"] != nil {
-					t.Fatalf("%s must run as one HTTP process container", test.webRuntime)
-				}
-				if _, hasEnvironment := web["environment"]; !hasEnvironment {
-					t.Fatalf("%s web process must receive Magento configuration", test.webRuntime)
-				}
-			}
-		})
-	}
-	args := validArgs()
-	args.WebRuntime = "frankenphp-worker"
-	m := &mocks{}
-	err := pulumi.RunErr(func(ctx *pulumi.Context) error { _, err := New(ctx, "shop", args); return err }, pulumi.WithMocks("project", "stack", m))
-	if err == nil || !strings.Contains(err.Error(), `plugin "frankenphp-worker" is not registered`) {
-		t.Fatalf("frankenphp-worker error = %v", err)
-	}
-}
-
 func TestRuntimeInjectsNonSecretCapabilityReferences(t *testing.T) {
 	t.Parallel()
-	for _, webRuntime := range []string{"nginx-fpm", "frankenphp-classic", "php-apache"} {
-		webRuntime := webRuntime
-		t.Run(webRuntime, func(t *testing.T) {
-			t.Parallel()
-			args := validArgs()
-			args.WebRuntime = webRuntime
-			args.Capabilities = testCapabilities()
-			m := deploy(t, args)
-			task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
-			definitions := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
-			application := definitions[0]
-			if webRuntime == "nginx-fpm" {
-				application = definitionsByName(definitions)["php-fpm"]
-				if _, exists := definitionsByName(definitions)["web"]["environment"]; exists {
-					t.Fatal("nginx sidecar received capability configuration")
-				}
-			}
-			environment := environmentByName(application)
-			want := map[string]string{
-				"MAGELIFT_APPLICATION_MODE": "integrated",
-				"MAGELIFT_DATABASE_WRITER":  "shop.writer", "MAGELIFT_DATABASE_SECRET_ARN": "arn:aws:secretsmanager:eu-west-3:123456789012:secret:database",
-				"MAGELIFT_CACHE_ENDPOINT": "shop.cache", "MAGELIFT_SESSION_ENDPOINT": "shop.sessions", "MAGELIFT_SEARCH_ENDPOINT": "https://shop.search",
-				"MAGELIFT_QUEUE_MODE": "rabbitmq", "MAGELIFT_QUEUE_ENDPOINT": "amqps://shop.queue:5671", "MAGELIFT_MEDIA_BUCKET": "shop-media",
-				"MAGENTO_DC_MEDIA__DRIVER": "aws-s3", "MAGENTO_DC_MEDIA__BUCKET": "shop-media", "MAGENTO_DC_MEDIA__REGION": "eu-west-3",
-				"MAGENTO_DC_MEDIA__ENDPOINT":                     "https://s3.eu-west-3.amazonaws.com",
-				"CONFIG__DEFAULT__WEB__UNSECURE__BASE_MEDIA_URL": "{{unsecure_base_url}}media/",
-				"CONFIG__DEFAULT__WEB__SECURE__BASE_MEDIA_URL":   "{{secure_base_url}}media/",
-			}
-			for name, value := range want {
-				if environment[name] != value {
-					t.Fatalf("%s = %q, want %q", name, environment[name], value)
-				}
-			}
-			for name, value := range map[string]string{
-				"MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST":                     "shop.writer",
-				"MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT":                     "3306",
-				"MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME":                   "magento",
-				"MAGENTO_DC_DB__CONNECTION__DEFAULT__MODEL":                    "mysql4",
-				"MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__SERVER": "shop.cache",
-				"MAGENTO_DC_SESSION__REDIS_HOST":                               "shop.sessions",
-				"MAGENTO_DC_QUEUE__DEFAULT_CONNECTION":                         "amqp",
-			} {
-				if environment[name] != value {
-					t.Fatalf("%s = %q, want %q", name, environment[name], value)
-				}
-			}
-			encoded := task.inputs["containerDefinitions"].StringValue()
-			if strings.Contains(encoded, "database-password") || strings.Contains(encoded, "cache-token-value") {
-				t.Fatal("container definitions contain plaintext secret material")
-			}
-		})
+	args := validArgs()
+	args.Capabilities = testCapabilities()
+	m := deploy(t, args)
+	task := m.named(t, "aws:ecs/taskDefinition:TaskDefinition", "shop-web-task")
+	definitions := decodeDefinitions(t, task.inputs["containerDefinitions"].StringValue())
+	byName := definitionsByName(definitions)
+	if _, exists := byName["web"]["environment"]; exists {
+		t.Fatal("nginx sidecar received capability configuration")
+	}
+	application := byName["php-fpm"]
+	environment := environmentByName(application)
+	want := map[string]string{
+		"MAGELIFT_APPLICATION_MODE": "integrated",
+		"MAGELIFT_DATABASE_WRITER":  "shop.writer", "MAGELIFT_DATABASE_SECRET_ARN": "arn:aws:secretsmanager:eu-west-3:123456789012:secret:database",
+		"MAGELIFT_CACHE_ENDPOINT": "shop.cache", "MAGELIFT_SESSION_ENDPOINT": "shop.sessions", "MAGELIFT_SEARCH_ENDPOINT": "https://shop.search",
+		"MAGELIFT_QUEUE_MODE": "rabbitmq", "MAGELIFT_QUEUE_ENDPOINT": "amqps://shop.queue:5671", "MAGELIFT_MEDIA_BUCKET": "shop-media",
+		"MAGENTO_DC_MEDIA__DRIVER": "aws-s3", "MAGENTO_DC_MEDIA__BUCKET": "shop-media", "MAGENTO_DC_MEDIA__REGION": "eu-west-3",
+		"MAGENTO_DC_MEDIA__ENDPOINT":                     "https://s3.eu-west-3.amazonaws.com",
+		"CONFIG__DEFAULT__WEB__UNSECURE__BASE_MEDIA_URL": "{{unsecure_base_url}}media/",
+		"CONFIG__DEFAULT__WEB__SECURE__BASE_MEDIA_URL":   "{{secure_base_url}}media/",
+	}
+	for name, value := range want {
+		if environment[name] != value {
+			t.Fatalf("%s = %q, want %q", name, environment[name], value)
+		}
+	}
+	for name, value := range map[string]string{
+		"MAGENTO_DC_DB__CONNECTION__DEFAULT__HOST":                     "shop.writer",
+		"MAGENTO_DC_DB__CONNECTION__DEFAULT__PORT":                     "3306",
+		"MAGENTO_DC_DB__CONNECTION__DEFAULT__DBNAME":                   "magento",
+		"MAGENTO_DC_DB__CONNECTION__DEFAULT__MODEL":                    "mysql4",
+		"MAGENTO_DC_CACHE__FRONTEND__DEFAULT__BACKEND_OPTIONS__SERVER": "shop.cache",
+		"MAGENTO_DC_SESSION__REDIS_HOST":                               "shop.sessions",
+		"MAGENTO_DC_QUEUE__DEFAULT_CONNECTION":                         "amqp",
+	} {
+		if environment[name] != value {
+			t.Fatalf("%s = %q, want %q", name, environment[name], value)
+		}
+	}
+	encoded := task.inputs["containerDefinitions"].StringValue()
+	if strings.Contains(encoded, "database-password") || strings.Contains(encoded, "cache-token-value") {
+		t.Fatal("container definitions contain plaintext secret material")
 	}
 }
 
@@ -677,7 +621,7 @@ func TestRuntimeRejectsUnsafeInputsBeforeRegistration(t *testing.T) {
 	t.Parallel()
 	tests := []func(*Args){
 		func(args *Args) { args.Image = "ghcr.io/magelift/shop:latest" },
-		func(args *Args) { args.WebRuntime = "frankenphp-worker" },
+		func(args *Args) { args.WebRuntime = "unknown" },
 		func(args *Args) { args.PrivateSubnetIDs = nil },
 		func(args *Args) { args.ContainerPort = 22 },
 		func(args *Args) { args.TaskCPU = "" },
@@ -793,24 +737,6 @@ func TestRuntimeContainerGraphInteractions(t *testing.T) {
 				if byName["varnish"]["image"] != testVarnishImage {
 					t.Fatalf("varnish image = %#v", byName["varnish"]["image"])
 				}
-			},
-		},
-		{
-			name: "U3_process_runtime_search_proxy_depends_on_web",
-			mutate: func(args *Args) {
-				args.WebRuntime = "frankenphp-classic"
-				args.ApplicationMode = "headless"
-				args.ContainerPort = ApplicationPort
-				args.VarnishImage = ""
-				args.SearchProxyImage = testSearchProxyImage
-				args.Capabilities = testCapabilities()
-			},
-			check: func(t *testing.T, m *mocks) {
-				byName := taskContainers(t, m, "shop-web-task")
-				if byName["web"] == nil || byName["search-proxy"] == nil || byName["php-fpm"] != nil {
-					t.Fatalf("frankenphp-classic containers = %#v", byName)
-				}
-				assertDependsOnSearchProxy(t, byName["web"])
 			},
 		},
 		{

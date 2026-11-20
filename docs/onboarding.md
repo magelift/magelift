@@ -29,18 +29,22 @@ To deploy from GitHub, pass `--github-owner OWNER --github-repo REPO` to bootstr
 
 ## Build and deploy the image
 
-Use Docker Engine and Buildx on the build host. Point Docker at the registry named by bootstrap, then build from a clean shop checkout. Replace the placeholders below with the registry destination and digest from your own run.
+Use Docker Engine and Buildx on the build host. Point Docker at the registry
+named by bootstrap, then build from a clean shop checkout. Pass the manifest
+path printed by the build to the deploy command.
 
 ```sh
 gcloud auth configure-docker REGION-docker.pkg.dev
 magelift build --push --image REGION-docker.pkg.dev/PROJECT/REPOSITORY/shop:candidate
-magelift --env staging deploy --digest REGION-docker.pkg.dev/PROJECT/REPOSITORY/shop@sha256:YOUR_DIGEST --yes
+magelift --env staging deploy --from-build /path/to/manifest.json --yes
 magelift --env staging outputs --output json
 ```
 
 Set `target.gcp.imageDigest` to the immutable image reference to reuse it in later runs. For private dependencies set `build.composer.credentials` to `env://COMPOSER_AUTH` or a supported secret reference. [Application builds](builds.md)
 
-Point the staging hostname at the load balancer address from the outputs. DNS propagation and issuance of the managed TLS certificate can take time. Once HTTPS responds, check the shop from the CLI and in a browser.
+Point the staging hostname at the load balancer address from the outputs.
+DNS propagation and issuance of the managed TLS certificate can take time.
+Once HTTPS responds, open the storefront URL and run the health check.
 
 ```sh
 magelift --env staging health --mode runtime

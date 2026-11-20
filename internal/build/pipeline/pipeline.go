@@ -23,7 +23,6 @@ import (
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/containerrunner"
 	"github.com/magelift/magelift/internal/source"
-	"github.com/magelift/magelift/sdk"
 )
 
 const maxManifestBytes int64 = 4 << 20
@@ -32,8 +31,6 @@ var pinnedImage = regexp.MustCompile(`^(?:sha256:[a-f0-9]{64}|[^\s@]+@sha256:[a-
 var repositoryDigest = regexp.MustCompile(`^[^\s@]+@sha256:[a-f0-9]{64}$`)
 var sourceRevision = regexp.MustCompile(`^(?:[a-f0-9]{40}|[a-f0-9]{64})$`)
 var localImageTag = regexp.MustCompile(`^[a-z0-9][a-z0-9._/-]*:[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
-var digestPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
-var hexDigestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 //go:embed assets/application.Dockerfile
 var applicationDockerfile []byte
@@ -72,47 +69,7 @@ type Result struct {
 	Runtime        RuntimeContract `json:"runtime" yaml:"runtime"`
 }
 
-// ImmutableArtifactContract converts a pushed pipeline result into the
-// provider-neutral artifact identity used by certification reuse. The build
-// pipeline proves the image and manifest digests; signing remains an explicit
-// release step, so its opaque reference is supplied by the caller.
-func (result Result) ImmutableArtifactContract(inputFingerprint, provenanceReference, signatureReference string) (sdk.ImmutableArtifactContract, error) {
-	if !result.Image.Pushed {
-		return sdk.ImmutableArtifactContract{}, errors.New("immutable artifact contract requires a confirmed image push")
-	}
-	baseReference := result.Image.ImageReference
-	if base, _, found := strings.Cut(baseReference, "@"); found {
-		baseReference = base
-	}
-	if !registryQualifiedReference(baseReference) {
-		return sdk.ImmutableArtifactContract{}, errors.New("immutable artifact contract requires a registry-qualified image reference")
-	}
-	if !digestPattern.MatchString(result.Image.Digest) {
-		return sdk.ImmutableArtifactContract{}, errors.New("immutable artifact contract requires an image SHA-256 digest")
-	}
-	manifestDigest := result.ManifestSHA256
-	if !strings.HasPrefix(manifestDigest, "sha256:") {
-		if !hexDigestPattern.MatchString(manifestDigest) {
-			return sdk.ImmutableArtifactContract{}, errors.New("immutable artifact contract requires a manifest SHA-256 digest")
-		}
-		manifestDigest = "sha256:" + manifestDigest
-	}
-	contract := sdk.ImmutableArtifactContract{
-		ImageDigest:         baseReference + "@" + result.Image.Digest,
-		ManifestDigest:      manifestDigest,
-		InputFingerprint:    inputFingerprint,
-		ProvenanceReference: provenanceReference,
-		SignatureReference:  signatureReference,
-	}
-	if err := contract.Validate(); err != nil {
-		return sdk.ImmutableArtifactContract{}, err
-	}
-	return contract, nil
-}
-
-// RuntimeContract is the resolved runtime that the isolated builder proved
-// before the application image was created. It is kept alongside the manifest
-// path so callers can publish the same contract in certification evidence.
+// RuntimeContract records the PHP and Composer versions reported by the builder.
 type RuntimeContract struct {
 	PHPVersion      string   `json:"phpVersion" yaml:"phpVersion"`
 	PHPExtensions   []string `json:"phpExtensions" yaml:"phpExtensions"`
@@ -282,13 +239,19 @@ func (pipeline *Pipeline) Run(ctx context.Context, request Request) (result Resu
 		return Result{}, err
 	}
 	destination := filepath.Join(artifactDirectory, filepath.Base(final.ManifestPath))
-	if err := atomicCopy(destination, manifest); err != nil {
+	manifestSHA256 := final.ManifestSHA256
+	if image.Pushed {
+		destination, manifestSHA256, err = publishPushedManifest(destination, manifest, image)
+	} else {
+		err = atomicCopy(destination, manifest)
+	}
+	if err != nil {
 		return Result{}, fmt.Errorf("publish artifact manifest: %w", err)
 	}
 	return Result{
 		Image:          image,
 		Manifest:       destination,
-		ManifestSHA256: final.ManifestSHA256,
+		ManifestSHA256: manifestSHA256,
 		Runtime: RuntimeContract{
 			PHPVersion:      prepareResponse.Prepare.PHPVersion,
 			PHPExtensions:   append([]string(nil), preparedExtensions...),

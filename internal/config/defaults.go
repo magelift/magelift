@@ -49,10 +49,6 @@ func defaultProviderPreset(provider, runtime, preset, applicationVersion string)
 	case "azure":
 		// Azure capacity is resolved by the provider; no AWS defaults apply.
 		return map[string]any{}, true
-	case "scaleway":
-		return defaultScalewayPreset(preset), true
-	case "ovh":
-		return defaultOVHPreset(preset), true
 	default:
 		return nil, false
 	}
@@ -313,69 +309,6 @@ func defaultGCPCloudSQLTier(applicationVersion, preset string) string {
 		return "db-custom-2-7680"
 	}
 	return "db-perf-optimized-N-2"
-}
-
-func defaultScalewayPreset(preset string) map[string]any {
-	desiredWeb := 1
-	queueConsumers := 0
-	databaseHighAvailability := false
-	redisClusterSize := 1
-	databaseNodeType := "DB-DEV-S"
-	redisNodeType := "RED1-MICRO"
-	databaseBackupEnabled := false
-	databaseBackupFrequency := 24
-	databaseBackupRetention := 7
-	databaseBackupSameRegion := true
-	databaseEncryptionAtRest := true
-	if preset != "preview" {
-		desiredWeb = 2
-		queueConsumers = 1
-		databaseNodeType = "DB-GP-S"
-		redisNodeType = "RED1-S"
-		databaseBackupEnabled = true
-	}
-	if preset == "high-availability" {
-		desiredWeb = 3
-		queueConsumers = 2
-		databaseHighAvailability = true
-		redisClusterSize = 2
-	}
-	return map[string]any{"target": map[string]any{"scaleway": map[string]any{
-		"networkCidr": "172.16.0.0/22", "databaseNodeType": databaseNodeType, "databaseHighAvailability": databaseHighAvailability, "redisNodeType": redisNodeType, "redisClusterSize": redisClusterSize,
-		"databaseBackupEnabled": databaseBackupEnabled, "databaseBackupFrequencyHours": databaseBackupFrequency, "databaseBackupRetentionDays": databaseBackupRetention, "databaseBackupSameRegion": databaseBackupSameRegion, "databaseEncryptionAtRest": databaseEncryptionAtRest,
-		"redisVersion": "8.6.3", "cacheMode": "redis", "kapsuleVersion": "1.36.1", "nodeType": "DEV1-M", "nodeCount": 2,
-		"cpuRequest": "500m", "memoryRequest": "1Gi", "desiredWebReplicas": desiredWeb, "queueConsumerCount": queueConsumers,
-	}}}
-}
-
-func defaultOVHPreset(preset string) map[string]any {
-	desiredWeb := 1
-	nodeCount := 1
-	databaseNodeCount := 1
-	valkeyNodeCount := 1
-	databasePlan := "discovery"
-	valkeyPlan := "discovery"
-	queueConsumers := 0
-	if preset != "preview" {
-		desiredWeb = 2
-		nodeCount = 2
-		databaseNodeCount = 2
-		valkeyNodeCount = 2
-		databasePlan = "production"
-		valkeyPlan = "production"
-		queueConsumers = 1
-	}
-	if preset == "high-availability" {
-		desiredWeb = 3
-		queueConsumers = 2
-	}
-	return map[string]any{"target": map[string]any{"ovh": map[string]any{
-		"networkCidr": "10.30.0.0/16", "databaseName": "magento", "masterUsername": "magento",
-		"databaseFlavor": "b3-8", "databasePlan": databasePlan, "databaseVersion": "8.4", "databaseNodeCount": databaseNodeCount,
-		"valkeyFlavor": "b3-8", "valkeyPlan": valkeyPlan, "valkeyVersion": "8.1", "valkeyNodeCount": valkeyNodeCount, "mksPlan": "standard",
-		"nodeFlavor": "b3-8", "nodeCount": nodeCount, "cpuRequest": "500m", "memoryRequest": "1Gi",
-		"desiredWebReplicas": desiredWeb, "queueConsumerCount": queueConsumers,
-	}}}
 }
 
 // RecommendedServiceVersions supplies starter values and dated AWS defaults.

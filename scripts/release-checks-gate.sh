@@ -108,7 +108,7 @@ wanted = [line for line in os.environ.get("GATE_CHECKS", "").splitlines() if lin
 def matches(wanted_name, actual):
     # GitHub Actions matrix jobs are named "php (8.3)", not "php".
     # Require an exact name or the matrix suffix so "php" does not
-    # accept "phpunit" or "frankenphp".
+    # accept "phpunit".
     return actual == wanted_name or actual.startswith(wanted_name + " (")
 
 

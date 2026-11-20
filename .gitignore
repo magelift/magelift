@@ -32,9 +32,10 @@ auth.json
 .vscode/
 .DS_Store
 
-# Local agent caches and installed skills. MageLift ships skills from agents/.
+# Local agent caches. Keep contributor skills in .agents/skills/.
 .claude/
-.agents/
+/.agents/*
+!/.agents/skills/
 .cursor/
 .serena/
 skills-lock.json

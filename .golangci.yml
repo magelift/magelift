@@ -59,11 +59,8 @@ linters:
       enabled-tags:
         - diagnostic
       disabled-checks:
-        - hugeParam
-        - rangeValCopy
         - sloppyReassign
         - appendAssign
-        - dupImport
         - ifElseChain
         - elseif
         - unlambda

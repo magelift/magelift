@@ -11,8 +11,8 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.3
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.8.0
-	github.com/magelift/magelift v0.1.0-alpha.1-rc.22
-	github.com/magelift/magelift/sdk v0.1.0-alpha.1-rc.22
+	github.com/magelift/magelift v1.0.0
+	github.com/magelift/magelift/sdk v1.0.0
 	github.com/pulumi/pulumi-azure-native-sdk/authorization/v3 v3.32.0
 	github.com/pulumi/pulumi-azure-native-sdk/containerservice/v3 v3.32.0
 	github.com/pulumi/pulumi-azure-native-sdk/dbformysql/v3 v3.32.0
@@ -144,7 +144,6 @@ require (
 	github.com/sergi/go-diff v1.4.5 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.1.0 // indirect
-	github.com/stretchr/objx v0.8.0 // indirect
 	github.com/texttheater/golang-levenshtein v1.0.1 // indirect
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect

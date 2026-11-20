@@ -575,7 +575,7 @@ func envDumpCommand(o *options) *cobra.Command {
 		Long: strings.TrimSpace(`
 Runs mysqldump against the selected environment over the dumpimport transport (host mysql, Docker Compose, or kube) and writes the SQL only to --to.
 
-The dump is unsanitized Magento data unless --sanitize is set. --sanitize hashes mailbox addresses only and is not certified anonymization. Database passwords travel through MAGELIFT_DUMPIMPORT_* / MYSQL_PWD and are not printed. Overwriting --to requires --yes.
+The dump contains Magento data. --sanitize hashes email addresses. Other personal data stays in the dump. Database passwords travel through MAGELIFT_DUMPIMPORT_* / MYSQL_PWD and are not printed. Overwriting --to requires --yes.
 `),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

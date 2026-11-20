@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/magelift/magelift/internal/automation"
+	buildpipeline "github.com/magelift/magelift/internal/build/pipeline"
 	"github.com/magelift/magelift/internal/config"
 	"github.com/magelift/magelift/internal/cosign"
 	deployflow "github.com/magelift/magelift/internal/deploy"
@@ -110,6 +111,9 @@ type infrastructureResult struct {
 	DestroyBackups       bool                     `json:"destroyBackups,omitempty" yaml:"destroyBackups,omitempty"`
 	DestroyedBackupNames []string                 `json:"destroyedBackupNames,omitempty" yaml:"destroyedBackupNames,omitempty"`
 	RetainedBackups      []config.RetainedBackup  `json:"retainedBackups,omitempty" yaml:"retainedBackups,omitempty"`
+	Endpoints            *deploymentEndpoints     `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
+	LogsCommand          string                   `json:"logsCommand,omitempty" yaml:"logsCommand,omitempty"`
+	applicationURL       string
 }
 
 func infrastructureCommands(o *options) []*cobra.Command {
@@ -135,32 +139,58 @@ func infrastructureCommands(o *options) []*cobra.Command {
 
 func infrastructureCommand(o *options, name, short string, operation func(context.Context, infrastructureBackend, automation.Request) (infrastructureResult, error)) *cobra.Command {
 	var digest string
+	var fromBuild string
+	var outputsFile string
 	var infraOnly bool
 	var ackMaintenanceDrain bool
-	var skipProviderLock bool
 	var destroyBackups bool
 	command := &cobra.Command{Use: name, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		if name == "deploy" {
 			o.infraOnly = infraOnly
 			o.ackMaintenanceDrain = ackMaintenanceDrain
+			if cmd.Flags().Changed("from-build") {
+				var err error
+				digest, err = buildpipeline.DeploymentDigest(fromBuild)
+				if err != nil {
+					return invalid(err)
+				}
+			}
+			if outputsFile != "" {
+				if infraOnly {
+					return invalid(errors.New("--outputs-file requires a Magento rollout"))
+				}
+				if err := validateDeploymentOutputPath(outputsFile, o.configPath, fromBuild); err != nil {
+					return invalid(err)
+				}
+			}
 		}
 		if name == "destroy" {
-			o.skipProviderLock = skipProviderLock
 			o.destroyBackups = destroyBackups
 		}
 		result, err := o.executeInfrastructure(cmd.Context(), name, operation, digest)
 		if err != nil {
 			return mapPluginError(mapConcurrentUpdateError(err))
 		}
-		return o.write(result)
+		if name == "deploy" && !infraOnly {
+			result.LogsCommand = o.deploymentLogsCommand(cmd, result.Environment)
+		}
+		if err := o.write(result); err != nil {
+			return err
+		}
+		if outputsFile != "" {
+			return writeDeploymentOutputs(outputsFile, result)
+		}
+		return nil
 	}}
 	if name == "deploy" {
 		command.Flags().StringVar(&digest, "digest", "", "override the configured immutable image digest")
+		command.Flags().StringVar(&fromBuild, "from-build", "", "deploy the registry digest recorded by magelift build --push")
+		command.Flags().StringVar(&outputsFile, "outputs-file", "", "write the Magento and storefront URLs to a JSON file after rollout")
+		command.MarkFlagsMutuallyExclusive("digest", "from-build")
 		command.Flags().BoolVar(&infraOnly, "infra-only", false, "update the infrastructure graph only (skip Magento migrate/health)")
 		command.Flags().BoolVar(&ackMaintenanceDrain, "ack-maintenance-drain", false, "attest backup, maintenance mode, and drained writers for production schema risk (see docs/operations.md)")
 	}
 	if name == "destroy" {
-		command.Flags().BoolVar(&skipProviderLock, "skip-lock", false, "skip the provider distributed state lock (acceptance cleanup only)")
 		command.Flags().BoolVar(&destroyBackups, "destroy-backups", false, "also destroy leftover provider backups after the environment is gone; GCP Cloud SQL leftovers are deleted even when the backup policy is disposable, AWS snapshots are still refused")
 	}
 	return command
@@ -217,7 +247,7 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 	if name == "destroy" {
 		planDigest = ""
 	}
-	environment, planned, err := o.planStackWithDigest(platform.PlanOptions{AllowExpiredPreview: name == "destroy"}, planDigest)
+	environment, planned, application, err := o.planStackWithDigest(platform.PlanOptions{AllowExpiredPreview: name == "destroy"}, planDigest)
 	if err != nil {
 		return infrastructureResult{}, invalid(err)
 	}
@@ -248,7 +278,15 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 		}
 	}
 	if name == "deploy" {
-		return o.runDeployment(ctx, environment, planned, planned.ImageDigest())
+		result, err := o.runDeploymentWithOptions(ctx, environment, planned, planned.ImageDigest(), deploymentOptions{
+			infraOnly:                   o.infraOnly,
+			acknowledgeMaintenanceDrain: o.ackMaintenanceDrain,
+			dependenciesChecked:         true,
+		})
+		if err == nil && !o.infraOnly {
+			result.Endpoints = deploymentLinks(application, result.applicationURL)
+		}
+		return result, err
 	}
 	if o.newBackend == nil {
 		return infrastructureResult{}, errors.New("infrastructure backend factory is required")
@@ -269,17 +307,15 @@ func (o *options) executeInfrastructure(ctx context.Context, name string, operat
 	if err := automation.ValidateRequest(ctx, backend, request); err != nil {
 		return infrastructureResult{}, err
 	}
+	if err := refuseAdoptedMutationForOperation(planned, name); err != nil {
+		return infrastructureResult{}, err
+	}
 	var release func(context.Context) error
-	if name == "destroy" && !o.skipProviderLock {
+	if name == "destroy" {
 		release, err = o.acquireProviderLock(ctx, planned)
 		if err != nil {
 			return infrastructureResult{}, err
 		}
-	} else if name == "destroy" && o.skipProviderLock {
-		announceSkipProviderLock(o.stderr)
-	}
-	if err := refuseAdoptedMutationForOperation(planned, name); err != nil {
-		return infrastructureResult{}, err
 	}
 	adopted := announceAdoptedResources(o.stderr, planned)
 	result, err := operation(ctx, backend, request)
@@ -309,10 +345,6 @@ type deploymentOptions struct {
 	acknowledgeMaintenanceDrain bool
 	infraOnly                   bool
 	dependenciesChecked         bool
-}
-
-func (o *options) runDeployment(ctx context.Context, environment string, planned platform.PlannedStack, digest string) (infrastructureResult, error) {
-	return o.runDeploymentWithOptions(ctx, environment, planned, digest, deploymentOptions{infraOnly: o.infraOnly, acknowledgeMaintenanceDrain: o.ackMaintenanceDrain, dependenciesChecked: true})
 }
 
 func (o *options) runDeploymentWithOptions(ctx context.Context, environment string, planned platform.PlannedStack, digest string, deployOptions deploymentOptions) (infrastructureResult, error) {
@@ -389,6 +421,7 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 			if err := o.applyFastlyEdge(ctx, environment, originURL); err != nil {
 				return out, err
 			}
+			out.applicationURL = originURL
 			return out, nil
 		}
 		if stepsErr != nil && !errors.Is(stepsErr, platform.ErrNotSupported) {
@@ -417,12 +450,14 @@ func (o *options) runDeploymentWithOptions(ctx context.Context, environment stri
 		if updateErr != nil {
 			return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Adopted: adopted}, updateErr
 		}
+		result := infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update, Adopted: adopted}
 		if outputs, outErr := backend.Outputs(ctx); outErr == nil && len(outputs) > 0 {
 			if reqErr := platform.RequireOutputs(outputs, platform.RequiredOutputKeys()); reqErr != nil {
-				return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update, Adopted: adopted}, reqErr
+				return result, reqErr
 			}
+			result.applicationURL, _ = outputs[platform.OutputApplicationURL].(string)
 		}
-		return infrastructureResult{Environment: environment, Stack: planned.StackName(), Preview: preview, Update: update, Adopted: adopted}, nil
+		return result, nil
 	}()
 	err = joinReleaseError(err, releaseDeploymentLock(ctx, release))
 	return result, err
@@ -530,27 +565,28 @@ func (o *options) planStackForRuntimeObserve() (string, platform.PlannedStack, e
 }
 
 func (o *options) planStackWith(opts platform.PlanOptions) (string, platform.PlannedStack, error) {
-	return o.planStackWithDigest(opts, "")
+	environment, planned, _, err := o.planStackWithDigest(opts, "")
+	return environment, planned, err
 }
 
 // planStackWithDigest plans with digestOverride written onto a copy of the
 // resolved target block. An empty override leaves the resolved config untouched.
 // Destroy and other planStackWith callers pass an empty override.
-func (o *options) planStackWithDigest(opts platform.PlanOptions, digestOverride string) (string, platform.PlannedStack, error) {
+func (o *options) planStackWithDigest(opts platform.PlanOptions, digestOverride string) (string, platform.PlannedStack, config.Application, error) {
 	o.resolvedPreviewIdentity = nil
 	if o.modules == nil {
-		return "", nil, errors.New("stack module registry is required")
+		return "", nil, config.Application{}, errors.New("stack module registry is required")
 	}
 	effective, environment, err := o.resolveWithEnvironment()
 	if err != nil {
-		return "", nil, err
+		return "", nil, config.Application{}, err
 	}
 	o.resolvedPreviewIdentity = effective.Config.PreviewIdentity
 	cfg := effective.Config
 	if digestOverride != "" {
 		cfg, err = configWithImageDigest(cfg, digestOverride)
 		if err != nil {
-			return "", nil, err
+			return "", nil, config.Application{}, err
 		}
 	}
 	if opts.Context == nil {
@@ -558,10 +594,10 @@ func (o *options) planStackWithDigest(opts platform.PlanOptions, digestOverride 
 	}
 	_, planned, err := o.modules.Plan(cfg, environment, opts)
 	if err != nil {
-		return "", nil, err
+		return "", nil, config.Application{}, err
 	}
 	warnExperimentalTarget(o.stderr, planned)
-	return environment, planned, nil
+	return environment, planned, cfg.Application, nil
 }
 
 // Copy the selected target so a command-line digest does not alter the project.
@@ -588,20 +624,6 @@ func configWithImageDigest(cfg config.Config, digest string) (config.Config, err
 		copied := *cfg.Target.Azure
 		copied.ImageDigest = digest
 		cfg.Target.Azure = &copied
-	case "ovh":
-		if cfg.Target.OVH == nil {
-			return config.Config{}, errors.New("target.ovh is required to apply the deployment digest")
-		}
-		copied := *cfg.Target.OVH
-		copied.ImageDigest = digest
-		cfg.Target.OVH = &copied
-	case "scaleway":
-		if cfg.Target.Scaleway == nil {
-			return config.Config{}, errors.New("target.scaleway is required to apply the deployment digest")
-		}
-		copied := *cfg.Target.Scaleway
-		copied.ImageDigest = digest
-		cfg.Target.Scaleway = &copied
 	default:
 		// External modules retain their existing typed override through
 		// PlannedStack.WithImageDigest after their initial plan.
@@ -615,16 +637,13 @@ func configWithImageDigest(cfg config.Config, digest string) (config.Config, err
 const experimentalTargetWarningFmt = "warning: MageLift: target %s/%s is experimental: broader release, architecture, and day-2 acceptance coverage is incomplete; see docs/capability-matrix.md"
 
 func warnExperimentalTarget(stderr io.Writer, planned platform.PlannedStack) {
-	if planned == nil || planned.CertificationTier() != platform.TierExperimental || stderr == nil {
+	if planned == nil || planned.RuntimeTier() != platform.TierExperimental || stderr == nil {
 		return
 	}
 	_, _ = fmt.Fprintf(stderr, experimentalTargetWarningFmt+"\n", planned.Provider(), planned.Runtime())
 }
 
-// infraOnlyDeployNoticeFmt is the TRUST-02 stderr line when --infra-only proceeds.
 const infraOnlyDeployNoticeFmt = "notice: --infra-only: Magento migrate, cutover, and health were skipped\n"
-
-const skipProviderLockNoticeFmt = "notice: --skip-lock: provider distributed state lock was skipped; use only when no concurrent operation is running\n"
 
 func announceInfraOnlyDeploy(stderr io.Writer) {
 	if stderr == nil {
@@ -633,17 +652,10 @@ func announceInfraOnlyDeploy(stderr io.Writer) {
 	_, _ = io.WriteString(stderr, infraOnlyDeployNoticeFmt)
 }
 
-func announceSkipProviderLock(stderr io.Writer) {
-	if stderr == nil {
-		return
-	}
-	_, _ = io.WriteString(stderr, skipProviderLockNoticeFmt)
-}
-
 func refuseInfraOnlyDeploy(planned platform.PlannedStack) error {
 	cause := fmt.Sprintf(
 		"deploy on target %s/%s (%s) cannot run Magento migrate, cutover, and health",
-		planned.Provider(), planned.Runtime(), planned.CertificationTier(),
+		planned.Provider(), planned.Runtime(), planned.RuntimeTier(),
 	)
 	return invalid(usererr.New(
 		cause,

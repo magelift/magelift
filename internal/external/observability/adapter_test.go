@@ -84,8 +84,6 @@ func TestPlanComposesNativeAndNewRelicAcrossFirstPartyTargets(t *testing.T) {
 	}{
 		{name: "aws-ecs", target: "aws", runtime: "ecs-fargate", native: "cloudwatch", signals: []string{"logs", "metrics"}, nativeBinding: 2},
 		{name: "gcp-gke", target: "gcp", runtime: "gke-standard", native: "google-cloud-operations", signals: []string{"logs", "metrics"}, nativeBinding: 2},
-		{name: "scaleway-kapsule", target: "scaleway", runtime: "kapsule", native: "scaleway-cockpit", signals: []string{"logs", "metrics", "traces"}, nativeBinding: 3},
-		{name: "ovh-mks", target: "ovh", runtime: "mks", native: "ovh-logs-data-platform", nativeRef: "stream-123", signals: []string{"audit-events"}, nativeBinding: 1},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -128,7 +126,7 @@ func TestPlanComposesNativeAndNewRelicAcrossFirstPartyTargets(t *testing.T) {
 }
 
 func TestPlanReportsNativeSignalGapsInsteadOfDroppingThem(t *testing.T) {
-	plan, err := New().Plan(Request{TargetProvider: "ovh", TargetRuntime: "mks", Intent: sdk.ObservabilityIntent{NativeProvider: "ovh-logs-data-platform", NativeReference: "stream-123", OwnershipMarker: "magelift/architecture/test", Signals: []string{"audit-events", "metrics"}}})
+	plan, err := New().Plan(Request{TargetProvider: "gcp", TargetRuntime: "gke-standard", Intent: sdk.ObservabilityIntent{NativeProvider: "google-cloud-operations", NativeReference: "services/shop", OwnershipMarker: "magelift/architecture/test", Signals: []string{"logs", "audit-events"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,11 +134,11 @@ func TestPlanReportsNativeSignalGapsInsteadOfDroppingThem(t *testing.T) {
 		t.Fatalf("plan = %#v", plan)
 	}
 	for _, status := range plan.SignalStatuses {
-		if status.Signal == "metrics" && (status.Status != "unavailable" || status.Reason == "") {
-			t.Fatalf("metrics gap = %#v", status)
+		if status.Signal == "audit-events" && (status.Status != "unavailable" || status.Reason == "") {
+			t.Fatalf("audit events gap = %#v", status)
 		}
-		if status.Signal == "audit-events" && status.Status != "configured" {
-			t.Fatalf("audit signal = %#v", status)
+		if status.Signal == "logs" && status.Status != "configured" {
+			t.Fatalf("log signal = %#v", status)
 		}
 	}
 }
@@ -170,19 +168,13 @@ func TestPlanReportsOperationalObjectGapsAcrossFirstPartyTargets(t *testing.T) {
 	}{
 		{name: "aws-cloudwatch", target: "aws", runtime: "ecs-fargate", native: "cloudwatch", want: []string{"slo.availability"}},
 		{name: "gcp-monitoring-service", target: "gcp", runtime: "gke-standard", native: "google-cloud-operations", nativeRef: "services/app", want: []string{}},
-		{name: "scaleway-cockpit", target: "scaleway", runtime: "kapsule", native: "scaleway-cockpit", want: []string{"alert.health", "dashboard.operations", "slo.availability"}},
-		{name: "ovh-logs", target: "ovh", runtime: "mks", native: "ovh-logs-data-platform", nativeRef: "stream-123", want: []string{"alert.health", "dashboard.operations", "slo.availability"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			intent := baseOperations()
 			intent.NativeProvider = test.native
 			intent.NativeReference = test.nativeRef
-			if test.target == "ovh" {
-				intent.Signals = []string{"audit-events"}
-			} else {
-				intent.Signals = []string{"metrics"}
-			}
+			intent.Signals = []string{"metrics"}
 			plan, err := New().Plan(Request{TargetProvider: test.target, TargetRuntime: test.runtime, Intent: intent})
 			if err != nil {
 				t.Fatal(err)
@@ -219,31 +211,6 @@ func TestNativePlansKeepUnprovisionedTraceAndAuditSourcesExplicit(t *testing.T) 
 				t.Fatalf("native gap was not explicit: %#v", plan)
 			}
 		})
-	}
-}
-
-func TestScalewayCockpitDeclaresTracesAndKeepsAuditExplicit(t *testing.T) {
-	plan, err := New().Plan(Request{
-		TargetProvider: "scaleway", TargetRuntime: "kapsule",
-		Intent: sdk.ObservabilityIntent{
-			NativeProvider: "scaleway-cockpit", OwnershipMarker: "magelift/architecture/test",
-			Signals: []string{"metrics", "logs", "traces", "audit-events"},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, status := range plan.SignalStatuses {
-		switch status.Signal {
-		case "metrics", "logs", "traces":
-			if status.Status != "configured" {
-				t.Fatalf("Scaleway native signal = %#v", status)
-			}
-		case "audit-events":
-			if status.Status != "unavailable" || status.Reason == "" {
-				t.Fatalf("Scaleway audit gap = %#v", status)
-			}
-		}
 	}
 }
 
@@ -328,8 +295,8 @@ func TestVerifyRequiresSignalDeliveryOperationalObjectsAndOwnedCleanup(t *testin
 }
 
 func TestVerifyKeepsUnavailableNativeSignalsExplicit(t *testing.T) {
-	plan, err := New().Plan(Request{TargetProvider: "ovh", TargetRuntime: "mks", Intent: sdk.ObservabilityIntent{
-		NativeProvider: "ovh-logs-data-platform", NativeReference: "stream-123", OwnershipMarker: "magelift/architecture/test", Signals: []string{"audit-events", "metrics"},
+	plan, err := New().Plan(Request{TargetProvider: "gcp", TargetRuntime: "gke-standard", Intent: sdk.ObservabilityIntent{
+		NativeProvider: "google-cloud-operations", NativeReference: "services/shop", OwnershipMarker: "magelift/architecture/test", Signals: []string{"logs", "audit-events"},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -338,7 +305,7 @@ func TestVerifyKeepsUnavailableNativeSignalsExplicit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if verification.Complete || !strings.Contains(strings.Join(verification.Failures, "\n"), "metrics") {
+	if verification.Complete || !strings.Contains(strings.Join(verification.Failures, "\n"), "audit-events") {
 		t.Fatalf("unavailable signal verification = %#v", verification)
 	}
 }
@@ -354,8 +321,8 @@ func TestSDKAdapterRunsNativeOnlyExternalOnlyAndCombinedDestinations(t *testing.
 		intent sdk.ObservabilityIntent
 	}{
 		{name: "native-only", intent: sdk.ObservabilityIntent{NativeProvider: "cloudwatch", OwnershipMarker: "magelift/test/native", Signals: []string{"metrics"}}},
-		{name: "newrelic-only", intent: sdk.ObservabilityIntent{ExternalProvider: "newrelic", Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental, CredentialRefs: []string{"aws-secrets-manager://magelift/test/newrelic"}, Endpoint: "https://otlp.eu01.nr-data.net", OwnershipMarker: "magelift/test/newrelic", Signals: []string{"metrics"}}},
-		{name: "combined", intent: sdk.ObservabilityIntent{NativeProvider: "cloudwatch", ExternalProvider: "newrelic", Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental, CredentialRefs: []string{"aws-secrets-manager://magelift/test/newrelic"}, Endpoint: "https://otlp.eu01.nr-data.net", OwnershipMarker: "magelift/test/combined", Signals: []string{"metrics"}}},
+		{name: "newrelic-only", intent: sdk.ObservabilityIntent{ExternalProvider: "newrelic", Lifecycle: sdk.ExternalLifecycleExtension, CredentialRefs: []string{"aws-secrets-manager://magelift/test/newrelic"}, Endpoint: "https://otlp.eu01.nr-data.net", OwnershipMarker: "magelift/test/newrelic", Signals: []string{"metrics"}}},
+		{name: "combined", intent: sdk.ObservabilityIntent{NativeProvider: "cloudwatch", ExternalProvider: "newrelic", Lifecycle: sdk.ExternalLifecycleExtension, CredentialRefs: []string{"aws-secrets-manager://magelift/test/newrelic"}, Endpoint: "https://otlp.eu01.nr-data.net", OwnershipMarker: "magelift/test/combined", Signals: []string{"metrics"}}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -424,10 +391,10 @@ func TestSDKAdapterRejectsTamperedPlanBeforeProviderMutation(t *testing.T) {
 }
 
 func TestSDKAdapterPreservesOpaqueNativeReferenceInPublicPlan(t *testing.T) {
-	adapter := NewSDKAdapter("ovh", New(), &countingLifecycleClient{})
+	adapter := NewSDKAdapter("gcp", New(), &countingLifecycleClient{})
 	request := sdk.ObservabilityPlanRequest{
-		TargetProvider: "ovh", TargetRuntime: "mks",
-		Intent: sdk.ObservabilityIntent{NativeProvider: "ovh-logs-data-platform", NativeReference: "stream-123", OwnershipMarker: "magelift/test/native-reference", Signals: []string{"audit-events"}},
+		TargetProvider: "gcp", TargetRuntime: "gke-standard",
+		Intent: sdk.ObservabilityIntent{NativeProvider: "google-cloud-operations", NativeReference: "services/shop", OwnershipMarker: "magelift/test/native-reference", Signals: []string{"logs"}},
 	}
 	plan, err := adapter.PlanObservability(context.Background(), request)
 	if err != nil {

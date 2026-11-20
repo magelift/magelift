@@ -1,6 +1,4 @@
-// Package kube holds Magento-shaped Kubernetes helpers shared by the GKE, MKS,
-// and Kapsule runtime adapters (ADR 0008). Cloud topology stays per-provider;
-// only the provider-agnostic Magento wiring lives here.
+// Package kube contains shared Kubernetes workload helpers for Magento.
 package kube
 
 import (

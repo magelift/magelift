@@ -26,7 +26,7 @@ type PermissionCheck struct {
 	Granted bool
 }
 
-// IdentityObservation is safe to return to admission and certification. A
+// IdentityObservation is safe to return from account checks. A
 // provider must set LeastPrivilegeVerified only when it has checked the
 // requested scope against its native identity/permission mechanism.
 type IdentityObservation struct {
@@ -39,7 +39,7 @@ type IdentityObservation struct {
 }
 
 // IdentityClient is the provider-specific account and least-privilege seam.
-// AWS, GCP, Scaleway, OVHcloud, and community providers can implement it
+// Cloud and community providers can implement it
 // without exposing their SDK identity types to the core.
 type IdentityClient interface {
 	CheckIdentity(context.Context, IdentityCheckRequest) (IdentityObservation, error)
@@ -48,7 +48,7 @@ type IdentityClient interface {
 // PermissionVerifier is implemented at the provider edge when the vendor
 // exposes an access-analyzer or permission-test API. Returning false is
 // deliberately conservative: account visibility alone is not proof of the
-// mutation scope required by a certification run.
+// scope of the requested account operation.
 type PermissionVerifier interface {
 	Verify(context.Context, sdk.ProviderID, string, string, []string) (bool, error)
 }

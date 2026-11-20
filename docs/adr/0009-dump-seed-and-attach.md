@@ -1,28 +1,17 @@
-# ADR 0009: Explicit database seed and existing infrastructure attachments
+# ADR 0009. Import a dump explicitly and attach existing services by reference
 
-- Status: Accepted
-- Date: 2026-08-22
+Accepted on 2026-08-22.
 
-## Context
+Creating infrastructure, loading data and deploying Magento are separate
+steps. `magelift env create --dump PATH` records the dump path. The
+operator runs the import after provisioning and before deploying. Importing
+over an existing schema needs a separate confirmation. Keep private dumps
+outside the repository and use sanitized data in previews.
+[Data migration](../weekend-migrate.md)
 
-New and ephemeral environments need a known Magento dump. Agencies also bring an existing AWS VPC or RDS instance. Those are different operations.
-
-## Decision
-
-1. `magelift env create --dump <path>` records `environments.<name>.seedDump` in the project. The operator provisions infrastructure, imports the dump with a separate command, then runs the Magento deployment. Recording a dump does not authorize replacing a populated database.
-2. Dumps with PII stay out of git. Operators use sanitized fixtures or paths outside the repo.
-3. Brownfield attach is in scope for **AWS VPC and RDS MySQL** via `target.aws.existing.network` / `target.aws.existing.database`. MageLift adopts by reference and does not take destroy ownership of the adopted VPC/RDS. There is no `magelift detach`; un-adopt is documented.
-4. Existing database connections on GKE and AKS use explicit endpoint and credential bindings. The database owner keeps responsibility for backups and deletion. See [service choices](../service-bindings.md).
-
-## Consequences
-
-Preview envs can take `--dump` plus TTL. Greenfield (MageLift creates network and DB) remains the default.
-
-## Alternatives considered
-
-- Import during Pulumi create: rejected (race with Magento not installed).
-- Attach as MageLift-owned destroy: rejected (would delete customer VPCs).
-
-## Provenance
-
-`docs/brownfield-attach.md` and `internal/cli` env seed import.
+An AWS environment can reference an existing VPC or RDS MySQL instance.
+MageLift manages the new resources that use them and leaves the attached
+resources with their owner during teardown. GKE and AKS can connect to
+existing databases through endpoint and credential settings. The owner of
+an attached service remains responsible for its backups.
+[Existing AWS resources](../brownfield-attach.md) · [Service choices](../service-bindings.md)

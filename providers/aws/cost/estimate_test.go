@@ -30,7 +30,7 @@ func (f fakePlanned) Runtime() sdk.RuntimeID {
 func (f fakePlanned) Project() string     { return "shop" }
 func (f fakePlanned) Environment() string { return f.env }
 func (f fakePlanned) Region() string      { return f.region }
-func (f fakePlanned) CertificationTier() platform.CertificationTier {
+func (f fakePlanned) RuntimeTier() platform.RuntimeTier {
 	return platform.TierBuiltIn
 }
 func (f fakePlanned) EnvironmentClass() string { return "preview" }

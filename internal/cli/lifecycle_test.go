@@ -400,35 +400,6 @@ func TestProtectedDestroyCannotBeBypassedWithYes(t *testing.T) {
 	}
 }
 
-func TestDestroySkipProviderLockRunsAcceptanceCleanup(t *testing.T) {
-	path := writeLifecycleConfig(t, "staging", false)
-	backend := &fakeInfrastructureBackend{}
-	var stderr bytes.Buffer
-	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
-	o.stderr = &stderr
-	o.configPath = path
-	o.environment = "staging"
-	o.yes = true
-	o.newBackend = func(_ context.Context, _ platform.PlannedStack, _ string) (infrastructureBackend, error) {
-		return backend, nil
-	}
-	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
-		t.Fatal("acceptance cleanup must not acquire the provider lock when --skip-lock is explicit")
-		return nil, nil
-	}
-	cmd := newCommandWithOptions(o)
-	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "destroy", "--skip-lock"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(stderr.String(), "--skip-lock") {
-		t.Fatalf("skip-lock notice missing: %q", stderr.String())
-	}
-	if !reflect.DeepEqual(backend.calls, []string{"preview", "destroy"}) {
-		t.Fatalf("backend calls = %v", backend.calls)
-	}
-}
-
 func TestDestroyReportsRetainedProductionBackups(t *testing.T) {
 	path := writeLifecycleConfig(t, "production", false)
 	backend := &fakeInfrastructureBackend{}
@@ -756,20 +727,20 @@ func TestExperimentalTargetWarnsAtPlanStack(t *testing.T) {
 		wantRuntime  string
 	}{
 		{
-			name:         "experimental ovh mutate preview",
-			configPath:   writeExperimentalOVHConfig,
+			name:         "experimental azure mutate preview",
+			configPath:   writeExperimentalAzureConfig,
 			command:      "preview",
 			wantWarn:     true,
-			wantProvider: "ovh",
-			wantRuntime:  "mks",
+			wantProvider: "azure",
+			wantRuntime:  "aks",
 		},
 		{
-			name:         "experimental ovh read-only outputs",
-			configPath:   writeExperimentalOVHConfig,
+			name:         "experimental azure read-only outputs",
+			configPath:   writeExperimentalAzureConfig,
 			command:      "outputs",
 			wantWarn:     true,
-			wantProvider: "ovh",
-			wantRuntime:  "mks",
+			wantProvider: "azure",
+			wantRuntime:  "aks",
 		},
 		{
 			name: "experimental aws kubernetes",
@@ -846,7 +817,7 @@ func TestExperimentalTargetWarnsAtPlanStack(t *testing.T) {
 }
 
 func TestExperimentalWarningLeavesJSONStdoutParseable(t *testing.T) {
-	path := writeExperimentalOVHConfig(t)
+	path := writeExperimentalAzureConfig(t)
 	var stdout, stderr bytes.Buffer
 	backend := &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop"}}
 	o := testOptions(&stdout, &fakeTerminal{interactive: false})

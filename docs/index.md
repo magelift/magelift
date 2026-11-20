@@ -1,6 +1,6 @@
 ---
 title: MageLift docs
-description: Docs for MageLift, a PHP-configured Magento deployment CLI. Install, migrate from ACC/Upsun, capability matrix.
+description: Run Magento 2 locally and deploy it to your own AWS, Google Cloud, or Azure account.
 hide:
   - toc
 ---
@@ -9,93 +9,36 @@ hide:
 <img src="assets/logo.png" alt="MageLift logo" />
 
 <div markdown>
-<h1 class="mdx-hero__title">Run Magento in your own cloud account.</h1>
+<h1 class="mdx-hero__title">Deploy Magento 2 to your own cloud</h1>
 
-<p class="mdx-hero__lede">Configure your Magento shop in PHP. Start it locally with Docker and deploy it to your AWS, Google Cloud or Azure account.</p>
+<p class="mdx-hero__lede">Start from your Magento checkout. Run it with Docker on your laptop, then deploy to your AWS, Google Cloud, or Azure account. Project settings live in PHP.</p>
 
 <div class="mdx-hero__cta" markdown>
 [Install the CLI](install.md){ .md-button .md-button--primary }
-[Get started](getting-started.md){ .md-button }
+[Run your first shop](getting-started.md){ .md-button }
 </div>
 </div>
 </div>
 
-Your cloud provider bills the resources to your account. [MageLift pricing](https://magelift.dev/pricing.md)
+MageLift works with Magento Open Source and licensed Adobe Commerce. Your
+cloud provider bills you for the resources in your account.
 
-## Pick a path
+## Start with your shop
 
-<div class="grid cards" markdown>
-
--   **Start a shop locally**
-
-    ---
-
-    Install the CLI and start your existing Magento checkout.
-
-    [Install](install.md) · [Getting started](getting-started.md)
-
--   **Move an existing store**
-
-    ---
-
-    Import settings from Upsun, Adobe Commerce Cloud or Docker Compose. Rehearse the database and media transfer on your chosen cloud.
-
-    [Import the shop](migrating-from-paas.md) · [Rehearse the migration](weekend-migrate.md)
-
--   **Operate a store**
-
-    ---
-
-    Inspect logs, manage secrets and check costs.
-
-    [Operations](operations.md) · [CLI reference](cli-reference.md)
-
--   **Check what is supported**
-
-    ---
-
-    Find test results for your provider, runtime and operation.
-
-    [Capability matrix](capability-matrix.md) · [Compare PaaS](compare-paas.md)
-
--   **Compare local and cloud**
-
-    ---
-
-    See which services run locally and which need a cloud account.
-
-    [Local vs cloud](local-vs-cloud.md)
-
--   **Extend MageLift**
-
-    ---
-
-    Add a cloud target through the provider boundary.
-
-    [Adding a provider](adding-a-provider.md)
-
-</div>
-
-## Cloud targets
-
-Start a PHP project for AWS ECS Fargate, GCP GKE Autopilot, or Azure AKS.
-AWS and GCP have historical live Magento runs. Azure has Pulumi graph and
-Floci coverage. Use the evidence for the individual operation when choosing
-a deployment target. AWS EKS, GCP GKE Standard, OVH MKS and Scaleway Kapsule
-have experimental adapters. [Recorded capabilities](capability-matrix.md)
+- [What MageLift does](what-magelift-does.md)
+- [Run Magento and deploy to staging](getting-started.md)
+- [Move a shop from Upsun or Adobe Commerce Cloud](migrating-from-paas.md)
+- [Compare AWS, Google Cloud, and Azure](capability-matrix.md)
+- [Read logs and manage a running shop](operations.md)
+- [Run the Magento storefront or connect a headless frontend](storefront-recipes.md)
 
 ## Contribute
 
-[CONTRIBUTING](https://github.com/magelift/magelift/blob/main/CONTRIBUTING.md) ·
-[SUPPORT](https://github.com/magelift/magelift/blob/main/SUPPORT.md) ·
-[Code of Conduct](https://github.com/magelift/magelift/blob/main/CODE_OF_CONDUCT.md) ·
-[SECURITY](https://github.com/magelift/magelift/blob/main/SECURITY.md)
-
-Agent skills for contributors:
-[`agents/`](https://github.com/magelift/magelift/tree/main/agents) in the repo.
-
-Plain-text site index: [llms.txt](https://magelift.dev/llms.txt),
-[llms-full.txt](https://magelift.dev/llms-full.txt).
+Use the [contributor guide](https://github.com/magelift/magelift/blob/main/CONTRIBUTING.md)
+and the [contributor skills](https://github.com/magelift/magelift/tree/main/.agents/skills).
+For a problem deploying or operating a shop, see [support](https://github.com/magelift/magelift/blob/main/SUPPORT.md).
+Report vulnerabilities using the [security policy](https://github.com/magelift/magelift/blob/main/SECURITY.md).
+You can also develop an extension or propose a cloud target. [Add a provider](adding-a-provider.md)
 
 MageLift is independent of Adobe Inc. Magento and Adobe Commerce are Adobe
-trademarks, used only to describe compatibility.
+trademarks.

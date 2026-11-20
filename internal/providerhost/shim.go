@@ -27,7 +27,7 @@ type ShimModule struct {
 	platform.LifecycleFactories
 	provider   sdk.ProviderID
 	runtime    sdk.RuntimeID
-	tier       platform.CertificationTier
+	tier       platform.RuntimeTier
 	outputKeys []string
 	client     *Client
 }
@@ -53,7 +53,7 @@ func NewShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, client *Clien
 }
 
 // NewLazyProviderShimModule binds one provider runtime to a verified plugin.
-func NewLazyProviderShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform.CertificationTier, outputKeys []string, dial DialFunc) (*ShimModule, error) {
+func NewLazyProviderShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform.RuntimeTier, outputKeys []string, dial DialFunc) (*ShimModule, error) {
 	if dial == nil {
 		return nil, errors.New("provider dialer is required")
 	}
@@ -63,7 +63,7 @@ func NewLazyProviderShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, t
 	return newShimModule(provider, runtime, tier, outputKeys, NewLazyClient(dial))
 }
 
-func newShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform.CertificationTier, outputKeys []string, client *Client) (*ShimModule, error) {
+func newShimModule(provider sdk.ProviderID, runtime sdk.RuntimeID, tier platform.RuntimeTier, outputKeys []string, client *Client) (*ShimModule, error) {
 	if client == nil {
 		return nil, errors.New("provider client is required")
 	}
@@ -132,7 +132,7 @@ func (m *ShimModule) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: sdk.TargetID(string(provider) + "." + string(runtime)), Provider: provider, Runtime: runtime}
 }
 
-func (m *ShimModule) CertificationTier() platform.CertificationTier {
+func (m *ShimModule) RuntimeTier() platform.RuntimeTier {
 	if m != nil && m.tier != "" {
 		return m.tier
 	}
@@ -142,7 +142,7 @@ func (m *ShimModule) CertificationTier() platform.CertificationTier {
 	return platform.TierExperimental
 }
 
-func platformTier(tier sdk.ExtensionCertificationTier) platform.CertificationTier {
+func platformTier(tier sdk.ExtensionTier) platform.RuntimeTier {
 	if tier == sdk.ExtensionTierBuiltIn {
 		return platform.TierBuiltIn
 	}
@@ -163,7 +163,6 @@ type retainedInputs struct {
 	runtime                string
 	liveQueueReplicas      int
 	valkeyRequirement      string
-	allowUnsupported       bool
 	allowExpiredPreview    bool
 	accountOnly            bool
 	runtimeObserve         bool
@@ -208,12 +207,9 @@ func (m *ShimModule) Plan(cfg config.Config, environment string, opts platform.P
 	inputs := retainedInputs{
 		stateEnvironment: cfg.StateEnvironment, envelope: buildEnvelope(cfg, environment),
 		application: buildApplication(cfg), targetBlock: block, services: maps.Clone(cfg.Services),
-		runtime: string(m.runtime), allowUnsupported: true, allowExpiredPreview: opts.AllowExpiredPreview,
+		runtime: string(m.runtime), allowExpiredPreview: opts.AllowExpiredPreview,
 		accountOnly: opts.AccountOnly, runtimeObserve: opts.RuntimeObserve,
 		useProviderDefaultEdge: cfg.Edge.Mode == "" && cfg.Edge.NativeProvider == "" && cfg.Edge.ExternalProvider == "",
-	}
-	if m.provider == StandaloneProviderAWS {
-		inputs.allowUnsupported = cfg.Compatibility.AllowUnsupported
 	}
 	if m.provider == StandaloneProviderAWS || m.provider == StandaloneProviderGCP {
 		if err := platform.ValidateFirstPartyEdge(cfg); err != nil {
@@ -270,7 +266,6 @@ func (m *ShimModule) replan(ctx context.Context, inputs retainedInputs) (*ShimPl
 		Runtime:                inputs.runtime,
 		LiveQueueReplicas:      inputs.liveQueueReplicas,
 		ValkeyRequirement:      inputs.valkeyRequirement,
-		AllowUnsupported:       inputs.allowUnsupported,
 		AllowExpiredPreview:    inputs.allowExpiredPreview,
 		AccountOnly:            inputs.accountOnly,
 		RuntimeObserve:         inputs.runtimeObserve,
@@ -500,7 +495,7 @@ func (p *ShimPlanned) Runtime() sdk.RuntimeID   { return sdk.RuntimeID(p.stored.
 func (p *ShimPlanned) Project() string          { return p.inputs.envelope.Project }
 func (p *ShimPlanned) Environment() string      { return p.inputs.envelope.Environment }
 func (p *ShimPlanned) Region() string           { return p.inputs.envelope.Region }
-func (p *ShimPlanned) CertificationTier() platform.CertificationTier {
+func (p *ShimPlanned) RuntimeTier() platform.RuntimeTier {
 	return platformTier(p.stored.Tier)
 }
 func (p *ShimPlanned) EnvironmentClass() string { return p.inputs.envelope.EnvironmentClass }
@@ -603,9 +598,9 @@ func (o ShimOps) NewDeploySteps(_ context.Context, backend any, planned platform
 }
 
 // shimDeploySteps implements deployflow.Steps for plugin-backed stacks.
-// Infrastructure methods drive the Pulumi backend; application phases RPC
-// to the provider, which decodes its own stored inputs and executes. The
-// opaque candidate handle crosses back and forth; core never interprets it.
+// Infrastructure methods drive Pulumi. For application phases, the provider
+// reads its stored inputs and runs the work over RPC. The CLI passes the
+// candidate handle back to the provider unchanged.
 type shimDeploySteps struct {
 	client      *Client
 	backend     kube.Backend

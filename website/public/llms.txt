@@ -1,10 +1,10 @@
 # MageLift
 
-MageLift is an Apache-2.0 CLI for running Magento Open Source and licensed Adobe Commerce in the shop’s own cloud account. A PHP project defines services for staging, UAT, production and pull-request previews. The shop chooses service versions and pays the cloud provider.
+MageLift helps Magento developers run a shop locally and deploy it to AWS, Google Cloud, or Azure. It supports Magento Open Source and licensed Adobe Commerce. You choose services in magelift.php and pay your cloud provider for the resources you use.
 
 - Getting started: https://magelift.dev/docs/getting-started/
 - Install from source: https://magelift.dev/docs/install/
-- Cloud targets and evidence: https://magelift.dev/docs/capability-matrix/
+- Provider support: https://magelift.dev/docs/capability-matrix/
 - Service families and existing endpoints: https://magelift.dev/docs/service-bindings/
 - Connect a headless storefront: https://magelift.dev/docs/storefront-recipes/
 - Migrate from Adobe Commerce Cloud or Upsun: https://magelift.dev/docs/migrating-from-paas/

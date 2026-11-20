@@ -18,7 +18,6 @@ type Config struct {
 	Email              EmailConfig               `yaml:"email,omitempty" json:"email,omitempty" config:"Cloud transactional email"`
 	Resilience         ResilienceConfig          `yaml:"resilience,omitempty" json:"resilience,omitempty" config:"Availability, backup, and disaster-recovery policy"`
 	Defaults           Defaults                  `yaml:"defaults" json:"defaults"`
-	Compatibility      Compatibility             `yaml:"compatibility,omitempty" json:"compatibility,omitempty"`
 	PreviewIdentity    *PreviewIdentity          `yaml:"previewIdentity,omitempty" json:"previewIdentity,omitempty" config:"Derived pull-request preview identity" schema:"nullable"`
 	Extensions         map[string]any            `yaml:"extensions,omitempty" json:"extensions,omitempty"`
 	Account            string                    `yaml:"account,omitempty" json:"account,omitempty"`
@@ -41,7 +40,7 @@ type Application struct {
 	Edition    string         `yaml:"edition" json:"edition" config:"Magento edition" schema:"enum=open-source|commerce"`
 	Version    string         `yaml:"version" json:"version" config:"Exact Magento release"`
 	Mode       string         `yaml:"mode" json:"mode" config:"Application mode" schema:"enum=integrated|headless"`
-	WebRuntime string         `yaml:"webRuntime,omitempty" json:"webRuntime,omitempty" config:"HTTP application runtime" schema:"enum=nginx-fpm|frankenphp-classic|php-apache"`
+	WebRuntime string         `yaml:"webRuntime,omitempty" json:"webRuntime,omitempty" config:"HTTP runtime (nginx and PHP-FPM)" schema:"enum=nginx-fpm"`
 	Magento    MagentoRuntime `yaml:"magento,omitempty" json:"magento,omitempty" config:"Magento runtime overlays"`
 	Cron       []CronEntry    `yaml:"cron,omitempty" json:"cron,omitempty" config:"Portable Magento cron schedule entries"`
 }
@@ -126,9 +125,9 @@ type LocalEmailSettings struct {
 }
 
 // EmailConfig is Magento SMTP on a cloud environment. Credentials are secret
-// references, never plaintext YAML. Validation success is not certified delivery.
+// references. Test email delivery against the selected relay.
 type EmailConfig struct {
-	Mode       string        `yaml:"mode,omitempty" json:"mode,omitempty" config:"Cloud email mode" schema:"nullable,enum=disabled|smtp|ses|tem|ovh"`
+	Mode       string        `yaml:"mode,omitempty" json:"mode,omitempty" config:"Cloud email mode" schema:"nullable,enum=disabled|smtp|ses"`
 	Host       string        `yaml:"host,omitempty" json:"host,omitempty" config:"SMTP host" schema:"nullable"`
 	Port       int           `yaml:"port,omitempty" json:"port,omitempty" config:"SMTP port" schema:"nullable,minimum=1,maximum=65535"`
 	Username   string        `yaml:"username,omitempty" json:"username,omitempty" config:"SMTP username" schema:"nullable"`
@@ -144,7 +143,6 @@ type EmailConfig struct {
 type EmailManaged struct {
 	Domain       string `yaml:"domain,omitempty" json:"domain,omitempty" config:"Verified sender domain" schema:"nullable"`
 	HostedZoneID string `yaml:"hostedZoneId,omitempty" json:"hostedZoneId,omitempty" config:"Route 53 hosted zone ID for DKIM records (SES only)" schema:"nullable"`
-	Account      string `yaml:"account,omitempty" json:"account,omitempty" config:"Mailbox account name (OVH only)" schema:"nullable"`
 }
 
 // StaticContentSettings configures Magento setup:static-content:deploy.
@@ -188,13 +186,11 @@ type Composer struct {
 	Credentials string `yaml:"credentials,omitempty" json:"credentials,omitempty" config:"Composer credentials secret reference" schema:"pattern=^(aws-secrets-manager|ssm|gcp-secret-manager)://\\S+$"`
 }
 type Target struct {
-	Provider string          `yaml:"provider" json:"provider" config:"Infrastructure provider" schema:"enum=aws|gcp|azure|ovh|scaleway"`
-	Runtime  string          `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"enum=ecs-fargate|eks|gke-autopilot|gke-standard|aks|mks|kapsule"`
-	AWS      *AWSTarget      `yaml:"aws,omitempty" json:"aws,omitempty" config:"AWS deployment inputs"`
-	GCP      *GCPTarget      `yaml:"gcp,omitempty" json:"gcp,omitempty" config:"GCP deployment inputs"`
-	Azure    *AzureTarget    `yaml:"azure,omitempty" json:"azure,omitempty" config:"Azure deployment inputs"`
-	OVH      *OVHTarget      `yaml:"ovh,omitempty" json:"ovh,omitempty" config:"OVHcloud deployment inputs (experimental)"`
-	Scaleway *ScalewayTarget `yaml:"scaleway,omitempty" json:"scaleway,omitempty" config:"Scaleway deployment inputs (experimental)"`
+	Provider string       `yaml:"provider" json:"provider" config:"Infrastructure provider" schema:"enum=aws|gcp|azure"`
+	Runtime  string       `yaml:"runtime" json:"runtime" config:"Application runtime" schema:"enum=ecs-fargate|eks|gke-autopilot|gke-standard|aks"`
+	AWS      *AWSTarget   `yaml:"aws,omitempty" json:"aws,omitempty" config:"AWS deployment inputs"`
+	GCP      *GCPTarget   `yaml:"gcp,omitempty" json:"gcp,omitempty" config:"GCP deployment inputs"`
+	Azure    *AzureTarget `yaml:"azure,omitempty" json:"azure,omitempty" config:"Azure deployment inputs"`
 }
 
 // AzureTarget identifies the subscription and resource group used by the
@@ -362,84 +358,6 @@ type ResilienceDataClass struct {
 	OwnershipMarker    string   `yaml:"ownershipMarker" json:"ownershipMarker" config:"Data-class ownership marker"`
 }
 
-// OVHTarget holds provider-specific OVHcloud semantic inputs. The adapter owns
-// the SDK topology; supported topology choices remain explicit and typed here.
-type OVHTarget struct {
-	ServiceName                    string            `yaml:"serviceName" json:"serviceName" config:"OVH Public Cloud project service name" schema:"minLength=1"`
-	APIEndpoint                    string            `yaml:"apiEndpoint,omitempty" json:"apiEndpoint,omitempty" config:"OVHcloud API endpoint alias (ovh-eu, ovh-ca, or ovh-us)" schema:"nullable,enum=ovh-eu|ovh-ca|ovh-us"`
-	Region                         string            `yaml:"region,omitempty" json:"region,omitempty" config:"OVH Public Cloud region (for example EU-WEST-PAR or GRA11)" schema:"nullable"`
-	NetworkCIDR                    string            `yaml:"networkCidr,omitempty" json:"networkCidr,omitempty" config:"Private network IPv4 CIDR" schema:"nullable"`
-	Zones                          []string          `yaml:"zones,omitempty" json:"zones,omitempty" config:"OVH MKS availability zones within the selected region" schema:"nullable"`
-	AttachFloatingIPs              bool              `yaml:"attachFloatingIps,omitempty" json:"attachFloatingIps,omitempty" config:"Attach OVH floating IPs to MKS nodes"`
-	PrivateNetworkRoutingAsDefault bool              `yaml:"privateNetworkRoutingAsDefault,omitempty" json:"privateNetworkRoutingAsDefault,omitempty" config:"Route MKS egress through OVH's documented private-subnet DHCP gateway; custom gateway routing is not inferred"`
-	ImageDigest                    string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Signed immutable OCI image digest" schema:"nullable"`
-	DatabaseName                   string            `yaml:"databaseName,omitempty" json:"databaseName,omitempty" config:"Magento database name" schema:"nullable"`
-	MasterUsername                 string            `yaml:"masterUsername,omitempty" json:"masterUsername,omitempty" config:"Managed MySQL master username" schema:"nullable"`
-	EncryptionKeySecret            string            `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Secret reference for Magento encryption key" schema:"nullable"`
-	DatabaseFlavor                 string            `yaml:"databaseFlavor,omitempty" json:"databaseFlavor,omitempty" config:"OVH managed MySQL flavor" schema:"nullable"`
-	DatabasePlan                   string            `yaml:"databasePlan,omitempty" json:"databasePlan,omitempty" config:"OVH managed MySQL plan (discovery/essential, business/production, or enterprise/advanced)" schema:"nullable,enum=discovery|essential|business|production|enterprise|advanced"`
-	DatabaseVersion                string            `yaml:"databaseVersion,omitempty" json:"databaseVersion,omitempty" config:"OVH managed MySQL engine version (8.0 or 8.4)" schema:"nullable,enum=8.0|8.4"`
-	DatabaseNodeCount              int               `yaml:"databaseNodeCount,omitempty" json:"databaseNodeCount,omitempty" config:"OVH managed MySQL node count" schema:"nullable,minimum=1"`
-	DatabaseBackupTime             string            `yaml:"databaseBackupTime,omitempty" json:"databaseBackupTime,omitempty" config:"OVH managed MySQL daily backup start time (HH:MM)" schema:"nullable"`
-	DatabaseBackupRegions          []string          `yaml:"databaseBackupRegions,omitempty" json:"databaseBackupRegions,omitempty" config:"OVH managed MySQL backup regions" schema:"nullable"`
-	DatabaseDeletionProtection     *bool             `yaml:"databaseDeletionProtection,omitempty" json:"databaseDeletionProtection,omitempty" config:"Enable OVH managed MySQL deletion protection" schema:"nullable"`
-	ValkeyFlavor                   string            `yaml:"valkeyFlavor,omitempty" json:"valkeyFlavor,omitempty" config:"OVH managed Valkey flavor" schema:"nullable"`
-	ValkeyPlan                     string            `yaml:"valkeyPlan,omitempty" json:"valkeyPlan,omitempty" config:"OVH managed Valkey plan (discovery/essential or business/production)" schema:"nullable,enum=discovery|essential|business|production"`
-	ValkeyVersion                  string            `yaml:"valkeyVersion,omitempty" json:"valkeyVersion,omitempty" config:"OVH managed Valkey engine version (7.2, 8.0, 8.1, 9.0, or 9.1; default 8.1)" schema:"nullable,enum=7.2|8.0|8.1|9.0|9.1"`
-	ValkeyNodeCount                int               `yaml:"valkeyNodeCount,omitempty" json:"valkeyNodeCount,omitempty" config:"OVH managed Valkey node count" schema:"nullable,minimum=1"`
-	ValkeyBackupTime               string            `yaml:"valkeyBackupTime,omitempty" json:"valkeyBackupTime,omitempty" config:"OVH managed Valkey daily backup start time (HH:MM)" schema:"nullable"`
-	ValkeyBackupRegions            []string          `yaml:"valkeyBackupRegions,omitempty" json:"valkeyBackupRegions,omitempty" config:"OVH managed Valkey backup regions" schema:"nullable"`
-	ValkeyDeletionProtection       *bool             `yaml:"valkeyDeletionProtection,omitempty" json:"valkeyDeletionProtection,omitempty" config:"Enable OVH managed Valkey deletion protection" schema:"nullable"`
-	MKSPlan                        string            `yaml:"mksPlan,omitempty" json:"mksPlan,omitempty" config:"OVH Managed Kubernetes plan" schema:"nullable,enum=free|standard"`
-	NodeFlavor                     string            `yaml:"nodeFlavor,omitempty" json:"nodeFlavor,omitempty" config:"MKS node pool flavor" schema:"nullable"`
-	NodeCount                      int               `yaml:"nodeCount,omitempty" json:"nodeCount,omitempty" config:"MKS node pool size" schema:"nullable"`
-	CPURequest                     string            `yaml:"cpuRequest,omitempty" json:"cpuRequest,omitempty" config:"Kubernetes CPU request" schema:"nullable"`
-	MemoryRequest                  string            `yaml:"memoryRequest,omitempty" json:"memoryRequest,omitempty" config:"Kubernetes memory request" schema:"nullable"`
-	DesiredWebReplicas             int               `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
-	QueueConsumerCount             int               `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
-	StateBucket                    string            `yaml:"stateBucket,omitempty" json:"stateBucket,omitempty" config:"S3-compatible DIY state bucket name" schema:"nullable"`
-	StateEndpoint                  string            `yaml:"stateEndpoint,omitempty" json:"stateEndpoint,omitempty" config:"Loopback S3-compatible endpoint override (Floci)" schema:"nullable"`
-	StateRegion                    string            `yaml:"stateRegion,omitempty" json:"stateRegion,omitempty" config:"S3-compatible region code for DIY state" schema:"nullable"`
-	Labels                         map[string]string `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
-}
-
-// ScalewayTarget holds provider-specific Scaleway semantic inputs. The adapter
-// owns the SDK topology; supported topology choices remain explicit and typed
-// here.
-type ScalewayTarget struct {
-	ProjectID                string            `yaml:"projectId" json:"projectId" config:"Scaleway project ID" schema:"minLength=1"`
-	Region                   string            `yaml:"region,omitempty" json:"region,omitempty" config:"Scaleway region (e.g. fr-par)" schema:"nullable"`
-	Zone                     string            `yaml:"zone,omitempty" json:"zone,omitempty" config:"Scaleway availability zone (e.g. fr-par-1)" schema:"nullable"`
-	NetworkCIDR              string            `yaml:"networkCidr,omitempty" json:"networkCidr,omitempty" config:"Private network IPv4 CIDR" schema:"nullable"`
-	Zones                    []string          `yaml:"zones,omitempty" json:"zones,omitempty" config:"Scaleway zones" schema:"nullable"`
-	ImageDigest              string            `yaml:"imageDigest,omitempty" json:"imageDigest,omitempty" config:"Signed immutable OCI image digest" schema:"nullable"`
-	DatabaseName             string            `yaml:"databaseName,omitempty" json:"databaseName,omitempty" config:"Magento database name" schema:"nullable"`
-	MasterUsername           string            `yaml:"masterUsername,omitempty" json:"masterUsername,omitempty" config:"Managed MySQL master username" schema:"nullable"`
-	EncryptionKeySecret      string            `yaml:"encryptionKeySecret,omitempty" json:"encryptionKeySecret,omitempty" config:"Secret reference for Magento encryption key" schema:"nullable"`
-	DatabaseNodeType         string            `yaml:"databaseNodeType,omitempty" json:"databaseNodeType,omitempty" config:"Scaleway RDB node type" schema:"nullable"`
-	DatabaseHighAvailability bool              `yaml:"databaseHighAvailability,omitempty" json:"databaseHighAvailability,omitempty" config:"Enable Scaleway RDB high availability"`
-	DatabaseBackupEnabled    *bool             `yaml:"databaseBackupEnabled,omitempty" json:"databaseBackupEnabled,omitempty" config:"Enable Scaleway RDB automated backups" schema:"nullable"`
-	DatabaseBackupFrequency  *int              `yaml:"databaseBackupFrequencyHours,omitempty" json:"databaseBackupFrequencyHours,omitempty" config:"Scaleway RDB automated backup frequency in hours" schema:"nullable,minimum=1"`
-	DatabaseBackupRetention  *int              `yaml:"databaseBackupRetentionDays,omitempty" json:"databaseBackupRetentionDays,omitempty" config:"Scaleway RDB automated backup retention in days" schema:"nullable,minimum=1"`
-	DatabaseBackupSameRegion *bool             `yaml:"databaseBackupSameRegion,omitempty" json:"databaseBackupSameRegion,omitempty" config:"Store Scaleway RDB logical backups in the instance region" schema:"nullable"`
-	DatabaseEncryptionAtRest *bool             `yaml:"databaseEncryptionAtRest,omitempty" json:"databaseEncryptionAtRest,omitempty" config:"Enable Scaleway RDB encryption at rest" schema:"nullable"`
-	RedisNodeType            string            `yaml:"redisNodeType,omitempty" json:"redisNodeType,omitempty" config:"Scaleway Redis node type" schema:"nullable"`
-	RedisVersion             string            `yaml:"redisVersion,omitempty" json:"redisVersion,omitempty" config:"Scaleway Redis engine version" schema:"nullable"`
-	RedisClusterSize         int               `yaml:"redisClusterSize,omitempty" json:"redisClusterSize,omitempty" config:"Scaleway Redis node count (1 standalone, 2 HA, 3-6 cluster mode)" schema:"nullable,minimum=1,maximum=6"`
-	CacheMode                string            `yaml:"cacheMode,omitempty" json:"cacheMode,omitempty" config:"Cache engine escape hatch" schema:"nullable,enum=redis"`
-	CPURequest               string            `yaml:"cpuRequest,omitempty" json:"cpuRequest,omitempty" config:"Kubernetes CPU request" schema:"nullable"`
-	MemoryRequest            string            `yaml:"memoryRequest,omitempty" json:"memoryRequest,omitempty" config:"Kubernetes memory request" schema:"nullable"`
-	DesiredWebReplicas       int               `yaml:"desiredWebReplicas,omitempty" json:"desiredWebReplicas,omitempty" config:"Desired web Deployment replicas" schema:"nullable"`
-	QueueConsumerCount       int               `yaml:"queueConsumerCount,omitempty" json:"queueConsumerCount,omitempty" config:"Queue consumer Deployment replicas" schema:"nullable"`
-	KapsuleVersion           string            `yaml:"kapsuleVersion,omitempty" json:"kapsuleVersion,omitempty" config:"Kapsule Kubernetes version" schema:"nullable"`
-	NodeType                 string            `yaml:"nodeType,omitempty" json:"nodeType,omitempty" config:"Kapsule pool node type" schema:"nullable"`
-	NodeCount                int               `yaml:"nodeCount,omitempty" json:"nodeCount,omitempty" config:"Kapsule pool size" schema:"nullable"`
-	StateBucket              string            `yaml:"stateBucket,omitempty" json:"stateBucket,omitempty" config:"S3-compatible DIY state bucket name" schema:"nullable"`
-	StateEndpoint            string            `yaml:"stateEndpoint,omitempty" json:"stateEndpoint,omitempty" config:"Loopback S3-compatible endpoint override (Floci)" schema:"nullable"`
-	StateRegion              string            `yaml:"stateRegion,omitempty" json:"stateRegion,omitempty" config:"S3-compatible region code for DIY state" schema:"nullable"`
-	Labels                   map[string]string `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
-}
-
 // GCPTarget holds provider-specific GCP semantic inputs. The adapter owns the
 // SDK topology; supported topology choices remain explicit and typed here.
 type GCPTarget struct {
@@ -519,12 +437,12 @@ type AWSTarget struct {
 	AvailabilityZones        []string             `yaml:"availabilityZones,omitempty" json:"availabilityZones,omitempty" config:"AWS availability zones" schema:"nullable"`
 	MediaDomain              string               `yaml:"mediaDomain,omitempty" json:"mediaDomain,omitempty" config:"Media delivery domain" schema:"nullable"`
 	NatMode                  string               `yaml:"natMode,omitempty" json:"natMode,omitempty" config:"Private subnet egress mode" schema:"nullable,enum=nat-gateway|fck-nat"`
-	NatTopology              string               `yaml:"natTopology,omitempty" json:"natTopology,omitempty" config:"AWS NAT failure-domain topology; omitted defaults to single-AZ for preview and multi-AZ for standard/high-availability" schema:"nullable,enum=single-az|multi-az"`
-	NatReplacementMode       string               `yaml:"natReplacementMode,omitempty" json:"natReplacementMode,omitempty" config:"AWS fck-nat replacement mode; omitted defaults to automatic replacement for multi-AZ fck-nat" schema:"nullable,enum=none|auto-scaling"`
-	NatInstanceType          string               `yaml:"natInstanceType,omitempty" json:"natInstanceType,omitempty" config:"ARM64 fck-nat instance type; omitted defaults to cost-optimized t4g.nano" schema:"nullable"`
+	NatTopology              string               `yaml:"natTopology,omitempty" json:"natTopology,omitempty" config:"NAT placement across AWS availability zones. Defaults to one zone for preview and multiple zones for standard or high availability" schema:"nullable,enum=single-az|multi-az"`
+	NatReplacementMode       string               `yaml:"natReplacementMode,omitempty" json:"natReplacementMode,omitempty" config:"How AWS replaces fck-nat instances. Defaults to automatic replacement for multi-AZ fck-nat" schema:"nullable,enum=none|auto-scaling"`
+	NatInstanceType          string               `yaml:"natInstanceType,omitempty" json:"natInstanceType,omitempty" config:"ARM64 instance type for fck-nat. Defaults to t4g.nano to reduce cost" schema:"nullable"`
 	Labels                   map[string]string    `yaml:"labels,omitempty" json:"labels,omitempty" config:"Resource labels" schema:"nullable"`
 	Existing                 AWSExistingResources `yaml:"existing,omitempty" json:"existing,omitempty" config:"Existing AWS resources" schema:"nullable"`
-	Catalog                  AWSCatalog           `yaml:"catalog,omitempty" json:"catalog,omitempty" config:"Benchmark-selected service catalog"`
+	Catalog                  AWSCatalog           `yaml:"catalog,omitempty" json:"catalog,omitempty" config:"AWS runtime and service settings"`
 }
 
 type AWSExistingResources struct {
@@ -553,18 +471,17 @@ type AWSExistingDatabase struct {
 }
 
 type AWSCatalog struct {
-	Version        string `yaml:"version,omitempty" json:"version,omitempty" config:"Benchmark catalog version" schema:"nullable"`
+	Version        string `yaml:"version,omitempty" json:"version,omitempty" config:"AWS service settings version" schema:"nullable"`
 	DatabaseEngine string `yaml:"databaseEngine,omitempty" json:"databaseEngine,omitempty" config:"Database engine shape" schema:"nullable,enum=aurora-mysql|rds-mysql|rds-mariadb"`
 	SearchMode     string `yaml:"searchMode,omitempty" json:"searchMode,omitempty" config:"OpenSearch provisioning mode" schema:"nullable,enum=serverless|provisioned|disabled"`
 	QueueMode      string `yaml:"queueMode,omitempty" json:"queueMode,omitempty" config:"Magento messaging broker mode" schema:"nullable,enum=db|amazon-mq|ecs-rabbitmq|ecs-artemis"`
-	// These fields are semantic AWS durability controls. They intentionally do
-	// not expose Pulumi or AWS SDK maps; omitted values retain the safe preset
-	// defaults used by the AWS stack.
+	// The AWS stack uses preset defaults for any omitted backup and retention
+	// settings. These fields map those settings to Pulumi and the AWS APIs.
 	DatabaseBackupWindow           string              `yaml:"databaseBackupWindow,omitempty" json:"databaseBackupWindow,omitempty" config:"AWS RDS/Aurora automated backup window in UTC" schema:"nullable"`
 	DatabaseMaintenanceWindow      string              `yaml:"databaseMaintenanceWindow,omitempty" json:"databaseMaintenanceWindow,omitempty" config:"AWS RDS/Aurora maintenance window in UTC" schema:"nullable"`
 	DatabaseDeletionProtection     *bool               `yaml:"databaseDeletionProtection,omitempty" json:"databaseDeletionProtection,omitempty" config:"Enable AWS RDS/Aurora deletion protection" schema:"nullable"`
 	DatabaseDeleteAutomatedBackups *bool               `yaml:"databaseDeleteAutomatedBackups,omitempty" json:"databaseDeleteAutomatedBackups,omitempty" config:"Delete AWS RDS/Aurora automated backups when the database is destroyed" schema:"nullable"`
-	CacheSnapshotRetentionLimit    *int                `yaml:"cacheSnapshotRetentionLimit,omitempty" json:"cacheSnapshotRetentionLimit,omitempty" config:"AWS ElastiCache Valkey automatic snapshot retention in days; zero disables snapshots" schema:"nullable,minimum=0,maximum=35"`
+	CacheSnapshotRetentionLimit    *int                `yaml:"cacheSnapshotRetentionLimit,omitempty" json:"cacheSnapshotRetentionLimit,omitempty" config:"Days to retain ElastiCache Valkey snapshots. Set to 0 to disable automatic snapshots" schema:"nullable,minimum=0,maximum=35"`
 	CacheSnapshotWindow            string              `yaml:"cacheSnapshotWindow,omitempty" json:"cacheSnapshotWindow,omitempty" config:"AWS ElastiCache Valkey daily snapshot window in UTC" schema:"nullable"`
 	Aurora                         AWSCatalogAurora    `yaml:"aurora,omitempty" json:"aurora,omitempty" config:"Aurora or RDS MySQL capacity"`
 	Valkey                         AWSCatalogValkey    `yaml:"valkey,omitempty" json:"valkey,omitempty" config:"Valkey capacity"`
@@ -658,10 +575,6 @@ type Defaults struct {
 	Region string `yaml:"region,omitempty" json:"region,omitempty" config:"Default AWS region"`
 	Preset string `yaml:"preset,omitempty" json:"preset,omitempty" config:"Default infrastructure preset" schema:"enum=preview|standard|high-availability"`
 }
-type Compatibility struct {
-	AllowUnsupported bool `yaml:"allowUnsupported,omitempty" json:"allowUnsupported,omitempty" config:"Legacy compatibility override; Adobe deviations now produce warnings"`
-}
-
 type Environment struct {
 	Services           map[string]ServiceBinding `yaml:"services,omitempty" json:"services,omitempty" config:"Magento service families, versions, ownership and connection settings"`
 	Inherits           string                    `yaml:"inherits,omitempty" json:"inherits,omitempty" config:"Parent environment"`
@@ -684,7 +597,6 @@ type Environment struct {
 	Email              *EmailConfig              `yaml:"email,omitempty" json:"email,omitempty"`
 	Resilience         *ResilienceConfig         `yaml:"resilience,omitempty" json:"resilience,omitempty"`
 	Defaults           *Defaults                 `yaml:"defaults,omitempty" json:"defaults,omitempty"`
-	Compatibility      *Compatibility            `yaml:"compatibility,omitempty" json:"compatibility,omitempty"`
 	Extensions         map[string]any            `yaml:"extensions,omitempty" json:"extensions,omitempty"`
 }
 
@@ -701,7 +613,6 @@ type document struct {
 	Email         EmailConfig               `yaml:"email,omitempty" config:"Cloud transactional email"`
 	Resilience    ResilienceConfig          `yaml:"resilience,omitempty" config:"Availability, backup, and disaster-recovery policy"`
 	Defaults      Defaults                  `yaml:"defaults" config:"Project defaults"`
-	Compatibility Compatibility             `yaml:"compatibility,omitempty" config:"Compatibility policy"`
 	Environments  map[string]Environment    `yaml:"environments,omitempty" config:"Named deployment environments" schema:"required,minProperties=1"`
 	Extensions    map[string]any            `yaml:"extensions,omitempty" config:"Namespaced extension settings"`
 }

@@ -14,7 +14,7 @@ func TestBundledManifestContainsOnlyShopSkills(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	contributorSkills, err := os.ReadDir(filepath.Join("..", "..", "contrib", "skills"))
+	contributorSkills, err := os.ReadDir(filepath.Join("..", "..", ".agents", "skills"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,5 @@
 # Trivy ignore for linux-libc-dev (Debian kernel UAPI headers).
 # Magento runtime images do not boot this kernel; findings are headers-only noise.
-# Do not ignore FrankenPHP gobinary advisories here — bump dunglas/frankenphp instead.
 # Source: force-all run 30831624434 (2026-08-03).
 
 CVE-2026-53399
@@ -32,17 +31,3 @@ CVE-2026-64552
 CVE-2026-64556
 CVE-2026-64558
 CVE-2026-64600
-
-# Upstream dunglas/frankenphp gobinary (not MageLift Go modules).
-# Version 1.12.7 vendored kin-openapi@v0.140.0 and grpc@v1.81.1.
-# Drop when FrankenPHP ships fixed versions; do not ignore MageLift module CVEs here.
-GHSA-r277-6w6q-xmqw
-GHSA-hrxh-6v49-42gf
-# 2026-09-15: 5 HIGH in the frankenphp gobinary, all fixed upstream
-# (kin-openapi 0.141.0/0.142.0, x/crypto 0.55.0, grpc-go 1.83.x) but
-# Observed in v1.12.7; re-check against the current image before removing.
-CVE-2026-76905
-CVE-2026-77354
-CVE-2026-56854
-CVE-2026-84304
-CVE-2026-84445

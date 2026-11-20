@@ -408,7 +408,7 @@ func validateResilienceOperationEvidence(descriptor ResilienceAdapterDescriptor,
 }
 
 // Inventory exposes the provider-owned final cleanup truth without extending
-// the portable ResilienceAdapter interface. Certification callers can use the
+// the portable ResilienceAdapter interface. Callers can use the
 // optional interface when they need a direct owning-service assertion.
 func (a *OperationBackedResilienceAdapter) Inventory(ctx context.Context, ownershipMarker string) ([]ResilienceInventoryResource, error) {
 	if a == nil || a.client == nil {

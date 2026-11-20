@@ -68,7 +68,7 @@ func TestRegisterPublicModuleAdaptsPlanAndProgram(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if planned.StackName() != "shop-staging" || planned.Region() != "eu-west-3" || planned.CertificationTier() != TierExperimental {
+	if planned.StackName() != "shop-staging" || planned.Region() != "eu-west-3" || planned.RuntimeTier() != TierExperimental {
 		t.Fatalf("planned stack = %#v", planned)
 	}
 	planned, err = planned.WithImageDigest("registry.example/shop@sha256:" + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
@@ -268,13 +268,13 @@ func TestPublicPlanRequestCarriesCrossCuttingIntent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if request.Edge.ExternalProvider != "fastly" || request.Edge.Lifecycle != sdk.ExternalLifecycleExtension || request.Edge.Certification != sdk.ExternalExperimental || len(request.Edge.CredentialRefs) != 1 || request.Edge.ServiceReference != "service-123" || !request.Edge.TLS || request.Edge.PolicyReference != "artifacts/edge.vcl" {
+	if request.Edge.ExternalProvider != "fastly" || request.Edge.Lifecycle != sdk.ExternalLifecycleExtension || len(request.Edge.CredentialRefs) != 1 || request.Edge.ServiceReference != "service-123" || !request.Edge.TLS || request.Edge.PolicyReference != "artifacts/edge.vcl" {
 		t.Fatalf("edge intent = %#v", request.Edge)
 	}
 	if request.Edge.Health.OriginURL != "https://origin.example.com/health" || request.Edge.Health.ExpectedRouteTarget != "dualstack.e.sni.global.fastly.net" || request.Edge.Health.RouteTimeoutSeconds != 90 {
 		t.Fatalf("edge health intent = %#v", request.Edge.Health)
 	}
-	if request.Observability.ExternalProvider != "datadog" || request.Observability.NativeReference != "native-destination-123" || request.Observability.Lifecycle != sdk.ExternalLifecycleExtension || request.Observability.Certification != sdk.ExternalExperimental || !request.Observability.Logs || request.Observability.Labels["team"] != "commerce" {
+	if request.Observability.ExternalProvider != "datadog" || request.Observability.NativeReference != "native-destination-123" || request.Observability.Lifecycle != sdk.ExternalLifecycleExtension || !request.Observability.Logs || request.Observability.Labels["team"] != "commerce" {
 		t.Fatalf("observability intent = %#v", request.Observability)
 	}
 	if request.Resilience.Projection == nil || request.Resilience.Projection.Runtime != "ecs" || request.Resilience.Projection.Cluster != "shop" || request.Resilience.Projection.Service != "web" || request.Resilience.Projection.Container != "php" {

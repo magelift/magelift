@@ -156,7 +156,7 @@ type NativeAPIConfig struct {
 }
 
 // NativeAPI translates the provider-neutral recovery port to the official AWS
-// SDK. It is safe to construct once and reuse across certification stages; no
+// SDK. It is safe to construct once and reuse across recovery stages; no
 // operation state is held in memory, so Poll can resume in a new process.
 type NativeAPI struct {
 	rds     RDSAPI
@@ -213,7 +213,7 @@ func NewAWSNativeAPI(ctx context.Context, config NativeAPIConfig, opts ...func(*
 }
 
 // NewAWSSQSNativeAPI constructs only the SQS translator and its official SDK
-// client. It is intended for focused certification cells so queue tests do not
+// client. It is intended for focused queue recovery so callers do not
 // require an archive bucket or construct unrelated AWS service clients.
 func NewAWSSQSNativeAPI(ctx context.Context, config NativeAPIConfig, opts ...func(*awsconfig.LoadOptions) error) (*NativeAPI, error) {
 	if ctx == nil {

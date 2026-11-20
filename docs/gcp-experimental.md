@@ -1,10 +1,10 @@
-# GCP target (GKE Autopilot and Standard)
+# Google Cloud runtimes
 
 The GCP plugin supports GKE Autopilot and experimental GKE Standard. The August 2026 runs exercised Magento 2.4.9, a migration job, Secret Manager, logs, exec and health checks on specific environments. The Standard run used Memorystore Valkey 9.0. A separate run provisioned a 9.1 preview instance. The records list the versions, operations and teardown results for each run. [Autopilot run](evidence/gcp-gke-autopilot-magento-live-gcap28-20260820.md) · [Standard run](evidence/gcp-gke-standard-magento-valkey90-live-20260815.md) · [Capability guide](capability-matrix.md)
 
-## Day-2 status
+## Stack operations
 
-The plugin manages state in Cloud Storage and can provision a Workload Identity Federation pool, provider and CI service account. It reads `gcp-secret-manager://` references through Secret Manager. Tests cover planning, migration jobs and Kubernetes workload operations. Hosted GitHub identity exchange and recovery depend on the identity and services configured in the shop’s account. [Bootstrap](bootstrap.md) · [GCP test records](gcp-acceptance.md)
+The plugin manages state in Cloud Storage and can provision a Workload Identity Federation pool, provider and CI service account. It reads `gcp-secret-manager://` references through Secret Manager. Tests cover planning, migration jobs and Kubernetes workload operations. Hosted GitHub identity exchange and recovery depend on the identity and services configured in the shop’s account. [Bootstrap](bootstrap.md) · [Provider support](capability-matrix.md)
 
 ## Target
 
@@ -25,7 +25,7 @@ $target = [
 ];
 ```
 
-## Magento capability map (production-shaped)
+## Service settings by preset
 
 | Magento need | Preview | Standard / HA |
 | --- | --- | --- |
@@ -49,20 +49,13 @@ privileged initialization, so HA selects Standard; see Google's
 [Autopilot security measures](https://cloud.google.com/kubernetes-engine/docs/concepts/autopilot-security)
 and [Standard node system configuration](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/node-system-config).
 
-## GitHub WIF
+## GitHub identity
 
-Bootstrap `Ensure` provisions a workload identity pool, GitHub OIDC provider
-(`https://token.actions.githubusercontent.com`), attribute condition
-`assertion.repository == 'magelift/magelift'`, and a CI service account with
-`roles/iam.workloadIdentityUser`. Details expose `wif.provider` / `wif.serviceAccount`
-(never `"deferred"`). Do not commit a service-account key.
-
-This repository does not run that token exchange. The hosted workflow is
-`magelift.yml` in
-[acceptance-magento-249](https://github.com/magelift/acceptance-magento-249).
-A local acceptance cell can impersonate the CI service account with `gcloud`.
-That checks IAM on the account. It does not present a token signed by
-`token.actions.githubusercontent.com`.
+Bootstrap can create a Workload Identity Federation pool and separate
+GitHub build and deploy service accounts. Review the permission plan and
+bind it to the shop repository. The build identity needs registry access.
+The deploy identity needs the roles for the resources MageLift uses.
+[Configure GitHub for Google Cloud](bootstrap.md) · [Staging walkthrough](onboarding.md)
 
 ## Offline verification
 
@@ -70,8 +63,3 @@ That checks IAM on the account. It does not present a token signed by
 - `make floci-gcp-test` starts the digest-pinned GCP emulator on port 4588 and exercises Cloud Storage, Secret Manager, Pub/Sub, Logging and Monitoring with the Go clients.
 - WIF unit proof: `go test ./providers/gcp/bootstrap/ -count=1 -run 'WIF|Identity'`
 - Composer SM: `go test ./providers/gcp/secrets/ ./internal/cli/ -count=1 -run 'Secret|Composer|GCP'`
-
-## Real cloud
-
-See [gcp-acceptance.md](gcp-acceptance.md). Use a **pullable** image digest for `up`
-(placeholder digests fail ImagePull). Destroy + assert_clean always.

@@ -20,7 +20,7 @@ const (
 type StandaloneRuntime struct {
 	Provider   sdk.ProviderID
 	Runtime    sdk.RuntimeID
-	Tier       platform.CertificationTier
+	Tier       platform.RuntimeTier
 	OptIn      bool
 	Edge       bool
 	Resilience bool

@@ -100,7 +100,7 @@ func (d *CachedDialer) Do(ctx context.Context) (*Client, error) {
 
 // Close reaps the cached provider process. It is safe to call more than once
 // and safe on a nil dialer. The cached client is dropped so a later Do dials
-// again instead of returning a dead session.
+// again after closing a dead session.
 func (d *CachedDialer) Close() {
 	if d == nil {
 		return

@@ -1,28 +1,17 @@
-# ADR 0020: GCP native edge URL and ingress address
+# ADR 0020. Report the shop URL and ingress address separately
 
-- Status: Accepted
-- Date: 2026-10-18
+Accepted on 2026-10-18.
 
-## Context
+GKE Ingress reports the load balancer's IP address or hostname. The
+certificate and routing rules use the shop's domain. Developers need both
+values when they set up DNS and check HTTPS.
 
-GKE Ingress publishes a load balancer IP while its managed certificate and
-routing use the configured shop hostname. Returning an HTTPS IP as the
-application URL breaks certificate and hostname checks.
+Once the native ingress has an address, `applicationURL` uses the shop
+hostname and TLS scheme. `nativeEdgeIngressAddress` holds the raw load
+balancer address for the DNS record. Both native values stay empty while the
+ingress is waiting for an address. The raw address output is empty when
+native edge is disabled.
 
-## Decision
-
-For GCP native edge, `applicationURL` uses the configured hostname and TLS
-scheme once Ingress publishes a load balancer address. The existing stack
-outputs gain `nativeEdgeIngressAddress`, containing the raw IP or hostname
-needed for customer-managed DNS. Both values stay empty before an address is
-available. The address output stays empty when native edge is disabled.
-
-This changes outputs only. It creates no DNS records or additional resources,
-and adds no YAML key, manifest or RPC method. Ingress readiness alone does not
-prove DNS delegation, certificate activation or application health.
-
-## Verification
-
-Local regressions cover hostname URLs, TLS schemes, missing addresses, IP and
-hostname load balancer addresses, and unchanged resource counts. Live HTTPS
-and application health remain separate acceptance checks.
+Local tests cover absent addresses, raw IPs and hostnames, and the URL's
+scheme and hostname. After creating the DNS record, check the certificate
+and storefront in the deployed environment. [Cloud setup](../bootstrap.md)

@@ -1,19 +1,23 @@
 # Operational ownership and escalation
 
-This document describes the ownership boundary for recovery, telemetry, and edge operations. Provider SDKs and community extensions implement the native calls; the MageLift core owns validation, fingerprints, idempotency, checkpoints, evidence requirements, and cleanup gates.
+Cloud providers and community extensions make native recovery, telemetry
+and edge API calls. MageLift validates requests, records their fingerprints
+and checkpoints, and checks evidence and ownership before cleanup. It uses
+idempotency keys so a retry refers to the same operation.
 
 ## Automation-owned actions
 
-Automation may perform these actions only inside an admitted ownership scope and with a bounded context:
+Automation can act on resources in the verified ownership scope within the
+operation's time limit.
 
-- validate provider credentials as references and refuse plaintext values;
-- build a provider-neutral architecture, observability, edge, and recovery plan;
-- create and poll provider operations using stable idempotency keys;
-- create backups, restore into an explicitly selected destination, and write operation identities to the checkpoint;
-- verify scrubbed known-content manifests, checksums, counts, permissions, health, and measured durations;
-- configure provider-native telemetry and external OTLP destinations through their adapters;
-- apply only health-gated edge routes, purge owned content, and verify post-purge behavior;
-- delete resources carrying the exact ownership marker and reconcile delayed provider tombstones.
+- Validate credential references and refuse plaintext values.
+- Plan infrastructure, recovery, telemetry and edge changes using shared types.
+- Start and poll provider operations with stable idempotency keys.
+- Back up or restore into the selected destination. Record the operation ID in the checkpoint.
+- Check scrubbed manifests, checksums, counts, permissions, health and timings.
+- Configure cloud telemetry and external OTLP destinations through their adapters.
+- Check route health before applying edge changes. Purge owned content and verify the result.
+- Delete resources with the exact ownership marker and reconcile delayed provider tombstones.
 
 Automation must stop and report `BLOCKED` when a capability is unavailable, a credential or quota admission check fails, an operation exceeds its timeout budget, a provider returns an unknown state, or an inventory contains an unmarked resource.
 
@@ -32,12 +36,15 @@ The operator records the action, approval identity, provider operation ID, desti
 
 ## Escalation rules
 
-1. A failed or ambiguous provider operation is retried only by the provider adapter within its declared budget. The core checkpoint remains authoritative for completed stages.
-2. A data-integrity mismatch escalates to the data owner and blocks failover or certification; it is not converted into a rebuild success.
+1. The provider adapter handles retries within its declared budget. Use the MageLift checkpoint to see which stages completed.
+2. A data-integrity mismatch blocks failover. Send the restore results to the data owner.
 3. A fencing or route-health check that fails escalates to the on-call operator and blocks traffic mutation.
-4. A cleanup mismatch escalates to the resource owner. Unmarked resources are preserved, and delayed tombstones are reported separately from live resources.
-5. A provider or integration without an adapter is recorded as `unavailable` or `unsupported`; it is never represented as a successful no-op.
+4. Send cleanup mismatches to the resource owner. MageLift leaves unmarked resources in place and lists delayed tombstones separately from live resources.
+5. MageLift reports a missing adapter as `unavailable` or `unsupported`.
 
 ## Provider and extension boundary
 
-AWS, GCP, Scaleway, OVHcloud, Fastly, New Relic, and community implementations receive the same semantic intent and ownership marker. Their SDK/API schemas remain inside the implementation package. Adding a provider therefore adds an adapter and capability records; it does not add a second core recovery, evidence, or scheduling model.
+Cloud and external adapters receive the operation and its ownership marker.
+The implementation package contains the provider's API types. A new adapter
+supplies capability records and uses the existing recovery, evidence and
+scheduling contracts.

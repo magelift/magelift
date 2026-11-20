@@ -21,15 +21,18 @@ func TestDestroyPreviewRequestKeepsDestroyFlag(t *testing.T) {
 		return backend, nil
 	}
 	o.newLock = func(context.Context, platform.PlannedStack) (func(context.Context) error, error) {
-		t.Fatal("destroy preview regression must not acquire the provider lock")
-		return nil, nil
+		backend.calls = append(backend.calls, "lock")
+		return func(context.Context) error {
+			backend.calls = append(backend.calls, "unlock")
+			return nil
+		}, nil
 	}
 	cmd := newCommandWithOptions(o)
-	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "destroy", "--skip-lock"})
+	cmd.SetArgs([]string{"--config", path, "--env", "staging", "--yes", "destroy"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(backend.calls, []string{"preview", "destroy"}) {
+	if !reflect.DeepEqual(backend.calls, []string{"lock", "preview", "destroy", "unlock"}) {
 		t.Fatalf("backend calls = %v", backend.calls)
 	}
 	if len(backend.requests) != 2 || !backend.requests[0].Destroy || !backend.requests[1].Destroy {

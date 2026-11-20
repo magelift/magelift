@@ -144,16 +144,6 @@ func (c *Client) Verify(ctx context.Context, reference string, options VerifyOpt
 	return nil
 }
 
-// VerifyArtifact exposes the provider-neutral verification shape used by the
-// certification artifact boundary while keeping cosign's policy type private
-// to this package.
-func (c *Client) VerifyArtifact(ctx context.Context, reference, certificateIdentity, oidcIssuer string) error {
-	return c.Verify(ctx, reference, VerifyOptions{
-		CertificateIdentity: certificateIdentity,
-		OIDCIssuer:          oidcIssuer,
-	})
-}
-
 func (c *Client) VerifyBlob(ctx context.Context, bundlePath, artifactPath string, options VerifyOptions) error {
 	if !validBlobPath(bundlePath) || !validBlobPath(artifactPath) {
 		return ErrInvalidBlobPath

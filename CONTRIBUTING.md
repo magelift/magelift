@@ -1,143 +1,59 @@
 # Contributing
 
-Open an issue before starting a large change so maintainers can discuss the design.
+For a first change, fix a broken link, document a confusing setup step, or add a
+regression to an existing test. For a change that spans providers or alters
+deployment behavior, open an issue with an example shop and the result you
+expect.
 
-## Agents
+## Set up the checkout
 
-Root [`AGENTS.md`](AGENTS.md) is the always-on agent guide. Contributor skills
-live under [`contrib/skills/`](contrib/skills/). User skills live under
-[`agents/`](agents/README.md) and are the only skills embedded in release
-binaries. Symlink contributor skills into your local `.cursor/skills` or
-`.claude/skills` when useful; those dirs stay gitignored. Do not commit
-personal agent caches or third-party skill packs.
-
-## 30-minute first PR
-
-Pick a `good first issue`, or:
-
-1. Fix a typo / dead link in `docs/` or `README.md`.
-2. Add a unit test beside an existing `_test.go` that already covers a nearby case.
-3. Extend `examples/custom-cli` comments if a provider-author step confused you.
-
-Then:
+Use the Go version in [go.mod](go.mod), PHP 8.3 or later, and Composer. Install
+the build package's dependencies once.
 
 ```sh
-# After: composer install --working-dir=build  (once)
-make verify-community   # GCP community alpha; no cloud credentials required
+composer install --working-dir=build
+make verify-community
 ```
 
-Open a PR with: what changed, how you verified, risk (usually “docs/test only”).
-Maintainers merge Dependabot when CI is green and the bump is patch/minor in an
-already-pinned ecosystem group; major bumps need a human review note.
+The CLI, SDK, and each provider have their own Go module. Run `make test-fast`
+to test all of them. Install Docker to run Floci and the local shop workflows.
+Pinned versions of the documentation and Go tools are selected by the Makefile.
 
-## Prerequisites
+## Verify a change
 
-For `make verify-community` (the community alpha local gate):
-
-- **Go** toolchain matching [`go.mod`](go.mod) (CI uses `go-version-file`)
-- **PHP 8.3+** and **Composer**, required because the verification gate runs `php-test`
-  on the `build/` Magento package. After clone, once: `composer install --working-dir=build`
-- **MkDocs**, required for `make docs` in the broader verification suite (strict link/nav build)
-
-Pulled automatically via pinned `go run` from Makefile targets (no separate
-global install needed for these):
-
-- golangci-lint (`make lint`)
-- go-licenses (`make license-check`)
-- actionlint (`make workflow-check`)
-
-Optional / situational:
-
-- **Docker**, only for Floci, image builds, and local Compose (`make floci-aws-test`,
-  `make floci-gcp-test`, `make local-gates`, `magelift local`, image targets). Required for the container PHP fallback when host extensions are missing.
-- **AWS or GCP credentials**, only for real-cloud acceptance targets
-  (`make aws-acceptance-local`, `make gcp-acceptance-local`).
-
-Layout:
-
-- `cmd/`: CLI and generators
-- `providers/<name>/`: AWS, GCP and Azure executables, Pulumi code and Floci tests
-- `internal/`: CLI, config, deploy, automation, `platform`, `cloud/<provider>`
-- `sdk/`: portable Target / Capability / Hook types
-- `build/`: Composer Magento package (not the Go build tree)
-- `images/`: optional nginx/PHP-FPM, Apache and FrankenPHP classic build recipes
-- `schema/`: generated JSON Schema for `magelift.php`
-- `docs/`: MkDocs; ADRs in `docs/adr/`; short evidence pack in `docs/evidence/`
-- `tests/`: Floci and fixtures ([tests/README.md](tests/README.md))
-
-## Principles
-
-- Use `magelift.php` for shop configuration. The PaaS importers read their vendors’ YAML formats.
-- Prefer per-provider adapters over shared cloud graphs (ADR 0003, 0004).
-- Keep config and deploy behavior deterministic.
-- Do not copy private or employer-owned source, docs, IDs, or secrets.
-- Record design inputs in `docs/provenance.md`; keep third-party notices.
-- Never commit credentials, customer data, build artifacts, or Pulumi state.
-
-Live tests require an explicitly authorized acceptance target. A local green
-gate is not live cloud evidence.
-
-## Changes
-
-1. Branch from `main`.
-2. Add tests and docs with behavior changes.
-3. Run `make verify-community` plus checks appropriate to your change.
-4. Conventional Commit subject, e.g. `feat(config): explain provenance`.
-5. Open a PR with the template (risk, compatibility, how you verified).
-
-Signed releases need attributable commits. Maintainers may ask for signed commits
-or a DCO before a public release. Contributions are Apache-2.0 unless stated
-otherwise.
-
-## Testing
-
-| Goal | Command |
+| Change | Check |
 | --- | --- |
-| Community alpha local gate | `make verify-community` |
-| Go suites for the CLI, SDK, AWS, GCP and Azure | `make test-fast` |
-| Provider dependency files against this checkout | `make provider-tidy-check` |
-| Broader verification suite | `make verify` |
-| Account-free stack (mocks + harness + Floci) | `make local-gates` |
-| Pulumi mock graphs | `make pulumi-mock-test` |
-| Account-free AWS paths | `make floci-aws-test` |
-| Account-free GCP paths | `make floci-gcp-test` |
-| Account-free Azure paths | `make floci-azure-test` |
-| Shop workflow with a local registry | `make ci-act-project` |
-| Real AWS (destroy on exit; light smoke) | `make aws-acceptance-local`; read `docs/aws-acceptance.md` |
-| Real GCP (reference recipe; destroy on exit) | `make gcp-acceptance-local`; read `docs/gcp-acceptance.md` |
+| Go, PHP, or scripts | `make verify-community` |
+| Provider or state operations | `make local-gates` |
+| Generated shop workflow | `make ci-act-project` |
+| Schema, CLI help, or bundled skills | `make generate`, then review the diff |
+| Documentation | `make docs` |
+| Landing site | `npm --prefix website run build:site` |
 
-### Local verification vs hosted CI
+Report the command you ran, the configuration it used, and what passed or
+failed. CI uses Floci for cloud APIs. A live run needs explicit authorization
+for a dedicated account, an owner for cleanup, and teardown on exit. Keep
+credentials, Pulumi state, customer data, and vendor source out of the checkout.
+[Clean-room rules](docs/provenance.md)
 
-The community alpha contributor gate is local **`make verify-community`**. Hosted GitHub Actions runs on
-the public `magelift/magelift` repo. Path-filtered CI on `main` must stay green
-before release qualification. Lint partition timing and policy live in
-[docs/lint-policy.md](docs/lint-policy.md). See also
-[docs/release-readiness.md](docs/release-readiness.md).
+## Find the code
 
-Optional: `make ci-act-go` runs Go CI jobs locally via nektos/act, one
-container at a time, so two hosted Go jobs do not share one laptop. Go
-inside each job still parallelizes under `GOMEMLIMIT`. This is not a
-substitute for full `make verify` (missing php-test, docs, and other
-local targets). More detail: [tests/README.md](tests/README.md).
+- `cmd/magelift` starts the CLI. `internal/cli` implements its commands.
+- `sdk/` defines shared types and the plugin protocol.
+- `providers/aws/`, `providers/gcp/`, and `providers/azure/` each build a provider plugin.
+- `build/` contains the PHP build package. `images/` contains the bundled nginx
+  recipe and Varnish configuration.
+- `docs/` contains the guides. `website/` contains the landing site.
 
-`make` sets `GOMEMLIMIT` to 75% of available RAM (`scripts/go-memlimit.sh`)
-and leaves `GOMAXPROCS` and compile `-p` to the toolchain.
+See the [architecture guide](docs/architecture.md) for package boundaries.
 
-## Adding a provider
+## Agent skills
 
-CLI planning and Pulumi programs go through `platform.ModuleRegistry`
-(`RegisterModule`). `internal/infra.Registry` alone does not wire deploy.
-Checklist: [docs/adding-a-provider.md](docs/adding-a-provider.md). Rules: ADR 0003,
-0004, 0008.
+Contributor skills live in [`.agents/skills/`](.agents/skills/) so agents can
+discover them from the checkout. The CLI bundles the [shop skills](agents/README.md)
+from `agents/skills/`. Update the relevant skill when you change a command it
+teaches.
 
-## Architecture decisions
-
-Hard-to-reverse boundary changes need an ADR under `docs/adr/`. Amend an existing
-ADR when the decision evolves.
-
-## Compatibility and security
-
-Do not quietly weaken compatibility, protection, validation, or secret handling.
-Report vulnerabilities via `SECURITY.md`, not a public issue.
-
-Follow `CODE_OF_CONDUCT.md`.
+Open a pull request with the problem, the change, and the checks you ran.
+Use a Conventional Commit subject when creating commits, such as
+`fix(config): explain an invalid service setting`.

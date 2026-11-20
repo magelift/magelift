@@ -106,19 +106,19 @@ func TestProjectionTargetValidation(t *testing.T) {
 
 func TestValidateEdgeAndObservabilityCompositions(t *testing.T) {
 	if err := ValidateEdgeIntent(EdgeIntent{
-		ExternalProvider: "fastly", Lifecycle: ExternalLifecycleExtension, Certification: ExternalExperimental,
+		ExternalProvider: "fastly", Lifecycle: ExternalLifecycleExtension,
 		Mode: "both", NativeProvider: "cloudfront", CredentialRefs: []string{"secret://fastly/token"},
 		OriginHealthRef: "health/origin", Domains: []string{"shop.example.com"}, TLS: true, TLSMode: "managed", DNSMode: "external", OwnershipMarker: "magelift/test/edge",
 		Health: EdgeHealthIntent{OriginURL: "https://origin.example.com/health", ExpectedRouteTarget: "dualstack.e.sni.global.fastly.net", RoutePath: "/health", ExpectedStatus: 200, RouteTimeoutSeconds: 90, RoutePollSeconds: 2},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	invalidHealth := EdgeIntent{Mode: "external", ExternalProvider: "fastly", Lifecycle: ExternalLifecycleExtension, Certification: ExternalExperimental, OriginHealthRef: "health/origin", Domains: []string{"shop.example.com"}, OwnershipMarker: "magelift/test/edge", Health: EdgeHealthIntent{ExpectedStatus: 99}}
+	invalidHealth := EdgeIntent{Mode: "external", ExternalProvider: "fastly", Lifecycle: ExternalLifecycleExtension, OriginHealthRef: "health/origin", Domains: []string{"shop.example.com"}, OwnershipMarker: "magelift/test/edge", Health: EdgeHealthIntent{ExpectedStatus: 99}}
 	if err := ValidateEdgeIntent(invalidHealth); err == nil || !strings.Contains(err.Error(), "expected status") {
 		t.Fatalf("invalid edge health status was accepted: %v", err)
 	}
 	if err := ValidateObservabilityIntent(ObservabilityIntent{
-		ExternalProvider: "newrelic", Lifecycle: ExternalLifecycleExtension, Certification: ExternalExperimental,
+		ExternalProvider: "newrelic", Lifecycle: ExternalLifecycleExtension,
 		OwnershipMarker: "magelift/architecture/test",
 		CredentialRefs:  []string{"secret://newrelic/license"},
 		Signals:         []string{"logs", "metrics", "traces"}, Logs: true, Metrics: true, Traces: true,

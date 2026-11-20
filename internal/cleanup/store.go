@@ -15,6 +15,10 @@ import (
 // project root. Process traps are last-mile; this directory survives them.
 const DefaultDir = ".magelift/cleanup"
 
+func UnsupportedProvider(provider string) error {
+	return fmt.Errorf("restartable cleanup has no adapter for provider %q", provider)
+}
+
 // Load reads one ledger document. The file is the authority for interrupted
 // cleanup, not a cache of a still-running process.
 func Load(path string) (sdk.CleanupLedger, error) {
@@ -80,8 +84,7 @@ func Save(path string, ledger sdk.CleanupLedger) error {
 	return nil
 }
 
-// ListDir returns every valid ledger in dir. Invalid files fail closed so an
-// operator can see a corrupt document instead of silently skipping a leak.
+// ListDir loads each ledger and reports the first corrupt document.
 func ListDir(dir string) ([]string, []sdk.CleanupLedger, error) {
 	dir = strings.TrimSpace(dir)
 	if dir == "" {

@@ -41,7 +41,7 @@ type HTTPDoer interface {
 type ClientFactory func(outputs map[string]any) (kubernetes.Interface, error)
 
 // Observe implements platform.RuntimeObserve against a Kubernetes API
-// (GKE Autopilot, EKS Autopilot, OVH MKS, Scaleway Kapsule).
+// (GKE, EKS, and AKS).
 type Observe struct {
 	client      kubernetes.Interface
 	factory     ClientFactory
@@ -144,7 +144,7 @@ func namespaceFromOutputs(outputs map[string]any) (string, error) {
 
 // BindOutputs builds and caches a kubernetes client from stack outputs so
 // TailLogs (which has no outputs argument on platform.RuntimeObserve) can
-// work with factory-backed Observe used by GKE/EKS/OVH/Scaleway adapters.
+// also work with provider-created observers.
 // Also caches OutputServiceName so TailLogs selects app=<service> (not bare "web").
 func (o *Observe) BindOutputs(outputs map[string]any) error {
 	client, err := o.clientFor(outputs)
@@ -300,11 +300,9 @@ func sortLogEvents(events []platform.LogEvent) []platform.LogEvent {
 	return events
 }
 
-// CheckRuntime reports Deployment ready/desired replica health (KUBE-02) and,
-// when a storefront URL is known, Magento HTTP health as runtime.web.
-// Autopilot SkipAwait often leaves applicationURL empty; the Service
-// LoadBalancer IP is then the preview HTTP origin. No URL means the Magento
-// check is omitted rather than guessed.
+// CheckRuntime reports Deployment replica health and probes Magento when it
+// has a storefront URL. For an Autopilot preview with an empty applicationURL
+// output, it can use the Service load balancer IP.
 func (o *Observe) CheckRuntime(ctx context.Context, _ platform.PlannedStack, outputs map[string]any) ([]platform.RuntimeHealth, error) {
 	service, err := platform.RequireStringOutput(outputs, platform.OutputServiceName)
 	if err != nil {

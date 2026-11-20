@@ -62,12 +62,9 @@ func NewKubernetesProjectionBackend(config KubernetesProjectionConfig) (*Kuberne
 	return &KubernetesProjectionBackend{CommandProjectionBackend: backend}, nil
 }
 
-// NewKubernetesProjectionLifecycle constructs the complete shared projection
-// lifecycle from a stack-produced kubeconfig. The kubeconfig is consumed only
-// at this provider/runtime boundary; it is never copied into a projection
-// request, operation ID, or proof record. EKS, GKE, Kapsule, MKS, and
-// community Kubernetes providers therefore reuse one command transport and
-// one core lifecycle while supplying only their target identity and verifier.
+// NewKubernetesProjectionLifecycle uses a stack's kubeconfig to connect to
+// Kubernetes. The operation records contain the target identity and verifier's
+// results. The kubeconfig stays with the connection.
 func NewKubernetesProjectionLifecycle(
 	kubeconfig []byte,
 	target KubernetesCommandRunnerConfig,

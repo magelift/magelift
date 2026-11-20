@@ -34,7 +34,7 @@ type Store interface {
 
 // BatchDeleter is an optional optimization for providers that can remove a
 // bounded batch in one control-plane request. The archive remains correct
-// with the single-object Delete fallback; certification runs use this seam to
+// with the single-object Delete fallback; tests use it to
 // keep cleanup latency proportional to API batches rather than object count.
 type BatchDeleter interface {
 	DeleteMany(context.Context, []string) error

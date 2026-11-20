@@ -34,7 +34,6 @@ type PlanInputs struct {
 	Runtime             sdk.RuntimeID
 	LiveQueueReplicas   int
 	ValkeyRequirement   string
-	AllowUnsupported    bool
 	AllowExpiredPreview bool
 	AccountOnly         bool
 	RuntimeObserve      bool

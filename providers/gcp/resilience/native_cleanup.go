@@ -14,7 +14,7 @@ import (
 
 // cleanupObjectsForState removes only the archive and isolated-restore
 // objects owned by the requested marker. Source objects remain outside this
-// provider operation; the certification cell owns their exact fixture keys.
+// provider operation. The caller owns source fixture cleanup.
 func (api *NativeAPI) cleanupObjectsForState(ctx context.Context, state cloudrecovery.OperationState, operationID string) (provider.NativeOperationObservation, error) {
 	if strings.TrimSpace(state.OwnershipMarker) == "" || strings.ContainsAny(state.OwnershipMarker, "\r\n\x00") {
 		return provider.NativeOperationObservation{}, errors.New("GCP Cloud Storage cleanup ownership marker is required and must be single-line")

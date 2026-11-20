@@ -18,10 +18,8 @@ func validate(name string, args Args) ([]SecretReference, error) {
 	if args.ApplicationMode != "integrated" && args.ApplicationMode != "headless" {
 		return nil, errors.New("runtime application mode must be integrated or headless")
 	}
-	switch args.WebRuntime {
-	case "nginx-fpm", "frankenphp-classic", "php-apache":
-	default:
-		return nil, fmt.Errorf("runtime web runtime plugin %q is not registered", args.WebRuntime)
+	if args.WebRuntime != "nginx-fpm" {
+		return nil, fmt.Errorf("web runtime must be nginx-fpm, got %q", args.WebRuntime)
 	}
 	if args.ApplicationMode == "integrated" {
 		if !imageDigest.MatchString(args.VarnishImage) {

@@ -1,74 +1,32 @@
 ---
 name: magelift-dependencies
-description: >-
-  Check the local tools MageLift needs for Docker, cloud access, builds, and
-  imported database dumps. Use when doctor reports a missing or unreachable tool.
+description: Diagnose missing MageLift tools, Docker connectivity, and cloud authentication on developer machines and CI runners.
 version: 1.0.0
 ---
 
 # Check MageLift dependencies
 
-Run the readiness check before a new workstation setup or a CI job:
+Run `magelift doctor --local` before starting a shop locally. It evaluates the
+project and checks PHP and Docker without contacting the cloud. Run
+`magelift doctor` after cloud login to include credential checks.
 
-```sh
-magelift doctor
-```
+Install tools only when the user requests it. Review the proposed package
+manager command before running `magelift doctor --install-dependencies`.
+If Docker is installed but unreachable, check its daemon and context first.
+Cloud stack commands need Pulumi on `PATH`. Azure AKS may need `kubelogin`
+when the cluster uses Entra authentication.
 
-Before cloud login, use `magelift doctor --local`. It skips credential probes
-and reports missing or invalid configuration alongside local checks without
-acquiring a provider. It does not install tools unless separately requested.
-
-To create a voluntary local support report:
+For a report you can review before sharing, run:
 
 ```sh
 magelift doctor --local --export doctor-metadata.json
 ```
 
-The new JSON file is mode 0600; existing files and symlinks are refused. Its
-fixed field allowlist includes known CLI/OS/target categories, check statuses,
-counts and required/optional tool classifications. Names, paths, account IDs,
-config values, free-text errors, tool
-output, URLs, tokens and logs are omitted. There is no upload. The full console
-report remains private diagnostic output; review raw logs separately before
-sharing any, because extension data is not covered by this export contract.
+The new file has mode 0600 and contains check statuses, tool requirements,
+and target categories. Keep raw command output private because it can
+include project and account details.
 
-The report separates required tools from optional capabilities. A cloud target
-does not require Docker unless the selected command actually builds or runs a
-local container. Infrastructure and stack operations require the Pulumi CLI
-on PATH. `doctor --local` reports it as optional. Read the capability and install hint beside
-each failed check before changing the machine.
-
-Evaluating `magelift.php` requires PHP. Docker and Compose are needed for
-`magelift dev`; Azure AKS access may need `kubelogin` when the cluster's
-kubeconfig uses Entra authentication. Generated Azure deployment jobs install
-the helper and use the Azure CLI session established by federation.
-
-Review package-manager commands before accepting an installation. Signed
-release operations and remote session launchers can offer to install missing
-tools through the same allowlist. Docker and cloud login remain prerequisites.
-In CI, `--yes` authorizes installation; otherwise missing tools produce a
-readiness error without prompting outside an interactive terminal.
-
-To prepare the workstation explicitly:
-
-```sh
-magelift doctor --install-dependencies
-```
-
-MageLift asks for confirmation and only invokes allowlisted package-manager
-arguments. It does not run a shell pipeline or install an arbitrary executable.
-For CI, install the tools in the runner image and keep `magelift doctor` as a
-read-only gate.
-
-When a tool is present but unreachable, fix its daemon, credentials, or PATH
-first. Do not treat an unreachable Docker daemon or provider session as a
-missing binary.
-
-The first-party GCP provider is acquired only when a command activates that
-target. A valid project lock takes priority over the CLI's fixed release
-version. `help`, `version`, `doctor` and envelope validation do not acquire it.
-For offline preparation or explicit repair, run `magelift providers install`
-while online. A corrupt cache is an error; do not remove or replace a project
-pin to hide a signature, digest or protocol failure. Community provider names
-in PHP configuration do not enable automatic installation. Release archives need no Go
-toolchain on the user's machine.
+Cloud commands load the verified provider for the selected target. Run
+`magelift providers install` online to prepare for offline use or repair a
+cache entry. Keep the project pin and check any digest or signature error
+against it. [Install and verify providers](https://magelift.dev/docs/install/#providers)

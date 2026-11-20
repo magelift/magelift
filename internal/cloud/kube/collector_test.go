@@ -218,7 +218,7 @@ func TestKubernetesCollectorBackendInventoryAndDestroyUseDirectOwnershipChecks(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan := sdk.CollectorDeploymentPlan{TargetProvider: "ovh", TargetRuntime: "mks", Workload: "kubernetes", Distribution: "opentelemetry-collector-contrib", CredentialRef: "kubernetes-secret://magelift/new-relic#license-key", Endpoint: "https://otlp.nr-data.net", NativeReference: "cluster/example", OwnershipMarker: "magelift/test/destroy", Signals: []string{"metrics"}}
+	plan := sdk.CollectorDeploymentPlan{TargetProvider: "gcp", TargetRuntime: "gke-autopilot", Workload: "kubernetes", Distribution: "opentelemetry-collector-contrib", CredentialRef: "kubernetes-secret://magelift/new-relic#license-key", Endpoint: "https://otlp.nr-data.net", NativeReference: "cluster/example", OwnershipMarker: "magelift/test/destroy", Signals: []string{"metrics"}}
 	resource, err := backend.Ensure(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)

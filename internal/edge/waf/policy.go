@@ -40,12 +40,8 @@ const (
 	// RateLimitWindowSeconds is AWS WAF's default evaluation window.
 	RateLimitWindowSeconds = 300
 	// BodyInspectionKB is CloudFront/Cloud Armor's maximum inspectable body.
-	// Magento admin uploads and product saves exceed the vendor 8–16 KB default.
+	// Magento admin uploads and product saves exceed the vendor default of 8 to 16 KB.
 	BodyInspectionKB = 64
-	// ScalewayMaxParanoiaLevel is vanilla OWASP CRS paranoia 1. Adobe's
-	// Fastly Magento WAF can run Magento-tuned rules up to PL3; generic CRS
-	// PL2+ is not that ruleset and false-positives Magento admin/GraphQL.
-	ScalewayMaxParanoiaLevel = 1
 )
 
 // AWSManagedGroup is one AWS managed rule group with Magento count-overrides.
@@ -86,7 +82,6 @@ type Policy struct {
 	AWSManagedGroups       []AWSManagedGroup
 	ArmorWAFSets           []ArmorWAFSet
 	FastlyPathExclusions   []FastlyPathExclusion
-	ScalewayMaxParanoia    int
 }
 
 // MagentoSafe is the production Magento WAF profile for the default admin
@@ -114,7 +109,6 @@ func MagentoSafeFor(frontName string) Policy {
 		RateLimitWindowSeconds: RateLimitWindowSeconds,
 		BodyInspectionKB:       BodyInspectionKB,
 		AdminPathPrefix:        AdminPathPrefix(frontName),
-		ScalewayMaxParanoia:    ScalewayMaxParanoiaLevel,
 		AWSManagedGroups: []AWSManagedGroup{
 			{Name: "AWSManagedRulesAmazonIpReputationList", Priority: 2},
 			{

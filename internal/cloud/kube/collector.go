@@ -65,10 +65,8 @@ type KubernetesCollectorConfig struct {
 	Probe                 CollectorSignalProbe
 }
 
-// KubernetesCollectorBackend manages a dedicated collector Deployment and its
-// ConfigMap/ServiceAccount. It is reusable by EKS, GKE, Kapsule, MKS, and
-// community Kubernetes providers; provider-specific Helm or cloud-secret
-// implementations can satisfy the same CollectorBackend port instead.
+// KubernetesCollectorBackend manages a collector Deployment, ConfigMap and
+// ServiceAccount for a Kubernetes runtime.
 type KubernetesCollectorBackend struct {
 	client                kubernetes.Interface
 	namespace             string
@@ -392,7 +390,7 @@ func (backend *KubernetesCollectorBackend) deleteOwned(ctx context.Context, plan
 // waitForCollectorResourcesGone makes direct owning-service inventory the
 // cleanup truth. Delete calls can return before Kubernetes or Helm has removed
 // the object, so reporting success after one read would allow the next
-// certification cell to reuse a still-terminating scope.
+// caller to reuse a namespace while it is terminating.
 func waitForCollectorResourcesGone(ctx context.Context, check func(context.Context) (bool, error)) error {
 	if ctx == nil {
 		return errors.New("collector cleanup context is required")

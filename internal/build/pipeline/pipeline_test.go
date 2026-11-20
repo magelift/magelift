@@ -189,6 +189,18 @@ func TestPipelineCoordinatesReleaseBuild(t *testing.T) {
 	if !result.Image.Pushed {
 		t.Fatal("release result was not marked as pushed")
 	}
+	digest, err := DeploymentDigest(result.Manifest)
+	if err != nil || digest != "ghcr.io/magelift/shop@"+pipelineDigest {
+		t.Fatalf("deployment digest = %q, %v", digest, err)
+	}
+	manifest, err := os.ReadFile(result.Manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(manifest)
+	if result.ManifestSHA256 != hex.EncodeToString(sum[:]) {
+		t.Fatal("build checksum does not cover the manifest with the registry digest")
+	}
 	got := builder.request
 	if got.Output != buildkit.OutputPush || strings.Join(got.Platforms, ",") != "linux/amd64,linux/arm64" {
 		t.Fatalf("release output = %q, platforms = %v", got.Output, got.Platforms)
@@ -213,34 +225,6 @@ func TestPipelineCoordinatesReleaseBuild(t *testing.T) {
 	}
 	if !strings.Contains(string(applicationDockerfile), "cp /app/app/etc/env.php /tmp/magelift-runtime-env.php") || !strings.Contains(string(applicationDockerfile), "cp /tmp/magelift-runtime-env.php /app/app/etc/env.php") {
 		t.Fatal("embedded Dockerfile does not preserve the runtime deployment scaffold")
-	}
-}
-
-func TestPipelineResultConvertsPublishedBuildToImmutableArtifactContract(t *testing.T) {
-	request := releaseRequest(t)
-	result, err := New(&fakeContainers{t: t}, &fakeBuilder{t: t, expectedRuntime: request.RuntimeImage, expectedOutput: buildkit.OutputPush}).Run(context.Background(), request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	contract, err := result.ImmutableArtifactContract(strings.Repeat("a", 64), request.ProvenanceSource, "oci://registry.example/signatures/shop@sha256:"+strings.Repeat("f", 64))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if contract.ImageDigest != request.ImageReference+"@"+pipelineDigest || contract.InputFingerprint != strings.Repeat("a", 64) || !strings.HasPrefix(contract.ManifestDigest, "sha256:") {
-		t.Fatalf("immutable artifact contract = %#v", contract)
-	}
-	if err := contract.Validate(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestPipelineResultRejectsLocalBuildForImmutableArtifactContract(t *testing.T) {
-	result, err := New(&fakeContainers{t: t}, &fakeBuilder{t: t}).Run(context.Background(), pipelineRequest(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := result.ImmutableArtifactContract(strings.Repeat("a", 64), "https://example.invalid/source", "oci://example.invalid/signature"); err == nil || !strings.Contains(err.Error(), "confirmed image push") {
-		t.Fatalf("local artifact contract error = %v", err)
 	}
 }
 

@@ -14,14 +14,14 @@ type fakeModule struct {
 	id       sdk.TargetID
 	provider sdk.ProviderID
 	runtime  sdk.RuntimeID
-	tier     CertificationTier
+	tier     RuntimeTier
 	keys     []string
 }
 
 func (m fakeModule) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: m.id, Provider: m.provider, Runtime: m.runtime}
 }
-func (m fakeModule) CertificationTier() CertificationTier { return m.tier }
+func (m fakeModule) RuntimeTier() RuntimeTier { return m.tier }
 func (m fakeModule) Plan(config.Config, string, PlanOptions) (PlannedStack, error) {
 	return nil, nil
 }
@@ -40,7 +40,7 @@ func (p fakePlannedStack) Runtime() sdk.RuntimeID   { return p.runtime }
 func (p fakePlannedStack) Project() string          { return "test-project" }
 func (p fakePlannedStack) Environment() string      { return "test" }
 func (p fakePlannedStack) Region() string           { return "test-region" }
-func (p fakePlannedStack) CertificationTier() CertificationTier {
+func (p fakePlannedStack) RuntimeTier() RuntimeTier {
 	return TierExperimental
 }
 func (p fakePlannedStack) EnvironmentClass() string { return "preview" }

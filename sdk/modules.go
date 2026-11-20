@@ -37,7 +37,7 @@ type ModulePlan struct {
 	Protected        bool
 	ImageDigest      string
 	Target           TargetDescriptor
-	Tier             ExtensionCertificationTier
+	Tier             ExtensionTier
 	Opaque           any
 }
 
@@ -101,11 +101,4 @@ type PlanAdmission interface {
 // must not mutate provider state while constructing or admitting the plan.
 type PlanAdmissionFactory interface {
 	NewPlanAdmission(context.Context, ModulePlan) (PlanAdmission, error)
-}
-
-// WebRuntimeFactory is optional. HTTP frontends are not stack modules and
-// must not require CoreOutputKeys. First-party plugins may compile in for
-// RC1 DX; community plugins use the same registry after signed go-plugin load.
-type WebRuntimeFactory interface {
-	NewWebRuntime(context.Context, ModulePlan) (WebRuntime, error)
 }

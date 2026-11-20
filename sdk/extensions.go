@@ -12,11 +12,11 @@ const ExtensionAPIVersion = "v1"
 
 var extensionVersionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.+_-]*$`)
 
-type ExtensionCertificationTier string
+type ExtensionTier string
 
 const (
-	ExtensionTierBuiltIn      ExtensionCertificationTier = "built-in"
-	ExtensionTierExperimental ExtensionCertificationTier = "experimental"
+	ExtensionTierBuiltIn      ExtensionTier = "built-in"
+	ExtensionTierExperimental ExtensionTier = "experimental"
 )
 
 var coreOutputKeys = []string{
@@ -36,16 +36,16 @@ func CoreOutputKeys() []string {
 }
 
 type ExtensionDescriptor struct {
-	APIVersion   string                     `json:"apiVersion" yaml:"apiVersion"`
-	ID           string                     `json:"id" yaml:"id"`
-	Version      string                     `json:"version" yaml:"version"`
-	Source       string                     `json:"source" yaml:"source"`
-	Digest       string                     `json:"digest,omitempty" yaml:"digest,omitempty"`
-	Build        string                     `json:"build,omitempty" yaml:"build,omitempty"`
-	Tier         ExtensionCertificationTier `json:"tier" yaml:"tier"`
-	Targets      []TargetDescriptor         `json:"targets" yaml:"targets"`
-	Capabilities []CapabilityDescriptor     `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
-	OutputKeys   []string                   `json:"outputKeys" yaml:"outputKeys"`
+	APIVersion   string                 `json:"apiVersion" yaml:"apiVersion"`
+	ID           string                 `json:"id" yaml:"id"`
+	Version      string                 `json:"version" yaml:"version"`
+	Source       string                 `json:"source" yaml:"source"`
+	Digest       string                 `json:"digest,omitempty" yaml:"digest,omitempty"`
+	Build        string                 `json:"build,omitempty" yaml:"build,omitempty"`
+	Tier         ExtensionTier          `json:"tier" yaml:"tier"`
+	Targets      []TargetDescriptor     `json:"targets" yaml:"targets"`
+	Capabilities []CapabilityDescriptor `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
+	OutputKeys   []string               `json:"outputKeys" yaml:"outputKeys"`
 }
 
 // Extension is the public metadata contract used by explicit custom binaries.

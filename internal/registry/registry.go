@@ -6,8 +6,6 @@ import (
 	"os"
 
 	internalcli "github.com/magelift/magelift/internal/cli"
-	ovhstack "github.com/magelift/magelift/internal/cloud/ovh/stack"
-	scwstack "github.com/magelift/magelift/internal/cloud/scaleway/stack"
 	"github.com/magelift/magelift/internal/platform"
 	"github.com/magelift/magelift/internal/providerhost"
 	"github.com/magelift/magelift/sdk"
@@ -32,7 +30,7 @@ func NewDefaultSet() (*platform.ModuleRegistry, internalcli.Hooks, error) {
 	return newDefaultSet(false)
 }
 
-// NewDefaultWithExperimental returns modules with EKS, OVH, and Scaleway.
+// NewDefaultWithExperimental returns modules including opt-in runtimes.
 func NewDefaultWithExperimental() (*platform.ModuleRegistry, error) {
 	modules, _, err := NewDefaultExperimentalSet()
 	return modules, err
@@ -53,13 +51,6 @@ func newDefaultSet(experimental bool) (*platform.ModuleRegistry, internalcli.Hoo
 		modules.RegisterCloser(dialer.Close)
 	}
 
-	if experimental {
-		for _, module := range []platform.StackModule{ovhstack.Module{}, scwstack.Module{}} {
-			if err := modules.RegisterModule(module); err != nil {
-				return nil, internalcli.Hooks{}, err
-			}
-		}
-	}
 	for _, descriptor := range providerhost.StandaloneRuntimes() {
 		if descriptor.OptIn && !experimental {
 			continue

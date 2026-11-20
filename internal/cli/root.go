@@ -123,7 +123,6 @@ type options struct {
 	providerVerifier           providerhost.BlobVerifier
 	infraOnly                  bool
 	ackMaintenanceDrain        bool
-	skipProviderLock           bool
 	destroyBackups             bool
 	newLeftoverBackupDestroyer func(context.Context, platform.PlannedStack) (leftoverBackupDestroyer, error)
 	newGCPCleanupProvider      func(context.Context, sdk.CleanupLedger) (cleanupProvider, error)
@@ -338,7 +337,7 @@ func newCommandWithOptions(o *options) *cobra.Command {
 	root.PersistentFlags().BoolVarP(&o.yes, "yes", "y", o.yes, "confirm destructive actions")
 	root.PersistentFlags().CountVarP(&o.verbose, "verbose", "v", "increase diagnostic verbosity")
 
-	root.AddCommand(versionCommand(o), initCommand(o), doctorCommand(o), configCommand(o), compatibilityCommand(o), certificationCommand(o), skillsCommand(o), providersCommand(o), extensionsCommand(o), edgeCommand(o), buildCommand(o), bootstrapCommand(o), benchmarkCommand(o), cleanupCommand(o))
+	root.AddCommand(versionCommand(o), initCommand(o), doctorCommand(o), configCommand(o), compatibilityCommand(o), skillsCommand(o), providersCommand(o), extensionsCommand(o), edgeCommand(o), buildCommand(o), bootstrapCommand(o), cleanupCommand(o))
 	root.AddCommand(statusCommand(o), costCommand(o), healthCommand(o))
 	root.AddCommand(infrastructureCommands(o)...)
 	root.AddCommand(commandGroups(o)...)

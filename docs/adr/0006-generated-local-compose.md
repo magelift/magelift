@@ -1,31 +1,18 @@
-# ADR 0006: Local development is generated Compose
+# ADR 0006. Generate Compose for local development
 
-- Status: Accepted
-- Date: 2026-08-22
+Accepted on 2026-08-22.
 
-## Context
+Magento developers can start the shop before connecting a cloud account.
+`magelift dev` resolves the project, generates Compose, starts the selected
+services and checks the store. A checked-in Compose file could drift from
+the shop's service settings.
 
-Contributors need Magento locally without AWS credentials or Pulumi state. The local stack must still use the same capability names as cloud so config errors show up early.
+`magelift local init` writes `.magelift/compose.local.yml` and a private
+`.magelift/local.env`. The app profile mounts the shop source into the
+nginx/PHP-FPM runtime. Search and queue have their own profiles. Host ports
+bind to loopback, and the HTTPS listener supports local cookie checks.
 
-## Decision
-
-`magelift local init` generates `.magelift/compose.local.yml` and a mode-0600 `.magelift/local.env`. Compose is an execution context, not a second cloud provider.
-
-Default project: MySQL and Valkey. The `app` profile uses nginx + PHP-FPM by default, plus OpenSearch and RabbitMQ, and bind-mounts the repository. `frankenphp-classic` and `php-apache` produce a compatibility warning; they have no Adobe row and are not certified. `frankenphp-worker` is unregistered. `search` and `queue` can start alone. Host ports bind to loopback. `local reset --yes` is the only command that removes named volumes.
-
-`magelift local seed` is the local first-install path when Composer dependencies and `bin/magento` exist. It is non-interactive and refuses to overwrite `app/etc/env.php`.
-
-HTTPS on 8443 is a local listener for cookies and integration tests, not production TLS evidence.
-
-## Consequences
-
-Cloud failover, IAM, and network behavior stay in Floci, Pulumi mocks, and sparse live acceptance. Image references can be replaced with project-approved digests through environment variables.
-
-## Alternatives considered
-
-- Check in a hand-maintained Compose file: rejected (drifts from CLI capabilities).
-- Local = mini AWS: rejected (needs credentials).
-
-## Provenance
-
-Original. Docker Compose public behavior.
+`magelift local seed` installs into an empty local database and protects an
+existing `app/etc/env.php`. `magelift local down` keeps volumes so the next
+startup can reuse the database. Use `magelift local reset --yes` when you
+intend to remove the local data. [Local and cloud environments](../local-vs-cloud.md)

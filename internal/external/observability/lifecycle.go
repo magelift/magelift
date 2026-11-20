@@ -8,9 +8,7 @@ import (
 	"strings"
 )
 
-// InventoryResource is the provider-neutral view of one telemetry-owned
-// resource. Provider adapters translate CloudWatch, Monitoring, Cockpit, or
-// Logs Data Platform objects into this shape before it reaches the core.
+// InventoryResource identifies a managed telemetry resource and its owner.
 type InventoryResource struct {
 	Identity        string
 	OwnershipMarker string
@@ -27,15 +25,6 @@ type Backend interface {
 	VerifyOperations(context.Context, Plan) (OperationalObservation, error)
 	Destroy(context.Context, Plan, []string) error
 	Inventory(context.Context, string) ([]InventoryResource, error)
-}
-
-// SignalProbePublisher is an optional provider capability for acceptance
-// harnesses whose destination has asynchronous data-plane activation. It
-// republishes a marker-scoped probe without creating or changing lifecycle
-// resources. Verification itself remains read-only; callers explicitly opt
-// into publication between verification attempts.
-type SignalProbePublisher interface {
-	PublishSignalProbe(context.Context, SignalBinding) error
 }
 
 // ScopedInventoryBackend can provide inventory that depends on the complete
@@ -98,32 +87,6 @@ func (client *ManagedLifecycleClient) VerifySignal(ctx context.Context, binding 
 		return SignalObservation{}, fmt.Errorf("observability backend returned %s at %s for %s at %s", observation.Signal, observation.Destination, binding.Signal, binding.Destination)
 	}
 	return observation, nil
-}
-
-// PublishSignalProbe republishes one provider-owned data-plane probe when the
-// backend supports the optional capability. The shared client validates the
-// portable identity boundary; the provider adapter owns the actual API call.
-func (client *ManagedLifecycleClient) PublishSignalProbe(ctx context.Context, binding SignalBinding) error {
-	if ctx == nil {
-		return errors.New("observability signal publication context is required")
-	}
-	if client == nil || client.backend == nil {
-		return errors.New("observability backend is required")
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if strings.TrimSpace(binding.Signal) == "" || strings.TrimSpace(binding.Destination) == "" || strings.TrimSpace(binding.OwnershipMarker) == "" {
-		return errors.New("observability signal publication identity is required")
-	}
-	publisher, ok := client.backend.(SignalProbePublisher)
-	if !ok {
-		return errors.New("observability backend does not support signal probe publication")
-	}
-	if err := publisher.PublishSignalProbe(ctx, binding); err != nil {
-		return fmt.Errorf("publish observability signal probe: %w", err)
-	}
-	return nil
 }
 
 func (client *ManagedLifecycleClient) VerifyOperations(ctx context.Context, plan Plan) (OperationalObservation, error) {

@@ -12,8 +12,8 @@ func testStoreLedger() sdk.CleanupLedger {
 	return sdk.CleanupLedger{
 		Version:   sdk.CleanupLedgerVersion,
 		RunID:     "run-store",
-		Marker:    "magelift/scaleway/rdb-recovery/run-store",
-		Provider:  "scaleway",
+		Marker:    "magelift/gcp/cloud-sql-recovery/run-store",
+		Provider:  "gcp",
 		Region:    "fr-par",
 		Project:   "11111111-1111-1111-1111-111111111111",
 		Profile:   "default",

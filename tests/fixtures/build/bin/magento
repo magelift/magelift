@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+if [ "$#" -eq 1 ] && [ "$1" = 'setup:di:compile' ]; then
+    exit 0
+fi
+
+printf 'Unexpected Magento command in build test: %s\n' "$*" >&2
+exit 1

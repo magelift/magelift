@@ -34,7 +34,7 @@ func TestModuleRegistersExperimentalOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	module, found := registry.Module("aws", "eks")
-	if !found || module.CertificationTier() != platform.TierExperimental {
+	if !found || module.RuntimeTier() != platform.TierExperimental {
 		t.Fatal("expected experimental EKS module")
 	}
 	planned := Planned{Spec: validSpec()}

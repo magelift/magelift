@@ -344,7 +344,7 @@ func pulumiAlertLabels(base pulumi.StringMap, intent sdk.AlertIntent) pulumi.Str
 func validateAlert(alert sdk.AlertIntent) error {
 	// Matched-log policies are intentionally limited to presence alerts. A
 	// portable threshold alert needs a provider metric mapping; silently
-	// discarding Operator and Threshold would produce a false certification.
+	// discarding Operator and Threshold would change the alert condition.
 	if alert.Signal != "logs" && alert.Signal != "provider-operations" && alert.Signal != "cleanup-failure" {
 		return fmt.Errorf("GCP native alert %q uses unsupported signal %q; provide a provider metric adapter or use New Relic", alert.ID, alert.Signal)
 	}

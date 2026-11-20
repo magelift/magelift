@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -145,7 +146,7 @@ func ValidateCollectorDeploymentPlan(plan CollectorDeploymentPlan, request Colle
 	if plan.CredentialRef != request.CredentialRef || plan.Endpoint != request.Endpoint || plan.NativeReference != request.NativeReference || plan.OwnershipMarker != request.OwnershipMarker {
 		problems = append(problems, errors.New("collector plan references do not match the request"))
 	}
-	if !sameStrings(plan.Signals, request.Signals) {
+	if !slices.Equal(SortedStrings(plan.Signals), SortedStrings(request.Signals)) {
 		problems = append(problems, errors.New("collector plan must preserve requested signals"))
 	}
 	return errors.Join(problems...)

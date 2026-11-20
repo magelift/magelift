@@ -194,7 +194,6 @@ func TestPlanFromInputsAcceptsValkeyNineOnePreview(t *testing.T) {
 	in.Application.Version = "2.4.9"
 	in.ValkeyRequirement = "9"
 	in.Target.MemorystoreEngineVersion = "VALKEY_9_1"
-	in.AllowUnsupported = false
 	in.Envelope.Environment = "preview"
 	spec, err := PlanFromInputs(in)
 	if err != nil {
@@ -330,7 +329,6 @@ func gcpDeploymentInputs() PlanInputs {
 		},
 		Runtime:           gcptarget.RuntimeAutopilotID,
 		ValkeyRequirement: "8.1",
-		AllowUnsupported:  true,
 	}
 }
 

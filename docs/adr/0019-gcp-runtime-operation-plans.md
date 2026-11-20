@@ -1,47 +1,20 @@
-# ADR 0019: GCP plans for runtime operations
+# ADR 0019. Operate an existing GCP environment without a build
 
-- Status: Accepted
-- Date: 2026-10-18
+Accepted on 2026-10-18.
 
-## Context
+A developer needs to read outputs, logs or health from another workstation
+even when the image was built in CI.
 
-User CI builds the application and passes its immutable digest to deploy. The
-shop YAML does not need to contain that digest. Requiring it again to prepare
-outputs, exec, logs, tunnels or health prevents diagnosis from another machine,
-including after a failed first deployment. A local release journal cannot
-supply that machine's missing context.
+The CLI uses the optional `runtimeObserve` flag on a Plan request for
+operations that read existing stack outputs. GCP allows an absent digest on
+this path. It still rejects a malformed digest and checks provider, backend,
+topology and preview ownership. The flag is a planning option. An ordinary
+preview or apply requires a complete deployment plan with a valid artifact.
 
-## Decision
+Teardown can run without an image digest. The provider previews the
+destruction against saved Pulumi state and disables execution of the
+application program. The teardown scope selects this path. Project ownership,
+environment protection and preview expiry checks still apply.
 
-The existing Plan request gains an optional `runtimeObserve` field, defaulting
-to false. The CLI uses it for output-backed runtime operations. GCP permits an
-absent image digest in this mode; an explicitly malformed digest is still
-rejected. Target, envelope, topology, backend and preview ownership validation
-remain in force. Account-only bootstrap planning keeps its existing meaning.
-
-The flag is used during planning and is not stored in the opaque spec or a
-second manifest. Output and runtime-observation handlers validate the resulting
-scope. Apply and ordinary preview validate a complete deployment spec before
-constructing a backend, so an operation plan without an artifact cannot deploy
-anything.
-
-Destroy planning uses the existing teardown validation, which also permits an
-absent image. Its preview uses Pulumi PreviewDestroy against the saved state,
-instead of running the application deployment program. Teardown explicitly
-disables RunProgram, including when a global Pulumi setting enables it. The existing teardown
-scope selects this path; runtime-observation plans do not. Apply always retains
-strict deployment validation. Target ownership, protected-environment and
-expired-preview rules remain in force. Teardown does not require an application
-build.
-
-No YAML key, RPC method, protocol version or StoredPlan shape changes. Older
-providers ignore the optional request field and reject the missing digest.
-Release lockfiles keep the distributed CLI and provider together. Artifact
-signature, digest and publisher checks are unchanged.
-
-## Verification
-
-Regressions cover flag forwarding, its default value, artifact-less runtime
-planning, malformed digests, rejection by apply and preview before backend
-construction, and teardown preview without an application update. Live distributed runtime operations
-remain an acceptance check.
+Local tests cover flag forwarding, malformed digests, rejection of observation
+plans by deploy operations and teardown preview. [Operate a shop](../operations.md)

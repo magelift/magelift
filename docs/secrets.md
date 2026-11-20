@@ -1,6 +1,17 @@
 # Secret references
 
-In `magelift.php`, set the Composer credential reference on the build array. Keep the contents of `auth.json` in the secret store for your target.
+In `magelift.php`, set `build.composer.credentials` to a reference. The secret
+must contain a non-empty Composer `auth.json` object.
+
+## Environment variable
+
+Use `env://COMPOSER_AUTH` to read an environment variable on the machine or CI
+runner that builds the image. This works with every provider. Populate
+`COMPOSER_AUTH` from your CI secret or workstation secret store.
+
+```php
+$build['composer']['credentials'] = 'env://COMPOSER_AUTH';
+```
 
 ## AWS (`target.provider: aws`)
 
@@ -12,9 +23,8 @@ $build['composer']['credentials'] = 'aws-secrets-manager://magelift/composer';
 $build['composer']['credentials'] = 'ssm:///magelift/composer';
 ```
 
-The value must be a non-empty Composer `auth.json` object. SSM parameters are
-fetched with decryption. Names and paths use `defaults.region`; an ARN supplies
-its own region.
+MageLift decrypts SSM parameters when it fetches them. A parameter name or
+path uses `defaults.region`. A parameter ARN supplies its own region.
 
 To pick one string field from a JSON Secrets Manager secret:
 
@@ -30,14 +40,11 @@ That field must hold the full Composer auth object.
 $build['composer']['credentials'] = 'gcp-secret-manager://projects/PROJECT/secrets/NAME/versions/latest';
 ```
 
-`magelift build` resolves `gcp-secret-manager://` on a GCP target the same way
-it resolves Secrets Manager and SSM on AWS: the value is written to a private
-temp file for the prepare container, then deleted. Cross-provider schemes still
-fail validation.
+A GCP reference includes the project, secret and version. The build identity
+needs permission to read that version.
 
 ## How resolution works
 
-Only the prepare container needs these credentials. The CLI removes its private temporary file after the build and keeps the value out of the image, artifact manifest, process arguments and Pulumi state.
-
-Unknown schemes, fragments, userinfo, and stray query keys fail validation.
-Cross-provider schemes (e.g. `gcp-secret-manager://` on an AWS target) fail too.
+MageLift passes the value to the prepare container in a private temporary file
+and deletes the file after the build. Use a scheme supported by the selected
+provider. [Application builds](builds.md#composer)

@@ -18,7 +18,6 @@ import (
 	buildcontext "github.com/magelift/magelift"
 	buildkit "github.com/magelift/magelift/internal/build/kit"
 	buildpipeline "github.com/magelift/magelift/internal/build/pipeline"
-	"github.com/magelift/magelift/internal/cosign"
 	"github.com/magelift/magelift/internal/secretref"
 	"github.com/magelift/magelift/internal/source"
 	"github.com/magelift/magelift/internal/toolchain"
@@ -74,7 +73,7 @@ func buildCommand(o *options) *cobra.Command {
 			return invalid(err)
 		}
 		writeCloudPatchesBuildNotice(o.stderr, spec.Build.CloudPatches)
-		if err := validateDefaultImageRecipe(spec.Build.PHP, string(spec.Application.WebRuntime), builderImage, runtimeImage); err != nil {
+		if err := validateDefaultImageRecipe(spec.Build.PHP, builderImage, runtimeImage); err != nil {
 			return invalid(err)
 		}
 		if spec.Build.Composer.Image != "" && (builderImage != "" || runtimeImage != "") {
@@ -209,7 +208,7 @@ func buildCommand(o *options) *cobra.Command {
 			return &exitError{code: 3, err: err}
 		}
 		if push {
-			reference, err := digestReference(result.Image.ImageReference, result.Image.Digest)
+			reference, err := buildpipeline.DigestReference(result.Image.ImageReference, result.Image.Digest)
 			if err != nil {
 				_ = os.Remove(result.Manifest)
 				return &exitError{code: 3, err: err}
@@ -265,13 +264,10 @@ func imageResolver(builderImage, runtimeImage string) (*toolchain.Resolver, erro
 	return toolchain.NewResolver(toolchain.SystemCommandRunner(), builderImage, runtimeImage), nil
 }
 
-func validateDefaultImageRecipe(php, webRuntime, builderImage, runtimeImage string) error {
+func validateDefaultImageRecipe(php, builderImage, runtimeImage string) error {
 	if builderImage == "" && runtimeImage == "" {
 		if _, _, err := buildcontext.PHPRecipe(php); err != nil {
 			return err
-		}
-		if webRuntime != toolchain.DefaultWebRuntime {
-			return fmt.Errorf("default community images require %s; other runtimes need explicit --builder-image and --runtime-image overrides", toolchain.DefaultWebRuntime)
 		}
 	}
 	return nil
@@ -330,19 +326,6 @@ func applicationImageRepository(reference string) (string, error) {
 		return "", errors.New("--image has an invalid repository or tag")
 	}
 	return repository, nil
-}
-
-func digestReference(imageReference, digest string) (string, error) {
-	name, _, _ := strings.Cut(imageReference, "@")
-	lastSlash := strings.LastIndexByte(name, '/')
-	if tag := strings.LastIndexByte(name, ':'); tag > lastSlash {
-		name = name[:tag]
-	}
-	reference := name + "@" + digest
-	if err := cosign.ValidateReference(reference); err != nil {
-		return "", err
-	}
-	return reference, nil
 }
 
 type buildRequestOptions struct {

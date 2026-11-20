@@ -14,7 +14,7 @@ func TestValidateEdgeAdapterBoundary(t *testing.T) {
 	request := EdgePlanRequest{
 		TargetProvider: "aws", TargetRuntime: "ecs-fargate",
 		Intent: EdgeIntent{
-			ExternalProvider: "fastly", Lifecycle: ExternalLifecycleExtension, Certification: ExternalExperimental,
+			ExternalProvider: "fastly", Lifecycle: ExternalLifecycleExtension,
 			Mode: "external", CredentialRefs: []string{"aws-secrets-manager://magelift/fastly"}, Domains: []string{"preview.example.com"},
 			OriginHealthRef: "health/application", OwnershipMarker: "magelift/run-1",
 		},
@@ -47,7 +47,7 @@ func TestValidateObservabilityAdapterBoundaryKeepsCredentialReferencesTyped(t *t
 	request := ObservabilityPlanRequest{
 		TargetProvider: "gcp", TargetRuntime: "gke-standard",
 		Intent: ObservabilityIntent{
-			ExternalProvider: "newrelic", Lifecycle: ExternalLifecycleExtension, Certification: ExternalExperimental,
+			ExternalProvider: "newrelic", Lifecycle: ExternalLifecycleExtension,
 			OwnershipMarker: "magelift/run-2", CredentialRefs: []string{"gcp-secret-manager://projects/p/secrets/newrelic"},
 			Endpoint: "https://otlp.eu01.nr-data.net", Signals: []string{"metrics", "traces"},
 		},
@@ -67,14 +67,14 @@ func TestValidateObservabilityAdapterBoundaryKeepsCredentialReferencesTyped(t *t
 		t.Fatal(err)
 	}
 
-	nativeRequest := ObservabilityPlanRequest{TargetProvider: "ovh", TargetRuntime: "mks", Intent: ObservabilityIntent{
-		NativeProvider: "ovh-logs-data-platform", NativeReference: "stream-123", OwnershipMarker: "magelift/run-2/native", Signals: []string{"audit-events"},
+	nativeRequest := ObservabilityPlanRequest{TargetProvider: "gcp", TargetRuntime: "gke-standard", Intent: ObservabilityIntent{
+		NativeProvider: "google-cloud-operations", NativeReference: "services/shop", OwnershipMarker: "magelift/run-2/native", Signals: []string{"logs"},
 	}}
-	nativePlan := ObservabilityPlan{AdapterID: "ovh.observability", TargetProvider: nativeRequest.TargetProvider, TargetRuntime: nativeRequest.TargetRuntime, OwnershipMarker: nativeRequest.Intent.OwnershipMarker, NativeReference: nativeRequest.Intent.NativeReference, Bindings: []ObservabilityBinding{{Signal: "audit-events", Destination: "ovh-logs-data-platform", Mode: "native"}}}
+	nativePlan := ObservabilityPlan{AdapterID: "gcp.observability", TargetProvider: nativeRequest.TargetProvider, TargetRuntime: nativeRequest.TargetRuntime, OwnershipMarker: nativeRequest.Intent.OwnershipMarker, NativeReference: nativeRequest.Intent.NativeReference, Bindings: []ObservabilityBinding{{Signal: "logs", Destination: "google-cloud-operations", Mode: "native"}}}
 	if err := ValidateObservabilityPlan(nativePlan, nativeRequest); err != nil {
 		t.Fatal(err)
 	}
-	nativePlan.NativeReference = "other-stream"
+	nativePlan.NativeReference = "services/another-shop"
 	if err := ValidateObservabilityPlan(nativePlan, nativeRequest); err == nil || !strings.Contains(err.Error(), "native reference") {
 		t.Fatalf("native reference drift was accepted: %v", err)
 	}

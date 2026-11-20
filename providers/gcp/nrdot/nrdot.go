@@ -352,10 +352,6 @@ func isNRDOTKubernetesTarget(provider, runtime string) bool {
 		return runtime == "eks" || strings.HasPrefix(runtime, "eks-")
 	case "gcp":
 		return runtime == "gke" || strings.HasPrefix(runtime, "gke-")
-	case "scaleway":
-		return runtime == "kapsule" || strings.HasPrefix(runtime, "kapsule-")
-	case "ovh":
-		return runtime == "mks" || strings.HasPrefix(runtime, "mks-")
 	default:
 		return false
 	}

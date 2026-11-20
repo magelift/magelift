@@ -1,53 +1,27 @@
-# ADR 0016: Owned GKE node identity
+# ADR 0016. Give GKE nodes a dedicated identity
 
-- Status: Accepted
-- Date: 2026-10-18
-- Supersedes: the node identity and base-bootstrap IAM details in ADRs 0007 and 0015.
+Accepted on 2026-10-18.
 
-## Context
+Bootstrap creates an environment-owned node service account. The default
+Compute service account may have unrelated permissions and is used by other
+workloads in the project.
 
-A project's default Compute service account can have privileges unrelated to
-MageLift. Using it for GKE nodes also makes registry access depend on shared IAM.
+After checking the registry's ownership, bootstrap grants the node account
+Artifact Registry reader on that repository and the
+`roles/container.defaultNodeServiceAccount` project role. This preparation
+also runs for a laptop deployment. It requires permission to manage IAM.
+The separate CI permission plan grants the deployment identity permission to
+act as the node account.
 
-## Decision
+Autopilot sets the account and OAuth scope in
+`clusterAutoscaling.autoProvisioningDefaults`. GKE computes the top-level
+`nodeConfig` block for Autopilot. Sending it can cause Pulumi to plan a cluster
+replacement. Standard clusters and node pools use their explicit
+`nodeConfig`.
 
-Base GCP bootstrap prepares a deterministic, environment-owned node service
-account after checking ownership of its Artifact Registry repository. It grants
-repository reader and the project-level roles/container.defaultNodeServiceAccount
-role. This happens without GitHub options and requires project IAM management
-permission. It does not change the default Compute account's bindings.
+Pulumi treats the selected identity as a creation-time setting. Create a
+fresh environment to migrate a cluster using the default account. The node
+account belongs to bootstrap and survives environment teardown.
 
-New Autopilot clusters select the owned account and cloud-platform OAuth scope
-through `clusterAutoscaling.autoProvisioningDefaults`. Setting cluster
-Autopilot omits the top-level `nodeConfig`: GKE computes that block, and
-sending it can make a subsequent Pulumi preview replace the cluster. Standard
-clusters and node pools retain their explicit `nodeConfig`. CI deployment receives actAs on that
-account through the existing reviewed CI permission plan. CI deployment roles
-still require --apply-ci-permissions. No YAML key or provider RPC is added.
-
-Ownership mismatch is refused before grants. Policy merges preserve unrelated
-members, conditions and audit settings, use etags, and retry a conflict once.
-
-## Consequences
-
-The node account is a bootstrap prerequisite retained after environment destroy.
-Cleanup must remove only this run's grants before deleting the account. Cluster
-and node-pool identity fields are creation-only: Pulumi ignores subsequent
-identity changes to avoid replacing an existing cluster implicitly. Use a fresh
-environment to migrate an older default-account deployment.
-
-Local API fixtures and Pulumi mocks cover ownership, grants, ordering, explicit
-identity and replacement guards. Live Autopilot creation and legacy migration
-remain acceptance checks; mocks do not establish Google API acceptance.
-
-## Alternatives
-
-Reusing the default account would inherit shared privileges. A new configuration
-key would burden the guided path with an identity choice it can derive safely.
-
-## Provenance
-
-Original implementation using public Google IAM, Artifact Registry and GKE
-cluster autoprovisioning and NodeConfig APIs and the existing Pulumi provider
-contract. Google documents the Autopilot service-account field in
-[Create an Autopilot cluster](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/creating-an-autopilot-cluster).
+API fixtures and Pulumi mock tests check permissions, resource ownership, initial
+cluster settings and replacement guards. [Cloud setup](../bootstrap.md) · [GKE Autopilot creation](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/creating-an-autopilot-cluster)

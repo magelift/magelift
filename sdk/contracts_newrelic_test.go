@@ -7,7 +7,7 @@ import (
 
 func TestValidateObservabilityIntentRequiresNewRelicCredentialReference(t *testing.T) {
 	intent := ObservabilityIntent{
-		ExternalProvider: "newrelic", Lifecycle: ExternalLifecycleExtension, Certification: ExternalExperimental,
+		ExternalProvider: "newrelic", Lifecycle: ExternalLifecycleExtension,
 		Endpoint: "https://otlp.nr-data.net", OwnershipMarker: "magelift/test/newrelic", Signals: []string{"metrics"},
 	}
 	if err := ValidateObservabilityIntent(intent); err == nil || !strings.Contains(err.Error(), "license-key credential") {

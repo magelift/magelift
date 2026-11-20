@@ -31,7 +31,7 @@ type Options struct {
 	// For Export, Yes overwrites an existing OutputPath.
 	Yes bool
 	// Sanitize rewrites the exported SQL so mailbox addresses are hashed. Off by
-	// default; the result is still not a certified anonymous dump.
+	// default. Other personal data stays in the export.
 	Sanitize bool
 
 	// Database is the target schema name (default magento).

@@ -50,7 +50,7 @@ type HasOps interface {
 }
 
 // HasRecordRelease is implemented by Ops adapters that accept a post-deploy
-// journal hook. The CLI uses this instead of importing concrete cloud Ops types.
+// journal hook. Provider modules implement it for the CLI.
 type HasRecordRelease interface {
 	WithRecordRelease(fn func(context.Context, deployflow.Request, deployflow.Result) error) Ops
 }

@@ -203,11 +203,11 @@ func TestECSPlanRetainsExplicitEdgeAndTelemetry(t *testing.T) {
 	req.Edge = sdk.EdgeIntent{
 		Mode: "both", NativeProvider: "cloudfront-waf", ExternalProvider: "fastly",
 		OriginHealthRef: "shop/health", OwnershipMarker: "magelift/shop/staging", CredentialRefs: []string{"aws-secrets-manager://edge-api"},
-		Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+		Lifecycle: sdk.ExternalLifecycleExtension,
 	}
 	req.Observability = sdk.ObservabilityIntent{
 		NativeProvider: "cloudwatch", ExternalProvider: "newrelic", OwnershipMarker: "magelift/shop/staging", CredentialRefs: []string{"aws-secrets-manager://collector-key"},
-		Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+		Lifecycle: sdk.ExternalLifecycleExtension,
 	}
 	var result sdk.PlanResult
 	if err := new(Server).Plan(req, &result); err != nil || result.Error != nil {

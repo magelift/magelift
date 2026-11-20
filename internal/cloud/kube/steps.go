@@ -37,12 +37,9 @@ type ProbeRunner interface {
 	RunProbe(ctx context.Context, request CandidateRequest, command []string) error
 }
 
-// ServiceHealth is a Deployment readiness snapshot for Stabilize/Health.
-// Generation, ObservedGeneration, UpdatedReplicas, and Images carry
-// rollout identity: Health requires the intended revision, not merely
-// healthy replicas from any revision. ImageDigest is the first
-// container's image (legacy display); Images holds every served
-// container image and is what rollout identity compares.
+// ServiceHealth records the Deployment generation, updated replicas, and
+// images needed to verify the intended rollout. ImageDigest is the first
+// container image for display. The rollout compares all Images.
 type ServiceHealth struct {
 	DesiredReplicas    int
 	ReadyReplicas      int
@@ -59,9 +56,7 @@ type RuntimeChecker interface {
 	Check(context.Context, string, string) (ServiceHealth, error)
 }
 
-// DeploySpec holds provider-portable Magento deploy knobs for kube.Steps.
-// The contract moved to the SDK; this alias keeps in-process providers
-// (EKS, OVH) compiling against the same versioned shape.
+// DeploySpec is the shared Magento deployment input for Kubernetes providers.
 type DeploySpec = sdk.DeployInputs
 
 // Steps implements deployflow.Steps for Magento on Kubernetes (D-03, KUBE-04).

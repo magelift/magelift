@@ -27,7 +27,7 @@ func (p Planned) Runtime() sdk.RuntimeID   { return sdk.RuntimeID(RuntimeID) }
 func (p Planned) Project() string          { return p.Spec.Identity.Project }
 func (p Planned) Environment() string      { return p.Spec.Identity.Environment }
 func (p Planned) Region() string           { return p.Spec.Identity.Region }
-func (p Planned) CertificationTier() platform.CertificationTier {
+func (p Planned) RuntimeTier() platform.RuntimeTier {
 	return platform.TierExperimental
 }
 func (p Planned) EnvironmentClass() string { return p.Spec.Identity.EnvironmentClass }
@@ -69,7 +69,7 @@ func (Module) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: TargetID, Provider: "aws", Runtime: RuntimeID}
 }
 
-func (Module) CertificationTier() platform.CertificationTier { return platform.TierExperimental }
+func (Module) RuntimeTier() platform.RuntimeTier { return platform.TierExperimental }
 
 // PlanAdmission resolves current AWS account, EKS, and catalog availability
 // before the cluster or any data-plane resource can be mutated.

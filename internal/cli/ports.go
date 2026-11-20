@@ -91,17 +91,17 @@ func (o *options) secretsPort() (platform.Secrets, error) {
 	return port, nil
 }
 
-func notSupportedMessage(provider, runtime string, tier platform.CertificationTier, surface string) string {
+func notSupportedMessage(provider, runtime string, tier platform.RuntimeTier, surface string) string {
 	return fmt.Sprintf("%s is not supported for target %s/%s yet (%s)", surface, provider, runtime, tier)
 }
 
 func notSupportedForPlanned(planned platform.PlannedStack, surface string) string {
-	return notSupportedMessage(string(planned.Provider()), string(planned.Runtime()), planned.CertificationTier(), surface)
+	return notSupportedMessage(string(planned.Provider()), string(planned.Runtime()), planned.RuntimeTier(), surface)
 }
 
 func notSupportedForModule(module platform.StackModule, surface string) string {
 	d := module.Descriptor()
-	return notSupportedMessage(string(d.Provider), string(d.Runtime), module.CertificationTier(), surface)
+	return notSupportedMessage(string(d.Provider), string(d.Runtime), module.RuntimeTier(), surface)
 }
 
 func notSupported(err error, planned platform.PlannedStack, surface string) error {

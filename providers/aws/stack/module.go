@@ -27,19 +27,14 @@ func (p Planned) StackName() string {
 func (p Planned) Provider() sdk.ProviderID {
 	return sdk.ProviderID("aws")
 }
-func (p Planned) Runtime() sdk.RuntimeID { return sdk.RuntimeID("ecs-fargate") }
-func (p Planned) Project() string        { return p.Spec.Identity.Project }
-func (p Planned) Environment() string    { return p.Spec.Identity.Environment }
-func (p Planned) Region() string         { return p.Spec.Identity.Region }
-func (p Planned) CertificationTier() platform.CertificationTier {
-	if matchesFargatePreviewReference(p.Spec) {
-		return platform.TierBuiltIn
-	}
-	return platform.TierExperimental
-}
-func (p Planned) EnvironmentClass() string { return p.Spec.Identity.EnvironmentClass }
-func (p Planned) Protected() bool          { return p.Spec.Lifecycle.Protection }
-func (p Planned) ImageDigest() string      { return p.Spec.Artifact.ImageDigest }
+func (p Planned) Runtime() sdk.RuntimeID          { return sdk.RuntimeID("ecs-fargate") }
+func (p Planned) Project() string                 { return p.Spec.Identity.Project }
+func (p Planned) Environment() string             { return p.Spec.Identity.Environment }
+func (p Planned) Region() string                  { return p.Spec.Identity.Region }
+func (Planned) RuntimeTier() platform.RuntimeTier { return platform.TierBuiltIn }
+func (p Planned) EnvironmentClass() string        { return p.Spec.Identity.EnvironmentClass }
+func (p Planned) Protected() bool                 { return p.Spec.Lifecycle.Protection }
+func (p Planned) ImageDigest() string             { return p.Spec.Artifact.ImageDigest }
 func (p Planned) TargetDescriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: "aws.ecs-fargate", Provider: "aws", Runtime: "ecs-fargate"}
 }
@@ -71,7 +66,7 @@ func (Module) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: "aws.ecs-fargate", Provider: "aws", Runtime: "ecs-fargate"}
 }
 
-func (Module) CertificationTier() platform.CertificationTier { return platform.TierBuiltIn }
+func (Module) RuntimeTier() platform.RuntimeTier { return platform.TierBuiltIn }
 
 // PlanAdmission resolves current AWS account and catalog availability before
 // the Pulumi program can begin any paid resource mutation.

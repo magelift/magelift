@@ -12,7 +12,6 @@ usage() {
   cat <<'EOF'
 usage: go-test-modules.sh [--community] [--race] [--only <module>] [--list-modules]
 
-  --community     omit frozen provider/vendor suites from the root module
   --race          pass -race to go test
   --only <name>   run a single module (repeatable)
   --list-modules  print module names and exit 0
@@ -20,7 +19,6 @@ EOF
 }
 
 race=0
-community=0
 declare -a only=()
 declare -a module_names=(root sdk)
 for manifest in "$ROOT"/providers/*/go.mod; do
@@ -48,10 +46,6 @@ valid_module() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  --community)
-    community=1
-    shift
-    ;;
   --race)
     race=1
     shift
@@ -104,26 +98,8 @@ if ((race == 1)); then
 fi
 
 run_root() {
-  local package_output
-  local -a packages=(./...)
-  cd "$ROOT"
-  if ((community == 1)); then
-    package_output="$(go_cmd list ./...)" || return
-    packages=()
-    while IFS= read -r package; do
-      packages+=("$package")
-    done < <(printf '%s\n' "$package_output" | awk '
-      !/\/internal\/cloud\/(ovh|scaleway)(\/|$)/ &&
-      !/\/internal\/external(\/|$)/ &&
-      !/\/cmd\/(ovh-|scaleway-|newrelic-|failed-deployment-probe)/
-    ')
-    if [[ "${#packages[@]}" -eq 0 ]]; then
-      printf 'go-test-modules: no community root packages found\n' >&2
-      return 1
-    fi
-  fi
-  printf '+ go-test-modules: root (%s packages; community=%s)\n' "${#packages[@]}" "$community"
-  go_cmd test "${race_args[@]}" "${packages[@]}" -count=1
+  printf '+ go-test-modules: root ./...\n'
+  (cd "$ROOT" && go_cmd test "${race_args[@]}" ./... -count=1)
 }
 
 run_sdk() {

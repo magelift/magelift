@@ -6,11 +6,29 @@ namespace MageLift\Build\Tests\Magento;
 
 use PHPUnit\Framework\TestCase;
 
-// RuntimeEnvTemplateTest pins the baked env.php contract: every value the
-// platform promises resolves from the documented environment variable, and
-// remote media storage stays inert unless a driver is selected.
 final class RuntimeEnvTemplateTest extends TestCase
 {
+    public function testMagentoSettingsMatchTheRuntimeInputs(): void
+    {
+        $recipe = dirname(__DIR__, 3) . '/images/php-nginx';
+        $env = require $recipe . '/env.php';
+        $amqp = $env['queue']['amqp'];
+        self::assertSame('#env(MAGENTO_DC_QUEUE__AMQP__USERNAME, "magento")', $amqp['user']);
+        self::assertSame('#env(MAGENTO_DC_QUEUE__AMQP__PASSWORD)', $amqp['password']);
+        self::assertArrayNotHasKey('username', $amqp);
+        self::assertSame('#env(MAGENTO_DC_INSTALL__DATE, "Thu, 01 Jan 1970 00:00:00 +0000")', $env['install']['date']);
+        self::assertArrayNotHasKey('port', $env['db']['connection']['default']);
+        self::assertSame(
+            '#env(MAGENTO_DC_CATALOG__SEARCH__OPENSEARCH_SERVER_HOSTNAME, "127.0.0.1")',
+            $env['system']['default']['catalog']['search']['opensearch_server_hostname']
+        );
+        self::assertArrayNotHasKey('catalog', $env);
+
+        $pool = file_get_contents($recipe . '/www.conf');
+        self::assertIsString($pool);
+        self::assertMatchesRegularExpression('/^\s*clear_env\s*=\s*no\s*$/m', $pool);
+    }
+
     public function testRemoteStorageSectionUsesDocumentedVariables(): void
     {
         $env = require dirname(__DIR__, 3) . '/images/php-nginx/env.php';

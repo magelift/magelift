@@ -9,8 +9,6 @@ Use a provider or area label to make related issues and pull requests easier to 
 | `provider/aws` | AWS plugin and runtimes |
 | `provider/gcp` | GCP plugin and runtimes |
 | `provider/azure` | Azure plugin and AKS |
-| `provider/ovh` | Experimental OVH adapter |
-| `provider/scaleway` | Experimental Scaleway adapter |
 | `area/cli` | Cobra commands |
 | `area/docs` | MkDocs, ADRs, CONTRIBUTING, marketing |
 | `area/config` | PHP project format, schema and validation |

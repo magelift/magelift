@@ -12,7 +12,7 @@ import (
 
 // LifecycleResult is the provider-neutral result returned by an injected
 // telemetry implementation. The implementation may be CloudWatch, Google
-// Cloud Operations, Cockpit, OVH Logs Data Platform, New Relic, or a
+// Cloud Operations, New Relic, or a
 // community collector; no vendor object crosses this boundary.
 type LifecycleResult struct {
 	OperationID         string

@@ -21,7 +21,7 @@ func (stubAWSModule) Descriptor() sdk.TargetDescriptor {
 	}
 }
 
-func (stubAWSModule) CertificationTier() platform.CertificationTier {
+func (stubAWSModule) RuntimeTier() platform.RuntimeTier {
 	return platform.TierBuiltIn
 }
 
@@ -70,19 +70,19 @@ func (stubAWSModule) Plan(cfg config.Config, environment string, _ platform.Plan
 	}, nil
 }
 
-// stubExperimentalModule is an OVH/MKS stub so CLI tests can assert experimental
+// stubExperimentalModule is an Azure AKS stub so CLI tests can assert experimental
 // tier messaging without importing cloud packages.
 type stubExperimentalModule struct{}
 
 func (stubExperimentalModule) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{
-		ID:       "ovh.mks",
-		Provider: "ovh",
-		Runtime:  "mks",
+		ID:       "azure.aks",
+		Provider: "azure",
+		Runtime:  "aks",
 	}
 }
 
-func (stubExperimentalModule) CertificationTier() platform.CertificationTier {
+func (stubExperimentalModule) RuntimeTier() platform.RuntimeTier {
 	return platform.TierExperimental
 }
 
@@ -97,13 +97,13 @@ func (stubExperimentalModule) Plan(cfg config.Config, environment string, _ plat
 		return nil, fmt.Errorf("environment is required")
 	}
 	digest := ""
-	if cfg.Target.OVH != nil {
-		digest = cfg.Target.OVH.ImageDigest
+	if cfg.Target.Azure != nil {
+		digest = cfg.Target.Azure.ImageDigest
 	}
 	return stubPlanned{
 		stackName:   cfg.Project.Name + "-" + environment,
-		provider:    "ovh",
-		runtime:     "mks",
+		provider:    "azure",
+		runtime:     "aks",
 		project:     cfg.Project.Name,
 		environment: environment,
 		region:      cfg.Defaults.Region,
@@ -126,7 +126,7 @@ func (stubExperimentalAWSEKSModule) Descriptor() sdk.TargetDescriptor {
 	}
 }
 
-func (stubExperimentalAWSEKSModule) CertificationTier() platform.CertificationTier {
+func (stubExperimentalAWSEKSModule) RuntimeTier() platform.RuntimeTier {
 	return platform.TierExperimental
 }
 
@@ -161,7 +161,7 @@ func (stubExperimentalAWSEKSModule) Plan(cfg config.Config, environment string, 
 type stubPlanned struct {
 	stackName, provider, runtime, project, environment, region, envClass, digest string
 	protected                                                                    bool
-	tier                                                                         platform.CertificationTier
+	tier                                                                         platform.RuntimeTier
 	adopted                                                                      []string
 	networkExternalID, networkLabel                                              string
 	databaseExternalID, databaseLabel                                            string
@@ -173,7 +173,7 @@ func (p stubPlanned) Runtime() sdk.RuntimeID   { return sdk.RuntimeID(p.runtime)
 func (p stubPlanned) Project() string          { return p.project }
 func (p stubPlanned) Environment() string      { return p.environment }
 func (p stubPlanned) Region() string           { return p.region }
-func (p stubPlanned) CertificationTier() platform.CertificationTier {
+func (p stubPlanned) RuntimeTier() platform.RuntimeTier {
 	if p.tier == "" {
 		return platform.TierBuiltIn
 	}
@@ -199,7 +199,7 @@ func (p stubPlanned) StoredPlan() sdk.StoredPlan {
 
 func (p stubPlanned) TargetDescriptor() sdk.TargetDescriptor {
 	switch {
-	case p.provider == "ovh" && p.runtime == "mks":
+	case p.provider == "azure" && p.runtime == "aks":
 		return stubExperimentalModule{}.Descriptor()
 	case p.provider == "aws" && p.runtime == "eks":
 		return stubExperimentalAWSEKSModule{}.Descriptor()
@@ -252,7 +252,7 @@ func (stubGCPModule) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: "gcp.gke-autopilot", Provider: "gcp", Runtime: "gke-autopilot"}
 }
 
-func (stubGCPModule) CertificationTier() platform.CertificationTier { return platform.TierBuiltIn }
+func (stubGCPModule) RuntimeTier() platform.RuntimeTier { return platform.TierBuiltIn }
 
 func (stubGCPModule) OutputKeys() []string { return platform.RequiredOutputKeys() }
 

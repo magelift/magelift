@@ -1,11 +1,8 @@
-# MageLift Build
+# MageLift build package
 
-`magelift/build` contains the lifecycle contracts used to describe a Magento build
-and deployment workflow.
-
-This package defines the Magento and Composer lifecycle contracts, validates hooks,
-and creates deterministic artifact manifests. The native runner executes the
-validated preparation graph; the Go pipeline owns OCI packaging and promotion.
+`magelift/build` plans Magento and Composer steps, validates hooks, and writes
+artifact manifests. The PHP runner prepares the shop. The Go pipeline packages
+and promotes the OCI image.
 
 ## Lifecycle model
 
@@ -42,7 +39,7 @@ $graph = new LifecycleGraph([
 $orderedSteps = $graph->orderedSteps();
 ```
 
-Magento commands are represented as argument arrays rather than shell strings. The
+Each Magento command is an argument array. The
 artifact manifest records the source revision, OCI digest, versions, enabled modules,
 checksums, static content, runtime capabilities, and compatibility status.
 

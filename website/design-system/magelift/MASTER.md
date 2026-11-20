@@ -1,17 +1,8 @@
 # Design System Master File
 
-> **LOGIC:** Page overrides in `pages/` win over this file.
-> Human-locked 2026-08-03 after ui-ux-pro-max + design-taste-frontend + frontend-design review.
-> Deliberately **not** the skill default (dark + acid green + mono display).
-
-**Project:** MageLift  
-**Category:** B2B Magento cloud CLI (open-source)  
-**Audience:** Agency tech leads / SME Magento owners  
-**Dials:** Variance 6 · Motion 5 · Density 3  
-
-**Design read:** Daylight industrial dock: cool concrete, ink navy, single teal accent. Trust-first Lexend + Source Sans 3. Terminal outcome is the signature visual.
-
----
+The landing page is for Magento developers and agencies. The site uses a light
+background, navy text, and one teal accent. See `src/styles/global.css` for the
+color values and component styles.
 
 ## Color Palette
 

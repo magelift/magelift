@@ -1,55 +1,45 @@
-# MageLift (extended site summary)
+# MageLift
 
-## Product
+MageLift is an Apache-2.0 CLI for small Magento teams and agencies. It runs
+Magento Open Source and licensed Adobe Commerce locally with Docker and
+deploys the shop into its own cloud account. Shop settings live in magelift.php.
 
-MageLift is an open-source (Apache-2.0) command-line tool and PHP configuration format for deploying and operating Magento Open Source and Adobe Commerce in the customer's own cloud account. The customer pays the cloud provider directly. MageLift is independent of Adobe Inc. Magento and Adobe Commerce are Adobe trademarks used only to describe compatibility.
+## Try a shop
 
-## Pricing
+Run `go install ./cmd/magelift` in the MageLift checkout. Then open the
+Magento checkout and run `magelift init --provider aws` and `magelift dev`.
+Pick `gcp` or `azure` for the other clouds. Open the local shop URL printed
+by the CLI.
+https://magelift.dev/docs/getting-started/
 
-- MageLift software: $0 under Apache-2.0. No SaaS subscription for the CLI.
-- Cloud spend: the customer's cloud provider bill. Use `magelift cost` for AWS shape estimates. Destroy preview stacks when finished.
-- Details: https://magelift.dev/pricing.md
+## Cloud accounts
 
-## Cloud targets and evidence
+AWS ECS Fargate and Google Cloud GKE Autopilot have recorded Magento runs.
+Azure AKS has Pulumi mock and Floci API tests and is experimental. AWS EKS
+and Google Cloud GKE Standard are also experimental. The provider guide
+lists what the tests exercised. https://magelift.dev/docs/capability-matrix/
 
-AWS ECS Fargate and GCP GKE Autopilot have historical Magento deployment evidence. The Azure AKS adapter has Pulumi graph and Floci coverage. Check the exact operation and test type in the capability matrix. AWS EKS, GCP GKE Standard, OVH MKS and Scaleway Kapsule are experimental. See https://magelift.dev/docs/capability-matrix/
+Cloud deployment uses a verified provider plugin. Connect your account,
+build an application image in your registry, and deploy the image by digest.
+Your cloud provider bills for running resources. https://magelift.dev/docs/bootstrap/
+https://magelift.dev/docs/builds/ · https://magelift.dev/pricing.md
 
-## Configuration
+## Move and operate a shop
 
-The shop keeps magelift.php in version control. Developers can share PHP functions and service definitions across preview, staging, UAT and production. The shop selects its images and service versions. MageLift reports compatibility advice and checks whether a provider can implement the requested topology.
+Import settings using `magelift init --from-acc`, `--from-upsun`, or
+`--from-compose`. Rehearse the database and media transfer before switching
+traffic. https://magelift.dev/docs/migrating-from-paas/
 
-## Primary workflows
+Deploy staging and production from the same image digest. Use the CLI for
+logs, health, and environment settings. A generated GitHub Actions workflow
+can create and remove pull-request previews. https://magelift.dev/docs/operations/
 
-1. Install the CLI from a MageLift checkout with `go install ./cmd/magelift`.
-2. Run `magelift init` in the Magento checkout, then `magelift config validate`.
-3. Run `magelift dev` to start Magento locally with Compose.
-4. Bootstrap once, then `preview` / `deploy` / `destroy` in your cloud account.
-5. Migrate from Adobe Commerce Cloud / Upsun: config import (`magelift init --from-acc` / `--from-upsun`), plus dump/media/DNS cutover docs.
+## References
 
-## MageLift vs Magento PaaS
+- Install: https://magelift.dev/docs/install/
+- Service settings: https://magelift.dev/docs/service-bindings/
+- Compare hosting: https://magelift.dev/docs/compare-paas/
+- Source and support: https://github.com/magelift/magelift
 
-| | ACC / Upsun-style PaaS | MageLift |
-| --- | --- | --- |
-| Where Magento runs | Vendor platform | Customer cloud account |
-| Config | PaaS YAML / UI | PHP project + CLI |
-| Lock-in | Platform | Cloud APIs + open-source CLI |
-| Cost | Platform fee + usage | Cloud bill + operator time |
-| Ops | Platform tickets | Provider commands for status, logs and deployment. The customer owns IAM and billing. |
-
-Full page: https://magelift.dev/docs/compare-paas/
-
-## Key URLs
-
-| Resource | URL |
-| --- | --- |
-| Home | https://magelift.dev/ |
-| Docs home | https://magelift.dev/docs/ |
-| FAQ | https://magelift.dev/docs/faq/ |
-| Install | https://magelift.dev/docs/install/ |
-| Getting started | https://magelift.dev/docs/getting-started/ |
-| Compare PaaS | https://magelift.dev/docs/compare-paas/ |
-| Weekend migrate | https://magelift.dev/docs/weekend-migrate/ |
-| Capability matrix | https://magelift.dev/docs/capability-matrix/ |
-| Architecture | https://magelift.dev/docs/architecture/ |
-| GitHub | https://github.com/magelift/magelift |
-| Short index | https://magelift.dev/llms.txt |
+MageLift is independent of Adobe Inc. Magento and Adobe Commerce are Adobe
+trademarks.

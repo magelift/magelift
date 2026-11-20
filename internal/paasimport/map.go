@@ -167,7 +167,7 @@ func catalogFromRelationships(rels map[string]string) map[string]any {
 	return catalog
 }
 
-// applyAllowlistEnv maps D-07 env vars into doc and returns residual env keys.
+// applyAllowlistEnv translates recognized variables and returns unmapped keys.
 func applyAllowlistEnv(doc *mageliftDocument, source string, env accEnvDocument) []UnmappedKey {
 	type staged struct {
 		path string

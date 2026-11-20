@@ -22,17 +22,6 @@ const (
 	ExternalLifecycleObserveOnly ExternalLifecycle = "observe-only"
 )
 
-// ExternalCertificationStatus records an edge or telemetry adapter's status independently
-// of the cloud runtime. Older run records use the certified value.
-type ExternalCertificationStatus string
-
-const (
-	ExternalCertified    ExternalCertificationStatus = "certified"
-	ExternalExperimental ExternalCertificationStatus = "experimental"
-	ExternalUnavailable  ExternalCertificationStatus = "unavailable"
-	ExternalBlocked      ExternalCertificationStatus = "blocked"
-)
-
 type Application struct {
 	Edition    string
 	Version    string
@@ -90,7 +79,6 @@ type EdgeHealthIntent struct {
 type EdgeIntent struct {
 	ExternalProvider  string
 	Lifecycle         ExternalLifecycle
-	Certification     ExternalCertificationStatus
 	Mode              string
 	NativeProvider    string
 	CredentialRefs    []string
@@ -113,16 +101,14 @@ type EdgeIntent struct {
 // ObservabilityIntent selects telemetry signals without coupling the public
 // SDK to a vendor API or credential format.
 type ObservabilityIntent struct {
-	Lifecycle     ExternalLifecycle
-	Certification ExternalCertificationStatus
+	Lifecycle ExternalLifecycle
 	// OwnershipMarker scopes native and external telemetry permissions to the
 	// selected architecture. It is an opaque, non-secret marker; adapters use
 	// it when naming resources and constraining vendor permissions.
 	OwnershipMarker string
 	NativeProvider  string
-	// NativeReference is an opaque provider-owned identity for an existing
-	// native destination, such as an OVH Logs Data Platform stream. It is not
-	// a provider SDK type and must never contain a secret.
+	// NativeReference identifies an existing destination, such as a Cloud
+	// Monitoring service. Store credentials in CredentialRefs.
 	NativeReference    string
 	ExternalProvider   string
 	CredentialRefs     []string
@@ -145,8 +131,7 @@ type ObservabilityIntent struct {
 }
 
 // AlertIntent is the portable minimum for an actionable alert. Provider
-// adapters translate it into CloudWatch alarms, Google Cloud alert policies,
-// Cockpit rules, Logs Data Platform alerts, or a community implementation.
+// adapters translate these settings into native alerting rules.
 type AlertIntent struct {
 	ID                   string
 	Signal               string
@@ -235,12 +220,6 @@ const (
 	CapabilityObservabilityGoogleCloudOperations CapabilityID = "observability.google-cloud-operations"
 	CapabilityObservabilityNewRelicProvider      CapabilityID = "observability.newrelic"
 	CapabilityObservabilityDatadogProvider       CapabilityID = "observability.datadog"
-
-	// Deprecated AWS-product aliases; prefer the Magento-shaped IDs above.
-	CapabilitySearchOpenSearch        = CapabilitySearchFullText
-	CapabilityObjectStorageS3         = CapabilityObjectStorageBlob
-	CapabilityEdgeCloudFront          = CapabilityEdgeCDN
-	CapabilityObservabilityCloudWatch = CapabilityObservabilityLogs
 )
 
 type CapabilityRequest struct {

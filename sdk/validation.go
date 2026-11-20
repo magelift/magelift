@@ -60,10 +60,10 @@ func ValidateCredentialReference(reference string) error {
 // ValidateExternalIntent checks the portable metadata carried to an edge or
 // observability extension. Secret values are outside this SDK; credential
 // entries are accepted only as opaque references.
-func ValidateExternalIntent(provider string, lifecycle ExternalLifecycle, certification ExternalCertificationStatus, credentialRefs []string) error {
+func ValidateExternalIntent(provider string, lifecycle ExternalLifecycle, credentialRefs []string) error {
 	provider = strings.TrimSpace(provider)
 	if provider == "" || provider == "none" {
-		if lifecycle != "" || certification != "" || len(credentialRefs) != 0 {
+		if lifecycle != "" || len(credentialRefs) != 0 {
 			return errors.New("external intent metadata requires a provider")
 		}
 		return nil
@@ -73,11 +73,6 @@ func ValidateExternalIntent(provider string, lifecycle ExternalLifecycle, certif
 	case ExternalLifecycleManaged, ExternalLifecycleExtension, ExternalLifecycleObserveOnly:
 	default:
 		problems = append(problems, fmt.Errorf("invalid external lifecycle %q", lifecycle))
-	}
-	switch certification {
-	case ExternalCertified, ExternalExperimental, ExternalUnavailable, ExternalBlocked:
-	default:
-		problems = append(problems, fmt.Errorf("invalid external certification status %q", certification))
 	}
 	for _, reference := range credentialRefs {
 		if err := ValidateCredentialReference(reference); err != nil {

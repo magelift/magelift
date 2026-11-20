@@ -43,10 +43,7 @@ func TestBuildNRDOTKubernetesValuesSupportsFirstPartyManagedKubernetesTargets(t 
 		name     string
 		provider sdk.ProviderID
 		runtime  sdk.RuntimeID
-	}{
-		{name: "scaleway kapsule", provider: "scaleway", runtime: "kapsule"},
-		{name: "ovh mks", provider: "ovh", runtime: "mks"},
-	} {
+	}{} {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := BuildNRDOTKubernetesValues(kube.HelmCollectorReleaseRequest{
 				TargetProvider: test.provider, TargetRuntime: test.runtime, NativeReference: "cluster-ref",

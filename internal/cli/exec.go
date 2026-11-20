@@ -61,7 +61,7 @@ func magentoOperationCommand(o *options, name string) *cobra.Command {
 		Short: "Run the Magento " + name + " operation on the web workload",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Empty container lets the adapter pick php-fpm vs web from WebRuntime.
+			// Let the adapter select the Magento container.
 			_, target, err := o.prepareRemoteCommand(cmd.Context(), "web", "", strings.Fields(commands[name]), true)
 			if err != nil {
 				return err

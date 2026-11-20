@@ -66,7 +66,7 @@ jobs:
               - 'Makefile'
               - '.golangci.yml'
               - 'scripts/check-provider-tidy.sh'
-              # CI Go jobs live here — workflow-only edits must still exercise them.
+              # Changes to this workflow also trigger the Go jobs.
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
               - 'internal/cli/ci_setup_pulumi.bash'
@@ -96,10 +96,12 @@ jobs:
             images:
               - 'images/**'
               - 'docker-bake.hcl'
-              - 'scripts/frankenphp-tls-test.sh'
+              - 'scripts/image-health-test.sh'
+              - 'scripts/nginx-media-deny-test.sh'
               - 'scripts/varnish-test.sh'
             scripts:
               - 'scripts/**'
+              - 'tests/scripts/**'
             workflows:
               - '.github/workflows/**'
               - '.github/actions/**'
@@ -116,7 +118,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
-    # Module download only — compiling was SIGTERM'd ~10m on the private runner (30350692845).
+    # This job warms the module cache. Each test job compiles its own packages.
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -139,7 +141,7 @@ jobs:
       - uses: ./.github/actions/go-memlimit
       - name: Warm module cache
         run: go mod download
-      # Explicit save with if: always() — setup-go's post-step never runs when the runner is reaped.
+      # Save downloaded modules even when a later step fails.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: always()
         with:
@@ -227,9 +229,7 @@ jobs:
           go-package: ./...
       - name: Check Go dependency licenses
         run: |
-          go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown \
-            --ignore=github.com/ovh/pulumi-ovh \
-            --ignore=github.com/ovh/okms-sdk-go
+          go run github.com/google/go-licenses/v2@v2.0.1 check ./... --disallowed_types=forbidden,unknown
 
   sdk-verify:
     needs: [changes, cache-prime]
@@ -446,44 +446,6 @@ jobs:
           trivyignores: .trivyignore
           exit-code: '1'
 
-  frankenphp:
-    needs: changes
-    if: needs.changes.outputs.images == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php:
-          - {branch: '8.3', target: '8-3'}
-          - {branch: '8.4', target: '8-4'}
-          - {branch: '8.5', target: '8-5'}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Build and inspect classic adapter
-        env:
-          PHP_BRANCH: ${{ matrix.php.branch }}
-        run: |
-          target="frankenphp-classic-${{ matrix.php.target }}"
-          image="magelift/frankenphp-classic:${PHP_BRANCH}-local"
-          docker buildx bake "$target" --load --provenance=false --sbom=false --set "$target.platform=linux/amd64"
-          test "$(docker run --rm --entrypoint id "$image" -u)" = 10001
-          docker run --rm --entrypoint frankenphp "$image" version
-          MAGELIFT_FRANKENPHP_IMAGE="$image" ./scripts/frankenphp-tls-test.sh
-      - name: Scan frankenphp image
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          version: v0.76.2
-          image-ref: magelift/frankenphp-classic:${{ matrix.php.branch }}-local
-          format: table
-          ignore-unfixed: true
-          severity: CRITICAL,HIGH
-          vuln-type: os,library
-          trivyignores: .trivyignore
-          exit-code: '1'
-
   varnish:
     needs: changes
     if: needs.changes.outputs.images == 'true'
@@ -633,12 +595,10 @@ jobs:
           koalaman/shellcheck-alpine:v0.11.0@sha256:9955be09ea7f0dbf7ae942ac1f2094355bb30d96fffba0ec09f5432207544002
           -c 'shellcheck --severity=warning /src/scripts/*.sh'
 
-  acceptance-contracts:
-    name: acceptance contracts
+  script-tests:
     needs: changes
     if: needs.changes.outputs.scripts == 'true' || needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -647,32 +607,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-${{ github.sha }}
-          restore-keys: |
-            go-prime-${{ runner.os }}-${{ hashFiles('go.sum', 'sdk/go.sum', 'providers/**/go.sum', 'go.work.sum') }}-
       - uses: ./.github/actions/go-memlimit
-      - name: Install pinned JSON/YAML tools
-        env:
-          YQ_VERSION: v4.54.3
-          YQ_SHA256: 129534601871538efe0ba4c5e62a34fb1d5f469bcb975c4fddeb467d82974973
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y jq
-          yq_path="$RUNNER_TEMP/yq"
-          curl --fail --silent --show-error --location \
-            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" \
-            --output "$yq_path"
-          test "$(sha256sum "$yq_path" | awk '{print $1}')" = "$YQ_SHA256"
-          sudo install -m 0755 "$yq_path" /usr/local/bin/yq
-          jq --version
-          yq --version
-      - name: Run offline acceptance contract suite
-        run: make acceptance-harness-test
+      - run: make script-test
 
   # Single required status check: skipped path-filtered jobs count as OK.
   result:
@@ -686,7 +622,6 @@ jobs:
       - docs
       - php
       - container
-      - frankenphp
       - varnish
       - floci-aws
       - floci-gcp
@@ -695,7 +630,7 @@ jobs:
       - release-config
       - workflow-lint
       - shellcheck
-      - acceptance-contracts
+      - script-tests
     if: always()
     runs-on: ubuntu-latest
     steps:

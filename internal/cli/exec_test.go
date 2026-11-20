@@ -139,26 +139,6 @@ func TestMagentoOperationTargetsPHPContainer(t *testing.T) {
 	}
 }
 
-func TestCacheFlushAcceptsFrankenPHPWithoutAdobeHatch(t *testing.T) {
-	path := writeLifecycleConfig(t, "staging", false)
-	data, err := readTestProjectYAML(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data = bytes.Replace(data, []byte("webRuntime: nginx-fpm"), []byte("webRuntime: frankenphp-classic"), 1)
-	if err := writeTestProjectFile(path, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
-	o.configPath, o.environment = path, "staging"
-	command := newCommandWithOptions(o)
-	command.SetArgs([]string{"--config", path, "--env", "staging", "cache-flush"})
-	err = command.Execute()
-	if err == nil || !strings.Contains(err.Error(), "infrastructure backend factory is required") {
-		t.Fatalf("error=%v code=%d", err, ExitCode(err))
-	}
-}
-
 func TestSSHUsesECSExecAsTheSupportedPath(t *testing.T) {
 	path := writeLifecycleConfig(t, "staging", false)
 	backend := &fakeInfrastructureBackend{outputs: map[string]any{"clusterName": "shop-cluster", "serviceName": "shop-web-service"}}

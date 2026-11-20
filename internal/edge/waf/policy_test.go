@@ -29,7 +29,7 @@ func TestMagentoSafeForUsesConfiguredFrontName(t *testing.T) {
 
 func TestMagentoSafeCountsLivedAWSFalsePositives(t *testing.T) {
 	policy := MagentoSafe()
-	if policy.RateLimitPerIP != 2000 || policy.BodyInspectionKB != 64 || policy.ScalewayMaxParanoia != 1 {
+	if policy.RateLimitPerIP != 2000 || policy.BodyInspectionKB != 64 {
 		t.Fatalf("Magento-safe scalars = %#v", policy)
 	}
 	required := []string{

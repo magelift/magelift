@@ -54,7 +54,7 @@ return new Project([
             'account' => '123456789012',
             'class' => 'preview',
             'domain' => 'preview.example.com',
-            'expiresAt' => '2026-12-31T23:59:59Z',
+            'previewTtl' => '168h',
             'monthlyBudgetCents' => 5000,
             'preset' => 'preview',
         ],
@@ -70,7 +70,6 @@ return new Project([
             'account' => '123456789012',
             'class' => 'staging',
             'domain' => 'staging.example.com',
-            'inherits' => 'preview',
             'preset' => 'standard',
             'target' => [
                 'aws' => [

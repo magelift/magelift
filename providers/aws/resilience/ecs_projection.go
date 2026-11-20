@@ -97,7 +97,7 @@ type ECSProjectionBackend struct {
 var _ cloudrecovery.ProjectionBackend = (*ECSProjectionBackend)(nil)
 
 // NewECSProjectionBackend constructs the ECS adapter around injected ports.
-// The separate constructor keeps fake-client certification deterministic and
+// The separate constructor keeps fake-client recovery tests deterministic and
 // lets community implementations provide an ECS-compatible API.
 func NewECSProjectionBackend(config ECSProjectionConfig) (*ECSProjectionBackend, error) {
 	if err := config.Target.validate(); err != nil {

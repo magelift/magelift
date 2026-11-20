@@ -1,15 +1,13 @@
 ---
 name: magelift-local-runtime
 description: >-
-  Create and operate MageLift's local Magento Docker environment with the
-  release-specific PHP, Composer, database, cache, search, and queue contract.
-  Use when starting local development or checking a local compatibility gap.
+  Start a Magento shop with MageLift and Docker. Use for local service settings, first install, logs, and stopping or resetting containers.
 version: 1.0.0
 ---
 
 # Run Magento locally
 
-After installing the shop's Composer dependencies, start the local environment:
+Install the shop's Composer dependencies, then start the local environment.
 
 ```sh
 magelift doctor --local
@@ -21,15 +19,15 @@ checks GraphQL. A generated admin password is stored in the ignored,
 mode-0600 `.magelift/local.env` file. Repeating `dev` reconciles generated
 Compose and PHP settings. If a generated file was manually edited, review and
 move it aside before retrying. `MAGELIFT_LOCAL_APP_HTTP_PORT` changes the local
-HTTP port; `MAGELIFT_LOCAL_BASE_URL` overrides the URL.
+HTTP port. `MAGELIFT_LOCAL_BASE_URL` overrides the URL.
 
 For separate steps, use `magelift local init`, `magelift local up --service app`
-and `magelift local seed`. `local init` resolves a source-dated compatibility
-row and does not change the cloud target.
+and `magelift local seed`. `local init` writes Compose using the selected
+environment’s service versions.
 
 Set local choices in the `local` block. Service selections also come from
-the project's `services` settings. Keep email credentials as environment-variable
-names; do not put secret values in `magelift.php`.
+the project's `services` settings. Put the variable names in `magelift.php`
+and keep their credential values in the environment.
 
 Add this fragment inside the existing project array in `magelift.php`:
 
@@ -40,8 +38,8 @@ Add this fragment inside the existing project array in `magelift.php`:
 ],
 ```
 
-`mailpit` starts a digest-pinned SMTP sink on loopback. SMTP and SES
-still take `credentialEnv` names, never secret values in `magelift.php`.
+`mailpit` starts a digest-pinned SMTP sink on loopback. For an authenticated relay, use `credentialEnv` to name the environment
+variable that supplies its password.
 
 Seed a project only after installing its Composer dependencies and supplying a
 local administrator password through the process environment:
@@ -58,6 +56,5 @@ Useful day-to-day commands are `magelift local status`, `magelift local logs
 Use `magelift local reset --yes` only when removing the local database and other
 Compose volumes is intended.
 
-If planning reports an unsupported Redis, provider-managed service, PHP
-setting, or extension contract, keep the explicit gap visible. Do not silently
-substitute a different production service family.
+If a production service has a different local substitute, explain the
+difference and check the production service in staging.

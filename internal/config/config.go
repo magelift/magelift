@@ -228,11 +228,9 @@ func (f *File) Resolve(environment string, opts ResolveOptions) (Effective, erro
 	return Effective{Config: cfg, Provenance: provenance, Compatibility: compatibility, Fingerprint: fingerprint}, nil
 }
 
-// materializeContextualDefaults resolves the small set of named defaults that
-// depend on the selected environment class rather than only on provider,
-// runtime, and preset. Keeping them in effective YAML prevents a provider
-// planner from applying a safety choice that is invisible to provenance and
-// architecture fingerprints.
+// materializeContextualDefaults applies defaults based on the environment
+// class as well as provider, runtime and preset. The same values appear in
+// effective config, provenance and architecture fingerprints.
 func materializeContextualDefaults(value map[string]any, provenance map[string]Provenance) {
 	provider := strings.TrimSpace(nestedString(value, "target", "provider"))
 	preset := strings.TrimSpace(nestedString(value, "preset"))
@@ -475,22 +473,15 @@ func apply(dst, src map[string]any, source, prefix string, provenance map[string
 }
 
 // normalizeDisabledProviderDefaults removes only preset-owned schedule values
-// that become meaningless when an operator explicitly disables the related
-// managed backup service. Project and environment values remain in place so
-// validation can report a contradictory advanced configuration instead of
-// silently discarding it.
+// for disabled backups. Keep explicit project and environment values so
+// validation can report conflicts.
 func normalizeDisabledProviderDefaults(value map[string]any, provenance map[string]Provenance) {
 	clearPresetValuesWhenDisabled(value, provenance, "target.gcp.cloudSqlBackupEnabled", "target.gcp.cloudSqlBackupRetentionCount", "target.gcp.cloudSqlTransactionLogRetentionDays", "target.gcp.cloudSqlBackupStartTime", "target.gcp.cloudSqlBackupLocation")
-	clearPresetValuesWhenDisabled(value, provenance, "target.scaleway.databaseBackupEnabled", "target.scaleway.databaseBackupFrequencyHours", "target.scaleway.databaseBackupRetentionDays", "target.scaleway.databaseBackupSameRegion")
 	clearPresetValuesWhenExistingAWSNetwork(value, provenance)
 }
 
-// clearPresetValuesWhenExistingAWSNetwork keeps managed NAT defaults on the
-// owned-network path only. An adopted VPC owns its own egress, so applying a
-// preset NAT topology to it would be both misleading in effective YAML and a
-// mutation attempt at the provider boundary. Explicit project or environment
-// choices remain so the AWS planner can reject them instead of silently
-// discarding operator intent.
+// clearPresetValuesWhenExistingAWSNetwork removes preset NAT settings for an
+// adopted VPC. The AWS planner still validates explicit egress settings.
 func clearPresetValuesWhenExistingAWSNetwork(value map[string]any, provenance map[string]Provenance) {
 	network, ok := nestedValue(value, []string{"target", "aws", "existing", "network"})
 	if !ok || network == nil {
@@ -704,41 +695,8 @@ func validate(c Config) (CompatibilityAssessment, error) {
 		if c.Target.Azure == nil || strings.TrimSpace(c.Target.Azure.SubscriptionID) == "" || strings.TrimSpace(c.Target.Azure.ResourceGroup) == "" {
 			problems = append(problems, "target.azure.subscriptionId and target.azure.resourceGroup are required when provider is azure")
 		}
-	case "ovh":
-		if c.Target.Runtime != "mks" {
-			problems = append(problems, "target.runtime must be mks when provider is ovh")
-		}
-		if c.Target.OVH == nil || c.Target.OVH.ServiceName == "" {
-			problems = append(problems, "target.ovh.serviceName is required when provider is ovh")
-		}
-		if c.Target.OVH != nil && (c.Target.OVH.DatabaseNodeCount < 0 || c.Target.OVH.ValkeyNodeCount < 0) {
-			problems = append(problems, "target.ovh managed database node counts cannot be negative")
-		}
-		if c.Target.OVH != nil {
-			if endpoint := strings.TrimSpace(c.Target.OVH.APIEndpoint); endpoint != "" && !validOVHAPIEndpoint(endpoint) {
-				problems = append(problems, fmt.Sprintf("target.ovh.apiEndpoint %q is not supported; use ovh-eu, ovh-ca, or ovh-us", endpoint))
-			}
-			problems = append(problems, validateOVHBackupSettings(*c.Target.OVH)...)
-			problems = append(problems, validateOVHManagedServiceSettings(*c.Target.OVH)...)
-		}
-	case "scaleway":
-		if c.Target.Runtime != "kapsule" {
-			problems = append(problems, "target.runtime must be kapsule when provider is scaleway")
-		}
-		if c.Target.Scaleway == nil || c.Target.Scaleway.ProjectID == "" {
-			problems = append(problems, "target.scaleway.projectId is required when provider is scaleway")
-		}
-		if c.Target.Scaleway != nil && c.Target.Scaleway.CacheMode != "" && c.Target.Scaleway.CacheMode != "redis" {
-			problems = append(problems, "target.scaleway.cacheMode must be redis when set")
-		}
-		if c.Target.Scaleway != nil && (c.Target.Scaleway.RedisClusterSize < 0 || c.Target.Scaleway.RedisClusterSize > 6) {
-			problems = append(problems, "target.scaleway.redisClusterSize must be between 1 and 6")
-		}
-		if c.Target.Scaleway != nil {
-			problems = append(problems, validateScalewayBackupSettings(*c.Target.Scaleway)...)
-		}
 	default:
-		problems = append(problems, "target.provider must be aws, gcp, azure, ovh, or scaleway")
+		problems = append(problems, "target.provider must be aws, gcp, or azure")
 	}
 	if c.Defaults.Preset != "preview" && c.Defaults.Preset != "standard" && c.Defaults.Preset != "high-availability" {
 		problems = append(problems, "defaults.preset must be preview, standard, or high-availability")
@@ -951,11 +909,11 @@ func validateCloudEmail(c Config) []string {
 	provider := strings.ToLower(strings.TrimSpace(c.Target.Provider))
 	managed := email.Managed != nil
 	var problems []string
-	if mode != "" && !containsString([]string{"disabled", "smtp", "ses", "tem", "ovh"}, mode) {
-		problems = append(problems, "email.mode must be disabled, smtp, ses, tem, or ovh")
+	if mode != "" && !containsString([]string{"disabled", "smtp", "ses"}, mode) {
+		problems = append(problems, "email.mode must be disabled, smtp, or ses")
 	}
-	if managed && mode != "ses" && mode != "tem" && mode != "ovh" {
-		problems = append(problems, "email.managed requires mode ses, tem, or ovh")
+	if managed && mode != "ses" {
+		problems = append(problems, "email.managed requires mode ses")
 	}
 	if email.Port < 0 || email.Port > 65535 {
 		problems = append(problems, "email.port must be between 1 and 65535 when set")
@@ -964,11 +922,10 @@ func validateCloudEmail(c Config) []string {
 		problems = append(problems, "email host, username, and from values contain a forbidden character")
 	}
 	byoSet := strings.TrimSpace(email.Host) != "" || email.Port != 0 || strings.TrimSpace(email.Username) != "" || strings.TrimSpace(email.Credential) != ""
-	var managedDomain, managedZone, managedAccount string
+	var managedDomain, managedZone string
 	if email.Managed != nil {
 		managedDomain = strings.TrimSpace(email.Managed.Domain)
 		managedZone = strings.TrimSpace(email.Managed.HostedZoneID)
-		managedAccount = strings.TrimSpace(email.Managed.Account)
 	}
 	switch mode {
 	case "ses":
@@ -987,13 +944,6 @@ func validateCloudEmail(c Config) []string {
 		if byoSet {
 			problems = append(problems, "email.ses managed mode cannot be combined with explicit host, port, username, or credential")
 		}
-		if managedAccount != "" {
-			problems = append(problems, "email.managed.account applies only to ovh mode")
-		}
-	case "tem":
-		problems = append(problems, "email.tem managed mode is not implemented for alpha; use email.mode smtp with an explicit relay")
-	case "ovh":
-		problems = append(problems, "email.ovh managed mode is not implemented for alpha; use email.mode smtp with an explicit relay")
 	case "smtp":
 		if strings.TrimSpace(email.Host) == "" || email.Port == 0 {
 			problems = append(problems, "email.smtp requires host and port")
@@ -1017,147 +967,18 @@ func validateSingleTargetBlock(c Config) []string {
 	if c.Target.Azure != nil {
 		set = append(set, "target.azure")
 	}
-	if c.Target.OVH != nil {
-		set = append(set, "target.ovh")
-	}
-	if c.Target.Scaleway != nil {
-		set = append(set, "target.scaleway")
-	}
 	if len(set) > 1 {
 		sort.Strings(set)
 		return []string{fmt.Sprintf("only one target block may be set; found %s", strings.Join(set, ", "))}
 	}
 	if len(set) == 1 {
-		want := map[string]string{"aws": "target.aws", "gcp": "target.gcp", "azure": "target.azure", "ovh": "target.ovh", "scaleway": "target.scaleway"}[c.Target.Provider]
+		want := map[string]string{"aws": "target.aws", "gcp": "target.gcp", "azure": "target.azure"}[c.Target.Provider]
 		if want != "" && set[0] != want {
 			return []string{fmt.Sprintf("%s is not valid when provider is %s", set[0], c.Target.Provider)}
 		}
 	}
 	return nil
 }
-func validateScalewayBackupSettings(target ScalewayTarget) []string {
-	var problems []string
-	if target.DatabaseBackupFrequency != nil && *target.DatabaseBackupFrequency < 1 {
-		problems = append(problems, "target.scaleway.databaseBackupFrequencyHours must be at least 1")
-	}
-	if target.DatabaseBackupRetention != nil && *target.DatabaseBackupRetention < 1 {
-		problems = append(problems, "target.scaleway.databaseBackupRetentionDays must be at least 1")
-	}
-	if target.DatabaseBackupEnabled != nil && !*target.DatabaseBackupEnabled && (target.DatabaseBackupFrequency != nil || target.DatabaseBackupRetention != nil || target.DatabaseBackupSameRegion != nil) {
-		problems = append(problems, "target.scaleway database backup schedule settings require databaseBackupEnabled")
-	}
-	return problems
-}
-
-func validateOVHBackupSettings(target OVHTarget) []string {
-	var problems []string
-	for name, value := range map[string]string{
-		"databaseBackupTime": target.DatabaseBackupTime,
-		"valkeyBackupTime":   target.ValkeyBackupTime,
-	} {
-		if value != "" && !validClockTime(value) {
-			problems = append(problems, fmt.Sprintf("target.ovh.%s must use HH:MM", name))
-		}
-	}
-	for name, regions := range map[string][]string{
-		"databaseBackupRegions": target.DatabaseBackupRegions,
-		"valkeyBackupRegions":   target.ValkeyBackupRegions,
-	} {
-		if len(regions) > 2 {
-			problems = append(problems, fmt.Sprintf("target.ovh.%s may contain at most two regions", name))
-		}
-		for _, region := range regions {
-			if strings.TrimSpace(region) == "" || strings.ContainsAny(region, "\r\n\x00") {
-				problems = append(problems, fmt.Sprintf("target.ovh.%s must contain non-empty region identifiers without control characters", name))
-			}
-		}
-	}
-	return problems
-}
-
-func validateOVHManagedServiceSettings(target OVHTarget) []string {
-	var problems []string
-	if target.DatabaseVersion != "" && target.DatabaseVersion != "8.0" && target.DatabaseVersion != "8.4" {
-		problems = append(problems, fmt.Sprintf("target.ovh.databaseVersion %q is not currently documented; use 8.0 or 8.4", target.DatabaseVersion))
-	}
-	if target.ValkeyVersion != "" && target.ValkeyVersion != "7.2" && target.ValkeyVersion != "8.0" && target.ValkeyVersion != "8.1" && target.ValkeyVersion != "9.0" && target.ValkeyVersion != "9.1" {
-		problems = append(problems, fmt.Sprintf("target.ovh.valkeyVersion %q is not currently documented or catalog-admitted; use 7.2, 8.0, 8.1, 9.0, or 9.1", target.ValkeyVersion))
-	}
-	if target.DatabasePlan != "" {
-		minNodes, maxNodes, ok := ovhMySQLPlanBounds(target.DatabasePlan)
-		if !ok {
-			problems = append(problems, fmt.Sprintf("target.ovh.databasePlan %q is not supported; use discovery, essential, business, production, enterprise, or advanced", target.DatabasePlan))
-		} else if target.DatabaseNodeCount > 0 && target.DatabaseNodeCount < minNodes {
-			problems = append(problems, fmt.Sprintf("target.ovh.databaseNodeCount %d is below the %s plan minimum of %d", target.DatabaseNodeCount, target.DatabasePlan, minNodes))
-		} else if target.DatabaseNodeCount > maxNodes {
-			problems = append(problems, fmt.Sprintf("target.ovh.databaseNodeCount %d exceeds the %s plan limit of %d", target.DatabaseNodeCount, target.DatabasePlan, maxNodes))
-		}
-	}
-	if target.ValkeyPlan != "" {
-		minNodes, maxNodes, ok := ovhValkeyPlanBounds(target.ValkeyPlan)
-		if !ok {
-			problems = append(problems, fmt.Sprintf("target.ovh.valkeyPlan %q is not supported; use discovery, essential, business, or production", target.ValkeyPlan))
-		} else if target.ValkeyNodeCount > 0 && target.ValkeyNodeCount < minNodes {
-			problems = append(problems, fmt.Sprintf("target.ovh.valkeyNodeCount %d is below the %s plan minimum of %d", target.ValkeyNodeCount, target.ValkeyPlan, minNodes))
-		} else if target.ValkeyNodeCount > maxNodes {
-			problems = append(problems, fmt.Sprintf("target.ovh.valkeyNodeCount %d exceeds the %s plan limit of %d", target.ValkeyNodeCount, target.ValkeyPlan, maxNodes))
-		}
-	}
-	seenZones := make(map[string]struct{}, len(target.Zones))
-	for index, zone := range target.Zones {
-		trimmed := strings.TrimSpace(zone)
-		if trimmed == "" {
-			problems = append(problems, fmt.Sprintf("target.ovh.zones[%d] must not be empty", index))
-			continue
-		}
-		key := strings.ToLower(trimmed)
-		if _, exists := seenZones[key]; exists {
-			problems = append(problems, fmt.Sprintf("target.ovh.zones contains duplicate availability zone %q", zone))
-			continue
-		}
-		seenZones[key] = struct{}{}
-	}
-	return problems
-}
-
-func validOVHAPIEndpoint(endpoint string) bool {
-	switch endpoint {
-	case "ovh-eu", "ovh-ca", "ovh-us":
-		return true
-	default:
-		return false
-	}
-}
-
-func ovhMySQLPlanBounds(plan string) (int, int, bool) {
-	switch plan {
-	case "discovery", "essential":
-		return 1, 1, true
-	case "business", "production":
-		return 2, 2, true
-	case "enterprise", "advanced":
-		return 3, 3, true
-	default:
-		return 0, 0, false
-	}
-}
-
-func ovhValkeyPlanBounds(plan string) (int, int, bool) {
-	switch plan {
-	case "discovery", "essential":
-		return 1, 1, true
-	case "business", "production":
-		return 2, 2, true
-	default:
-		return 0, 0, false
-	}
-}
-
-func validClockTime(value string) bool {
-	parsed, err := time.Parse("15:04", value)
-	return err == nil && parsed.Format("15:04") == value
-}
-
 func validateBuildRequirements(build Build) []string {
 	var problems []string
 	seen := make(map[string]struct{}, len(build.Extensions))
@@ -1222,9 +1043,6 @@ func validateEdge(c Config) []string {
 	}
 	if (mode == "native" || mode == "both") && strings.TrimSpace(edge.NativeProvider) == "" {
 		problems = append(problems, "edge.nativeProvider is required for native or both edge mode")
-	}
-	if c.Target.Provider == "ovh" && (mode == "native" || mode == "both") && strings.EqualFold(strings.TrimSpace(edge.NativeProvider), "cdn") {
-		problems = append(problems, "OVH: native CDN is unavailable (no MKS CDN adapter); use Fastly or the MKS load balancer")
 	}
 	if (mode == "external" || mode == "both") && strings.TrimSpace(edge.ExternalProvider) == "" {
 		problems = append(problems, "edge.externalProvider is required for external or both edge mode")
@@ -1584,7 +1402,7 @@ func validateResilienceProjection(c Config, projection *ResilienceProjection) []
 			problems = append(problems, "resilience.projection namespace and workload are only valid for Kubernetes")
 		}
 	case "kubernetes":
-		if c.Target.Provider == "aws" && c.Target.Runtime != "eks" || c.Target.Provider == "gcp" && c.Target.Runtime != "gke-autopilot" && c.Target.Runtime != "gke-standard" || c.Target.Provider == "scaleway" && c.Target.Runtime != "kapsule" || c.Target.Provider == "ovh" && c.Target.Runtime != "mks" {
+		if !containsString([]string{"eks", "gke-autopilot", "gke-standard", "aks"}, c.Target.Runtime) {
 			problems = append(problems, "resilience.projection.runtime kubernetes requires a Kubernetes target runtime")
 		}
 		if strings.TrimSpace(projection.Workload) == "" {

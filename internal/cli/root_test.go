@@ -253,24 +253,6 @@ func TestEnvironmentSelectionPromptsOnlyOnTTY(t *testing.T) {
 	}
 }
 
-func TestExtensionsListIncludesWebRuntimes(t *testing.T) {
-	var out bytes.Buffer
-	cmd := newCommandWithOptions(testOptions(&out, &fakeTerminal{interactive: false}))
-	cmd.SetArgs([]string{"--output", "json", "extensions", "list"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	text := out.String()
-	for _, want := range []string{`"id": "nginx-fpm"`, `"id": "frankenphp-classic"`, `"id": "php-apache"`, `"adobeSupported": true`, `"adobeSupported": false`} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("extensions list missing %s:\n%s", want, text)
-		}
-	}
-	if strings.Contains(text, "frankenphp-worker") {
-		t.Fatalf("extensions list registered worker:\n%s", text)
-	}
-}
-
 func TestConfigExplainStandardQueueDefault(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "magelift.php")
@@ -378,8 +360,8 @@ func TestNewWithModulesAndHooksThreadsCleanupAndMediaHooks(t *testing.T) {
 			"--output", "json", "cleanup", "claim",
 			"--ledger", path,
 			"--run-id", "run-hooks",
-			"--marker", "magelift/scaleway/rdb-recovery/run-hooks",
-			"--provider", "scaleway",
+			"--marker", "magelift/gcp/recovery/run-hooks",
+			"--provider", "gcp",
 			"--region", "fr-par",
 			"--project", "11111111-1111-1111-1111-111111111111",
 			"--profile", "default",

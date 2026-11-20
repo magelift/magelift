@@ -15,11 +15,11 @@ func TestNotSupportedNamesSurfaceTargetAndTier(t *testing.T) {
 		name     string
 		provider string
 		runtime  string
-		tier     platform.CertificationTier
+		tier     platform.RuntimeTier
 		surface  string
 	}{
 		{
-			name:     "certified",
+			name:     "built-in",
 			provider: "aws",
 			runtime:  "ecs-fargate",
 			tier:     platform.TierBuiltIn,
@@ -27,8 +27,8 @@ func TestNotSupportedNamesSurfaceTargetAndTier(t *testing.T) {
 		},
 		{
 			name:     "experimental",
-			provider: "ovh",
-			runtime:  "mks",
+			provider: "azure",
+			runtime:  "aks",
 			tier:     platform.TierExperimental,
 			surface:  "cost estimation",
 		},
@@ -109,7 +109,7 @@ func TestPortHelpersNameTargetAndTier(t *testing.T) {
 }
 
 func TestPortHelpersNameExperimentalTier(t *testing.T) {
-	path := writeExperimentalOVHConfig(t)
+	path := writeExperimentalAzureConfig(t)
 	o := testOptions(&bytes.Buffer{}, &fakeTerminal{interactive: false})
 	o.configPath, o.environment = path, "staging"
 
@@ -120,12 +120,12 @@ func TestPortHelpersNameExperimentalTier(t *testing.T) {
 	if err == nil || ExitCode(err) != 2 {
 		t.Fatalf("error/code = %v/%d", err, ExitCode(err))
 	}
-	want := "bootstrap is not supported for target ovh/mks yet (experimental)"
+	want := "bootstrap is not supported for target azure/aks yet (experimental)"
 	if err.Error() != want {
 		t.Fatalf("message = %q, want %q", err.Error(), want)
 	}
 	if strings.Contains(err.Error(), string(platform.TierBuiltIn)) {
-		t.Fatalf("experimental message must not contain certified: %v", err)
+		t.Fatalf("experimental message must not contain built-in: %v", err)
 	}
 }
 
@@ -148,12 +148,12 @@ func TestLogsErrNotSupportedNamesTier(t *testing.T) {
 		t.Fatalf("leading portion must survive; got: %v", err)
 	}
 	if !strings.Contains(err.Error(), "("+string(platform.TierBuiltIn)+")") {
-		t.Fatalf("message must name certified tier: %v", err)
+		t.Fatalf("message must name built-in tier: %v", err)
 	}
 }
 
 func TestCostErrNotSupportedNamesTierBothDirections(t *testing.T) {
-	t.Run("certified", func(t *testing.T) {
+	t.Run("built-in", func(t *testing.T) {
 		path := writeCostConfig(t, starterConfig)
 		var out bytes.Buffer
 		o := testOptions(&out, nil)
@@ -168,14 +168,14 @@ func TestCostErrNotSupportedNamesTierBothDirections(t *testing.T) {
 			t.Fatalf("01-03 prefix must survive byte-for-byte; got: %v", err)
 		}
 		if !strings.Contains(err.Error(), "("+string(platform.TierBuiltIn)+")") {
-			t.Fatalf("message must name certified tier: %v", err)
+			t.Fatalf("message must name built-in tier: %v", err)
 		}
 		if strings.Contains(err.Error(), string(platform.TierExperimental)) {
-			t.Fatalf("certified message must not contain experimental: %v", err)
+			t.Fatalf("built-in message must not contain experimental: %v", err)
 		}
 	})
 	t.Run("experimental", func(t *testing.T) {
-		path := writeExperimentalOVHConfig(t)
+		path := writeExperimentalAzureConfig(t)
 		var out bytes.Buffer
 		o := testOptions(&out, nil)
 		o.testCostEstimator = &recordingCostEstimator{err: platform.ErrNotSupported}
@@ -185,7 +185,7 @@ func TestCostErrNotSupportedNamesTierBothDirections(t *testing.T) {
 		if err == nil || ExitCode(err) != 2 {
 			t.Fatalf("error/code = %v/%d", err, ExitCode(err))
 		}
-		prefix := "cost estimation is not supported for target ovh/mks yet"
+		prefix := "cost estimation is not supported for target azure/aks yet"
 		if !strings.HasPrefix(err.Error(), prefix) {
 			t.Fatalf("leading portion must survive; got: %v", err)
 		}
@@ -193,7 +193,7 @@ func TestCostErrNotSupportedNamesTierBothDirections(t *testing.T) {
 			t.Fatalf("message must name experimental tier: %v", err)
 		}
 		if strings.Contains(err.Error(), string(platform.TierBuiltIn)) {
-			t.Fatalf("experimental message must not contain certified: %v", err)
+			t.Fatalf("experimental message must not contain built-in: %v", err)
 		}
 	})
 }
@@ -219,7 +219,7 @@ func TestHealthRuntimeErrNotSupportedNamesTier(t *testing.T) {
 	}
 }
 
-func writeExperimentalOVHConfig(t *testing.T) string {
+func writeExperimentalAzureConfig(t *testing.T) string {
 	t.Helper()
 	contents := `schemaVersion: 1
 project:
@@ -231,16 +231,17 @@ application:
 build:
   php: "8.3"
 target:
-  provider: ovh
-  runtime: mks
-  ovh:
-    serviceName: pc-example
+  provider: azure
+  runtime: aks
+  azure:
+    subscriptionId: 00000000-0000-0000-0000-000000000000
+    resourceGroup: shop
 defaults:
-  region: GRA9
+  region: eastus
   preset: preview
 environments:
   staging:
-    account: "pc-example"
+    account: "00000000-0000-0000-0000-000000000000"
     class: staging
     domain: shop.example
     monthlyBudgetCents: 250000

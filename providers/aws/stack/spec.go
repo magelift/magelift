@@ -284,7 +284,7 @@ func (a Application) validate() error {
 	if a.Mode != "integrated" && a.Mode != "headless" {
 		problems = append(problems, fmt.Errorf("unsupported application mode %q", a.Mode))
 	}
-	if a.WebRuntime != "" && a.WebRuntime != "nginx-fpm" && a.WebRuntime != "frankenphp-classic" && a.WebRuntime != "php-apache" {
+	if a.WebRuntime != "" && a.WebRuntime != "nginx-fpm" {
 		problems = append(problems, fmt.Errorf("unsupported web runtime %q", a.WebRuntime))
 	}
 	return errors.Join(problems...)
@@ -507,7 +507,7 @@ func (p NetworkPolicy) validate(preset sdk.PresetID) error {
 func (c CatalogSelection) validate(preset sdk.PresetID, externalSearch bool) error {
 	var problems []error
 	if strings.TrimSpace(c.Version) == "" {
-		problems = append(problems, errors.New("benchmark catalog version is required"))
+		problems = append(problems, errors.New("AWS service settings version is required"))
 	}
 	if c.DatabaseEngine != DatabaseEngineAuroraMySQL && c.DatabaseEngine != DatabaseEngineRDSMySQL && c.DatabaseEngine != DatabaseEngineRDSMariaDB {
 		problems = append(problems, errors.New("databaseEngine must be aurora-mysql, rds-mysql, or rds-mariadb"))

@@ -18,9 +18,9 @@ git -C "$fixture" config user.name "MageLift fixture"
 git -C "$fixture" add .
 git -C "$fixture" commit --quiet -m "test: create build fixture"
 
-export XDG_CACHE_HOME="$work/cache"
+go build -o "$work/magelift" "$repository_root/cmd/magelift"
 result="$work/result.json"
-go run "$repository_root/cmd/magelift" \
+XDG_CACHE_HOME="$work/cache" "$work/magelift" \
     --config "$fixture/magelift.php" \
     --output json \
     build >"$result"
@@ -40,6 +40,7 @@ if ($manifest["imageDigest"] !== $result["image"]["digest"] || $manifest["source
 
 image=$(php -r '$result = json_decode(file_get_contents($argv[1]), true, flags: JSON_THROW_ON_ERROR); echo $result["image"]["imageReference"];' "$result")
 docker run --rm --entrypoint sh "$image" -c '
+set -eu
 test "$(id -u)" = 10001
 test ! -e /app/.git
 test ! -e /app/.magelift

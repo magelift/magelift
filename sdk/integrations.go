@@ -88,7 +88,6 @@ type EdgeCapabilityStatus string
 
 const (
 	EdgeCapabilitySupported    EdgeCapabilityStatus = "supported"
-	EdgeCapabilityCertified    EdgeCapabilityStatus = "certified"
 	EdgeCapabilityExperimental EdgeCapabilityStatus = "experimental"
 	EdgeCapabilityUnavailable  EdgeCapabilityStatus = "unavailable"
 	EdgeCapabilityUnsupported  EdgeCapabilityStatus = "unsupported"
@@ -113,7 +112,7 @@ func (e EdgeCapabilityError) Error() string {
 }
 
 // EdgeAdapter is optional. A target that does not expose it cannot claim
-// automated native or external edge lifecycle certification.
+// automated edge operations.
 type EdgeAdapter interface {
 	EdgeDescriptor() EdgeAdapterDescriptor
 	PlanEdge(context.Context, EdgePlanRequest) (EdgePlan, error)
@@ -258,7 +257,7 @@ type ObservabilityPlan struct {
 	DataResidency      string            `json:"dataResidency,omitempty" yaml:"dataResidency,omitempty"`
 	UnavailableSignals []string          `json:"unavailableSignals,omitempty" yaml:"unavailableSignals,omitempty"`
 	// UnavailableOperations keeps provider gaps for alerts, dashboards, and
-	// SLOs explicit instead of allowing an adapter to silently drop them.
+	// SLOs in the plan.
 	UnavailableOperations []string        `json:"unavailableOperations,omitempty" yaml:"unavailableOperations,omitempty"`
 	Outputs               []AdapterOutput `json:"outputs,omitempty" yaml:"outputs,omitempty"`
 	Opaque                any             `json:"-" yaml:"-"`
@@ -334,7 +333,7 @@ func ValidateObservabilityApplyPlan(plan ObservabilityPlan) error {
 }
 
 // ObservabilityAdapter is optional. A target that does not expose it cannot
-// claim native or New Relic lifecycle certification, even if it can emit a
+// manage the native or external destination, even if it can emit a
 // configured exporter from application code.
 type ObservabilityAdapter interface {
 	ObservabilityDescriptor() ObservabilityAdapterDescriptor

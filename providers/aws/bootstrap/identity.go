@@ -48,6 +48,7 @@ type IdentityPlan struct {
 	StateRoleARN           string `json:"stateRoleArn" yaml:"stateRoleArn"`
 	StateBoundaryName      string `json:"stateBoundaryName" yaml:"stateBoundaryName"`
 	StateBoundaryARN       string `json:"stateBoundaryArn" yaml:"stateBoundaryArn"`
+	StateTrustPolicy       string `json:"stateTrustPolicy" yaml:"stateTrustPolicy"`
 	StatePermissionsPolicy string `json:"statePermissionsPolicy" yaml:"statePermissionsPolicy"`
 
 	// CIRole* is assumed by generated GitHub Actions workflows. It can manage
@@ -77,15 +78,6 @@ type IdentityPlan struct {
 	Region            string            `json:"region" yaml:"region"`
 	StateBucket       string            `json:"stateBucket" yaml:"stateBucket"`
 	KMSKeyARN         string            `json:"kmsKeyArn" yaml:"kmsKeyArn"`
-
-	// Deprecated aliases remain in the output for consumers of the pre-split
-	// bootstrap contract. They point to the recovery identity, never the CI role.
-	RoleName          string `json:"roleName" yaml:"roleName"`
-	RoleARN           string `json:"roleArn" yaml:"roleArn"`
-	BoundaryName      string `json:"boundaryName" yaml:"boundaryName"`
-	BoundaryARN       string `json:"boundaryArn" yaml:"boundaryArn"`
-	TrustPolicy       string `json:"trustPolicy" yaml:"trustPolicy"`
-	PermissionsPolicy string `json:"permissionsPolicy" yaml:"permissionsPolicy"`
 }
 
 func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
@@ -155,11 +147,10 @@ func BuildIdentityPlan(spec IdentitySpec) (IdentityPlan, error) {
 	tags := map[string]string{"magelift:environment": spec.Environment, "magelift:managed-by": "magelift", "magelift:project": spec.Project, "magelift:purpose": "deployment-identity"}
 	return IdentityPlan{
 		OIDCProviderARN: providerARN,
-		StateRoleName:   stateRoleName, StateRoleARN: stateRoleARN, StateBoundaryName: stateBoundaryName, StateBoundaryARN: stateBoundaryARN, StatePermissionsPolicy: statePolicy,
+		StateRoleName:   stateRoleName, StateRoleARN: stateRoleARN, StateBoundaryName: stateBoundaryName, StateBoundaryARN: stateBoundaryARN, StateTrustPolicy: trust, StatePermissionsPolicy: statePolicy,
 		CIRoleName: ciRoleName, CIRoleARN: ciRoleARN, CIBoundaryName: ciBoundaryName, CIBoundaryARN: ciBoundaryARN, CITrustPolicy: trust, CIPermissionsPolicy: ciPolicy, CIEmailPermissionsPolicy: ciEmailPolicy,
 		BuildRoleName: buildRoleName, BuildRoleARN: buildRoleARN, BuildBoundaryName: buildBoundaryName, BuildBoundaryARN: buildBoundaryARN, BuildTrustPolicy: buildTrust, BuildPermissionsPolicy: buildPolicy,
 		MetadataParameter: parameter, Tags: tags, Region: spec.Region, StateBucket: spec.StateBucket, KMSKeyARN: spec.KMSKeyARN,
-		RoleName: stateRoleName, RoleARN: stateRoleARN, BoundaryName: stateBoundaryName, BoundaryARN: stateBoundaryARN, TrustPolicy: trust, PermissionsPolicy: statePolicy,
 	}, nil
 }
 
@@ -282,11 +273,11 @@ func (b *IdentityBootstrapper) ensureProvider(ctx context.Context, plan Identity
 }
 
 func (b *IdentityBootstrapper) ensureBoundary(ctx context.Context, plan IdentityPlan) error {
-	return b.ensureManagedPolicy(ctx, plan.BoundaryName, plan.BoundaryARN, plan.PermissionsPolicy, plan.Tags)
+	return b.ensureManagedPolicy(ctx, plan.StateBoundaryName, plan.StateBoundaryARN, plan.StatePermissionsPolicy, plan.Tags)
 }
 
 func (b *IdentityBootstrapper) ensureRole(ctx context.Context, plan IdentityPlan) error {
-	return b.ensureRoleSpec(ctx, plan.StateRoleName, plan.TrustPolicy, plan.StateBoundaryARN, "magelift-state", plan.StatePermissionsPolicy, plan.Tags)
+	return b.ensureRoleSpec(ctx, plan.StateRoleName, plan.StateTrustPolicy, plan.StateBoundaryARN, "magelift-state", plan.StatePermissionsPolicy, plan.Tags)
 }
 
 func (b *IdentityBootstrapper) ensureCIBoundary(ctx context.Context, plan IdentityPlan) error {

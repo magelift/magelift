@@ -28,8 +28,8 @@ type Module struct {
 }
 
 func (Module) Descriptor() sdk.TargetDescriptor { return awsstack.Module{}.Descriptor() }
-func (Module) CertificationTier() platform.CertificationTier {
-	return awsstack.Module{}.CertificationTier()
+func (Module) RuntimeTier() platform.RuntimeTier {
+	return awsstack.Module{}.RuntimeTier()
 }
 func (Module) PlanAdmission() platform.PlanAdmission { return awsstack.Module{}.PlanAdmission() }
 func (Module) Plan(cfg config.Config, environment string, opts platform.PlanOptions) (platform.PlannedStack, error) {

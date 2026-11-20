@@ -615,30 +615,6 @@ func (backend *GoogleCloudOperationsBackend) VerifySignal(ctx context.Context, b
 	return observation, nil
 }
 
-// PublishSignalProbe implements the optional acceptance-only data-plane seam.
-// Google Cloud log routing is eventually consistent after a new sink is
-// created, so a caller may republish the same marker-scoped probe while it
-// waits. It never creates or updates a dashboard, alert, bucket, sink, or
-// metric descriptor.
-func (backend *GoogleCloudOperationsBackend) PublishSignalProbe(ctx context.Context, binding providerobservability.SignalBinding) error {
-	if ctx == nil {
-		return errors.New("Google Cloud observability signal publication context is required")
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if strings.TrimSpace(binding.OwnershipMarker) == "" || binding.Destination != googleCloudOperationsDestination {
-		return errors.New("Google Cloud observability signal publication identity does not match the adapter")
-	}
-	if signalKind(binding.Signal) == "unsupported" {
-		return fmt.Errorf("Google Cloud observability signal %q is not supported by the adapter", binding.Signal)
-	}
-	if signalKind(binding.Signal) == "logs" {
-		return backend.writeLogProbe(ctx, binding)
-	}
-	return backend.writeMetricProbe(ctx, binding)
-}
-
 func (backend *GoogleCloudOperationsBackend) VerifyOperations(ctx context.Context, plan providerobservability.Plan) (providerobservability.OperationalObservation, error) {
 	if err := backend.validatePlan(ctx, plan); err != nil {
 		return providerobservability.OperationalObservation{}, err

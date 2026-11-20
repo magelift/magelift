@@ -162,7 +162,6 @@ func (s *Server) Plan(ctx context.Context, req *sdk.PlanRequest) (*sdk.PlanResul
 		Runtime:             sdk.RuntimeID(req.Runtime),
 		LiveQueueReplicas:   req.LiveQueueReplicas,
 		ValkeyRequirement:   req.ValkeyRequirement,
-		AllowUnsupported:    req.AllowUnsupported,
 		AllowExpiredPreview: req.AllowExpiredPreview,
 		AccountOnly:         req.AccountOnly,
 		RuntimeObserve:      req.RuntimeObserve,

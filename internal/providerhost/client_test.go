@@ -303,14 +303,14 @@ func TestStaticPreDialValuesMatchAdvertised(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var want sdk.ExtensionCertificationTier
+		var want sdk.ExtensionTier
 		for _, advertised := range described.Runtimes {
 			if advertised.Runtime == runtime {
 				want = advertised.Tier
 			}
 		}
 		got := sdk.ExtensionTierExperimental
-		if string(module.CertificationTier()) == string(sdk.ExtensionTierBuiltIn) {
+		if string(module.RuntimeTier()) == string(sdk.ExtensionTierBuiltIn) {
 			got = sdk.ExtensionTierBuiltIn
 		}
 		if got != want {

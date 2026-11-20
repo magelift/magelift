@@ -11,16 +11,14 @@ import (
 	"strings"
 )
 
-// SanitizedLabel is the operator-facing dump classification after opt-in
-// email hashing. It must not be advertised as certified anonymization.
-const SanitizedLabel = "email-hashed Magento dump (not certified anonymous)"
+// SanitizedLabel describes the only transformation applied to exported data.
+const SanitizedLabel = "Magento dump with hashed email addresses and other personal data"
 
 // mailboxPattern matches mailbox addresses inside SQL string values. It
 // requires a dotted domain so DEFINER=`user`@`localhost` is left alone.
 var mailboxPattern = regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`)
 
-// SanitizeSQL hashes mailbox addresses in a Magento dump. Other PII is left
-// unchanged; callers must keep the not-certified-anonymous label.
+// SanitizeSQL hashes email addresses and preserves other personal data.
 func SanitizeSQL(sql []byte) []byte {
 	return mailboxPattern.ReplaceAllFunc(sql, func(match []byte) []byte {
 		sum := sha256.Sum256(match)

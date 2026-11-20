@@ -299,7 +299,7 @@ func validateServiceBoundary(boundary ServiceBoundaryIntent) error {
 // ValidateEdgeIntent validates composition and secret-reference shape while
 // leaving DNS, TLS, WAF, and origin semantics to the edge adapter.
 func ValidateEdgeIntent(intent EdgeIntent) error {
-	if err := ValidateExternalIntent(intent.ExternalProvider, intent.Lifecycle, intent.Certification, intent.CredentialRefs); err != nil {
+	if err := ValidateExternalIntent(intent.ExternalProvider, intent.Lifecycle, intent.CredentialRefs); err != nil {
 		return err
 	}
 	nativeProvider := strings.TrimSpace(intent.NativeProvider)
@@ -393,7 +393,7 @@ func healthString(health EdgeHealthIntent) string {
 // ValidateObservabilityIntent validates the generic signal contract. Provider
 // adapters decide which signals are native and whether OTLP is required.
 func ValidateObservabilityIntent(intent ObservabilityIntent) error {
-	if err := ValidateExternalIntent(intent.ExternalProvider, intent.Lifecycle, intent.Certification, intent.CredentialRefs); err != nil {
+	if err := ValidateExternalIntent(intent.ExternalProvider, intent.Lifecycle, intent.CredentialRefs); err != nil {
 		return err
 	}
 	nativeProvider := strings.TrimSpace(intent.NativeProvider)

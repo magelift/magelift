@@ -106,18 +106,14 @@ func TestFinalizeValidatesOCIDigest(t *testing.T) {
 	}
 }
 
-func TestPrepareAcceptsRegisteredWebRuntimesAndRejectsWorker(t *testing.T) {
-	for _, webRuntime := range []string{"nginx-fpm", "frankenphp-classic", "php-apache"} {
-		request := validPrepareRequest()
-		request.Prepare.Application.WebRuntime = webRuntime
-		if err := request.Validate(); err != nil {
-			t.Fatalf("%s validation: %v", webRuntime, err)
-		}
-	}
+func TestPrepareRequiresNginxFPM(t *testing.T) {
 	request := validPrepareRequest()
-	request.Prepare.Application.WebRuntime = "frankenphp-worker"
-	if err := request.Validate(); err == nil || !strings.Contains(err.Error(), `plugin "frankenphp-worker" is not registered`) {
-		t.Fatalf("frankenphp-worker validation = %v", err)
+	if err := request.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	request.Prepare.Application.WebRuntime = "unknown"
+	if err := request.Validate(); err == nil || !strings.Contains(err.Error(), `web runtime must be nginx-fpm`) {
+		t.Fatalf("unknown validation = %v", err)
 	}
 }
 

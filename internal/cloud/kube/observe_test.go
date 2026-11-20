@@ -31,7 +31,7 @@ func (p observePlanned) Runtime() sdk.RuntimeID   { return "gke-autopilot" }
 func (p observePlanned) Project() string          { return p.project }
 func (p observePlanned) Environment() string      { return p.env }
 func (p observePlanned) Region() string           { return "europe-west9" }
-func (p observePlanned) CertificationTier() platform.CertificationTier {
+func (p observePlanned) RuntimeTier() platform.RuntimeTier {
 	return platform.TierBuiltIn
 }
 func (p observePlanned) EnvironmentClass() string { return "preview" }

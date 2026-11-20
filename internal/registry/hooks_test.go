@@ -41,9 +41,6 @@ func TestRegisterHooksNeedsNoCredentials(t *testing.T) {
 	if _, err := hooks.NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "unknown-cloud"}); err == nil || !strings.Contains(err.Error(), `restartable cleanup has no adapter for provider "unknown-cloud"`) {
 		t.Fatalf("unknown provider err = %v", err)
 	}
-	if _, err := hooks.NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "ovh"}); err == nil || err.Error() != "OVHcloud cleanup ledgers require profile, region, and project" {
-		t.Fatalf("ovh validation err = %v", err)
-	}
 	if _, err := hooks.NewLeftoverBackupDestroyer(context.Background(), nil); err == nil || err.Error() != "leftover Cloud SQL backup destroy requires a GCP planned stack" {
 		t.Fatalf("leftover destroyer err = %v", err)
 	}
@@ -63,15 +60,6 @@ func TestRegisterHooksMediaEndpointReadsEnvironment(t *testing.T) {
 	_, err = hooks.MediaEndpoint()
 	if err == nil || !strings.Contains(err.Error(), `host "example.com" is not loopback`) {
 		t.Fatalf("non-loopback err = %v", err)
-	}
-}
-
-func TestRegisterHooksCleanupProviderRejectsIncompleteOVHLedgerBeforeCredentialLookup(t *testing.T) {
-	hooks := RegisterHooks()
-	t.Cleanup(hooks.Close)
-	_, err := hooks.NewCleanupProvider(context.Background(), sdk.CleanupLedger{Provider: "ovh"})
-	if err == nil || !strings.Contains(err.Error(), "profile, region, and project") {
-		t.Fatalf("error = %v", err)
 	}
 }
 

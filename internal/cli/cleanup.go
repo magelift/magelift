@@ -26,7 +26,7 @@ type cleanupProvider = CleanupProvider
 func cleanupCommand(o *options) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "cleanup",
-		Short: "Reconcile interrupted environment and acceptance cleanup",
+		Short: "Inspect and remove resources recorded in a cleanup ledger",
 	}
 	command.AddCommand(cleanupClaimCommand(o), cleanupRecordCommand(o), cleanupPlanCommand(o), cleanupReconcileCommand(o))
 	return command
@@ -68,7 +68,7 @@ func cleanupClaimCommand(o *options) *cobra.Command {
 	command.Flags().StringVar(&ledgerPath, "ledger", "", "path to the cleanup ledger JSON file")
 	command.Flags().StringVar(&runID, "run-id", "", "stable run identity")
 	command.Flags().StringVar(&marker, "marker", "", "ownership marker")
-	command.Flags().StringVar(&providerName, "provider", "", "provider ID, such as scaleway")
+	command.Flags().StringVar(&providerName, "provider", "", "provider ID (gcp)")
 	command.Flags().StringVar(&region, "region", "", "provider region")
 	command.Flags().StringVar(&project, "project", "", "provider project or account")
 	command.Flags().StringVar(&profile, "profile", "", "local CLI profile name")

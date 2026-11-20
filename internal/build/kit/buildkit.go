@@ -22,8 +22,7 @@ import (
 
 const maxMetadataBytes = 4 << 20
 
-// Pin the current Docker-maintained scanner rather than resolving a mutable tag
-// during a release build.
+// Pin the scanner so release builds use the same version.
 const sbomGeneratorImage = "docker.io/docker/buildkit-syft-scanner:stable-1@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9"
 
 var digestPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)

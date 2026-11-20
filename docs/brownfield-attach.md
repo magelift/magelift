@@ -1,11 +1,9 @@
-# Brownfield attach (existing VPC + RDS)
+# Use an existing AWS VPC or RDS database
 
-Bring an existing AWS VPC and/or RDS MySQL instance into a MageLift stack
-**without** MageLift owning destroy. Greenfield (MageLift creates network + DB)
-remains the default. Field reference: [configuration.md](configuration.md).
-
-Phase 8 delivers AWS attach (ATTACH-01..04). There is no `magelift detach` CLI;
-detach is a documented manual un-adopt.
+Point a MageLift environment at an existing AWS VPC, RDS MySQL instance or
+both. The existing resources stay under their owner's control when you destroy
+the environment. Without an attachment, MageLift creates the resources.
+[Project settings](configuration.md)
 
 ## What can be attached
 
@@ -14,11 +12,8 @@ detach is a documented manual un-adopt.
 | Existing VPC | `target.aws.existing.network` | `provider: aws`, `kind: network`, `externalId` (VPC ID); plus `existing.publicSubnetIds` / `privateSubnetIds` / `dataSubnetIds` (one of each per AZ); `vpcCidr` still required for security-group rules |
 | Existing RDS MySQL | `target.aws.existing.database` | `provider: aws`, `kind: database`, `externalId` (instance ID or ARN), `secretArn` (Secrets Manager master-user secret; never an inline password), `endpoint` (writer hostname) |
 
-Preview reports `ADOPT network <id>` / `ADOPT database <id>` for each ref (not
-CREATE). Apply adopts by reference: MageLift does not import the VPC/RDS into
-Pulumi state for destroy ownership.
-
-Example shape (illustrative):
+The preview reports `ADOPT network <id>` or `ADOPT database <id>` for each
+attachment. MageLift applies the infrastructure changes using those resource IDs.
 
 Use this array for the `target` entry in `magelift.php`.
 
@@ -29,7 +24,7 @@ $target = [
     'aws' => [
         'vpcCidr' => '10.0.0.0/16',
         'availabilityZones' => ['eu-west-3a', 'eu-west-3b'],
-        'encryptionKeySecretArn' => 'aws-secrets-manager://…',
+        'encryptionKeySecretArn' => 'arn:aws:secretsmanager:eu-west-3:123456789012:secret:magento/crypt-key',
         'existing' => [
             'network' => [
                 'provider' => 'aws',
@@ -51,13 +46,10 @@ $target = [
 ];
 ```
 
-## What cannot be attached (this milestone)
+## Connect other services
 
-- On GCP, use the database service binding to connect to an existing MySQL-compatible endpoint. The AWS resource-ID settings on this page apply to AWS only. [Existing service connections](service-bindings.md)
-- Non-AWS VPC / DB: OVH, Scaleway, and multi-cloud attach are out of scope.
-- Import into Pulumi state for destroy ownership: MageLift references
-  existing IDs; it does not claim the cloud resource so that `destroy` would
-  delete it. Do not expect a Pulumi `import` that transfers lifecycle ownership.
+On GCP or Azure, use a database service binding to connect to an existing
+MySQL-compatible endpoint. [Existing service connections](service-bindings.md)
 
 ## Limits (existing network mode)
 
@@ -71,44 +63,29 @@ Adopted resources are refuse-before-mutate: destroy or replace intent against an
 adopted external ID fails closed naming the resource (`MageLift does not own this
 resource`). MageLift-owned children (ECS services, ALB, etc.) remain destroyable.
 
-## Detach path (manual un-adopt)
+## Remove the environment
 
-There is no detach command. To leave cloud VPC/RDS intact while removing MageLift:
+Run `magelift destroy --env NAME` when you are ready to remove the environment.
+MageLift checks its protection settings, previews the teardown, then removes
+the resources it owns. The attached VPC and RDS instance stay with their
+owner. To provision a new VPC or database, create a new environment and omit
+the corresponding `existing` settings.
 
-1. Remove MageLift-owned stack only: `magelift env destroy <env> --yes` (or
-   equivalent stack destroy) after protection is off. Adopted VPC/RDS were never
-   in Pulumi state, so destroy targets MageLift-owned children only.
-2. Or start a new stack without `existing.*`: drop the `existing.network` /
-   `existing.database` blocks (and related subnet ID lists) from a fresh
-   environment config if you no longer want attach mode.
-3. Do not attempt to destroy the VPC/RDS through MageLift. Refuse will fail
-   closed if that intent is expressed against adopted refs.
+### Verify ownership
 
-### Offline proof (ATTACH-04)
-
-Reference-without-own is asserted in
-`providers/aws/stack/adopt_test.go`:
-
-- `TestAdoptedDetachDestroyRecordsNoDeleteForAdoptedIDs`: mock destroy of
-  MageLift-owned children never emits Delete for adopted VPC/RDS external IDs;
-  empty intent (owned-child detach) is allowed; explicit destroy intent is
-  refused.
-- Related: `TestRefuseAdoptedMutation*` / `TestAdoptedRefuse*` name every
-  adopted external ID on mutate.
+Run the AWS stack tests to check which resources a destroy can remove.
 
 ```sh
 go test ./providers/aws/stack/ -count=1 \
   -run 'Adopt|Refuse|Adopted|Detach'
 ```
 
-### Live confirm
-
-After a live destroy of an attach stack, operators can confirm the VPC and RDS
-still exist:
+After tearing down an attached environment, confirm the VPC and RDS instance
+in the AWS console or with the AWS CLI.
 
 ```sh
-aws ec2 describe-vpcs --vpc-ids <vpc-id>
-aws rds describe-db-instances --db-instance-identifier <db-id>
+aws ec2 describe-vpcs --vpc-ids VPC_ID
+aws rds describe-db-instances --db-instance-identifier DB_ID
 ```
 
 Maintainer free-tier confirm (2026-08-02, disposable AWS account / `eu-north-1`):
@@ -125,4 +102,4 @@ MageLift validators accept that form.
 - [Configuration](configuration.md): `target.aws.existing.*` fields
 - [Migrating from PaaS](migrating-from-paas.md): dump/media cutover vs attach
 - [ADR 0009](adr/0009-dump-seed-and-attach.md): dump seed and AWS attach
-- [Post-beta roadmap](post-beta-roadmap.md): remaining post-beta tracks
+- [Provider support](capability-matrix.md)

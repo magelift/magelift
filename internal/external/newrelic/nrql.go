@@ -74,13 +74,13 @@ func NewNRQLClientWithQueryCredential(httpClient HTTPDoer, resolver provider.Cre
 }
 
 // NewNRQLClientWithRetry is the injectable constructor for deterministic
-// tests and callers with an explicit certification polling budget.
+// tests and callers with an explicit polling deadline.
 func NewNRQLClientWithRetry(httpClient HTTPDoer, resolver provider.CredentialResolver, endpoint string, accountID int64, retry RetryPolicy) (*NRQLClient, error) {
 	return NewNRQLClientWithQueryCredentialAndRetry(httpClient, resolver, endpoint, accountID, "", retry)
 }
 
 // NewNRQLClientWithQueryCredentialAndRetry is the fully injectable
-// constructor for tests and certification callers with separate ingest and
+// constructor for tests and callers with separate ingest and
 // NerdGraph credentials.
 func NewNRQLClientWithQueryCredentialAndRetry(httpClient HTTPDoer, resolver provider.CredentialResolver, endpoint string, accountID int64, credentialRef string, retry RetryPolicy) (*NRQLClient, error) {
 	if httpClient == nil {

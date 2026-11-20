@@ -239,10 +239,8 @@ func serviceContract(component, family string, ports []int) ([]LocalCredentialBi
 	}
 }
 
-// Plan resolves a local runtime before Compose is written. The catalog is
-// intentionally smaller than the provider matrix: unsupported local service
-// families fail with their nearest verified choice instead of being silently
-// replaced.
+// Plan selects local service images and reports unsupported choices before
+// Compose is written.
 func Plan(build config.BuildSpec) (RuntimePlan, error) {
 	return PlanFor(build, CloudHints{})
 }
@@ -398,17 +396,12 @@ func chooseWebServer(requested config.LocalService, webRuntime, php string) (Loc
 	if webRuntime == "" {
 		webRuntime = "nginx-fpm"
 	}
-	var expectedFamily, version, image string
-	switch webRuntime {
-	case "nginx-fpm":
-		expectedFamily, version, image = "nginx", "1.30", "magelift/php-nginx:"+phpBranch(php)+"-local"
-	case "frankenphp-classic":
-		expectedFamily, version, image = "frankenphp-classic", "1.13.5", "magelift/frankenphp-classic:"+phpBranch(php)+"-local"
-	case "php-apache":
-		expectedFamily, version, image = "php-apache", "2.4", "magelift/php-apache:"+phpBranch(php)+"-local"
-	default:
-		return LocalServicePlan{}, fmt.Errorf("local web runtime plugin %q is not registered", webRuntime)
+	if webRuntime != "nginx-fpm" {
+		return LocalServicePlan{}, fmt.Errorf("application.webRuntime must be nginx-fpm, got %q", webRuntime)
 	}
+	const expectedFamily = "nginx"
+	version := "1.30"
+	image := "magelift/php-nginx:" + phpBranch(php) + "-local"
 	family := strings.ToLower(strings.TrimSpace(requested.Family))
 	if family == "" {
 		family = expectedFamily
@@ -610,7 +603,6 @@ func ComposeTemplateFor(plan RuntimePlan) string {
 	template = strings.Replace(template, "__MAGELIFT_SESSION_DEPENDS__", composeSessionDepends(plan), 1)
 	template = strings.Replace(template, "__MAGELIFT_SESSION_VOLUME__", composeSessionVolume(plan), 1)
 	template = strings.Replace(template, "__MAGELIFT_VARNISH_SERVICE__", composeVarnishService(plan), 1)
-	template = strings.Replace(template, `    command: ["php-fpm", "--nodaemonize"]`, composeAppCommand(plan), 1)
 	if command := searchplugins.Entrypoint(plan.Search.Plugins); len(command) > 0 {
 		// Compose interpolates dollar signs before passing arguments to the container.
 		encoded, _ := json.Marshal(command)
@@ -727,7 +719,7 @@ func ComposeTemplateFor(plan RuntimePlan) string {
 	}
 	if len(extra) > 0 {
 		sort.Strings(extra)
-		command := composeAppCommand(plan)
+		command := nginxAppCommand
 		template = strings.Replace(template, command, strings.Join(extra, "\n")+"\n"+command, 1)
 	}
 	return template
@@ -885,19 +877,6 @@ func composeMailpitDepends(email config.LocalEmailSettings) string {
 	return `      mailpit:
         condition: service_healthy
 `
-}
-
-func composeAppCommand(plan RuntimePlan) string {
-	switch plan.WebServer.Family {
-	case "nginx":
-		return `    command: ["sh", "-eu", "-c", "php-fpm --daemonize && exec nginx -g 'daemon off;'"]`
-	case "frankenphp-classic":
-		return `    command: ["frankenphp", "run"]`
-	case "php-apache":
-		return `    command: ["sh", "-eu", "-c", "php-fpm --daemonize && exec apache2ctl -D FOREGROUND"]`
-	default:
-		return `    command: ["false"]`
-	}
 }
 
 func localEmailRuntimeValues(email config.LocalEmailSettings) map[string]string {

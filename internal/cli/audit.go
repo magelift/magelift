@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const auditCertificationDisclaimer = "This report lists MageLift control posture and evidence pointers. It does not certify the customer for SOC 2, ISO 27001, or GDPR."
+const auditReportScope = "This report covers project settings. Organizational compliance requires its own assessment."
 
 type auditControl struct {
 	ID       string   `json:"id" yaml:"id"`
@@ -25,8 +25,8 @@ type auditReport struct {
 func auditCommand(o *options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "audit",
-		Short: "Export a control-posture matrix with evidence pointers and no secret values",
-		Long:  "Lists encryption, IAM, logging, backup, WAF, and residency controls as reconstructable pointers from the effective configuration. Distinct from magelift evidence (the production change journal). Does not claim SOC 2, ISO 27001, or GDPR certification.",
+		Short: "Show where security, backups, and monitoring are configured",
+		Long:  "Shows the project settings for encryption, access, logging, backups, web application firewall, and data residency. Secret values are omitted.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			report, err := o.runAudit()
@@ -46,7 +46,7 @@ func (o *options) runAudit() (auditReport, error) {
 	cfg := effective.Config
 	return auditReport{
 		Environment: environment,
-		Disclaimer:  auditCertificationDisclaimer,
+		Disclaimer:  auditReportScope,
 		Controls: []auditControl{
 			{ID: "encryption", Status: auditEncryptionStatus(cfg), Pointers: auditEncryptionPointers(cfg)},
 			{ID: "iam", Status: auditIAMStatus(cfg), Pointers: auditIAMPointers(cfg, environment)},

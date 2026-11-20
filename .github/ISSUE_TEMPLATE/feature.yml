@@ -6,9 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Substantial design changes should be discussed here before a large PR.
-        Provider work should follow [Adding a provider](https://github.com/magelift/magelift/blob/main/docs/adding-a-provider.md)
-        and the ADRs under `docs/adr/`.
+        For a new cloud or runtime, name the target and the first shop workflow
+        you want to run. Discuss a large provider change here before opening a PR.
+        [Provider guide](https://github.com/magelift/magelift/blob/main/docs/adding-a-provider.md)
   - type: textarea
     id: problem
     attributes:
@@ -20,18 +20,19 @@ body:
     id: proposal
     attributes:
       label: Proposal
-      description: Concrete behavior change. Prefer provider-specific adapters over shared cloud abstractions.
+      description: What should MageLift do? For a new cloud, include the service choices and the first deployment or operation to test.
     validations:
       required: true
   - type: dropdown
     id: tier
     attributes:
-      label: Target certification impact
+      label: Affected area
       options:
-        - Docs / DX only
-        - Certified AWS path
-        - Certified GCP path
-        - Experimental provider (EKS, GKE Standard, OVH, Scaleway)
+        - CLI or documentation
+        - AWS provider
+        - Google Cloud provider
+        - Azure provider
+        - New cloud provider or runtime
         - Community / custom binary
         - Unsure
     validations:
@@ -46,6 +47,6 @@ body:
     attributes:
       label: Constraints you accept
       options:
-        - label: Keep normal projects YAML-only (no required Pulumi/Go edits)
-        - label: Do not introduce shared Pulumi components that switch on provider
-        - label: Do not weaken compatibility, protection, or secret-handling rules
+        - label: Keep shop configuration in magelift.php
+        - label: Keep cloud topology in the provider module
+        - label: Preserve compatibility, environment protection and secret handling

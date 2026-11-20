@@ -16,9 +16,7 @@ import (
 )
 
 // cleanupSecretClass removes only the archive objects and isolated restore
-// secrets selected by the operation marker. The source secret is deliberately
-// outside this provider cleanup boundary; the provider-neutral certification
-// cell deletes its exact synthetic source reference after this succeeds.
+// secrets selected by the operation marker. The caller owns source secret cleanup.
 func (api *NativeAPI) cleanupSecretClass(ctx context.Context, state operationState, operationID string) (provider.NativeOperationObservation, error) {
 	if api == nil || api.s3 == nil || api.secrets == nil {
 		return provider.NativeOperationObservation{}, errors.New("AWS Secrets Manager recovery requires Secrets Manager and archive S3 APIs for cleanup")

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/magelift/magelift/internal/webruntime"
+	"github.com/magelift/magelift/sdk"
 )
 
 type CompatibilityStatus string
@@ -134,7 +134,7 @@ var currentCompatibilityCatalog = CompatibilityCatalog{
 	Metadata: CompatibilityMetadata{
 		UpdatedAt:       "2026-11-02",
 		AdobeSnapshotAt: "2026-11-02",
-		Scope:           "Adobe Commerce release requirements and MageLift service choices for the RC1 architecture matrix.",
+		Scope:           "Adobe Commerce requirements and additional service choices in MageLift.",
 		Sources: []CompatibilitySource{
 			{Name: "Adobe Commerce system requirements", URL: "https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements?lang=en", RetrievedAt: "2026-11-02"},
 			{Name: "PHP supported versions", URL: "https://www.php.net/supported-versions.php", RetrievedAt: "2026-08-08"},
@@ -302,7 +302,7 @@ type CompatibilitySelection struct {
 
 // ValidateCompatibilitySelection validates one catalog choice without making
 // provider calls. Provider availability is checked separately by the target
-// module, so a catalog match is not itself a certification claim.
+// module checks the selected services against the region and account.
 func ValidateCompatibilitySelection(selection CompatibilitySelection) (CompatibilityRequirement, error) {
 	for _, requirement := range currentCompatibilityCatalog.Requirements {
 		if requirement.Release != selection.Release || requirement.Component != selection.Component || requirement.Option != selection.Option {
@@ -402,11 +402,8 @@ func assessSelectedServices(c Config, assessment *CompatibilityAssessment) strin
 			assessment.Status = CompatibilityUnsupportedAllowed
 		}
 	}
-	if msg := providerUnavailableReason(c); msg != "" {
-		return msg
-	}
-	if msg := assessWebRuntime(c, assessment); msg != "" {
-		return msg
+	if runtime := strings.TrimSpace(c.Application.WebRuntime); runtime != "" && runtime != sdk.WebRuntimeNginxFPM {
+		return fmt.Sprintf("application.webRuntime must be %s, got %q", sdk.WebRuntimeNginxFPM, runtime)
 	}
 	family := selectedDatabaseFamily(c)
 	if family == "" {
@@ -424,19 +421,6 @@ func assessSelectedServices(c Config, assessment *CompatibilityAssessment) strin
 	assessment.Reasons = append(assessment.Reasons, msg)
 	assessment.Warnings = append(assessment.Warnings, msg)
 	assessment.Status = CompatibilityUnsupportedAllowed
-	return ""
-}
-
-func assessWebRuntime(c Config, assessment *CompatibilityAssessment) string {
-	warning, err := webruntime.Admit(c.Application.WebRuntime, c.Application.Version, true)
-	if err != nil {
-		return err.Error()
-	}
-	if warning != "" {
-		assessment.Warnings = append(assessment.Warnings, warning)
-		assessment.Reasons = append(assessment.Reasons, warning)
-		assessment.Status = CompatibilityUnsupportedAllowed
-	}
 	return ""
 }
 
@@ -474,7 +458,7 @@ func experimentalTargetWarnings(c Config) []string {
 		warnings = append(warnings, "GCP: selected Memorystore Valkey 8.0 is outside the Adobe Valkey 9 recommendation")
 	}
 	switch key {
-	case "aws/eks", "gcp/gke-standard", "ovh/mks", "scaleway/kapsule":
+	case "aws/eks", "gcp/gke-standard", "azure/aks":
 		warnings = append(warnings, fmt.Sprintf("MageLift: target %s is experimental. See docs/capability-matrix.md", key))
 	}
 	if c.Target.Provider == "aws" && c.Target.AWS != nil {
@@ -511,13 +495,6 @@ func experimentalTargetWarnings(c Config) []string {
 		}
 	}
 	return warnings
-}
-
-func providerUnavailableReason(c Config) string {
-	if c.Target.Provider == "ovh" && strings.EqualFold(strings.TrimSpace(c.Edge.NativeProvider), "cdn") {
-		return "OVH: native CDN is unavailable (no MKS CDN adapter); use Fastly or the MKS load balancer"
-	}
-	return ""
 }
 
 func contains(values []string, wanted string) bool {

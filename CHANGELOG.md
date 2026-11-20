@@ -1,28 +1,24 @@
 # Changelog
 
-Notable changes for MageLift. After the first public release this project follows
-[Semantic Versioning](https://semver.org/) and Keep a Changelog. Version bumps
-are prepared with Conventional Commits and Release Please.
+MageLift uses [Semantic Versioning](https://semver.org/). The CLI, SDK,
+and first-party provider modules share a release version.
 
-## [Unreleased]
+## [1.0.0] - 2026-11-20
 
-### Added
+The first stable MageLift release includes signed CLI archives and separate
+plugins for AWS, Google Cloud, and Azure.
 
-- Public repository under `github.com/magelift/magelift` with site at
-  [magelift.dev](https://magelift.dev/) (docs under `/docs/`).
-- PHP project configuration, environment comparisons, a local Magento quickstart and pull-request previews. Removing the preview label or closing the pull request schedules teardown.
-- Account-free provider checks run against Floci for AWS, GCP and Azure. Generated shop workflows deploy the reviewed image digest to the shop’s own account.
-- An Azure AKS provider with Pulumi and Floci tests. AWS ECS Fargate and GCP GKE Autopilot have dated Magento acceptance runs. [Provider coverage](docs/capability-matrix.md)
-- Imports from Adobe Commerce Cloud, Upsun Flex and Upsun Fixed, including multi-app repositories.
-- First-party agent skills under `agents/skills/` for Cursor, Claude Code, and Codex.
-- RC contract for the first public tag `v1.0.0-rc.1`; see
-  [docs/versioning.md](docs/versioning.md).
-- OpenSearch public-tag substitute: offline SigV4 wiring, free-tier
-  `searchMode: disabled` matrix, and documented prior Magento+OpenSearch ops
-  experience. Live MageLift SigV4 data-plane remains deferred.
-- Runtime `/health` short-circuit on nginx and FrankenPHP; brownfield AWS VPC/RDS
-  adopt path; PaaS compare and weekend migration guides.
+- Run Magento Open Source or licensed Adobe Commerce locally with Docker.
+  Configure cloud environments in `magelift.php`.
+- Build an immutable image in your registry and deploy it with
+  `magelift deploy --from-build <manifest>`. The rollout summary includes
+  the shop and GraphQL URLs. Export them as JSON with `--outputs-file`.
+- Generate GitHub Actions workflows for pull-request previews, promotion,
+  and production deployment. Import settings from Adobe Commerce Cloud,
+  Upsun, or Docker Compose.
+- Deploy to AWS ECS Fargate or GKE Autopilot. Azure AKS, AWS EKS, and
+  GKE Standard are experimental. [Provider support](docs/capability-matrix.md)
 
-### Notes
-
-- Git history starts at this public import. Older private history is not published.
+Release verification uses Pulumi mocks, Floci for AWS, GCP, and Azure API
+requests, and a synthetic shop with BuildKit and a local registry. Dated
+live run records describe earlier versions. [Run records](docs/evidence/README.md)

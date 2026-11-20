@@ -1,66 +1,26 @@
-# ADR 0005: Artifact manifest lives outside the image
+# ADR 0005. Write the artifact manifest beside the image
 
-- Status: Accepted
-- Date: 2026-08-22
+Accepted on 2026-08-22.
 
-## Context
+The manifest names the finished OCI image by digest. Writing it into the
+image would change that digest, so MageLift keeps it as a separate artifact.
 
-The artifact manifest must name the OCI image by digest. Embedding the finalized manifest in the image would change that digest. Rebuild loops follow.
+## Build and promotion
 
-## Decision
+The PHP `prepare` step records the source revision, versions, enabled modules,
+checksums and static assets. BuildKit creates the image. PHP `finalize` combines
+the prepared metadata with the returned digest, without rereading the source.
+The manifest and image labels keep the build traceable. Keep secret values in
+the shop's secret store.
 
-The finalized artifact manifest is external to the application image. MageLift writes it after BuildKit returns the digest.
+The shop's Docker host or CI runner builds the image. The CLI bundles the
+nginx/PHP-FPM recipes and pins upstream bases. `build.php` selects the same PHP
+branch for the builder and runtime. Local builds load the result into Docker.
+Pushed builds use the shop's OCI registry. For bundled builds, the optional
+`buildRecipe` entry records the recipe checksum, platform and pinned bases.
+An explicit base-image override records the selected image references.
 
-1. `prepare` records deterministic pre-digest metadata (source revision, Magento edition, PHP, modules, checksums, static content matrix, required capabilities).
-2. `finalize` accepts only that prepared output plus BuildKit's `containerimage.digest`. It does not re-inspect the tree.
-
-The CLI supplies its semantic version to the isolated PHP runner through a
-public environment value; standalone package invocations retain their own
-version default. Builder/runtime identities are OCI labels within the final
-image digest. These additions keep the external manifest schema and runner
-JSON protocol unchanged.
-
-Neither step records secret values. Promotion, sign, and rollback use the digest in the external manifest.
-
-`magelift build --push`, `sign`, and `promote` use the operator's current cloud or CI login. Cosign keyless identity is Sigstore OIDC (Actions, Google SA), not Artifact Registry or ECR native signatures. The PHP project uses the default Cosign settings.
-
-Cloud-native image signatures are not a substitute for MageLift's signed release journal.
-
-## Consequences
-
-The same signed digest and manifest pair can move through staging and production. Republishing a digest to another registry does not copy Sigstore signatures; resign or copy signatures explicitly.
-
-## Alternatives considered
-
-- Manifest inside the image: rejected (digest cycle).
-- Cloud-provider signing as the Magento release identity: rejected (wrong trust root).
-
-## Provenance
-
-Original. Cosign/Sigstore public docs.
-
-### User-owned image production
-
-The maintainer clarified that the user's CI/CD builds and publishes every image.
-The CLI carries the existing PHP build and Docker recipes; pinned official
-upstream images remain inputs. Builder/runtime intermediates stay on the runner. The application uses
-the user's selected OCI repository; its runtime stage comes from the bundled
-recipe and pinned official upstreams. Optional private registry caches are
-separate from the deployable artifact. MageLift does not operate a required image registry. The existing
-manifest and OCI labels retain their traceability roles; no new lock or manifest
-is introduced. Local builds load images without publishing.
-
-Source builds label the bundled recipe SHA256 and its runtime recipe identity.
-Explicit base-image overrides continue to record their immutable image references.
-CI preserves the existing external manifest, its checksum and build result between
-jobs; promotion verifies an existing artifact instead of invoking a builder.
-
-The optional `buildRecipe` member of that same manifest records `sha256`,
-`platform` and the three pinned upstream `baseImages` roles. It is supplied at
-finalization and omitted for older/explicit-base requests. Existing requests
-without the member retain their canonical JSON; provider RPC is unchanged.
-Recipe metadata cannot replace the image's final digest or the source checksums.
-
-## Amendment: PHP branch selection
-
-The bundled nginx-fpm recipe selects the digest-pinned PHP 8.3, 8.4, or 8.5 base from `build.php`. The builder, application runtime, exported recipe, fingerprint, and artifact manifest use the same selected base. This extends the build recipe; it does not certify additional live cells.
+MageLift signs the pushed digest with Cosign and the operator's or CI job's
+Sigstore OIDC identity. Promotion and rollback use the recorded digest.
+When copying the image to another registry, copy the signature or sign the
+destination separately. [Application builds](../builds.md) · [Promote a release](../operations.md)

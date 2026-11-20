@@ -47,7 +47,7 @@ func newPublicModuleAdapter(module sdk.Module) (publicModuleAdapter, error) {
 
 func (m publicModuleAdapter) Descriptor() sdk.TargetDescriptor { return m.target }
 
-func (m publicModuleAdapter) CertificationTier() CertificationTier {
+func (m publicModuleAdapter) RuntimeTier() RuntimeTier {
 	if m.descriptor.Tier == sdk.ExtensionTierBuiltIn {
 		return TierBuiltIn
 	}
@@ -110,16 +110,6 @@ func (m publicModuleAdapter) Observability() sdk.ObservabilityAdapter {
 	return adapter
 }
 
-func (m publicModuleAdapter) Certification() sdk.CertificationAdapter {
-	adapter, _ := m.module.(sdk.CertificationAdapter)
-	return adapter
-}
-
-func (m publicModuleAdapter) CertificationAdmission() sdk.CertificationAdmissionAdapter {
-	adapter, _ := m.module.(sdk.CertificationAdmissionAdapter)
-	return adapter
-}
-
 func (m publicModuleAdapter) CollectorDeployment() sdk.CollectorDeploymentAdapter {
 	adapter, _ := m.module.(sdk.CollectorDeploymentAdapter)
 	return adapter
@@ -167,28 +157,6 @@ func (m publicModuleAdapter) NewCollectorDeployment(ctx context.Context, planned
 		return factory.NewCollectorDeployment(ctx, value.plan)
 	}
 	return m.CollectorDeployment(), nil
-}
-
-func (m publicModuleAdapter) NewCertification(ctx context.Context, planned PlannedStack) (sdk.CertificationAdapter, error) {
-	value, ok := planned.(publicPlannedStack)
-	if !ok || value.plan.Target != m.target {
-		return nil, fmt.Errorf("extension module %q received unexpected planned type %T", m.descriptor.ID, planned)
-	}
-	if factory, ok := m.module.(sdk.CertificationAdapterFactory); ok {
-		return factory.NewCertification(ctx, value.plan)
-	}
-	return m.Certification(), nil
-}
-
-func (m publicModuleAdapter) NewCertificationAdmission(ctx context.Context, planned PlannedStack) (sdk.CertificationAdmissionAdapter, error) {
-	value, ok := planned.(publicPlannedStack)
-	if !ok || value.plan.Target != m.target {
-		return nil, fmt.Errorf("extension module %q received unexpected planned type %T", m.descriptor.ID, planned)
-	}
-	if factory, ok := m.module.(sdk.CertificationAdmissionAdapterFactory); ok {
-		return factory.NewCertificationAdmission(ctx, value.plan)
-	}
-	return m.CertificationAdmission(), nil
 }
 
 func (m publicModuleAdapter) NewPlanAdmission(ctx context.Context, planned PlannedStack) (PlanAdmission, error) {
@@ -243,7 +211,7 @@ func (p publicPlannedStack) ImageDigest() string      { return p.plan.ImageDiges
 func (p publicPlannedStack) TargetDescriptor() sdk.TargetDescriptor {
 	return p.plan.Target
 }
-func (p publicPlannedStack) CertificationTier() CertificationTier {
+func (p publicPlannedStack) RuntimeTier() RuntimeTier {
 	if p.plan.Tier == sdk.ExtensionTierBuiltIn {
 		return TierBuiltIn
 	}
@@ -296,7 +264,6 @@ func publicPlanRequest(cfg config.Config, environment string, opts PlanOptions) 
 	edge := sdk.EdgeIntent{
 		ExternalProvider:  cfg.Edge.ExternalProvider,
 		Lifecycle:         externalLifecycle(cfg.Edge.ExternalProvider),
-		Certification:     externalCertification(cfg.Edge.ExternalProvider),
 		Mode:              edgeMode(cfg.Edge),
 		NativeProvider:    cfg.Edge.NativeProvider,
 		CredentialRefs:    stringSlice(cfg.Edge.TokenSecret),
@@ -409,19 +376,8 @@ func configuredAccountOrProject(cfg config.Config) string {
 	if strings.TrimSpace(cfg.Account) != "" {
 		return cfg.Account
 	}
-	switch cfg.Target.Provider {
-	case "gcp":
-		if cfg.Target.GCP != nil {
-			return cfg.Target.GCP.Project
-		}
-	case "ovh":
-		if cfg.Target.OVH != nil {
-			return cfg.Target.OVH.ServiceName
-		}
-	case "scaleway":
-		if cfg.Target.Scaleway != nil {
-			return cfg.Target.Scaleway.ProjectID
-		}
+	if cfg.Target.Provider == "gcp" && cfg.Target.GCP != nil {
+		return cfg.Target.GCP.Project
 	}
 	return ""
 }
@@ -453,17 +409,6 @@ func externalLifecycle(provider string) sdk.ExternalLifecycle {
 	}
 }
 
-func externalCertification(provider string) sdk.ExternalCertificationStatus {
-	switch provider {
-	case "", "none":
-		return ""
-	case "cloudwatch", "google-cloud-operations":
-		return sdk.ExternalCertified
-	default:
-		return sdk.ExternalExperimental
-	}
-}
-
 func nativeObservabilityProvider(cfg config.Config) string {
 	return strings.TrimSpace(cfg.Observability.NativeProvider)
 }
@@ -475,7 +420,6 @@ func nativeObservabilityProvider(cfg config.Config) string {
 func ObservabilityIntentFromConfig(cfg config.Config, environment string) (sdk.ObservabilityIntent, error) {
 	intent := sdk.ObservabilityIntent{
 		Lifecycle:          externalLifecycle(cfg.Observability.ExternalProvider),
-		Certification:      externalCertification(cfg.Observability.ExternalProvider),
 		OwnershipMarker:    architectureOwnershipMarker(cfg, environment),
 		NativeProvider:     nativeObservabilityProvider(cfg),
 		NativeReference:    strings.TrimSpace(cfg.Observability.NativeReference),
@@ -592,8 +536,6 @@ func architectureComputeMode(cfg config.Config) string {
 		return "autopilot"
 	case "gke-standard":
 		return "standard"
-	case "mks", "kapsule":
-		return "managed-node-pools"
 	default:
 		return cfg.Target.Runtime
 	}
@@ -601,7 +543,7 @@ func architectureComputeMode(cfg config.Config) string {
 
 func architectureKubernetesMode(cfg config.Config) string {
 	switch cfg.Target.Runtime {
-	case "eks", "mks", "kapsule":
+	case "eks":
 		if len(configuredZones(cfg)) > 1 {
 			return "multi-zone"
 		}
@@ -685,18 +627,6 @@ func configuredZones(cfg config.Config) []string {
 		if cfg.Target.GCP != nil {
 			return append([]string(nil), cfg.Target.GCP.Zones...)
 		}
-	case "ovh":
-		if cfg.Target.OVH != nil {
-			return append([]string(nil), cfg.Target.OVH.Zones...)
-		}
-	case "scaleway":
-		if cfg.Target.Scaleway != nil {
-			zones := append([]string(nil), cfg.Target.Scaleway.Zones...)
-			if len(zones) == 0 && cfg.Target.Scaleway.Zone != "" {
-				zones = []string{cfg.Target.Scaleway.Zone}
-			}
-			return zones
-		}
 	}
 	return nil
 }
@@ -754,18 +684,6 @@ func architectureBoundaries(cfg config.Config) []sdk.ServiceBoundaryIntent {
 			result = append(result, boundary("queue", "rabbitmq", "current", "self-hosted", ""))
 		}
 		result = append(result, boundary("media", "object-storage", "current", "managed", "gcp.cloud-storage"), boundary("secrets", "secret-manager", "current", "managed", "gcp.secret-manager"))
-	case "scaleway":
-		redisVersion := "current"
-		if cfg.Target.Scaleway != nil && cfg.Target.Scaleway.RedisVersion != "" {
-			redisVersion = cfg.Target.Scaleway.RedisVersion
-		}
-		result = append(result, boundary("database", "mysql", "current", "managed", "scaleway.managed-mysql"), boundary("cache", "redis", redisVersion, "managed", "scaleway.managed-redis"), boundary("search", "search", "current", "self-hosted", ""), boundary("queue", "queue", "current", "self-hosted", ""), boundary("media", "object-storage", "current", "managed", "scaleway.object-storage"), boundary("secrets", "secret-manager", "current", "managed", "scaleway.secret-manager"))
-	case "ovh":
-		valkeyVersion := "current"
-		if cfg.Target.OVH != nil && cfg.Target.OVH.ValkeyVersion != "" {
-			valkeyVersion = cfg.Target.OVH.ValkeyVersion
-		}
-		result = append(result, boundary("database", "mysql", "current", "managed", "ovh.managed-database"), boundary("cache", "valkey", valkeyVersion, "managed", ""), boundary("search", "search", "current", "self-hosted", ""), boundary("queue", "queue", "current", "self-hosted", ""), boundary("media", "object-storage", "current", "managed", "ovh.object-storage"), boundary("secrets", "kms", "current", "managed", "ovh.kms"))
 	}
 	return result
 }
@@ -846,38 +764,18 @@ func configuredImageDigest(cfg config.Config) string {
 		if cfg.Target.GCP != nil {
 			return cfg.Target.GCP.ImageDigest
 		}
-	case "ovh":
-		if cfg.Target.OVH != nil {
-			return cfg.Target.OVH.ImageDigest
-		}
-	case "scaleway":
-		if cfg.Target.Scaleway != nil {
-			return cfg.Target.Scaleway.ImageDigest
-		}
 	}
 	return ""
 }
 
 func configuredRegion(cfg config.Config) string {
-	region := cfg.Defaults.Region
-	switch cfg.Target.Provider {
-	case "gcp":
-		if cfg.Target.GCP != nil && cfg.Target.GCP.Region != "" {
-			region = cfg.Target.GCP.Region
-		}
-	case "ovh":
-		if cfg.Target.OVH != nil && cfg.Target.OVH.Region != "" {
-			region = cfg.Target.OVH.Region
-		}
-	case "scaleway":
-		if cfg.Target.Scaleway != nil && cfg.Target.Scaleway.Region != "" {
-			region = cfg.Target.Scaleway.Region
-		}
+	if cfg.Target.Provider == "gcp" && cfg.Target.GCP != nil && cfg.Target.GCP.Region != "" {
+		return cfg.Target.GCP.Region
 	}
-	return region
+	return cfg.Defaults.Region
 }
 
-func validatePublicPlan(target sdk.TargetDescriptor, tier sdk.ExtensionCertificationTier, request sdk.ModulePlanRequest, plan sdk.ModulePlan) error {
+func validatePublicPlan(target sdk.TargetDescriptor, tier sdk.ExtensionTier, request sdk.ModulePlanRequest, plan sdk.ModulePlan) error {
 	var problems []error
 	if strings.TrimSpace(plan.StackName) == "" {
 		problems = append(problems, errors.New("stack name is required"))

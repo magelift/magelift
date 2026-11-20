@@ -202,8 +202,7 @@ func (e EmailSelection) validate() []error {
 }
 
 // CloudSQLDatabaseVersion returns the release-aware Cloud SQL version. A
-// manually constructed Spec may omit the catalog field, so derive the same
-// value used by PlanFromInputs instead of falling back to an old default.
+// Spec without a database version uses the same defaults as PlanFromInputs.
 func (s Spec) CloudSQLDatabaseVersion() (string, error) {
 	if configured := strings.TrimSpace(s.Catalog.CloudSQLDatabaseVersion); configured != "" {
 		return configured, nil
@@ -214,11 +213,8 @@ func (s Spec) CloudSQLDatabaseVersion() (string, error) {
 // MemorystoreEngineVersion returns the provider API value for the selected
 // Magento release. GCP's current Valkey 9.0 GA service is the default
 // compatible target for Adobe Commerce 2.4.9. An explicit VALKEY_9_1 request
-// is also accepted as a Preview profile; certification must keep that
-// lifecycle status separate from the GA 9.0 record. Older release rows remain
-// mapped to VALKEY_8_0 only for older compatibility rows whose Adobe major is
-// still 8. The current 2.4.9 profile must use Valkey 9; a 9.1 selection is
-// explicitly preview and therefore cannot inherit the GA certification status.
+// selects the Preview service. Older Adobe rows that specify Valkey 8
+// use VALKEY_8_0.
 func (s Spec) MemorystoreEngineVersion() (string, error) {
 	return memorystoreAPIEngineVersionForMagento(s.Application.Version, s.Catalog.MemorystoreEngineVersion, s.Catalog.ValkeyRequirement)
 }

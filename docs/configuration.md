@@ -1,161 +1,70 @@
 # Configuration reference
 
-This page is generated from the MageLift configuration schema. Do not edit it by hand.
+Use `magelift.php` to choose a cloud, set service versions, and name environments such
+as staging and production. MageLift reads schema version 1 and reports unknown fields.
+Start with [Getting started](getting-started.md) if you are setting up a shop.
 
-`magelift.php` uses schema version 1. Unknown fields are rejected.
+A preset fills in common service and capacity settings. Values in the project file
+override the preset, and environment settings override project settings. Run
+`magelift config effective --env staging` to see the resulting values and where
+they came from. Set an optional environment value to `null` to remove an inherited
+value. Keep the cloud-specific settings under `target.aws`, `target.gcp`, or
+`target.azure`, according to `target.provider`.
 
-When a provider target block is present, the resolver applies the selected preset's
-safe provider shape defaults and the service versions from the Magento compatibility catalog.
-Project and environment values override them. The defaults do not create secrets,
-certificates, or existing-resource references; provider and preset catalogs do
-materialize named capacity shapes so project code can override them deliberately
-instead of inheriting an undocumented SDK default.
-Use `config effective` to inspect the values and their provenance.
+## Build and email
 
-See the [advanced AWS example](https://github.com/magelift/magelift/blob/main/examples/advanced-aws-fck-nat.php) for a complete
-typed configuration that composes multi-AZ fck-nat, native and external edge,
-native and external observability, recovery policy, and a community extension.
+`build.extensions` lists the PHP extensions your shop needs. The builder checks
+that it loads them and that its Composer version matches your request before it
+installs packages. Set `build.composer.version` to a branch such as `2.10`, an
+exact release such as `2.11.2`, a minimum such as `2.9.8+`, or a patch range
+such as `~2.9.8`. Set `build.composer.image` to a digest-pinned image if you
+need another Composer binary. [Composer build settings](builds.md#composer)
 
-Configuration has four intentional levels: the project/defaults/preset layer is the
-easy path for most users; environment overlays specialize it without duplicating the
-whole file; provider target fields select supported semantic infrastructure choices;
-and namespaced `extensions.<vendor>` fields hold provider-owned integration options.
-Provider target fields are validated semantic escape hatches, not an unversioned dump
-of raw provider SDK arguments. Omitted values resolve to named defaults and appear in
-the effective configuration, provenance, plan, and architecture fingerprint.
+Use `email` to configure a shop's cloud mail relay. Provide a secret reference in
+`email.credential` for authenticated SMTP. On AWS, use `email.mode: ses` with
+`email.managed.domain` and `email.managed.hostedZoneId` to let MageLift create the
+sender identity, SMTP credentials and DKIM records. Managed SES takes care of
+the host, port and login values. Preview environments use disabled email by
+default. Use `local.email` for Docker Compose and pass a password through the
+variable named by `local.email.credentialEnv`.
 
-Cloud transactional email is `email` on the project or an environment overlay.
-`ses` requires a provider-matching secret reference in `email.credential`;
-plaintext is rejected before Magento SMTP is written. Delivery is verified against the configured SMTP service.
-Modes `tem` and `ovh`, and `ses` with a `managed` block, provision the sender identity, credentials, and DNS through the provider adapter; explicit host, port, username, and credential values are rejected alongside `managed`.
-`local.email` remains the workstation overlay and uses `credentialEnv`. A preview environment that
-omits `email` resolves to `disabled` and does not inherit production SES credentials.
+## Cloud settings
 
-Resilience projection targets are optional advanced settings: use `resilience.projection.runtime: ecs` with an ECS `cluster`,
-`service` (preferred) or pinned `task`, and `container`; use `runtime: kubernetes` with `namespace`, `workload`, and an optional
-`container`. These are workload identities only; credentials and application verifiers stay provider-owned.
+On AWS, `target.aws.encryptionKeySecretArn` refers to the Secrets Manager value
+for the Magento encryption key. Keep that value for as long as you keep the
+encrypted data. If you use an existing VPC, supply one public, private and data
+subnet ID per selected zone. The network must already have egress and access to
+the AWS services your shop uses. Set `target.aws.existing.database` to adopt an
+existing RDS instance. [Connect existing resources](brownfield-attach.md)
 
-`target.provider: gcp` with `runtime: gke-autopilot` selects the GKE Autopilot adapter. `runtime: gke-standard` is experimental and remains the node-capable path for workloads such as multi-node OpenSearch.
-Historical 2.4.6-p15 and 2.4.9 topology/runtime passes remain scoped evidence. The bundled build recipes cover PHP 8.3 through 8.5. Projects may choose their own runtime images. The complete Adobe cache intersection and the rest of the release matrix stay open.
-Both require `target.gcp.project` and keep GCP topology under
-`target.gcp` only. Do not reuse `target.aws` fields for GCP.
+GKE Autopilot and GKE Standard require `target.gcp.project`. Choose Standard for
+workloads such as multi-node OpenSearch that need control over the worker nodes.
+Set `memorystoreMode`, `memorystoreShardCount`, and `memorystoreReplicas` to
+select the cache configuration. Cluster mode disabled supports one shard.
+Choose cluster mode enabled for multiple shards.
 
-GCP Memorystore capacity and failure-domain choices are explicit advanced fields: `memorystoreShardCount`,
-`memorystoreReplicas`, `memorystoreMode`, and `memorystoreZoneDistributionMode`/`memorystoreZone`.
-Cluster Mode Disabled accepts one shard; Cluster Mode Enabled is the path for multiple shards, and
-the selected mode is translated to the current Memorystore API rather than left to an SDK default.
+AWS and Google Cloud select backup retention and deletion protection from the
+preset and environment class. Preview defaults limit the resources retained
+after teardown. Check the effective configuration before deployment. Explicit
+`false` and `0` values are preserved. [Service settings](service-bindings.md)
 
-`target.provider: ovh` / `runtime: mks` and `target.provider: scaleway` / `runtime: kapsule`
-are also experimental. See [ovh-experimental.md](ovh-experimental.md) and
-[scaleway-experimental.md](scaleway-experimental.md). Scaleway requires
-`cacheMode: redis` (no managed Valkey yet); `databaseHighAvailability` and `redisClusterSize`
-select its supported RDB/Redis failure-domain shapes. Redis cluster mode (3-6 nodes) remains
-blocked until the Magento connector carries cluster discovery endpoints. OVH exposes
-`mksPlan`, `zones`, `nodeCount`, `databaseNodeCount`, and `valkeyNodeCount`; `zones` are MKS
-availability zones inside the selected OVH region, not database regions. Free MKS is single-zone;
-Standard multi-zone MKS creates one worker pool per listed zone and requires at least one worker per zone.
-The preview preset selects the current low-cost discovery one-node shape; standard and high-availability select the current production two-node shape. Advanced configuration can choose discovery/essential, business/production, or enterprise/advanced plans plus explicit flavors and node counts, and provider admission checks the selected region before mutation.
-On Scaleway, `zone` selects the managed-cache zone and `zones`
-selects the Kapsule worker zones; multi-zone plans create one worker pool per listed zone
-and require at least one configured node per zone. The preview preset may use one zone;
-standard requires two and high-availability requires three, so an underprovisioned list
-is rejected before Pulumi mutation.
+## Edge and telemetry
 
-Managed-service durability is customizable at the provider boundary while keeping the core contract portable.
-AWS exposes RDS/Aurora backup and maintenance windows, database deletion-protection and automated-backup deletion policy, and ElastiCache Valkey snapshot retention/window choices. Preview materializes zero Valkey snapshot-retention days; standard and high-availability materialize seven days. Database deletion protection and automated-backup cleanup are materialized from the environment class, with production retaining protection and backups by default. Explicit `false` and `0` values are preserved as intentional advanced choices.
-The AWS ECS presets materialize task CPU/memory, capacity mode, database/cache/search capacity, and queue shape;
-the EKS presets materialize compute mode, Kubernetes version, requests, workload replicas, and the shared
-managed database/cache durability shape.
-GCP exposes Cloud SQL automated-backup, binary-log, retained-backup-count, transaction-log, schedule,
-location, and deletion-protection choices plus Memorystore deletion protection and the PSC connection limit.
-The standard and high-availability GCP presets name eight retained automated backups and seven days of
-transaction-log retention; the preview preset disables Cloud SQL automated backups and binary logging.
-Cloud Armor is materialized for durable presets and for production environments, including production
-environments that deliberately select preview capacity; an explicit `enableCloudArmor` value overrides it.
-Scaleway exposes RDB backup enablement, frequency, retention, same-region placement, and encryption at rest;
-standard and high-availability presets name daily backups (24 hours), seven-day retention, same-region
-placement, and encryption at rest; preview explicitly disables automated backups to avoid orphaned
-backup cost during disposable environments.
-OVH exposes managed MySQL/Valkey backup time, destination regions, and deletion protection. Retention is
-provider-native: GCP's retained-backup count, Scaleway's retention days, and OVH's plan-controlled policy
-are not silently converted into the generic recovery policy. Cache authentication or transport-encryption
-modes are only exposed once the Magento connection, secret, certificate, health, and recovery contracts
-can honor them end to end; otherwise they fail as typed unsupported choices before mutation.
+Set `observability.nativeProvider` to `cloudwatch` on AWS or
+`google-cloud-operations` on Google Cloud. To send signals to an external
+adapter, use `observability.externalProvider` and put vendor-specific settings
+under `extensions.<vendor>`. `observability.nativeReference` identifies an
+existing destination, such as a Google Cloud Monitoring service. Store
+credentials as secret references.
 
-Deployments require `target.aws.encryptionKeySecretArn` to reference a stable
-Secrets Manager value. MageLift injects it at task start as the Magento encryption
-key. The key must remain stable for the lifetime of encrypted Magento data.
+For an external edge adapter, set `edge.health.expectedCname` to the DNS
+target the provider gave you. For standalone `magelift edge apply`, set
+`edge.health.originUrl` to the origin's health endpoint. A deployment can use
+the `applicationURL` output to find that endpoint. Set `edge.health.originHost`
+if the certificate uses a different hostname. With `edge.tlsMode: external`,
+you supply and renew the certificate. [Operate a shop](operations.md)
 
-`target.aws.existing.network` enables an existing VPC. When it is set, provide one
-public, private, and data subnet ID for every configured availability zone. MageLift
-does not create NAT gateways, route tables, or VPC endpoints in this mode, so the
-imported network must already provide the required egress and private AWS service
-access. The VPC CIDR is still required for security-group rules.
-
-For an owned AWS network, omitting `target.aws.vpcCidr` and
-`target.aws.availabilityZones` selects the named preview/standard/high-availability
-network defaults (`10.42.0.0/16` and two or three zones derived from the configured
-region). The effective configuration shows these values and their provenance;
-override them when the account's available zones or address plan differs.
-
-`target.aws.existing.database` adopts an existing AWS RDS MySQL instance. When it is
-set, provide `provider: aws`, `kind: database`, `externalId` (instance ID or ARN),
-`secretArn` (Secrets Manager master-user secret ARN; never an inline password),
-and `endpoint` (writer hostname). MageLift does not create RDS when this block is
-set. GCP managed Cloud SQL settings, when used, belong under `target.gcp`; they are
-not overloaded into the AWS existing-resource shape.
-
-For AWS fck-nat, `natMode`, `natTopology`, and `natReplacementMode` form one
-explicit network boundary. Selecting fck-nat materializes the preview or durable-preset
-topology, replacement policy, and one cost-optimized ARM64 NAT instance in effective configuration;
-multi-AZ fck-nat uses one failure-domain target per selected zone and automatic
-replacement through an Auto Scaling group unless `none` is explicitly selected.
-`target.aws.natInstanceType` overrides the ARM64 Graviton size; it defaults to the
-cost-optimized `t4g.nano`, and x86 instance types are rejected for the first-party
-ARM64 fck-nat AMI.
-A high-availability fck-nat plan requires multi-AZ plus automatic replacement; a
-single instance is never labeled highly available.
-
-`build.staticContent.strategy` and `build.staticContent.threads` map PaaS
-`SCD_STRATEGY` / `SCD_THREADS` on import and become Magento SCD `-s` / `-j`.
-See [ece-tools parity](ece-parity.md) for the closed vs intentional-gap matrix.
-
-`build.extensions` declares the PHP extensions that the selected builder must load.
-Set `build.composer.version` to a branch such as `2.10`, an exact release such as `2.11.2`, a minimum such as `2.9.8+`, or a patch range such as `~2.9.8`.
-The bundled recipe supplies a patched Composer 2 binary. To use a different binary, set `build.composer.image` to an image by digest.
-The builder checks the requested version and extensions before it installs the shop's locked packages. [Composer build settings](builds.md#composer)
-
-`observability.nativeProvider` selects a matching cloud telemetry destination and
-`observability.externalProvider` selects an extension-owned adapter without putting vendor credentials
-in the portable configuration. `observability.nativeReference` is an opaque identity
-owned by that native provider; it is not a credential, selector, or provider SDK
-object. For example, OVHcloud uses it to identify an existing Logs Data Platform
-stream. `cloudwatch`, `google-cloud-operations`, `scaleway-cockpit`, and
-`ovh-logs-data-platform` are first-party native adapters for their matching clouds.
-New Relic, Datadog, OTLP, and other external providers are extension-owned. Put
-their credentials and provider-specific options under `extensions.<vendor>`.
-The core preserves an extension namespace as opaque configuration; its registered adapter
-must strict-decode and validate that payload before planning or mutation. A
-first-party adapter rejects signals it cannot configure rather than silently
-dropping them.
-
-The first-release schema has no singular `edge.provider` or
-`observability.provider` field and has no compatibility alias for either one.
-Use `nativeProvider` and `externalProvider` to compose destinations;
-`provider` on `target` and existing-resource identities remains identity data.
-
-External edge apply requires a real `edge.health` policy. Set
-`edge.health.expectedCname` to the provider's DNS target and, for a standalone
-`edge apply`, set `edge.health.originUrl` to the origin health endpoint. A normal
-deployment may derive the origin URL from the newly provisioned
-`applicationURL` output. If the endpoint uses a generated load-balancer hostname with a certificate
-for the application domain, set `edge.health.originHost` for TLS SNI and HTTP Host.
-When one edge domain is configured, the first-party Fastly adapter uses that
-domain as the default origin host; set `originHost` when the certificate differs.
-An `originHealthRef` is a reference for evidence and
-never substitutes for an HTTP health proof. `tlsMode: external` means that
-certificate ownership and renewal stay outside MageLift; the Fastly adapter
-maps it to customer-provided TLS and does not create a TLS subscription.
+## Fields
 
 | Field | Type | Required | Accepted values | Description |
 | --- | --- | --- | --- | --- |
@@ -181,7 +90,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `application.edition` | string | yes | open-source, commerce | Magento edition |
 | `application.version` | string | yes |  | Exact Magento release |
 | `application.mode` | string | yes | integrated, headless | Application mode |
-| `application.webRuntime` | string | no | nginx-fpm, frankenphp-classic, php-apache | HTTP application runtime |
+| `application.webRuntime` | string | no | nginx-fpm | HTTP runtime (nginx and PHP-FPM) |
 | `application.magento` | object | no |  | Magento runtime overlays |
 | `application.magento.frontName` | string | no |  | Magento admin frontName |
 | `application.magento.cookieDomain` | string | no |  | Magento cookie domain |
@@ -296,8 +205,8 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `local.email.from` | string or null | no |  | Default sender address |
 | `local.email.credentialEnv` | string or null | no |  | Environment variable containing the email credential |
 | `target` | object | yes |  | Deployment target |
-| `target.provider` | string | yes | aws, gcp, azure, ovh, scaleway | Infrastructure provider |
-| `target.runtime` | string | yes | ecs-fargate, eks, gke-autopilot, gke-standard, aks, mks, kapsule | Application runtime |
+| `target.provider` | string | yes | aws, gcp, azure | Infrastructure provider |
+| `target.runtime` | string | yes | ecs-fargate, eks, gke-autopilot, gke-standard, aks | Application runtime |
 | `target.aws` | object or null | no |  | AWS deployment inputs |
 | `target.aws.previewPool` | object or null | no |  | Shared preview compute in an existing VPC |
 | `target.aws.previewPool.clusterArn` | string | yes |  | ECS Fargate cluster owned outside the preview stack |
@@ -317,9 +226,9 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `target.aws.availabilityZones` | array or null | no |  | AWS availability zones |
 | `target.aws.mediaDomain` | string or null | no |  | Media delivery domain |
 | `target.aws.natMode` | string or null | no | nat-gateway, fck-nat | Private subnet egress mode |
-| `target.aws.natTopology` | string or null | no | single-az, multi-az | AWS NAT failure-domain topology; omitted defaults to single-AZ for preview and multi-AZ for standard/high-availability |
-| `target.aws.natReplacementMode` | string or null | no | none, auto-scaling | AWS fck-nat replacement mode; omitted defaults to automatic replacement for multi-AZ fck-nat |
-| `target.aws.natInstanceType` | string or null | no |  | ARM64 fck-nat instance type; omitted defaults to cost-optimized t4g.nano |
+| `target.aws.natTopology` | string or null | no | single-az, multi-az | NAT placement across AWS availability zones. Defaults to one zone for preview and multiple zones for standard or high availability |
+| `target.aws.natReplacementMode` | string or null | no | none, auto-scaling | How AWS replaces fck-nat instances. Defaults to automatic replacement for multi-AZ fck-nat |
+| `target.aws.natInstanceType` | string or null | no |  | ARM64 instance type for fck-nat. Defaults to t4g.nano to reduce cost |
 | `target.aws.labels` | object or null | no |  | Resource labels |
 | `target.aws.existing` | object or null | no |  | Existing AWS resources |
 | `target.aws.existing.network` | object or null | no |  | Existing VPC reference |
@@ -335,8 +244,8 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `target.aws.existing.database.externalId` | string | yes |  | RDS instance identifier or ARN |
 | `target.aws.existing.database.secretArn` | string | yes |  | Secrets Manager master-user secret ARN |
 | `target.aws.existing.database.endpoint` | string | yes |  | RDS writer endpoint hostname |
-| `target.aws.catalog` | object | no |  | Benchmark-selected service catalog |
-| `target.aws.catalog.version` | string or null | no |  | Benchmark catalog version |
+| `target.aws.catalog` | object | no |  | AWS runtime and service settings |
+| `target.aws.catalog.version` | string or null | no |  | AWS service settings version |
 | `target.aws.catalog.databaseEngine` | string or null | no | aurora-mysql, rds-mysql, rds-mariadb | Database engine shape |
 | `target.aws.catalog.searchMode` | string or null | no | serverless, provisioned, disabled | OpenSearch provisioning mode |
 | `target.aws.catalog.queueMode` | string or null | no | db, amazon-mq, ecs-rabbitmq, ecs-artemis | Magento messaging broker mode |
@@ -344,7 +253,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `target.aws.catalog.databaseMaintenanceWindow` | string or null | no |  | AWS RDS/Aurora maintenance window in UTC |
 | `target.aws.catalog.databaseDeletionProtection` | boolean or null | no |  | Enable AWS RDS/Aurora deletion protection |
 | `target.aws.catalog.databaseDeleteAutomatedBackups` | boolean or null | no |  | Delete AWS RDS/Aurora automated backups when the database is destroyed |
-| `target.aws.catalog.cacheSnapshotRetentionLimit` | integer or null | no |  | AWS ElastiCache Valkey automatic snapshot retention in days; zero disables snapshots |
+| `target.aws.catalog.cacheSnapshotRetentionLimit` | integer or null | no |  | Days to retain ElastiCache Valkey snapshots. Set to 0 to disable automatic snapshots |
 | `target.aws.catalog.cacheSnapshotWindow` | string or null | no |  | AWS ElastiCache Valkey daily snapshot window in UTC |
 | `target.aws.catalog.aurora` | object | no |  | Aurora or RDS MySQL capacity |
 | `target.aws.catalog.aurora.minimumAcu` | number | no |  | Minimum Aurora Serverless v2 capacity |
@@ -481,75 +390,6 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `target.azure.previewPool.nodeSubnetId` | string | yes |  | Existing AKS node subnet resource ID |
 | `target.azure.previewPool.mysqlSubnetId` | string | yes |  | Existing delegated MySQL subnet resource ID |
 | `target.azure.previewPool.mysqlDnsZoneId` | string | yes |  | Existing private DNS zone linked to the cluster network |
-| `target.ovh` | object or null | no |  | OVHcloud deployment inputs (experimental) |
-| `target.ovh.serviceName` | string | yes |  | OVH Public Cloud project service name |
-| `target.ovh.apiEndpoint` | string or null | no | ovh-eu, ovh-ca, ovh-us | OVHcloud API endpoint alias (ovh-eu, ovh-ca, or ovh-us) |
-| `target.ovh.region` | string or null | no |  | OVH Public Cloud region (for example EU-WEST-PAR or GRA11) |
-| `target.ovh.networkCidr` | string or null | no |  | Private network IPv4 CIDR |
-| `target.ovh.zones` | array or null | no |  | OVH MKS availability zones within the selected region |
-| `target.ovh.attachFloatingIps` | boolean | no |  | Attach OVH floating IPs to MKS nodes |
-| `target.ovh.privateNetworkRoutingAsDefault` | boolean | no |  | Route MKS egress through OVH's documented private-subnet DHCP gateway; custom gateway routing is not inferred |
-| `target.ovh.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
-| `target.ovh.databaseName` | string or null | no |  | Magento database name |
-| `target.ovh.masterUsername` | string or null | no |  | Managed MySQL master username |
-| `target.ovh.encryptionKeySecret` | string or null | no |  | Secret reference for Magento encryption key |
-| `target.ovh.databaseFlavor` | string or null | no |  | OVH managed MySQL flavor |
-| `target.ovh.databasePlan` | string or null | no | discovery, essential, business, production, enterprise, advanced | OVH managed MySQL plan (discovery/essential, business/production, or enterprise/advanced) |
-| `target.ovh.databaseVersion` | string or null | no | 8.0, 8.4 | OVH managed MySQL engine version (8.0 or 8.4) |
-| `target.ovh.databaseNodeCount` | integer or null | no |  | OVH managed MySQL node count |
-| `target.ovh.databaseBackupTime` | string or null | no |  | OVH managed MySQL daily backup start time (HH:MM) |
-| `target.ovh.databaseBackupRegions` | array or null | no |  | OVH managed MySQL backup regions |
-| `target.ovh.databaseDeletionProtection` | boolean or null | no |  | Enable OVH managed MySQL deletion protection |
-| `target.ovh.valkeyFlavor` | string or null | no |  | OVH managed Valkey flavor |
-| `target.ovh.valkeyPlan` | string or null | no | discovery, essential, business, production | OVH managed Valkey plan (discovery/essential or business/production) |
-| `target.ovh.valkeyVersion` | string or null | no | 7.2, 8.0, 8.1, 9.0, 9.1 | OVH managed Valkey engine version (7.2, 8.0, 8.1, 9.0, or 9.1; default 8.1) |
-| `target.ovh.valkeyNodeCount` | integer or null | no |  | OVH managed Valkey node count |
-| `target.ovh.valkeyBackupTime` | string or null | no |  | OVH managed Valkey daily backup start time (HH:MM) |
-| `target.ovh.valkeyBackupRegions` | array or null | no |  | OVH managed Valkey backup regions |
-| `target.ovh.valkeyDeletionProtection` | boolean or null | no |  | Enable OVH managed Valkey deletion protection |
-| `target.ovh.mksPlan` | string or null | no | free, standard | OVH Managed Kubernetes plan |
-| `target.ovh.nodeFlavor` | string or null | no |  | MKS node pool flavor |
-| `target.ovh.nodeCount` | integer or null | no |  | MKS node pool size |
-| `target.ovh.cpuRequest` | string or null | no |  | Kubernetes CPU request |
-| `target.ovh.memoryRequest` | string or null | no |  | Kubernetes memory request |
-| `target.ovh.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
-| `target.ovh.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
-| `target.ovh.stateBucket` | string or null | no |  | S3-compatible DIY state bucket name |
-| `target.ovh.stateEndpoint` | string or null | no |  | Loopback S3-compatible endpoint override (Floci) |
-| `target.ovh.stateRegion` | string or null | no |  | S3-compatible region code for DIY state |
-| `target.ovh.labels` | object or null | no |  | Resource labels |
-| `target.scaleway` | object or null | no |  | Scaleway deployment inputs (experimental) |
-| `target.scaleway.projectId` | string | yes |  | Scaleway project ID |
-| `target.scaleway.region` | string or null | no |  | Scaleway region (e.g. fr-par) |
-| `target.scaleway.zone` | string or null | no |  | Scaleway availability zone (e.g. fr-par-1) |
-| `target.scaleway.networkCidr` | string or null | no |  | Private network IPv4 CIDR |
-| `target.scaleway.zones` | array or null | no |  | Scaleway zones |
-| `target.scaleway.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
-| `target.scaleway.databaseName` | string or null | no |  | Magento database name |
-| `target.scaleway.masterUsername` | string or null | no |  | Managed MySQL master username |
-| `target.scaleway.encryptionKeySecret` | string or null | no |  | Secret reference for Magento encryption key |
-| `target.scaleway.databaseNodeType` | string or null | no |  | Scaleway RDB node type |
-| `target.scaleway.databaseHighAvailability` | boolean | no |  | Enable Scaleway RDB high availability |
-| `target.scaleway.databaseBackupEnabled` | boolean or null | no |  | Enable Scaleway RDB automated backups |
-| `target.scaleway.databaseBackupFrequencyHours` | integer or null | no |  | Scaleway RDB automated backup frequency in hours |
-| `target.scaleway.databaseBackupRetentionDays` | integer or null | no |  | Scaleway RDB automated backup retention in days |
-| `target.scaleway.databaseBackupSameRegion` | boolean or null | no |  | Store Scaleway RDB logical backups in the instance region |
-| `target.scaleway.databaseEncryptionAtRest` | boolean or null | no |  | Enable Scaleway RDB encryption at rest |
-| `target.scaleway.redisNodeType` | string or null | no |  | Scaleway Redis node type |
-| `target.scaleway.redisVersion` | string or null | no |  | Scaleway Redis engine version |
-| `target.scaleway.redisClusterSize` | integer or null | no |  | Scaleway Redis node count (1 standalone, 2 HA, 3-6 cluster mode) |
-| `target.scaleway.cacheMode` | string or null | no | redis | Cache engine escape hatch |
-| `target.scaleway.cpuRequest` | string or null | no |  | Kubernetes CPU request |
-| `target.scaleway.memoryRequest` | string or null | no |  | Kubernetes memory request |
-| `target.scaleway.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
-| `target.scaleway.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
-| `target.scaleway.kapsuleVersion` | string or null | no |  | Kapsule Kubernetes version |
-| `target.scaleway.nodeType` | string or null | no |  | Kapsule pool node type |
-| `target.scaleway.nodeCount` | integer or null | no |  | Kapsule pool size |
-| `target.scaleway.stateBucket` | string or null | no |  | S3-compatible DIY state bucket name |
-| `target.scaleway.stateEndpoint` | string or null | no |  | Loopback S3-compatible endpoint override (Floci) |
-| `target.scaleway.stateRegion` | string or null | no |  | S3-compatible region code for DIY state |
-| `target.scaleway.labels` | object or null | no |  | Resource labels |
 | `edge` | object | no |  | Optional edge delivery provider |
 | `edge.externalProvider` | string or null | no |  | External edge delivery provider |
 | `edge.mode` | string or null | no | none, native, external, both | Edge composition mode |
@@ -598,7 +438,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `observability.dashboards` | array or null | no |  | Operational dashboards |
 | `observability.slos` | array or null | no |  | Service-level objectives |
 | `email` | object | no |  | Cloud transactional email |
-| `email.mode` | string or null | no | disabled, smtp, ses, tem, ovh | Cloud email mode |
+| `email.mode` | string or null | no | disabled, smtp, ses | Cloud email mode |
 | `email.host` | string or null | no |  | SMTP host |
 | `email.port` | integer or null | no |  | SMTP port |
 | `email.username` | string or null | no |  | SMTP username |
@@ -607,7 +447,6 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `email.managed` | object or null | no |  | Managed email provisioning inputs |
 | `email.managed.domain` | string or null | no |  | Verified sender domain |
 | `email.managed.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID for DKIM records (SES only) |
-| `email.managed.account` | string or null | no |  | Mailbox account name (OVH only) |
 | `resilience` | object | no |  | Availability, backup, and disaster-recovery policy |
 | `resilience.profileId` | string or null | no |  | Named resilience profile |
 | `resilience.availabilityTarget` | string or null | no |  | Availability target |
@@ -631,8 +470,6 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `defaults` | object | yes |  | Project defaults |
 | `defaults.region` | string | no |  | Default AWS region |
 | `defaults.preset` | string | no | preview, standard, high-availability | Default infrastructure preset |
-| `compatibility` | object | no |  | Compatibility policy |
-| `compatibility.allowUnsupported` | boolean | no |  | Legacy compatibility override; Adobe deviations now produce warnings |
 | `environments` | object | yes |  | Named deployment environments |
 | `environments.*.services` | object | no |  | Magento service families, versions, ownership and connection settings |
 | `environments.*.services.*.parameters` | object | no |  | Database server defaults for charset, collation and packet size |
@@ -666,7 +503,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.application.edition` | string | no | open-source, commerce | Magento edition |
 | `environments.*.application.version` | string | no |  | Exact Magento release |
 | `environments.*.application.mode` | string | no | integrated, headless | Application mode |
-| `environments.*.application.webRuntime` | string | no | nginx-fpm, frankenphp-classic, php-apache | HTTP application runtime |
+| `environments.*.application.webRuntime` | string | no | nginx-fpm | HTTP runtime (nginx and PHP-FPM) |
 | `environments.*.application.magento` | object | no |  | Magento runtime overlays |
 | `environments.*.application.magento.frontName` | string | no |  | Magento admin frontName |
 | `environments.*.application.magento.cookieDomain` | string | no |  | Magento cookie domain |
@@ -716,8 +553,8 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.build.cache.mode` | string or null | no | min, max | BuildKit cache export mode |
 | `environments.*.build.cache.ignoreExportErrors` | boolean | no |  | Continue when cache export fails |
 | `environments.*.target` | object or null | no |  |  |
-| `environments.*.target.provider` | string | no | aws, gcp, azure, ovh, scaleway | Infrastructure provider |
-| `environments.*.target.runtime` | string | no | ecs-fargate, eks, gke-autopilot, gke-standard, aks, mks, kapsule | Application runtime |
+| `environments.*.target.provider` | string | no | aws, gcp, azure | Infrastructure provider |
+| `environments.*.target.runtime` | string | no | ecs-fargate, eks, gke-autopilot, gke-standard, aks | Application runtime |
 | `environments.*.target.aws` | object or null | no |  | AWS deployment inputs |
 | `environments.*.target.aws.previewPool` | object or null | no |  | Shared preview compute in an existing VPC |
 | `environments.*.target.aws.previewPool.clusterArn` | string | no |  | ECS Fargate cluster owned outside the preview stack |
@@ -737,9 +574,9 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.target.aws.availabilityZones` | array or null | no |  | AWS availability zones |
 | `environments.*.target.aws.mediaDomain` | string or null | no |  | Media delivery domain |
 | `environments.*.target.aws.natMode` | string or null | no | nat-gateway, fck-nat | Private subnet egress mode |
-| `environments.*.target.aws.natTopology` | string or null | no | single-az, multi-az | AWS NAT failure-domain topology; omitted defaults to single-AZ for preview and multi-AZ for standard/high-availability |
-| `environments.*.target.aws.natReplacementMode` | string or null | no | none, auto-scaling | AWS fck-nat replacement mode; omitted defaults to automatic replacement for multi-AZ fck-nat |
-| `environments.*.target.aws.natInstanceType` | string or null | no |  | ARM64 fck-nat instance type; omitted defaults to cost-optimized t4g.nano |
+| `environments.*.target.aws.natTopology` | string or null | no | single-az, multi-az | NAT placement across AWS availability zones. Defaults to one zone for preview and multiple zones for standard or high availability |
+| `environments.*.target.aws.natReplacementMode` | string or null | no | none, auto-scaling | How AWS replaces fck-nat instances. Defaults to automatic replacement for multi-AZ fck-nat |
+| `environments.*.target.aws.natInstanceType` | string or null | no |  | ARM64 instance type for fck-nat. Defaults to t4g.nano to reduce cost |
 | `environments.*.target.aws.labels` | object or null | no |  | Resource labels |
 | `environments.*.target.aws.existing` | object or null | no |  | Existing AWS resources |
 | `environments.*.target.aws.existing.network` | object or null | no |  | Existing VPC reference |
@@ -755,8 +592,8 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.target.aws.existing.database.externalId` | string | no |  | RDS instance identifier or ARN |
 | `environments.*.target.aws.existing.database.secretArn` | string | no |  | Secrets Manager master-user secret ARN |
 | `environments.*.target.aws.existing.database.endpoint` | string | no |  | RDS writer endpoint hostname |
-| `environments.*.target.aws.catalog` | object | no |  | Benchmark-selected service catalog |
-| `environments.*.target.aws.catalog.version` | string or null | no |  | Benchmark catalog version |
+| `environments.*.target.aws.catalog` | object | no |  | AWS runtime and service settings |
+| `environments.*.target.aws.catalog.version` | string or null | no |  | AWS service settings version |
 | `environments.*.target.aws.catalog.databaseEngine` | string or null | no | aurora-mysql, rds-mysql, rds-mariadb | Database engine shape |
 | `environments.*.target.aws.catalog.searchMode` | string or null | no | serverless, provisioned, disabled | OpenSearch provisioning mode |
 | `environments.*.target.aws.catalog.queueMode` | string or null | no | db, amazon-mq, ecs-rabbitmq, ecs-artemis | Magento messaging broker mode |
@@ -764,7 +601,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.target.aws.catalog.databaseMaintenanceWindow` | string or null | no |  | AWS RDS/Aurora maintenance window in UTC |
 | `environments.*.target.aws.catalog.databaseDeletionProtection` | boolean or null | no |  | Enable AWS RDS/Aurora deletion protection |
 | `environments.*.target.aws.catalog.databaseDeleteAutomatedBackups` | boolean or null | no |  | Delete AWS RDS/Aurora automated backups when the database is destroyed |
-| `environments.*.target.aws.catalog.cacheSnapshotRetentionLimit` | integer or null | no |  | AWS ElastiCache Valkey automatic snapshot retention in days; zero disables snapshots |
+| `environments.*.target.aws.catalog.cacheSnapshotRetentionLimit` | integer or null | no |  | Days to retain ElastiCache Valkey snapshots. Set to 0 to disable automatic snapshots |
 | `environments.*.target.aws.catalog.cacheSnapshotWindow` | string or null | no |  | AWS ElastiCache Valkey daily snapshot window in UTC |
 | `environments.*.target.aws.catalog.aurora` | object | no |  | Aurora or RDS MySQL capacity |
 | `environments.*.target.aws.catalog.aurora.minimumAcu` | number | no |  | Minimum Aurora Serverless v2 capacity |
@@ -901,75 +738,6 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.target.azure.previewPool.nodeSubnetId` | string | no |  | Existing AKS node subnet resource ID |
 | `environments.*.target.azure.previewPool.mysqlSubnetId` | string | no |  | Existing delegated MySQL subnet resource ID |
 | `environments.*.target.azure.previewPool.mysqlDnsZoneId` | string | no |  | Existing private DNS zone linked to the cluster network |
-| `environments.*.target.ovh` | object or null | no |  | OVHcloud deployment inputs (experimental) |
-| `environments.*.target.ovh.serviceName` | string | no |  | OVH Public Cloud project service name |
-| `environments.*.target.ovh.apiEndpoint` | string or null | no | ovh-eu, ovh-ca, ovh-us | OVHcloud API endpoint alias (ovh-eu, ovh-ca, or ovh-us) |
-| `environments.*.target.ovh.region` | string or null | no |  | OVH Public Cloud region (for example EU-WEST-PAR or GRA11) |
-| `environments.*.target.ovh.networkCidr` | string or null | no |  | Private network IPv4 CIDR |
-| `environments.*.target.ovh.zones` | array or null | no |  | OVH MKS availability zones within the selected region |
-| `environments.*.target.ovh.attachFloatingIps` | boolean | no |  | Attach OVH floating IPs to MKS nodes |
-| `environments.*.target.ovh.privateNetworkRoutingAsDefault` | boolean | no |  | Route MKS egress through OVH's documented private-subnet DHCP gateway; custom gateway routing is not inferred |
-| `environments.*.target.ovh.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
-| `environments.*.target.ovh.databaseName` | string or null | no |  | Magento database name |
-| `environments.*.target.ovh.masterUsername` | string or null | no |  | Managed MySQL master username |
-| `environments.*.target.ovh.encryptionKeySecret` | string or null | no |  | Secret reference for Magento encryption key |
-| `environments.*.target.ovh.databaseFlavor` | string or null | no |  | OVH managed MySQL flavor |
-| `environments.*.target.ovh.databasePlan` | string or null | no | discovery, essential, business, production, enterprise, advanced | OVH managed MySQL plan (discovery/essential, business/production, or enterprise/advanced) |
-| `environments.*.target.ovh.databaseVersion` | string or null | no | 8.0, 8.4 | OVH managed MySQL engine version (8.0 or 8.4) |
-| `environments.*.target.ovh.databaseNodeCount` | integer or null | no |  | OVH managed MySQL node count |
-| `environments.*.target.ovh.databaseBackupTime` | string or null | no |  | OVH managed MySQL daily backup start time (HH:MM) |
-| `environments.*.target.ovh.databaseBackupRegions` | array or null | no |  | OVH managed MySQL backup regions |
-| `environments.*.target.ovh.databaseDeletionProtection` | boolean or null | no |  | Enable OVH managed MySQL deletion protection |
-| `environments.*.target.ovh.valkeyFlavor` | string or null | no |  | OVH managed Valkey flavor |
-| `environments.*.target.ovh.valkeyPlan` | string or null | no | discovery, essential, business, production | OVH managed Valkey plan (discovery/essential or business/production) |
-| `environments.*.target.ovh.valkeyVersion` | string or null | no | 7.2, 8.0, 8.1, 9.0, 9.1 | OVH managed Valkey engine version (7.2, 8.0, 8.1, 9.0, or 9.1; default 8.1) |
-| `environments.*.target.ovh.valkeyNodeCount` | integer or null | no |  | OVH managed Valkey node count |
-| `environments.*.target.ovh.valkeyBackupTime` | string or null | no |  | OVH managed Valkey daily backup start time (HH:MM) |
-| `environments.*.target.ovh.valkeyBackupRegions` | array or null | no |  | OVH managed Valkey backup regions |
-| `environments.*.target.ovh.valkeyDeletionProtection` | boolean or null | no |  | Enable OVH managed Valkey deletion protection |
-| `environments.*.target.ovh.mksPlan` | string or null | no | free, standard | OVH Managed Kubernetes plan |
-| `environments.*.target.ovh.nodeFlavor` | string or null | no |  | MKS node pool flavor |
-| `environments.*.target.ovh.nodeCount` | integer or null | no |  | MKS node pool size |
-| `environments.*.target.ovh.cpuRequest` | string or null | no |  | Kubernetes CPU request |
-| `environments.*.target.ovh.memoryRequest` | string or null | no |  | Kubernetes memory request |
-| `environments.*.target.ovh.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
-| `environments.*.target.ovh.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
-| `environments.*.target.ovh.stateBucket` | string or null | no |  | S3-compatible DIY state bucket name |
-| `environments.*.target.ovh.stateEndpoint` | string or null | no |  | Loopback S3-compatible endpoint override (Floci) |
-| `environments.*.target.ovh.stateRegion` | string or null | no |  | S3-compatible region code for DIY state |
-| `environments.*.target.ovh.labels` | object or null | no |  | Resource labels |
-| `environments.*.target.scaleway` | object or null | no |  | Scaleway deployment inputs (experimental) |
-| `environments.*.target.scaleway.projectId` | string | no |  | Scaleway project ID |
-| `environments.*.target.scaleway.region` | string or null | no |  | Scaleway region (e.g. fr-par) |
-| `environments.*.target.scaleway.zone` | string or null | no |  | Scaleway availability zone (e.g. fr-par-1) |
-| `environments.*.target.scaleway.networkCidr` | string or null | no |  | Private network IPv4 CIDR |
-| `environments.*.target.scaleway.zones` | array or null | no |  | Scaleway zones |
-| `environments.*.target.scaleway.imageDigest` | string or null | no |  | Signed immutable OCI image digest |
-| `environments.*.target.scaleway.databaseName` | string or null | no |  | Magento database name |
-| `environments.*.target.scaleway.masterUsername` | string or null | no |  | Managed MySQL master username |
-| `environments.*.target.scaleway.encryptionKeySecret` | string or null | no |  | Secret reference for Magento encryption key |
-| `environments.*.target.scaleway.databaseNodeType` | string or null | no |  | Scaleway RDB node type |
-| `environments.*.target.scaleway.databaseHighAvailability` | boolean | no |  | Enable Scaleway RDB high availability |
-| `environments.*.target.scaleway.databaseBackupEnabled` | boolean or null | no |  | Enable Scaleway RDB automated backups |
-| `environments.*.target.scaleway.databaseBackupFrequencyHours` | integer or null | no |  | Scaleway RDB automated backup frequency in hours |
-| `environments.*.target.scaleway.databaseBackupRetentionDays` | integer or null | no |  | Scaleway RDB automated backup retention in days |
-| `environments.*.target.scaleway.databaseBackupSameRegion` | boolean or null | no |  | Store Scaleway RDB logical backups in the instance region |
-| `environments.*.target.scaleway.databaseEncryptionAtRest` | boolean or null | no |  | Enable Scaleway RDB encryption at rest |
-| `environments.*.target.scaleway.redisNodeType` | string or null | no |  | Scaleway Redis node type |
-| `environments.*.target.scaleway.redisVersion` | string or null | no |  | Scaleway Redis engine version |
-| `environments.*.target.scaleway.redisClusterSize` | integer or null | no |  | Scaleway Redis node count (1 standalone, 2 HA, 3-6 cluster mode) |
-| `environments.*.target.scaleway.cacheMode` | string or null | no | redis | Cache engine escape hatch |
-| `environments.*.target.scaleway.cpuRequest` | string or null | no |  | Kubernetes CPU request |
-| `environments.*.target.scaleway.memoryRequest` | string or null | no |  | Kubernetes memory request |
-| `environments.*.target.scaleway.desiredWebReplicas` | integer or null | no |  | Desired web Deployment replicas |
-| `environments.*.target.scaleway.queueConsumerCount` | integer or null | no |  | Queue consumer Deployment replicas |
-| `environments.*.target.scaleway.kapsuleVersion` | string or null | no |  | Kapsule Kubernetes version |
-| `environments.*.target.scaleway.nodeType` | string or null | no |  | Kapsule pool node type |
-| `environments.*.target.scaleway.nodeCount` | integer or null | no |  | Kapsule pool size |
-| `environments.*.target.scaleway.stateBucket` | string or null | no |  | S3-compatible DIY state bucket name |
-| `environments.*.target.scaleway.stateEndpoint` | string or null | no |  | Loopback S3-compatible endpoint override (Floci) |
-| `environments.*.target.scaleway.stateRegion` | string or null | no |  | S3-compatible region code for DIY state |
-| `environments.*.target.scaleway.labels` | object or null | no |  | Resource labels |
 | `environments.*.edge` | object or null | no |  |  |
 | `environments.*.edge.externalProvider` | string or null | no |  | External edge delivery provider |
 | `environments.*.edge.mode` | string or null | no | none, native, external, both | Edge composition mode |
@@ -1018,7 +786,7 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.observability.dashboards` | array or null | no |  | Operational dashboards |
 | `environments.*.observability.slos` | array or null | no |  | Service-level objectives |
 | `environments.*.email` | object or null | no |  |  |
-| `environments.*.email.mode` | string or null | no | disabled, smtp, ses, tem, ovh | Cloud email mode |
+| `environments.*.email.mode` | string or null | no | disabled, smtp, ses | Cloud email mode |
 | `environments.*.email.host` | string or null | no |  | SMTP host |
 | `environments.*.email.port` | integer or null | no |  | SMTP port |
 | `environments.*.email.username` | string or null | no |  | SMTP username |
@@ -1027,7 +795,6 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.email.managed` | object or null | no |  | Managed email provisioning inputs |
 | `environments.*.email.managed.domain` | string or null | no |  | Verified sender domain |
 | `environments.*.email.managed.hostedZoneId` | string or null | no |  | Route 53 hosted zone ID for DKIM records (SES only) |
-| `environments.*.email.managed.account` | string or null | no |  | Mailbox account name (OVH only) |
 | `environments.*.resilience` | object or null | no |  |  |
 | `environments.*.resilience.profileId` | string or null | no |  | Named resilience profile |
 | `environments.*.resilience.availabilityTarget` | string or null | no |  | Availability target |
@@ -1051,9 +818,5 @@ maps it to customer-provided TLS and does not create a TLS subscription.
 | `environments.*.defaults` | object or null | no |  |  |
 | `environments.*.defaults.region` | string | no |  | Default AWS region |
 | `environments.*.defaults.preset` | string | no | preview, standard, high-availability | Default infrastructure preset |
-| `environments.*.compatibility` | object or null | no |  |  |
-| `environments.*.compatibility.allowUnsupported` | boolean | no |  | Legacy compatibility override; Adobe deviations now produce warnings |
 | `environments.*.extensions` | object | no |  |  |
 | `extensions` | object | no |  | Namespaced extension settings |
-
-Environment values override project values. A `null` environment value removes an optional inherited value. Entries under `extensions` may use namespaced fields that MageLift does not inspect.

@@ -57,7 +57,7 @@ func TestResilienceAdapterDescriptorAndExecutionValidation(t *testing.T) {
 		Capabilities: []ResilienceAction{ResilienceBackup, ResilienceRestore},
 		DataClasses: []ResilienceDataClassCapability{{
 			Name:                "database",
-			Status:              ResilienceCapabilityCertified,
+			Status:              ResilienceCapabilitySupported,
 			Actions:             []ResilienceAction{ResilienceBackup, ResilienceRestore, ResilienceIntegrityCheck},
 			Destinations:        []RecoveryDestination{RecoverySameRegionIsolated, RecoveryAlternateRegion},
 			PollingRequired:     true,
@@ -211,7 +211,7 @@ func TestResilienceAdapterDescriptorRequiresDurableProtectionMetadata(t *testing
 
 func TestResilienceCapabilityErrorIsTypedAndActionable(t *testing.T) {
 	original := ResilienceCapabilityError{
-		AdapterID: "scaleway.kapsule",
+		AdapterID: "gcp.gke-autopilot",
 		Operation: ResilienceRestore,
 		DataClass: "search-index",
 		Status:    ResilienceCapabilityUnavailable,
@@ -225,7 +225,7 @@ func TestResilienceCapabilityErrorIsTypedAndActionable(t *testing.T) {
 	if got.AdapterID != original.AdapterID || got.Operation != original.Operation || got.DataClass != original.DataClass {
 		t.Fatalf("errors.As() = %#v, want %#v", got, original)
 	}
-	for _, want := range []string{"unavailable", "adapter=scaleway.kapsule", "operation=restore", "dataClass=search-index", "no supported restore adapter"} {
+	for _, want := range []string{"unavailable", "adapter=gcp.gke-autopilot", "operation=restore", "dataClass=search-index", "no supported restore adapter"} {
 		if !strings.Contains(original.Error(), want) {
 			t.Fatalf("ResilienceCapabilityError.Error() = %q, want substring %q", original.Error(), want)
 		}

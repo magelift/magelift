@@ -2,19 +2,25 @@
 
 ## Who hosts the store?
 
-The shop owns its cloud account, registry, state and data. MageLift builds and operates the infrastructure through provider adapters. The cloud provider bills the shop for the resources it creates.
+The store runs in the shop's cloud account. Your team controls the image
+registry, infrastructure state and shop data. MageLift uses the selected
+provider plugin to manage the deployment. The cloud provider bills your
+account for the resources the shop uses.
 
 ## Which Magento releases and services can I select?
 
 Declare the exact Magento release and the PHP and service versions you need. The CLI reads Composer metadata when you initialize a shop. Its Adobe compatibility snapshot supplies recommendations and warnings. Actual provisioning depends on the adapter, region and the cloud API. Teams can connect existing services, use compatible runtime images from their own registry or extend a provider. [Provider capabilities](capability-matrix.md) · [Configuration](configuration.md)
 
-## Does MageLift certify a deployment?
+## What does MageLift test?
 
 MageLift publishes the outcomes of specific tests. Pulumi mocks inspect resource graphs. Floci tests cover individual SDK calls. A real Magento installation exercises its application and dependencies. Use the scope, versions and dates of each result when deciding what to accept for production. [Evidence](evidence/README.md)
 
 ## How do I keep testing environments close to production?
 
-Define the application and service versions once, then change the capacity preset per environment. Use `magelift env diff staging production` to review the changes. The starter enables protection on production. HA also depends on the availability options of each dependency and a tested restore procedure.
+Define the application and service versions once, then set the capacity preset
+per environment. `magelift env diff staging production` shows where they differ.
+The starter protects production from teardown. Check which services can fail
+over and rehearse a restore before relying on the high-availability preset.
 
 ## Can I bring an existing project?
 

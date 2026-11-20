@@ -1,6 +1,6 @@
 # Experimental AWS target (EKS Autopilot / Auto Mode)
 
-Set `MAGELIFT_EXPERIMENTAL_PROVIDERS=1` to enable the EKS runtime in the AWS plugin. EKS is experimental. The `awsek` acceptance run deployed Magento 2.4.9 with RabbitMQ on Auto Mode and removed the environment. [AWS resource coverage](architecture.md#aws-magento-product-matrix) · [Evidence terminology](adr/0002-certified-vs-experimental.md)
+Set `MAGELIFT_EXPERIMENTAL_PROVIDERS=1` to enable the EKS runtime in the AWS plugin. EKS is experimental. The `awsek` acceptance run deployed Magento 2.4.9 with RabbitMQ on Auto Mode and removed the environment. [AWS resource coverage](architecture.md#aws-magento-product-matrix) · [Evidence terminology](adr/0002-provider-test-evidence.md)
 
 ## Target
 
@@ -64,9 +64,7 @@ tokens, so existing GCP state identities are not changed.
 
 ## Verification
 
-- Unit/mock: `go test ./providers/aws/eks/... ./providers/aws/eksops/...`
-- Preview against a real account only when you intend to pay for EKS Auto Mode +
-  RDS/ElastiCache; destroy on exit. Prefer Floci + mocks for day-to-day work.
-- Paid warm matrix: use `scripts/aws-acceptance-local.sh` with the EKS profile,
-  a stable `MAGELIFT_AWS_ACCEPTANCE_DIR`, and `KEEP=true` until all compatible
-  cells finish. Disable `KEEP` for the final teardown and cleanup assertion.
+Run `go test ./providers/aws/eks/... ./providers/aws/eksops/...` for local
+resource and workload checks. The recorded [EKS Auto Mode run](evidence/aws-eks-auto-mode-packed-keep-awsek-20260823.md)
+and [self-managed node run](evidence/aws-eks-self-managed-magento-live-20260817bf.md)
+describe the tested Magento versions, service settings, and cleanup.

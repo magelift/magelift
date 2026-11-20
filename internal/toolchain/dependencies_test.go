@@ -254,7 +254,7 @@ func TestSpecsForTargetGuidesGcloudForGCP(t *testing.T) {
 }
 
 func TestPulumiTargetRequirementAndOptionalInstall(t *testing.T) {
-	for _, provider := range []string{"aws", "gcp", "azure", "ovh", "scaleway"} {
+	for _, provider := range []string{"aws", "gcp", "azure"} {
 		t.Run(provider, func(t *testing.T) {
 			var pulumi *DependencySpec
 			for _, spec := range SpecsForTarget(provider, "") {

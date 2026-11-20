@@ -101,12 +101,10 @@ func ExperimentalReason(provider sdk.ProviderID, dataClass string) string {
 	return fmt.Sprintf("The %s %s operation translator and independent live evidence are not included yet; use an injected or community client until both are available.", provider, dataClass)
 }
 
-// NativeTranslatorReason distinguishes a shipped official-SDK translator from
-// a provider package that only exposes an injected lifecycle seam. It keeps
-// experimental status honest until independent live certification evidence is
-// available.
+// NativeTranslatorReason describes experimental recovery support when the adapter
+// calls the provider API.
 func NativeTranslatorReason(provider sdk.ProviderID, dataClass string) string {
-	return fmt.Sprintf("The %s %s operation translator is implemented against the official SDK; independent live evidence and provider certification are still required.", provider, dataClass)
+	return fmt.Sprintf("The %s adapter implements %s operations through the provider SDK. Live verification is pending.", provider, dataClass)
 }
 
 // New returns the shared operation-backed adapter. Provider code supplies a

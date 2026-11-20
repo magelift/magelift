@@ -64,17 +64,8 @@ func TestFuturePatchesAreUnsupported(t *testing.T) {
 				t.Fatalf("expected advisory, got %#v, %v", initial.Compatibility, err)
 			}
 
-			input = strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)
-			f, err = Load([]byte(input))
-			if err != nil {
-				t.Fatal(err)
-			}
-			effective, err := f.Resolve("staging", ResolveOptions{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if effective.Compatibility.Status != CompatibilityUnsupportedAllowed {
-				t.Fatalf("status = %q", effective.Compatibility.Status)
+			if initial.Compatibility.Status != CompatibilityUnsupportedAllowed {
+				t.Fatalf("status = %q", initial.Compatibility.Status)
 			}
 		})
 	}
@@ -92,7 +83,7 @@ func TestCompatibilityRejectsUnresolvedRange(t *testing.T) {
 	}
 }
 
-func TestUnsupportedCombinationRequiresCommittedOverride(t *testing.T) {
+func TestUnsupportedCombinationProducesAnAdvisory(t *testing.T) {
 	input := withVersions(base, "2.4.8-p5", "8.2")
 	f, err := Load([]byte(input))
 	if err != nil {
@@ -103,17 +94,8 @@ func TestUnsupportedCombinationRequiresCommittedOverride(t *testing.T) {
 		t.Fatalf("expected advisory, got %#v, %v", initial.Compatibility, err)
 	}
 
-	input = strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)
-	f, err = Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	effective, err := f.Resolve("staging", ResolveOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if effective.Compatibility.Status != CompatibilityUnsupportedAllowed || len(effective.Compatibility.Reasons) == 0 {
-		t.Fatalf("assessment = %#v", effective.Compatibility)
+	if len(initial.Compatibility.Reasons) == 0 {
+		t.Fatalf("assessment = %#v", initial.Compatibility)
 	}
 }
 
@@ -270,7 +252,7 @@ func TestRequirementsForReleaseReturnsCopies(t *testing.T) {
 	}
 }
 
-func TestAdobeUnsupportedMySQLFailsClosedUnlessHatch(t *testing.T) {
+func TestAdobeUnsupportedMySQLProducesAnAdvisory(t *testing.T) {
 	input := withVersions(base, "2.4.7-p10", "8.3")
 	input = strings.Replace(input, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: aws, runtime: ecs-fargate, aws: {catalog: {databaseEngine: rds-mysql, versions: {mysql: 8.0.45, valkey: \"8.1\", openSearch: OpenSearch_2.19}}}}", 1)
 	file, err := Load([]byte(input))
@@ -282,25 +264,16 @@ func TestAdobeUnsupportedMySQLFailsClosedUnlessHatch(t *testing.T) {
 		t.Fatalf("expected MySQL advisory, got %#v, %v", initial.Compatibility, err)
 	}
 
-	input = strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)
-	file, err = Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
+	if initial.Compatibility.Status != CompatibilityUnsupportedAllowed {
+		t.Fatalf("status = %q", initial.Compatibility.Status)
 	}
-	effective, err := file.Resolve("staging", ResolveOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if effective.Compatibility.Status != CompatibilityUnsupportedAllowed {
-		t.Fatalf("status = %q", effective.Compatibility.Status)
-	}
-	joined := strings.Join(effective.Compatibility.Reasons, "\n")
+	joined := strings.Join(initial.Compatibility.Reasons, "\n")
 	if !strings.Contains(joined, "Adobe") || strings.Contains(joined, string(CompatibilityAdobeSupported)) {
-		t.Fatalf("hatch provenance = %#v", effective.Compatibility)
+		t.Fatalf("MySQL assessment = %#v", initial.Compatibility)
 	}
 }
 
-func TestExperimentalManagedInstancesWarnsWithoutHatch(t *testing.T) {
+func TestExperimentalManagedInstancesProducesAnAdvisory(t *testing.T) {
 	input := strings.Replace(base, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: aws, runtime: ecs-fargate, aws: {catalog: {fargate: {computeMode: managed-instances}}}}", 1)
 	file, err := Load([]byte(input))
 	if err != nil {
@@ -354,32 +327,6 @@ func TestExperimentalAmazonMQWarnsWithoutHatch(t *testing.T) {
 	joined := strings.Join(effective.Compatibility.Warnings, "\n")
 	if !strings.Contains(joined, "MageLift") || !strings.Contains(joined, "Amazon MQ") || !strings.Contains(joined, "experimental") {
 		t.Fatalf("warnings = %#v", effective.Compatibility.Warnings)
-	}
-}
-
-func TestProviderUnavailableOVHCDNFailsClosed(t *testing.T) {
-	input := `schemaVersion: 1
-project: {name: shop}
-application: {edition: open-source, version: 2.4.8-p5, mode: integrated}
-build:
-  php: "8.3"
-  composer: {credentials: aws-secrets-manager://composer/auth}
-target: {provider: ovh, runtime: mks, ovh: {serviceName: pc-example}}
-edge: {mode: native, nativeProvider: cdn, originHealthRef: ovh/lb}
-defaults: {region: GRA9, preset: preview}
-environments:
-  staging:
-    account: "pc-example"
-    domain: shop.example
-extensions: {}
-`
-	file, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = file.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "OVH") || !strings.Contains(err.Error(), "unavailable") {
-		t.Fatalf("unavailable OVH CDN error = %v", err)
 	}
 }
 

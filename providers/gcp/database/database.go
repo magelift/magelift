@@ -297,7 +297,7 @@ func New(ctx *pulumi.Context, name string, args Args, opts ...pulumi.ResourceOpt
 	return component, nil
 }
 
-// finalBackupRetentionDays is the Cloud SQL final-backup window (1–365) used
+// finalBackupRetentionDays is the Cloud SQL final-backup window (1 to 365 days) used
 // when automated backups are on, so instance destroy keeps a backup inside the
 // configured retention instead of deleting it. Preview cells with backups off
 // return 0 and omit FinalBackupConfig.

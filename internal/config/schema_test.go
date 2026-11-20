@@ -95,7 +95,7 @@ func TestExistingDatabaseAppearsInSchemaAndReference(t *testing.T) {
 		"`target.aws.existing.database`",
 		"`target.aws.existing.database.secretArn`",
 		"`target.aws.existing.database.endpoint`",
-		"does not create RDS",
+		"existing RDS instance",
 	} {
 		if !strings.Contains(reference, needle) {
 			t.Fatalf("configuration reference missing %s", needle)

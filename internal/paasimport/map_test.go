@@ -185,7 +185,7 @@ func TestAllowlistEnvKeys(t *testing.T) {
 		"CONFIG__DEFAULT__CRON__CONSUMERS_RUNNER__CONSUMERS",
 	} {
 		if !IsAllowlistedEnv(key) {
-			t.Fatalf("%s must be on D-07 allowlist", key)
+			t.Fatalf("the importer should recognize %s", key)
 		}
 	}
 	if IsAllowlistedEnv("CUSTOM_FEATURE_FLAG") {

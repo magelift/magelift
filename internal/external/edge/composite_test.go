@@ -62,7 +62,7 @@ func TestCompositeAdapterSplitsIntentAndRoutesOpaqueReferences(t *testing.T) {
 		TargetProvider: "aws", TargetRuntime: "ecs-fargate",
 		Intent: sdk.EdgeIntent{
 			Mode: "both", NativeProvider: "cloudfront", ExternalProvider: "fastly",
-			Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+			Lifecycle:      sdk.ExternalLifecycleExtension,
 			CredentialRefs: []string{"aws-secrets-manager://magelift/fastly"}, Domains: []string{"shop.example.com"},
 			OriginHealthRef: "health:origin", OwnershipMarker: "magelift/test/edge-composite",
 		},
@@ -121,7 +121,7 @@ func TestCompositeAdapterPreservesEdgeSafetyIntentAcrossNativeAndExternalChildre
 		TargetProvider: "aws", TargetRuntime: "ecs-fargate",
 		Intent: sdk.EdgeIntent{
 			Mode: "both", NativeProvider: "cloudfront", ExternalProvider: "fastly",
-			Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+			Lifecycle:      sdk.ExternalLifecycleExtension,
 			CredentialRefs: []string{"aws-secrets-manager://magelift/fastly"},
 			Domains:        []string{"shop.example.com"}, TLS: true, TLSMode: "managed", DNSMode: "external",
 			PurgeOnDeploy: true, PolicyReference: "policy/edge", OriginHealthRef: "health/origin",
@@ -256,10 +256,10 @@ func newPlannedCompositeEdge(t *testing.T) (sdk.EdgeAdapter, sdk.EdgePlan, *reco
 			NativeProvider:   "cloudfront",
 			ExternalProvider: "fastly",
 			Lifecycle:        sdk.ExternalLifecycleExtension,
-			Certification:    sdk.ExternalExperimental,
-			CredentialRefs:   []string{"aws-secrets-manager://magelift/fastly"},
-			OriginHealthRef:  "health:origin",
-			OwnershipMarker:  "magelift/test/edge-tamper",
+
+			CredentialRefs:  []string{"aws-secrets-manager://magelift/fastly"},
+			OriginHealthRef: "health:origin",
+			OwnershipMarker: "magelift/test/edge-tamper",
 		},
 	})
 	if err != nil {

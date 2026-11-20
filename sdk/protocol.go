@@ -11,8 +11,8 @@ import (
 // every response carries a typed error or a result, never both. All types
 // are gob-safe (exported fields, no interfaces, no freestanding any).
 // Rich pre-existing payloads (stack outputs, platform reports, adapter
-// plans) cross as JSON bytes inside typed envelopes — the Kubernetes
-// RawExtension pattern — with the JSON schema named on each field, so no
+// plans) cross as JSON bytes inside typed envelopes. Each field names its
+// JSON schema, following the Kubernetes RawExtension pattern, so no
 // wire type is ever an untyped blob.
 const (
 	// ProtocolV1 is the only protocol version this SDK speaks.
@@ -171,8 +171,8 @@ type DescribeRequest struct {
 
 // RuntimeAdvertisement names one served runtime and its runtime tier.
 type RuntimeAdvertisement struct {
-	Runtime string                     `json:"runtime"`
-	Tier    ExtensionCertificationTier `json:"tier"`
+	Runtime string        `json:"runtime"`
+	Tier    ExtensionTier `json:"tier"`
 }
 
 // DescribeResponse carries the plugin identity and operation versions.
@@ -221,13 +221,13 @@ func (r AdoptedResource) Line() string { return fmt.Sprintf("ADOPT %s %s", r.Kin
 // StoredPlan is a provider plan: stable identity fields the core may read
 // plus opaque bytes the core stores uninspected and returns verbatim.
 type StoredPlan struct {
-	Adopted         []AdoptedResource          `json:"adopted,omitempty"`
-	StackName       string                     `json:"stackName"`
-	Provider        string                     `json:"provider"`
-	Runtime         string                     `json:"runtime"`
-	Tier            ExtensionCertificationTier `json:"tier,omitempty"`
-	ImageDigest     string                     `json:"imageDigest"`
-	StateBackendURL string                     `json:"stateBackendUrl,omitempty"`
+	Adopted         []AdoptedResource `json:"adopted,omitempty"`
+	StackName       string            `json:"stackName"`
+	Provider        string            `json:"provider"`
+	Runtime         string            `json:"runtime"`
+	Tier            ExtensionTier     `json:"tier,omitempty"`
+	ImageDigest     string            `json:"imageDigest"`
+	StateBackendURL string            `json:"stateBackendUrl,omitempty"`
 	// DeployInputsJSON carries the JSON-encoded provider deploy inputs
 	// (for GCP, a kube.DeploySpec) so the core can construct deploy
 	// steps without reading the opaque plan.
@@ -252,7 +252,6 @@ type PlanRequest struct {
 	Runtime                string                    `json:"runtime,omitempty"`
 	LiveQueueReplicas      int                       `json:"liveQueueReplicas,omitempty"`
 	ValkeyRequirement      string                    `json:"valkeyRequirement,omitempty"`
-	AllowUnsupported       bool                      `json:"allowUnsupported,omitempty"`
 	AllowExpiredPreview    bool                      `json:"allowExpiredPreview,omitempty"`
 	// AccountOnly asks for the account-prep plan bootstrap uses. Deploy
 	// planning leaves it false and still requires the image digest and
@@ -496,8 +495,7 @@ type TailLogsCall struct {
 
 // TailLogsResult carries the JSON-encoded []platform.LogEvent.
 // FailuresJSON carries JSON-encoded "source: reason" strings when the query
-// succeeded partially; a non-empty failures list is the partial signal
-// (the core reports partial status instead of failing).
+// succeeded partially. The CLI reports the entries in Failures.
 type TailLogsResult struct {
 	EventsJSON   []byte          `json:"eventsJson,omitempty"`
 	FailuresJSON []byte          `json:"failuresJson,omitempty"`
@@ -615,10 +613,8 @@ type DestroyLeftoverBackupsResult struct {
 
 // Adapter proxy calls carry their adapter-defined payloads as JSON bytes
 // inside typed envelopes (the Kubernetes RawExtension pattern): adapter
-// types contain dynamic maps that gob cannot encode, so JSON- not gob—
-// framing applies below this layer. Malformed payloads fail closed with a
-// typed Invalid error; the operation names, versions, and error taxonomy
-// stay fully typed.
+// types contain dynamic maps, so the transport uses JSON for them.
+// Malformed payloads return a typed Invalid error.
 
 // EdgePlanCall forwards an edge adapter Plan call; RequestJSON encodes an
 // EdgePlanRequest.

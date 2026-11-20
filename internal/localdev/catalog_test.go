@@ -82,7 +82,7 @@ func TestPlanSupportsArtemisNginxAndVarnishContracts(t *testing.T) {
 	}
 }
 
-func TestPlanFollowsRegisteredWebRuntime(t *testing.T) {
+func TestPlanUsesNginxRuntime(t *testing.T) {
 	for _, test := range []struct {
 		webRuntime string
 		family     string
@@ -90,8 +90,6 @@ func TestPlanFollowsRegisteredWebRuntime(t *testing.T) {
 		command    string
 	}{
 		{webRuntime: "nginx-fpm", family: "nginx", image: "magelift/php-nginx:8.5-local", command: "php-fpm --daemonize && exec nginx"},
-		{webRuntime: "frankenphp-classic", family: "frankenphp-classic", image: "magelift/frankenphp-classic:8.5-local", command: `command: ["frankenphp", "run"]`},
-		{webRuntime: "php-apache", family: "php-apache", image: "magelift/php-apache:8.5-local", command: "php-fpm --daemonize && exec apache2ctl -D FOREGROUND"},
 	} {
 		test := test
 		t.Run(test.webRuntime, func(t *testing.T) {
@@ -115,16 +113,16 @@ func TestPlanFollowsRegisteredWebRuntime(t *testing.T) {
 
 func TestPlanRejectsContradictoryOrUnregisteredWebRuntime(t *testing.T) {
 	base := config.BuildSpec{
-		Application: config.Application{Version: "2.4.9", WebRuntime: "php-apache"},
+		Application: config.Application{Version: "2.4.9", WebRuntime: "nginx-fpm"},
 		Build:       config.Build{PHP: "8.5", Composer: config.Composer{Version: "2.10"}},
-		Local:       config.LocalRuntime{WebServer: config.LocalService{Family: "nginx"}},
+		Local:       config.LocalRuntime{WebServer: config.LocalService{Family: "other"}},
 	}
 	if _, err := Plan(base); err == nil || !strings.Contains(err.Error(), "contradicts application.webRuntime") {
 		t.Fatalf("contradictory web server error = %v", err)
 	}
-	base.Application.WebRuntime = "frankenphp-worker"
+	base.Application.WebRuntime = "unknown"
 	base.Local.WebServer = config.LocalService{}
-	if _, err := Plan(base); err == nil || !strings.Contains(err.Error(), `plugin "frankenphp-worker" is not registered`) {
+	if _, err := Plan(base); err == nil || !strings.Contains(err.Error(), `application.webRuntime must be nginx-fpm`) {
 		t.Fatalf("unregistered web runtime error = %v", err)
 	}
 }

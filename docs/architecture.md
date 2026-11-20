@@ -21,7 +21,7 @@ AWS, Google Cloud and Azure each ship a `magelift-provider-<name>` executable fr
 | Google Cloud | GKE Autopilot, experimental GKE Standard | GKE, Cloud SQL, private connectivity, Cloud Storage, workload identity and Cloud Monitoring |
 | Azure | Experimental AKS | Dedicated or shared AKS, MySQL Flexible Server, Azure Files, Blob Storage and Key Vault |
 
-Set `MAGELIFT_EXPERIMENTAL_PROVIDERS=1` to enable AWS EKS, OVHcloud MKS or Scaleway Kapsule. The OVHcloud and Scaleway adapters are compiled into the CLI and maintained under `internal/cloud/`. New first-party providers follow the plugin layout. Resource support varies by runtime. The capability guide distinguishes mock resource graphs, emulator requests and dated runs in a real account. [Capability guide](capability-matrix.md) · [Add a provider](adding-a-provider.md)
+AWS EKS and GCP GKE Standard are experimental runtimes. Azure AKS remains experimental. Resource support varies by runtime. The capability guide distinguishes mock resource graphs, emulator requests and dated runs in a real account. [Capability guide](capability-matrix.md) · [Add a provider](adding-a-provider.md)
 
 ### AWS Magento product matrix
 
@@ -39,9 +39,9 @@ ECS Fargate can provision or attach a network, use RDS MySQL or MariaDB, and sel
 | `internal/platform/`, `internal/deploy/`, `internal/automation/` | Stack and operation contracts, Magento deployment ordering and Pulumi Automation helpers |
 | `internal/cloud/kube/`, `internal/s3state/`, `internal/mediasync/` | Kubernetes workload operations, S3-compatible state storage and Magento media transfer used by multiple adapters |
 | `internal/external/`, `internal/shared/` | External edge and telemetry adapters, shared recovery and state archive logic |
-| `build/`, `images/`, `internal/build/` | Magento’s Composer build package, optional image recipes, and the Go code that runs builds |
-| `agents/`, `contrib/` | Skills installed into shop projects and contributor-only runbooks, respectively |
-| `tests/`, `providers/<name>/tests/`, `testdata/` | Cross-provider checks, provider-specific acceptance helpers where needed, and public synthetic fixtures |
+| `build/`, `images/`, `internal/build/` | Composer build package, bundled image recipes and Go build orchestration |
+| `agents/`, `.agents/skills/` | Skills installed into shop projects and contributor runbooks, respectively |
+| `tests/`, `testdata/` | Cross-provider checks, shell regressions and synthetic fixtures |
 | `docs/`, `website/` | MkDocs guides and the Astro website. MkDocs writes its generated output to `site/`. |
 
 The root module and each nested module are listed in `go.work`. A root `go test ./...` covers one module. `make test-fast` runs them all. `make core-leanness` checks the CLI dependency graph for accidentally linked cloud plugins. [Testing](https://github.com/magelift/magelift/tree/main/tests) · [Contributing](https://github.com/magelift/magelift/blob/main/CONTRIBUTING.md)

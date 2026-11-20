@@ -60,8 +60,8 @@ func testCleanupLedger(resources ...CleanupResource) CleanupLedger {
 	return CleanupLedger{
 		Version:   CleanupLedgerVersion,
 		RunID:     "run-20260813",
-		Marker:    "magelift/scaleway/rdb-recovery/run-20260813",
-		Provider:  "scaleway",
+		Marker:    "magelift/gcp/cloud-sql-recovery/run-20260813",
+		Provider:  "gcp",
 		Region:    "fr-par",
 		Project:   "11111111-1111-1111-1111-111111111111",
 		Profile:   "default",

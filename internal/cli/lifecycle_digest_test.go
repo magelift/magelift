@@ -44,7 +44,7 @@ func (p *digestProbe) Descriptor() sdk.TargetDescriptor {
 	return sdk.TargetDescriptor{ID: "gcp.gke-autopilot", Provider: "gcp", Runtime: "gke-autopilot"}
 }
 
-func (*digestProbe) CertificationTier() platform.CertificationTier {
+func (*digestProbe) RuntimeTier() platform.RuntimeTier {
 	return platform.TierBuiltIn
 }
 
@@ -290,8 +290,6 @@ func TestConfigWithImageDigestCopiesEveryTarget(t *testing.T) {
 	aws := &config.AWSTarget{ImageDigest: "aws-old", VPCCIDR: "10.0.0.0/16", AvailabilityZones: []string{"eu-west-3a"}}
 	gcp := &config.GCPTarget{Project: "example-gcp-project", ImageDigest: "gcp-old", Labels: map[string]string{"k": "v"}}
 	azure := &config.AzureTarget{ResourceGroup: "shop"}
-	ovh := &config.OVHTarget{ServiceName: "project", ImageDigest: "ovh-old"}
-	scw := &config.ScalewayTarget{ProjectID: "project", ImageDigest: "scw-old"}
 	for _, test := range []struct {
 		name   string
 		cfg    config.Config
@@ -328,30 +326,6 @@ func TestConfigWithImageDigestCopiesEveryTarget(t *testing.T) {
 				if azure.ImageDigest != "" || before.Target.Azure != azure || after.Target.Azure == azure ||
 					after.Target.Azure.ImageDigest != freshDeployDigest || after.Target.Azure.ResourceGroup != "shop" {
 					t.Fatalf("Azure digest override changed the wrong target: %#v", after.Target.Azure)
-				}
-			},
-		},
-		{
-			name: "ovh",
-			cfg:  config.Config{Target: config.Target{Provider: "ovh", OVH: ovh}},
-			mutate: func(before, after config.Config) {
-				if before.Target.OVH != ovh || ovh.ImageDigest != "ovh-old" || after.Target.OVH == ovh {
-					t.Fatalf("ovh alias")
-				}
-				if after.Target.OVH.ImageDigest != freshDeployDigest || after.Target.OVH.ServiceName != "project" {
-					t.Fatalf("ovh copy = %#v", after.Target.OVH)
-				}
-			},
-		},
-		{
-			name: "scaleway",
-			cfg:  config.Config{Target: config.Target{Provider: "scaleway", Scaleway: scw}},
-			mutate: func(before, after config.Config) {
-				if before.Target.Scaleway != scw || scw.ImageDigest != "scw-old" || after.Target.Scaleway == scw {
-					t.Fatalf("scaleway alias")
-				}
-				if after.Target.Scaleway.ImageDigest != freshDeployDigest || after.Target.Scaleway.ProjectID != "project" {
-					t.Fatalf("scaleway copy = %#v", after.Target.Scaleway)
 				}
 			},
 		},

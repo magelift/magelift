@@ -1,9 +1,5 @@
-# MageLift integrated-mode VCL (mount over /etc/varnish/default.vcl when baking
-# a custom Varnish sidecar). Until then, the pinned official image uses its
-# env-based default VCL, which already forwards /health to the Magento HTTP
-# container ;  nginx/FrankenPHP must short-circuit /health with 200 OK.
-#
-# This file adds an explicit uncacheable pass for /health and a backend probe.
+# Mount this file as /etc/varnish/default.vcl to use the health probe and
+# uncached /health route. nginx serves /health from the application container.
 
 vcl 4.1;
 

@@ -125,9 +125,9 @@ signs:
 release:
   preflight:
     fail_on_error: true
-  # Debug tags are never installable: draft, prerelease, never latest.
+  # Debug tags stay draft and prerelease, outside the install channel.
   draft: true
-  prerelease: true
+  prerelease: auto
   make_latest: false
 
 changelog:

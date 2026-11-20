@@ -113,15 +113,15 @@ func TestNewShimModule(t *testing.T) {
 	if got := module.Descriptor(); got.ID != "gcp.gke-autopilot" || got.Provider != "gcp" || got.Runtime != "gke-autopilot" {
 		t.Fatalf("descriptor = %#v", got)
 	}
-	if module.CertificationTier() != platform.TierBuiltIn {
-		t.Fatalf("tier = %q", module.CertificationTier())
+	if module.RuntimeTier() != platform.TierBuiltIn {
+		t.Fatalf("tier = %q", module.RuntimeTier())
 	}
 	standard, err := NewShimModule("gcp", "gke-standard", &Client{describe: cannedDescribe()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if standard.CertificationTier() != platform.TierExperimental {
-		t.Fatalf("tier = %q", standard.CertificationTier())
+	if standard.RuntimeTier() != platform.TierExperimental {
+		t.Fatalf("tier = %q", standard.RuntimeTier())
 	}
 	keys := module.OutputKeys()
 	if len(keys) < len(platform.RequiredOutputKeys()) {
@@ -185,8 +185,8 @@ func TestShimPlan(t *testing.T) {
 	if shim.ImageDigest() == "" || shim.StateBackendURL() != "gs://shop-staging-state" {
 		t.Fatalf("stored = %#v", shim.stored)
 	}
-	if shim.CertificationTier() != platform.TierExperimental {
-		t.Fatalf("tier = %q", shim.CertificationTier())
+	if shim.RuntimeTier() != platform.TierExperimental {
+		t.Fatalf("tier = %q", shim.RuntimeTier())
 	}
 	if got := shim.TargetDescriptor(); got.ID != "gcp.gke-autopilot" {
 		t.Fatalf("descriptor = %#v", got)
@@ -224,8 +224,8 @@ func TestShimPlanDefaultsMissingTierToNegotiatedTier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if planned.CertificationTier() != platform.TierBuiltIn {
-		t.Fatalf("plan tier = %q, want negotiated built-in tier", planned.CertificationTier())
+	if planned.RuntimeTier() != platform.TierBuiltIn {
+		t.Fatalf("plan tier = %q, want negotiated built-in tier", planned.RuntimeTier())
 	}
 }
 
@@ -474,7 +474,7 @@ func (fakeForeignPlanned) Runtime() sdk.RuntimeID   { return "ecs-fargate" }
 func (fakeForeignPlanned) Project() string          { return "shop" }
 func (fakeForeignPlanned) Environment() string      { return "staging" }
 func (fakeForeignPlanned) Region() string           { return "eu-west-1" }
-func (fakeForeignPlanned) CertificationTier() platform.CertificationTier {
+func (fakeForeignPlanned) RuntimeTier() platform.RuntimeTier {
 	return platform.TierExperimental
 }
 func (fakeForeignPlanned) EnvironmentClass() string { return "staging" }

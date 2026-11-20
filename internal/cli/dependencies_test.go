@@ -25,7 +25,7 @@ func (p plannedTargetStub) Runtime() sdk.RuntimeID   { return p.runtime }
 func (p plannedTargetStub) Project() string          { return "test-project" }
 func (p plannedTargetStub) Environment() string      { return "preview" }
 func (p plannedTargetStub) Region() string           { return "europe-west1" }
-func (p plannedTargetStub) CertificationTier() platform.CertificationTier {
+func (p plannedTargetStub) RuntimeTier() platform.RuntimeTier {
 	return platform.TierBuiltIn
 }
 func (p plannedTargetStub) EnvironmentClass() string                              { return "preview" }

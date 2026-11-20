@@ -52,9 +52,7 @@ type IntegrationRequest struct {
 	OwnershipMarker string
 }
 
-// IntegrationPlan is safe to pass to a core lifecycle runner. Unsupported
-// combinations are represented as data so certification can record them
-// without treating a neighboring architecture as a PASS.
+// IntegrationPlan records the integration and its support status for the selected target.
 type IntegrationPlan struct {
 	Provider              string
 	TargetProvider        string
@@ -167,21 +165,13 @@ func validateWorkload(workload Workload) error {
 }
 
 // isNRDOTKubernetesTarget identifies first-party Kubernetes runtimes for
-// which the provider-neutral Helm lifecycle can install the standard NRDOT
-// chart. New Relic documents the chart as a Kubernetes installation and lists
-// managed-cloud examples such as EKS and GKE; Kapsule and MKS use the same
-// Kubernetes/Helm boundary, but their compatibility remains a separate live
-// evidence gate rather than an implicit certification claim.
+// which the Helm adapter can install the NRDOT chart.
 func isNRDOTKubernetesTarget(provider, runtime string) bool {
 	switch provider {
 	case "aws":
 		return runtime == "eks" || strings.HasPrefix(runtime, "eks-")
 	case "gcp":
 		return runtime == "gke" || strings.HasPrefix(runtime, "gke-")
-	case "scaleway":
-		return runtime == "kapsule" || strings.HasPrefix(runtime, "kapsule-")
-	case "ovh":
-		return runtime == "mks" || strings.HasPrefix(runtime, "mks-")
 	default:
 		return false
 	}

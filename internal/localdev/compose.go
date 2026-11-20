@@ -12,6 +12,8 @@ const ComposeFile = ".magelift/compose.local.yml"
 
 var projectNamePattern = regexp.MustCompile(`[^a-z0-9-]+`)
 
+const nginxAppCommand = `    command: ["sh", "-eu", "-c", "php-fpm --daemonize && exec nginx -g 'daemon off;'"]`
+
 const ComposeTemplate = `services:
   database:
     command: ["--log-bin-trust-function-creators=1"]
@@ -131,7 +133,7 @@ __MAGELIFT_MAILPIT_SERVICE__
       MAGENTO_DC_QUEUE__STOMP__SSL: "0"
       MAGENTO_DC_QUEUE__STOMP__USER: magento
       MAGENTO_DC_QUEUE__STOMP__PASSWORD: magento
-    command: ["php-fpm", "--nodaemonize"]
+` + nginxAppCommand + `
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health"]
       interval: 5s

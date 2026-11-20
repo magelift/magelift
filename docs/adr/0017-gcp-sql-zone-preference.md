@@ -1,49 +1,22 @@
-# ADR 0017: Cloud SQL primary-zone preference on creation
+# ADR 0017. Choose the Cloud SQL primary zone at creation
 
-- Status: Accepted
-- Date: 2026-10-18
+Accepted on 2026-10-18.
 
-## Context
+Cloud SQL returned `ERROR_STOCKOUT` when it chose a zone automatically,
+including for tiers listed in the region. The shop can express a zone
+preference with the placement settings it already uses.
 
-Cloud SQL can fail creation with ERROR_STOCKOUT in its automatically selected
-zone, even when the requested tier is listed for the region. Acceptance
-reproduced this on two supported hardware families. The existing GCP zones
-setting reached networking and runtime placement but did not reach Cloud SQL.
+The provider passes the first resolved `target.gcp.zones` entry to Cloud SQL
+when it creates an instance. With no zone preference, Google selects the zone.
+Google also selects the secondary location for regional instances. Pulumi
+ignores changes to `settings.locationPreference.zone` after creation to avoid
+relocating a running database when the list is reordered.
 
-## Decision
+A zone preference cannot guarantee capacity. If creation fails, review the
+failed operation and resources already created. Retry the same image after
+resolving the failed operation and selecting another compatible zone.
+MageLift reports the environment and phase and leaves retry timing to the
+operator.
 
-New Cloud SQL instances use the first resolved target.gcp.zones entry as their
-primary location preference. The provider passes it through the existing
-internal database component. No YAML key, manifest or RPC field is added.
-An empty zone on a direct component call preserves Google default selection.
-
-The zone property is creation-only through Pulumi IgnoreChanges on
-settings.locationPreference.zone. Updating the CLI or reordering configured
-zones must not implicitly relocate an existing database. Region, availability
-type, backup settings, encryption and deletion protection are unchanged.
-Regional instances keep Google-managed secondary placement.
-
-Creation-capacity failures report project, environment, region, phase and a
-next action. They are not automatically retried. Operators inspect the failed
-operation and resource inventory, preserve state, then choose another compatible
-zone before retrying the same artifact. A protected existing database is not
-removed as a capacity workaround.
-
-## Consequences
-
-The selected zone is a request, not a capacity guarantee. Mock tests verify
-inputs, the stack-to-component mapping and the ignore path. Live chosen-zone
-creation and legacy-zone preservation remain acceptance checks. Existing
-instances require a separately planned maintenance procedure for relocation.
-
-## Alternatives
-
-Continuing to leave placement entirely to Google repeats the observed failure.
-Adding a second zone key would duplicate the existing placement setting.
-Automatically changing regions or tiers could change cost and infrastructure
-without a reviewed plan.
-
-## Provenance
-
-Original implementation using the public Cloud SQL locationPreference API and
-Pulumi IgnoreChanges contract. Live ERROR_STOCKOUT evidence is retained privately.
+Pulumi tests check the resolved zone and the ignore path. The original
+capacity failure was observed in a real project. [Cloud SQL setup](../bootstrap.md#cloud-sql-placement-and-capacity)

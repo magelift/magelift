@@ -35,8 +35,8 @@ func (p SpecPlanned) Project() string     { return p.Spec.Identity.Project }
 func (p SpecPlanned) Environment() string { return p.Spec.Identity.Environment }
 func (p SpecPlanned) Region() string      { return p.Spec.Identity.Region }
 
-func (p SpecPlanned) CertificationTier() platform.CertificationTier {
-	return p.Spec.CertificationTier()
+func (p SpecPlanned) RuntimeTier() platform.RuntimeTier {
+	return p.Spec.RuntimeTier()
 }
 
 func (p SpecPlanned) EnvironmentClass() string { return p.Spec.Identity.EnvironmentClass }

@@ -116,7 +116,7 @@ func dispatch[Resp any](s *RPCServer, operation sdk.Operation, version string, r
 
 // setError stores a typed error on a result value. It returns false when
 // resp is nil or its concrete type is not mapped, so dispatch fails closed
-// instead of dropping the failure. The type switch stays reflection-free.
+// when an operation fails.
 func setError(resp any, operr *sdk.OperationError) bool {
 	if resp == nil || operr == nil {
 		return false

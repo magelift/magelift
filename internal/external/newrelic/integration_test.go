@@ -25,18 +25,8 @@ func TestPlanIntegrationKeepsWorkloadBoundariesAndReferencesOpaque(t *testing.T)
 		},
 		{
 			name:    "generic native is typed unsupported",
-			request: IntegrationRequest{TargetProvider: "ovh", TargetRuntime: "mks", Workload: WorkloadGeneric, Mode: IntegrationNative, CredentialRef: "ovh-secret://magelift/newrelic", Endpoint: "https://otlp.nr-data.net", NativeReference: "ref", OwnershipMarker: "magelift/test/generic"},
+			request: IntegrationRequest{TargetProvider: "azure", TargetRuntime: "aks", Workload: WorkloadGeneric, Mode: IntegrationNative, CredentialRef: "azure-key-vault://shop/newrelic", Endpoint: "https://otlp.nr-data.net", NativeReference: "ref", OwnershipMarker: "magelift/test/generic"},
 			status:  IntegrationUnsupported, reasonContains: "OTLP",
-		},
-		{
-			name:    "scaleway kubernetes native helm path",
-			request: IntegrationRequest{TargetProvider: "scaleway", TargetRuntime: "kapsule", Workload: WorkloadKubernetes, Mode: IntegrationNative, CredentialRef: "scaleway-secret://magelift/newrelic", Endpoint: "https://otlp.nr-data.net", NativeReference: "cluster-ref", OwnershipMarker: "magelift/test/kapsule"},
-			status:  IntegrationConfigured, distribution: NRDOTKubernetesDistribution,
-		},
-		{
-			name:    "ovh kubernetes native helm path",
-			request: IntegrationRequest{TargetProvider: "ovh", TargetRuntime: "mks", Workload: WorkloadKubernetes, Mode: IntegrationNative, CredentialRef: "ovh-secret://magelift/newrelic", Endpoint: "https://otlp.nr-data.net", NativeReference: "cluster-ref", OwnershipMarker: "magelift/test/mks"},
-			status:  IntegrationConfigured, distribution: NRDOTKubernetesDistribution,
 		},
 	}
 	for _, test := range tests {
@@ -51,7 +41,7 @@ func TestPlanIntegrationKeepsWorkloadBoundariesAndReferencesOpaque(t *testing.T)
 			if test.reasonContains != "" && !strings.Contains(plan.Reason, test.reasonContains) {
 				t.Fatalf("reason = %q", plan.Reason)
 			}
-			if strings.Contains(plan.Reason, "aws-secrets-manager") || strings.Contains(plan.Reason, "gcp-secret-manager") || strings.Contains(plan.Reason, "ovh-secret") {
+			if strings.Contains(plan.Reason, "aws-secrets-manager") || strings.Contains(plan.Reason, "gcp-secret-manager") || strings.Contains(plan.Reason, "azure-key-vault") {
 				t.Fatalf("credential reference leaked into reason: %#v", plan)
 			}
 		})

@@ -196,11 +196,7 @@ func (o *options) runEdgePurge(ctx context.Context) (map[string]any, error) {
 }
 
 func edgePurgeUnsupportedReason(cfg config.Config) string {
-	provider := strings.TrimSpace(cfg.Target.Provider)
 	native := strings.TrimSpace(cfg.Edge.NativeProvider)
-	if provider == "ovh" || strings.EqualFold(native, "cdn") || strings.EqualFold(native, "ovh-cdn") {
-		return "OVH native edge cannot purge Magento cache; use Fastly or another provider that advertises purge"
-	}
 	if native == "" && strings.TrimSpace(cfg.Edge.ExternalProvider) == "" {
 		return "selected target has no Magento-facing CDN cache to purge; configure Fastly or a native CloudFront/Cloud CDN edge"
 	}

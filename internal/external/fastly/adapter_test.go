@@ -974,7 +974,7 @@ func TestSDKAdapterUsesSharedEdgeLifecycleAndOpaqueResourceReferences(t *testing
 	}}
 	adapter := NewSDKAdapter(NewWithProbes(runner, healthyFastlyProbe(), completeFastlyDeletionProbe()))
 	intent := sdk.EdgeIntent{
-		ExternalProvider: "fastly", Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+		ExternalProvider: "fastly", Lifecycle: sdk.ExternalLifecycleExtension,
 		CredentialRefs: []string{"aws-secrets-manager://magelift/fastly-token"}, Mode: "external", Domains: []string{"preview.example.com"},
 		PurgeOnDeploy: true, OriginHealthRef: "health/magento", OwnershipMarker: "magelift/acceptance/sdk-fastly",
 	}
@@ -1068,7 +1068,7 @@ func TestSDKLifecycleAdapterBridgesProviderLifecycleWithoutCLI(t *testing.T) {
 		TargetProvider: "aws",
 		TargetRuntime:  "ecs-fargate",
 		Intent: sdk.EdgeIntent{
-			ExternalProvider: "fastly", Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+			ExternalProvider: "fastly", Lifecycle: sdk.ExternalLifecycleExtension,
 			CredentialRefs: []string{"aws-secrets-manager://magelift/fastly-token"}, Mode: "external",
 			Domains: []string{"preview.example.com"}, OriginHealthRef: "health/magento",
 			OwnershipMarker: "magelift/acceptance/sdk-fastly-native",
@@ -1120,7 +1120,7 @@ func TestSDKLifecycleAdapterAdvertisesAndExecutesOptionalFailoverLifecycle(t *te
 		t.Fatalf("descriptor = %#v", adapter.EdgeDescriptor())
 	}
 	request := sdk.EdgePlanRequest{TargetProvider: "aws", TargetRuntime: "ecs-fargate", Intent: sdk.EdgeIntent{
-		ExternalProvider: "fastly", Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+		ExternalProvider: "fastly", Lifecycle: sdk.ExternalLifecycleExtension,
 		CredentialRefs: []string{"aws-secrets-manager://magelift/fastly-token"}, Mode: "external", Domains: []string{"preview.example.com"},
 		OriginHealthRef: "health/magento", FailoverPolicyRef: "fastly-policy://magelift/primary-secondary", OwnershipMarker: "magelift/acceptance/sdk-fastly-failover",
 	}}

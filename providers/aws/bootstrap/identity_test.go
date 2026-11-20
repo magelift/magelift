@@ -220,13 +220,13 @@ func (f *fakeMetadataSSM) PutParameter(_ context.Context, input *ssm.PutParamete
 
 func TestIdentityPlanIsRepoScopedAndLeastPrivilege(t *testing.T) {
 	plan := testIdentityPlan(t)
-	if !strings.Contains(plan.TrustPolicy, "repo:magelift/magelift:environment:production") || !strings.Contains(plan.TrustPolicy, "sts.amazonaws.com") {
-		t.Fatalf("trust policy is not repository scoped: %s", plan.TrustPolicy)
+	if !strings.Contains(plan.StateTrustPolicy, "repo:magelift/magelift:environment:production") || !strings.Contains(plan.StateTrustPolicy, "sts.amazonaws.com") {
+		t.Fatalf("trust policy is not repository scoped: %s", plan.StateTrustPolicy)
 	}
-	if strings.Contains(plan.PermissionsPolicy, `"Resource":"*"`) || strings.Contains(plan.PermissionsPolicy, `"Action":"*"`) {
-		t.Fatalf("permissions contain an unrestricted wildcard: %s", plan.PermissionsPolicy)
+	if strings.Contains(plan.StatePermissionsPolicy, `"Resource":"*"`) || strings.Contains(plan.StatePermissionsPolicy, `"Action":"*"`) {
+		t.Fatalf("permissions contain an unrestricted wildcard: %s", plan.StatePermissionsPolicy)
 	}
-	if !strings.Contains(plan.PermissionsPolicy, plan.StateBucket) || !strings.Contains(plan.PermissionsPolicy, plan.KMSKeyARN) {
+	if !strings.Contains(plan.StatePermissionsPolicy, plan.StateBucket) || !strings.Contains(plan.StatePermissionsPolicy, plan.KMSKeyARN) {
 		t.Fatal("state resources are absent from the permissions boundary")
 	}
 	if plan.CIRoleARN == plan.StateRoleARN || plan.BuildRoleARN == plan.CIRoleARN || !strings.Contains(plan.CIPermissionsPolicy, "ecs:RegisterTaskDefinition") || !strings.Contains(plan.CIPermissionsPolicy, "iam:PassRole") || !strings.Contains(plan.CIPermissionsPolicy, "role/magelift-*") || !strings.Contains(plan.BuildPermissionsPolicy, "secretsmanager:GetSecretValue") || strings.Contains(plan.BuildPermissionsPolicy, `"Action":"*"`) || strings.Contains(plan.CIPermissionsPolicy, `"Action":"*"`) {
@@ -372,7 +372,7 @@ func TestIdentityPolicyDocumentsStayUnderIAMQuotas(t *testing.T) {
 		},
 		{
 			name:   "state permissions boundary",
-			doc:    plan.PermissionsPolicy,
+			doc:    plan.StatePermissionsPolicy,
 			quota:  managedPolicyQuota,
 			remedy: "move detail into the state inline role policy (see commit 8c3a4c6)",
 		},
@@ -414,7 +414,7 @@ func TestIdentityPolicyDocumentsStayUnderIAMQuotas(t *testing.T) {
 		},
 		{
 			name:   "state role trust policy",
-			doc:    plan.TrustPolicy,
+			doc:    plan.StateTrustPolicy,
 			quota:  trustPolicyQuota,
 			remedy: "narrow conditions or request an AWS quota raise to 8192 before growing further",
 		},
@@ -511,13 +511,13 @@ func TestBuildIdentityPlanUsesAWSPartitionForGovCloud(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, value := range []string{plan.OIDCProviderARN, plan.RoleARN, plan.BoundaryARN, plan.MetadataParameter} {
+	for _, value := range []string{plan.OIDCProviderARN, plan.StateRoleARN, plan.StateBoundaryARN, plan.MetadataParameter} {
 		if strings.HasPrefix(value, "arn:aws:") {
 			t.Fatalf("partition was not preserved in %q", value)
 		}
 	}
-	if !strings.Contains(plan.PermissionsPolicy, `"Resource":"arn:aws-us-gov:s3:::magelift-state"`) {
-		t.Fatalf("GovCloud S3 policy resource used the wrong partition: %s", plan.PermissionsPolicy)
+	if !strings.Contains(plan.StatePermissionsPolicy, `"Resource":"arn:aws-us-gov:s3:::magelift-state"`) {
+		t.Fatalf("GovCloud S3 policy resource used the wrong partition: %s", plan.StatePermissionsPolicy)
 	}
 }
 
@@ -530,7 +530,7 @@ func TestBuildIdentityPlanUsesAWSChinaPartitionForStatePolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(plan.PermissionsPolicy, `"Resource":"arn:aws-cn:s3:::magelift-state"`) {
-		t.Fatalf("China S3 policy resource used the wrong partition: %s", plan.PermissionsPolicy)
+	if !strings.Contains(plan.StatePermissionsPolicy, `"Resource":"arn:aws-cn:s3:::magelift-state"`) {
+		t.Fatalf("China S3 policy resource used the wrong partition: %s", plan.StatePermissionsPolicy)
 	}
 }

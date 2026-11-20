@@ -1,54 +1,49 @@
 # MageLift
 
-MageLift runs Magento Open Source and licensed Adobe Commerce projects in your cloud account. Define the project in PHP, start a shop locally with `magelift dev`, and deploy a digest from your own registry. Teams can use Magento’s native storefront or connect a separately deployed headless frontend.
+Run Magento 2 on your laptop and deploy it to your AWS, Google Cloud, or Azure
+account. Give a client a preview URL or promote an image you've tested in
+staging. MageLift works with Magento Open Source and licensed Adobe Commerce
+(Magento Enterprise Edition).
 
-From an existing Magento shop with a Composer lock, choose a destination and inspect its environments.
+You set the shop's service versions and environments in `magelift.php`.
+MageLift builds a container image from your checkout. It previews infrastructure
+changes and runs Magento's database upgrades during deployment. Use the CLI to
+check the running shop and read its logs. [What MageLift does](docs/what-magelift-does.md)
+
+## Try it locally
+
+Install the signed CLI release.
 
 ```sh
-magelift init --provider gcp
+curl -fsSL https://magelift.dev/install.sh | sh
+```
+
+In the Magento checkout, choose `aws`, `gcp`, or `azure`. This example picks AWS.
+
+```sh
+magelift init --provider aws
 magelift dev
-magelift env diff staging production
 ```
 
-The same project defines staging, UAT, production and pull-request previews. Cloud adapters cover AWS ECS Fargate, GCP GKE Autopilot and Azure AKS at different levels of implementation. MageLift publishes test results for individual paths. The shop owns its service versions, credentials and production acceptance. [Provider coverage](docs/capability-matrix.md) · [Getting started](docs/getting-started.md) · [Moving from Upsun or Adobe Commerce Cloud](docs/migrating-from-paas.md)
+Open the URL printed by `magelift dev`. You can run the shop locally with PHP
+and Docker before connecting a cloud account. [Other installation methods](docs/install.md) · [Getting started](docs/getting-started.md)
 
-Release builds package a separate provider plugin for AWS, Google Cloud and Azure. A release CLI loads the one your project selects. To prepare it ahead of time, run `magelift providers install` in the shop checkout. [Installing providers](docs/install.md#providers)
+If you are moving a shop from Upsun, Adobe Commerce Cloud, or Docker Compose,
+MageLift can import the service settings. Rehearse the database and media
+transfer in staging before you switch traffic. [Migration guide](docs/migrating-from-paas.md)
 
-For an existing shop, run `magelift init --from-upsun --provider aws`, `--from-acc` for Adobe Commerce Cloud, or `--from-compose` for a Compose checkout. Each importer accepts AWS, GCP or Azure. Review `magelift.unmapped.md` alongside the generated PHP before moving your data. [SQL and media rehearsal](docs/weekend-migrate.md)
+## Choose a cloud
 
-## Install
+The run records cover Magento deployments on AWS ECS Fargate and Google Cloud
+GKE Autopilot. Azure AKS has Pulumi mock and Floci API tests. AKS, AWS EKS and
+GKE Standard are experimental. Your cloud provider bills for the resources you
+deploy. [Provider support](docs/capability-matrix.md)
 
-With the Go toolchain named in [`go.mod`](go.mod), install from a checkout of
-this commit. `go install github.com/magelift/magelift/cmd/magelift@main` links
-the CLI to the last published SDK module, which is an older candidate.
+## Contribute
 
-```sh
-git clone https://github.com/magelift/magelift.git
-cd magelift
-go install ./cmd/magelift
-magelift version
-```
-
-Follow the [getting-started guide](docs/getting-started.md) or try the [sample shop](examples/sample-shop).
-Signed release archives are described in [Install](docs/install.md) for after
-the first release.
-
-## Development
-
-```sh
-make help
-make verify-community
-```
-
-Contributor setup, local Compose, and preview commands are in
-[Contributing](CONTRIBUTING.md) and [getting started](docs/getting-started.md).
-
-## Trademarks
+Run `make verify-community` from the repository root. Contributor runbooks
+live in `.agents/skills`. The provider guide explains how to use the SDK or
+propose a cloud target. [Contributor guide](CONTRIBUTING.md) · [Add a provider](docs/adding-a-provider.md)
 
 MageLift is independent of Adobe Inc. Magento and Adobe Commerce are Adobe
-trademarks, used here only to describe compatibility.
-
-## License
-
-Original work is [Apache License 2.0](LICENSE). Third-party materials keep their
-own licenses and notices.
+trademarks. MageLift is distributed under the [Apache License 2.0](LICENSE).

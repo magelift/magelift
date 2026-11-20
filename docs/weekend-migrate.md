@@ -45,7 +45,7 @@ magelift --config rehearsal.php env import-dump staging --from /secure/rehearsal
 unset MAGELIFT_DUMPIMPORT_PASSWORD
 ```
 
-The TLS setting requires the CA file and a client that identifies itself as MySQL or MariaDB. The connection verifies the server certificate and hostname; use the writer DNS name rather than an IP or a tunnel hostname that cannot match the certificate. Install the [RDS CA bundle](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html) on the import host. The first import into an empty database does not require `--yes`. If the import is interrupted, inspect the target and restore from backup or use a new empty database. `--yes` on a later import drops and recreates a nonempty schema before loading the dump.
+The TLS setting requires the CA file and a client that identifies itself as MySQL or MariaDB. The connection verifies the server certificate and hostname. Use the writer DNS name so the hostname matches the certificate. Install the [RDS CA bundle](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html) on the import host. The first import into an empty database does not require `--yes`. If the import is interrupted, inspect the target and restore from backup or use a new empty database. `--yes` on a later import drops and recreates a nonempty schema before loading the dump.
 
 On ECS Fargate, MageLift configures Magento's native S3 driver with the task role. Media sync reads `mediaBucket` from the stack outputs and writes the contents of the local media directory under `media/` in that bucket. Run the sync with a role in the bucket's AWS account. If you work from another account, assume that role before uploading.
 

@@ -138,7 +138,7 @@ func reconcileLocalGenerated(directory string, desired map[string][]byte) error 
 	if err != nil {
 		return err
 	}
-	if err := writeLocalGeneratedFile(manifestPath, data, 0o600); err != nil {
+	if err := writeGeneratedFile(manifestPath, data, 0o600); err != nil {
 		return err
 	}
 	for name, content := range desired {
@@ -154,7 +154,7 @@ func reconcileLocalGenerated(directory string, desired map[string][]byte) error 
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		if err := writeLocalGeneratedFile(path, content, 0o644); err != nil {
+		if err := writeGeneratedFile(path, content, 0o644); err != nil {
 			return err
 		}
 	}
@@ -165,7 +165,7 @@ func reconcileLocalGenerated(directory string, desired map[string][]byte) error 
 	if err != nil {
 		return err
 	}
-	return writeLocalGeneratedFile(manifestPath, data, 0o600)
+	return writeGeneratedFile(manifestPath, data, 0o600)
 }
 
 func localContentHash(data []byte) string {
@@ -173,8 +173,8 @@ func localContentHash(data []byte) string {
 	return hex.EncodeToString(digest[:])
 }
 
-func writeLocalGeneratedFile(path string, data []byte, mode os.FileMode) error {
-	f, err := os.CreateTemp(filepath.Dir(path), ".local-generated-*")
+func writeGeneratedFile(path string, data []byte, mode os.FileMode) error {
+	f, err := os.CreateTemp(filepath.Dir(path), ".magelift-generated-*")
 	if err != nil {
 		return err
 	}

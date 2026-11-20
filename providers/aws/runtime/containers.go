@@ -3,7 +3,6 @@ package runtime
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -60,24 +59,10 @@ func FrontendPort(applicationMode string) int {
 }
 
 func containerDefinitions(args Args, secrets []SecretReference, environment []containerEnvironment, databaseARN, searchEndpoint string) (string, error) {
-	var containers []containerDefinition
-	switch args.WebRuntime {
-	case "nginx-fpm":
-		php := baseContainer(args, appendDatabaseSecret(secrets, databaseARN), environment, "php-fpm", nil, false)
-		web := baseContainer(args, nil, nil, "web", []string{"nginx", "-g", "daemon off;"}, args.ApplicationMode != "integrated")
-		web.HealthCheck = webHealthCheck()
-		containers = []containerDefinition{php, web}
-	case "frankenphp-classic":
-		web := baseContainer(args, appendDatabaseSecret(secrets, databaseARN), environment, "web", []string{"frankenphp", "run"}, args.ApplicationMode != "integrated")
-		web.HealthCheck = webHealthCheck()
-		containers = []containerDefinition{web}
-	case "php-apache":
-		web := baseContainer(args, appendDatabaseSecret(secrets, databaseARN), environment, "web", []string{"sh", "-eu", "-c", "php-fpm --daemonize && exec apache2ctl -D FOREGROUND"}, args.ApplicationMode != "integrated")
-		web.HealthCheck = webHealthCheck()
-		containers = []containerDefinition{web}
-	default:
-		return "", fmt.Errorf("runtime web runtime plugin %q is not registered", args.WebRuntime)
-	}
+	php := baseContainer(args, appendDatabaseSecret(secrets, databaseARN), environment, "php-fpm", nil, false)
+	web := baseContainer(args, nil, nil, "web", []string{"nginx", "-g", "daemon off;"}, args.ApplicationMode != "integrated")
+	web.HealthCheck = webHealthCheck()
+	containers := []containerDefinition{php, web}
 	containers, err := appendSearchProxy(args, containers, searchEndpoint)
 	if err != nil {
 		return "", err

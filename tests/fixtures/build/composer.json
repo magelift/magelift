@@ -1,0 +1,9 @@
+{
+    "name": "magelift/build-fixture",
+    "description": "Shop fixture for the MageLift build test.",
+    "type": "project",
+    "license": "Apache-2.0",
+    "require": {
+        "php": "~8.5.0"
+    }
+}

@@ -1,6 +1,6 @@
 // Package pricing adapts the AWS Price List API to the small set of capacity
 // estimates MageLift exposes. It deliberately returns a missing-price error
-// instead of inventing a fallback when AWS has no matching product.
+// when AWS has no matching product.
 package pricing
 
 import (

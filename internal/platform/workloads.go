@@ -59,7 +59,7 @@ func MagentoMigrationShell() []string {
 	return []string{"/bin/sh", "-ec", strings.Join(parts, " && ")}
 }
 
-// MagentoCronShell is the long-running cron loop used by certified runtimes.
+// MagentoCronShell is the long-running cron loop used by provider workloads.
 func MagentoCronShell() []string {
 	return []string{"/bin/sh", "-ec", "while true; do bin/magento cron:run; sleep 60; done"}
 }

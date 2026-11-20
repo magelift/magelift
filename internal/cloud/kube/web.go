@@ -32,46 +32,12 @@ func NginxFPMContainers(image string, env corev1.EnvVarArrayInput, cpuRequest, m
 	}
 }
 
-// FrankenPHPClassicContainers runs FrankenPHP in its classic PHP-server mode.
-// Worker mode is deliberately not a supported MageLift web runtime.
-func FrankenPHPClassicContainers(image string, env corev1.EnvVarArrayInput, cpuRequest, memoryRequest string) corev1.ContainerArray {
-	return processWebContainers(image, env, []string{"frankenphp", "run"}, cpuRequest, memoryRequest)
-}
-
-// PHPApacheContainers runs the Apache HTTPD and PHP-FPM runtime image as one
-// container. Apache owns the Service port and proxies PHP requests to FPM.
-func PHPApacheContainers(image string, env corev1.EnvVarArrayInput, cpuRequest, memoryRequest string) corev1.ContainerArray {
-	return processWebContainers(image, env, []string{"sh", "-eu", "-c", "php-fpm --daemonize && exec apache2ctl -D FOREGROUND"}, cpuRequest, memoryRequest)
-}
-
-// WebRuntimeContainers maps registered runtime IDs to Kubernetes pod shapes.
-// Admission is performed in config; this layer still rejects an unknown ID so
-// direct runtime construction cannot silently deploy an unsupported frontend.
+// WebRuntimeContainers checks the runtime before creating the application pod.
 func WebRuntimeContainers(webRuntime, image string, env corev1.EnvVarArrayInput, cpuRequest, memoryRequest string) (corev1.ContainerArray, error) {
-	switch webRuntime {
-	case "nginx-fpm":
-		return NginxFPMContainers(image, env, cpuRequest, memoryRequest), nil
-	case "frankenphp-classic":
-		return FrankenPHPClassicContainers(image, env, cpuRequest, memoryRequest), nil
-	case "php-apache":
-		return PHPApacheContainers(image, env, cpuRequest, memoryRequest), nil
-	default:
-		return nil, fmt.Errorf("web runtime plugin %q is not registered", webRuntime)
+	if webRuntime != "nginx-fpm" {
+		return nil, fmt.Errorf("web runtime must be nginx-fpm, got %q", webRuntime)
 	}
-}
-
-func processWebContainers(image string, env corev1.EnvVarArrayInput, command []string, cpuRequest, memoryRequest string) corev1.ContainerArray {
-	return corev1.ContainerArray{
-		&corev1.ContainerArgs{
-			Name:           pulumi.String("web"),
-			Image:          pulumi.String(image),
-			Command:        ToStringArray(command),
-			Env:            env,
-			Ports:          corev1.ContainerPortArray{&corev1.ContainerPortArgs{ContainerPort: pulumi.Int(applicationPort)}},
-			ReadinessProbe: readinessProbe(),
-			Resources:      applicationResources(cpuRequest, memoryRequest),
-		},
-	}
+	return NginxFPMContainers(image, env, cpuRequest, memoryRequest), nil
 }
 
 func applicationResources(cpuRequest, memoryRequest string) *corev1.ResourceRequirementsArgs {

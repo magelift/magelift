@@ -1,198 +1,53 @@
-# ADR 0013: Provider plugin contract (core versus provider)
+# ADR 0013. Provider plugin contract
 
-- Status: Accepted
-- Date: 2026-09-16
+Accepted on 2026-09-16. The first-party module layout below reflects the
+2026-11-19 AWS, Google Cloud, and Azure split.
 
-## Context
+## Ownership
 
-The shipped CLI compiles provider implementations into its registration path
-(`internal/registry/registry.go` registers all six first-party modules), core
-configuration owns provider enums and per-provider target types
-(`internal/config`), the public SDK leaves the program contract outside the
-type system (`Program(ModulePlan) (any, error)` with a `pulumi.RunFunc`
-assertion in `internal/platform/public_module.go`), and the wire protocol is a
-narrow JSON proof (`request_json` / `plan_json` / `result_json` /
-`execute_json` in `internal/providerhost/hostproto/ping.proto`). ADRs 0008 and
-0011 scoped that shape deliberately as a single-version proof: exact-version
-equality between CLI and provider artifact, silent fallback to embedded
-execution on plugin failure, and day-2 ports staying in-process.
+The CLI evaluates the shop's PHP configuration, resolves its environment,
+verifies the provider executable, and coordinates deployment. The provider
+owns its cloud API calls, resource graphs, and Pulumi stack operations.
+AWS, Google Cloud, and Azure each build an executable from a module under
+`providers/<name>/`. Each ships with provider-local tests and a verified
+release artifact. [Architecture](../architecture.md)
 
-The pre-publication audit (F01-F03, F15) found that boundary unfinished. Those
-notes were not kept in the public tree. Calling the boundary done would
-mislead every consumer and contributor. This ADR promotes the proof
-into the versioned contract that followers implement. It changes the target
-rules; it does not rewrite the history that 0008/0011 record.
+The core sends provider-specific settings in the target block and shared
+settings through typed SDK messages. Providers check region and account
+prerequisites during admission. Ordinary planning resolves the intended
+target without creating cloud resources.
 
-## Decision
+First-party providers share workload and state helpers from the root Go
+module. They pin the root and SDK versions alongside the release. An
+explicitly linked community extension can use the public Go SDK.
+[Add a provider](../adding-a-provider.md)
 
-### Ownership split
+## Protocol
 
-The shipped core owns configuration envelopes, command UX, plugin discovery,
-trust (identity, integrity, compatibility), locking, and orchestration policy.
-The provider owns its cloud implementation, its Pulumi program and stack
-execution, and its operating capabilities. Each responsibility sits on exactly
-one side; there are no jointly owned rows.
+HashiCorp go-plugin runs the verified executable as a subprocess. The CLI
+checks its digest and Cosign signature before starting it. The handshake and
+`Describe` report the provider identity, supported runtimes, protocol version,
+and operations. The process runs with the operator's permissions.
+[Distribution trust](0014-distribution-trust.md)
 
-### Autonomous provider operations
+Operations cross the boundary as data. A stored plan includes the provider,
+runtime, stack name, state backend, image digest, and provider-owned payload.
+The core preserves that payload and the provider verifies the identity when
+it reads it. The provider runs Pulumi and handles Magento rollout phases.
 
-A provider is autonomous when it provisions and independently operates the
-seven day-2 operations over the versioned protocol: status, logs, execution,
-backup, restore, teardown, and credential refresh. Cost-estimate inputs are
-required; full cost adapters are out of scope for alpha. A plugin that
-provisions but cannot operate is not the product vision.
+Required deployment operations are `describe`, `validate-config`, `plan`,
+`preview`, `apply`, `outputs`, `destroy`, `state-lock`, `state-unlock`, and
+`deploy-app-phase`. Optional operations advertise support through
+`Describe`. The CLI reports when the selected target cannot perform an
+operation. Secret outputs keep their secret markings.
 
-### Versioned typed operations protocol
+Put new operation types in `sdk/protocol.go` and related SDK files. Keep cloud
+SDK models inside the provider. Add runtime registration and advertised
+output keys in `internal/providerhost/standalone.go`.
 
-The protocol is versioned typed operations, not a hardened envelope over the
-JSON host protocol: `ping.proto` stays frozen as the single-version proof and
-is not extended. The operations set is stack lifecycle (plan, preview, apply,
-destroy, refresh, outputs with a redacted variant) plus Describe
-(negotiation) plus ValidateConfig plus the seven day-2 operations. Requests
-and responses are typed; no operation carries an untyped JSON string or a Go
-`any` holding a Pulumi program. Errors are typed codes with human-readable
-detail and a retryability flag. Cancellation is per-operation context
-cancellation across the transport; progress is a typed event stream
-(started/progress/log/done). Provider state is opaque bytes to the core: the
-core stores and returns it without inspection, and secret values never appear
-in logs or evidence.
+## Verification
 
-### Execution boundary
-
-The provider executes its own Pulumi Automation API stacks inside the provider
-process. A `RunFunc` closure cannot cross gRPC (established by ADR 0011), so
-the `any`-carrying `Program` shape is retired: stack work runs provider-side
-and only typed results cross. The core never imports provider SDKs or Pulumi
-provider packages.
-
-### Configuration split
-
-The core owns a stable common YAML envelope (project, environments, target
-selectors, application, presets) and validates it. Each provider owns its
-`target.<provider>` block: it publishes the schema and validates the raw
-block bytes passed to ValidateConfig and Plan. The cloud resource model is
-not forced to a lowest common denominator. The core accepts any well-formed
-provider ID at parse; unknown providers fail at resolution, not at parse:
-no installed compatible plugin is a fail-closed error naming the provider ID,
-the required protocol version, and the install action: never a silent
-substitution.
-
-### Negotiation and fail-closed compatibility
-
-The provider Describe call reports protocol version, provider ID and version,
-supported operations with versions, and target runtimes. The core requires a
-protocol-major match plus the operations each command needs. Checksum
-rejection, incompatibility, and plugin load/dial errors each fail closed. The
-only sanctioned fallback is an explicit `--migration-mode` flag for moving
-between embedded and plugin execution; migration runs log the selected
-implementation at startup, and every run logs the selected plugin ID plus
-version. Silent conversion of plugin errors into embedded execution is
-forbidden.
-
-### Independent releases
-
-Provider implementations live in nested modules under `providers/<name>/`
-(one `go.mod` each); the core never imports provider packages. Tags are
-`vX.Y.Z` for the core, `sdk/vX.Y.Z` for the SDK, `providers/<name>/vX.Y.Z`
-for providers. Alpha ships all three lockstep; the independent-cadence rules
-(additive changes minor, removals major, protocol major enforced at
-negotiation via the core-held compatibility matrix) are specified here and
-activate post-alpha. Independent releases are a build and dependency
-contract; separate Git repositories are explicitly not required and not
-created.
-
-### Proof gates for followers
-
-`gcp-autonomous-provider` proves the contract with two MUST-pass gates: a
-provider built outside the root module using only the public SDK (clean
-module, `GOWORK=off`), and a core built without provider SDK dependencies
-(`go list` over the shipped CLI closure rejecting provider SDK packages).
-
-### Process boundary honesty
-
-The provider subprocess runs with the user's cloud privileges. The process
-boundary is a deployment and compatibility boundary, not a security sandbox.
-No section of this contract calls it a sandbox or implies privilege
-separation.
-
-### Documentation updates
-
-The boundary sections of `docs/adding-a-provider.md` and
-`docs/architecture.md` describe this contract as specified, and ADRs 0008 and
-0011 carry reciprocal scope notes. Human docs and decision record ship
-together; neither lands without the other.
-
-### Supersession of 0008 and 0011
-
-This ADR supersedes as target rules: 0008's "Magento deploy still needs the
-AWS and GCP adapters in the same process as the CLI for RC1" and "adapters
-may stay in-process for one RC1 release if extract lags"; 0011's
-"Single-version v1: the provider artifact version equals the CLI version",
-"A failed subprocess attempt falls back to the in-process backend with a
-stderr notice. It never fails the command.", and "Day-2 ports stay
-in-process for every adapter". What stands: no unsigned downloads, HashiCorp
-go-plugin transport with `plugin.Open` forbidden, lockfile digest plus Cosign
-identity verification before spawn, in-process loading for tests and Floci,
-compile-time community binaries, provider-side Pulumi execution, and
-operations crossing as data. The current code still behaves the old way where
-noted; Order 5 implements this contract, and behavior changes land there.
-
-## Consequences
-
-- Follower intents implement against this contract instead of freelancing the
-  protocol; `gcp-autonomous-provider` is unblocked on a specified boundary.
-- `internal/cloud/<provider>/` keeps topology until Order 5 performs the
-  specified move; no directory-only reorganization happens here.
-- The SDK gains protocol types under the compatibility rules above; nothing
-  is exported merely to make the current package graph compile.
-- Distribution trust mechanics (download, install, lockfile) are specified
-  at policy level here and implemented in
-  `verified-provider-distribution`.
-
-## Alternatives considered
-
-- Hardened envelope over the JSON host protocol: rejected (the JSON proof
-  does not grow into the product; typed operations from the start).
-- Provider returns a Pulumi program handle: impossible across gRPC (same as
-  ADR 0011); execution stays provider-side.
-- Lowest-common-denominator cloud resource model: rejected (destroys
-  provider expressiveness; the envelope stays stable instead).
-- Separate Git repositories per provider: rejected (multiplies
-  cross-repository changes before boundaries settle; the monorepo stays).
-- Silent migration mode: rejected (a rejected checksum must never change the
-  selected implementation quietly).
-
-## Alpha reconciliation (2026-09-17)
-
-The 0.1.0 alpha review (R05) found the as-built boundary narrower than
-this ADR's letter. Reconciled position for the alpha:
-
-- HELD: deploy-step execution lives in the plugin behind the typed
-  `deploy-app-phase` operation; deploy inputs are an SDK-governed
-  contract the core passes through without decoding; the GCP provider
-  ships as a separate module and process with no core fallback.
-- HELD: the alpha core registers GCP plus AWS ECS Fargate only. EKS,
-  OVH, and Scaleway register behind `MAGELIFT_EXPERIMENTAL_PROVIDERS`.
-  Cleanup/recovery providers stay available regardless (recovery must
-  read old ledgers).
-- DEFERRED with trigger: the provider still imports root-internal
-  implementation helpers (kube execution primitives, automation,
-  platform types). Full SDK-plus-support-module independence lands
-  with `aws-provider-parity` at the latest: the second provider must
-  not clone the coupling. The leanness gate pins the GCP boundary
-  today, not full SDK independence.
-- DROPPED: nothing. The autonomous-provider goal stands; this section
-  records what alpha proves versus what parity completes.
-
-## First-party provider layout (2026-11-19)
-
-AWS, GCP and Azure build separate executables from `providers/<name>/cmd/magelift-provider-<name>/`. Their runtime registrations use the same verified plugin resolver. AWS serves ECS Fargate and EKS through one process. The core checks the advertised provider identity before accepting operations. Each provider has a nested Go module, a matching release artifact and provider-local Floci tests.
-
-The first-party plugins currently pin the root module alongside the SDK to share Magento rollout, state and Automation API helpers. Community extensions can use the public SDK. Existing OVH and Scaleway adapters still run in process. The module dependency check covers all three standalone plugins. [Contributor guide](../adding-a-provider.md)
-
-## Provenance
-
-Pre-publication audit F01-F03/F15 and review R05. The intent notes were not
-published. Code:
-`sdk/modules.go`, `internal/platform/public_module.go`,
-`internal/providerhost/hostproto/ping.proto`, `internal/config`,
-`internal/registry/registry.go`, ADRs 0003/0004/0008/0011.
+Test the typed exchange using the provider executable and a synthetic shop.
+Use Pulumi mocks to check resources and Floci for the APIs it implements.
+Run the module checks and `make core-leanness` to confirm the CLI builds
+without linking provider implementations. [Test coverage](../capability-matrix.md)

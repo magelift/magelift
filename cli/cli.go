@@ -14,8 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ExperimentalProvidersEnv opts the CLI into the deferred providers
-// (EKS, OVH, Scaleway). Empty is the alpha set: GCP plus AWS ECS.
+// ExperimentalProvidersEnv enables cloud runtimes that require opt-in, including EKS.
 const ExperimentalProvidersEnv = "MAGELIFT_EXPERIMENTAL_PROVIDERS"
 
 // New returns a command with the first-party MageLift modules registered.

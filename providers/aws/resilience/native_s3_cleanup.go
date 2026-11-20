@@ -15,9 +15,7 @@ import (
 )
 
 // cleanupObjectClass removes only marker-owned archive and restore objects.
-// Source objects remain outside this provider operation; the certification
-// cell owns their exact fixture keys. This is deliberately provider-local
-// because S3-compatible APIs differ in retention and deletion semantics.
+// The caller owns source object cleanup. Retention and deletion follow S3 rules.
 func (api *NativeAPI) cleanupObjectClass(ctx context.Context, state operationState, operationID string) (provider.NativeOperationObservation, error) {
 	if strings.TrimSpace(state.OwnershipMarker) == "" || strings.ContainsAny(state.OwnershipMarker, "\r\n\x00") {
 		return provider.NativeOperationObservation{}, errors.New("AWS S3 cleanup ownership marker is required and must be single-line")

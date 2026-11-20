@@ -6,7 +6,7 @@ set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALL="$ROOT/website/public/install.sh"
-TAG="v9.9.9-harness"
+TAG="v9.9.9"
 VERSION="${TAG#v}"
 
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -96,12 +96,12 @@ build_fixture() {
 }
 
 run_installer() {
-  local root="$1" pin="$2" dest="$3" cosign_exit="$4"
+  local root="$1" pin="$2" dest="$3" cosign_exit="$4" version="${5-$TAG}"
   stop_server
   start_server "$root"
   COSIGN_FIXTURE_MARKER="$WORK/marker.txt" \
     COSIGN_FIXTURE_EXIT="$cosign_exit" \
-    MAGELIFT_VERSION="$TAG" \
+    MAGELIFT_VERSION="$version" \
     MAGELIFT_INSTALL_DIR="$dest" \
     MAGELIFT_RELEASE_BASE="http://127.0.0.1:$PORT/release" \
     MAGELIFT_COSIGN_BASE="http://127.0.0.1:$PORT/cosign" \
@@ -130,6 +130,27 @@ check "installed binary runs" sh -c "$WORK/dest-success/magelift | grep -q magel
 check "identity pinned to release workflow" grep -q "identity=https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/$TAG" "$WORK/marker.txt"
 check "issuer pinned to github oidc" grep -q "issuer=https://token.actions.githubusercontent.com" "$WORK/marker.txt"
 check "success announces verification" sh -c "printf '%s' '$output' | grep -q 'Sigstore bundle verified'"
+
+# The default channel reads GitHub's latest stable release endpoint.
+REAL_CURL="$(command -v curl)"
+mkdir -p "$WORK/latest-bin"
+cat >"$WORK/latest-bin/curl" <<'CURL'
+#!/bin/sh
+case "$*" in
+  *api.github.com/repos/magelift/magelift/releases/latest*)
+    printf '{"tag_name":"v9.9.9"}\n'
+    exit 0
+    ;;
+esac
+exec "$MAGELIFT_HARNESS_REAL_CURL" "$@"
+CURL
+chmod +x "$WORK/latest-bin/curl"
+rm -rf "$WORK/dest-latest"
+output="$(PATH="$WORK/latest-bin:$PATH" MAGELIFT_HARNESS_REAL_CURL="$REAL_CURL" \
+  run_installer "$WORK/success" "$pin" "$WORK/dest-latest" 0 "" 2>&1)"
+check "latest release installs" test -x "$WORK/dest-latest/magelift"
+check "latest release identity is pinned" grep -q "identity=https://github.com/magelift/magelift/.github/workflows/release.yml@refs/tags/$TAG" "$WORK/marker.txt"
+check "latest install announces verification" sh -c "printf '%s' '$output' | grep -q 'Sigstore bundle verified'"
 
 # 2. Tampered archive: checksum failure, nothing installed.
 rm -rf "$WORK/tampered" "$WORK/dest-tampered"

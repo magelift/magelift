@@ -199,7 +199,7 @@ func wipeProjectionOutput(outputs ...[]byte) {
 }
 
 // ProjectionLifecycle centralizes validation shared by every provider. This
-// prevents AWS, GCP, Scaleway, OVHcloud, and community implementations from
+// keeps cloud and community adapters from
 // gradually inventing different meanings for cache loss or search integrity.
 type ProjectionLifecycle struct {
 	backend ProjectionBackend

@@ -1,31 +1,18 @@
-# MageLift site (Astro + MkDocs)
+# MageLift website
 
-Public surface for https://magelift.dev/
+The Astro landing page lives in `src/pages/index.astro`. MkDocs builds the
+guides from `../docs` and the site serves them under `/docs/`.
 
-- Landing page: Astro (`src/pages/index.astro`)
-- Docs: MkDocs Material, built into `public/docs/` then shipped in the same
-  GitHub Pages deploy
-
-## Develop the landing page only
+To preview changes to the landing page, run these commands from `website/`.
 
 ```sh
-cd website
 npm ci
 npm run dev
 ```
 
-Docs locally: from repo root, `make docs-serve` (pinned MkDocs Material in the
-repo venv: a system/Homebrew mkdocs does not bundle the theme).
+For the guides, run `make docs-serve` from the repository root. The Makefile
+uses the pinned MkDocs Material environment.
 
-## Production build (landing + docs)
-
-```sh
-cd website
-npm run build:site
-# → dist/  (docs at dist/docs/)
-```
-
-The Public site workflow deploys `dist/` to GitHub Pages on pushes to `main`.
-
-For claims about a provider, check the operation and date in
-[provider coverage](../docs/capability-matrix.md).
+Run `npm run build:site` from `website/` to build both into `dist/`. The public
+site workflow deploys that directory on pushes to `main`. Check the date and
+method before making claims about a cloud target. [Provider support](../docs/capability-matrix.md)

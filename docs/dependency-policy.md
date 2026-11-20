@@ -13,4 +13,4 @@ Use the newest stable release that works on the oldest runtime MageLift supports
 
 Dependabot checks the Go, Composer, npm, Python, Docker and Actions dependencies weekly. Review major upgrades for API changes and new runtime requirements. For PHP branch lifetimes and Magento service recommendations, consult the upstream tables. [PHP support dates](https://www.php.net/supported-versions.php) · [Adobe Commerce system requirements](https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements)
 
-CI runs Go vulnerability and license checks, CodeQL, ShellCheck, actionlint and zizmor. Trivy scans the locally built PHP images. The root licenses for the OVH Pulumi and OKMS Go packages are listed in `NOTICE` because the license scanner cannot classify their nested packages. Changes to CLI help belong in the Cobra command. Run `make generate cli-docs` to update generated files and the CLI reference.
+CI runs Go vulnerability and license checks, CodeQL, ShellCheck, actionlint and zizmor. Trivy scans the locally built PHP images.

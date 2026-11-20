@@ -1,27 +1,30 @@
-# Architecture decision records
+# Architecture decisions
 
-ADRs record decisions that constrain public contracts, infrastructure, security, or maintenance. Until the first public release tag, this set is the **current** decision list: edit or replace a file when the product changes. After that tag, freeze the body and supersede with a new number.
+These records describe the design. When a release decision changes, write
+a new record and link it to the decision it replaces. Record what changed,
+why, and how you checked it. The evidence archive holds dated run reports.
+[Architecture](../architecture.md) · [Run records](../evidence/README.md)
 
-When a public contract, runtime tier or topology rule changes, update its ADR and the guide that explains it.
-
-Each ADR states context, decision, consequences, alternatives, and provenance.
-
-## Current decisions
-
-- [ADR 0001](0001-yaml-only-cli.md): PHP project configuration in the shop’s cloud account.
-- [ADR 0002](0002-certified-vs-experimental.md): Test evidence for each deployment path.
-- [ADR 0003](0003-portable-contracts-vs-topology.md): Portable Magento contracts vs per-cloud topology.
-- [ADR 0004](0004-ports-and-adapters.md): Ports and adapters, including day-2 `Has*` ports.
-- [ADR 0005](0005-external-artifact-manifest.md): Artifact manifest lives outside the image. Cosign is Sigstore OIDC.
-- [ADR 0006](0006-generated-local-compose.md): Local development is generated Compose.
-- [ADR 0007](0007-github-oidc-roles.md): Separate GitHub OIDC roles for CI and state recovery.
-- [ADR 0008](0008-provider-load-path.md): In-process Magento; signed go-plugin lock for published adapters.
-- [ADR 0009](0009-dump-seed-and-attach.md): Explicit database seed and existing infrastructure attachments.
-- [ADR 0010](0010-live-certification.md): Local cloud checks and the scope of historical acceptance runs.
-- [ADR 0011](0011-subprocess-dial-proof.md): Subprocess Dial proof for one adapter (GCP Autopilot); rest stay in-process.
-- [ADR 0012](0012-search-proof-shapes.md): Search proof shapes and AWS spend cap; live runs in Phase 2.
-- [ADR 0013](0013-provider-plugin-contract.md): Versioned typed operations protocol; nested provider modules; lockstep alpha.
-- [ADR 0014](0014-distribution-trust.md): One fail-closed trust policy for installer, updater, core load, and provider download.
-- [ADR 0015](0015-gcp-bootstrap-state-key.md): GCP bootstrap prerequisites and an immutable remote Pulumi state passphrase.
-- [ADR 0016](0016-gcp-owned-node-identity.md): Owned GKE node identity and creation-only cluster identity selection.
-- [ADR 0017](0017-gcp-sql-zone-preference.md): Cloud SQL primary-zone preference for new instances and safe capacity recovery.
+| Decision | Subject |
+| --- | --- |
+| [0001](0001-php-project-configuration.md) | PHP shop configuration |
+| [0002](0002-provider-test-evidence.md) | Report evidence for each tested path |
+| [0003](0003-portable-contracts-vs-topology.md) | Shared Magento contracts and provider-owned infrastructure |
+| [0004](0004-ports-and-adapters.md) | Ports and adapters |
+| [0005](0005-external-artifact-manifest.md) | External artifact manifest and shop-owned images |
+| [0006](0006-generated-local-compose.md) | Generate Compose for local development |
+| [0007](0007-github-oidc-roles.md) | Separate identities for CI and state recovery |
+| [0008](0008-provider-load-path.md) | Verify provider executables before loading |
+| [0009](0009-dump-seed-and-attach.md) | Explicit dump import and existing service references |
+| [0010](0010-local-cloud-checks.md) | Run cloud API checks locally |
+| [0011](0011-subprocess-dial-proof.md) | Run provider plans in a subprocess |
+| [0012](0012-search-proof-shapes.md) | Magento search and readiness |
+| [0013](0013-provider-plugin-contract.md) | Versioned provider plugin contract |
+| [0014](0014-distribution-trust.md) | Verify releases before execution |
+| [0015](0015-gcp-bootstrap-state-key.md) | GCP bootstrap and the remote state passphrase |
+| [0016](0016-gcp-owned-node-identity.md) | Give GKE nodes a dedicated identity |
+| [0017](0017-gcp-sql-zone-preference.md) | Choose the Cloud SQL primary zone at creation |
+| [0018](0018-gcp-explicit-sql-edition.md) | Choose the Cloud SQL edition from the requested tier |
+| [0019](0019-gcp-runtime-operation-plans.md) | Operate an existing GCP environment without a build |
+| [0020](0020-gcp-native-edge-address.md) | Report the shop URL and ingress address separately |
+| [0021](0021-empty-magento-database-bootstrap.md) | Bootstrap an empty Magento database |

@@ -306,7 +306,6 @@ func childPlanRequest(request sdk.EdgePlanRequest, destination string) (sdk.Edge
 	case destination == strings.TrimSpace(intent.NativeProvider) && (intent.Mode == "native" || intent.Mode == "both"):
 		intent.ExternalProvider = ""
 		intent.Lifecycle = ""
-		intent.Certification = ""
 		intent.CredentialRefs = nil
 		intent.Mode = "native"
 		return sdk.EdgePlanRequest{TargetProvider: request.TargetProvider, TargetRuntime: request.TargetRuntime, Intent: intent, Configuration: cloneConfiguration(request.Configuration)}, true

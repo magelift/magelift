@@ -72,7 +72,7 @@ type EKSVersion struct {
 
 // SDKCapabilityClient adapts official AWS SDK read-only APIs. It is safe to
 // use concurrently for one plan; admission fans out independent catalog
-// requests to keep certification runs short.
+// requests during regional availability checks.
 type SDKCapabilityClient struct {
 	sts         *sts.Client
 	ec2         *ec2.Client

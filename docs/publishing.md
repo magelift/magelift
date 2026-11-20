@@ -1,58 +1,28 @@
-# Publishing
+# Publish a release
 
-The current milestone is the GCP community alpha. Its gates are in
-[Release readiness](release-readiness.md).
-MageLift releases the CLI, provider and bundled build recipes. Application images
-are built in the user's CI and published to the user's chosen registry.
-MageLift does not publish central builder/runtime images.
+MageLift releases include the CLI and separate plugins for AWS, Google Cloud,
+and Azure. GoReleaser builds the platform archives. The release workflow signs
+checksums and provider locks, generates software bills of materials, and
+tests the signed CLI installer and all three signed provider plugins against
+draft release assets before the CI gate publishes the release.
 
-## Historical v1.0.0 publishing notes
+Run the [contributor checks](https://github.com/magelift/magelift/blob/main/CONTRIBUTING.md)
+and `make release-smoke` before requesting approval for a tag. The smoke check
+builds the CLI and all three provider binaries for the local platform and
+checks the archive and checksum files. Verify the selected commit's full CI
+run before publishing. [How to report provider results](capability-matrix.md)
 
-Notes for the public `v1.0.0` surface. Earlier release planning recorded live
-results for AWS ECS Fargate and GCP GKE Autopilot. This milestone covers
-packaging, documentation, and repository trust without new paid cloud runs.
+After approval, tag the root module, SDK, and all provider modules at the same
+commit. The root tag starts `release.yml`. The workflow waits for those
+versions to reach the Go proxy before building. Release Please manages the
+root changelog and version. Module tags use the corresponding prefix.
 
-## What waits until later
+- `vX.Y.Z`
+- `sdk/vX.Y.Z`
+- `providers/aws/vX.Y.Z`
+- `providers/gcp/vX.Y.Z`
+- `providers/azure/vX.Y.Z`
 
-Keep these on [post-beta / v1.1+](post-beta-roadmap.md):
-
-- ECS Managed Instances
-- Live OpenSearch SigV4 data-plane
-- Cloud SQL attach
-- FinOps SaaS, fifth provider, signed plugins
-
-OpenSearch for the public tag still uses the offline SigV4 + free-tier path in
-[release-readiness](release-readiness.md). AWS brownfield attach ships; Cloud SQL
-attach does not block `v1.0.0`.
-
-## Site and repo
-
-| Surface | Where |
-| --- | --- |
-| Marketing + docs | [magelift.dev](https://magelift.dev/) (docs under `/docs/`) |
-| Build | `cd website && npm run build:site` → GitHub Pages via the Public site workflow |
-| Source | [github.com/magelift/magelift](https://github.com/magelift/magelift) |
-
-Canonical docs URL is the `/docs/` path.
-
-## Evidence and secrets
-
-Acceptance samples: [evidence/](evidence/README.md). Never commit real AWS account
-IDs, GCP project IDs, or personal domains. Use env vars locally
-(`MAGELIFT_GCP_PROJECT`, `MAGELIFT_CUTOVER_HOST`).
-
-## History
-
-Public `main` is a clean import. Closed PR tip refs on GitHub may still hold older
-blobs until Support clears them; a normal `git clone` does not fetch `refs/pull/*`.
-
-## Launch checklist
-
-| Item | Status |
-| --- | --- |
-| Site on GitHub Pages (`magelift.dev`) | Done |
-| Private vulnerability reporting | Done |
-| `good first issue` label | The label exists. The August onboarding issues (#38, #42, #44) are closed; the docs they named already cover those links. |
-| Hosted CI on this `main` | Green on [39172860659](https://github.com/magelift/magelift/actions/runs/39172860659). The August force-all run is from before the public history and is not this tree. |
-| Release Please | Manual (`workflow_dispatch`) until the first public tag. Actions on this repo cannot open pull requests, and the manifest is still `0.0.0`. |
-| Cut `v1.0.0-rc.1` | After readiness gates stay Closed and CI is green |
+Use the [release runbook](https://github.com/magelift/magelift/blob/main/.agents/skills/magelift-release/SKILL.md)
+for maintainer steps. Public tags and publication need explicit approval.
+[Install](install.md) · [Distribution trust](adr/0014-distribution-trust.md)

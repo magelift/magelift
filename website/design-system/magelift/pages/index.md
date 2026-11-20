@@ -10,8 +10,8 @@ Overrides MASTER for https://magelift.dev/
   right (0.95fr). Stacks to one column on mobile.
 - No cards in hero; feature/proof rows use hairline dividers (`--rule`).
 - Max 1 eyebrow total on page (the `.brand-mark` lockup in the hero).
-- Section order: proof strip → personas (tabs) → how-it-works (steps + YAML
-  figure) → certified targets → trust grid → FAQ (`<details>`) → final CTA.
+- Section order: proof strip → personas (tabs) → how-it-works (steps and PHP
+  figure) → cloud targets → trust grid → FAQ (`<details>`) → final CTA.
 
 ## CTA
 - Single primary intent label: **Install the CLI**
@@ -25,8 +25,7 @@ Overrides MASTER for https://magelift.dev/
   stiffness 130 / damping 22).
 - Section reveal: `[data-reveal]` starts hidden only when below the fold,
   springs in (16px y) via `inView` at 15% visibility.
-- Terminal: live typing loop (cmd keystrokes → dim/ok output → destroy
-  outcome), static transcript under reduced motion / no-JS (`<pre class="sr-only">`
+- Terminal: live typing loop (sample project commands), static transcript under reduced motion / no-JS (`<pre class="sr-only">`
   always present for assistive tech).
 - Persona tabs: WAI tablist, sliding ink bar spring, panel crossfade.
 - Hero grid overlay drifts on scroll via `animation-timeline: scroll(root)`

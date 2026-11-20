@@ -13,7 +13,6 @@ const (
 	DefaultBuilderTag = "magelift/php-builder:local"
 	DefaultRuntimeTag = "magelift/php-nginx:local"
 	DefaultPHPBranch  = "8.5"
-	DefaultWebRuntime = "nginx-fpm"
 )
 
 const maxImageIDBytes = 80

@@ -143,7 +143,7 @@ signs:
 
 # Homebrew cask with binary stanzas: goreleaser deprecated brews (formula
 # generation) in v2.16 in favor of homebrew_casks; casks install binaries on
-# macOS and Linuxbrew alike. Casks live in Casks/ (default) — no Formula dir.
+# Homebrew uses the Casks/ directory on macOS and Linux.
 # HOMEBREW_TAP_GITHUB_TOKEN is currently acourtiol's OAuth token (repo scope);
 # upgrade path: a GitHub App with contents:write on homebrew-tap + scoop-bucket.
 homebrew_casks:
@@ -160,6 +160,7 @@ homebrew_casks:
     homepage: https://magelift.dev
     description: Open-source Magento CLI for AWS, Google Cloud and Azure
     license: Apache-2.0
+    skip_upload: auto
     binaries:
       - magelift
 
@@ -174,6 +175,7 @@ scoops:
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: bucket
+    skip_upload: auto
     homepage: https://magelift.dev
     description: Open-source Magento CLI for AWS, Google Cloud and Azure
     license: Apache-2.0
@@ -183,15 +185,12 @@ release:
   # (missing token, or an immutable release that cannot be updated).
   preflight:
     fail_on_error: true
-  # Channels: every release stays draft until the workflow verifies the full
-  # artifact set (bundles, checksums, lockfiles) and publishes it. Every
-  # release is a prerelease and never "latest": hyphen tags (rc, alpha,
-  # beta) must not become the default install channel. Flip prerelease and
-  # make_latest only for the first stable release, and update install.sh,
-  # the upgrade channel, and docs/install.md together.
+  # The release workflow keeps each candidate in draft until it verifies the
+  # artifacts and passes the CI gate. It then marks stable SemVer tags latest.
+  # GoReleaser detects prerelease tags and keeps them outside that channel.
   draft: true
-  prerelease: true
-  make_latest: false
+  prerelease: auto
+  make_latest: true
 
 changelog:
   use: github-native

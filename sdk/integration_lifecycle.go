@@ -99,7 +99,7 @@ func containsEdgeProof(proofRefs []string, semantic string) bool {
 }
 
 // RunObservabilityLifecycle is the observability equivalent of
-// RunEdgeLifecycle. It keeps native CloudWatch/Google Cloud/Cockpit/OVH
+// RunEdgeLifecycle. It keeps native cloud
 // schemas and New Relic object models behind the same public port.
 func RunObservabilityLifecycle(ctx context.Context, adapter ObservabilityAdapter, request ObservabilityPlanRequest, action ObservabilityAction, idempotencyKey string, resourceReferences []string, approvalReference string) (ObservabilityPlan, ObservabilityExecutionResult, error) {
 	if ctx == nil {

@@ -118,9 +118,6 @@ func PlanFromConfigWithOptions(cfg config.Config, environment string, options Pl
 	if err := config.ValidateAWSProviderConstraints(cfg); err != nil {
 		return Spec{}, err
 	}
-	if cfg.Compatibility.AllowUnsupported {
-		status = "unsupported-allowed"
-	}
 	if err := validateAWSServiceCompatibility(cfg); err != nil {
 		status = "unsupported-allowed"
 	}

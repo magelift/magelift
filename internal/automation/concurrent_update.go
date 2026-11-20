@@ -8,9 +8,8 @@ import (
 )
 
 // ConcurrentUpdateError marks a backend failure caused by another Pulumi
-// update holding the stack lock. It survives errors.As so the CLI can map
-// a colliding deploy to a dedicated exit code instead of a generic graph
-// failure. The Pulumi cause stays attached via Unwrap for predicates.
+// update holding the stack lock. The CLI uses it to return a distinct exit
+// code. Unwrap preserves the Pulumi error.
 type ConcurrentUpdateError struct {
 	Cause error
 }

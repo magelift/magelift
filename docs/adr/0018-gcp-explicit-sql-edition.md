@@ -1,46 +1,22 @@
-# ADR 0018: explicit Cloud SQL tiers select their compatible edition
+# ADR 0018. Choose the Cloud SQL edition from the requested tier
 
-Status: accepted, 2026-10-18.
+Accepted on 2026-10-18.
 
-## Context
+A shop can keep MySQL 8.4 when a Cloud SQL Enterprise Plus shape is
+unavailable. MySQL 8.4 defaults to Enterprise Plus with
+`db-perf-optimized-N-2`. An explicit supported `db-custom-<cpus>-<memoryMB>`
+tier selects Enterprise.
 
-The reference run encountered Enterprise Plus capacity failures in several zones.
-Google currently supports MySQL 8.4 on Enterprise as well as Enterprise Plus.
-The provider previously forced Plus for 8.4, rejecting dedicated custom tiers.
-Changing the engine version would break the selected Magento recipe.
+The provider checks the CPU and memory limits and queries the regional tier
+catalog. A custom size needs a compatible dedicated-core series in that
+catalog. A predefined tier needs its own entry. Available capacity still
+depends on the region and zone.
 
-## Decision
+Pulumi plans edition or tier changes. Switching an existing Plus instance
+to a dedicated custom tier can request a downgrade and downtime. Rehearse the
+change outside production.
 
-Keep the existing MySQL 8.4 default: Enterprise Plus with
-`db-perf-optimized-N-2`. An explicit `target.gcp.cloudSqlTier` dedicated-core
-`db-custom-<cpus>-<memoryMB>` selects Enterprise. Validate the documented CPU,
-memory and alignment limits before planning. Other new machine families remain
-outside this change. MySQL 8.0 behavior is preserved.
-
-The regional admission check still reads Google's tier catalog and fails on read
-errors. Custom combinations are not enumerated there; a valid custom shape needs
-a matching regional dedicated-core series entry. Exact predefined tiers keep
-their existing regional checks. Neither check guarantees allocation capacity.
-
-No YAML field, manifest, provider RPC or alternate state store is added.
-
-## Consequences
-
-Unchanged configuration keeps the same edition and tier. A deliberate custom
-tier change on an existing Plus instance can request an edition downgrade and
-cause downtime. Preview that change and test it outside production first.
-Edition and tier remain visible to Pulumi; neither is ignored. Creation-only
-zone handling from ADR 0017 remains unchanged.
-
-Tests cover real resource inputs, default preservation, custom limits and
-regional catalog handling. Acceptance with published provider 0660426 allocated
-MySQL 8.4 Enterprise with the explicit dedicated tier successfully. Application
-acceptance and migration of an existing Plus instance remain separate checks.
-A stockout is handled through the existing diagnostic and retained state,
-without automatic retries.
-
-## References
-
-- [Google Cloud SQL editions](https://docs.cloud.google.com/sql/docs/mysql/editions-intro)
-- [Google Cloud SQL machine series](https://docs.cloud.google.com/sql/docs/mysql/machine-series-overview)
-- [Cloud SQL creation placement](0017-gcp-sql-zone-preference.md)
+Tests check defaults, valid custom sizes, resource arguments and catalog
+validation. A development run with provider build `0660426` allocated
+an Enterprise instance with the explicit tier.
+[Zone selection](0017-gcp-sql-zone-preference.md) · [Cloud SQL editions](https://docs.cloud.google.com/sql/docs/mysql/editions-intro)

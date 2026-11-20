@@ -1,23 +1,21 @@
 # Custom CLI and community providers
 
-This example registers a community module through MageLift's public Go API. It
-builds a custom binary; it does not use Go's `plugin` ABI or automatically
-download an unsigned provider.
+This example registers a community module through MageLift's public Go API. Compile the module into a custom CLI binary.
 
 From the repository root:
 
 ```sh
 go build -o /tmp/magelift-ext ./examples/custom-cli
+/tmp/magelift-ext --output json extensions list
 /tmp/magelift-ext version
 ```
 
 [`main.go`](main.go) calls `cli.NewWithExtensions` with [`stubModule`](stub_module.go).
-The stub demonstrates registration and refuses to plan a deployment. Replace it
-with an implementation of `sdk.Module` before using it as a provider. The
-[adding a provider](../../docs/adding-a-provider.md) guide covers the public
-extension contract. Ship and sign your custom binary if others will use it.
+Look for `example.community-stub` in the extension list. The stub deliberately
+refuses planning. A deployable cloud target also needs project validation and
+the MageLift deployment operations wired into the host.
+[Public extension contract](../../docs/adding-a-provider.md#develop-an-external-extension)
 
-First-party cloud providers can be installed as release plugins. A community
-provider name in `magelift.php` does not cause MageLift to download its code.
-Label community and experimental integrations accurately and report the checks
-actually run; no compatibility cell is certified by this example.
+Use the custom binary for the extensions you link into it. Its first-party
+provider installer works as usual. Report which operations you tested and how.
+[Install providers](../../docs/install.md#providers)

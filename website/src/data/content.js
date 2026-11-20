@@ -12,14 +12,14 @@ export const nav = {
 };
 
 export const hero = {
-  h1: 'Run Magento in your own cloud account.',
-  lede: 'Define your Magento services in PHP. Run the shop locally, share a preview for review, and promote the same image to production.',
+  h1: 'Deploy Magento 2 to your own cloud',
+  lede: 'Run your Magento checkout with Docker on your laptop. Set up your environments in PHP and deploy to your AWS, Google Cloud, or Azure account.',
   primaryCta: { label: 'Install the CLI', href: `${docsUrl}install/` },
   secondaryCta: { label: 'Get started', href: `${docsUrl}getting-started/` },
 };
 
 export const terminal = {
-  title: 'Try the sample shop locally',
+  title: 'Inspect the sample project',
   copyCommand: 'git clone --depth 1 https://github.com/magelift/magelift.git && cd magelift && go install ./cmd/magelift',
   lines: [
     { type: 'cmd', text: 'git clone --depth 1 https://github.com/magelift/magelift.git' },
@@ -38,41 +38,41 @@ export const proof = [
 ];
 
 export const personas = {
-  heading: 'Working with a shop',
-  lede: 'The same PHP project describes staging, UAT, production and pull-request previews.',
+  heading: 'Work on your shop',
+  lede: 'Keep staging, production, and preview settings in one PHP project.',
   tabs: [
     {
       label: 'Review a change',
-      pain: 'Give reviewers a shop of their own',
-      body: 'Apply the magelift-preview label to a reviewed pull request in your repository. The generated workflow deploys that revision and removes the preview when you remove the label, close the PR or reach its expiry.',
+      pain: 'Give a pull request its own URL',
+      body: 'Apply magelift-preview after reviewing the pull request. The GitHub workflow deploys that revision. Close the pull request or remove the label to schedule teardown.',
       proof: 'magelift env diff staging production',
     },
     {
       label: 'Move a shop',
-      pain: 'Bring an existing Magento project',
-      body: 'Bring service versions, session settings and search plugins from Upsun or Adobe Commerce Cloud. For a Compose shop, import its service images. Rehearse the SQL and media transfer in staging.',
+      pain: 'Start with your existing settings',
+      body: 'Import settings from Upsun, Adobe Commerce Cloud, or Docker Compose. Rehearse the database and media transfer in staging before switching traffic.',
       proof: 'magelift init --from-upsun --provider gcp',
     },
     {
       label: 'Connect a storefront',
-      pain: 'Use Magento behind your frontend',
-      body: 'Keep the native Magento storefront or host a headless frontend separately. Configure its allowed origin in PHP and look up the Magento GraphQL endpoint for each environment.',
+      pain: 'Use Magento as the backend',
+      body: 'For a headless shop, set the storefront origin in PHP and use the Magento GraphQL URL for the environment.',
       proof: 'magelift env status staging',
     },
   ],
 };
 
 export const how = {
-  heading: 'Set up a shop',
-  lede: 'Start with your Magento checkout, or add --new to have Composer create a shop.',
+  heading: 'From your laptop to staging',
+  lede: 'MageLift reads the Magento edition and version from your Composer lockfile.',
   steps: [
-    'Install the CLI from the MageLift checkout with go install ./cmd/magelift.',
-    'Run magelift init --provider aws in your shop repository, or choose gcp or azure. Start Magento locally with magelift dev.',
-    'Connect your cloud account, push a signed shop image to your registry and review the infrastructure changes with magelift preview.',
+    'Install the CLI, then open your Magento repository.',
+    'Run magelift init with your cloud choice, then start Magento locally with magelift dev.',
+    'Connect the cloud account. Push the shop image to your registry and review the changes before deploying.',
   ],
   links: [
     { label: 'Getting started', href: `${docsUrl}getting-started/` },
-    { label: 'GCP onboarding', href: `${docsUrl}onboarding/` },
+    { label: 'Deploy to Google Cloud', href: `${docsUrl}onboarding/` },
     { label: 'Migration checklist', href: `${docsUrl}weekend-migrate/` },
   ],
   project: [
@@ -92,32 +92,33 @@ export const how = {
     { text: '    ],' },
     { text: ']);' },
   ],
-  projectCaption: 'Both environments inherit MySQL 8.4. Production uses the high-availability preset.',
+  projectCaption: 'The preview expires after seven days. Both environments use MySQL 8.4. Production uses the high-availability preset.',
 };
 
 export const targets = {
-  heading: 'Cloud targets',
-  lede: 'Compare the tests and recorded runs for each cloud adapter.',
+  heading: 'Choose a cloud',
+  lede: 'The run records cover Magento on ECS Fargate and GKE Autopilot. Local tests check the AKS resources and Azure API calls.',
   rows: [
     { target: 'AWS ECS Fargate', status: 'implemented' },
-    { target: 'GCP GKE Autopilot', status: 'implemented' },
+    { target: 'Google Cloud GKE Autopilot', status: 'implemented' },
     { target: 'Azure AKS', status: 'experimental' },
-    { target: 'AWS EKS · GCP GKE Standard · OVH MKS · Scaleway Kapsule', status: 'experimental' },
+    { target: 'AWS EKS', status: 'experimental' },
+    { target: 'Google Cloud GKE Standard', status: 'experimental' },
   ],
   links: [
-    { label: 'Capability matrix', href: `${docsUrl}capability-matrix/` },
-    { label: 'Compare to ACC / Upsun', href: `${docsUrl}compare-paas/` },
+    { label: 'Provider support', href: `${docsUrl}capability-matrix/` },
+    { label: 'Compare hosting', href: `${docsUrl}compare-paas/` },
   ],
 };
 
 export const trust = {
   heading: 'Billing and releases',
-  lede: 'You choose the registry and the cloud account that pay for each shop.',
+  lede: 'Your team keeps the application image in its own registry. The cloud provider bills your account.',
   items: [
-    { h: 'Apache-2.0', p: 'The open-source CLI carries no license fee.' },
+    { h: 'License', p: 'The CLI is free under the Apache 2.0 license.' },
     { h: 'Image promotion', p: 'Staging and production can deploy the same signed image digest.' },
-    { h: 'Verifiable releases', p: 'The release workflow signs checksums and generates a software bill of materials.' },
-    { h: 'Independent', p: 'MageLift is independent of Adobe.' },
+    { h: 'Signed releases', p: 'The release workflow signs checksums and lists the dependencies in each build.' },
+    { h: 'Adobe affiliation', p: 'MageLift is independent of Adobe.' },
   ],
 };
 
@@ -128,7 +129,7 @@ export const faqs = [
   },
   {
     q: 'Is MageLift a Magento hosting provider?',
-    a: 'Your team owns the cloud account. MageLift uses a signed plugin for AWS, Google Cloud or Azure to deploy and operate Magento there.',
+    a: 'The store runs in your cloud account. MageLift creates the infrastructure there and deploys Magento.',
   },
   {
     q: 'How much does MageLift cost?',
@@ -136,11 +137,11 @@ export const faqs = [
   },
   {
     q: 'Which cloud targets can I use?',
-    a: 'AWS ECS Fargate and GCP GKE Autopilot have recorded Magento runs. Azure AKS has resource tests with Pulumi mocks and API tests with Floci. The capability matrix lists the evidence for each path.',
+    a: 'Start with ECS Fargate on AWS, GKE Autopilot on Google Cloud, or experimental AKS support on Azure. Consult the provider guide for the tests and operations available on each runtime.',
   },
   {
     q: 'Can I migrate from Adobe Commerce Cloud or Upsun?',
-    a: 'Yes. Run magelift init --from-acc or --from-upsun and choose AWS, GCP or Azure. Review the generated PHP and the list of settings that need attention. The migration guide covers the encryption key, database, media and traffic switch.',
+    a: 'Run magelift init --from-acc or --from-upsun and choose AWS, GCP or Azure. Review the generated PHP and any settings the importer could not map. Follow the migration guide to move the encryption key, database and media before switching traffic.',
   },
   {
     q: 'Is MageLift affiliated with Adobe?',
@@ -150,7 +151,7 @@ export const faqs = [
 
 export const finalCta = {
   heading: 'Try MageLift locally',
-  body: 'Validate the sample project or start Magento in your existing shop with Docker Compose.',
+  body: 'Use an existing Magento checkout with PHP and Docker. You can connect the cloud account later.',
   primaryCta: { label: 'Install the CLI', href: `${docsUrl}install/` },
   secondaryCta: { label: 'Get started', href: `${docsUrl}getting-started/` },
 };

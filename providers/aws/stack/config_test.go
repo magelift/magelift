@@ -414,7 +414,7 @@ func TestPlanFromConfigUsesResolvedDefaultPresetWhenEnvironmentDoesNotOverride(t
 	}
 }
 
-func TestPlanFromConfigRejectsUnsupportedAWSServiceCombination(t *testing.T) {
+func TestPlanFromConfigReportsUnsupportedAWSServiceCombination(t *testing.T) {
 	cfg := deploymentConfig()
 	cfg.Application.Version = "2.4.9"
 	cfg.Target.AWS.Catalog.Versions.OpenSearch = "OpenSearch_2.19"
@@ -422,10 +422,7 @@ func TestPlanFromConfigRejectsUnsupportedAWSServiceCombination(t *testing.T) {
 	if err != nil || spec.Artifact.CompatibilityStatus != "unsupported-allowed" {
 		t.Fatalf("expected advisory status, got %#v, %v", spec.Artifact.CompatibilityStatus, err)
 	}
-	cfg.Compatibility.AllowUnsupported = true
-	if _, err := PlanFromConfig(cfg, "staging"); err != nil {
-		t.Fatalf("explicit compatibility override was rejected: %v", err)
-	}
+
 }
 
 func TestPlanFromConfigAcceptsCurrentAWSServiceVersions(t *testing.T) {

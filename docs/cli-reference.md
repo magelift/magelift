@@ -22,40 +22,10 @@ This page is generated from the Cobra command tree. Do not edit it by hand.
 ```
 ## magelift audit
 
-Export a control-posture matrix with evidence pointers and no secret values
+Show where security, backups, and monitoring are configured
 
 ```text
 magelift audit
-```
-## magelift benchmark
-
-Measure a Magento workload for preset sizing
-
-```text
-magelift benchmark
-```
-### magelift benchmark run
-
-```text
-magelift benchmark run [flags]
-```
-
-Options:
-
-```text
-      --cache string              cache implementation and version under test
-      --catalog string            benchmark catalog name
-      --catalog-revision string   benchmark catalog revision or commit
-      --concurrency int           number of concurrent workers (default 10)
-      --database string           database engine and version under test
-      --duration duration         measurement duration (default 30s)
-      --edition string            Magento edition: open-source or commerce (default "open-source")
-      --magento-version string    Magento version under test
-      --mix string                request mix as comma-separated path=weight entries (default "/=100")
-      --php-version string        PHP version under test
-      --queue string              queue implementation and version under test
-      --search string             search engine and version under test
-      --url string                Magento base URL to measure
 ```
 ## magelift bootstrap
 
@@ -140,7 +110,7 @@ Options:
 ```
 ## magelift cleanup
 
-Reconcile interrupted environment and acceptance cleanup
+Inspect and remove resources recorded in a cleanup ledger
 
 ```text
 magelift cleanup
@@ -163,7 +133,7 @@ Options:
       --name string       provider name used before the identity exists
       --profile string    local CLI profile name
       --project string    provider project or account
-      --provider string   provider ID, such as scaleway
+      --provider string   provider ID (gcp)
       --rank int          deletion rank; snapshots are lower than source instances
       --region string     provider region
       --role string       resource role: source, restore, or snapshot
@@ -312,7 +282,9 @@ Options:
 ```text
       --ack-maintenance-drain[=true|false]   attest backup, maintenance mode, and drained writers for production schema risk (see docs/operations.md)
       --digest string                        override the configured immutable image digest
+      --from-build string                    deploy the registry digest recorded by magelift build --push
       --infra-only[=true|false]              update the infrastructure graph only (skip Magento migrate/health)
+      --outputs-file string                  write the Magento and storefront URLs to a JSON file after rollout
 ```
 ## magelift destroy
 
@@ -326,7 +298,6 @@ Options:
 
 ```text
       --destroy-backups[=true|false]   also destroy leftover provider backups after the environment is gone; GCP Cloud SQL leftovers are deleted even when the backup policy is disposable, AWS snapshots are still refused
-      --skip-lock[=true|false]         skip the provider distributed state lock (acceptance cleanup only)
 ```
 ## magelift dev
 

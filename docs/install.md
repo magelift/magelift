@@ -1,17 +1,11 @@
 ---
 title: Install MageLift
-description: Install the MageLift CLI from source. Signed release archives apply after the first GitHub Release.
+description: Install the MageLift CLI from source or from a signed release.
 ---
 
 # Install
 
 Install the `magelift` CLI, then continue with [getting started](getting-started.md).
-
-!!! note "No release is published yet"
-    GitHub Releases is empty. Install from source with the Go toolchain.
-    The installer and release-archive steps below apply after the first
-    published release. A prerelease never becomes the default channel;
-    installing one still needs an explicit `MAGELIFT_VERSION`.
 
 ## From source
 
@@ -24,24 +18,22 @@ go install ./cmd/magelift
 magelift version
 ```
 
-Run that from the checkout so the workspace file selects the modules in that
-commit. `go install github.com/magelift/magelift/cmd/magelift@main` links the
-CLI to the last published SDK module, which is an older candidate.
+Run these commands from the checkout. The Go workspace selects the modules
+from that commit.
 
-A binary built from source does not pass release verification. There is no
-bypass flag.
+Use the source build for local work. Cloud commands still verify the provider
+binary against a trusted lock and Cosign bundle.
 
-Building from the repo Makefile sets `GOMEMLIMIT` to 75% of available
-RAM. Do not pin `GOMAXPROCS` or `-p`. Ordinary `go install` does not
-need either.
-
-## When a release exists
+## From a signed release
 
 ### Installer
 
 ```sh
 curl -fsSL https://magelift.dev/install.sh | sh
 ```
+
+The unpinned installer selects the latest stable release. To test a candidate,
+select its exact tag with `MAGELIFT_VERSION`.
 
 The installer downloads the release archive, bootstraps a pinned Cosign
 to verify the Sigstore bundle on `checksums.txt`, checks the archive
@@ -59,7 +51,7 @@ magelift version
 
 ### Release archive
 
-When a release exists for your OS and architecture:
+Choose the archive for your operating system and architecture.
 
 1. Open [Releases](https://github.com/magelift/magelift/releases) and download the
    archive for your OS and architecture.
@@ -98,7 +90,7 @@ magelift providers install
 magelift extensions list
 ```
 
-MageLift verifies the binary digest and Cosign signature, then caches the plugin by provider, version, operating system and architecture. Keep the project lock and verified cache when moving offline. If the CLI reports a damaged or unverified entry, check the lock and run `magelift providers install` to repair it. Community plugins require explicit installation. [Provider trust](adr/0014-distribution-trust.md)
+MageLift verifies the binary digest and Cosign signature, then caches the plugin by provider, version, operating system and architecture. Keep the project lock and verified cache when moving offline. If the CLI reports a damaged or unverified entry, check the lock and run `magelift providers install` to repair it. Community extensions use a custom CLI build. [Provider trust](adr/0014-distribution-trust.md) · [External extensions](adding-a-provider.md#develop-an-external-extension)
 
 Signed release operations and remote sessions can offer to install missing
 tools through the existing package-manager allowlist. Review the command
@@ -107,10 +99,7 @@ cloud authentication remain prerequisites. `magelift doctor` reports missing
 tools; only `doctor --install-dependencies` requests their installation.
 
 Homebrew and Scoop release configuration lives in the project's
-`magelift/homebrew-tap` and `magelift/scoop-bucket` repositories. Native
-installation and cloud execution on macOS and Windows remain unverified for
-this alpha working tree. Use the qualified Linux archive path once a release
-exists; WSL is an alternative on Windows, with its own Docker access and cloud
+`magelift/homebrew-tap` and `magelift/scoop-bucket` repositories. Check the release notes for the operating systems used in verification. WSL is an alternative on Windows, with its own Docker access and cloud
 authentication.
 
 ## Next

@@ -68,52 +68,16 @@ func TestResolveMergeAndProvenance(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsUnregisteredWebRuntimes(t *testing.T) {
-	for _, runtime := range []string{"frankenphp-worker", "caddy"} {
+func TestLoadRejectsUnsupportedWebRuntimes(t *testing.T) {
+	for _, runtime := range []string{"frankenphp-classic", "php-apache", "caddy"} {
 		input := strings.Replace(base, "mode: integrated}", "mode: integrated, webRuntime: "+runtime+"}", 1)
 		file, err := Load([]byte(input))
 		if err != nil {
 			t.Fatalf("load webRuntime %q: %v", runtime, err)
 		}
 		_, err = file.Resolve("staging", ResolveOptions{})
-		if err == nil || !strings.Contains(err.Error(), "not registered") {
-			t.Fatalf("webRuntime %q error = %v, want missing plugin", runtime, err)
-		}
-	}
-}
-
-func TestLoadFrankenPHPAndApacheRequireAdobeHatch(t *testing.T) {
-	for _, runtime := range []string{"frankenphp-classic", "php-apache"} {
-		input := strings.Replace(base, "mode: integrated}", "mode: integrated, webRuntime: "+runtime+"}", 1)
-		file, err := Load([]byte(input))
-		if err != nil {
-			t.Fatalf("load webRuntime %q: %v", runtime, err)
-		}
-		initial, err := file.Resolve("staging", ResolveOptions{})
-		if err != nil || initial.Compatibility.Status != CompatibilityUnsupportedAllowed {
-			t.Fatalf("webRuntime %q assessment = %#v, %v", runtime, initial.Compatibility, err)
-		}
-
-		hatched := strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)
-		file, err = Load([]byte(hatched))
-		if err != nil {
-			t.Fatalf("load hatched webRuntime %q: %v", runtime, err)
-		}
-		effective, err := file.Resolve("staging", ResolveOptions{})
-		if err != nil {
-			t.Fatalf("hatched webRuntime %q: %v", runtime, err)
-		}
-		if effective.Compatibility.Status != CompatibilityUnsupportedAllowed {
-			t.Fatalf("hatched status = %q", effective.Compatibility.Status)
-		}
-		found := false
-		for _, warning := range effective.Compatibility.Warnings {
-			if strings.Contains(warning, "Adobe-unsupported") {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatalf("hatched webRuntime %q missing Adobe warning: %#v", runtime, effective.Compatibility.Warnings)
+		if err == nil || !strings.Contains(err.Error(), "application.webRuntime must be nginx-fpm") {
+			t.Fatalf("webRuntime %q error = %v, want an nginx-fpm requirement", runtime, err)
 		}
 	}
 }
@@ -466,7 +430,7 @@ func TestObservabilityNativeReferenceRequiresNativeDestination(t *testing.T) {
 }
 
 func TestObservabilityNativeReferenceResolvesAsOpaqueIdentity(t *testing.T) {
-	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "observability: {nativeProvider: ovh-logs-data-platform, nativeReference: stream-123, signals: [audit-events]}\ndefaults: {region: eu-west-3, preset: preview}", 1)
+	input := strings.Replace(base, "defaults: {region: eu-west-3, preset: preview}", "observability: {nativeProvider: cloudwatch, nativeReference: service-123, signals: [logs]}\ndefaults: {region: eu-west-3, preset: preview}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)
@@ -475,7 +439,7 @@ func TestObservabilityNativeReferenceResolvesAsOpaqueIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if effective.Config.Observability.NativeReference != "stream-123" || effective.Config.Observability.NativeProvider != "ovh-logs-data-platform" {
+	if effective.Config.Observability.NativeReference != "service-123" || effective.Config.Observability.NativeProvider != "cloudwatch" {
 		t.Fatalf("opaque native destination identity = %#v", effective.Config.Observability)
 	}
 }
@@ -916,254 +880,6 @@ environments: {staging: {}}
 	}
 }
 
-func TestResolveMapsScalewayAndOVHManagedServiceDurabilitySettings(t *testing.T) {
-	t.Run("scaleway preserves explicit disabled backups and encryption", func(t *testing.T) {
-		input := `schemaVersion: 1
-project: {name: shop}
-application: {edition: open-source, version: 2.4.8-p5, mode: integrated}
-build: {php: "8.3"}
-target:
-  provider: scaleway
-  runtime: kapsule
-  scaleway:
-    projectId: 11111111-1111-1111-1111-111111111111
-    databaseBackupEnabled: false
-    databaseEncryptionAtRest: true
-defaults: {region: fr-par, preset: standard}
-environments: {staging: {}}
-`
-		file, err := Load([]byte(input))
-		if err != nil {
-			t.Fatal(err)
-		}
-		effective, err := file.Resolve("staging", ResolveOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		scaleway := effective.Config.Target.Scaleway
-		if scaleway == nil || scaleway.DatabaseBackupEnabled == nil || *scaleway.DatabaseBackupEnabled || scaleway.DatabaseEncryptionAtRest == nil || !*scaleway.DatabaseEncryptionAtRest {
-			t.Fatalf("Scaleway durability settings were not resolved: %#v", scaleway)
-		}
-		for _, path := range []string{"target.scaleway.databaseBackupEnabled", "target.scaleway.databaseEncryptionAtRest"} {
-			if got := effective.Provenance[path].Source; got != "project" {
-				t.Fatalf("%s provenance = %q, want project", path, got)
-			}
-		}
-	})
-
-	t.Run("ovh preserves backup destinations and deletion protection", func(t *testing.T) {
-		input := `schemaVersion: 1
-project: {name: shop}
-application: {edition: open-source, version: 2.4.8-p5, mode: integrated}
-build: {php: "8.3"}
-target:
-  provider: ovh
-  runtime: mks
-  ovh:
-    serviceName: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    region: GRA9
-    databaseBackupTime: "03:30"
-    databaseBackupRegions: [GRA9, GRA11]
-    databaseDeletionProtection: true
-    valkeyBackupTime: "04:00"
-    valkeyBackupRegions: [GRA11]
-    valkeyDeletionProtection: true
-defaults: {region: GRA9, preset: standard}
-environments: {staging: {}}
-`
-		file, err := Load([]byte(input))
-		if err != nil {
-			t.Fatal(err)
-		}
-		effective, err := file.Resolve("staging", ResolveOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		ovh := effective.Config.Target.OVH
-		if ovh == nil || ovh.DatabaseBackupTime != "03:30" || len(ovh.DatabaseBackupRegions) != 2 || ovh.DatabaseDeletionProtection == nil || !*ovh.DatabaseDeletionProtection || ovh.ValkeyBackupTime != "04:00" || len(ovh.ValkeyBackupRegions) != 1 || ovh.ValkeyDeletionProtection == nil || !*ovh.ValkeyDeletionProtection {
-			t.Fatalf("OVH durability settings were not resolved: %#v", ovh)
-		}
-		for _, path := range []string{"target.ovh.databaseBackupTime", "target.ovh.databaseBackupRegions", "target.ovh.databaseDeletionProtection", "target.ovh.valkeyBackupTime", "target.ovh.valkeyBackupRegions", "target.ovh.valkeyDeletionProtection"} {
-			if got := effective.Provenance[path].Source; got != "project" {
-				t.Fatalf("%s provenance = %q, want project", path, got)
-			}
-		}
-	})
-}
-
-func TestResolveMaterializesNamedDefaultsForScalewayAndOVH(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		check func(t *testing.T, cfg Config)
-		paths []string
-	}{
-		{
-			name: "scaleway",
-			input: `schemaVersion: 1
-project: {name: shop}
-application: {edition: open-source, version: 2.4.8, mode: integrated}
-build: {php: "8.3"}
-target:
-  provider: scaleway
-  runtime: kapsule
-  scaleway: {projectId: 11111111-1111-1111-1111-111111111111, region: fr-par}
-defaults: {region: fr-par, preset: standard}
-environments: {staging: {}}
-`,
-			check: func(t *testing.T, cfg Config) {
-				scw := cfg.Target.Scaleway
-				if scw == nil || scw.NetworkCIDR != "172.16.0.0/22" || scw.DatabaseNodeType != "DB-GP-S" || scw.RedisNodeType != "RED1-S" || scw.KapsuleVersion != "1.36.1" || scw.NodeCount != 2 || scw.DesiredWebReplicas != 2 || scw.QueueConsumerCount != 1 || scw.DatabaseBackupEnabled == nil || !*scw.DatabaseBackupEnabled || scw.DatabaseBackupFrequency == nil || *scw.DatabaseBackupFrequency != 24 || scw.DatabaseBackupRetention == nil || *scw.DatabaseBackupRetention != 7 || scw.DatabaseBackupSameRegion == nil || !*scw.DatabaseBackupSameRegion || scw.DatabaseEncryptionAtRest == nil || !*scw.DatabaseEncryptionAtRest {
-					t.Fatalf("Scaleway defaults = %#v", scw)
-				}
-			},
-			paths: []string{"target.scaleway.networkCidr", "target.scaleway.databaseNodeType", "target.scaleway.kapsuleVersion", "target.scaleway.nodeCount", "target.scaleway.queueConsumerCount", "target.scaleway.databaseBackupEnabled", "target.scaleway.databaseBackupFrequencyHours", "target.scaleway.databaseBackupRetentionDays", "target.scaleway.databaseBackupSameRegion", "target.scaleway.databaseEncryptionAtRest"},
-		},
-		{
-			name: "ovh",
-			input: `schemaVersion: 1
-project: {name: shop}
-application: {edition: open-source, version: 2.4.8, mode: integrated}
-build: {php: "8.3"}
-target:
-  provider: ovh
-  runtime: mks
-  ovh: {serviceName: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, region: GRA9}
-defaults: {region: GRA9, preset: standard}
-environments: {staging: {}}
-`,
-			check: func(t *testing.T, cfg Config) {
-				ovh := cfg.Target.OVH
-				if ovh == nil || ovh.NetworkCIDR != "10.30.0.0/16" || ovh.DatabaseFlavor != "b3-8" || ovh.DatabasePlan != "production" || ovh.DatabaseNodeCount != 2 || ovh.ValkeyFlavor != "b3-8" || ovh.ValkeyPlan != "production" || ovh.ValkeyNodeCount != 2 || ovh.ValkeyVersion != "8.1" || ovh.MKSPlan != "standard" || ovh.NodeCount != 2 || ovh.DesiredWebReplicas != 2 || ovh.QueueConsumerCount != 1 {
-					t.Fatalf("OVH defaults = %#v", ovh)
-				}
-			},
-			paths: []string{"target.ovh.networkCidr", "target.ovh.databaseFlavor", "target.ovh.databasePlan", "target.ovh.databaseNodeCount", "target.ovh.valkeyFlavor", "target.ovh.valkeyPlan", "target.ovh.valkeyNodeCount", "target.ovh.valkeyVersion", "target.ovh.mksPlan", "target.ovh.nodeCount", "target.ovh.queueConsumerCount"},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			f, err := Load([]byte(test.input))
-			if err != nil {
-				t.Fatal(err)
-			}
-			effective, err := f.Resolve("staging", ResolveOptions{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			test.check(t, effective.Config)
-			for _, path := range test.paths {
-				if got := effective.Provenance[path].Source; got != "preset standard" {
-					t.Fatalf("%s provenance = %q, want preset standard", path, got)
-				}
-			}
-		})
-	}
-}
-
-func TestResolveMaterializesLowCostOVHPreviewManagedServiceDefaults(t *testing.T) {
-	input := `schemaVersion: 1
-project: {name: shop}
-application: {edition: open-source, version: 2.4.8, mode: integrated}
-build: {php: "8.3"}
-target:
-  provider: ovh
-  runtime: mks
-  ovh: {serviceName: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, region: EU-WEST-PAR}
-defaults: {region: EU-WEST-PAR, preset: preview}
-environments: {preview: {class: preview}}
-`
-	file, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	effective, err := file.Resolve("preview", ResolveOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ovh := effective.Config.Target.OVH
-	if ovh == nil || ovh.DatabasePlan != "discovery" || ovh.DatabaseNodeCount != 1 || ovh.ValkeyPlan != "discovery" || ovh.ValkeyNodeCount != 1 {
-		t.Fatalf("OVH preview defaults = %#v", ovh)
-	}
-}
-
-func TestResolveRejectsUnsupportedOVHManagedServiceSettings(t *testing.T) {
-	const ovhYAML = `schemaVersion: 1
-project: {name: shop}
-application: {edition: open-source, version: 2.4.8, mode: integrated}
-build: {php: "8.3"}
-target:
-  provider: ovh
-  runtime: mks
-  ovh:
-    serviceName: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    region: EU-WEST-PAR
-    zones: [eu-west-par-a, eu-west-par-b]
-    databasePlan: business
-    databaseVersion: 8.4
-    databaseNodeCount: 2
-    valkeyPlan: business
-    valkeyVersion: 8.1
-    valkeyNodeCount: 2
-defaults: {region: EU-WEST-PAR, preset: standard}
-environments: {staging: {}}
-`
-	cases := []struct {
-		name       string
-		input      string
-		wantErrMsg string
-	}{
-		{name: "unsupported Valkey version", input: strings.Replace(ovhYAML, "valkeyVersion: 8.1", "valkeyVersion: 10.0", 1), wantErrMsg: "target.ovh.valkeyVersion"},
-		{name: "MySQL plan node limit", input: strings.Replace(ovhYAML, "databaseNodeCount: 2", "databaseNodeCount: 3", 1), wantErrMsg: "target.ovh.databaseNodeCount"},
-		{name: "Valkey plan minimum", input: strings.Replace(ovhYAML, "valkeyNodeCount: 2", "valkeyNodeCount: 1", 1), wantErrMsg: "target.ovh.valkeyNodeCount"},
-		{name: "duplicate MKS zone", input: strings.Replace(ovhYAML, "zones: [eu-west-par-a, eu-west-par-b]", "zones: [eu-west-par-a, EU-WEST-PAR-A]", 1), wantErrMsg: "target.ovh.zones contains duplicate"},
-	}
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			file, err := Load([]byte(testCase.input))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := file.Resolve("staging", ResolveOptions{}); err == nil || !strings.Contains(err.Error(), testCase.wantErrMsg) {
-				t.Fatalf("Resolve() error = %v, want substring %q", err, testCase.wantErrMsg)
-			}
-		})
-	}
-}
-
-func TestResolveAcceptsCurrentOVHValkeyVersions(t *testing.T) {
-	const ovhYAML = `schemaVersion: 1
-project: {name: shop}
-application: {edition: open-source, version: 2.4.8, mode: integrated}
-build: {php: "8.3"}
-target:
-  provider: ovh
-  runtime: mks
-  ovh:
-    serviceName: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    region: EU-WEST-PAR
-    zones: [eu-west-par-a]
-    valkeyVersion: "%s"
-defaults: {region: EU-WEST-PAR, preset: standard}
-environments: {staging: {}}
-`
-	for _, version := range []string{"7.2", "8.0", "8.1", "9.0", "9.1"} {
-		t.Run(version, func(t *testing.T) {
-			file, err := Load([]byte(fmt.Sprintf(ovhYAML, version)))
-			if err != nil {
-				t.Fatal(err)
-			}
-			resolved, err := file.Resolve("staging", ResolveOptions{})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := resolved.Config.Target.OVH.ValkeyVersion; got != version {
-				t.Fatalf("ValkeyVersion = %q, want %q", got, version)
-			}
-		})
-	}
-}
-
 func TestResolvePreservesAdvancedAWSEgressChoices(t *testing.T) {
 	input := strings.Replace(base, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: aws, runtime: ecs-fargate, aws: {natMode: fck-nat, natTopology: multi-az, natReplacementMode: auto-scaling}}", 1)
 	f, err := Load([]byte(input))
@@ -1326,7 +1042,7 @@ func TestResolveUsesMagento247RDSMariaDBCompatibilityDefault(t *testing.T) {
 	}
 }
 
-func TestResolveRejectsUnsupportedAWSServiceVersionBeforePlanning(t *testing.T) {
+func TestResolveWarnsAboutAWSServiceVersionBeforePlanning(t *testing.T) {
 	input := strings.Replace(base, "target: {provider: aws, runtime: ecs-fargate}", "target: {provider: aws, runtime: ecs-fargate, aws: {catalog: {searchMode: serverless, versions: {openSearch: OpenSearch_2.19}}}}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
@@ -1337,14 +1053,6 @@ func TestResolveRejectsUnsupportedAWSServiceVersionBeforePlanning(t *testing.T) 
 		t.Fatalf("expected OpenSearch advisory, got %#v, %v", effective.Compatibility, err)
 	}
 
-	input = strings.Replace(input, "extensions:\n", "compatibility: {allowUnsupported: true}\nextensions:\n", 1)
-	f, err = Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.Resolve("staging", ResolveOptions{}); err != nil {
-		t.Fatalf("explicit compatibility exception was rejected: %v", err)
-	}
 }
 
 func TestResolveDoesNotInventAWSTargetForMinimalConfig(t *testing.T) {
@@ -1367,14 +1075,13 @@ func TestResolvePreservesExplicitOptionsWhenUsingDefaultPresets(t *testing.T) {
 		t.Fatal(err)
 	}
 	effective, err := f.Resolve("staging", ResolveOptions{
-		Builtins:      map[string]any{"defaults": map[string]any{"region": "us-east-1"}},
-		Compatibility: map[string]any{"compatibility": map[string]any{"allowUnsupported": true}},
-		Overrides:     map[string]any{"defaults": map[string]any{"region": "us-west-2"}},
+		Builtins:  map[string]any{"defaults": map[string]any{"region": "us-east-1"}},
+		Overrides: map[string]any{"defaults": map[string]any{"region": "us-west-2"}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if effective.Config.Defaults.Region != "us-west-2" || !effective.Config.Compatibility.AllowUnsupported {
+	if effective.Config.Defaults.Region != "us-west-2" {
 		t.Fatalf("explicit resolver options were lost: %#v", effective.Config)
 	}
 }
@@ -1856,29 +1563,16 @@ defaults: {region: eu-west-3, preset: preview}
 environments: {staging: {}}
 `
 
-const managedEmailScalewayBase = `schemaVersion: 1
+const managedEmailGCPBase = `schemaVersion: 1
 project: {name: shop}
 application: {edition: open-source, version: 2.4.8-p5, mode: integrated}
 build: {php: "8.3"}
 target:
-  provider: scaleway
-  runtime: kapsule
-  scaleway:
-    projectId: 11111111-1111-1111-1111-111111111111
-defaults: {region: fr-par, preset: standard}
-environments: {staging: {}}
-`
-
-const managedEmailOVHBase = `schemaVersion: 1
-project: {name: shop}
-application: {edition: open-source, version: 2.4.8-p5, mode: integrated}
-build: {php: "8.3"}
-target:
-  provider: ovh
-  runtime: mks
-  ovh:
-    serviceName: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-defaults: {region: GRA9, preset: standard}
+  provider: gcp
+  runtime: gke-autopilot
+  gcp:
+    project: example-project
+defaults: {region: europe-west1, preset: standard}
 environments: {staging: {}}
 `
 
@@ -1923,7 +1617,7 @@ func TestManagedSESRejectsBYOMix(t *testing.T) {
 }
 
 func TestManagedSESRequiresAWSProvider(t *testing.T) {
-	input := strings.Replace(managedEmailScalewayBase, "environments: {staging: {}}", "email: {mode: ses, managed: {domain: example.invalid, hostedZoneId: Z123}}\nenvironments: {staging: {}}", 1)
+	input := strings.Replace(managedEmailGCPBase, "environments: {staging: {}}", "email: {mode: ses, managed: {domain: example.invalid, hostedZoneId: Z123}}\nenvironments: {staging: {}}", 1)
 	f, err := Load([]byte(input))
 	if err != nil {
 		t.Fatal(err)
@@ -1934,42 +1628,6 @@ func TestManagedSESRequiresAWSProvider(t *testing.T) {
 	}
 }
 
-func TestManagedSESRejectsOVHAccount(t *testing.T) {
-	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: ses, managed: {domain: example.invalid, hostedZoneId: Z123, account: shop}}\nenvironments: {staging: {}}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "applies only to ovh") {
-		t.Fatalf("misplaced account was accepted: %v", err)
-	}
-}
-
-func TestTEMManagedIsUnimplementedForAlpha(t *testing.T) {
-	input := strings.Replace(managedEmailScalewayBase, "environments: {staging: {}}", "email: {mode: tem, from: shop@example.invalid, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "email.tem managed mode is not implemented") {
-		t.Fatalf("unimplemented TEM was accepted: %v", err)
-	}
-}
-
-func TestOVHManagedIsUnimplementedForAlpha(t *testing.T) {
-	input := strings.Replace(managedEmailOVHBase, "environments: {staging: {}}", "email: {mode: ovh, from: shop@example.invalid, managed: {domain: example.invalid, account: shop}}\nenvironments: {staging: {}}", 1)
-	f, err := Load([]byte(input))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "email.ovh managed mode is not implemented") {
-		t.Fatalf("unimplemented OVH mail was accepted: %v", err)
-	}
-}
-
 func TestManagedBlockRejectedOnSMTP(t *testing.T) {
 	input := strings.Replace(managedEmailAWSBase, "environments: {staging: {}}", "email: {mode: smtp, host: mail.example.invalid, port: 2525, managed: {domain: example.invalid}}\nenvironments: {staging: {}}", 1)
 	f, err := Load([]byte(input))
@@ -1977,7 +1635,7 @@ func TestManagedBlockRejectedOnSMTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = f.Resolve("staging", ResolveOptions{})
-	if err == nil || !strings.Contains(err.Error(), "requires mode ses, tem, or ovh") {
+	if err == nil || !strings.Contains(err.Error(), "requires mode ses") {
 		t.Fatalf("managed block on smtp was accepted: %v", err)
 	}
 }

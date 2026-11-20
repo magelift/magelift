@@ -68,7 +68,7 @@ var (
 
 // RedactLogMessage removes common credential forms before a provider log line
 // crosses the platform boundary. It is intentionally conservative: unknown
-// application data is preserved rather than treated as a credential.
+// application data stays in the log.
 func RedactLogMessage(message string) string {
 	message = logBearerValue.ReplaceAllString(message, "Bearer [redacted]")
 	return logSensitiveValue.ReplaceAllString(message, "$1$2[redacted]")
@@ -147,14 +147,6 @@ func ValidateFirstPartyObservability(cfg config.Config) error {
 	case "google-cloud-operations":
 		if cfg.Target.Provider != "gcp" {
 			return fmt.Errorf("observability provider %q requires target.provider gcp", provider)
-		}
-	case "scaleway-cockpit":
-		if cfg.Target.Provider != "scaleway" {
-			return fmt.Errorf("observability provider %q requires target.provider scaleway", provider)
-		}
-	case "ovh-logs-data-platform":
-		if cfg.Target.Provider != "ovh" {
-			return fmt.Errorf("observability provider %q requires target.provider ovh", provider)
 		}
 	case "xray", "aws-xray":
 		return sdk.ObservabilityCapabilityError{

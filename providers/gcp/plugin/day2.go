@@ -129,7 +129,7 @@ func (s *Server) StateStatus(ctx context.Context, req *sdk.StateStatusCall) (*sd
 }
 
 // StateLock mirrors State.Lock. Teardown plans omit the image digest, so
-// they use the same validation as destroy instead of the deploy check.
+// they use destroy validation.
 func (s *Server) StateLock(ctx context.Context, req *sdk.StateLockCall) (*sdk.StateLockResult, *sdk.OperationError) {
 	if req == nil {
 		return nil, InvalidError("state lock call is required")

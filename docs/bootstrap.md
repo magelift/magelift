@@ -1,42 +1,42 @@
 # Bootstrap
 
 `magelift bootstrap` prepares the selected cloud account so Magento can deploy.
-Laptop users omit GitHub flags. AWS and GCP support preparing a CI identity with
+For a deployment from your laptop, omit the GitHub flags. AWS and GCP can prepare a CI identity with
 `--github-owner` and `--github-repo`. For Azure, configure federation in Entra ID.
 
-You do not set a state-backend URL. Magelift derives it from `magelift.php`
-after bootstrap.
+MageLift derives the state-backend URL from `magelift.php` after bootstrap.
+That backend holds the record of resources MageLift manages for the shop.
 
 For an existing GCP state bucket, bootstrap checks its four MageLift ownership
-labels and region before changing versioning or retention. A mismatch stops
-without adopting the bucket. Select a fresh project/environment name or have
-the bucket owner review its recorded ownership; do not relabel another bucket
-to bypass the check. This guard checks labels and region, not the cloud project
-number.
+labels and region before changing versioning or retention. This check does not
+compare the cloud project number. If the labels or region differ, choose a new
+project or environment name or ask the bucket owner to review its ownership.
+Leave the existing labels in place.
 
 ## Laptop
 
-Log in with the AWS, Google Cloud or Azure CLI for your target, then run
+Log in to the cloud account you configured for staging. On GCP and Azure,
+run the bootstrap command.
 
 ```sh
-magelift bootstrap --env preview
+magelift bootstrap --env staging
 ```
 
-AWS also needs an existing log bucket:
+For AWS, supply the name of an existing access log bucket.
 
 ```sh
-magelift bootstrap --env preview --access-log-bucket existing-log-bucket
+magelift bootstrap --env staging --access-log-bucket existing-log-bucket
 ```
 
-Then `magelift deploy --env preview --yes`. Destroy with
-`magelift destroy --env preview --yes`.
+Use the staging guide to build an image, push it to the registry and deploy
+its digest. [Build and deploy to staging](getting-started.md#build-and-deploy-to-staging)
 
 ## AWS details
 
-`magelift bootstrap` verifies the active caller account before changing anything, then creates the Pulumi S3
-state bucket, its KMS key, a recovery-only state identity, and (when GitHub flags are set) a GitHub Actions
-infrastructure identity. It also creates a separate build identity that can read
-only MageLift-scoped Composer and build secrets.
+`magelift bootstrap` checks that the active AWS login matches the account in
+the environment. It then creates the Pulumi S3 state bucket, KMS key and
+recovery role. With the GitHub flags, it creates a deployment role and a build
+role that reads MageLift-scoped Composer and build secrets.
 
 The access log bucket must already exist. MageLift does not create or delete that
 shared logging bucket. State backups under `backups/` expire after 90 days, and
@@ -50,10 +50,8 @@ magelift bootstrap --env staging \
   --github-repo magelift
 ```
 
-The command accepts only an AWS account selected by the environment. If the active
-credentials belong to another account, it stops before any resource mutation.
-State and identity details are printed in the selected output format. Secret values
-are never included. Use `identity.buildRoleArn` for `MAGELIFT_BUILD_ROLE_ARN` and
+Bootstrap reports state and identity references in the selected output format
+and omits secret values. Use `identity.buildRoleArn` for `MAGELIFT_BUILD_ROLE_ARN` and
 `identity.ciRoleArn` for the environment role variables consumed by generated
 deployment workflows. Keep `identity.stateRoleArn` for audited state recovery only.
 
@@ -65,13 +63,12 @@ updates role policies.
 
 The minimal starter produces build and test-deploy jobs. On GCP they use
 separate GitHub environments named `build` and `test`. The workflow moves
-federated credentials into the runner temporary directory before building;
-the Google auth post hook removes them after the job. Customized workflows
-must also keep those credentials outside the shop source. The build refuses
-known root `gha-creds-*.json` files.
+federated credentials to the runner's temporary directory before building.
+The Google auth post hook removes them after the job. Keep those credentials
+outside the shop checkout in custom workflows too. A build fails if it finds
+`gha-creds-*.json` files at the shop root.
 
-
-Generate the workflow from the same configuration that will be deployed:
+Generate the workflow from the project configuration you intend to deploy.
 
 ```sh
 magelift ci generate
@@ -83,14 +80,14 @@ need an explicit --magelift-version naming an available signed release.
 Generation preserves an existing customized workflow and writes a candidate
 beside it. Review the reported diff, then rerun the original generation command
 with `--replace` if you want to adopt the template. Retain your `--path` and
-version flags. Validation checks configuration, presence and YAML syntax;
-`--check-template` additionally requires exact template content. This is not a
-validator for arbitrary GitHub Actions behavior.
-
+version flags. Validation checks the configuration, workflow file and YAML
+syntax. With `--check-template`, it also compares the file to the generated
+template. Run the workflow to test its behavior.
 
 The generator selects the registered provider/runtime adapter. AWS ECS Fargate uses
 the role variables created by `magelift bootstrap --github-owner --github-repo`.
-GCP GKE uses GitHub federation variables Magelift prints after that same bootstrap:
+GCP GKE uses the GitHub federation variables MageLift prints after bootstrap,
+including
 `MAGELIFT_GCP_PROJECT_ID`, `MAGELIFT_GCP_REGION`,
 `MAGELIFT_GCP_WORKLOAD_IDENTITY_PROVIDER`, and
 the separate `MAGELIFT_GCP_BUILD_SERVICE_ACCOUNT`,
@@ -105,14 +102,12 @@ identities alone does not grant those permissions.
 The runtime's GKE image-pull identity is another role and needs repository read
 permissions independently of the Pod's application identity.
 
-Magelift derives stack state from `magelift.php` after bootstrap; do not set a
-state-backend URL. Set `MAGELIFT_RELEASE_IMAGE` to your application destination
-and `MAGELIFT_REGISTRY` to its exact registry host. Artifact Registry uses the
-GCP federation credential helper. User GHCR uses GITHUB_TOKEN; other registries
-require `MAGELIFT_REGISTRY_USERNAME` and secret `MAGELIFT_REGISTRY_PASSWORD` or an
-explicitly prepared credential flow. The workflow never sends GITHUB_TOKEN to
-an arbitrary registry. Native ECR workflow authentication remains a later AWS
-acceptance check.
+Set `MAGELIFT_RELEASE_IMAGE` to your application destination and
+`MAGELIFT_REGISTRY` to the registry host. Artifact Registry uses the GCP
+federation credential helper. GHCR uses GITHUB_TOKEN. For other registries, set
+`MAGELIFT_REGISTRY_USERNAME` and the `MAGELIFT_REGISTRY_PASSWORD` secret or
+configure authentication in the workflow. ECR needs its own authentication
+setup.
 
 The source-build path needs no builder/runtime image variables. Configure
 `build.composer.credentials: env://COMPOSER_AUTH` to consume the optional
@@ -148,34 +143,32 @@ Floci can create and read an IAM OIDC provider. A shop can check the GitHub toke
 For local AWS-compatible testing, set `MAGELIFT_AWS_ENDPOINT_URL` to the emulator
 endpoint, for example `http://127.0.0.1:4566`. The endpoint must use HTTP or HTTPS
 and resolve to loopback with no credentials or path. Bootstrap S3/KMS clients, the
-state archive, and Secrets Manager/SSM clients honor it; S3 clients use path-style
-requests. For floci-gcp, set `MAGELIFT_GCP_ENDPOINT_URL` to `http://127.0.0.1:4588`
+state archive, and Secrets Manager/SSM clients use it. S3 clients make
+path-style requests. For floci-gcp, set `MAGELIFT_GCP_ENDPOINT_URL` to `http://127.0.0.1:4588`
 and `STORAGE_EMULATOR_HOST` to the host:port. Production runs leave the variables unset.
 
 The build job retains the existing manifest, checksum and build result for 14
 days in the user's repository. Staging verifies that handoff before deployment.
-Production dispatch requires `release_digest` and `artifact_run_id` from a
-successful run of the same workflow in the same repository; it does not build.
+Production dispatch deploys an existing build. Supply `release_digest` and
+`artifact_run_id` from a successful run of the same workflow in the same repository.
 The guided GCP setup derives `MAGELIFT_IMAGE_SIGNING_IDENTITY` and
 `MAGELIFT_IMAGE_SIGNING_ISSUER` from the repository workflow, independently of
 the deployment login. Advanced workflows can configure their producer policy
 explicitly.
-Configure required reviewers on protected GitHub environments. Fork PRs do not
-receive build, preview or deployment privileges; labelled preview jobs also
-require a branch in the same repository.
+Configure required reviewers on protected GitHub environments. Privileged
+build, preview and deployment jobs exclude fork pull requests. A labeled
+preview also requires the branch to be in the shop repository.
 
-The generated workflow is tested locally as code. A local build or fixture test
-is not evidence of an executed GitHub/GCP workflow; record that acceptance run
-separately before advertising the full alpha path.
+Run the generated workflow against the shop’s staging environment to verify
+its GitHub identity and Google Cloud permissions.
 
 The GCP provider's identity reconciler distinguishes build and deployment
 service accounts. Its reference trust accepts the named repository's
 `.github/workflows/magelift.yml` on `main`, for push or manual dispatch, and
 separates impersonation through the `build` and selected shop environments.
-An existing resource with different ownership or federation settings is refused;
-bootstrap does not silently adopt it. IAM reconciliation preserves unrelated
-bindings and conditions. This library behavior is covered by local fixtures;
-a real GitHub token exchange remains an acceptance check.
+Bootstrap refuses existing resources with different ownership or federation
+settings and preserves unrelated IAM bindings and conditions. Local fixtures
+check those rules. Use staging to verify the GitHub token exchange.
 
 An untagged `MAGELIFT_RELEASE_IMAGE` destination receives the source commit SHA
 as its tag in CI. An explicitly tagged destination is preserved. Build results
@@ -189,12 +182,11 @@ GCP bootstrap enables missing reference APIs, ensures the state bucket,
 initializes its state passphrase in Secret Manager, and creates the user's
 Docker Artifact Registry repository. It also creates an owned GKE node service
 account, grants it reader on that repository and the project-level
-`roles/container.defaultNodeServiceAccount` role. This runtime preparation
-runs even without GitHub options; it needs project IAM policy management
-permission. It returns the image destination, node identity and secret version
-reference. The caller needs permission to create these
-resources. If Service Usage itself is unavailable, the error names that
-prerequisite. GitHub CI grants require the explicit --apply-ci-permissions option.
+`roles/container.defaultNodeServiceAccount` role. Bootstrap does this for
+laptop deployments too. The operator needs permission to create the resources
+and manage the project's IAM policy. Bootstrap reports the image destination,
+node identity and secret version. If Service Usage is unavailable, it names
+the missing prerequisite. GitHub CI grants require --apply-ci-permissions.
 
 The passphrase stays at version 1. Bootstrap uses the existing deployment lock
 and checks noncurrent GCS generations as well as live state before creating a
@@ -202,17 +194,16 @@ key. It refuses existing encrypted state without its original key. Do not
 delete the state secret while state or backups still need it. An environment
 destroy does not remove these bootstrap resources, including the node account.
 New Autopilot clusters use that account through their node autoprovisioning
-defaults and omit the Google-computed cluster `nodeConfig`; Standard clusters
-and node pools use their explicit node configuration. Existing clusters
-keep their original node identity: bootstrap does not trigger an immutable
-cluster replacement.
-Use a fresh environment for migration; live legacy migration remains unverified.
+defaults. GKE computes the cluster `nodeConfig`. Standard clusters and node
+pools use their explicit node configuration. Existing clusters keep their
+original node identity. Use a fresh environment for migration. A real migration
+of a legacy cluster still needs verification.
 
 Deploy reads the remote key into its Pulumi workspace. For an existing stack
 or recovery, an explicit PULUMI_CONFIG_PASSPHRASE or
 PULUMI_CONFIG_PASSPHRASE_FILE takes precedence. Bootstrap does not convert an
-existing passphrase or rotate it. These paths have local regression coverage;
-real project permissions and state decryption remain acceptance checks.
+existing passphrase or rotate it. Local tests cover passphrase selection. Check
+project permissions and state decryption with the actual environment.
 
 
 ## Cloud SQL placement and capacity
@@ -232,7 +223,7 @@ MySQL 8.4 defaults to Enterprise Plus with `db-perf-optimized-N-2`. An explicit
 dedicated-core tier such as `target.gcp.cloudSqlTier: db-custom-2-7680` selects
 Enterprise while retaining MySQL 8.4. That example requests 2 vCPUs and 7680 MB
 of memory. The provider validates custom size limits and regional dedicated-core
-support; available capacity still depends on Google. Shared-core and N4 custom
+support. Allocation depends on Google Cloud capacity. Shared-core and N4 custom
 tiers are outside this override. See [ADR 0018](adr/0018-gcp-explicit-sql-edition.md)
 and [Google's edition overview](https://docs.cloud.google.com/sql/docs/mysql/editions-intro).
 
@@ -252,8 +243,8 @@ magelift bootstrap --env staging --github-owner YOUR_OWNER --github-repo YOUR_RE
 The build identity gets Artifact Registry writer on the owned repository. The
 node identity gets repository reader. Deployment receives access to the state
 bucket and key, node impersonation, and the service roles needed to provision
-the staging stack. The listed project roles apply across the selected GCP project;
-they are not restricted to resources with a MageLift name. Review that scope
+the staging stack. The listed project roles apply across the selected GCP
+project. Review that scope
 with the project administrator and prefer a dedicated test project.
 
 Apply the reviewed grants and configure the nonsecret repository variables:
@@ -271,10 +262,10 @@ secrets. A partial setup can be rerun. Keep Composer credentials in the user's
 GitHub secret settings when the shop needs them. Custom registry authentication
 still follows the selected registry's documented flow.
 
-These options extend the existing bootstrap request; the provider RPC operation
-and SDK manifest remain unchanged. An older provider that cannot confirm the
-grants is refused by the CLI. Local tests cover the request and IAM policies;
-a real CI token exchange and deployment must be recorded separately.
+The CLI uses the existing provider RPC operation and SDK manifest for these
+options. It requires the provider to confirm the grants. Local tests check
+the request and IAM policies. Record the CI token exchange and deployment in
+a separate staging run.
 
 ## GCP native edge DNS
 
@@ -301,8 +292,8 @@ referenced by the generated workflow. Set the `MAGELIFT_AZURE_STORAGE_ACCOUNT`
 and `MAGELIFT_AZURE_TENANT_ID` variables and the
 `MAGELIFT_PULUMI_CONFIG_PASSPHRASE` secret in each deployment environment.
 Use the state account and passphrase created for that environment. The Azure
-login provides the CLI session used by Pulumi and the Blob client; the identity
-needs Blob data access. The generated deployment jobs install `kubelogin`.
+login provides the session that Pulumi and the Blob client use. Grant that
+identity Blob data access. The generated deployment jobs install `kubelogin`.
 
 The dedicated AKS graph provisions a VNet, cluster, MySQL Flexible Server,
 Key Vault and Azure Files. Set `target.azure.acrResourceId` for pull access to

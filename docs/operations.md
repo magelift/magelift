@@ -1,22 +1,21 @@
 # Deployment operations
 
-The deployment contract is shared by every target. The provider-neutral orchestrator
-defines validation, locking, preview, candidate registration, Magento migrations,
-service updates, stabilization, health checks and release recording. On AWS ECS, the
-provider runs migrations in a candidate task and deregisters its task definition
-afterwards. GKE and AKS run Magento workloads in Kubernetes. Pulumi manages each
-environment's infrastructure. If deployment stops early, MageLift gives cleanup
-time to finish before releasing that deployment's lock.
+MageLift validates the environment, takes its lock and previews the Pulumi
+changes. The provider registers the candidate, runs Magento migrations and
+updates the service. MageLift checks the rollout and the running shop before
+recording the release. On ECS, the provider runs migrations in a candidate task
+and deregisters its task definition afterwards. GKE and AKS run Magento
+workloads in Kubernetes. If the deployment stops early, MageLift gives cleanup
+time to finish before releasing the lock.
 
 `magelift doctor` resolves the build configuration and every named environment. It
-prints all readiness checks, including failures, before exiting. Exit code 4 means
-the file parsed but one or more resolved contracts are invalid; read and schema
-errors use the invalid-input exit code 2.
+prints every readiness check before exiting. Exit code 4 means the file parsed
+and a resolved setting failed a check. File read and schema errors exit 2.
 
 Use `magelift doctor --local` before cloud login or deployment. It checks local
 tools and configuration without probing cloud credentials or downloading a
-provider. Missing or invalid configuration is reported with the other checks;
-local readiness failures exit 4. Installing tools still requires the separate
+provider. The command reports missing or invalid configuration alongside the
+other checks. Local readiness failures exit 4. Installing tools requires the separate
 `--install-dependencies` option and its normal confirmation.
 
 For a local support report, run:
@@ -25,21 +24,21 @@ For a local support report, run:
 magelift doctor --local --export doctor-metadata.json
 ```
 
-The new file has mode 0600; existing files and symlinks are refused. The export
-contains the known CLI version, OS/architecture, known target category and check
-categories/statuses/counts and known required/optional tool classifications.
-Missing optional tools remain distinct from failed checks. It omits project and
-environment names, account IDs,
-paths, configuration values, free-text errors, tool output, tokens, URLs and logs.
-Unknown target categories and arbitrary version strings are omitted. The full
-console report remains separate and can contain private diagnostic details.
-Nothing is uploaded. Review any raw logs separately before sharing them; an
-extension can put private data in its logs. An export also works with missing
-configuration; without `--local`, invalid-input failures retain exit 2.
+MageLift creates the file locally with mode 0600 and refuses an existing file
+or symlink. The export contains the recognized CLI version, operating system,
+architecture and target category. It includes check categories, statuses and
+counts. It reports whether a recognized tool is required or optional and
+separates missing optional tools from failed checks.
 
-When `preview`, `deploy`, or `destroy` fails because another Pulumi update
-holds the stack lock, the command exits 5 with a wait-and-retry sentence
-instead of the generic failure, so CI can tell a collision from a graph bug.
+The export omits names, account IDs, paths, configuration values, free-text
+errors, tool output, tokens, URLs and logs. Unrecognized version strings and
+target categories are also omitted. The console report may include private
+diagnostics. Review raw logs before sharing them because extensions can write
+private data. The export works with a missing project file. Without
+`--local`, invalid-input failures still exit 2.
+
+`preview`, `deploy`, and `destroy` exit 5 when another Pulumi update
+holds the stack lock. Wait for the active update to finish before retrying.
 
 If CI supplied the image digest during deployment, you can still run
 `magelift edge purge --env staging` from a fresh checkout. On ECS with CloudFront
@@ -53,13 +52,13 @@ For a database with zero tables, the deployment migration first runs Magento's
 schema and data upgrade commands, then the normal upgrade, configuration import
 and cache commands. An existing database skips this initial step. This does not
 create an administrator. A failed migration stops deployment without an automatic
-Job retry; inspect the failing step and database before retrying. A partially
-initialized database is preserved and may need repair before another attempt.
+Job retry. Inspect the failing step and database first. MageLift leaves a
+partially initialized database in place so you can diagnose and repair it.
 See [ADR 0021](adr/0021-empty-magento-database-bootstrap.md).
 
 Magento readiness checks the database, configured search engine and endpoint.
-Bare OpenSearch service names use HTTP on port 9200, matching runtime settings;
-explicit HTTP(S) endpoints retain their configured port and path. SigV4-only
+Bare OpenSearch service names use HTTP on port 9200, matching runtime settings.
+Explicit HTTP(S) endpoints keep their configured port and path. SigV4-only
 endpoints skip the unsigned reachability request. See
 [ADR 0012](adr/0012-search-proof-shapes.md).
 
@@ -71,28 +70,21 @@ an explicit acknowledgement of that limitation.
 
 ## Incompatible schema changes (runbook)
 
-Static content is baked into the image at build (the PHP lifecycle plan owns
-it); deploy-time migration runs config import, schema upgrade, and cache
-operations only, and serving containers receive baked assets by image-digest
-identity. Deploy success means the intended rollout plus a passing serving
-request and bounded Magento probe: scheduler settlement alone never
-reports success.
+The build packages static assets into the application image. During rollout,
+MageLift upgrades the database, imports configuration and runs cache commands.
+It then checks that the serving endpoint responds and that Magento is ready.
 
-The preview alpha supports compatible migrations only (additive,
-reversible schema changes). Incompatible (destructive or irreversible)
-changes on production ride an operator-attested manual procedure: the
-flag records human judgement, not automated verification. MageLift does
-not verify maintenance state, stop cron or consumers itself, share the
-maintenance flag across replicas, or protect pods the rollout creates.
-Zero-downtime incompatible schema changes are explicitly not promised.
-For any production deploy that may carry one:
+Schedule a maintenance window for a destructive or irreversible production
+schema change. Your team manages maintenance mode on the serving replicas and
+stops background writers. The acknowledgement flag records that an operator
+completed that work.
 
 1. Take a fresh backup (database plus media export) and confirm it restores.
 2. Enable maintenance mode (`bin/magento maintenance:enable`).
-3. Drain writers yourself: stop cron and queue consumers; confirm no active writers.
+3. Stop cron and queue consumers. Confirm that no writer is active.
 4. Deploy with `--ack-maintenance-drain`, attesting steps 1-3.
 5. Verify health output, then disable maintenance mode.
-6. Scale consumers and cron back; watch the first scheduled runs.
+6. Scale consumers and cron back up, then watch the first scheduled runs.
 
 A digest rollback never reverses a migration: rolled-back code on a migrated
 schema is a forward fix (compatible follow-up migration), never a downgrade.
@@ -130,9 +122,9 @@ credentials against the environment's cloud account.
 local binary. `magelift upgrade` downloads the matching OS/architecture archive,
 verifies the keyless Sigstore bundle for `checksums.txt`, then verifies the
 archive's SHA-256 entry before atomically replacing the current executable.
-Release artifacts are built by GoReleaser and accompanied by GitHub artifact
-attestations; package-manager installations remain an option for teams that do
-not permit self-updates.
+GoReleaser builds the release archives, and GitHub publishes artifact
+attestations. Teams that restrict self-updates can install with a package
+manager.
 `magelift state status` inspects the bootstrap-created lock object and reports its
 owner when another process holds it. `magelift state backup` takes a versioned
 snapshot of Pulumi state while holding the deployment lock. Bootstrap retains
@@ -158,9 +150,9 @@ protection. [Bootstrap the selected provider](bootstrap.md)
 Compiled extensions may add deployment and post-deployment hooks through the Go SDK.
 Hooks target stable operation IDs such as `deploy.migrations`, `deploy.update`, and
 `post-deploy.health`, declare dependencies, and run with a timeout and bounded retry
-policy. `replace` and `disable` are explicit graph operations; arbitrary numeric
-priorities and shell-command matching are not supported. Project configuration is limited to the
-Magento preparation lifecycle, so ordinary projects do not need an extension.
+policy. Use `replace` and `disable` to change an explicit operation. Hooks
+match operation IDs. Project configuration can customize the Magento build
+lifecycle without compiling an extension.
 
 `magelift secret set <name> --value-stdin` reads the value from standard input.
 `magelift secret list` displays the provider's secret references. On AWS,
@@ -168,8 +160,8 @@ Magento preparation lifecycle, so ordinary projects do not need an extension.
 window. On other clouds, recovery follows the destination secret store's policy.
 
 `magelift build --push` and `magelift sign --digest <registry>@sha256:<digest>`
-sign the published digest using the same login already used for Magento. On GCP
-that is `gcloud`; MageLift impersonates the CI service account created by
+sign the published digest using your active login. On GCP, MageLift uses
+`gcloud` to impersonate the CI service account created by
 `magelift bootstrap` (`ml-<project>-<env>-ci@<gcp-project>.iam.gserviceaccount.com`).
 Override with `MAGELIFT_SIGNING_SERVICE_ACCOUNT` or
 `CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT`. In GitHub Actions the workflow's
@@ -181,8 +173,8 @@ with the current login and records the release. `--certificate-identity` and
 `--certificate-oidc-issuer` remain available for CI overrides. Use `--from` to
 name the environment that supplied the digest. Successful deployments append a
 deploy event to the same journal. MageLift writes the release history to
-`.magelift/releases/<environment>.jsonl` with an atomic file replacement; these
-commands do not contact AWS.
+`.magelift/releases/<environment>.jsonl` with an atomic file replacement. The
+journal is local and the release recording needs no AWS API calls.
 
 `magelift history` reads the release journal. `magelift evidence` exports the
 image digest, actor, configuration source and backup policy with secret values
@@ -200,8 +192,8 @@ the cache. [GKE edge outputs](bootstrap.md#gcp-native-edge-dns)
 selects an earlier signed digest, verifies it again, refuses when the selected
 digest cannot run on the live Magento schema, runs the same candidate-task and
 service workflow with that digest, and records a new release that points to it.
-Deploy journal rows often omit Cosign identity and schema epoch; rollback looks
-those up from the newest promote of the same digest. Promote and deploy record
+When a deploy event omits Cosign identity or schema epoch, rollback reads
+them from the newest promotion of the same digest. Promote and deploy record
 `schemaEpoch` from Magento `patch_list` plus `setup_module` counts only when a
 dumpimport transport is explicit: `MAGELIFT_DUMPIMPORT_RUNNER=kube` with
 namespace and pod/selector, or `MAGELIFT_DUMPIMPORT_HOST`. They do not dial
@@ -209,9 +201,9 @@ localhost MySQL. Missing epochs fail closed before cutover. It does not delete h
 database migrations. Promote and rollback both
 require `--yes` when the selected environment has `class: production`.
 
-`magelift cost` is account-free by default and is routed through the selected
-provider's `CostEstimator` adapter (same boundary as logs/ops; ADR 0004). AWS ECS
-Fargate reports catalog capacity and budget inputs; `magelift cost --live` queries
+`magelift cost` uses the selected provider's `CostEstimator` adapter. The
+default estimate needs no account credentials. AWS ECS Fargate reports
+catalog capacity and budget inputs. `magelift cost --live` queries
 the AWS Price List API for on-demand capacity in the selected region and separates
 priced resources from capacity that remains an estimate and products AWS could not
 match. GCP `cost --live` is not wired and returns an error telling the operator
@@ -220,32 +212,29 @@ to use account-free mode (omit `--live`). Experimental targets return
 Data transfer, requests, storage growth, logs, WAF, CloudFront, and NAT processing
 remain unsupported because they depend on real workload measurements. A budget is
 never presented as a forecast. On GCP, `magelift cost --budget` reads only
-budgets scoped exactly to the configured project and reports alert thresholds;
-account-wide or multi-project budgets are omitted. The Cloud Billing Budget API
-does not provide current or forecast spend through this read path, and a budget
-does not block deployments. Every budget report carries `Enforced: false`:
-MageLift validates the configured budget and reports alert thresholds; it never
-caps or stops spend, and provider billing delay means recently destroyed
-resources can still appear on the next invoice. For actual spend, use the
+budgets scoped to that Google Cloud project alone and reports alert thresholds.
+The Cloud Billing Budget API
+does not return current or forecast spend through this read path. Budget reports
+carry `Enforced: false` because the thresholds are alerts. MageLift validates and
+reports them while deployments proceed as usual. Provider billing delay means
+recently destroyed resources can appear on the next invoice. For actual spend, use the
 provider's billing report or your billing export. The GCP budget reader needs
 `billing.budgets.list` on the associated billing account.
 
 For AWS, `magelift cost --budget` reads account-scoped cost budgets and their
-percentage notifications through the read-only Budgets API. Preview environments
-do not inherit those account or production limits; the report is scoped to the
-preview environment and stays `not-configured` until a preview-owned budget
-exists. Expensive preview catalog choices (Amazon MQ, provisioned OpenSearch,
+percentage notifications through the read-only Budgets API. The preview report
+stays `not-configured` until that preview has its own budget. Expensive preview
+catalog choices (Amazon MQ, provisioned OpenSearch,
 multi-instance Aurora) are flagged in the account-free notice. It includes the
 provider's current and forecast values when returned, but account budgets are
 not treated as MageLift environment-owned or deployment-enforcing unless a
-future ownership contract proves that mapping. OVHcloud and Scaleway report
-budget state as unavailable until their authenticated budget APIs and scope
-semantics are verified; `monthlyBudgetCents` remains a planning input only.
+provider report identifies the environment. Treat `monthlyBudgetCents` as a
+planning input.
 
 Standard and high-availability presets include private interface endpoints for the
-runtime's AWS control-plane traffic. Preview uses the S3 gateway endpoint only; its
-remaining AWS API and image/log traffic uses the preview NAT path to avoid adding
-fixed endpoint-hour charges to disposable environments.
+runtime's AWS control-plane traffic. The preview has an S3 gateway endpoint.
+Its other AWS API, image and log traffic uses NAT to avoid hourly interface
+endpoint charges.
 
 An existing VPC can be supplied with explicit public, private, and data subnet IDs.
 MageLift then leaves routing, NAT, and endpoint ownership with that network and
@@ -253,39 +242,39 @@ validates the imported subnet shape before Pulumi resource registration.
 
 `magelift health` defaults to account-free configuration checks. `--mode outputs`
 checks that the last successful stack exposes structurally valid HTTPS application
-and media URLs; reading outputs may require access to the configured Pulumi backend.
+and media URLs. The command may need access to the configured Pulumi backend.
 `--mode runtime` reads provider runtime state (ECS service/task or Kubernetes
 rollout) and does not infer health from configuration or stack outputs. Each check
 includes a `layer` of `infrastructure`, `service`, `magento`, `dependency`, or
 `deployment`. Magento down with a healthy database is overall unhealthy (exit 4).
 Exit code 4 means a check failed, while exit code 3 means the requested evidence is
-unavailable. Production AWS stacks additionally run a CloudWatch Synthetics check
+unavailable. Production AWS stacks run a CloudWatch Synthetics check
 against the public
 `/health` endpoint every five minutes. The canary's `SuccessPercent` alarm treats
 missing data as a failure and sends notifications through the configured SNS topic.
 Run artifacts are encrypted, versioned, and lifecycle-managed in the private
-synthetic-artifact bucket. The CLI health command reports ECS evidence; canary run
-history and screenshots remain in CloudWatch Synthetics.
+synthetic-artifact bucket. The CLI health command reports ECS checks. Find
+canary history and screenshots in CloudWatch Synthetics.
 
 `magelift ci generate --magelift-version vX.Y.Z` writes a deterministic GitHub Actions
 workflow for the configured provider/runtime and environment matrix. The shared
 workflow validates every environment, builds and signs one digest, previews opt-in
 pull requests labeled `magelift-preview`, destroys the preview when its label is removed or its pull
 request closes, deploys `staging` on main, sweeps expired previews hourly, and gates
-a manual `production` run with the GitHub production environment. Fixed environment
-names are unchanged; preview names derive from the repository and pull-request
-number, while branch and commit values remain diagnostic metadata.
+a manual `production` run with the GitHub production environment. Stable
+environments keep their names. Preview names use the repository and pull-request
+number. The branch and commit appear in diagnostics.
 
 The AWS generator uses the role variables returned by `magelift bootstrap` with
 GitHub flags. The GCP generator uses `MAGELIFT_GCP_PROJECT_ID`,
 `MAGELIFT_GCP_REGION`, `MAGELIFT_GCP_WORKLOAD_IDENTITY_PROVIDER`, and
 separate build and environment service-account variables for GitHub federation
-(see [bootstrap](bootstrap.md#generated-ci-and-pull-request-previews)). Magelift
+(see [bootstrap](bootstrap.md#generated-ci-and-pull-request-previews)). MageLift
 derives stack state from `magelift.php` after bootstrap. `build --push` needs
 only the final application image destination. Promotion consumes an existing
-build run and signed digest; its expected producer identity/issuer is independent
-of the deployment login. GCP uses short-lived credentials; long-lived
-service-account keys are not part of the workflow contract.
+build run and signed digest. It verifies the identity and issuer of the build
+job. Deployment uses a separate login. GCP exchanges the job identity for
+short-lived credentials.
 
 `magelift ci validate` detects a missing, edited, or configuration-drifted workflow
 without contacting a cloud provider. Preview apply and close jobs are serialized by
@@ -295,8 +284,8 @@ checks still run before provider mutation because queued GitHub events can be st
 `magelift logs --service web|deploy|cron` reads the selected ECS service's structured
 CloudWatch log group. Use `--since 15m` or an RFC3339 timestamp, `--filter` for a
 CloudWatch Logs pattern, and `--limit` to bound the response. The command paginates
-and sorts events before writing table, JSON, or YAML output; it does not fall back to
-local container logs when AWS evidence is unavailable.
+and sorts events before writing table, JSON, or YAML output. If AWS logs are
+unavailable, the command reports the failure.
 
 `magelift exec --service web --container web -- <command>` selects a running task and
 starts the AWS-supported ECS Exec session through the locally installed AWS CLI.
@@ -308,12 +297,10 @@ selected container as required by ECS Exec.
 `--service deploy` is rejected: migrate is a one-off candidate task, not a durable
 service. Use `magelift logs --service deploy` for migration output.
 `magelift tunnel` is capability-driven. Kubernetes runtimes can forward the
-application, queue, queue management UI, and search API through `kubectl`; the
-database path is intentionally unsupported there until a provider-native private
-proxy is available. GCP database tunnels use the Cloud SQL Auth Proxy and require
-the private connection output. Database and dashboard paths that are not verified
-by the selected adapter fail explicitly; MageLift never falls back to a public
-endpoint.
+application, queue, queue management UI and search API through `kubectl`.
+Database tunnels need a provider-native private proxy. GCP uses the Cloud SQL
+Auth Proxy and requires the private connection output. The command reports
+unsupported database and dashboard paths instead of opening a public endpoint.
 
 Local development stays account-free. `magelift local init` resolves the
 source-dated local compatibility row for the configured Magento release before it
@@ -357,43 +344,28 @@ local contract fails before Compose creates a volume. Use the project-level
 ```
 
 `local init` also writes `.magelift/local.php.ini` and mounts it as the final PHP
-configuration layer in the app container. The nginx + PHP-FPM runtime image
-builds the verified local extension baseline; an extension outside that baseline
-fails during planning instead of being reported as available metadata.
+configuration layer in the app container. The nginx/PHP-FPM recipe includes a fixed list of extensions. Planning reports
+a missing extension before Docker starts.
 
 Then use `magelift local up --service database` for the database, or
 `magelift local up --service app` for the full Magento stack. The app profile
-runs the selected web-runtime image, which is nginx + PHP-FPM by default, plus OpenSearch and
-RabbitMQ. The CLI reports compatibility advice for `frankenphp-classic` and `php-apache`. `frankenphp-worker` is unregistered. Selecting `webCache: varnish`
+runs nginx and PHP-FPM with the selected services. Setting `webCache: varnish`
 adds Varnish in front of nginx and keeps the app's direct HTTP port on 8081 by
 default. `magelift local status`, `magelift local logs`, and
 `magelift local exec --service app -- <command>` complete the workflow.
 `magelift local reset --yes` removes all local capability volumes. Service containers use upstream tags derived from the selection. A project may supply an explicit image digest. Artemis uses Magento's STOMP queue transport and a
-Jolokia-backed broker image contract. Redis remains outside the current Adobe
-rows; MageLift reports that choice as an explicit warning. SMTP and SES modes write Magento's
+Jolokia-backed broker image contract. MageLift warns about Redis when it falls
+outside the Adobe version guidance for the selected release. SMTP and SES modes write Magento's
 `system.smtp` configuration. Both take explicit host, port, username, and a
-credential environment variable; no vendor endpoints are baked in. Point
-`smtp` at any provider relay: OVH mailbox (`smtp.mail.ovh.net`, port 465
-SSL/TLS or 587 STARTTLS, full mailbox address as username, about 200 mails
-per hour and not for bulk), Scaleway TEM (`smtp.tem.scaleway.com`, port 587
-STARTTLS or 465/2465 TLS, Project ID as username, API secret key as password),
-or Cloudflare Email Sending (`smtp.mx.cloudflare.net`, port 465 implicit TLS
-only, username `api_token`, API token with Email Sending permission as
-password; beta), or SendGrid (`smtp.sendgrid.net`, port 587, username
-`apikey`, API key as password; manual-only until a stable Pulumi package
-exists). GCP and Fastly have no native email sending; shops there
-point `smtp` at SES or another relay.
+credential environment variable. Use the host and port provided by your SMTP relay.
 Put the credential variable in `.magelift/local.env` when the app needs it. The
 resolver reads it inside the container without writing the secret to the
 generated Compose file. `local.email.mode: mailpit` starts a digest-pinned
 Mailpit sidecar (`axllent/mailpit:v1.33.0`) on loopback SMTP 1025 / UI 8025
-with `/mailpit readyz`, and wires Magento SMTP to that sink. It is not cloud
-delivery. The generated credentials and
-loopback-only ports are for local development only; do not reuse them in a
-deployed environment. The app also listens on `https://localhost:8443`. Use
-`MAGELIFT_LOCAL_HTTPS_PORT` to change the host port. The certificate is
-local and ephemeral; trust it only in a development profile, and do not use it
-as production TLS evidence.
+with `/mailpit readyz` and points Magento at that SMTP server. Keep local
+credentials on the workstation. The app also listens on `https://localhost:8443`
+with an ephemeral development certificate. Set `MAGELIFT_LOCAL_HTTPS_PORT`
+to change the local HTTPS port.
 
 For a Magento repository with dependencies already installed, run
 `MAGELIFT_LOCAL_ADMIN_PASSWORD='...' magelift local seed`. The command starts the
@@ -402,7 +374,7 @@ writes the administrator password only to `.magelift/local.env` with mode 0600.
 The generated `.magelift/` directory is ignored by Git. If `app/etc/env.php`
 already exists, seeding reports that the project is installed and does not run a
 second installation. The password must be at least 16 alphanumeric characters;
-the command never prints it or places it in the Docker command arguments.
+MageLift keeps it out of output and Docker command arguments.
 
 ## Operator verbs
 
@@ -485,9 +457,8 @@ need deployment-specific evidence. [Pulumi unit tests](https://www.pulumi.com/do
 
 Start with a staging deployment, record its image digest and check a shopper journey.
 Restore a recent database and media snapshot to an empty destination, then measure
-how long it takes to return the shop to service. Use the archive to compare the
-specific GCP configuration from the alpha run. [Staging walkthrough](onboarding.md) ·
-[Database and media rehearsal](weekend-migrate.md) · [Archived GCP run](alpha-recipe.md)
+how long it takes to return the shop to service. The archived Google Cloud run lists its exact service settings. [Staging walkthrough](onboarding.md) ·
+[Database and media rehearsal](weekend-migrate.md) · [Archived Google Cloud configuration](evidence/gcp-autopilot-alpha-configuration.md)
 
 ## Staging, UAT and pull requests
 
@@ -495,7 +466,11 @@ Keep the application image, PHP and dependency selectors at project level. Chang
 
 The generated GitHub workflow builds in the shop’s registry. After reviewing the current head of a same-repository PR to `main`, apply `magelift-preview` to deploy that revision. Removing the label schedules teardown. After reviewing a later head, reapply it to authorize that revision. Its stack is keyed by repository and PR number and its domain is derived from the preview domain. The workflow uses the base revision of the PHP project for privileged planning and deployment. Use the `preview-build` GitHub environment for the registry identity and `preview` for deployment. Configure required reviewers for these two environments. Stable builds use the `build` environment. Configure their cloud roles and GitHub environment protections before enabling the workflow.
 
-The starter sets `previewTtl` to `168h`. CI anchors the duration to the pull request event timestamp, so repeated evaluation of the same event produces the same expiration. Closing the PR requests teardown. A scheduled sweep processes expired previews using their recorded ownership. The monthly budget is an estimate input; check provider billing and set account alerts for a spending limit.
+The starter sets `previewTtl` to `168h`, or seven days. CI counts from the pull
+request event timestamp, so retrying the same event keeps the expiration.
+Closing the PR requests teardown. The scheduled sweep uses the recorded owner to
+clean up expired previews. The monthly budget informs the cost estimate. Check
+provider billing and set account alerts to track spend.
 
 An AWS team with an existing Fargate cluster and VPC can place `target.aws.previewPool.clusterArn` under its preview environment and supply `target.aws.existing.network` and the public, private and data subnet IDs. The preview reads the shared cluster and owns its own ECS services. Bootstrap the authored preview environment once. PRs have distinct Pulumi stacks and lock records in its state backend. Keep the compute pool in a separately managed stack. Use separate databases, secrets, storage and service identities for PRs that can change code.
 

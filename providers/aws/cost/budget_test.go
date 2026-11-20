@@ -163,7 +163,7 @@ func (p budgetPlanned) Runtime() sdk.RuntimeID   { return "ecs-fargate" }
 func (p budgetPlanned) Project() string          { return "shop" }
 func (p budgetPlanned) Environment() string      { return p.environment }
 func (p budgetPlanned) Region() string           { return p.region }
-func (p budgetPlanned) CertificationTier() platform.CertificationTier {
+func (p budgetPlanned) RuntimeTier() platform.RuntimeTier {
 	return platform.TierBuiltIn
 }
 func (p budgetPlanned) EnvironmentClass() string { return "staging" }

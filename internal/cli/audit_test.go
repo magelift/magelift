@@ -27,7 +27,7 @@ func TestAuditExportsControlPointersWithoutSecretsOrCertificates(t *testing.T) {
 			t.Fatalf("audit claimed %q: %s", banned, got)
 		}
 	}
-	if !strings.Contains(got, "does not certify") {
+	if !strings.Contains(got, "covers project settings") {
 		t.Fatalf("missing disclaimer: %s", got)
 	}
 	var report auditReport

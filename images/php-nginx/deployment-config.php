@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// The same runtime file is used by nginx/FPM, Apache/FPM and FrankenPHP.
+// nginx and PHP-FPM use this file to read Magento runtime settings.
 // Handle CORS before Magento bootstrap, including on preflight requests.
 mageliftHandleCors();
 

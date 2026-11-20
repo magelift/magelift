@@ -134,10 +134,10 @@ func TestGCPAdapterRowsDoNotClaimUnimplementedClients(t *testing.T) {
 		t.Fatalf("new adapter: %v", err)
 	}
 	for _, capability := range adapter.ResilienceDescriptor().DataClasses {
-		if capability.Status == sdk.ResilienceCapabilitySupported || capability.Status == sdk.ResilienceCapabilityCertified {
+		if capability.Status == sdk.ResilienceCapabilitySupported {
 			t.Fatalf("data class %q claims status %q without a concrete provider client", capability.Name, capability.Status)
 		}
-		if capability.Status == sdk.ResilienceCapabilityExperimental && !strings.Contains(capability.Reason, "operation translator") {
+		if capability.Status == sdk.ResilienceCapabilityExperimental && strings.TrimSpace(capability.Reason) == "" {
 			t.Fatalf("experimental data class %q has incomplete reason: %q", capability.Name, capability.Reason)
 		}
 	}

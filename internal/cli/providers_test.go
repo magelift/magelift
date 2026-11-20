@@ -425,45 +425,6 @@ func TestDefaultLoadProviderAcquiresPinnedGCPFromOfflineCache(t *testing.T) {
 	}
 }
 
-func TestProvidersInstallBuiltinOnlyHasNoSideEffects(t *testing.T) {
-	for _, provider := range []struct{ name, runtime, settings string }{
-		{"ovh", "mks", "ovh:\n    serviceName: example-service"}, {"scaleway", "kapsule", "scaleway:\n    projectId: example-project"},
-	} {
-		t.Run(provider.name, func(t *testing.T) {
-			dir := t.TempDir()
-			t.Chdir(dir)
-			configPath := filepath.Join(dir, "magelift.php")
-			target := "provider: " + provider.name + "\n  runtime: " + provider.runtime + "\n  " + provider.settings
-			text := strings.Replace(providersTestConfig, "provider: gcp\n  runtime: gke-autopilot\n  gcp:\n    project: example-gcp-project\n    region: europe-west1", target, 1)
-			if err := writeTestProjectFile(configPath, []byte(text), 0600); err != nil {
-				t.Fatal(err)
-			}
-			var out bytes.Buffer
-			o := testOptions(&out, &fakeTerminal{interactive: false})
-			o.executable = func() (string, error) { t.Fatal("builtin target looked up executable"); return "", nil }
-			o.fetchProviderLock = func(context.Context, string) (providerhost.Lockfile, error) {
-				t.Fatal("builtin target fetched lock")
-				return providerhost.Lockfile{}, nil
-			}
-			o.ensureProviderVerifier = func(context.Context, string) (string, error) {
-				t.Fatal("builtin target installed verifier")
-				return "", nil
-			}
-			cmd := newCommandWithOptions(o)
-			cmd.SetArgs([]string{"--config", configPath, "--output", "json", "providers", "install"})
-			if err := cmd.Execute(); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := os.Stat("magelift.providers.lock"); !os.IsNotExist(err) {
-				t.Fatalf("unexpected lock: %v", err)
-			}
-			if !strings.Contains(out.String(), `"providers": []`) {
-				t.Fatalf("output: %s", out.String())
-			}
-		})
-	}
-}
-
 func TestProvidersBootstrapRejectsMismatchedReleaseBeforeSideEffects(t *testing.T) {
 	for _, field := range []string{"version", "identity", "extra-provider"} {
 		t.Run(field, func(t *testing.T) {

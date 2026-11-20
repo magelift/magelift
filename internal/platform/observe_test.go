@@ -21,8 +21,6 @@ func TestValidateFirstPartyObservability(t *testing.T) {
 		{name: "disabled"},
 		{name: "AWS logs", nativeProvider: "cloudwatch", target: "aws", logs: true},
 		{name: "GCP logs", nativeProvider: "google-cloud-operations", target: "gcp", logs: true},
-		{name: "Scaleway Cockpit", nativeProvider: "scaleway-cockpit", target: "scaleway", logs: true, metrics: true},
-		{name: "OVH Logs Data Platform", nativeProvider: "ovh-logs-data-platform", target: "ovh", logs: true},
 		{name: "wrong cloud", nativeProvider: "cloudwatch", target: "gcp", logs: true, wantError: "target.provider aws"},
 		{name: "extension provider is validated by its adapter", externalProvider: "datadog", target: "aws", logs: true},
 		{name: "native and independent providers", nativeProvider: "cloudwatch", externalProvider: "newrelic", target: "aws", logs: true, metrics: true, traces: true},
@@ -79,15 +77,9 @@ func TestValidateFirstPartyEdgeAcrossOriginProviders(t *testing.T) {
 		{name: "GCP load balancing", target: "gcp", nativeProvider: "google-cloud-load-balancing"},
 		{name: "GCP CDN", target: "gcp", nativeProvider: "cloud-cdn"},
 		{name: "GCP Armor", target: "gcp", nativeProvider: "cloud-armor"},
-		{name: "Scaleway Edge Services", target: "scaleway", nativeProvider: "scaleway-edge-services"},
-		{name: "Scaleway load balancer", target: "scaleway", nativeProvider: "scaleway-load-balancer"},
-		{name: "OVH CDN", target: "ovh", nativeProvider: "ovh-cdn"},
-		{name: "OVH load balancer", target: "ovh", nativeProvider: "ovh-public-cloud-load-balancer"},
 		{name: "Fastly composition", target: "aws", external: "fastly"},
 		{name: "wrong AWS provider", target: "aws", nativeProvider: "cloud-cdn", wantError: "target.provider \"aws\""},
 		{name: "wrong GCP provider", target: "gcp", nativeProvider: "cloudfront", wantError: "target.provider \"gcp\""},
-		{name: "wrong Scaleway provider", target: "scaleway", nativeProvider: "ovh-cdn", wantError: "target.provider \"scaleway\""},
-		{name: "wrong OVH provider", target: "ovh", nativeProvider: "cloudfront", wantError: "target.provider \"ovh\""},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -119,7 +119,7 @@ func normalizeDoctorExportStatus(status string) string {
 // still allow private names or credential-like values from configuration.
 func exportableDoctorTarget(provider, runtimeID string) *doctorExportTarget {
 	switch provider + ":" + runtimeID {
-	case "gcp:gke-autopilot", "gcp:gke-standard", "aws:ecs-fargate", "aws:eks", "ovh:mks", "scaleway:kapsule":
+	case "gcp:gke-autopilot", "gcp:gke-standard", "aws:ecs-fargate", "aws:eks", "azure:aks":
 		return &doctorExportTarget{Provider: provider, Runtime: runtimeID}
 	default:
 		return nil

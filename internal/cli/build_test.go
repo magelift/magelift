@@ -167,7 +167,7 @@ func TestApplyResolvedImagesUsesBuilderIDForLocalTags(t *testing.T) {
 
 func TestDigestReferenceReplacesMutableTag(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("d", 64)
-	reference, err := digestReference("registry.example.invalid:5000/team/shop:candidate", digest)
+	reference, err := buildpipeline.DigestReference("registry.example.invalid:5000/team/shop:candidate", digest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,10 +178,10 @@ func TestDigestReferenceReplacesMutableTag(t *testing.T) {
 }
 
 func TestDigestReferenceRejectsInvalidBuildMetadata(t *testing.T) {
-	if _, err := digestReference("shop:candidate", "sha256:"+strings.Repeat("d", 64)); err == nil {
+	if _, err := buildpipeline.DigestReference("shop:candidate", "sha256:"+strings.Repeat("d", 64)); err == nil {
 		t.Fatal("unqualified reference was accepted")
 	}
-	if _, err := digestReference("registry.example.invalid/team/shop:candidate", "sha256:short"); err == nil {
+	if _, err := buildpipeline.DigestReference("registry.example.invalid/team/shop:candidate", "sha256:short"); err == nil {
 		t.Fatal("invalid digest was accepted")
 	}
 }
@@ -355,20 +355,19 @@ func TestApplyResolvedLocalOverridesKeepRuntimeDriftGuard(t *testing.T) {
 	}
 }
 
-func TestDefaultImageRecipeRejectsWrongPHPOrRuntimeBeforePull(t *testing.T) {
+func TestDefaultImageRecipeChecksPHPBranch(t *testing.T) {
 	for _, tc := range []struct {
-		php, runtime, builder, image string
-		allowed                      bool
+		php, builder, image string
+		allowed             bool
 	}{
-		{"8.5", "nginx-fpm", "", "", true},
-		{"8.3", "nginx-fpm", "", "", true},
-		{"8.4", "nginx-fpm", "", "", true},
-		{"8.4.1", "nginx-fpm", "", "", true},
-		{"8.2", "nginx-fpm", "", "", false},
-		{"8.5", "frankenphp-classic", "", "", false},
-		{"8.4", "nginx-fpm", "builder-override", "runtime-override", true},
+		{"8.5", "", "", true},
+		{"8.3", "", "", true},
+		{"8.4", "", "", true},
+		{"8.4.1", "", "", true},
+		{"8.2", "", "", false},
+		{"8.4", "builder-override", "runtime-override", true},
 	} {
-		if err := validateDefaultImageRecipe(tc.php, tc.runtime, tc.builder, tc.image); (err == nil) != tc.allowed {
+		if err := validateDefaultImageRecipe(tc.php, tc.builder, tc.image); (err == nil) != tc.allowed {
 			t.Fatalf("%+v: %v", tc, err)
 		}
 	}

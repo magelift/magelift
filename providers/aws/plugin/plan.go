@@ -66,8 +66,8 @@ func projectConfig(req *sdk.PlanRequest, target *config.AWSTarget) config.Config
 			Magento: config.MagentoRuntime{FrontName: m.FrontName, CookieDomain: m.CookieDomain, SecureBaseURL: m.SecureBaseURL, UnsecureBaseURL: m.UnsecureBaseURL,
 				CORSOrigins: m.CORSOrigins, StorefrontOrigin: m.StorefrontOrigin, Consumers: config.MagentoConsumers{Mode: m.ConsumersMode, Names: m.ConsumerNames},
 				QueueTransport: m.QueueTransport, QueueModule: m.QueueModule, Variables: m.Variables}},
-		Email:         config.EmailConfig{Mode: email.Mode, Host: email.Host, Port: email.Port, Username: email.Username, From: email.From, Credential: email.Credential},
-		Compatibility: config.Compatibility{AllowUnsupported: req.AllowUnsupported}, Services: req.Services,
+		Email:    config.EmailConfig{Mode: email.Mode, Host: email.Host, Port: email.Port, Username: email.Username, From: email.From, Credential: email.Credential},
+		Services: req.Services,
 	}
 	cfg.Edge.NativeProvider = req.Edge.NativeProvider
 	cfg.Edge.ExternalProvider = req.Edge.ExternalProvider
@@ -152,7 +152,7 @@ func (s *Server) Plan(req *sdk.PlanRequest, resp *sdk.PlanResult) error {
 			return err
 		}
 		backend := planned.(interface{ StateBackendURL() string }).StateBackendURL()
-		resp.Plan = sdk.StoredPlan{Provider: "aws", Runtime: req.Runtime, StackName: planned.StackName(), Tier: sdk.ExtensionCertificationTier(planned.CertificationTier()), ImageDigest: planned.ImageDigest(), StateBackendURL: backend, Opaque: opaque}
+		resp.Plan = sdk.StoredPlan{Provider: "aws", Runtime: req.Runtime, StackName: planned.StackName(), Tier: sdk.ExtensionTier(planned.RuntimeTier()), ImageDigest: planned.ImageDigest(), StateBackendURL: backend, Opaque: opaque}
 		if body.ECS != nil {
 			resp.Plan.Adopted = stack.AdoptReport(*body.ECS)
 		}
@@ -198,7 +198,7 @@ func checked(envelope sdk.Envelope, plan sdk.StoredPlan) (stored, platform.Stack
 		return b, nil, nil, integrity("AWS stored plan identity differs from the requested environment")
 	}
 	if p.StackName() != plan.StackName || plan.StackName != envelope.StackName ||
-		plan.Tier != sdk.ExtensionCertificationTier(p.CertificationTier()) ||
+		plan.Tier != sdk.ExtensionTier(p.RuntimeTier()) ||
 		p.ImageDigest() != plan.ImageDigest || p.(interface{ StateBackendURL() string }).StateBackendURL() != plan.StateBackendURL {
 		return b, nil, nil, integrity("AWS stored plan metadata differs from the planned stack")
 	}

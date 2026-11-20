@@ -65,7 +65,7 @@ type Plan struct {
 
 // SignalObservation is returned by a provider-specific probe after a
 // telemetry destination has received data. A plan alone cannot prove delivery
-// or retention, so certification requires every relevant boolean to be true.
+// or retention. Verification checks each of those settings.
 type SignalObservation struct {
 	Signal            string `json:"signal" yaml:"signal"`
 	Destination       string `json:"destination" yaml:"destination"`
@@ -98,10 +98,8 @@ type Verification struct {
 	Failures   []string               `json:"failures,omitempty" yaml:"failures,omitempty"`
 }
 
-// VerificationProbe is the provider-specific boundary for live telemetry
-// checks. It may query CloudWatch, Google Cloud Operations, Cockpit, Logs Data
-// Platform, or New Relic, but the portable adapter only consumes this semantic
-// result and never imports those SDK response types.
+// VerificationProbe reports signal delivery, telemetry resources and cleanup
+// using shared result types.
 type VerificationProbe interface {
 	VerifySignal(context.Context, SignalBinding) (SignalObservation, error)
 	VerifyOperations(context.Context, Plan) (OperationalObservation, error)
@@ -112,9 +110,8 @@ type Adapter struct{}
 
 func New() Adapter { return Adapter{} }
 
-// Plan is side-effect free. It selects native destinations where the current
-// target has one and uses OTLP for New Relic, allowing the same collector and
-// signal contract to work across ECS, EKS/GKE, Kapsule, and MKS.
+// Plan selects native destinations for the runtime and OTLP for New Relic
+// without contacting those services.
 func (Adapter) Plan(request Request) (Plan, error) {
 	if strings.TrimSpace(request.TargetProvider) == "" || strings.TrimSpace(request.TargetRuntime) == "" {
 		return Plan{}, errors.New("observability target provider and runtime are required")
@@ -122,9 +119,6 @@ func (Adapter) Plan(request Request) (Plan, error) {
 	intent := request.Intent
 	if intent.ExternalProvider != "" && intent.Lifecycle == "" {
 		intent.Lifecycle = sdk.ExternalLifecycleExtension
-	}
-	if intent.ExternalProvider != "" && intent.Certification == "" {
-		intent.Certification = sdk.ExternalExperimental
 	}
 	if err := sdk.ValidateObservabilityIntent(intent); err != nil {
 		return Plan{}, fmt.Errorf("validate observability intent: %w", err)
@@ -155,7 +149,7 @@ func (Adapter) Plan(request Request) (Plan, error) {
 	statuses := make([]SignalStatus, 0, len(request.Intent.Signals)*2)
 	for _, signal := range sdk.SortedStrings(intent.Signals) {
 		if native != "" {
-			status := nativeSignalStatus(native, signal, intent.NativeReference)
+			status := nativeSignalStatus(native, signal)
 			statuses = append(statuses, status)
 			if status.Status == "configured" {
 				bindings = append(bindings, SignalBinding{Signal: signal, Destination: native, Mode: "native", OwnershipMarker: intent.OwnershipMarker, RetentionDays: intent.RetentionDays, RedactionPolicy: intent.RedactionPolicyRef})
@@ -184,13 +178,13 @@ func (Adapter) Plan(request Request) (Plan, error) {
 		return statuses[i].Destination < statuses[j].Destination
 	})
 	outputs := observabilityOutputs(request.TargetProvider, request.TargetRuntime, bindings, statuses, intent.Alerts, intent.Dashboards, intent.SLOs)
-	return Plan{TargetProvider: request.TargetProvider, TargetRuntime: request.TargetRuntime, OwnershipMarker: intent.OwnershipMarker, NativeReference: intent.NativeReference, Bindings: bindings, SignalStatuses: statuses, UnavailableOperations: unavailableOperations(native, external, intent), Alerts: append([]sdk.AlertIntent(nil), intent.Alerts...), Dashboards: append([]sdk.DashboardIntent(nil), intent.Dashboards...), SLOs: append([]sdk.SLOIntent(nil), intent.SLOs...), DataResidency: intent.DataResidency, Outputs: outputs}, nil
+	return Plan{TargetProvider: request.TargetProvider, TargetRuntime: request.TargetRuntime, OwnershipMarker: intent.OwnershipMarker, NativeReference: intent.NativeReference, Bindings: bindings, SignalStatuses: statuses, UnavailableOperations: unavailableOperations(native, intent), Alerts: append([]sdk.AlertIntent(nil), intent.Alerts...), Dashboards: append([]sdk.DashboardIntent(nil), intent.Dashboards...), SLOs: append([]sdk.SLOIntent(nil), intent.SLOs...), DataResidency: intent.DataResidency, Outputs: outputs}, nil
 }
 
 // Verify turns provider-specific observations into a release-gate result. It
 // deliberately returns an incomplete result without an error when a declared
 // signal is unavailable or a check is false; callers can then retain the
-// explicit reason in evidence instead of collapsing it into an adapter error.
+// reason in the verification report.
 func (Adapter) Verify(ctx context.Context, plan Plan, probe VerificationProbe) (Verification, error) {
 	if ctx == nil {
 		return Verification{}, errors.New("observability verification context is required")
@@ -298,10 +292,6 @@ func nativeMatchesTarget(provider, target string) bool {
 		return provider == "cloudwatch"
 	case "gcp":
 		return provider == "google-cloud-operations"
-	case "scaleway":
-		return provider == "scaleway-cockpit"
-	case "ovh":
-		return provider == "ovh-logs-data-platform"
 	default:
 		return false
 	}
@@ -314,7 +304,7 @@ func externalModeEndpoint(provider, configured string) (string, string) {
 	return "exporter", configured
 }
 
-func nativeSignalStatus(provider, signal, nativeReference string) SignalStatus {
+func nativeSignalStatus(provider, signal string) SignalStatus {
 	status := SignalStatus{Signal: signal, Destination: provider, Status: "configured"}
 	switch provider {
 	case "cloudwatch":
@@ -331,25 +321,6 @@ func nativeSignalStatus(provider, signal, nativeReference string) SignalStatus {
 			status.Status = "unavailable"
 			status.Reason = "the Google Cloud lifecycle adapter currently owns only Logging probes and custom Monitoring metrics; use the GKE/provider integration or an external OTLP destination for this signal"
 		}
-	case "scaleway-cockpit":
-		switch signal {
-		case "logs", "metrics", "traces":
-		default:
-			status.Status = "unavailable"
-			status.Reason = "the Scaleway Cockpit lifecycle adapter currently owns only data-source lifecycle; provider health, audit, and alert semantics need an official adapter-backed integration or an external destination"
-		}
-	case "ovh-logs-data-platform":
-		if strings.TrimSpace(nativeReference) == "" {
-			status.Status = "unavailable"
-			status.Reason = "OVH native audit delivery requires an opaque Logs Data Platform stream reference"
-			return status
-		}
-		switch signal {
-		case "audit-events", "provider-operations":
-		default:
-			status.Status = "unavailable"
-			status.Reason = "OVH's first-party adapter currently provisions Kubernetes audit delivery only; workload logs, metrics, traces, and recovery signals require another adapter"
-		}
 	default:
 		status.Status = "unavailable"
 		status.Reason = "native provider is not registered by the observability adapter"
@@ -357,45 +328,27 @@ func nativeSignalStatus(provider, signal, nativeReference string) SignalStatus {
 	return status
 }
 
-func unavailableOperations(native, external string, intent sdk.ObservabilityIntent) []string {
+func unavailableOperations(native string, intent sdk.ObservabilityIntent) []string {
 	result := make([]string, 0, len(intent.Alerts)+len(intent.Dashboards)+len(intent.SLOs))
 	appendOperation := func(kind, id string) {
 		if strings.TrimSpace(id) != "" {
 			result = append(result, kind+"."+id)
 		}
 	}
-	// CloudWatch alarms and dashboards have provider-native lifecycle APIs;
-	// CloudWatch has no portable SLO object in this adapter yet.
+	// This adapter manages CloudWatch alarms and dashboards. It reports SLOs
+	// as unsupported.
 	if native == "cloudwatch" {
 		for _, slo := range intent.SLOs {
 			appendOperation("slo", slo.ID)
 		}
 	}
-	// Google Cloud SLOs are children of an existing Monitoring Service. The
-	// provider adapter can own them when that service identity is supplied as
-	// the opaque native reference; keep the missing prerequisite explicit at
-	// planning time rather than allowing a later mutation to fail.
+	// Google Cloud SLOs belong to a Monitoring Service. If the plan has no
+	// reference to that service, report the SLO operation as unavailable.
 	if native == "google-cloud-operations" {
 		if strings.TrimSpace(intent.NativeReference) == "" {
 			for _, slo := range intent.SLOs {
 				appendOperation("slo", slo.ID)
 			}
-		}
-	}
-	// Cockpit alert references and OVH stream subscriptions are not a
-	// provider-neutral alert/dashboard/SLO lifecycle. Do not imply ownership.
-	// New Relic is intentionally absent: its provider-local NerdGraph adapter
-	// owns these objects when configured, and returns an explicit incomplete
-	// verification otherwise.
-	if native == "scaleway-cockpit" || native == "ovh-logs-data-platform" {
-		for _, alert := range intent.Alerts {
-			appendOperation("alert", alert.ID)
-		}
-		for _, dashboard := range intent.Dashboards {
-			appendOperation("dashboard", dashboard.ID)
-		}
-		for _, slo := range intent.SLOs {
-			appendOperation("slo", slo.ID)
 		}
 	}
 	sort.Strings(result)

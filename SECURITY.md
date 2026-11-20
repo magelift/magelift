@@ -1,15 +1,8 @@
 # Security policy
 
-## Supported versions
+## Supported revisions
 
-| Line | Support |
-| --- | --- |
-| `main` | Best-effort security fixes until the first public tag |
-| `v1.0.0-rc.*` | Supported after the first public tag ships (listed here when cut) |
-| `v1.x` | Supported after `v1.0.0` (latest patch of the current minor) |
-
-Reporting against: **`main` only** until a release line appears in this table.
-There is no supported release line yet.
+Report vulnerabilities against `main`. Security fixes are best effort.
 
 ## Reporting a vulnerability
 
@@ -21,16 +14,13 @@ message.
 
 Include affected versions, impact, reproduction steps, and any suggested mitigation.
 
-### Response SLA
+### Response targets
 
 | Step | Target |
 | --- | --- |
-| Acknowledge a complete report | **5 business days** |
-| Initial severity / next steps | **10 business days** after ack |
-| Fix or advisory for supported releases | Coordinated with reporter; no fixed calendar for zero-days |
-
-Supported releases after the first public tag: see the Supported versions table
-above.
+| Acknowledge a complete report | 5 business days |
+| Initial severity / next steps | 10 business days after acknowledgment |
+| Fix or advisory for supported releases | Coordinate timing with the reporter. Timing varies for zero-days. |
 
 Never test against infrastructure or accounts you do not own or have explicit
 permission to assess. Good-faith research that follows this policy will not be

@@ -179,9 +179,9 @@ func (request PrepareRequest) validate() error {
 		problems = append(problems, errors.New("application version, PHP version, and web runtime are required"))
 	} else {
 		switch request.Application.WebRuntime {
-		case "nginx-fpm", "frankenphp-classic", "php-apache":
+		case "nginx-fpm":
 		default:
-			problems = append(problems, fmt.Errorf("web runtime plugin %q is not registered", request.Application.WebRuntime))
+			problems = append(problems, fmt.Errorf("web runtime must be nginx-fpm, got %q", request.Application.WebRuntime))
 		}
 	}
 	if request.CompatibilityStatus != "supported" && request.CompatibilityStatus != "unsupported-allowed" {

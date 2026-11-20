@@ -19,13 +19,13 @@ func TestValidatesTargetAndCapabilityDescriptors(t *testing.T) {
 }
 
 func TestValidateExternalIntentRequiresReferenceShapeAndLifecycle(t *testing.T) {
-	if err := ValidateExternalIntent("fastly", ExternalLifecycleExtension, ExternalExperimental, []string{"aws-secrets-manager://magelift/fastly-token"}); err != nil {
+	if err := ValidateExternalIntent("fastly", ExternalLifecycleExtension, []string{"aws-secrets-manager://magelift/fastly-token"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := ValidateExternalIntent("fastly", "unknown", ExternalExperimental, nil); err == nil || !strings.Contains(err.Error(), "lifecycle") {
+	if err := ValidateExternalIntent("fastly", "unknown", nil); err == nil || !strings.Contains(err.Error(), "lifecycle") {
 		t.Fatalf("invalid lifecycle was accepted: %v", err)
 	}
-	if err := ValidateExternalIntent("fastly", ExternalLifecycleExtension, ExternalExperimental, []string{"raw-token"}); err == nil || !strings.Contains(err.Error(), "credential") {
+	if err := ValidateExternalIntent("fastly", ExternalLifecycleExtension, []string{"raw-token"}); err == nil || !strings.Contains(err.Error(), "credential") {
 		t.Fatalf("plaintext credential was accepted: %v", err)
 	}
 	for _, reference := range []string{"https://example.invalid/token", "token://embedded/value", "secret://user:password@example.invalid/name", "secret://example.invalid/name#value"} {
@@ -41,7 +41,7 @@ func TestValidateExternalIntentRequiresReferenceShapeAndLifecycle(t *testing.T) 
 	if err := ValidateCredentialReference("kubernetes-secret://magelift/new-relic#license-key"); err != nil {
 		t.Fatalf("Kubernetes Secret key selector was rejected: %v", err)
 	}
-	if err := ValidateExternalIntent("", ExternalLifecycleExtension, "", nil); err == nil || !strings.Contains(err.Error(), "provider") {
+	if err := ValidateExternalIntent("", ExternalLifecycleExtension, nil); err == nil || !strings.Contains(err.Error(), "provider") {
 		t.Fatalf("metadata without provider was accepted: %v", err)
 	}
 }

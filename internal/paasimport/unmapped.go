@@ -58,8 +58,8 @@ func RenderUnmappedReport(keys []UnmappedKey) string {
 }
 
 // guidanceForFamily maps an unmapped path to its checklist family and action.
-// Actions name the MageLift equivalent; the hooks family shows the generic
-// before/after shape rather than echoing the user's hook body.
+// Actions name the MageLift equivalent. Hook guidance uses a generic example
+// to keep the shop's original shell commands out of the report.
 func guidanceForFamily(path string) (family, action string) {
 	first, _, _ := strings.Cut(path, ".")
 	switch first {

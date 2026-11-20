@@ -317,12 +317,12 @@ func InstallDependencies(ctx context.Context, runner DependencyRunner, actions [
 func SpecsForTarget(provider, runtimeID string) []DependencySpec {
 	specs := dockerDependencySpecs(DependencyOptional)
 	switch provider {
-	case "aws", "gcp", "azure", "ovh", "scaleway":
+	case "aws", "gcp", "azure":
 		specs = append(specs, DependencySpec{ID: "pulumi", Command: "pulumi", Capability: "cloud infrastructure and stack operations", Requirement: DependencyRequired, VersionArgs: []string{"version"}})
 	}
 
 	switch runtimeID {
-	case "eks", "gke-autopilot", "gke-standard", "aks", "kapsule", "mks":
+	case "eks", "gke-autopilot", "gke-standard", "aks":
 		specs = append(specs, DependencySpec{ID: "kubectl", Command: "kubectl", Capability: "Kubernetes exec and private tunnels", Requirement: DependencyOptional, VersionArgs: []string{"version", "--client=true", "--output=yaml"}, InstallPackage: "kubectl", Installable: true})
 	}
 	if provider == "gcp" {

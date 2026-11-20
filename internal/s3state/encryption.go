@@ -14,7 +14,7 @@ type EncryptionMode int
 const (
 	// EncryptionKMS requires a customer-managed KMS key ARN (AWS production).
 	EncryptionKMS EncryptionMode = iota + 1
-	// EncryptionAES256 uses S3 AES256 SSE without a KMS key (OVH/SCW/Floci).
+	// EncryptionAES256 uses S3 AES256 SSE without a KMS key.
 	EncryptionAES256
 	// EncryptionNone omits SSE headers. Only for emulators that reject SSE.
 	EncryptionNone

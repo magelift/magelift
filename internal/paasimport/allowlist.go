@@ -1,7 +1,7 @@
 package paasimport
 
-// D-07 frozen allowlist of store-breaker env vars.
-// Everything else is an intentional gap / unmapped residual (ECE-04 docs in 04-06).
+// allowlistedEnv contains source variables that the importers translate.
+// The import report lists keys outside this set.
 var allowlistedEnv = map[string]struct{}{
 	"CRYPT_KEY":       {},
 	"SCD_STRATEGY":    {},
@@ -16,7 +16,7 @@ var allowlistedEnv = map[string]struct{}{
 	"CONFIG__DEFAULT__CRON__CONSUMERS_RUNNER__CONSUMERS": {},
 }
 
-// IsAllowlistedEnv reports whether key is on the D-07 v1 allowlist.
+// IsAllowlistedEnv reports whether the importers recognize key.
 func IsAllowlistedEnv(key string) bool {
 	_, ok := allowlistedEnv[key]
 	return ok

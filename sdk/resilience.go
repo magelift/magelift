@@ -56,7 +56,6 @@ type ResilienceCapabilityStatus string
 
 const (
 	ResilienceCapabilitySupported    ResilienceCapabilityStatus = "supported"
-	ResilienceCapabilityCertified    ResilienceCapabilityStatus = "certified"
 	ResilienceCapabilityExperimental ResilienceCapabilityStatus = "experimental"
 	ResilienceCapabilityUnavailable  ResilienceCapabilityStatus = "unavailable"
 	ResilienceCapabilityUnsupported  ResilienceCapabilityStatus = "unsupported"
@@ -65,7 +64,7 @@ const (
 
 // ResilienceDataClassCapability is provider-owned capability metadata. It
 // describes the semantic operations an adapter can execute without exposing
-// AWS, GCP, Scaleway, OVHcloud, or community SDK types in the core contract.
+// cloud SDK types out of the shared contract.
 type ResilienceDataClassCapability struct {
 	Name                string                     `json:"name" yaml:"name"`
 	Status              ResilienceCapabilityStatus `json:"status" yaml:"status"`
@@ -85,10 +84,8 @@ type ResilienceDataClassCapability struct {
 	Reason              string                     `json:"reason,omitempty" yaml:"reason,omitempty"`
 }
 
-// ResilienceCapabilityError is returned when a selected operation is not
-// executable for the adapter's provider, region, or service boundary. A
-// typed error keeps unavailable paths visible to callers and certification
-// reports instead of allowing a provider adapter to silently no-op.
+// ResilienceCapabilityError names the unavailable recovery operation for the
+// selected provider, region, or service.
 type ResilienceCapabilityError struct {
 	AdapterID string                     `json:"adapterId" yaml:"adapterId"`
 	Operation ResilienceAction           `json:"operation" yaml:"operation"`
@@ -205,7 +202,7 @@ type ResilienceExecutionResult struct {
 }
 
 // ResilienceAdapter is the optional state-recovery surface of a deployable
-// extension. Planning is separate from execution so certification can inspect
+// extension. Callers can inspect
 // a complete strategy before cloud credentials or mutable clients are used.
 type ResilienceAdapter interface {
 	ResilienceDescriptor() ResilienceAdapterDescriptor
@@ -240,7 +237,7 @@ func ValidateResilienceAdapterDescriptor(descriptor ResilienceAdapterDescriptor)
 	for _, capability := range descriptor.DataClasses {
 		problems = append(problems, validateID("resilience adapter data-class capability name", capability.Name))
 		switch capability.Status {
-		case ResilienceCapabilitySupported, ResilienceCapabilityCertified, ResilienceCapabilityExperimental:
+		case ResilienceCapabilitySupported, ResilienceCapabilityExperimental:
 			if len(capability.Actions) == 0 {
 				problems = append(problems, fmt.Errorf("resilience adapter data-class capability %q must declare at least one action for status %q", capability.Name, capability.Status))
 			}

@@ -1,33 +1,22 @@
-# ADR 0021: Initial Magento database bootstrap
+# ADR 0021. Bootstrap an empty Magento database before the normal upgrade
 
-- Status: Accepted
-- Date: 2026-10-18
+Accepted on 2026-10-18.
 
-## Context
+On an empty Magento Open Source 2.4.9 database, `setup:upgrade` can validate
+search before the default website exists. The deployment must initialize the
+schema before running the usual upgrade.
 
-On Magento Open Source 2.4.9 with an empty database, setup:upgrade validates
-search before creating the default website. The reference recipe therefore
-fails before schema creation, even with a reachable search service.
+The PHP lifecycle helper checks the selected database with `SHOW TABLES`.
+When it finds zero tables, it runs Magento's `setup:db-schema:upgrade` and
+`setup:db-data:upgrade`. The normal lifecycle follows. An existing database
+starts at the normal upgrade. The helper preserves the configured encryption
+key. The operator sets up Admin access separately.
 
-## Decision
+A failed subcommand stops the migration. Diagnose a partial initialization
+before retrying. Go renders the helper from the PHP lifecycle plan with
+POSIX argument escaping so the runtime needs only the Magento image.
 
-The existing PHP deployment plan checks the effective database with SHOW TABLES.
-Only a database with zero tables receives Magento's setup:db-schema:upgrade and
-setup:db-data:upgrade before the normal lifecycle. Populated databases skip this
-step. No tables are dropped, no administrator is created, and the configured
-crypt key is preserved. Subcommand failures stop the migration without retry.
-A partial initialization is preserved for diagnosis and repair.
-
-The helper is self-contained PHP embedded through the existing lifecycle golden.
-The Go adapters render that plan with POSIX argument escaping for inline PHP.
-Runtime containers do not need the Composer build package. No YAML field,
-manifest, provider RPC or separate installer is introduced.
-
-## Verification
-
-PHP regressions cover empty and populated databases, effective configuration,
-subprocess failure, stream handling and error disclosure. The actual Go-rendered
-shell completed twice inside the signed reference application image against
-local MySQL, Valkey and OpenSearch: database status remained healthy, the marker
-ID and crypt key were preserved, and no administrator was created. Live GCP
-application and product persistence remain separate acceptance checks.
+PHP tests cover both database states, subprocess failures and diagnostics.
+A local run of the Go-rendered commands against MySQL, Valkey and OpenSearch
+completed twice in the reference image and preserved the marker data and
+crypt key. [Operate a shop](../operations.md)

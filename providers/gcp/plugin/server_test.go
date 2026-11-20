@@ -143,7 +143,7 @@ func TestDescribe(t *testing.T) {
 	if len(result.Runtimes) != 2 {
 		t.Fatalf("runtimes = %#v", result.Runtimes)
 	}
-	tiers := map[string]sdk.ExtensionCertificationTier{}
+	tiers := map[string]sdk.ExtensionTier{}
 	for _, runtime := range result.Runtimes {
 		tiers[runtime.Runtime] = runtime.Tier
 	}
@@ -295,8 +295,8 @@ func TestPlan(t *testing.T) {
 	if result.Plan.StackName == "" || result.Plan.StateBackendURL == "" || len(result.Plan.Opaque) == 0 {
 		t.Fatalf("plan = %#v", result.Plan)
 	}
-	if result.Plan.Tier != sdk.ExtensionTierExperimental {
-		t.Fatalf("standard plan tier = %q, want experimental", result.Plan.Tier)
+	if result.Plan.Tier != sdk.ExtensionTierBuiltIn {
+		t.Fatalf("Autopilot plan tier = %q, want built-in", result.Plan.Tier)
 	}
 	var spec gcpstack.Spec
 	if err := json.Unmarshal(result.Plan.Opaque, &spec); err != nil {

@@ -153,7 +153,7 @@ type ResilienceAdapter interface {
 
 // ModuleResilience returns a module's recovery adapter when it exposes one.
 // Absence is explicit: a target without this port cannot claim automated
-// backup/restore or DR certification.
+// backup or restore capability.
 func ModuleResilience(module StackModule) sdk.ResilienceAdapter {
 	if module == nil {
 		return nil
@@ -172,7 +172,7 @@ type EdgeAdapter interface {
 
 // ModuleEdge returns an edge adapter when the module exposes one. Absence is
 // explicit: an adapter without this port cannot claim automated edge lifecycle
-// or cleanup certification.
+// operations.
 func ModuleEdge(module StackModule) sdk.EdgeAdapter {
 	if module == nil {
 		return nil
@@ -200,46 +200,6 @@ func ModuleObservability(module StackModule) sdk.ObservabilityAdapter {
 	return nil
 }
 
-// CertificationAdapter is the optional provider-neutral execution port for
-// certification units. It is intentionally separate from deployment and from
-// resilience/edge/observability lifecycle ports.
-type CertificationAdapter interface {
-	Certification() sdk.CertificationAdapter
-}
-
-// ModuleCertification returns a statically constructed certification adapter
-// when a module exposes one. A nil result is explicit and cannot be promoted
-// to certification support by the deployment graph alone.
-func ModuleCertification(module StackModule) sdk.CertificationAdapter {
-	if module == nil {
-		return nil
-	}
-	if provider, ok := module.(CertificationAdapter); ok {
-		return provider.Certification()
-	}
-	return nil
-}
-
-// CertificationAdmissionAdapter is the optional provider-neutral read-only
-// admission port. It stays separate from certification execution so a
-// provider can prove account, quota, network, state, fixture, and ownership
-// facts before it exposes a paid mutation client.
-type CertificationAdmissionAdapter interface {
-	CertificationAdmission() sdk.CertificationAdmissionAdapter
-}
-
-// ModuleCertificationAdmission returns a statically constructed admission
-// adapter when a module exposes one.
-func ModuleCertificationAdmission(module StackModule) sdk.CertificationAdmissionAdapter {
-	if module == nil {
-		return nil
-	}
-	if provider, ok := module.(CertificationAdmissionAdapter); ok {
-		return provider.CertificationAdmission()
-	}
-	return nil
-}
-
 // CollectorDeploymentAdapter is the optional workload collector lifecycle
 // port associated with observability. It remains separate from signal export
 // because ECS task definitions and Kubernetes releases have their own
@@ -250,7 +210,7 @@ type CollectorDeploymentAdapter interface {
 
 // ModuleCollectorDeployment returns an injected collector lifecycle adapter
 // when the module exposes one. Absence is explicit and cannot be treated as
-// collector delivery certification.
+// collector delivery support.
 func ModuleCollectorDeployment(module StackModule) sdk.CollectorDeploymentAdapter {
 	if module == nil {
 		return nil
@@ -285,31 +245,17 @@ type ObservabilityFactory interface {
 	NewObservability(context.Context, PlannedStack) (sdk.ObservabilityAdapter, error)
 }
 
-// CertificationFactory is the planned internal bridge for provider modules
-// whose certification client depends on the resolved target identity.
-type CertificationFactory interface {
-	NewCertification(context.Context, PlannedStack) (sdk.CertificationAdapter, error)
-}
-
-// CertificationAdmissionFactory is the planned internal bridge for
-// provider-owned read-only admission clients.
-type CertificationAdmissionFactory interface {
-	NewCertificationAdmission(context.Context, PlannedStack) (sdk.CertificationAdmissionAdapter, error)
-}
-
 // LifecycleFactories is the small dependency-injection seam used by
 // first-party modules. Provider packages may fill only the ports they own;
 // the core remains responsible for resolving a planned module and validating
 // every returned SDK descriptor. Functions must construct clients/adapters
 // without mutating provider state.
 type LifecycleFactories struct {
-	Resilience             func(context.Context, PlannedStack) (sdk.ResilienceAdapter, error)
-	Edge                   func(context.Context, PlannedStack) (sdk.EdgeAdapter, error)
-	Observability          func(context.Context, PlannedStack) (sdk.ObservabilityAdapter, error)
-	CollectorDeployment    func(context.Context, PlannedStack) (sdk.CollectorDeploymentAdapter, error)
-	Certification          func(context.Context, PlannedStack) (sdk.CertificationAdapter, error)
-	Admission              func(context.Context, PlannedStack) (PlanAdmission, error)
-	CertificationAdmission func(context.Context, PlannedStack) (sdk.CertificationAdmissionAdapter, error)
+	Resilience          func(context.Context, PlannedStack) (sdk.ResilienceAdapter, error)
+	Edge                func(context.Context, PlannedStack) (sdk.EdgeAdapter, error)
+	Observability       func(context.Context, PlannedStack) (sdk.ObservabilityAdapter, error)
+	CollectorDeployment func(context.Context, PlannedStack) (sdk.CollectorDeploymentAdapter, error)
+	Admission           func(context.Context, PlannedStack) (PlanAdmission, error)
 }
 
 func (f LifecycleFactories) NewResilience(ctx context.Context, planned PlannedStack) (sdk.ResilienceAdapter, error) {
@@ -340,25 +286,11 @@ func (f LifecycleFactories) NewCollectorDeployment(ctx context.Context, planned 
 	return f.CollectorDeployment(ctx, planned)
 }
 
-func (f LifecycleFactories) NewCertification(ctx context.Context, planned PlannedStack) (sdk.CertificationAdapter, error) {
-	if f.Certification == nil {
-		return nil, nil
-	}
-	return f.Certification(ctx, planned)
-}
-
 func (f LifecycleFactories) NewPlanAdmission(ctx context.Context, planned PlannedStack) (PlanAdmission, error) {
 	if f.Admission == nil {
 		return nil, nil
 	}
 	return f.Admission(ctx, planned)
-}
-
-func (f LifecycleFactories) NewCertificationAdmission(ctx context.Context, planned PlannedStack) (sdk.CertificationAdmissionAdapter, error) {
-	if f.CertificationAdmission == nil {
-		return nil, nil
-	}
-	return f.CertificationAdmission(ctx, planned)
 }
 
 // ModuleResilienceFor resolves a recovery adapter after planning. The
@@ -479,74 +411,6 @@ func ModuleCollectorDeploymentFor(ctx context.Context, module StackModule, plann
 	return ModuleCollectorDeployment(module), nil
 }
 
-// ModuleCertificationFor resolves a provider certification adapter after the
-// target has been planned. The provider factory is preferred; a static module
-// adapter is the fallback for clients that are safe to construct at registry
-// time. The returned descriptor is checked against both the module and the
-// planned target before it can execute a unit.
-func ModuleCertificationFor(ctx context.Context, module StackModule, planned PlannedStack) (sdk.CertificationAdapter, error) {
-	if err := validatePlannedModule(ctx, module, planned); err != nil {
-		return nil, err
-	}
-	if factory, ok := module.(CertificationFactory); ok {
-		adapter, err := factory.NewCertification(ctx, planned)
-		if err != nil {
-			return nil, fmt.Errorf("create certification adapter for %q: %w", module.Descriptor().ID, err)
-		}
-		if adapter == nil {
-			adapter = ModuleCertification(module)
-			if adapter == nil {
-				return nil, nil
-			}
-		}
-		if err := validatePlannedCertificationAdapter(module, planned, adapter); err != nil {
-			return nil, err
-		}
-		return adapter, nil
-	}
-	adapter := ModuleCertification(module)
-	if adapter == nil {
-		return nil, nil
-	}
-	if err := validatePlannedCertificationAdapter(module, planned, adapter); err != nil {
-		return nil, err
-	}
-	return adapter, nil
-}
-
-// ModuleCertificationAdmissionFor resolves a provider admission adapter
-// after planning. The provider factory is preferred; a static adapter is the
-// fallback for clients that are safe to construct before planning.
-func ModuleCertificationAdmissionFor(ctx context.Context, module StackModule, planned PlannedStack) (sdk.CertificationAdmissionAdapter, error) {
-	if err := validatePlannedModule(ctx, module, planned); err != nil {
-		return nil, err
-	}
-	if factory, ok := module.(CertificationAdmissionFactory); ok {
-		adapter, err := factory.NewCertificationAdmission(ctx, planned)
-		if err != nil {
-			return nil, fmt.Errorf("create certification admission adapter for %q: %w", module.Descriptor().ID, err)
-		}
-		if adapter == nil {
-			adapter = ModuleCertificationAdmission(module)
-			if adapter == nil {
-				return nil, nil
-			}
-		}
-		if err := validatePlannedCertificationAdmissionAdapter(module, planned, adapter); err != nil {
-			return nil, err
-		}
-		return adapter, nil
-	}
-	adapter := ModuleCertificationAdmission(module)
-	if adapter == nil {
-		return nil, nil
-	}
-	if err := validatePlannedCertificationAdmissionAdapter(module, planned, adapter); err != nil {
-		return nil, err
-	}
-	return adapter, nil
-}
-
 func validatePlannedModule(ctx context.Context, module StackModule, planned PlannedStack) error {
 	if ctx == nil {
 		return fmt.Errorf("lifecycle adapter context is required")
@@ -594,40 +458,6 @@ func validatePlannedObservabilityAdapter(module StackModule, planned PlannedStac
 	}
 	if descriptor.Provider != module.Descriptor().Provider || descriptor.Provider != planned.Provider() {
 		return fmt.Errorf("planned observability adapter provider %q does not match target provider %q", descriptor.Provider, planned.Provider())
-	}
-	return nil
-}
-
-func validatePlannedCertificationAdapter(module StackModule, planned PlannedStack, adapter sdk.CertificationAdapter) error {
-	if adapter == nil {
-		return errors.New("planned certification adapter is required")
-	}
-	descriptor := adapter.CertificationDescriptor()
-	if err := sdk.ValidateCertificationAdapterDescriptor(descriptor); err != nil {
-		return fmt.Errorf("validate planned certification adapter for %q: %w", module.Descriptor().ID, err)
-	}
-	if descriptor.Provider != module.Descriptor().Provider || descriptor.Provider != planned.Provider() {
-		return fmt.Errorf("planned certification adapter provider %q does not match target provider %q", descriptor.Provider, planned.Provider())
-	}
-	if descriptor.Runtime != module.Descriptor().Runtime || descriptor.Runtime != planned.Runtime() {
-		return fmt.Errorf("planned certification adapter runtime %q does not match target runtime %q", descriptor.Runtime, planned.Runtime())
-	}
-	return nil
-}
-
-func validatePlannedCertificationAdmissionAdapter(module StackModule, planned PlannedStack, adapter sdk.CertificationAdmissionAdapter) error {
-	if adapter == nil {
-		return errors.New("planned certification admission adapter is required")
-	}
-	descriptor := adapter.CertificationAdmissionDescriptor()
-	if err := sdk.ValidateCertificationAdmissionAdapterDescriptor(descriptor); err != nil {
-		return fmt.Errorf("validate planned certification admission adapter for %q: %w", module.Descriptor().ID, err)
-	}
-	if descriptor.Provider != module.Descriptor().Provider || descriptor.Provider != planned.Provider() {
-		return fmt.Errorf("planned certification admission adapter provider %q does not match target provider %q", descriptor.Provider, planned.Provider())
-	}
-	if descriptor.Runtime != module.Descriptor().Runtime || descriptor.Runtime != planned.Runtime() {
-		return fmt.Errorf("planned certification admission adapter runtime %q does not match target runtime %q", descriptor.Runtime, planned.Runtime())
 	}
 	return nil
 }

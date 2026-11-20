@@ -1,9 +1,9 @@
 [
   {
     "name": "magelift-configure",
-    "description": "Configure a MageLift PHP project and choose Magento services. Use when selecting PHP, database, search, queue, cache, Varnish, edge, or provider options.",
+    "description": "Set up magelift.php, choose Magento service versions, validate an environment, or generate the shop's GitHub Actions workflow.",
     "version": "1.0.0",
-    "digest": "a98d22d0d3e8a6295ff4f8f3d57de447c074e82a0b8e7b79b85a630ee723ac7a",
+    "digest": "e22e3d940b95d036288a861e84d38cfa4cdb21b278e65d28f7f31ebc4b174617",
     "sources": [
       "embedded",
       "skills-cli"
@@ -11,9 +11,9 @@
   },
   {
     "name": "magelift-dependencies",
-    "description": "Check the local tools MageLift needs for Docker, cloud access, builds, and imported database dumps. Use when doctor reports a missing or unreachable tool.",
+    "description": "Diagnose missing MageLift tools, Docker connectivity, and cloud authentication on developer machines and CI runners.",
     "version": "1.0.0",
-    "digest": "ef1d622a4d0b3831890a4c8eb62264815e534e2af83152c4efd6ad350d9c729e",
+    "digest": "3fac8895772b2676cf399b9974bd31156b94901befd18c3c90b43f564adcbf23",
     "sources": [
       "embedded",
       "skills-cli"
@@ -21,9 +21,9 @@
   },
   {
     "name": "magelift-local-runtime",
-    "description": "Create and operate MageLift's local Magento Docker environment with the release-specific PHP, Composer, database, cache, search, and queue contract. Use when starting local development or checking a local compatibility gap.",
+    "description": "Start a Magento shop with MageLift and Docker. Use for local service settings, first install, logs, and stopping or resetting containers.",
     "version": "1.0.0",
-    "digest": "a2c2d0312586474f8dbd75c934612fdf3f1b856b86c0949568f55972c82c50ab",
+    "digest": "aed66738c7d6d1e767e52becc9a08593f3d71c044b0dbb3cf2a40e71d991f050",
     "sources": [
       "embedded",
       "skills-cli"
@@ -33,7 +33,7 @@
     "name": "magelift-migrate",
     "description": "Import Magento settings from Adobe Commerce Cloud, Upsun, Platform.sh or Compose and rehearse a migration to AWS, GCP or Azure.",
     "version": "1.1.0",
-    "digest": "a6898107fef72342a8e8c07fd493b5aa29ed076bfa47d5757bd349cfbb7e7e3f",
+    "digest": "46c6576fda451df69b328cd68e23bf4b9e0033bae22aab1950dea578b75be3a0",
     "sources": [
       "embedded",
       "skills-cli"
@@ -41,9 +41,9 @@
   },
   {
     "name": "magelift-operate",
-    "description": "Operate a MageLift environment after deployment. Use for status, health, logs, safe Magento commands, release promotion, rollback, and teardown.",
+    "description": "Inspect a deployed MageLift shop, collect logs, promote an image, roll back, or clean up an environment.",
     "version": "1.0.0",
-    "digest": "9d6cd406258d4eabba1e04a894fa4b0521bb3b0897f37427b797bc9bded5999d",
+    "digest": "2a3b99949a7cd17c24485305d23019552726c052b403bc9129a7dedf810b56f2",
     "sources": [
       "embedded",
       "skills-cli"

@@ -205,7 +205,7 @@ func TestNewOmitsNativeEdgeForExternalIntent(t *testing.T) {
 	spec := validSpec()
 	spec.Existing.HostedZone = nil
 	spec.Edge = sdk.EdgeIntent{
-		ExternalProvider: "fastly", Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+		ExternalProvider: "fastly", Lifecycle: sdk.ExternalLifecycleExtension,
 		Mode: "external", CredentialRefs: []string{"aws-secrets-manager://magelift/fastly-token"}, ServiceReference: "svc-123",
 		Domains: []string{"preview.example.com"}, TLS: true, TLSMode: "fastly", DNSMode: "external",
 		OriginHealthRef: "aws/alb", OwnershipMarker: "magelift/edge/test",
@@ -238,7 +238,7 @@ func TestNewOmitsNativeObservabilityForExternalIntent(t *testing.T) {
 	t.Parallel()
 	spec := validSpec()
 	spec.Observability = sdk.ObservabilityIntent{
-		ExternalProvider: "newrelic", Lifecycle: sdk.ExternalLifecycleExtension, Certification: sdk.ExternalExperimental,
+		ExternalProvider: "newrelic", Lifecycle: sdk.ExternalLifecycleExtension,
 		CredentialRefs: []string{"aws-secrets-manager://magelift/newrelic-token"}, Endpoint: "https://otlp.eu01.nr-data.net",
 		OwnershipMarker: "magelift/observability/test", Signals: []string{"metrics"}, RetentionDays: 30,
 	}

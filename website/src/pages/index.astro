@@ -12,9 +12,9 @@ import FinalCta from "../components/FinalCta.astro";
 import Footer from "../components/Footer.astro";
 import { faqs } from "../data/content.js";
 
-const title = "MageLift | Magento on AWS, Google Cloud and Azure";
+const title = "MageLift | Deploy Magento 2 to your own cloud";
 const description =
-  "Configure Magento in PHP, run it locally and deploy to your AWS, Google Cloud or Azure account. MageLift supports the native storefront and separately hosted headless frontends.";
+  "Run Magento 2 locally and deploy to your own AWS, Google Cloud, or Azure account. Keep project settings in PHP.";
 
 const schema = {
   "@context": "https://schema.org",
@@ -49,7 +49,6 @@ const schema = {
       url: "https://magelift.dev/",
       downloadUrl: "https://github.com/magelift/magelift/releases",
       installUrl: "https://magelift.dev/docs/install/",
-      softwareVersion: "main (first public tag target v1.0.0-rc.1)",
       license: "https://www.apache.org/licenses/LICENSE-2.0",
       offers: {
         "@type": "Offer",
@@ -58,10 +57,10 @@ const schema = {
         description: "The CLI is free. Your cloud provider bills your account.",
       },
       featureList: [
-        "Programmable PHP project configuration",
+        "Project configuration in PHP",
         "AWS ECS Fargate",
         "GCP GKE Autopilot",
-        "Azure AKS",
+        "Experimental Azure AKS",
         "Staging, UAT, production and pull-request previews",
         "Local Magento with Docker Compose",
         "PaaS config import from ACC and Upsun",
@@ -75,7 +74,7 @@ const schema = {
       "@type": "HowTo",
       name: "Deploy Magento with MageLift in your cloud account",
       description:
-        "Install the CLI, initialize a shop and inspect its planned infrastructure.",
+        "Start from your Magento checkout and run the shop locally before deploying.",
       step: [
         {
           "@type": "HowToStep",
@@ -85,14 +84,14 @@ const schema = {
         },
         {
           "@type": "HowToStep",
-          name: "Configure the shop",
-          text: "Run magelift init in the Magento checkout, set the cloud account and secret references, then run magelift config validate.",
+          name: "Run locally",
+          text: "Run magelift init in the Magento checkout, then start the shop with magelift dev.",
           url: "https://magelift.dev/docs/getting-started/",
         },
         {
           "@type": "HowToStep",
-          name: "Preview and destroy",
-          text: "Bootstrap the account and review the planned resources with magelift preview. Destroy a temporary environment when testing ends.",
+          name: "Deploy to staging",
+          text: "Connect your cloud account, build a shop image, and review the plan before deploying to staging.",
           url: "https://magelift.dev/docs/getting-started/",
         },
       ],

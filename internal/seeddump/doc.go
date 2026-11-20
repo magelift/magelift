@@ -1,5 +1,5 @@
 // Package seeddump persists seed-dump import status under .magelift/seed-dumps.
 //
-// Status lives only in the journal (D-03 / ADR 0010): magelift.php records the
-// dump path via environments.<name>.seedDump; seedDumpStatus is never a YAML field.
+// magelift.php records the dump path in environments.<name>.seedDump. The
+// journal records the result of the import.
 package seeddump
