@@ -13,9 +13,10 @@ checks the archive and checksum files. Verify the selected commit's full CI
 run before publishing. [How to report provider results](capability-matrix.md)
 
 After approval, tag the root module, SDK, and all provider modules at the same
-commit. The root tag starts `release.yml`. The workflow waits for those
-versions to reach the Go proxy before building. Release Please manages the
-root changelog and version. Module tags use the corresponding prefix.
+commit. Push the SDK and provider tags first. Push the root tag on its own
+so GitHub starts `release.yml`. The workflow waits for the modules to reach
+the Go proxy before building. Release Please manages the root changelog
+and version. Module tags use the corresponding prefix.
 
 - `vX.Y.Z`
 - `sdk/vX.Y.Z`

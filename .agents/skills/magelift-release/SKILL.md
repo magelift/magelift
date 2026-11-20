@@ -31,9 +31,13 @@ out of the shared cache. Run tidy and verify the CLI and provider builds
 with `GOWORK=off`. Re-stage after changes to the module manifests and confirm
 the staged requirements and sums still match.
 
-After approval, push the CLI, SDK, and three provider module tags together
-from the same commit. Wait five minutes before querying the Go proxy because early misses are
-cached. Verify each module resolves, then dispatch full CI with
+After approval, tag the same commit for the CLI, SDK, and three provider
+modules. Push the SDK and provider tags first. Push the CLI tag by itself
+to start the release workflow. GitHub skips tag push events when a push
+includes more than three tags. [GitHub push events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push)
+
+Wait five minutes after the CLI tag before querying the Go proxy. The proxy
+caches early misses. Verify each module resolves, then dispatch full CI with
 `gh workflow run ci.yml --ref <tag> -f all=true`.
 
 ## Verify the artifacts
