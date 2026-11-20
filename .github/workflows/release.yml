@@ -4,6 +4,7 @@ on:
   push:
     # `sdk/v*` module tags never match: `v*` anchors at the start of the ref name.
     tags: ['v*']
+  workflow_dispatch:
 
 concurrency:
   group: release-artifacts-${{ github.ref }}
@@ -13,6 +14,7 @@ permissions: {}
 
 jobs:
   release:
+    if: github.event_name == 'push'
     permissions:
       contents: write
       id-token: write
@@ -281,9 +283,12 @@ jobs:
   # The cask publishes to the tap during release; this job is the tested
   # macOS install path the readiness doc requires. A failure fails the
   # workflow visibly so the tap file gets fixed forward the same day.
-  # Dialproof tags publish no tap, so there is nothing to verify.
+  # A manual run checks the published cask without rebuilding the release.
   cask-verify:
-    if: "!(startsWith(github.ref_name, 'v0.0.0-dialproof') || startsWith(github.ref_name, 'v0.0.0-canary.')) && !contains(github.ref_name, '-')"
+    if: >-
+      ${{ !cancelled() &&
+        (github.event_name == 'workflow_dispatch' ||
+         (needs.release.result == 'success' && !contains(github.ref_name, '-'))) }}
     needs: [release]
     runs-on: macos-latest
     timeout-minutes: 30

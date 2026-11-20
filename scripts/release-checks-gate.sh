@@ -72,20 +72,20 @@ if [[ -z "$SHA" ]]; then
 fi
 
 evaluate() {
-	export GATE_PAYLOAD="$1"
 	export GATE_CHECKS
 	GATE_CHECKS="$(printf '%s\n' "${CHECKS[@]}")"
 	export GATE_EXCLUDE_RUN="$EXCLUDE_RUN"
 	export GATE_RUN_ID="$RUN_ID"
-	python3 - <<'PY'
+	python3 - "$1" <<'PY'
 import json
 import os
 import re
 import sys
 
 try:
-    raw = json.loads(os.environ["GATE_PAYLOAD"])
-except (KeyError, ValueError) as exc:
+    with open(sys.argv[1], encoding="utf-8") as payload:
+        raw = json.load(payload)
+except (OSError, ValueError) as exc:
     print(f"release-checks-gate: invalid check-runs payload: {exc}", file=sys.stderr)
     sys.exit(3)
 
@@ -224,7 +224,7 @@ PY
 }
 
 if [[ -n "$CHECKS_JSON" ]]; then
-	evaluate "$(cat "$CHECKS_JSON")"
+	evaluate "$CHECKS_JSON"
 	exit "$?"
 fi
 
@@ -232,37 +232,18 @@ command -v gh >/dev/null 2>&1 || {
 	printf 'release-checks-gate: gh is required\n' >&2
 	exit 3
 }
+work=$(mktemp -d "${TMPDIR:-/tmp}/magelift-release-checks.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+payload="$work/checks.json"
 deadline=$((SECONDS + TIMEOUT_SECONDS))
 while true; do
 	# filter=all: the default latest filter orders by completed_at and can
 	# omit a queued rerun (no completion time) that supersedes the visible
 	# success. Paginate: required checks plus historical attempts exceed
 	# one page of 100 on busy commits.
-	pages='[]'
-	page=1
-	while true; do
-		chunk="$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100&page=${page}&filter=all")"
-		pages="$(GATE_PAGES="$pages" GATE_CHUNK="$chunk" python3 - <<'PY'
-import json, os
-pages = json.loads(os.environ["GATE_PAGES"])
-chunk = json.loads(os.environ["GATE_CHUNK"])
-pages.append(chunk)
-print(json.dumps(pages))
-PY
-)"
-		more="$(GATE_CHUNK="$chunk" python3 - <<'PY'
-import json, os
-chunk = json.loads(os.environ["GATE_CHUNK"])
-print("1" if len(chunk.get("check_runs") or []) >= 100 else "0")
-PY
-)"
-		if [[ "$more" != "1" ]]; then
-			break
-		fi
-		page=$((page + 1))
-	done
+	gh api --paginate --slurp "repos/$REPO/commits/$SHA/check-runs?per_page=100&filter=all" >"$payload"
 	set +e
-	evaluate "$pages"
+	evaluate "$payload"
 	code="$?"
 	set -e
 	if [[ "$code" != "2" ]]; then

@@ -189,15 +189,47 @@ if ! "$GATE" --sha abc123 --checks-json "$WORK/checks.json" >"$WORK/queuedone.ou
 	exit 1
 fi
 
-# 11. The live fetch paginates every attempt, not the latest-only view.
-grep -q "check-runs?per_page=100&page=" "$GATE" || {
-	printf 'gate live fetch lost pagination\n' >&2
-	exit 1
+# 11. The live fetch reads every page, even when the payload exceeds the
+# process argument limit.
+write_payload
+python3 - "$WORK/checks.json" "$WORK/large.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1]) as source:
+    selected = json.load(source)
+older = {
+    "check_runs": [
+        {
+            "name": "lint",
+            "id": 1000 + index,
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": f"https://github.com/magelift/magelift/actions/runs/99/job/{1000 + index}",
+            "output": {"summary": "x" * 2048},
+        }
+        for index in range(100)
+    ]
 }
-grep -q "filter=all" "$GATE" || {
-	printf 'gate live fetch lost filter=all\n' >&2
+with open(sys.argv[2], "w") as destination:
+    json.dump([older, selected], destination)
+PY
+mkdir "$WORK/bin"
+cat >"$WORK/bin/gh" <<'SH'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+[[ "$#" == 4 && "$1" == api && "$2" == --paginate && "$3" == --slurp ]]
+[[ "$4" == 'repos/magelift/magelift/commits/abc123/check-runs?per_page=100&filter=all' ]]
+cat "$GATE_TEST_PAYLOAD"
+SH
+chmod +x "$WORK/bin/gh"
+if ! env -u BASH_ENV PATH="$WORK/bin:$PATH" GATE_TEST_PAYLOAD="$WORK/large.json" \
+	"$BASH" "$GATE" --sha abc123 --run-id 100 >"$WORK/large.out" 2>&1; then
+	cat "$WORK/large.out" >&2
+	printf 'gate rejected a green run in a large response\n' >&2
 	exit 1
-}
+fi
+grep -q "PASS     provider-gcp: success (run 100" "$WORK/large.out"
 
 # 12. The release run itself does not count as active CI.
 write_payload

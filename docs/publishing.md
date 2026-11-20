@@ -24,6 +24,9 @@ and version. Module tags use the corresponding prefix.
 - `providers/gcp/vX.Y.Z`
 - `providers/azure/vX.Y.Z`
 
+To verify the published Homebrew cask again, dispatch **Release Artifacts**
+on `main`. A manual run installs the cask and checks that the CLI starts.
+
 Use the [release runbook](https://github.com/magelift/magelift/blob/main/.agents/skills/magelift-release/SKILL.md)
 for maintainer steps. Public tags and publication need explicit approval.
 [Install](install.md) · [Distribution trust](adr/0014-distribution-trust.md)
